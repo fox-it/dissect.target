@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import mock_open, patch
 
 import pytest
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webserver import iis
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
@@ -54,13 +59,13 @@ def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, ii
 
     # first 6 records do not have custom fields and server_name is not set
     assert {r.server_name for r in records[:6]} == {None}
-    assert not any([hasattr(r, "custom_field_1") for r in records[:6]])
-    assert not any([hasattr(r, "custom_field_2") for r in records[:6]])
+    assert not any(hasattr(r, "custom_field_1") for r in records[:6])
+    assert not any(hasattr(r, "custom_field_2") for r in records[:6])
 
     # other records have the custom fields and server_name set
     assert {r.server_name for r in records[6:]} == {"DESKTOP-PJOQLJS"}
-    assert all([hasattr(r, "custom_field_1") for r in records[6:]])
-    assert all([hasattr(r, "custom_field_2") for r in records[6:]])
+    assert all(hasattr(r, "custom_field_1") for r in records[6:])
+    assert all(hasattr(r, "custom_field_2") for r in records[6:])
 
     assert {str(r.client_ip) for r in records} == {"127.0.0.1", "::1"}
     assert {r.site_name for r in records} == {None, "W3SVC1"}
@@ -81,7 +86,7 @@ def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, ii
 
 
 @pytest.mark.parametrize(
-    "stream, method",
+    ("stream", "method"),
     [
         (b"-, -, 10/1/2021, 00:00:00, -, \xa7, ::1, 1, 2, 3, 200, 0, GET, /, -,", "parse_iis_format_log"),
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
@@ -91,10 +96,10 @@ def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method
     server = iis.IISLogsPlugin(target_win_tzinfo)
     # should not crash on invalid bytes like \xa7
     with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
-        assert list(getattr(server, method)(Path("/iis")))[0].server_name == "\\xa7"
+        assert next(iter(getattr(server, method)(Path("/iis")))).server_name == "\\xa7"
 
 
-def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
+def test_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     tz = timezone(timedelta(hours=-5))
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
@@ -121,7 +126,7 @@ def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target
     assert record.source == "sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"
 
 
-def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
+def test_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-w3c.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c")
 
@@ -202,7 +207,7 @@ def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_wi
         ("w3c"),
     ],
 )
-def test_plugins_apps_webservers_iis_access_iis_format_noconfig(
+def test_iis_access_iis_format_noconfig(
     target_win_tzinfo: Target, fs_win: VirtualFilesystem, map_dir: str, log_format: str
 ) -> None:
     data_dir = absolute_path(f"_data/plugins/apps/webserver/iis/iis-logs-{log_format}/W3SVC1")

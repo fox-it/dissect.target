@@ -17,41 +17,32 @@ Commit hash we're in sync with: 846a23d
 Notes:
     - CPython 3.11 ditched the _Accessor class, so we override the methods that should use it
 """
+
 from __future__ import annotations
 
 import fnmatch
 import re
 from pathlib import Path, PurePath, _PosixFlavour
-from stat import S_ISBLK, S_ISCHR, S_ISFIFO, S_ISSOCK
-from typing import IO, TYPE_CHECKING, Any, Callable, Iterator, Optional
+from typing import IO, TYPE_CHECKING, Any, Callable, ClassVar
 
 from dissect.target import filesystem
-from dissect.target.exceptions import (
-    FileNotFoundError,
-    FilesystemError,
-    NotADirectoryError,
-    NotASymlinkError,
-    SymlinkRecursionError,
-)
-from dissect.target.helpers.compat.path_common import (
-    _DissectPathParents,
-    io_open,
-    isjunction,
-    realpath,
-    scandir,
-)
-from dissect.target.helpers.polypath import normalize
+from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
+from dissect.target.helpers import polypath
+from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem, FilesystemEntry
-    from dissect.target.helpers.compat.path_common import _DissectScandirIterator
     from dissect.target.helpers.fsutil import stat_result
 
 
 class _DissectFlavour(_PosixFlavour):
     is_supported = True
 
-    __variant_instances = {}
+    __variant_instances: ClassVar[dict[tuple[bool, str], _DissectFlavour]] = {}
 
     def __new__(cls, case_sensitive: bool = False, alt_separator: str = ""):
         idx = (case_sensitive, alt_separator)
@@ -88,20 +79,20 @@ class PureDissectPath(PurePath):
         raise TypeError("TargetPath pickling is currently not supported")
 
     @classmethod
-    def _from_parts(cls, args: list) -> TargetPath:
+    def _from_parts(cls, args: list) -> Self:
         fs = args[0]
 
         if not isinstance(fs, filesystem.Filesystem):
             raise TypeError(
                 "invalid PureDissectPath initialization: missing filesystem, "
-                "got %r (this might be a bug, please report)" % args
+                f"got {args!r} (this might be a bug, please report)"
             )
 
         alt_separator = fs.alt_separator
         path_args = []
         for arg in args[1:]:
             if isinstance(arg, str):
-                arg = normalize(arg, alt_separator=alt_separator)
+                arg = polypath.normalize(arg, alt_separator=alt_separator)
             path_args.append(arg)
 
         self = super()._from_parts(path_args)
@@ -111,58 +102,58 @@ class PureDissectPath(PurePath):
 
         return self
 
-    def _make_child(self, args: list) -> TargetPath:
+    def _make_child(self, args: list) -> Self:
         child = super()._make_child(args)
         child._fs = self._fs
         child._flavour = self._flavour
         return child
 
-    def with_name(self, name: str) -> TargetPath:
+    def with_name(self, name: str) -> Self:
         result = super().with_name(name)
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
-    def with_stem(self, stem: str) -> TargetPath:
+    def with_stem(self, stem: str) -> Self:
         result = super().with_stem(stem)
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
-    def with_suffix(self, suffix: str) -> TargetPath:
+    def with_suffix(self, suffix: str) -> Self:
         result = super().with_suffix(suffix)
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
-    def relative_to(self, *other) -> TargetPath:
+    def relative_to(self, *other) -> Self:
         result = super().relative_to(*other)
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
-    def __rtruediv__(self, key: str) -> TargetPath:
+    def __rtruediv__(self, key: str) -> Self:
         try:
-            return self._from_parts([self._fs, key] + self._parts)
+            return self._from_parts([self._fs, key, *self._parts])
         except TypeError:
             return NotImplemented
 
     @property
-    def parent(self) -> TargetPath:
+    def parent(self) -> Self:
         result = super().parent
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
     @property
-    def parents(self) -> _DissectPathParents:
-        return _DissectPathParents(self)
+    def parents(self) -> path_common._DissectPathParents:
+        return path_common._DissectPathParents(self)
 
 
 class TargetPath(Path, PureDissectPath):
     __slots__ = ("_entry",)
 
-    def _make_child_relpath(self, part: str) -> TargetPath:
+    def _make_child_relpath(self, part: str) -> Self:
         child = super()._make_child_relpath(part)
         child._fs = self._fs
         child._flavour = self._flavour
@@ -176,24 +167,24 @@ class TargetPath(Path, PureDissectPath):
             return self._entry
 
     @classmethod
-    def cwd(cls) -> TargetPath:
+    def cwd(cls) -> Self:
         """Return a new path pointing to the current working directory
         (as returned by os.getcwd()).
         """
         raise NotImplementedError("TargetPath.cwd() is unsupported")
 
     @classmethod
-    def home(cls) -> TargetPath:
+    def home(cls) -> Self:
         """Return a new path pointing to the user's home directory (as
         returned by os.path.expanduser('~')).
         """
         raise NotImplementedError("TargetPath.home() is unsupported")
 
-    def iterdir(self) -> Iterator[TargetPath]:
+    def iterdir(self) -> Iterator[Self]:
         """Iterate over the files in this directory.  Does not yield any
         result for the special paths '.' and '..'.
         """
-        for entry in scandir(self):
+        for entry in path_common.scandir(self):
             if entry.name in {".", ".."}:
                 # Yielding a path object for these makes little sense
                 continue
@@ -201,13 +192,13 @@ class TargetPath(Path, PureDissectPath):
             child_path._entry = entry
             yield child_path
 
-    def _scandir(self) -> _DissectScandirIterator:
-        return scandir(self)
+    def _scandir(self) -> path_common._DissectScandirIterator:
+        return path_common.scandir(self)
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def walk(
-        self, top_down: bool = True, on_error: Callable[[Exception], None] = None, follow_symlinks: bool = False
-    ) -> Iterator[tuple[TargetPath, list[str], list[str]]]:
+        self, top_down: bool = True, on_error: Callable[[Exception], None] | None = None, follow_symlinks: bool = False
+    ) -> Iterator[tuple[Self, list[str], list[str]]]:
         """Walk the directory tree from this directory, similar to os.walk()."""
         paths = [self]
 
@@ -224,9 +215,9 @@ class TargetPath(Path, PureDissectPath):
             # directories are still left to visit. That logic is copied here.
             try:
                 scandir_it = path._scandir()
-            except OSError as error:
+            except OSError as e:
                 if on_error is not None:
-                    on_error(error)
+                    on_error(e)
                 continue
 
             with scandir_it:
@@ -251,7 +242,7 @@ class TargetPath(Path, PureDissectPath):
 
             paths += [path._make_child_relpath(d) for d in reversed(dirnames)]
 
-    def absolute(self) -> TargetPath:
+    def absolute(self) -> Self:
         """Return an absolute version of this path.  This function works
         even if the path doesn't point to anything.
 
@@ -261,13 +252,13 @@ class TargetPath(Path, PureDissectPath):
         raise NotImplementedError("TargetPath.absolute() is unsupported in Dissect")
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
-    def resolve(self, strict: bool = False) -> TargetPath:
+    def resolve(self, strict: bool = False) -> Self:
         """
         Make the path absolute, resolving all symlinks on the way and also
         normalizing it.
         """
 
-        s = realpath(self, strict=strict)
+        s = path_common.realpath(self, strict=strict)
         p = self._from_parts((self._fs, s))
 
         # In non-strict mode, realpath() doesn't raise on symlink loops.
@@ -287,8 +278,7 @@ class TargetPath(Path, PureDissectPath):
         """
         if follow_symlinks:
             return self.get().stat()
-        else:
-            return self.get().lstat()
+        return self.get().lstat()
 
     def owner(self) -> str:
         """
@@ -306,9 +296,9 @@ class TargetPath(Path, PureDissectPath):
         self,
         mode: str = "rb",
         buffering: int = 0,
-        encoding: Optional[str] = None,
-        errors: Optional[str] = None,
-        newline: Optional[str] = None,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
     ) -> IO:
         """Open file and return a stream.
 
@@ -317,7 +307,7 @@ class TargetPath(Path, PureDissectPath):
         Note: in contrast to regular Python, the mode is binary by default. Text mode
         has to be explicitly specified. Buffering is also disabled by default.
         """
-        return io_open(self, mode, buffering, encoding, errors, newline)
+        return path_common.io_open(self, mode, buffering, encoding, errors, newline)
 
     def write_bytes(self, data: bytes) -> int:
         """
@@ -326,14 +316,14 @@ class TargetPath(Path, PureDissectPath):
         raise NotImplementedError("TargetPath.write_bytes() is unsupported")
 
     def write_text(
-        self, data: str, encoding: Optional[str] = None, errors: Optional[str] = None, newline: Optional[str] = None
+        self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None
     ) -> int:
         """
         Open the file in text mode, write to it, and close the file.
         """
         raise NotImplementedError("TargetPath.write_text() is unsupported")
 
-    def readlink(self) -> TargetPath:
+    def readlink(self) -> Self:
         """
         Return the path to which the symbolic link points.
         """
@@ -377,7 +367,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.rmdir() is unsupported")
 
-    def rename(self, target: str) -> TargetPath:
+    def rename(self, target: str) -> Self:
         """
         Rename this path to the target path.
 
@@ -389,7 +379,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.rename() is unsupported")
 
-    def replace(self, target: str) -> TargetPath:
+    def replace(self, target: str) -> Self:
         """
         Rename this path to the target path, overwriting if that path exists.
 
@@ -430,36 +420,6 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.link_to() is unsupported")
 
-    def exists(self) -> bool:
-        """
-        Whether this path exists.
-        """
-        try:
-            # .exists() must resolve possible symlinks
-            self.get().stat()
-            return True
-        except (FileNotFoundError, NotADirectoryError, NotASymlinkError, SymlinkRecursionError, ValueError):
-            return False
-
-    def is_dir(self) -> bool:
-        """
-        Whether this path is a directory.
-        """
-        try:
-            return self.get().is_dir()
-        except (FilesystemError, ValueError):
-            return False
-
-    def is_file(self) -> bool:
-        """
-        Whether this path is a regular file (also True for symlinks pointing
-        to regular files).
-        """
-        try:
-            return self.get().is_file()
-        except (FilesystemError, ValueError):
-            return False
-
     def is_mount(self) -> bool:
         """
         Check if this path is a POSIX mount point
@@ -480,59 +440,14 @@ class TargetPath(Path, PureDissectPath):
         parent_ino = self.parent.stat().st_ino
         return ino == parent_ino
 
-    def is_symlink(self) -> bool:
-        """
-        Whether this path is a symbolic link.
-        """
-        try:
-            return self.get().is_symlink()
-        except (FilesystemError, ValueError):
-            return False
-
     # NOTE: Forward compatibility with CPython >= 3.12
     def is_junction(self) -> bool:
         """
         Whether this path is a junction.
         """
-        return isjunction(self)
+        return path_common.isjunction(self)
 
-    def is_block_device(self) -> bool:
-        """
-        Whether this path is a block device.
-        """
-        try:
-            return S_ISBLK(self.stat().st_mode)
-        except (FilesystemError, ValueError):
-            return False
-
-    def is_char_device(self) -> bool:
-        """
-        Whether this path is a character device.
-        """
-        try:
-            return S_ISCHR(self.stat().st_mode)
-        except (FilesystemError, ValueError):
-            return False
-
-    def is_fifo(self) -> bool:
-        """
-        Whether this path is a FIFO.
-        """
-        try:
-            return S_ISFIFO(self.stat().st_mode)
-        except (FilesystemError, ValueError):
-            return False
-
-    def is_socket(self) -> bool:
-        """
-        Whether this path is a socket.
-        """
-        try:
-            return S_ISSOCK(self.stat().st_mode)
-        except (FilesystemError, ValueError):
-            return False
-
-    def expanduser(self) -> TargetPath:
+    def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
         (as returned by os.path.expanduser)
         """

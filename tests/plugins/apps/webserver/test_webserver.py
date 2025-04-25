@@ -1,7 +1,13 @@
-from dissect.target.filesystem import VirtualFilesystem
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.apps.webserver import apache, caddy, iis, nginx, webserver
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_access_logs_webserver_namespace_unix(target_unix: Target, fs_unix: VirtualFilesystem) -> None:

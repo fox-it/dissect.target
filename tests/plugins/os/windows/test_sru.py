@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
-import pytest
-
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows import sru
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    import pytest
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_sru_plugin(target_win: Target, fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:
@@ -23,6 +28,6 @@ def test_sru_plugin(target_win: Target, fs_win: VirtualFilesystem, caplog: pytes
     assert len(list(target_win.sru.sdp_cpu_provider())) == 3
 
     caplog.clear()
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, target_win.log.name):
         assert list(target_win.sru.vfu()) == []
         assert "Table not found: vfu" in caplog.text

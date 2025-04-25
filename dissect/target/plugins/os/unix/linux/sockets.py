@@ -1,14 +1,21 @@
-from itertools import chain
-from typing import Iterator
+from __future__ import annotations
 
+from itertools import chain
+from typing import TYPE_CHECKING
+
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.linux.proc import (
-    NetSocket,
-    PacketSocket,
-    UnixSocket,
-)
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.plugins.os.unix.linux.proc import (
+        NetSocket,
+        PacketSocket,
+        UnixSocket,
+    )
+    from dissect.target.target import Target
 
 NetSocketRecord = TargetRecordDescriptor(
     "linux/proc/sockets",
@@ -16,9 +23,9 @@ NetSocketRecord = TargetRecordDescriptor(
         ("string", "protocol"),
         ("uint32", "rx_queue"),
         ("uint32", "tx_queue"),
-        ("string", "local_ip"),
+        ("net.ipaddress", "local_ip"),
         ("uint16", "local_port"),
-        ("string", "remote_ip"),
+        ("net.ipaddress", "remote_ip"),
         ("uint16", "remote_port"),
         ("string", "state"),
         ("string", "owner"),
@@ -73,7 +80,8 @@ class NetSocketPlugin(Plugin):
         self.sockets = self.target.proc.sockets
 
     def check_compatible(self) -> None:
-        self.target.proc
+        if not self.target.has_function("proc"):
+            raise UnsupportedPluginError("proc filesystem not available")
 
     @export(record=PacketSocketRecord)
     def packet(self) -> Iterator[PacketSocketRecord]:

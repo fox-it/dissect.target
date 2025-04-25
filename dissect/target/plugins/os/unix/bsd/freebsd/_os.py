@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from dissect.target.filesystem import Filesystem
+from typing import TYPE_CHECKING
+
 from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 class FreeBsdPlugin(BsdPlugin):
@@ -13,10 +17,15 @@ class FreeBsdPlugin(BsdPlugin):
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
-        for fs in target.filesystems:
-            if fs.exists("/net") and (fs.exists("/.sujournal") or fs.exists("/entropy")):
-                return fs
+        FREEBSD_PATHS = {
+            "/.sujournal",
+            "/entropy",
+            "/bin/freebsd-version",
+        }
 
+        for fs in target.filesystems:
+            if fs.exists("/net") and any(fs.exists(path) for path in FREEBSD_PATHS):
+                return fs
         return None
 
     @export(property=True)

@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import MagicMock, call, create_autospec, mock_open, patch
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.containers.raw import RawContainer
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.loaders.local import (
@@ -13,7 +14,7 @@ from dissect.target.loaders.local import (
     _get_windows_drive_volumes,
     map_linux_drives,
 )
-from dissect.target.target import TargetLogAdapter
+from dissect.target.target import Target, TargetLogAdapter
 
 
 @patch("builtins.open", create=True)
@@ -24,17 +25,18 @@ from dissect.target.target import TargetLogAdapter
 @patch("dissect.target.volume.Volume", create=True)
 @patch("dissect.target.target.TargetLogAdapter", create=True)
 @patch("dissect.target.loaders.local._windows_get_volume_disk_extents", create=True)
-def test_local_loader_skip_emulated_drive(extents: MagicMock, log: MagicMock, *args) -> None:
+def test_skip_emulated_drive(extents: MagicMock, log: MagicMock, *args) -> None:
     class Dummy:
-        def __init__(self, data):
+        def __init__(self, data: dict):
             self.__dict__ = data
 
     dummy = Dummy(
         {"NumberOfDiskExtents": 1, "Extents": [Dummy({"DiskNumber": "999", "StartingOffset": 0, "ExtentLength": 0})]}
     )
     extents.return_value = dummy
-    for volume in _get_windows_drive_volumes(log):
+    for _ in _get_windows_drive_volumes(log):
         pass
+
     assert (
         call.debug(
             "Skipped drive %d from %s, not a physical drive (could be emulation or ram disk)", "999", "\\\\.\\z:"
@@ -43,36 +45,37 @@ def test_local_loader_skip_emulated_drive(extents: MagicMock, log: MagicMock, *a
     )
 
 
-def test__add_disk_as_raw_container_to_target(target_bare: Target) -> None:
+def test_add_disk_as_raw_container_to_target(target_bare: Target) -> None:
     # Does it attempt to open the file and pass a raw container?
     mock = mock_open()
     drive = Path("/xdev/fake")
 
     with (
-        patch("builtins.open", mock),
+        patch("pathlib.Path.open", mock),
         patch.object(target_bare.disks, "add") as mock_method,
     ):
         _add_disk_as_raw_container_to_target(drive, target_bare)
 
         assert isinstance(mock_method.call_args[0][0], RawContainer) is True
-        mock.assert_called_with(drive, "rb")
+        mock.assert_called_with("rb")
 
 
-def test__add_disk_as_raw_container_to_target_skip_fail(target_bare: Target) -> None:
+def test_add_disk_as_raw_container_to_target_skip_fail(target_bare: Target) -> None:
     # Does it emit a warning instead of raising an exception?
     mock = mock_open()
     mock.side_effect = IOError
     drive = Path("/xdev/fake")
 
     with (
-        patch.object(TargetLogAdapter, "warning") as mock_method,
-        patch("builtins.open", mock),
+        patch.object(TargetLogAdapter, "warning") as mock_warning,
+        patch.object(TargetLogAdapter, "debug") as mock_debug,
+        patch("pathlib.Path.open", mock),
     ):
         _add_disk_as_raw_container_to_target(drive, target_bare)
 
-        assert mock_method.call_args[0][0] == f"Unable to open drive: {str(drive)}, skipped"
-        assert isinstance(mock_method.call_args[1]["exc_info"], OSError) is True
-        mock.assert_called_with(drive, "rb")
+        assert mock_warning.call_args[0] == ("Unable to open drive: %s, skipped", drive)
+        assert isinstance(mock_debug.call_args[1]["exc_info"], OSError) is True
+        mock.assert_called_with("rb")
 
 
 def test_map_linux_drives(target_bare: Target, tmp_path: Path) -> None:
@@ -103,7 +106,7 @@ def test_map_linux_drives(target_bare: Target, tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "drive_path, expected",
+    ("drive_path", "expected"),
     [
         (Path("/dev/fd0"), True),  # Floppy
         (Path("/dev/fd1"), True),  # Floppy

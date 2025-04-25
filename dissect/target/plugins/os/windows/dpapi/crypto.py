@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from typing import TYPE_CHECKING
 
 try:
     from Crypto.Cipher import AES, ARC4, DES3
@@ -12,6 +13,9 @@ except ImportError:
 
 CIPHER_ALGORITHMS: dict[int | str, CipherAlgorithm] = {}
 HASH_ALGORITHMS: dict[int | str, HashAlgorithm] = {}
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class CipherAlgorithm:
@@ -26,11 +30,11 @@ class CipherAlgorithm:
         CIPHER_ALGORITHMS[cls.name] = cls
 
     @classmethod
-    def from_id(cls, id: int) -> CipherAlgorithm:
+    def from_id(cls, id: int) -> Self:
         return CIPHER_ALGORITHMS[id]()
 
     @classmethod
-    def from_name(cls, name: str) -> CipherAlgorithm:
+    def from_name(cls, name: str) -> Self:
         return CIPHER_ALGORITHMS[name]()
 
     def derive_key(self, key: bytes, hash_algorithm: HashAlgorithm) -> bytes:
@@ -50,8 +54,7 @@ class CipherAlgorithm:
         pad1 = bytes(c ^ 0x36 for c in key)[: hash_algorithm.block_length]
         pad2 = bytes(c ^ 0x5C for c in key)[: hash_algorithm.block_length]
         key = hashlib.new(hash_algorithm.name, pad1).digest() + hashlib.new(hash_algorithm.name, pad2).digest()
-        key = self.fixup_key(key)
-        return key
+        return self.fixup_key(key)
 
     def fixup_key(self, key: bytes) -> bytes:
         return key
@@ -65,7 +68,7 @@ class CipherAlgorithm:
         return self.decrypt(data, key, iv)
 
     def decrypt(self, data: bytes, key: bytes, iv: bytes | None = None) -> bytes:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class _AES(CipherAlgorithm):
@@ -156,11 +159,11 @@ class HashAlgorithm:
         HASH_ALGORITHMS[cls.name] = cls
 
     @classmethod
-    def from_id(cls, id: int) -> HashAlgorithm:
+    def from_id(cls, id: int) -> Self:
         return HASH_ALGORITHMS[id]()
 
     @classmethod
-    def from_name(cls, name: str) -> HashAlgorithm | None:
+    def from_name(cls, name: str) -> Self:
         return HASH_ALGORITHMS[name]()
 
 
@@ -257,7 +260,7 @@ def crypt_session_key_type1(
         verify_blob: Optional encrypted blob used for integrity check.
 
     Returns:
-        decryption key
+        The decryption key.
     """
     if len(master_key) > 20:
         master_key = hashlib.sha1(master_key).digest()
@@ -314,8 +317,9 @@ def crypt_session_key_type2(
         strong_password: Optional password used for decryption or the blob itself.
         smart_card_secret: Optional MS Next Gen Crypto secret (e.g. from PIN code). Only for API compatibility.
         verify_blob: Optional encrypted blob used for integrity check.
+
     Returns:
-        decryption key
+        The decryption key.
     """
     if len(masterkey) > 20:
         masterkey = hashlib.sha1(masterkey).digest()

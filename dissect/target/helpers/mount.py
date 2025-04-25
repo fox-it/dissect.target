@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import errno
 import logging
 from ctypes import c_void_p
 from functools import lru_cache
-from typing import BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.feature import Feature, feature_enabled
 
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.filesystem import Filesystem, FilesystemEntry
 
 if feature_enabled(Feature.BETA):
     from fuse3 import FuseOSError, Operations
@@ -42,19 +47,19 @@ class DissectMount(Operations):
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
-    def init(self, path: str, conn: Optional[fuse_conn_info_p] = None, cfg: Optional[fuse_config_p] = None) -> None:
+    def init(self, path: str, conn: fuse_conn_info_p | None = None, cfg: fuse_config_p | None = None) -> None:
         if cfg:
             # Enables the use of inodes in getattr
             cfg.contents.use_ino = 1
 
-    def getattr(self, path: str, fh: Optional[int] = None) -> dict:
+    def getattr(self, path: str, fh: int | None = None) -> dict:
         fe = self._get(path)
 
         try:
             st = fe.lstat()
 
-            return dict(
-                (key, getattr(st, key))
+            return {
+                key: getattr(st, key)
                 for key in (
                     "st_atime",
                     "st_ctime",
@@ -66,7 +71,7 @@ class DissectMount(Operations):
                     "st_size",
                     "st_uid",
                 )
-            )
+            }
 
         except Exception:
             raise FuseOSError(errno.EIO)
@@ -94,7 +99,7 @@ class DissectMount(Operations):
         self.dir_handles[fno] = entry
         return fno
 
-    def read(self, path: str, size: int, offset: int, fh: int):
+    def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
         if fh not in self.file_handles:
             raise FuseOSError(errno.EBADFD)
 
@@ -117,8 +122,7 @@ class DissectMount(Operations):
             yield "."
             yield ".."
 
-            for entry in fobj.iterdir():
-                yield entry
+            yield from fobj.iterdir()
         except Exception:
             log.exception("Exception in fuse::readdir")
             raise FuseOSError(errno.EIO)
@@ -148,3 +152,4 @@ class DissectMount(Operations):
         def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
             if file := self.file_handles.get(fh):
                 return file.seek(off, whence)
+            raise FuseOSError(errno.EBADFD)

@@ -5,13 +5,15 @@ import io
 import logging
 import zlib
 from itertools import cycle, islice
-from pathlib import Path
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import AlignedStream, RangeStream, RelativeStream
 
 from dissect.target.container import Container
 from dissect.target.tools.utils import catch_sigpipe
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -84,7 +86,7 @@ class FortiFirmwareFile(AlignedStream):
             if dec.unused_data:
                 self.trailer_offset = self.fh.seek(-len(dec.unused_data), io.SEEK_END)
                 self.trailer_data = self.fh.read()
-                log.info("Found trailer offset: %d, data: %r", self.trailer_offset, self.trailer_data)
+                log.debug("Found trailer offset: %d, data: %r", self.trailer_offset, self.trailer_data)
                 self.fh = RangeStream(self.fh, 0, self.trailer_offset)
 
             self.fh.seek(0)

@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 import io
 from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loaders.multiraw import MultiRawLoader
 
+if TYPE_CHECKING:
+    import pytest
 
-def test_multiraw_loader(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+
+def test_multiraw_loader(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / "file1.bin").touch()
     (tmp_path / "file2.bin").touch()
 

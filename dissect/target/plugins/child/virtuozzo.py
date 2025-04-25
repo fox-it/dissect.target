@@ -1,8 +1,13 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
@@ -23,7 +28,7 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
 
     References:
         - https://docs.virtuozzo.com/virtuozzo_hybrid_server_7_command_line_reference/managing-system/configuration-files.html
-    """  # noqa: E501
+    """
 
     __type__ = "virtuozzo"
 

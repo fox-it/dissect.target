@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from dissect.target.plugins.apps.shell.powershell import PowerShellHistoryPlugin
@@ -5,7 +7,7 @@ from tests._utils import absolute_path
 
 
 @pytest.mark.parametrize(
-    "target,fs,target_file",
+    ("target", "fs", "target_file"),
     [
         (
             "target_win_users",
@@ -15,7 +17,7 @@ from tests._utils import absolute_path
         ("target_unix_users", "fs_unix", "/root/.local/share/powershell/PSReadLine/ConsoleHost_history.txt"),
     ],
 )
-def test_plugins_os_windows_powershell(target, fs, target_file, request):
+def test_powershell(target: str, fs: str, target_file: str, request: pytest.FixtureRequest) -> None:
     fs = request.getfixturevalue(fs)
     target = request.getfixturevalue(target)
 
@@ -31,4 +33,5 @@ def test_plugins_os_windows_powershell(target, fs, target_file, request):
 
     assert len(records) == 4
     assert records[0].command == 'Write-Host "Hello World!"'
+    assert records[0].order == 0
     assert str(records[0].source) == target_file

@@ -1,16 +1,14 @@
-"""Registry related abstractions"""
+"""Registry related abstractions."""
 
 from __future__ import annotations
 
 import fnmatch
 import re
 from collections import defaultdict
-from datetime import datetime
 from enum import IntEnum
 from functools import cached_property
 from io import BytesIO
-from pathlib import Path
-from typing import BinaryIO, Iterator, Optional, TextIO, Union
+from typing import TYPE_CHECKING, BinaryIO, NewType, TextIO, Union
 
 from dissect.regf import c_regf, regf
 
@@ -20,13 +18,18 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+    from pathlib import Path
+
 GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
 GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 
 KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.NamedKey]
 """The possible key types that can be returned from the registry."""
 
-ValueType = Union[int, str, bytes, list[str]]
+ValueType = Union[int, str, bytes, list[str], None]
 """The possible value types that can be returned from the registry."""
 
 
@@ -76,9 +79,9 @@ class RegistryHive:
         Raises:
             RegistryKeyNotFoundError: If the registry key could not be found.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
-    def keys(self, keys: Union[str, list[str]]) -> Iterator[RegistryKey]:
+    def keys(self, keys: str | list[str]) -> Iterator[RegistryKey]:
         """Retrieve all the registry keys in this hive from the given paths.
 
         Args:
@@ -88,7 +91,7 @@ class RegistryHive:
         for key in keys:
             try:
                 yield self.key(key)
-            except RegistryError:
+            except RegistryError:  # noqa: PERF203
                 pass
 
 
@@ -99,7 +102,7 @@ class RegistryKey:
         hive: The registry hive to which this registry key belongs.
     """
 
-    def __init__(self, hive: Optional[RegistryHive] = None):
+    def __init__(self, hive: RegistryHive | None = None):
         self.hive = hive
 
     def __repr__(self) -> str:
@@ -113,22 +116,22 @@ class RegistryKey:
     @property
     def name(self) -> str:
         """Returns the name of this key."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @property
     def class_name(self) -> str:
         """Returns the class name of this key."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @property
     def path(self) -> str:
         """Returns the path of this key."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @property
     def timestamp(self) -> datetime:
         """Returns the last modified timestamp of this key."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get(self, key_path: str) -> RegistryKey:
         """Returns the RegistryKey pointed to by ``path``.
@@ -143,7 +146,7 @@ class RegistryKey:
         if not key_path:
             return self
 
-        key_path = "\\".join([self.path, key_path])
+        key_path = f"{self.path}\\{key_path}"
         return self.hive.key(key_path)
 
     def subkey(self, subkey: str) -> RegistryKey:
@@ -155,26 +158,38 @@ class RegistryKey:
         Raises:
             RegistryKeyNotFoundError: If this key has no subkey with the requested name.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def subkeys(self) -> list[RegistryKey]:
         """Returns a list of subkeys from this key."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
-    def value(self, value: str) -> RegistryValue:
+    Marker = NewType("Marker", object)
+    __marker = Marker(object())
+
+    def value(self, value: str, default: ValueType | Marker = __marker) -> RegistryValue:
         """Returns a specific value from this key.
 
         Args:
             value: The name of the value to retrieve.
+            default: An optional argument that specifies the default return value in case the value cannot be found.
 
         Raises:
-            RegistryValueNotFoundError: If this key has no value with the requested name.
+            RegistryValueNotFoundError: If this key has no value with the requested name and default is not defined.
         """
-        raise NotImplementedError()
+        try:
+            return self._value(value)
+        except RegistryValueNotFoundError:
+            if default is self.__marker:
+                raise
+            return VirtualValue(self.hive, value, default)
+
+    def _value(self, value: str) -> RegistryValue:
+        raise NotImplementedError
 
     def values(self) -> list[RegistryValue]:
         """Returns a list of all the values from this key."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class RegistryValue:
@@ -184,7 +199,7 @@ class RegistryValue:
         hive: The registry hive to which this registry value belongs.
     """
 
-    def __init__(self, hive: Optional[RegistryHive] = None):
+    def __init__(self, hive: RegistryHive | None = None):
         self.hive = hive
 
     def __repr__(self) -> str:
@@ -193,12 +208,12 @@ class RegistryValue:
     @property
     def name(self) -> str:
         """Returns the name of this value."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @property
     def value(self) -> ValueType:
         """Returns the value of this value."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @property
     def type(self) -> int:
@@ -207,7 +222,7 @@ class RegistryValue:
         Reference:
             - https://docs.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class VirtualHive(RegistryHive):
@@ -291,7 +306,7 @@ class VirtualHive(RegistryHive):
         vkey = self.make_keys(keypath)
         vkey.add_subkey(name, key)
 
-    def map_value(self, path: str, name: str, value: Union[ValueType, RegistryValue]) -> None:
+    def map_value(self, path: str, name: str, value: ValueType | RegistryValue) -> None:
         """Map an arbitrary value to a path and value name in this hive.
 
         Args:
@@ -319,7 +334,7 @@ class VirtualHive(RegistryHive):
 class VirtualKey(RegistryKey):
     """Virtual key implementation."""
 
-    def __init__(self, hive: RegistryHive, path: str, class_name: Optional[str] = None):
+    def __init__(self, hive: RegistryHive, path: str, class_name: str | None = None):
         self._path = path
         if not path.strip("\\"):
             self._name = "VROOT"
@@ -335,11 +350,11 @@ class VirtualKey(RegistryKey):
     def __contains__(self, key: str) -> bool:
         return key.lower() in self._subkeys
 
-    def add_subkey(self, name: str, key: str):
+    def add_subkey(self, name: str, key: str) -> None:
         """Add a subkey to this key."""
         self._subkeys[name.lower()] = key
 
-    def add_value(self, name: str, value: Union[ValueType, RegistryValue]):
+    def add_value(self, name: str, value: ValueType | RegistryValue) -> None:
         """Add a value to this key."""
         if not isinstance(value, RegistryValue):
             value = VirtualValue(self.hive, name, value)
@@ -400,7 +415,7 @@ class VirtualKey(RegistryKey):
 
         return res.values()
 
-    def value(self, value: str) -> RegistryValue:
+    def _value(self, value: str) -> RegistryValue:
         try:
             return self._values[value.lower()]
         except KeyError:
@@ -459,7 +474,7 @@ class HiveCollection(RegistryHive):
     return them in a KeyCollection.
     """
 
-    def __init__(self, hives: Optional[list[RegistryHive]] = None):
+    def __init__(self, hives: list[RegistryHive] | None = None):
         self.hives = hives or []
         super().__init__()
 
@@ -481,7 +496,7 @@ class HiveCollection(RegistryHive):
         for hive in self:
             try:
                 res.add(hive.key(key))
-            except RegistryKeyNotFoundError:
+            except RegistryKeyNotFoundError:  # noqa: PERF203
                 pass
 
         if not res:
@@ -489,13 +504,12 @@ class HiveCollection(RegistryHive):
 
         return res
 
-    def keys(self, keys: Union[list, str]) -> Iterator[RegistryKey]:
+    def keys(self, keys: list | str) -> Iterator[RegistryKey]:
         keys = [keys] if not isinstance(keys, list) else keys
         for key in keys:
             try:
-                for sub in self.key(key):
-                    yield sub
-            except RegistryError:
+                yield from self.key(key)
+            except RegistryError:  # noqa: PERF203
                 pass
 
     def iterhives(self) -> Iterator[RegistryHive]:
@@ -513,26 +527,26 @@ class KeyCollection(RegistryKey):
     down every key in it's collection.
     """
 
-    def __init__(self, keys: Optional[list[RegistryKey]] = None):
+    def __init__(self, keys: list[RegistryKey] | None = None):
         self.keys = keys or []
         super().__init__()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.keys)
 
     def __iter__(self) -> Iterator[RegistryKey]:
         return iter(self.keys)
 
-    def __getitem__(self, index) -> RegistryValue:
+    def __getitem__(self, index: int) -> RegistryValue:
         return self.keys[index]
 
     def _key(self) -> RegistryKey:
         try:
             return self.keys[0]
         except IndexError:
-            raise RegistryKeyNotFoundError()
+            raise RegistryKeyNotFoundError
 
-    def add(self, key: Union[KeyCollection, RegistryKey]):
+    def add(self, key: KeyCollection | RegistryKey) -> None:
         if isinstance(key, KeyCollection):
             self.keys.extend(key.keys)
         else:
@@ -559,7 +573,7 @@ class KeyCollection(RegistryKey):
         for key in self:
             try:
                 ret.add(key.get(key_path))
-            except RegistryKeyNotFoundError:
+            except RegistryKeyNotFoundError:  # noqa: PERF203
                 pass
 
         if not ret:
@@ -572,7 +586,7 @@ class KeyCollection(RegistryKey):
         for key in self:
             try:
                 ret.add(key.subkey(subkey))
-            except RegistryKeyNotFoundError:
+            except RegistryKeyNotFoundError:  # noqa: PERF203
                 pass
 
         if not ret:
@@ -588,12 +602,12 @@ class KeyCollection(RegistryKey):
 
         return ret.values()
 
-    def value(self, value: str) -> ValueCollection:
+    def _value(self, value: str) -> ValueCollection:
         ret = ValueCollection()
         for key in self:
             try:
                 ret.add(key.value(value))
-            except RegistryValueNotFoundError:
+            except RegistryValueNotFoundError:  # noqa: PERF203
                 pass
 
         if not ret:
@@ -616,7 +630,7 @@ class ValueCollection(RegistryValue):
     Same idea as KeyCollection, but for values.
     """
 
-    def __init__(self, values: Optional[list[RegistryValue]] = None):
+    def __init__(self, values: list[RegistryValue] | None = None):
         self.values = values or []
         super().__init__()
 
@@ -630,7 +644,7 @@ class ValueCollection(RegistryValue):
         try:
             return self.values[0]
         except IndexError:
-            raise RegistryValueNotFoundError()
+            raise RegistryValueNotFoundError
 
     def add(self, value: RegistryValue) -> None:
         self.values.append(value)
@@ -651,7 +665,7 @@ class ValueCollection(RegistryValue):
 class RegfHive(RegistryHive):
     """Registry implementation for regf hives."""
 
-    def __init__(self, filepath: Path, fh: Optional[BinaryIO] = None):
+    def __init__(self, filepath: Path, fh: BinaryIO | None = None):
         fh = fh or filepath.open("rb")
         self.hive = regf.RegistryHive(fh)
         self.filepath = filepath
@@ -698,7 +712,7 @@ class RegfKey(RegistryKey):
     def subkeys(self) -> list[RegistryKey]:
         return [RegfKey(self.hive, k) for k in self.key.subkeys()]
 
-    def value(self, value: str) -> RegistryValue:
+    def _value(self, value: str) -> RegistryValue:
         try:
             return RegfValue(self.hive, self.key.value(value))
         except regf.RegistryValueNotFoundError as e:
@@ -821,7 +835,7 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
     vtype, _, value = value.partition(":")
     if vtype == "dword":
         return RegistryValueType.DWORD, int.from_bytes(bytes.fromhex(value), "big", signed=True)
-    elif "hex" in vtype:
+    if "hex" in vtype:
         value = bytes.fromhex(value.replace(",", ""))
         if vtype == "hex":
             return RegistryValueType.BINARY, value
@@ -831,9 +845,7 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
         vtype = int(vtype[4:5], 16)
         if vtype == regf.REG_NONE:
             decoded = value if value else None
-        elif vtype == regf.REG_SZ:
-            decoded = regf.try_decode_sz(value)
-        elif vtype == regf.REG_EXPAND_SZ:
+        elif vtype == regf.REG_SZ or vtype == regf.REG_EXPAND_SZ:
             decoded = regf.try_decode_sz(value)
         elif vtype == regf.REG_BINARY:
             decoded = value
@@ -858,6 +870,8 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
         else:
             raise NotImplementedError(f"Registry flex value type {vtype}")
         return RegistryValueType(vtype), decoded
+
+    raise ValueError(f"Unsupported registry flex value type: {value!r}")
 
 
 def has_glob_magic(pattern: str) -> bool:
@@ -938,10 +952,7 @@ def glob_ext(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollect
         # recursively.
         key_collections = glob_ext0(key_collection, key_path)
 
-    if has_glob_magic(last_key):
-        glob_in_key_path = glob_ext1
-    else:
-        glob_in_key_path = glob_ext0
+    glob_in_key_path = glob_ext1 if has_glob_magic(last_key) else glob_ext0
 
     for key_collection in key_collections:
         yield from glob_in_key_path(key_collection, last_key)

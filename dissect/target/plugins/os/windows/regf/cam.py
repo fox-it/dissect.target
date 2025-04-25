@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import wintimestamp
 from flow.record.fieldtypes import windows_path
@@ -11,7 +13,11 @@ from dissect.target.helpers.descriptor_extensions import (
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.regutil import RegistryKey, RegistryValueNotFoundError
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 CamRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/cam",
@@ -30,22 +36,17 @@ CamRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserR
 class CamPlugin(Plugin):
     """Plugin that iterates various Capability Access Manager registry key locations."""
 
-    CONSENT_STORES = [
+    CONSENT_STORES = (
         "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore",
         "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
         self.app_regf_keys = self._find_apps()
 
     def _find_apps(self) -> list[RegistryKey]:
-        apps = []
-        for store in self.target.registry.keys(self.CONSENT_STORES):
-            for key in store.subkeys():
-                apps.append(key)
-
-        return apps
+        return [key for store in self.target.registry.keys(self.CONSENT_STORES) for key in store.subkeys()]
 
     def check_compatible(self) -> None:
         if not self.app_regf_keys:

@@ -1,9 +1,14 @@
-from datetime import datetime, timezone
+from __future__ import annotations
 
-from dissect.target.filesystem import VirtualFilesystem
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.unix.log.utmp import UtmpPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_utmp_ipv6(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
@@ -16,16 +21,16 @@ def test_utmp_ipv6(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     assert len(results) == 6
 
     # IPv4 address
-    results[0].ut_host == "127.0.0.1"
-    results[0].ut_addr == "127.0.0.1"
+    assert results[0].ut_host == "127.0.0.1"
+    assert results[0].ut_addr == "127.0.0.1"
 
     # IPv6 address
-    results[4].ut_host == "1337::1"
-    results[4].ut_addr == "1337::1"
+    assert results[2].ut_host == "1337::1"
+    assert results[2].ut_addr == "1337::1"
 
     # IPv6 address with 12 bytes of trailing zeroes
-    results[5].ut_host == "1337:1::"
-    results[5].ut_addr == "1337:1::"
+    assert results[5].ut_host == "1337:1::"
+    assert results[5].ut_addr == "1337:1::"
 
 
 def test_wtmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
@@ -69,7 +74,7 @@ def test_btmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
 
 
 def test_utmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    """test if we correctly parse a /var/run/utmp file."""
+    """Test if we correctly parse a /var/run/utmp file."""
     fs_linux.map_file("var/run/utmp", absolute_path("_data/plugins/os/unix/log/wtmp/wtmp"))
     target_linux.add_plugin(UtmpPlugin)
     results = list(target_linux.utmp())

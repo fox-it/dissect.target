@@ -2,13 +2,10 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from pathlib import Path
-from typing import Any, BinaryIO, Iterator
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.eventlog import evt
-from flow.record import Record
 
-from dissect.target import plugin
 from dissect.target.exceptions import (
     FilesystemError,
     PluginError,
@@ -17,6 +14,13 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, arg, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from flow.record import Record
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#]")
 
@@ -49,8 +53,7 @@ class WindowsEventlogsMixin:
     EVENTLOG_REGISTRY_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Eventlog"
     LOGS_DIR_PATH = None
 
-    @plugin.internal
-    def get_logs(self, filename_glob="*") -> list[Path]:
+    def get_logs(self, filename_glob: str = "*") -> list[Path]:
         file_paths = []
         file_paths.extend(self.get_logs_from_dir(self.LOGS_DIR_PATH, filename_glob=filename_glob))
 
@@ -67,7 +70,6 @@ class WindowsEventlogsMixin:
 
         return file_paths
 
-    @plugin.internal
     def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> list[Path]:
         file_paths = []
         logs_dir = self.target.fs.path(logs_dir)
@@ -77,7 +79,6 @@ class WindowsEventlogsMixin:
         self.target.log.debug("Log files found in '%s': %d", self.LOGS_DIR_PATH, len(file_paths))
         return file_paths
 
-    @plugin.internal
     def get_logs_from_registry(self, filename_glob: str = "*") -> list[Path]:
         # compile glob into case-insensitive regex
         filename_regex = re.compile(fnmatch.translate(filename_glob), re.IGNORECASE)
@@ -113,7 +114,7 @@ class WindowsEventlogsMixin:
             raise UnsupportedPluginError(f'Event log directory "{self.LOGS_DIR_PATH}" not found')
 
 
-class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
+class EvtPlugin(WindowsEventlogsMixin, Plugin):
     """Windows ``.evt`` event log plugin."""
 
     LOGS_DIR_PATH = "sysvol/windows/system32/config"
@@ -121,9 +122,9 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
     NEEDLE = b"LfLe"
     CHUNK_SIZE = 0x10000
 
-    @plugin.arg("--logs-dir", help="logs directory to scan")
-    @plugin.arg("--log-file-glob", default=EVT_GLOB, help="glob pattern to match a log file name")
-    @plugin.export(record=EvtRecordDescriptor)
+    @arg("--logs-dir", help="logs directory to scan")
+    @arg("--log-file-glob", default=EVT_GLOB, help="glob pattern to match a log file name")
+    @export(record=EvtRecordDescriptor)
     def evt(self, log_file_glob: str = EVT_GLOB, logs_dir: str | None = None) -> Iterator[EvtRecordDescriptor]:
         """Parse Windows Eventlog files (``*.evt``).
 
@@ -177,9 +178,9 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
             _target=self.target,
         )
 
-    @plugin.export(record=EvtRecordDescriptor)
+    @export(record=EvtRecordDescriptor)
     def scraped_evt(self) -> Iterator[EvtRecordDescriptor]:
-        """Yields EVT log file records scraped from target disks"""
+        """Yields EVT log file records scraped from target disks."""
         yield from self.target.scrape.scrape_chunks_from_disks(
             needle=self.NEEDLE,
             chunk_size=self.CHUNK_SIZE,
@@ -193,6 +194,6 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
         fh.seek(offset - 4)
         return fh.read(chunk_size)
 
-    def _parse_chunk(self, _, chunk: bytes) -> Iterator[Record]:
+    def _parse_chunk(self, needle: bytes, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
             yield self._build_record(record)

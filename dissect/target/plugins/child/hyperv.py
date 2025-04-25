@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 from dissect.hypervisor import hyperv
 
@@ -9,6 +9,8 @@ from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.target import Target
 
 

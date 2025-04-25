@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
@@ -6,7 +8,11 @@ from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 FilesystemRecord = TargetRecordDescriptor(
     "filesystem/entry",
@@ -37,11 +43,22 @@ class WalkFSPlugin(Plugin):
     @arg("--walkfs-path", default="/", help="path to recursively walk")
     def walkfs(self, walkfs_path: str = "/") -> Iterator[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries."""
+
+        path = self.target.fs.path(walkfs_path)
+
+        if not path.exists():
+            self.target.log.error("No such directory: '%s'", walkfs_path)
+            return
+
+        if not path.is_dir():
+            self.target.log.error("Not a directory: '%s'", walkfs_path)
+            return
+
         for entry in self.target.fs.recurse(walkfs_path):
             try:
                 yield generate_record(self.target, entry)
 
-            except FileNotFoundError as e:
+            except FileNotFoundError as e:  # noqa: PERF203
                 self.target.log.warning("File not found: %s", entry)
                 self.target.log.debug("", exc_info=e)
             except Exception as e:

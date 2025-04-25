@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import logging
 import pathlib
-from typing import BinaryIO, Iterator, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.fve import luks
-from dissect.util.stream import AlignedStream
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers.keychain import KeyType
 from dissect.target.volume import EncryptedVolumeSystem, Volume
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.util.stream import AlignedStream
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +25,7 @@ class LUKSVolumeSystemError(VolumeSystemError):
 class LUKSVolumeSystem(EncryptedVolumeSystem):
     __type__ = "luks"
 
-    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.luks = luks.LUKS(fh)
 
@@ -29,42 +35,43 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
 
     def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):
-            volume_details = dict(
-                number=self.fh.number,
-                offset=self.fh.offset,
-                vtype=self.fh.type,
-                name=self.fh.name,
-            )
+            volume_details = {
+                "number": self.fh.number,
+                "offset": self.fh.offset,
+                "vtype": self.fh.type,
+                "name": self.fh.name,
+            }
         else:
-            volume_details = dict(
-                number=1,
-                offset=0,
-                vtype=None,
-                name=None,
-            )
+            volume_details = {
+                "number": 1,
+                "offset": 0,
+                "vtype": None,
+                "name": None,
+            }
 
         stream = self.unlock_volume()
         yield Volume(
             fh=stream,
             size=stream.size,
             raw=self.fh,
+            disk=self.disk,
             vs=self,
             **volume_details,
         )
 
     def unlock_with_volume_encryption_key(
-        self, key: bytes, keyslot: Optional[int] = None, is_wildcard: bool = False
+        self, key: bytes, keyslot: int | None = None, is_wildcard: bool = False
     ) -> None:
         try:
             if keyslot is None:
-                for keyslot in self.luks.keyslots.keys():
+                for keyslot in self.luks.keyslots:
                     try:
                         self.luks.unlock(key, keyslot)
                         break
                     except ValueError:
                         continue
                 else:
-                    raise ValueError("Failed to find matching keyslot for provided volume encryption key")
+                    raise ValueError("Failed to find matching keyslot for provided volume encryption key")  # noqa: TRY301
             else:
                 self.luks.unlock(key, keyslot)
 
@@ -73,7 +80,7 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
             if not is_wildcard:
                 log.exception("Failed to unlock LUKS volume with provided volume encryption key")
 
-    def unlock_with_passphrase(self, passphrase: str, keyslot: Optional[int] = None, is_wildcard: bool = False) -> None:
+    def unlock_with_passphrase(self, passphrase: str, keyslot: int | None = None, is_wildcard: bool = False) -> None:
         try:
             self.luks.unlock_with_passphrase(passphrase, keyslot)
             log.debug("Unlocked LUKS volume with provided passphrase")
@@ -82,7 +89,7 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
                 log.exception("Failed to unlock LUKS volume with provided passphrase")
 
     def unlock_with_key_file(
-        self, key_file: pathlib.Path, keyslot: Optional[int] = None, is_wildcard: bool = False
+        self, key_file: pathlib.Path, keyslot: int | None = None, is_wildcard: bool = False
     ) -> None:
         if not key_file.exists():
             if not is_wildcard:
@@ -120,5 +127,4 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
 
         if self.luks.unlocked:
             return self.luks.open()
-        else:
-            raise LUKSVolumeSystemError("Failed to unlock LUKS volume")
+        raise LUKSVolumeSystemError("Failed to unlock LUKS volume")

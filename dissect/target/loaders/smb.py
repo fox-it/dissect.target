@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime
 from functools import cached_property
-from pathlib import Path
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 from urllib.parse import ParseResult, parse_qsl
 
 from dissect.regf import regf
@@ -14,7 +12,6 @@ from impacket.dcerpc.v5 import rpcrt, rrp, scmr, transport
 from impacket.dcerpc.v5.rpcrt import DCERPCException
 from impacket.smbconnection import SessionError, SMBConnection
 
-from dissect.target import Target
 from dissect.target.exceptions import (
     LoaderError,
     RegistryKeyNotFoundError,
@@ -22,13 +19,23 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystems.smb import SmbFilesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.regutil import RegistryHive, RegistryKey, RegistryValue
+from dissect.target.helpers.regutil import (
+    RegistryHive,
+    RegistryKey,
+    RegistryValue,
+    ValueType,
+)
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
+    from datetime import datetime
+    from pathlib import Path
+
     from impacket.dcerpc.v5.srvs import SHARE_INFO_1
+
+    from dissect.target.target import Target
 
 
 class SmbLoader(Loader):
@@ -74,20 +81,19 @@ class SmbLoader(Loader):
     EMPTY_NT = "31d6cfe0d16ae931b73c59d7e0c089c0"
     EMPTY_LM = "aad3b435b51404eeaad3b435b51404ee"
 
-    def __init__(self, path: Union[Path, str], **kwargs):
-        super().__init__(path)
+    def __init__(self, path: Path, parsed_path: ParseResult | None = None):
+        super().__init__(path, parsed_path, resolve=False)
 
-        self._uri: ParseResult = kwargs.get("parsed_path")
-        if self._uri is None:
+        if parsed_path is None:
             raise LoaderError("Missing URI connection details")
 
-        self._params = dict(parse_qsl(self._uri.query, keep_blank_values=False))
+        self._params = dict(parse_qsl(parsed_path.query, keep_blank_values=False))
 
-        self._ip = self._params.get("ip", os.getenv("SMB_TARGET_IP", self._uri.hostname))
-        self._host = self._params.get("host", os.getenv("SMB_TARGET_HOST", self._uri.hostname))
+        self._ip = self._params.get("ip", os.getenv("SMB_TARGET_IP", parsed_path.hostname))
+        self._host = self._params.get("host", os.getenv("SMB_TARGET_HOST", parsed_path.hostname))
         self._domain = self._params.get("domain", os.getenv("SMB_DOMAIN", "."))
-        self._username = self._uri.username or os.getenv("SMB_USERNAME", "Guest")
-        self._password = self._uri.password or os.getenv("SMB_PASSWORD", "")
+        self._username = parsed_path.username or os.getenv("SMB_USERNAME", "Guest")
+        self._password = parsed_path.password or os.getenv("SMB_PASSWORD", "")
         self._nt, self._lm = "", ""
         if not self._password:
             self._nt, self._lm = self._get_hashes()
@@ -281,7 +287,7 @@ class SmbRegistryKey(RegistryKey):
 
     @property
     def path(self) -> str:
-        return "\\".join([self.hive.name, self._path]) if self._path else self.hive.name
+        return f"{self.hive.name}\\{self._path}" if self._path else self.hive.name
 
     @property
     def timestamp(self) -> datetime:
@@ -291,7 +297,7 @@ class SmbRegistryKey(RegistryKey):
         # To improve peformance, immediately return a "hollow" key object
         # Only listing all subkeys or reading a value will result in data being loaded
         # Technically this means we won't raise a RegistryKeyNotFoundError in the correct place
-        return SmbRegistryKey(self.hive, "\\".join([self._path, subkey]) if self._path else subkey)
+        return SmbRegistryKey(self.hive, f"{self._path}\\{subkey}" if self._path else subkey)
 
     def subkeys(self) -> list[SmbRegistryKey]:
         subkeys = []
@@ -303,12 +309,12 @@ class SmbRegistryKey(RegistryKey):
                 name = rrp.hBaseRegEnumKey(self.hive.winreg, handle, i)["lpNameOut"][:-1]
                 subkeys.append(self.subkey(name))
                 i += 1
-            except Exception:
+            except Exception:  # noqa: PERF203
                 break
 
         return subkeys
 
-    def value(self, value: str) -> str:
+    def _value(self, value: str) -> SmbRegistryValue:
         reg_value = value.lower()
         for val in self.values():
             if val.name.lower() == reg_value:
@@ -333,7 +339,7 @@ class SmbRegistryKey(RegistryKey):
                     )
                 )
                 i += 1
-            except Exception:
+            except Exception:  # noqa: PERF203
                 break
 
         return values
@@ -351,7 +357,7 @@ class SmbRegistryValue(RegistryValue):
         return self._name
 
     @property
-    def value(self) -> str:
+    def value(self) -> ValueType:
         return self._value
 
     @property
@@ -359,7 +365,7 @@ class SmbRegistryValue(RegistryValue):
         return self._type
 
 
-def _connect_rpc(conn: SMBConnection, binding: str, uuid: bytes):
+def _connect_rpc(conn: SMBConnection, binding: str, uuid: bytes) -> rpcrt.DCERPC_v5:
     rpc = transport.DCERPCTransportFactory(binding)
     rpc.set_smb_connection(conn)
     dce = rpc.get_dce_rpc()

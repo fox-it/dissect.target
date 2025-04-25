@@ -1,11 +1,11 @@
-from typing import Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
-from flow.record import Record
 from flow.record.fieldtypes import command, digest, path
 
-from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record_modifier import (
@@ -14,6 +14,11 @@ from dissect.target.helpers.record_modifier import (
     get_modifier_function,
 )
 from tests.helpers.test_hashutil import HASHES
+
+if TYPE_CHECKING:
+    from flow.record import Record
+
+    from dissect.target.target import Target
 
 
 @pytest.fixture
@@ -27,7 +32,7 @@ def resolve_function() -> ModifierFunc:
 
 
 @pytest.mark.parametrize(
-    "test_input, expected_records",
+    ("test_input", "expected_records"),
     [
         ({"name": path}, 2),
         ({"name": path, "test": path}, 3),
@@ -40,7 +45,7 @@ def test_hash_path_records_with_paths(
     record: Record,
     hash_function: ModifierFunc,
     target_win: Mock,
-    test_input: dict[str, Union[type[path], type[str]]],
+    test_input: dict[str, type[path | str]],
     expected_records: int,
 ) -> None:
     record._desc.name = "test"
@@ -86,7 +91,7 @@ def test_hash_path_records_without_paths(
 
 
 @pytest.mark.parametrize(
-    "side_effects,expected",
+    ("side_effects", "expected"),
     [
         ([FileNotFoundError], 0),
         ([IsADirectoryError], 0),
@@ -105,7 +110,7 @@ def test_hash_path_records_with_exception(
     record: Record,
     hash_function: ModifierFunc,
     target_win: Target,
-    side_effects: list[Union[type[Exception], tuple[str]]],
+    side_effects: list[type[Exception] | tuple[str]],
     expected: int,
 ) -> None:
     record._desc.name = "test"
@@ -145,5 +150,5 @@ def test_resolved_modifier(record: Record, target_win: Target, resolve_function:
     resolved_record = resolve_function(target_win, record)
 
     for _record in resolved_record.records[1:]:
-        assert getattr(_record, "name_resolved") is not None
+        assert _record.name_resolved is not None
         assert not hasattr(_record, "name_digest")

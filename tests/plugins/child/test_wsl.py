@@ -1,10 +1,17 @@
-import io
+from __future__ import annotations
 
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+import io
+from typing import TYPE_CHECKING
+
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.child.wsl import WSLChildTargetPlugin
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_plugins_child_wsl(target_win_users, hive_hku, fs_win):
+
+def test_wsl(target_win_users: Target, hive_hku: VirtualHive, fs_win: VirtualFilesystem) -> None:
     fs_win.map_file_fh(
         "users/john/appdata/local/Packages/CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc/LocalState/ext4.vhdx",
         io.BytesIO(),

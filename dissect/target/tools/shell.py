@@ -19,7 +19,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, BinaryIO, Callable, Iterator, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
 from flow.record import RecordOutput
@@ -31,9 +31,9 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
     TargetError,
 )
-from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
-from dissect.target.plugin import PluginFunction, alias, arg, clone_alias
+from dissect.target.helpers.utils import StrEnum
+from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
 from dissect.target.target import Target
 from dissect.target.tools.fsutils import (
     fmt_ls_colors,
@@ -44,14 +44,19 @@ from dissect.target.tools.fsutils import (
 )
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
-    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
+    escape_str,
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_bound_method,
     process_generic_arguments,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.filesystem import FilesystemEntry
 
 log = logging.getLogger(__name__)
 logging.lastResort = None
@@ -76,6 +81,56 @@ except ImportError:
     readline = None
 
 
+def readline_escape(s: str | dict[str, str]) -> str | dict[str, str]:
+    """Escape a string or values in dictionary for readline prompt.
+
+    Used to embed terminal-specific escape sequences in prompts.
+
+    References:
+        - https://wiki.hackzine.org/development/misc/readline-color-prompt.html
+        - http://stackoverflow.com/a/9468954/148845
+        - RL_PROMPT_START_IGNORE = "\001"
+        - RL_PROMPT_END_IGNORE = "\002"
+    """
+    if isinstance(s, dict):
+        return {k: f"\001{v}\002" for k, v in s.items()}
+    return f"\001{s}\002"
+
+
+class AnsiColors(StrEnum):
+    """ANSI color escape sequences."""
+
+    # Base formatting
+    RESET = "\033[0m"
+
+    # Basic colors
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    MAGENTA = "\033[35m"
+    CYAN = "\033[36m"
+    WHITE = "\033[37m"
+
+    # Bold colors
+    BOLD_RED = "\033[1;31m"
+    BOLD_GREEN = "\033[1;32m"
+    BOLD_YELLOW = "\033[1;33m"
+    BOLD_BLUE = "\033[1;34m"
+    BOLD_MAGENTA = "\033[1;35m"
+    BOLD_CYAN = "\033[1;36m"
+    BOLD_WHITE = "\033[1;37m"
+
+    @classmethod
+    def as_dict(cls) -> dict[str, str]:
+        """Return ANSI color escape sequences as a dictionary."""
+        return {item.name: item.value for item in cls}
+
+
+# ANSI color escape sequences for readline prompt
+ANSI_COLORS = readline_escape(AnsiColors.as_dict())
+
+
 class ExtendedCmd(cmd.Cmd):
     """Subclassed cmd.Cmd to provide some additional features.
 
@@ -95,8 +150,9 @@ class ExtendedCmd(cmd.Cmd):
     """
 
     CMD_PREFIX = "cmd_"
-    _runtime_aliases = {}
     DEFAULT_RUNCOMMANDS_FILE = None
+
+    _runtime_aliases: ClassVar[dict[str, str]] = {}
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -210,7 +266,6 @@ class ExtendedCmd(cmd.Cmd):
             - https://stackoverflow.com/a/16479030
             - https://github.com/python/cpython/blob/3.12/Lib/cmd.py#L10
         """
-        pass
 
     def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False) -> bool:
         """Command execution helper that chains initial command and piped subprocesses (if any) together."""
@@ -255,9 +310,10 @@ class ExtendedCmd(cmd.Cmd):
 
     def do_man(self, line: str) -> bool:
         """alias for help"""
-        return self.do_help(line)
+        self.do_help(line)
+        return False
 
-    def complete_man(self, *args) -> list[str]:
+    def complete_man(self, *args: list[str]) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
 
     def do_unalias(self, line: str) -> bool:
@@ -293,7 +349,6 @@ class ExtendedCmd(cmd.Cmd):
                     print(f"alias {alias_name}={self._runtime_aliases[alias_name]}")
                 else:
                     print(f"alias {alias_name} not found")
-                pass
 
         return False
 
@@ -352,15 +407,15 @@ class TargetCmd(ExtendedCmd):
             self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
         # prompt format
+        self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
         if ps1 := getattr(target._config, "PS1", None):
             if "{cwd}" in ps1 and "{base}" in ps1:
                 self.prompt_ps1 = ps1
+            else:
+                self.target.log.warning("{cwd} and {base} were not set inside PS1, using the default prompt")
 
         elif getattr(target._config, "NO_COLOR", None) or os.getenv("NO_COLOR"):
             self.prompt_ps1 = "{base}:{cwd}$ "
-
-        else:
-            self.prompt_ps1 = "\x1b[1;32m{base}\x1b[0m:\x1b[1;34m{cwd}\x1b[0m$ "
 
         super().__init__(self.target.props.get("cyber"))
 
@@ -395,13 +450,13 @@ class TargetCmd(ExtendedCmd):
         # execution
         command, command_args_str, line = self.parseline(line)
 
-        if plugins := list(find_and_filter_plugins(self.target, command, [])):
-            return self._exec_target(plugins, command_args_str)
+        if functions := list(find_and_filter_plugins(command, self.target)):
+            return self._exec_target(functions, command_args_str)
 
         # We didn't execute a function on the target
         return None
 
-    def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> bool:
+    def _exec_target(self, funcs: list[FunctionDescriptor], command_args_str: str) -> bool:
         """Command exection helper for target plugins."""
 
         def _exec_(argparts: list[str], stdout: TextIO) -> None:
@@ -430,13 +485,14 @@ class TargetCmd(ExtendedCmd):
             else:
                 print(value, file=stdout)
 
-        for func in funcs:
+        # What in the variable hoisting is this
+        for func in funcs:  # noqa: B007
             try:
                 self._exec(_exec_, command_args_str)
-            except PluginError as err:
+            except PluginError:  # noqa: PERF203
                 if self.debug:
-                    raise err
-                self.target.log.error(err)
+                    raise
+                self.target.log.exception("Plugin error")
 
         # Keep the shell open
         return False
@@ -542,12 +598,12 @@ class TargetCli(TargetCmd):
 
         TargetCmd.__init__(self, target)
         self._clicache = {}
-        self.cwd = None
-        self.chdir("/")
+        # Force to root, using `chdir` causes `None` to propagate throughout the class methods.
+        self.cwd = self.target.fs.path("/")
 
     @property
     def prompt(self) -> str:
-        return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd)
+        return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
@@ -583,25 +639,25 @@ class TargetCli(TargetCmd):
             try:
                 for path in self.target.fs.path("/").glob(glob_path):
                     yield path
-            except ValueError as err:
+            except ValueError as e:
                 # The generator returned by glob() will raise a
                 # ValueError if the '**' glob is not used as an entire path
                 # component
-                print(err)
+                print(e)
 
     def check_file(self, path: str) -> fsutil.TargetPath | None:
         path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such file")
-            return
+            return None
 
         if path.is_dir():
             print(f"{path}: Is a directory")
-            return
+            return None
 
         if not path.is_file():
             print(f"{path}: Not a file")
-            return
+            return None
 
         return path
 
@@ -609,15 +665,15 @@ class TargetCli(TargetCmd):
         path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such directory")
-            return
+            return None
 
         if path.is_file():
             print(f"{path}: Is a file")
-            return
+            return None
 
         if not path.is_dir():
             print(f"{path}: Not a directory")
-            return
+            return None
 
         return path
 
@@ -625,14 +681,14 @@ class TargetCli(TargetCmd):
         path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such file or directory")
-            return
+            return None
 
         return path
 
     def chdir(self, path: str) -> None:
         """Change directory to the given path."""
-        if path := self.check_dir(path):
-            self.cwd = path
+        if dir := self.check_dir(path):
+            self.cwd = dir
 
     def do_cd(self, line: str) -> bool:
         """change directory"""
@@ -667,6 +723,13 @@ class TargetCli(TargetCmd):
         print_target_info(self.target)
         return False
 
+    def do_reload(self, line: str) -> bool:
+        """reload the target"""
+        self.target = self.target.reload()
+        if self.cwd:
+            self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
+        return False
+
     @arg("path", nargs="?")
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
@@ -699,7 +762,7 @@ class TargetCli(TargetCmd):
     def cmd_ll(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """alias for ls -la"""
         args = extend_args(args, self.cmd_ls)
-        args.l = True  # noqa: E741
+        args.l = True
         args.a = True
         return self.cmd_ls(args, stdout)
 
@@ -793,7 +856,7 @@ class TargetCli(TargetCmd):
                     if child_attr := child.get().attr():
                         print_xattr(child, child_attr, stdout)
                         print()
-                except Exception:
+                except Exception:  # noqa: PERF203
                     pass
 
         return False
@@ -837,7 +900,7 @@ class TargetCli(TargetCmd):
 
         def get_diverging_path(path: pathlib.Path, reference_path: pathlib.Path) -> pathlib.Path:
             """Get the part of path where it diverges from reference_path."""
-            diverging_path = pathlib.Path("")
+            diverging_path = pathlib.Path()
 
             for diff_idx, path_part in enumerate(reference_path.parts):
                 if path_part != path.parts[diff_idx]:
@@ -894,7 +957,7 @@ class TargetCli(TargetCmd):
                 if not dst_path.exists() and not dst_path.parent.is_dir():
                     print(f"{dst_path.parent}: destination directory does not exist")
                     return
-                elif dst_path.exists():
+                if dst_path.exists():
                     if dst_path.is_dir():
                         if create_dst_subdir:
                             dst_path = dst_path.joinpath(create_dst_subdir)
@@ -972,7 +1035,7 @@ class TargetCli(TargetCmd):
             fh = path.open()
             shutil.copyfileobj(fh, stdout)
             stdout.flush()
-        print("")
+        print()
         return False
 
     @arg("path")
@@ -1154,7 +1217,7 @@ class UnixConfigTreeCli(TargetCli):
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.config_tree.path(path)
 
-    def resolve_key(self, path) -> FilesystemEntry:
+    def resolve_key(self, path: str) -> FilesystemEntry:
         return self.config_tree.path(path).get()
 
     def resolve_glob_path(self, path: fsutil.TargetPath) -> Iterator[fsutil.TargetPath]:
@@ -1167,11 +1230,11 @@ class UnixConfigTreeCli(TargetCli):
             try:
                 for path in self.config_tree.path("/").glob(glob_path):
                     yield path
-            except ValueError as err:
+            except ValueError as e:
                 # The generator returned by glob() will raise a
                 # ValueError if the '**' glob is not used as an entire path
                 # component
-                print(err)
+                print(e)
 
 
 class RegistryCli(TargetCmd):
@@ -1199,7 +1262,7 @@ class RegistryCli(TargetCmd):
 
     @property
     def prompt(self) -> str:
-        return "(registry) " + self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd)
+        return "(registry) " + self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         path = line[:begidx].rsplit(" ")[-1]
@@ -1209,10 +1272,7 @@ class RegistryCli(TargetCmd):
         if isinstance(path, regutil.RegistryKey):
             return path
 
-        if path and not path.startswith("\\"):
-            path = "\\".join([self.cwd, path])
-        else:
-            path = path or self.cwd
+        path = f"{self.cwd}\\{path}" if path and not path.startswith("\\") else path or self.cwd
         path = path.replace("\\\\", "\\")
         return self.registry.key(path.strip("\\"))
 
@@ -1234,7 +1294,7 @@ class RegistryCli(TargetCmd):
 
     def chdir(self, path: str) -> None:
         if not path.startswith("\\"):
-            path = "\\".join([self.cwd, path])
+            path = f"{self.cwd}\\{path}"
 
         if self.check_key(path):
             self.cwd = "\\" + path.strip("\\")
@@ -1245,12 +1305,10 @@ class RegistryCli(TargetCmd):
         except RegistryError:
             return []
 
-        r = []
-        for s in key.subkeys():
-            r.append((s, fmt_ls_colors("di", s.name) if color else s.name))
-
-        for v in key.values():
-            r.append((v, fmt_ls_colors("fi", v.name) if color else v.name))
+        r = [
+            *((s, fmt_ls_colors("di", s.name) if color else s.name) for s in key.subkeys()),
+            *((v, fmt_ls_colors("fi", v.name) if color else v.name) for v in key.values()),
+        ]
 
         r.sort(key=lambda e: e[0].name)
         return r
@@ -1338,18 +1396,17 @@ def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
 
 
 def _target_name(target: Target) -> str:
-    """Return a target name for cmd.Cmd base prompts."""
+    """Return a printable FQDN target name for cmd.Cmd base prompts."""
 
     if target.has_function("domain") and target.domain:
-        return f"{target.name}.{target.domain}"
+        return escape_str(f"{target.name}.{target.domain}")
 
-    return target.name
+    return escape_str(target.name)
 
 
 @contextmanager
 def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Iterator[tuple[TextIO, BinaryIO]]:
-    """
-    Generator context manager that chains piped subprocessess and
+    """Generator context manager that chains piped subprocessess and
     returns a tuple (chain input stream, chain output stream).
 
     On context exit the generator will close the input stream and wait for
@@ -1401,8 +1458,7 @@ def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Ite
 
 @contextmanager
 def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
-    """
-    Generator context manager that chains piped subprocessess, with a chain's
+    """Generator context manager that chains piped subprocessess, with a chain's
     outgoing stream configured to be parent's stdout.
 
     Generator returns a chain's input stream from `build_pipe` generator.
@@ -1463,7 +1519,7 @@ def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> cmd.Cmd | Non
     if len(targets) == 1:
         target = targets[0]
         if not cli_cls.check_compatible(target):
-            return
+            return None
 
         cli = cli_cls(target)
     else:
@@ -1481,12 +1537,7 @@ def run_cli(cli: cmd.Cmd) -> None:
     while True:
         try:
             cli.cmdloop()
-
-            # Print an empty newline on exit
-            print()
-            return
-
-        except KeyboardInterrupt:
+        except KeyboardInterrupt:  # noqa: PERF203
             # Run postloop so the interrupted command is added to the history file
             cli.postloop()
 
@@ -1495,17 +1546,21 @@ def run_cli(cli: cmd.Cmd) -> None:
 
         except Exception as e:
             if cli.debug:
-                log.exception(e)
+                log.exception("Unhandled error")
             else:
                 log.info(e)
                 print(f"*** Unhandled error: {e}")
                 print("If you wish to see the full debug trace, enable debug mode.")
 
             cli.postloop()
+        else:
+            # Print an empty newline on exit
+            print()
+            return
 
 
 @catch_sigpipe
-def main() -> None:
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -1515,18 +1570,11 @@ def main() -> None:
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="targets to load")
     parser.add_argument("-p", "--python", action="store_true", help="(I)Python shell")
     parser.add_argument("-r", "--registry", action="store_true", help="registry shell")
-    parser.add_argument(
-        "-L",
-        "--loader",
-        action="store",
-        default=None,
-        help="select a specific loader (i.e. vmx, raw)",
-    )
     parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
     configure_generic_arguments(parser)
+
     args, rest = parser.parse_known_args()
-    args.targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
-    process_generic_arguments(args)
+    process_generic_arguments(args, rest)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:
@@ -1537,20 +1585,18 @@ def main() -> None:
         major, minor, patch = tuple(map(int, platform.python_version_tuple()))
         if major <= 3 and minor <= 10 and patch < 14:
             print(
-                "\n".join(
-                    [
-                        "Note for users of PyPy < 3.10.14:",
-                        "Autocomplete might not work due to an outdated version of pyrepl/readline.py",
-                        "To fix this, please update your version of PyPy.",
-                    ]
-                )
+                "Note for users of PyPy < 3.10.14:\n"
+                "Autocomplete might not work due to an outdated version of pyrepl/readline.py\n"
+                "To fix this, please update your version of PyPy."
             )
 
     try:
         open_shell(args.targets, args.python, args.registry, args.commands)
     except TargetError as e:
-        log.error(e)
+        log.exception("Error opening shell")
         log.debug("", exc_info=e)
+
+    return 0
 
 
 if __name__ == "__main__":

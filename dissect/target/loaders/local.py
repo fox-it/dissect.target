@@ -1,17 +1,26 @@
+from __future__ import annotations
+
 import ctypes
 import platform
 import re
 from functools import cache
 from pathlib import Path
+from typing import TYPE_CHECKING, TypeVar
 
 from dissect.util.stream import BufferedStream
 
-from dissect.target import Target, filesystem, volume
+from dissect.target import filesystem, volume
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.utils import parse_path_uri
 from dissect.target.loader import Loader
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from logging import Logger
+
+    from dissect.target.target import Target
 
 SOLARIS_DEV_DIR = Path("/dev/dsk")
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
@@ -32,12 +41,15 @@ WINDOWS_DRIVE_FIXED = 3
 class LocalLoader(Loader):
     """Load local filesystem."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, resolve=False)
+
     @staticmethod
-    def detect(path):
+    def detect(path: Path) -> bool:
         _, path_part, _ = parse_path_uri(path)
         return path_part == "local"
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         os_name = _get_os_name()
 
         force_dirfs = "force-directory-fs" in target.path_query
@@ -60,7 +72,7 @@ class LocalLoader(Loader):
                 map_solaris_drives(target)
             elif os_name == "vmkernel":
                 map_esxi_drives(target)
-            elif os_name in ["darwin", "osx"]:
+            elif os_name in ["darwin", "osx", "macos"]:
                 # There is currently no way to access raw disk devices in OS-X,
                 # so we always do a simple DirectoryFilesystem fallback.
                 target.filesystems.add(DirectoryFilesystem(Path("/")))
@@ -68,7 +80,7 @@ class LocalLoader(Loader):
                 raise LoaderError(f"Unsupported OS for local target: {os_name}")
 
 
-def map_linux_drives(target: Target):
+def map_linux_drives(target: Target) -> None:
     """Map Linux raw disks and /proc and /sys.
 
     Iterate through /dev and match raw device names (not partitions).
@@ -92,7 +104,7 @@ def map_linux_drives(target: Target):
             target.fs.mount(str(volatile_path), volatile_fs)
 
 
-def map_solaris_drives(target):
+def map_solaris_drives(target: Target) -> None:
     """Map Solaris raw disks.
 
     Iterate through /dev/dsk and match raw device names (not slices or partitions).
@@ -103,7 +115,7 @@ def map_solaris_drives(target):
         _add_disk_as_raw_container_to_target(drive, target)
 
 
-def map_esxi_drives(target):
+def map_esxi_drives(target: Target) -> None:
     """Map ESXi raw disks.
 
     Get all devices from /vmfs/devices/disks/* (not partitions).
@@ -114,7 +126,7 @@ def map_esxi_drives(target):
         _add_disk_as_raw_container_to_target(drive, target)
 
 
-def map_windows_drives(target):
+def map_windows_drives(target: Target) -> None:
     """Map Windows drives by iterating physical drives.
 
     For each physical drive, load the partition table and volumes.
@@ -142,7 +154,7 @@ def map_windows_drives(target):
 
         disk = RawContainer(
             BufferedStream(
-                open(drivepath, "rb"),
+                open(drivepath, "rb"),  # noqa: PTH123, SIM115
                 size=drivesize,
             )
         )
@@ -152,9 +164,9 @@ def map_windows_drives(target):
             # Open the decrypted volume if we encounter Bitlocker
             if b"-FVE-FS-" in vol.read(512):
                 # Partition numbers are 1 indexed
-                partname = f"Harddisk{drivenum}Partition{i+1}"
+                partname = f"Harddisk{drivenum}Partition{i + 1}"
                 vol.fh = BufferedStream(
-                    open(f"\\\\.\\{partname}", "rb"),
+                    open(f"\\\\.\\{partname}", "rb"),  # noqa: PTH123, SIM115
                     size=vol.size,
                 )
             vol.seek(0)
@@ -169,13 +181,14 @@ def map_windows_drives(target):
 
 def _add_disk_as_raw_container_to_target(drive: Path, target: Target) -> None:
     try:
-        fh = BufferedStream(open(drive, "rb"))
+        fh = BufferedStream(drive.open("rb"))
         target.disks.add(RawContainer(fh))
     except Exception as e:
-        target.log.warning(f"Unable to open drive: {drive}, skipped", exc_info=e)
+        target.log.warning("Unable to open drive: %s, skipped", drive)
+        target.log.debug("", exc_info=e)
 
 
-def _read_drive_letters():
+def _read_drive_letters() -> list[bytes]:
     # Get all logical drive letters
     drives_buf = ctypes.c_buffer(256)
     ctypes.windll.kernel32.GetLogicalDriveStringsA(256, drives_buf)
@@ -183,7 +196,7 @@ def _read_drive_letters():
     return drives_buf.raw.rstrip(b"\x00").split(b"\x00")
 
 
-def _get_windows_drive_volumes(log):
+def _get_windows_drive_volumes(log: Logger) -> Iterator[tuple[volume.Volume, bool, RawContainer | None, int | None]]:
     # Get the sysvol drive letter
     windir_buf = ctypes.c_buffer(256)
     ctypes.windll.kernel32.GetWindowsDirectoryA(windir_buf, 256)
@@ -205,7 +218,7 @@ def _get_windows_drive_volumes(log):
         # If it fails, skip it
         try:
             log.debug("Trying to read from drive %s", drive_letter)
-            drive_volume = volume.Volume(BufferedStream(open(drive_path, "rb")), None, 0, None, None, None)
+            drive_volume = volume.Volume(BufferedStream(open(drive_path, "rb")), None, 0, None, None, None)  # noqa: PTH123, SIM115
             drive_volume.seek(0)
             drive_volume.read(1024)
             drive_volume.seek(0)
@@ -250,7 +263,7 @@ def _get_windows_drive_volumes(log):
                 try:
                     disk = RawContainer(
                         BufferedStream(
-                            open(disk_path, "rb"),
+                            open(disk_path, "rb"),  # noqa: PTH123, SIM115
                             size=disk_size,
                         )
                     )
@@ -283,7 +296,7 @@ def _get_windows_drive_volumes(log):
         yield (drive_volume, drive_letter == windrive, disk, disk_num)
 
 
-def map_windows_mounted_drives(target: Target, force_dirfs: bool = False, fallback_to_dirfs: bool = False):
+def map_windows_mounted_drives(target: Target, force_dirfs: bool = False, fallback_to_dirfs: bool = False) -> None:
     """Map Windows drives by their drive letter.
 
     For each drive (mounted) partition, determine if it's a fixed drive
@@ -334,7 +347,7 @@ def map_windows_mounted_drives(target: Target, force_dirfs: bool = False, fallba
 
 
 @cache
-def _windows_get_devices():
+def _windows_get_devices() -> list[str]:
     """Internal function to query all devices.
 
     https://www.virag.si/2010/02/enumerate-physical-drives-in-windows/
@@ -352,11 +365,9 @@ def _windows_get_devices():
                 bufsize *= 2
                 devices_buf = ctypes.c_buffer(bufsize)
                 continue
-            else:
-                raise ValueError
+            raise ValueError
 
-    devices = [d.decode() for d in devices_buf.raw.rstrip(b"\x00").split(b"\x00")]
-    return devices
+    return [d.decode() for d in devices_buf.raw.rstrip(b"\x00").split(b"\x00")]
 
 
 def _is_physical_drive(path: str) -> bool:
@@ -364,31 +375,31 @@ def _is_physical_drive(path: str) -> bool:
     return path in _windows_get_devices()
 
 
-def _windows_get_disk_size(path):
+def _windows_get_disk_size(path: str) -> int:
     geometry_ex = _windows_get_disk_geometry_ex(path)
     return geometry_ex.DiskSize
 
 
-def _windows_get_disk_geometry_ex(path):
+def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
     from ctypes import wintypes
 
-    IOCTL_DISK_GET_DRIVE_GEOMETRY_EX = 0x700A0  # noqa
+    IOCTL_DISK_GET_DRIVE_GEOMETRY_EX = 0x700A0
 
     class DISK_GEOMETRY(ctypes.Structure):
-        _fields_ = [
+        _fields_ = (
             ("Cylinders", wintypes.LARGE_INTEGER),
             ("MediaType", wintypes.BYTE),
             ("TracksPerCylinder", wintypes.DWORD),
             ("SectorsPerTrack", wintypes.DWORD),
             ("BytesPerSector", wintypes.DWORD),
-        ]
+        )
 
     class DISK_GEOMETRY_EX(ctypes.Structure):
-        _fields_ = [
+        _fields_ = (
             ("Geometry", DISK_GEOMETRY),
             ("DiskSize", wintypes.LARGE_INTEGER),
             ("Data", wintypes.BYTE),
-        ]
+        )
 
     handle = _windows_createfile(path)
     try:
@@ -403,24 +414,24 @@ def _windows_get_disk_geometry_ex(path):
     return res
 
 
-def _windows_get_volume_disk_extents(path):
+def _windows_get_volume_disk_extents(path: str) -> ctypes.Structure:
     from ctypes import wintypes
 
-    ERROR_MORE_DATA = 234  # noqa
-    IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS = 0x560000  # noqa
+    ERROR_MORE_DATA = 234
+    IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS = 0x560000
 
     class DISK_EXTENT(ctypes.Structure):
-        _fields_ = [
+        _fields_ = (
             ("DiskNumber", wintypes.DWORD),
             ("StartingOffset", wintypes.LARGE_INTEGER),
             ("ExtentLength", wintypes.LARGE_INTEGER),
-        ]
+        )
 
     class VOLUME_DISK_EXTENTS(ctypes.Structure):
-        _fields_ = [
+        _fields_ = (
             ("NumberOfDiskExtents", wintypes.DWORD),
             ("Extents", DISK_EXTENT * 1),
-        ]
+        )
 
     handle = _windows_createfile(path)
     try:
@@ -436,9 +447,9 @@ def _windows_get_volume_disk_extents(path):
     return res
 
 
-def _windows_createfile(path):
-    OPEN_EXISTING = 3  # noqa
-    FILE_ATTRIBUTE_NORMAL = 0x00000080  # noqa
+def _windows_createfile(path: str) -> int:
+    OPEN_EXISTING = 3
+    FILE_ATTRIBUTE_NORMAL = 0x00000080
 
     handle = ctypes.windll.kernel32.CreateFileW(
         path,
@@ -457,11 +468,14 @@ def _windows_createfile(path):
     return handle
 
 
-def _windows_closehandle(handle):
+def _windows_closehandle(handle: int) -> None:
     ctypes.windll.kernel32.CloseHandle(handle)
 
 
-def _windows_ioctl(handle, ioctl, out_struct):
+T = TypeVar("T", bound=ctypes.Structure)
+
+
+def _windows_ioctl(handle: int, ioctl: int, out_struct: type[T]) -> tuple[int, T]:
     # http://www.ioctls.net/
     from ctypes import wintypes
 
@@ -481,5 +495,5 @@ def _windows_ioctl(handle, ioctl, out_struct):
     return status, out_inst
 
 
-def _get_os_name():
+def _get_os_name() -> str:
     return platform.system().lower()

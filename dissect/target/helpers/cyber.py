@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import random
 import string
@@ -8,7 +10,10 @@ from array import array
 from contextlib import contextmanager, redirect_stdout
 from enum import Enum
 from io import StringIO
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 try:
     import fcntl
@@ -28,7 +33,7 @@ NMS_MASK_TABLE = [
     "5", "6", "7", "8", "9", "Ç", "ü", "é", "â", "ä", "à", "å", "ç", "ê", "ë", "è", "ï",
     "î", "ì", "Ä", "Å", "É", "æ", "Æ", "ô", "ö", "ò", "û", "ù", "ÿ", "Ö", "Ü", "¢", "£",
     "¥", "ƒ", "á", "í", "ó", "ú", "ñ", "Ñ", "ª", "º", "¿", "¬", "½", "¼", "¡", "«", "»",
-    "α", "ß", "Γ", "π", "Σ", "σ", "µ", "τ", "Φ", "Θ", "Ω", "δ", "φ", "ε", "±", "÷", "°",
+    "α", "ß", "Γ", "π", "Σ", "σ", "µ", "τ", "Φ", "Θ", "Ω", "δ", "φ", "ε", "±", "÷", "°",  # noqa: RUF001
     "·", "²", "¶", "⌐", "₧", "░", "▒", "▓", "│", "┤", "╡", "╢", "╖", "╕", "╣", "║", "╗",
     "╝", "╜", "╛", "┐", "└", "┴", "┬", "├", "─", "┼", "╞", "╟", "╚", "╔", "╩", "╦", "╠",
     "═", "╬", "╧", "╨", "╤", "╧", "╙", "╘", "╒", "╓", "╫", "╪", "┘", "┌", "█", "▄", "▌",
@@ -65,7 +70,7 @@ class Color(Enum):
 
 
 class CyberIO(StringIO):
-    def __init__(self, color: Optional[Color] = None, run_at_end: bool = False, **kwargs):
+    def __init__(self, color: Color | None = None, run_at_end: bool = False, **kwargs):
         self._color = color
         self._run_at_end = run_at_end
         self._kwargs = kwargs
@@ -80,7 +85,7 @@ class CyberIO(StringIO):
 
 
 @contextmanager
-def cyber(color: Optional[Color] = Color.YELLOW, run_at_end: bool = False, **kwargs) -> Iterator[None]:
+def cyber(color: Color | None = Color.YELLOW, run_at_end: bool = False, **kwargs) -> Iterator[None]:
     stream = CyberIO(color, run_at_end, **kwargs)
     with redirect_stdout(stream):
         yield
@@ -89,7 +94,7 @@ def cyber(color: Optional[Color] = Color.YELLOW, run_at_end: bool = False, **kwa
         cyber_print(stream.getvalue(), color, **kwargs)
 
 
-def cyber_print(buf: str, color: Optional[Color] = None, **kwargs) -> None:
+def cyber_print(buf: str, color: Color | None = None, **kwargs) -> None:
     if not buf or buf == "\n":
         sys.__stdout__.write(buf)
         return
@@ -106,7 +111,7 @@ def cyber_print(buf: str, color: Optional[Color] = None, **kwargs) -> None:
 
 
 # https://github.com/bartobri/libnms
-def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False, mask_indent: bool = True, **kwargs) -> None:
+def nms(buf: str, color: Color | None = None, mask_space: bool = False, mask_indent: bool = True, **kwargs) -> None:
     orig_row, orig_col = (0, 0)
     with _set_terminal():
         max_rows, max_cols = _get_win_size()
@@ -126,10 +131,7 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False, mask_
             # Write initial mask
             for char, has_ansi, end_ansi in characters:
                 # Initialize the character state with a mask and reveal time
-                if end_ansi:
-                    reveal_time = random.randint(0, 100)
-                else:
-                    reveal_time = random.randint(100, NMS_REVEAL_SECONDS * 1000)
+                reveal_time = random.randint(0, 100) if end_ansi else random.randint(100, NMS_REVEAL_SECONDS * 1000)
 
                 mask = random.choice(NMS_MASK_TABLE)
                 character_state.append((char, mask, reveal_time, has_ansi))
@@ -241,7 +243,7 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False, mask_
 
 
 # https://github.com/jsbueno/terminal_matrix
-def matrix(buf: str, color: Optional[Color] = None, **kwargs) -> None:
+def matrix(buf: str, color: Color | None = None, **kwargs) -> None:
     orig_row, orig_col = (0, 0)
     with _set_terminal():
         max_rows, max_cols = _get_win_size()
@@ -278,10 +280,7 @@ def matrix(buf: str, color: Optional[Color] = None, **kwargs) -> None:
 
             reveal_cols[column][row] = char
 
-            if "\n" in char or "\r\n" in char:
-                row += 1
-                column = 0
-            elif column == max_cols:
+            if "\n" in char or "\r\n" in char or column == max_cols:
                 row += 1
                 column = 0
             else:
@@ -315,7 +314,7 @@ def matrix(buf: str, color: Optional[Color] = None, **kwargs) -> None:
                 for c in cascading:
                     try:
                         next(c)
-                    except StopIteration:
+                    except StopIteration:  # noqa: PERF203
                         stopped.add(c)
 
                 sys.__stdout__.flush()
@@ -448,7 +447,7 @@ def _get_character_info(
     return characters, remaining, (orig_row, orig_col), (cur_row, cur_col)
 
 
-def _write_remaining(remaining: str, color: Optional[Color]) -> None:
+def _write_remaining(remaining: str, color: Color | None) -> None:
     time.sleep(0.5)
 
     if color and "\033" not in remaining:
@@ -498,7 +497,7 @@ def _get_cursor_pos() -> int:
     return row, col
 
 
-def _print_at(s: str, row: int, col: int, color: Optional[Color] = None, bright: bool = False) -> None:
+def _print_at(s: str, row: int, col: int, color: Color | None = None, bright: bool = False) -> None:
     _cursor_move(row, col)
     if color:
         _foreground_color(color, bright)

@@ -1,5 +1,6 @@
-from pathlib import Path
-from typing import BinaryIO, Iterator, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.esedb import esedb, record, table
 from dissect.esedb.exceptions import KeyNotFoundError
@@ -15,8 +16,13 @@ from dissect.target.plugins.apps.browser.browser import (
     BrowserPlugin,
     try_idna,
 )
-from dissect.target.plugins.general.users import UserDetails
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 
 class WebCache:
@@ -61,8 +67,9 @@ class WebCache:
         for container in self.find_containers(name):
             try:
                 yield from container.records()
-            except Exception as e:
-                self.target.log.warning("Error iterating IExplore container %s", container, exc_info=e)
+            except Exception as e:  # noqa: PERF203
+                self.target.log.warning("Error iterating IExplore container %s", container)
+                self.target.log.debug("", exc_info=e)
                 continue
 
     def history(self) -> Iterator[record.Record]:
@@ -82,9 +89,7 @@ class InternetExplorerPlugin(BrowserPlugin):
 
     __namespace__ = "iexplore"
 
-    DIRS = [
-        "AppData/Local/Microsoft/Windows/WebCache",
-    ]
+    DIRS = ("AppData/Local/Microsoft/Windows/WebCache",)
 
     CACHE_FILENAME = "WebCacheV01.dat"
 
@@ -99,7 +104,7 @@ class InternetExplorerPlugin(BrowserPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
 
-        self.users_dirs: list[Tuple[UserDetails, Path]] = []
+        self.users_dirs: list[tuple[UserDetails, Path]] = []
         for user_details in self.target.user_details.all_with_home():
             for ie_dir in self.DIRS:
                 cdir = user_details.home_path.joinpath(ie_dir)
@@ -214,7 +219,7 @@ class InternetExplorerPlugin(BrowserPlugin):
                     # Not used here, but [-6:-3] should give: ref_url, mime_type, temp_download_path
                     down_url, down_path = response_headers.split("\x00")[-3:-1]
                 except (AttributeError, KeyNotFoundError) as e:
-                    self.target.log.error("Error parsing response headers: %s", e)
+                    self.target.log.error("Error parsing response headers: %s", e)  # noqa: TRY400
                     self.target.log.debug("", exc_info=e)
 
                 yield self.BrowserDownloadRecord(

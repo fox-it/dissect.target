@@ -1,8 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.child.hyperv import HyperVChildTargetPlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_plugins_child_wsl(target_win, fs_win):
+
+def test_wsl(target_win: Target, fs_win: VirtualFilesystem) -> None:
     fs_win.map_file(
         "ProgramData/Microsoft/Windows/Hyper-V/data.vmcx",
         absolute_path("_data/plugins/child/hyperv/data.vmcx"),

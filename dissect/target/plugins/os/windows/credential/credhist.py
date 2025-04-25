@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO
 from uuid import UUID
 
 from dissect.cstruct import cstruct
@@ -13,13 +14,18 @@ from dissect.target.helpers import keychain
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.general.users import UserDetails
 from dissect.target.plugins.os.windows.dpapi.crypto import (
     CipherAlgorithm,
     HashAlgorithm,
     derive_password_hash,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -61,8 +67,8 @@ class CredHistEntry:
     version: int
     guid: str
     user_sid: str
-    sha1: Optional[bytes]
-    nt: Optional[bytes]
+    sha1: bytes | None
+    nt: bytes | None
     hash_alg: HashAlgorithm = field(repr=False)
     cipher_alg: CipherAlgorithm = field(repr=False)
     raw: c_credhist.entry = field(repr=False)
@@ -103,7 +109,7 @@ class CredHistEntry:
 
 
 class CredHistFile:
-    def __init__(self, fh: BinaryIO) -> None:
+    def __init__(self, fh: BinaryIO):
         self.fh = fh
         self.entries = list(self._parse())
 
@@ -133,6 +139,7 @@ class CredHistFile:
                     raw=entry,
                 )
         except EOFError:
+            # An empty CREDHIST file will be 24 bytes long and has dwNextLinkSize set to 0.
             pass
 
     def decrypt(self, password_hash: bytes) -> None:
@@ -178,6 +185,7 @@ class CredHistPlugin(Plugin):
     @export(record=CredHistRecord)
     def credhist(self) -> Iterator[CredHistRecord]:
         """Yield and decrypt all Windows CREDHIST entries on the target."""
+
         passwords = keychain_passwords()
 
         if not passwords:

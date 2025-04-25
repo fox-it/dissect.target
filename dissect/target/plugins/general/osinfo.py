@@ -1,8 +1,12 @@
-from typing import Callable, Generator, Iterator, Union
+from __future__ import annotations
+
+from collections.abc import Generator, Iterator
+from typing import Callable
 
 from flow.record import GroupedRecord
 
 from dissect.target import plugin
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 OSInfoRecord = TargetRecordDescriptor(
@@ -18,19 +22,18 @@ class OSInfoPlugin(plugin.Plugin):
     """Convenience plugin that wraps _os.* functions in records."""
 
     def check_compatible(self) -> None:
-        pass
+        if not self.target._os_plugin:
+            raise UnsupportedPluginError("No operating system detected on target")
 
     @plugin.export(record=OSInfoRecord)
-    def osinfo(self) -> Iterator[Union[OSInfoRecord, GroupedRecord]]:
+    def osinfo(self) -> Iterator[OSInfoRecord | GroupedRecord]:
         """Yield grouped records with target OS info."""
         for os_func in self.target._os.__functions__:
-            if os_func in ["is_compatible", "get_all_records"]:
-                continue
             value = getattr(self.target._os, os_func)
             record = OSInfoRecord(name=os_func, value=None, _target=self.target)
             if isinstance(value, Callable) and isinstance(subrecords := value(), Generator):
                 try:
-                    yield GroupedRecord("generic/osinfo/grouped", [record] + list(subrecords))
+                    yield GroupedRecord("generic/osinfo/grouped", [record, *list(subrecords)])
                 except Exception:
                     # Ignore exceptions triggered by functions
                     # that cannot be executed in this context

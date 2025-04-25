@@ -1,10 +1,16 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.ntfs.c_ntfs import segment_reference
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.filesystem.ntfs.utils import get_drive_letter
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 UsnjrnlRecord = TargetRecordDescriptor(
     "filesystem/ntfs/usnjrnl",
@@ -27,7 +33,8 @@ class UsnjrnlPlugin(Plugin):
     """NFTS UsnJrnl plugin."""
 
     def check_compatible(self) -> None:
-        pass
+        if not any(fs for fs in self.target.filesystems if fs.__type__ == "ntfs"):
+            raise UnsupportedPluginError("No NTFS filesystem(s) found on target")
 
     @export(record=UsnjrnlRecord)
     def usnjrnl(self) -> Iterator[UsnjrnlRecord]:
@@ -65,10 +72,11 @@ class UsnjrnlPlugin(Plugin):
                     ts = None
                     try:
                         ts = record.timestamp
-                    except ValueError:
-                        target.log.error(
+                    except ValueError as e:
+                        target.log.error(  # noqa: TRY400
                             "Error occured during parsing of timestamp in usnjrnl: %x", record.record.TimeStamp
                         )
+                        target.log.debug("", exc_info=e)
 
                     path = f"{drive_letter}{record.full_path}"
                     segment = segment_reference(record.record.FileReferenceNumber)
@@ -85,5 +93,6 @@ class UsnjrnlPlugin(Plugin):
                         minor=record.MinorVersion,
                         _target=target,
                     )
-                except Exception as e:
-                    target.log.error("Error during processing of usnjrnl record: %s", record.record, exc_info=e)
+                except Exception as e:  # noqa: PERF203
+                    target.log.error("Error during processing of usnjrnl record: %s", record.record)  # noqa: TRY400
+                    target.log.debug("", exc_info=e)

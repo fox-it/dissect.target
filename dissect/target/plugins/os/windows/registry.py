@@ -1,31 +1,38 @@
+from __future__ import annotations
+
 import logging
 import re
-import warnings
 from collections import defaultdict
 from functools import lru_cache
-from typing import Iterator, Optional, Union
+from typing import TYPE_CHECKING, Final
 
 from dissect.target.exceptions import (
     HiveUnavailableError,
     RegistryKeyNotFoundError,
+    RegistryValueNotFoundError,
     UnsupportedPluginError,
 )
-from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.helpers.regutil import (
     HiveCollection,
     KeyCollection,
     RegfHive,
     RegistryHive,
     RegistryKey,
+    RegistryValue,
     ValueCollection,
     VirtualHive,
     glob_ext,
     glob_split,
 )
 from dissect.target.plugin import Plugin, internal
-from dissect.target.plugins.general.users import UserDetails
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.helpers.record import WindowsUserRecord
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 CONTROLSET_REGEX = re.compile("CurrentControlSet", flags=re.IGNORECASE)
 
@@ -41,7 +48,7 @@ class RegistryPlugin(Plugin):
 
     __namespace__ = "registry"
 
-    SHORTNAMES = {
+    SHORTNAMES: Final[dict[str, str]] = {
         "HKLM": "HKEY_LOCAL_MACHINE",
         "HKCC": "HKEY_CURRENT_CONFIG",
         "HKCU": "HKEY_CURRENT_USER",
@@ -49,7 +56,7 @@ class RegistryPlugin(Plugin):
         "HKU": "HKEY_USERS",
     }
 
-    MAPPINGS = {
+    MAPPINGS: Final[dict[str, str]] = {
         "SAM": "HKEY_LOCAL_MACHINE\\SAM",
         "SECURITY": "HKEY_LOCAL_MACHINE\\SECURITY",
         "SOFTWARE": "HKEY_LOCAL_MACHINE\\SOFTWARE",
@@ -60,7 +67,7 @@ class RegistryPlugin(Plugin):
         "ELAM": "HKEY_LOCAL_MACHINE\\ELAM",
     }
 
-    SYSTEM = [
+    SYSTEM = (
         "SAM",
         "SECURITY",
         "SOFTWARE",
@@ -72,16 +79,16 @@ class RegistryPlugin(Plugin):
         "SYSTEM.DAT",  # Win 95/98/ME
         "CLASSES.DAT",  # Win ME
         "REG.DAT",  # Win 3.1
-    ]
+    )
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
 
         self._root = VirtualHive()
         self._hive_collections = defaultdict(HiveCollection)
         self._hive_paths = []
 
-        self._hives_to_users: dict[RegfHive, UserDetails] = dict()
+        self._hives_to_users: dict[RegfHive, UserDetails] = {}
 
         self._controlsets = []
         self._currentcontrolset = None
@@ -124,8 +131,8 @@ class RegistryPlugin(Plugin):
                     self._add_hive(fname, hf, hive_file)
                     opened_hives.add(fname)
                 except Exception as e:
-                    self.target.log.warning("Could not open hive: %s", hive_file, exc_info=e)
-                    continue
+                    self.target.log.warning("Could not open hive: %s", hive_file)
+                    self.target.log.debug("", exc_info=e)
 
         for drive in ["sysvol", "efi"]:
             bcd = self.target.fs.path(drive).joinpath("boot/BCD")
@@ -140,7 +147,8 @@ class RegistryPlugin(Plugin):
                 hf = RegfHive(bcd)
                 self._add_hive("BCD", hf, bcd)
             except Exception as e:
-                self.target.log.warning("Could not open BCD: %s", bcd, exc_info=e)
+                self.target.log.warning("Could not open BCD: %s", bcd)
+                self.target.log.debug("", exc_info=e)
 
         for hive, location in self.MAPPINGS.items():
             if hive in self._hive_collections:
@@ -169,7 +177,8 @@ class RegistryPlugin(Plugin):
                     self.add_hive(user.sid, f"HKEY_USERS\\{user.sid}", ntuserhive, ntuser)
                     self._hives_to_users[ntuserhive] = user_details
                 except Exception as e:
-                    self.target.log.warning("Could not open ntuser.dat: %s", ntuser, exc_info=e)
+                    self.target.log.warning("Could not open ntuser.dat: %s", ntuser)
+                    self.target.log.debug("", exc_info=e)
 
             usrclass = user_details.home_path.joinpath("AppData/Local/Microsoft/Windows/usrclass.dat")
 
@@ -185,7 +194,8 @@ class RegistryPlugin(Plugin):
 
                     self._hives_to_users[usr_class_hive] = user_details
                 except Exception as e:
-                    self.target.log.warning("Could not open usrclass.dat: %s", usrclass, exc_info=e)
+                    self.target.log.warning("Could not open usrclass.dat: %s", usrclass)
+                    self.target.log.debug("", exc_info=e)
 
         self._users_loaded = True
 
@@ -231,7 +241,7 @@ class RegistryPlugin(Plugin):
         return self.key()
 
     @internal
-    def key(self, key: Optional[str] = None) -> KeyCollection:
+    def key(self, key: str | None = None) -> KeyCollection:
         """Query the virtual registry on the given key.
 
         Returns a KeyCollection which contains all keys that match
@@ -255,7 +265,7 @@ class RegistryPlugin(Plugin):
                 hive = name
                 break
 
-        key = "\\".join([hive, path])
+        key = f"{hive}\\{path}"
 
         if hive in ("HKEY_CURRENT_USER", "HKEY_USERS"):
             self._init_users()
@@ -270,12 +280,11 @@ class RegistryPlugin(Plugin):
                 except RegistryKeyNotFoundError:
                     pass
             return res
-        elif hive == "HKEY_CLASSES_ROOT":
+        if hive == "HKEY_CLASSES_ROOT":
             res = self.key(f"HKEY_CURRENT_USER\\Software\\Classes\\{path}")
             res.add(self.key(f"HKEY_LOCAL_MACHINE\\Software\\Classes\\{path}"))
             return res
-        else:
-            res = self._root.key(key)
+        res = self._root.key(key)
 
         if not isinstance(res, KeyCollection):
             res = KeyCollection([res])
@@ -293,30 +302,33 @@ class RegistryPlugin(Plugin):
         return self.key(key).subkey(subkey)
 
     @internal
-    def iterkeys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
-        warnings.warn("The iterkeys() function is deprecated, use keys() instead", DeprecationWarning)
-        for key in self.keys(keys):
-            yield key
-
-    @internal
-    def keys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
+    def keys(self, keys: str | Iterable[str]) -> Iterator[RegistryKey]:
         """Yields all keys that match the given queries.
 
-        Automatically resolves CurrentVersion keys. Also unrolls KeyCollections.
+        Automatically resolves CurrentVersion keys. Also flattens KeyCollections.
         """
-        keys = [keys] if not isinstance(keys, list) else keys
+        keys = [keys] if isinstance(keys, str) else keys
 
         for key in self._iter_controlset_keypaths(keys):
             try:
-                res = self.key(key)
-                for r in res:
-                    yield r
-            except RegistryKeyNotFoundError:
-                pass
-            except HiveUnavailableError:
+                yield from self.key(key)
+            except (RegistryKeyNotFoundError, HiveUnavailableError):  # noqa: PERF203
                 pass
 
-    def _iter_controlset_keypaths(self, keys: list[str]) -> Iterator[str]:
+    @internal
+    def values(self, keys: str | Iterable[str], value: str) -> Iterator[RegistryValue]:
+        """Yields all values that match the given queries.
+
+        Automatically resolves CurrentVersion keys. Also flattens ValueCollections.
+        """
+
+        for key in self.keys(keys):
+            try:
+                yield key.value(value)
+            except RegistryValueNotFoundError:  # noqa: PERF203
+                pass
+
+    def _iter_controlset_keypaths(self, keys: Iterable[str]) -> Iterator[str]:
         """Yield the key transformed for the different control sets."""
         for key in keys:
             if not self.controlsets or not CONTROLSET_REGEX.search(key):
@@ -340,19 +352,20 @@ class RegistryPlugin(Plugin):
         return self.MAPPINGS
 
     @internal
-    def get_user_details(self, key: RegistryKey) -> UserDetails:
-        """Return user details for the user who owns a registry hive that contains the provided key"""
+    def get_user_details(self, key: RegistryKey | RegistryValue) -> UserDetails | None:
+        """Return user details for the user who owns a registry hive that contains the provided key."""
         if not key.hive or not getattr(key.hive, "filepath", None):
-            return
+            return None
 
         return self._hives_to_users.get(key.hive)
 
     @internal
-    def get_user(self, key: RegistryKey) -> WindowsUserRecord:
-        """Return user record for the user who owns a registry hive that contains the provided key"""
+    def get_user(self, key: RegistryKey | RegistryValue) -> WindowsUserRecord | None:
+        """Return user record for the user who owns a registry hive that contains the provided key."""
         details = self._hives_to_users.get(key.hive)
         if details:
             return details.user
+        return None
 
     @internal
     def glob_ext(self, pattern: str) -> Iterator[KeyCollection]:

@@ -1,4 +1,5 @@
-from typing import Optional
+from __future__ import annotations
+
 from uuid import UUID
 
 from dissect.cstruct import cstruct
@@ -72,9 +73,9 @@ class Blob:
     def decrypt(
         self,
         master_key: bytes,
-        entropy: Optional[bytes] = None,
-        strong_password: Optional[str] = None,
-        smart_card_secret: Optional[bytes] = None,
+        entropy: bytes | None = None,
+        strong_password: str | None = None,
+        smart_card_secret: bytes | None = None,
     ) -> bool:
         """Try to decrypt the blob with the given master key.
 
@@ -129,25 +130,20 @@ class Blob:
     def __repr__(self) -> str:
         s = [
             "DPAPI BLOB",
-            "\n".join(
-                (
-                    "\tversion      = %(version)d",
-                    "\tprovider     = %(provider)s",
-                    "\tmkey         = %(guid)s",
-                    "\tflags        = %(flags)#x",
-                    "\tdescr        = %(description)s",
-                    "\tcipher_algo   = %(cipher_algorithm)r",
-                    "\thash_algo     = %(hash_algorithm)r",
-                )
-            )
-            % self.__dict__,
-            "\tsalt         = %s" % self.salt.hex(),
-            "\thmac         = %s" % self.hmac.hex(),
-            "\tcipher       = %s" % self.cipher_text.hex(),
-            "\tsign         = %s" % self.sign.hex(),
+            f"\tversion      = {self.version}",
+            f"\tprovider     = {self.provider}",
+            f"\tmkey         = {self.guid}",
+            f"\tflags        = {self.flags:#x}",
+            f"\tdescr        = {self.description}",
+            f"\tcipher_algo   = {self.cipher_algorithm!r}",
+            f"\thash_algo     = {self.hash_algorithm!r}",
+            f"\tsalt         = {self.salt.hex()}",
+            f"\thmac         = {self.hmac.hex()}",
+            f"\tcipher       = {self.cipher_text.hex()}",
+            f"\tsign         = {self.sign.hex()}",
         ]
         if self.sign_computed is not None:
-            s.append("\tsign_computed = %s" % self.sign_computed.hex())
+            s.append(f"\tsign_computed = {self.sign_computed.hex()}")
         if self.clear_text is not None:
-            s.append("\tcleartext    = %r" % self.clear_text)
+            s.append(f"\tcleartext    = {self.clear_text!r}")
         return "\n".join(s)

@@ -1,11 +1,20 @@
-from typing import Iterator, Optional, Union
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING, Union
 
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import sru
+from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 NetworkDataRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/network_data",
@@ -176,8 +185,8 @@ VfuRecord = TargetRecordDescriptor(
         ("path", "app"),
         ("string", "user"),
         ("varint", "flags"),
-        ("varint", "start_time"),
-        ("varint", "end_time"),
+        ("datetime", "start_time"),
+        ("datetime", "end_time"),
         ("bytes", "usage"),
     ],
 )
@@ -340,17 +349,22 @@ FIELD_MAPPINGS = {
 }
 
 
-def transform_app_id(value: Optional[Union[bytes, str]]) -> Optional[str]:
+def transform_app_id(value: bytes | str | None) -> str | None:
     if value is not None:
-        if isinstance(value, bytes):
-            value = value.decode()
-        else:
-            value = str(value)
+        value = value.decode() if isinstance(value, bytes) else str(value)
     return value
+
+
+def transform_timestamp(value: int | datetime) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    return wintimestamp(value)
 
 
 TRANSFORMS = {
     "AppId": transform_app_id,
+    "StartTime": transform_timestamp,
+    "EndTime": transform_timestamp,
 }
 
 
@@ -363,11 +377,11 @@ class SRUPlugin(Plugin):
     References:
         - https://docs.microsoft.com/en-us/sql/relational-databases/performance-monitor/monitor-resource-usage-system-monitor?view=sql-server-ver15
         - https://blog.1234n6.com/2019/01/
-    """  # noqa: E501
+    """
 
     __namespace__ = "sru"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._sru = None
 
@@ -376,7 +390,8 @@ class SRUPlugin(Plugin):
             try:
                 self._sru = sru.SRU(srupath.open())
             except Error as e:
-                self.target.log.warning("Error opening SRU database", exc_info=e)
+                self.target.log.warning("Error opening SRU database")
+                self.target.log.debug("", exc_info=e)
 
     def check_compatible(self) -> None:
         if not self._sru:
@@ -401,7 +416,10 @@ class SRUPlugin(Plugin):
             for column, value in column_values:
                 new_value = value
                 if new_value and (transform := TRANSFORMS.get(column)):
-                    new_value = self.target.fs.path(transform(new_value))
+                    if isinstance((transformed_value := transform(new_value)), str):
+                        new_value = self.target.fs.path(transformed_value)
+                    else:
+                        new_value = transformed_value
                 new_column = FIELD_MAPPINGS.get(column, column)
                 record_values[new_column] = new_value
 

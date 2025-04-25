@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import logging
-from collections import defaultdict
-from typing import BinaryIO, Iterator, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume import lvm
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
 
 log = logging.getLogger(__name__)
 
@@ -24,13 +30,13 @@ KNOWN_SKIP_TYPES = (
 class LvmVolumeSystem(LogicalVolumeSystem):
     __type__ = "lvm"
 
-    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         self.lvm = lvm.LVM2(fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
-        lvm_pvs = defaultdict(list)
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
+        devices: dict[str, list[lvm.LVM2Device]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -39,21 +45,18 @@ class LvmVolumeSystem(LogicalVolumeSystem):
             dev = lvm.LVM2Device(vol)
             if metadata := dev.metadata:
                 vg_name = next(key for key, value in metadata.items() if isinstance(value, dict))
-                lvm_pvs[vg_name].append(dev)
+                devices.setdefault(vg_name, []).append(dev)
 
-        for pvs in lvm_pvs.values():
+        for pvs in devices.values():
             try:
-                yield cls(pvs)
-            except Exception:
+                yield cls(pvs, disk=[pv.fh for pv in pvs])
+            except Exception:  # noqa: PERF203
                 continue
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         vols = [fh] if not isinstance(fh, list) else fh
-        for vol in vols:
-            if LvmVolumeSystem.detect_volume(vol):
-                return True
-        return False
+        return any(LvmVolumeSystem.detect_volume(vol) for vol in vols)
 
     @staticmethod
     def _detect_volume(fh: BinaryIO) -> bool:
@@ -74,6 +77,6 @@ class LvmVolumeSystem(LogicalVolumeSystem):
             name = f"{lv.vg.name.replace('-', '--')}-{lv_name.replace('-', '--')}"
 
             fh = lv.open()
-            yield Volume(fh, num, None, fh.size, None, name, raw=lv, vs=self)
+            yield Volume(fh, num, None, fh.size, None, name, raw=lv, disk=self.disk, vs=self)
 
             num += 1

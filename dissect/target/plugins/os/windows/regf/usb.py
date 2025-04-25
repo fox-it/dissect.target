@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import struct
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import wintimestamp
 
@@ -12,8 +12,12 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import VirtualKey
 
 UsbRegistryRecord = TargetRecordDescriptor(
     "windows/registry/usb",
@@ -121,7 +125,6 @@ class UsbPlugin(Plugin):
                         friendly_name = usb_device.value("FriendlyName").value
                     except RegistryValueNotFoundError:
                         self.target.log.warning("No FriendlyName for USB with serial: %s", serial)
-                        pass
 
                     try:
                         container_id = usb_device.value("ContainerID").value
@@ -173,7 +176,7 @@ class UsbPlugin(Plugin):
                 try:
                     if serial in mount.value.decode("utf-16-le").lower():
                         yield mount.name.replace("\\DosDevices\\", "")
-                except UnicodeDecodeError:
+                except UnicodeDecodeError:  # noqa: PERF203
                     pass
         except RegistryKeyNotFoundError:
             pass
@@ -185,7 +188,7 @@ class UsbPlugin(Plugin):
             try:
                 for key in self.target.registry.key(self.USER_MOUNTS + "\\" + volume_guid):
                     yield self.target.registry.get_user_details(key)
-            except RegistryKeyNotFoundError:
+            except RegistryKeyNotFoundError:  # noqa: PERF203
                 pass
 
 
@@ -212,8 +215,7 @@ def unpack_timestamps(usb_reg_properties: VirtualKey) -> dict[str, int]:
                     data_value = version_key.value("(Default)").value
                 timestamps[device_property] = wintimestamp(struct.unpack("<Q", data_value)[0])
                 break
-            else:
-                timestamps[device_property] = None
+            timestamps[device_property] = None
     return timestamps
 
 

@@ -1,19 +1,24 @@
+from __future__ import annotations
+
 import textwrap
 from io import BytesIO
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.network_managers import NetworkManager
 from dissect.target.tools.query import main as target_query
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
 
 @pytest.mark.parametrize(
-    "expected_ips, messages",
+    ("expected_ips", "messages"),
     [
         (
             ["10.13.37.1"],
@@ -55,7 +60,7 @@ def test_ips_dhcp(
 
 
 @pytest.mark.parametrize(
-    "flag, expected_out",
+    ("flag", "expected_out"),
     [
         (None, "['10.13.37.2']"),
         # ("--dhcp-all", "['10.13.37.2', '10.13.37.1']"),
@@ -71,7 +76,7 @@ def test_ips_dhcp_arg(
     capsys: pytest.CaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Test --dhcp-all flag behaviour"""
+    """Test --dhcp-all flag behaviour."""
 
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
@@ -91,12 +96,11 @@ def test_ips_dhcp_arg(
     if flag:
         argv.append(flag)
 
-    with patch("dissect.target.Target.open_all", return_value=[target_unix]):
-        with monkeypatch.context() as m:
-            m.setattr("sys.argv", argv)
-            target_query()
-            out, _ = capsys.readouterr()
-            assert expected_out in out
+    with patch("dissect.target.Target.open_all", return_value=[target_unix]), monkeypatch.context() as m:
+        m.setattr("sys.argv", argv)
+        target_query()
+        out, _ = capsys.readouterr()
+        assert expected_out in out
 
 
 def test_ips_cloud_init(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -104,7 +108,7 @@ def test_ips_cloud_init(target_unix_users: Target, fs_unix: VirtualFilesystem) -
 
     messages = """
     2022-12-31 13:37:00,000 - dhcp.py[DEBUG]: Received dhcp lease on eth0 for 10.13.37.5/24
-    """  # noqa E501
+    """
 
     fs_unix.map_file_fh(
         "/var/log/cloud-init.log",
@@ -149,7 +153,7 @@ def test_dns_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> No
 
 
 def test_ips_netplan_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """Test statically defined ipv4 and ipv6 ip addresses in /etc/netplan/*.yaml"""
+    """Test statically defined ipv4 and ipv6 ip addresses in /etc/netplan/*.yaml."""
 
     config = """
     # This file describes the network interfaces available on your system
@@ -172,7 +176,7 @@ def test_ips_netplan_static(target_unix_users: Target, fs_unix: VirtualFilesyste
 
 
 @pytest.mark.parametrize(
-    "config, expected_output",
+    ("config", "expected_output"),
     [
         ("", []),
         ("network:", []),
@@ -198,7 +202,7 @@ def test_ips_netplan_static_empty_regression(target_unix_users: Target, fs_unix:
 
 
 @pytest.mark.parametrize(
-    "input, expected_output",
+    ("input", "expected_output"),
     [
         # 'invalid' or input that should be filtered
         ("0.0.0.0", set()),
@@ -225,7 +229,7 @@ def test_clean_ips(input: str, expected_output: set) -> None:
 
 
 def test_regression_ips_unique_strings(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """Regression test for https://github.com/fox-it/dissect.target/issues/877"""
+    """Regression test for https://github.com/fox-it/dissect.target/issues/877."""
 
     config = """
     network:
@@ -242,7 +246,7 @@ def test_regression_ips_unique_strings(target_unix: Target, fs_unix: VirtualFile
     target_unix.add_plugin(LinuxPlugin)
 
     assert isinstance(target_unix.ips, list)
-    assert all([isinstance(ip, str) for ip in target_unix.ips])
+    assert all(isinstance(ip, str) for ip in target_unix.ips)
 
     assert len(target_unix.ips) == 1
     assert target_unix.ips == ["1.2.3.4"]

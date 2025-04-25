@@ -1,43 +1,46 @@
+from __future__ import annotations
+
 import io
-from collections import defaultdict
-from typing import BinaryIO, Iterator, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume.ddf.ddf import DDF, DEFAULT_SECTOR_SIZE, DDFPhysicalDisk
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
 
 class DdfVolumeSystem(LogicalVolumeSystem):
     __type__ = "ddf"
 
-    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         self.ddf = DDF(fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
-        sets = defaultdict(list)
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
+        sets: dict[bytes, list[DDFPhysicalDisk]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
                 continue
 
             disk = DDFPhysicalDisk(vol)
-            sets[disk.anchor.DDF_Header_GUID].append(disk)
+            sets.setdefault(disk.anchor.DDF_Header_GUID, []).append(disk)
 
         for devs in sets.values():
             try:
                 yield cls(devs)
-            except Exception:
+            except Exception:  # noqa: PERF203
                 continue
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         vols = [fh] if not isinstance(fh, list) else fh
-        for vol in vols:
-            if DdfVolumeSystem.detect_volume(vol):
-                return True
-        return False
+        return any(DdfVolumeSystem.detect_volume(vol) for vol in vols)
 
     @staticmethod
     def _detect_volume(fh: BinaryIO) -> bool:
@@ -50,4 +53,4 @@ class DdfVolumeSystem(LogicalVolumeSystem):
         for conf in self.ddf.configurations:
             for vd in conf.virtual_disks:
                 fh = vd.open()
-                yield Volume(fh, 1, None, vd.size, None, vd.name, vd.uuid, raw=self.ddf, vs=self)
+                yield Volume(fh, 1, None, vd.size, None, vd.name, vd.uuid, raw=self.ddf, disk=self.disk, vs=self)

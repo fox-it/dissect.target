@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import re
-from typing import Iterator
+from typing import TYPE_CHECKING, Any, Callable, Final
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 re_firewall = re.compile(r"(.*)=(.*)")
 
@@ -12,8 +17,8 @@ class FirewallPlugin(Plugin):
     """Plugin that parses firewall rules from the registry."""
 
     KEY = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules"
-    FIELD_MAP = {"app": "path"}
-    VALUE_MAP = {"active": lambda val: val == "TRUE"}
+    FIELD_MAP: Final[dict[str, str]] = {"app": "path"}
+    VALUE_MAP: Final[dict[str, Callable[[str], Any]]] = {"active": lambda val: val == "TRUE"}
 
     def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
@@ -64,7 +69,7 @@ class FirewallPlugin(Plugin):
                     ft = self.FIELD_MAP.get(fname, "string")
                     try:
                         value = self.VALUE_MAP[fname](value)
-                    except Exception:  # noqa
+                    except Exception:
                         pass
 
                     r.append((ft, fname))

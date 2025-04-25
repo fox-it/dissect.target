@@ -1,13 +1,18 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.clfs import blf, container
 from dissect.clfs.exceptions import InvalidBLFError, InvalidRecordBlockError
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 ClfsRecord = TargetRecordDescriptor(
     "filesystem/windows/clfs",
@@ -55,9 +60,11 @@ class ClfsPlugin(Plugin):
                     blf_instance = blf.BLF(fh)
                     self._blfs.append((blf_path, blf_instance))
                 except InvalidRecordBlockError as e:
-                    self.target.log.warning(f"Invalid record block: {blf_path}", exc_info=e)
+                    self.target.log.warning("Invalid record block: %s", blf_path)
+                    self.target.log.debug("", exc_info=e)
                 except InvalidBLFError as e:
-                    self.target.log.warning(f"Could not validate BLF: {blf_path}", exc_info=e)
+                    self.target.log.warning("Could not validate BLF: %s", blf_path)
+                    self.target.log.debug("", exc_info=e)
 
     def check_compatible(self) -> None:
         if not self._blfs:
@@ -71,7 +78,7 @@ class ClfsPlugin(Plugin):
 
         References:
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-the-common-log-file-system
-        """  # noqa: E501
+        """
 
         for blf_path, blf_instance in self._blfs:
             # We only parse the base record client/container contexts for now
@@ -91,7 +98,6 @@ class ClfsPlugin(Plugin):
                             continue
 
                         container_path = blf_container.name.replace("%BLF%", str(blf_path.parent))
-                        container_path = fsutil.normalize(container_path, alt_separator=blf_path._flavour.altsep)
                         container_file = self.target.fs.path(container_path)
 
                         fh = container_file.open()

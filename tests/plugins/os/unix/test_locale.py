@@ -1,5 +1,11 @@
+from __future__ import annotations
+
 from io import BytesIO
+from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
+
+import pytest
 
 from dissect.target.filesystem import (
     VirtualDirectory,
@@ -7,9 +13,11 @@ from dissect.target.filesystem import (
     VirtualFilesystem,
     VirtualSymlink,
 )
-from dissect.target.plugins.os.unix.locale import LocalePlugin as UnixLocalePlugin
-from dissect.target.target import Target
+from dissect.target.plugins.os.unix.locale import UnixLocalePlugin, timezone_from_path
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_locale_plugin_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -76,3 +84,17 @@ def test_locale_etc_localtime_regular_file(target_unix_users: Target, fs_unix: V
     assert isinstance(fs_unix.get("/usr/share/zoneinfo/Europe/Amsterdam"), VirtualFile)
     assert isinstance(fs_unix.get("/usr/share/zoneinfo/America/New_York"), VirtualFile)
     assert target_unix_users.timezone == "Europe/Amsterdam"
+
+
+@pytest.mark.parametrize(
+    ("input", "expected_output"),
+    [
+        ("/usr/share/zoneinfo/Europe/Amsterdam", "Europe/Amsterdam"),
+        ("/usr/share/zoneinfo/UTC", "UTC"),
+        ("Europe/Amsterdam", "Europe/Amsterdam"),
+        ("Etc/UTC", "UTC"),
+    ],
+)
+def test_locale_timezone_string_normalize(input: str, expected_output: str) -> None:
+    """Test if we normalize zoneinfo paths correctly."""
+    assert timezone_from_path(Path(input)) == expected_output

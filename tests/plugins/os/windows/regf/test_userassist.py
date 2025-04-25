@@ -1,5 +1,12 @@
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.userassist import UserAssistPlugin
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 USERASSIST_DATA_VERSION0 = bytes.fromhex(
     "0100000000060000341ad99d3c98d808",
@@ -15,7 +22,7 @@ USERASSIST_DATA_VERSION5 = bytes.fromhex(
 )
 
 
-def test_userassist_plugin(target_win_users, hive_hku):
+def test_userassist_plugin(target_win_users: Target, hive_hku: VirtualHive) -> None:
     userassist_key_name = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist"
     userassist_key = VirtualKey(hive_hku, userassist_key_name)
 

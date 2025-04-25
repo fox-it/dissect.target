@@ -1,20 +1,23 @@
+from __future__ import annotations
+
 import sys
-from typing import Iterator
-from unittest.mock import MagicMock
+from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from dissect.target.target import Target
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 @pytest.fixture
 def mock_impacket(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
-    try:
-        del sys.modules["dissect.target.loader"]
-    except KeyError:
-        pass
-
     with monkeypatch.context() as m:
+        if "dissect.target.loaders.smb" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.loaders.smb")
+
         mock_impacket = MagicMock()
         m.setitem(sys.modules, "impacket", mock_impacket)
         m.setitem(sys.modules, "impacket.dcerpc", mock_impacket.dcerpc)
@@ -33,7 +36,7 @@ def mock_connection(mock_impacket: MagicMock) -> MagicMock:
     mock_connection = MagicMock()
     mock_impacket.smbconnection.SMBConnection.return_value = mock_connection
 
-    yield mock_connection
+    return mock_connection
 
 
 def test_smb_loader(mock_impacket: MagicMock, mock_connection: MagicMock) -> None:
@@ -41,7 +44,9 @@ def test_smb_loader(mock_impacket: MagicMock, mock_connection: MagicMock) -> Non
     from dissect.target.loader import open as loader_open
     from dissect.target.loaders.smb import SmbLoader, SmbRegistry
 
-    loader = loader_open("smb://user@host")
+    with patch.dict("dissect.target.loader.LOADERS_BY_SCHEME", {"smb": SmbLoader}):
+        loader = loader_open("smb://user@host")
+
     assert isinstance(loader, SmbLoader)
     assert loader._conn is mock_connection
     mock_impacket.smbconnection.SMBConnection.assert_called_with(

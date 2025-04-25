@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.plugins.os.unix.linux.suse.zypper import ZypperPlugin
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 @pytest.mark.parametrize(
@@ -14,7 +21,7 @@ from tests._utils import absolute_path
         "history.1.bz2",
     ],
 )
-def test_zypper_logs(test_file, target_unix, fs_unix) -> None:
+def test_zypper_logs(target_unix: Target, fs_unix: VirtualFilesystem, test_file: str) -> None:
     tz = timezone.utc
     data_file = absolute_path(f"_data/plugins/os/unix/linux/suse/zypp/{test_file}")
     fs_unix.map_file(f"/var/log/zypp/{test_file}", data_file)

@@ -1,4 +1,6 @@
-from typing import BinaryIO, Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
 from dissect.util import ts
@@ -6,6 +8,9 @@ from dissect.util import ts
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 LastLogRecord = TargetRecordDescriptor(
     "linux/log/lastlog",
@@ -47,7 +52,7 @@ class LastLogFile:
         while True:
             try:
                 yield c_lastlog.entry(self.fh)
-            except EOFError:
+            except EOFError:  # noqa: PERF203
                 break
 
 

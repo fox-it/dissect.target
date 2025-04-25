@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
+from dissect.target.plugins.os.default.locale import LocalePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 WindowsKeyboardRecord = TargetRecordDescriptor(
     "windows/keyboard",
@@ -16,10 +22,10 @@ WindowsKeyboardRecord = TargetRecordDescriptor(
 )
 
 
-class LocalePlugin(Plugin):
+class WindowsLocalePlugin(LocalePlugin):
     """Windows locale plugin."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.LANG_DICT = {
             lang.name: lang.value
@@ -30,6 +36,23 @@ class LocalePlugin(Plugin):
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):
             raise UnsupportedPluginError("Unsupported Plugin")
+
+    @export(property=True)
+    def timezone(self) -> str | None:
+        """Get the configured timezone of the system in IANA TZ standard format."""
+        return normalize_timezone(self.target.datetime.tzinfo.name)
+
+    @export(property=True)
+    def language(self) -> str | None:
+        """Get a list of installed languages on the system."""
+        # HKCU\\Control Panel\\International\\User Profile" Languages
+        found_languages = []
+        for up in self.target.registry.keys("HKCU\\Control Panel\\International\\User Profile"):
+            for subkey in up.subkeys():
+                language = normalize_language(subkey.name.replace("-", "_"))
+                if language not in found_languages:
+                    found_languages.append(language)
+        return found_languages
 
     @export(record=WindowsKeyboardRecord)
     def keyboard(self) -> Iterator[WindowsKeyboardRecord]:
@@ -45,20 +68,3 @@ class LocalePlugin(Plugin):
                         id=language_id,
                         _target=self.target,
                     )
-
-    @export(property=True)
-    def language(self) -> str | None:
-        """Get a list of installed languages on the system."""
-        # HKCU\\Control Panel\\International\\User Profile" Languages
-        found_languages = []
-        for up in self.target.registry.keys("HKCU\\Control Panel\\International\\User Profile"):
-            for subkey in up.subkeys():
-                language = normalize_language(subkey.name.replace("-", "_"))
-                if language not in found_languages:
-                    found_languages.append(language)
-        return found_languages
-
-    @export(property=True)
-    def timezone(self) -> str | None:
-        """Get the configured timezone of the system in IANA TZ standard format."""
-        return normalize_timezone(self.target.datetime.tzinfo.name)

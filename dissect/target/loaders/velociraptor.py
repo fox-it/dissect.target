@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import zipfile
-from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
@@ -13,7 +12,9 @@ from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +70,8 @@ def extract_drive_letter(name: str) -> str | None:
     if len(name) == 4 and name.endswith("%3A"):
         return name[0].lower()
 
+    return None
+
 
 class VelociraptorLoader(DirLoader):
     """Load Rapid7 Velociraptor forensic image files.
@@ -76,7 +79,7 @@ class VelociraptorLoader(DirLoader):
     As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
     Generic.Collectors.File (Unix) uses the accessors file and auto. The loader supports the following configuration::
 
-        {"Generic.Collectors.File":{"Root":"/","collectionSpec":"Glob\\netc/**\\nvar/log/**"}}
+        {"Generic.Collectors.File": {"Root": "/", "collectionSpec": "Glob\\netc/**\\nvar/log/**"}}
 
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
     ntfs_vss and auto. The loader supports a collection where multiple accessors were used.
@@ -88,7 +91,7 @@ class VelociraptorLoader(DirLoader):
     """
 
     def __init__(self, path: Path, **kwargs):
-        super().__init__(path)
+        super().__init__(path, **kwargs)
 
         if path.suffix == ".zip":
             self.root = zipfile.Path(path.open("rb"))

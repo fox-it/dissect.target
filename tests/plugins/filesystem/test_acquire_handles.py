@@ -1,9 +1,11 @@
-from dissect.target import Target
+from __future__ import annotations
+
 from dissect.target.plugins.filesystem.acquire_handles import OpenHandlesPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_acquire_handles_plugin():
+def test_acquire_handles_plugin() -> None:
     file_hashes_target = Target().open(
         absolute_path("_data/plugins/filesystem/acquire_handles/test-acquire-handles.tar")
     )

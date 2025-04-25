@@ -4,15 +4,14 @@ import gzip
 import hashlib
 import struct
 from base64 import b64decode
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from tarfile import ReadError
-from typing import BinaryIO, Iterator, TextIO
+from typing import TYPE_CHECKING, BinaryIO, TextIO
 
 from dissect.util import cpio
 from dissect.util.compression import xz
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor, UnixUserRecord
@@ -24,7 +23,14 @@ from dissect.target.plugins.os.unix.linux.fortios._keys import (
     ChaCha20Key,
     ChaCha20Seed,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 try:
     from Crypto.Cipher import AES, ChaCha20
@@ -43,6 +49,20 @@ FortiOSUserRecord = TargetRecordDescriptor(
         ("path", "home"),
     ],
 )
+
+
+def create_tar_filesystem(fileobj: BinaryIO) -> TarFilesystem:
+    """Create appropriate ``TarFilesystem`` based on file format.
+
+    Args:
+        fileobj: The file-like object of a tar or cpio file
+
+    Returns:
+        TarFilesystem with cpio handler if cpio format is detected.
+    """
+    if open_decompress(fileobj=fileobj).read(4) == b"0707":
+        return TarFilesystem(fileobj, tarinfo=cpio.CpioInfo)
+    return TarFilesystem(fileobj)
 
 
 class FortiOSPlugin(LinuxPlugin):
@@ -66,16 +86,12 @@ class FortiOSPlugin(LinuxPlugin):
         config = {}
         for conf_file, section in CONFIG_FILES.items():
             if (conf_path := self.target.fs.path(conf_file)).exists():
-                if conf_file.endswith("gz"):
-                    fh = gzip.open(conf_path.open("rb"), "rt")
-                else:
-                    fh = conf_path.open("rt")
+                with gzip.open(conf_path.open("rb"), "rt") if conf_file.endswith("gz") else conf_path.open("rt") as fh:
+                    if not self._version and section in ["global-config", "root-config"]:
+                        self._version = fh.readline().split("=", 1)[1]
 
-                if not self._version and section in ["global-config", "root-config"]:
-                    self._version = fh.readline().split("=", 1)[1]
-
-                parsed = FortiOSConfig.from_fh(fh)
-                config |= {section: parsed} if section else parsed
+                    parsed = FortiOSConfig.from_fh(fh)
+                    config |= {section: parsed} if section else parsed
 
         return config
 
@@ -86,18 +102,16 @@ class FortiOSPlugin(LinuxPlugin):
             # Other Fortinet devices may look different.
             if fs.exists("/rootfs.gz") and (any(map(fs.exists, (".fgtsum", ".fmg_sign", "flatkc", "system.conf")))):
                 return fs
+        return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> FortiOSPlugin:
-        target.log.warning("Attempting to load rootfs.gz, this can take a while.")
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
+        target.log.warning("Attempting to load rootfs.gz, this can take a while")
         rootfs = sysvol.path("/rootfs.gz")
         vfs = None
 
         try:
-            if open_decompress(rootfs).read(4) == b"0707":
-                vfs = TarFilesystem(rootfs.open(), tarinfo=cpio.CpioInfo)
-            else:
-                vfs = TarFilesystem(rootfs.open())
+            vfs = create_tar_filesystem(rootfs.open())
         except ReadError:
             # The rootfs.gz file could be encrypted.
             try:
@@ -107,14 +121,14 @@ class FortiOSPlugin(LinuxPlugin):
                 target.log.info("Trying to decrypt_rootfs using key: %r", key)
                 rfs_fh = decrypt_rootfs(rootfs.open(), key)
                 target.log.info("Decrypted fh: %r", rfs_fh)
-                vfs = TarFilesystem(rfs_fh, tarinfo=cpio.CpioInfo)
+                vfs = create_tar_filesystem(rfs_fh)
             except RuntimeError:
-                target.log.warning("Could not decrypt rootfs.gz. Missing `pycryptodome` dependency.")
+                target.log.warning("Could not decrypt rootfs.gz, missing `pycryptodome` dependency")
             except ValueError as e:
-                target.log.warning("Could not decrypt rootfs.gz. Unknown kernel hash (%s).", kernel_hash)
+                target.log.warning("Could not decrypt rootfs.gz, unknown kernel hash (%s)", kernel_hash)
                 target.log.debug("", exc_info=e)
             except ReadError as e:
-                target.log.warning("Could not mount rootfs.gz. It could be corrupt.")
+                target.log.warning("Could not mount rootfs.gz, it could be corrupt")
                 target.log.debug("", exc_info=e)
 
         if vfs:
@@ -124,10 +138,10 @@ class FortiOSPlugin(LinuxPlugin):
 
         # FortiGate
         if (datafs_tar := sysvol.path("/datafs.tar.gz")).exists():
-            target.fs.append_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
+            target.fs.append_layer().mount("/data", TarFilesystem(BytesIO(datafs_tar.open("rb").read())))
 
         # Additional FortiGate or FortiManager tars with corrupt XZ streams
-        target.log.warning("Attempting to load XZ files, this can take a while.")
+        target.log.warning("Attempting to load XZ files, this can take a while")
         for path in (
             "bin.tar.xz",
             "usr.tar.xz",
@@ -137,12 +151,17 @@ class FortiOSPlugin(LinuxPlugin):
             "syntax.tar.xz",
         ):
             if (tar := target.fs.path(path)).exists() or (tar := sysvol.path(path)).exists():
-                fh = xz.repair_checksum(tar.open("rb"))
+                fh = xz.repair_checksum(BytesIO(tar.open("rb").read()))
                 target.fs.append_layer().mount("/", TarFilesystem(fh))
 
         # FortiAnalyzer and FortiManager
         if (rootfs_ext_tar := sysvol.path("rootfs-ext.tar.xz")).exists():
             target.fs.append_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
+
+        # If there is no /migadmin at this point, check sysvol and map accordingly
+        if not target.fs.exists("/migadmin") and target.fs.exists("/data/migadmin"):
+            target.log.info("Directory migadmin found in sysvol, mapping /migadmin to /data/migadmin")
+            target.fs.map_file_entry("/migadmin", target.fs.get("/data/migadmin"))
 
         # Filesystem mounts can be discovered in the FortiCare debug report
         # or using ``fnsysctl ls`` and ``fnsysctl df`` in the cli.
@@ -207,12 +226,10 @@ class FortiOSPlugin(LinuxPlugin):
     @export(property=True)
     def dns(self) -> list[str]:
         """Return configured WAN DNS servers."""
-        entries = []
         try:
-            for entry in self._config["global-config"]["system"]["dns"].values():
-                entries.append(entry[0])
+            entries = [entry[0] for entry in self._config["global-config"]["system"]["dns"].values()]
         except KeyError:
-            pass
+            entries = []
         return entries
 
     @export(property=True)
@@ -288,8 +305,8 @@ class FortiOSPlugin(LinuxPlugin):
         if self._config.get("root-config", {}).get("user", {}).get("group", {}).get("guestgroup"):
             # Temporary guest users
             try:
-                for _, entry in (
-                    self._config["root-config"]["user"]["group"].get("guestgroup", {}).get("guest", {}).items()
+                for entry in (
+                    self._config["root-config"]["user"]["group"].get("guestgroup", {}).get("guest", {}).values()
                 ):
                     try:
                         password = decrypt_password(entry.get("password")[-1])
@@ -317,6 +334,7 @@ class FortiOSPlugin(LinuxPlugin):
         for path in ["/lib/libav.so", "/bin/ctr", "/bin/grep"]:
             if (bin := self.target.fs.path(path)).exists():
                 return self._get_architecture(path=bin)
+        return None
 
 
 class ConfigNode(dict):
@@ -336,7 +354,7 @@ class ConfigNode(dict):
 
 class FortiOSConfig(ConfigNode):
     @classmethod
-    def from_fh(cls, fh: TextIO) -> FortiOSConfig:
+    def from_fh(cls, fh: TextIO) -> Self:
         root = cls()
 
         stack = []
@@ -352,11 +370,7 @@ class FortiOSConfig(ConfigNode):
             elif cmd == "edit":
                 stack.append(parts[1:])
 
-            elif cmd == "end":
-                if stack:
-                    stack.pop()
-
-            elif cmd == "next":
+            elif cmd == "end" or cmd == "next":
                 if stack:
                     stack.pop()
 
@@ -428,12 +442,12 @@ def parse_version(input: str) -> str:
         type, version, _, build_num, build_date = version_str.rsplit("-", 4)
 
         build_num = build_num.replace("build", "build ", 1)
-        build_date = datetime.strptime(build_date, "%y%m%d").strftime("%Y-%m-%d")
-        type = PREFIXES.get(type[:3], type)
-
-        return f"{type} {version} ({build_num}, {build_date})"
+        build_date = datetime.strptime(build_date, "%y%m%d").replace(tzinfo=timezone.utc).strftime("%Y-%m-%d")
     except ValueError:
         return input
+    else:
+        type = PREFIXES.get(type[:3], type)
+        return f"{type} {version} ({build_num}, {build_date})"
 
 
 def local_groups_to_users(config_groups: dict) -> dict:
@@ -501,10 +515,10 @@ def key_iv_for_kernel_hash(kernel_hash: str) -> AesKey | ChaCha20Key:
         # FortiOS 7.4.x uses a KDF to derive the key and IV
         key, iv = _kdf_7_4_x(key.key)
         return ChaCha20Key(key, iv)
-    elif isinstance(key, ChaCha20Key):
+    if isinstance(key, ChaCha20Key):
         # FortiOS 7.0.13 and 7.0.14 uses a static key and IV
         return key
-    elif isinstance(key, AesKey):
+    if isinstance(key, AesKey):
         # FortiOS 7.0.16, 7.2.9, 7.4.4, 7.6.0 and higher uses AES-CTR with a custom CTR increment
         return key
     raise ValueError(f"No known decryption keys for kernel hash: {kernel_hash}")
@@ -646,3 +660,4 @@ def get_kernel_hash(sysvol: Filesystem) -> str | None:
     for k in kernel_files:
         if sysvol.path(k).exists():
             return sysvol.sha256(k)
+    return None

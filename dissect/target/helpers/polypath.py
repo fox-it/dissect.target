@@ -15,8 +15,7 @@ re_normalize_sbs_path = re.compile(r"[\\/]+")
 def normalize(path: str, alt_separator: str = "") -> str:
     if alt_separator == "\\":
         return re_normalize_sbs_path.sub("/", path)
-    else:
-        return re_normalize_path.sub("/", path)
+    return re_normalize_path.sub("/", path)
 
 
 def isabs(path: str, alt_separator: str = "") -> bool:
@@ -37,7 +36,7 @@ splitext = posixpath.splitext
 splitdrive = posixpath.splitdrive
 
 
-def splitroot(path: str, alt_separator: str = "") -> tuple[str, str]:
+def splitroot(path: str, alt_separator: str = "") -> tuple[str, str, str]:
     return posixpath.splitroot(normalize(path, alt_separator=alt_separator))
 
 
@@ -71,3 +70,11 @@ def relpath(path: str, start: str, alt_separator: str = "") -> str:
 
 def commonpath(paths: list[str], alt_separator: str = "") -> str:
     return posixpath.commonpath([normalize(path, alt_separator=alt_separator) for path in paths])
+
+
+def isreserved(path: str) -> bool:
+    """Return True if the path is a reserved name.
+
+    We currently do not have any reserved names.
+    """
+    return False

@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import ipaddress
-from datetime import datetime
 from functools import cached_property
-from pathlib import Path
-from typing import TYPE_CHECKING, Optional
-from urllib.parse import ParseResult
+from typing import TYPE_CHECKING
 
 try:
     from cbc_sdk.errors import CredentialError
-    from cbc_sdk.live_response_api import LiveResponseSession
     from cbc_sdk.platform import Device
     from cbc_sdk.rest_api import CBCloudAPI
 except ImportError:
@@ -25,11 +21,22 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystems.cb import CbFilesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.regutil import RegistryHive, RegistryKey, RegistryValue
+from dissect.target.helpers.regutil import (
+    RegistryHive,
+    RegistryKey,
+    RegistryValue,
+    ValueType,
+)
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
+    from datetime import datetime
+    from pathlib import Path
+    from urllib.parse import ParseResult
+
+    from cbc_sdk.live_response_api import LiveResponseSession
+
     from dissect.target.target import Target
 
 
@@ -41,10 +48,10 @@ class CbLoader(Loader):
     Refer to the Carbon Black documentation for setting up a ``credentials.cbc`` file.
     """
 
-    def __init__(self, path: str, parsed_path: ParseResult = None, **kwargs):
-        super().__init__(path)
+    def __init__(self, path: Path, parsed_path: ParseResult | None = None):
+        super().__init__(path, parsed_path, resolve=False)
 
-        self.host, _, instance = parsed_path.netloc.partition("@")
+        self.host, _, instance = self.parsed_path.netloc.partition("@")
 
         try:
             self.cbc_api = CBCloudAPI(profile=instance or None)
@@ -57,7 +64,7 @@ class CbLoader(Loader):
 
         self.session = self.sensor.lr_session()
 
-    def get_device(self) -> Optional[Device]:
+    def get_device(self) -> Device | None:
         try:
             ipaddress.ip_address(self.host)
             host_is_ip = True
@@ -112,7 +119,7 @@ class CbRegistry(RegistryPlugin):
                 hive = CbRegistryHive(self.session, root_key)
                 self._add_hive(hive_name, hive, TargetPath(self.target.fs, "CBR"))
                 self._map_hive(root_key, hive)
-            except RegistryError:
+            except RegistryError:  # noqa: PERF203
                 continue
 
 
@@ -122,7 +129,7 @@ class CbRegistryHive(RegistryHive):
         self.root_key = root_key
 
     def key(self, key: str) -> CbRegistryKey:
-        path = "\\".join([self.root_key, key]) if key else self.root_key
+        path = f"{self.root_key}\\{key}" if key else self.root_key
         return CbRegistryKey(self, path)
 
 
@@ -156,12 +163,12 @@ class CbRegistryKey(RegistryKey):
         # To improve peformance, immediately return a "hollow" key object
         # Only listing all subkeys or reading a value will result in data being loaded
         # Technically this means we won't raise a RegistryKeyNotFoundError in the correct place
-        return CbRegistryKey(self.hive, "\\".join([self._path, subkey]))
+        return CbRegistryKey(self.hive, f"{self._path}\\{subkey}")
 
     def subkeys(self) -> list[CbRegistryKey]:
         return list(map(self.subkey, self.data["sub_keys"]))
 
-    def value(self, value: str) -> str:
+    def _value(self, value: str) -> CbRegistryValue:
         reg_value = value.lower()
         for val in self.values():
             if val.name.lower() == reg_value:
@@ -197,7 +204,7 @@ class CbRegistryValue(RegistryValue):
         return self._name
 
     @property
-    def value(self) -> str:
+    def value(self) -> ValueType:
         return self._value
 
     @property

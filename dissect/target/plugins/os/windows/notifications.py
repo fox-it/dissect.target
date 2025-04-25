@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Iterator
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from dissect.cstruct import cstruct
@@ -13,6 +13,11 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import WindowsUserRecord, create_extended_descriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 appdb_def = """
 typedef struct {
@@ -197,7 +202,7 @@ class NotificationsPlugin(Plugin):
 
     __namespace__ = "notifications"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.wpndb_files = []
         self.appdb_files = []
@@ -225,8 +230,7 @@ class NotificationsPlugin(Plugin):
                             )
                             if version != 1:
                                 self.target.log.warning(
-                                    "Unknown appdb version %s in file %s, "
-                                    "please consider providing us with a sample.",
+                                    "Unknown appdb version %s in file %s, please consider providing us with a sample.",
                                     version,
                                     appdb_file,
                                 )
@@ -410,8 +414,7 @@ class NotificationsPlugin(Plugin):
                         continue
                     elif chunk.Info.InUse != 1:
                         self.target.log.warning(
-                            "Unknown field value %s for chunk.Info.InUse, "
-                            "please consider providing us with a sample.",
+                            "Unknown field value %s for chunk.Info.InUse, please consider providing us with a sample.",
                             chunk.Info.InUse,
                         )
                         continue
@@ -427,11 +430,9 @@ class NotificationsPlugin(Plugin):
                     if badge_record:
                         yield badge_record
 
-                    for tile_record in self._get_appdb_tile_records(chunk, chunk_num, user):
-                        yield tile_record
+                    yield from self._get_appdb_tile_records(chunk, chunk_num, user)
 
-                    for toast_record in self._get_appdb_toast_records(chunk, chunk_num, user):
-                        yield toast_record
+                    yield from self._get_appdb_toast_records(chunk, chunk_num, user)
 
     @export(record=[WpnDatabaseNotificationRecord, WpnDatabaseNotificationHandlerRecord])
     def wpndatabase(self) -> Iterator[WpnDatabaseNotificationRecord | WpnDatabaseNotificationHandlerRecord]:
@@ -440,6 +441,8 @@ class NotificationsPlugin(Plugin):
         References:
             - https://inc0x0.com/2018/10/windows-10-notification-database/
         """
+        target_tz = self.target.datetime.tzinfo
+
         for user, wpndatabase in self.wpndb_files:
             db = sqlite3.SQLite3(wpndatabase.open())
             handlers = {}
@@ -447,8 +450,12 @@ class NotificationsPlugin(Plugin):
             if table := db.table("NotificationHandler"):
                 for row in table.rows():
                     handlers[row["[RecordId]"]] = WpnDatabaseNotificationHandlerRecord(
-                        created_time=datetime.datetime.strptime(row["[CreatedTime]"], "%Y-%m-%d %H:%M:%S"),
-                        modified_time=datetime.datetime.strptime(row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S"),
+                        created_time=datetime.datetime.strptime(row["[CreatedTime]"], "%Y-%m-%d %H:%M:%S").replace(
+                            tzinfo=target_tz
+                        ),
+                        modified_time=datetime.datetime.strptime(row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S").replace(
+                            tzinfo=target_tz
+                        ),
                         id=row["[RecordId]"],
                         primary_id=row["[PrimaryId]"],
                         wns_id=row["[WNSId]"],

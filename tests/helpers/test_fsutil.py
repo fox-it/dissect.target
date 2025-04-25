@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import bz2
 import gzip
 import io
@@ -6,7 +8,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable
 from unittest.mock import Mock, patch
 
 import pytest
@@ -21,11 +23,15 @@ from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystemEntry
 from dissect.target.helpers import fsutil
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 
 @pytest.mark.parametrize(
-    ("path, alt_separator, result"),
+    ("path", "alt_separator", "result"),
     [
         ("/some/dir/some/file", "", "/some/dir/some/file"),
         ("/some/dir/some/file", "\\", "/some/dir/some/file"),
@@ -39,7 +45,7 @@ def test_normalize(path: str, alt_separator: str, result: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("args, alt_separator, result"),
+    ("args", "alt_separator", "result"),
     [
         (("/some/dir", "some/file"), "", "/some/dir/some/file"),
         (("/some/dir", "some/file"), "\\", "/some/dir/some/file"),
@@ -53,7 +59,7 @@ def test_join(args: str, alt_separator: str, result: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path, alt_separator, result"),
+    ("path", "alt_separator", "result"),
     [
         ("/some/dir/some/file", "", "/some/dir/some"),
         ("/some/dir/some/file", "\\", "/some/dir/some"),
@@ -67,7 +73,7 @@ def test_dirname(path: str, alt_separator: str, result: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path, alt_separator, result"),
+    ("path", "alt_separator", "result"),
     [
         ("/some/dir/some/file", "", "file"),
         ("/some/dir/some/file", "\\", "file"),
@@ -81,7 +87,7 @@ def test_basename(path: str, alt_separator: str, result: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path, alt_separator, result"),
+    ("path", "alt_separator", "result"),
     [
         ("/some/dir/some/file", "", ("/some/dir/some", "file")),
         ("/some/dir/some/file", "\\", ("/some/dir/some", "file")),
@@ -99,7 +105,7 @@ def test_split(path: str, alt_separator: str, result: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path, alt_separator, result"),
+    ("path", "alt_separator", "result"),
     [
         ("/some/dir", "", True),
         ("some/dir", "", False),
@@ -114,7 +120,7 @@ def test_isabs(path: str, alt_separator: str, result: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path, alt_separator, result"),
+    ("path", "alt_separator", "result"),
     [
         ("/some/dir/../some/file", "", "/some/some/file"),
         ("/some/dir/../some/file", "\\", "/some/some/file"),
@@ -128,7 +134,7 @@ def test_normpath(path: str, alt_separator: str, result: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path, cwd, alt_separator, result"),
+    ("path", "cwd", "alt_separator", "result"),
     [
         ("/some/dir", "", "", "/some/dir"),
         ("some/dir", "", "", "/some/dir"),
@@ -150,7 +156,7 @@ def test_abspath(path: str, cwd: str, alt_separator: str, result: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path, start, alt_separator, result"),
+    ("path", "start", "alt_separator", "result"),
     [
         ("/some/dir/some/file", "/some/dir", "", "some/file"),
         ("/some/dir/some/file", "/some/dir", "\\", "some/file"),
@@ -163,6 +169,26 @@ def test_abspath(path: str, cwd: str, alt_separator: str, result: str) -> None:
 )
 def test_relpath(path: str, start: str, alt_separator: str, result: str) -> None:
     assert fsutil.relpath(path, start, alt_separator=alt_separator) == result
+
+
+@pytest.mark.parametrize(
+    ("paths", "alt_separator", "result"),
+    [
+        (["/some/dir/some/file", "/some/dir/some/other"], "", "/some/dir/some"),
+        (["/some/dir/some/file", "/some/dir/some/other"], "\\", "/some/dir/some"),
+        (["\\some\\dir\\some\\file", "\\some\\dir\\some\\other"], "\\", "/some/dir/some"),
+        (["/some/dir/some/file", "/some/dir/other"], "", "/some/dir"),
+        (["/some/dir/some/file", "/some/other"], "", "/some"),
+        (["/some/dir/some/file", "/some/other"], "\\", "/some"),
+    ],
+)
+def test_commonpath(paths: list[str], alt_separator: str, result: str) -> None:
+    assert fsutil.commonpath(paths, alt_separator=alt_separator) == result
+
+
+def test_isreserved() -> None:
+    assert not fsutil.isreserved("CON")
+    assert not fsutil.isreserved("foo")
 
 
 def test_generate_addr() -> None:
@@ -216,22 +242,25 @@ def test_stat_result() -> None:
     assert st.st_blksize is None
     assert list(st) == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-    my_stat = os.stat(__file__)
+    my_stat = Path(__file__).stat()
     st = fsutil.stat_result.copy(my_stat)
     assert st == my_stat
 
 
 @pytest.fixture
-def path_fs() -> Iterator[VirtualFilesystem]:
+def path_fs() -> VirtualFilesystem:
     vfs = VirtualFilesystem()
 
     vfs.makedirs("/some/dir")
+    vfs.makedirs("/some/dir/nested")
     vfs.symlink("/some/dir/file.txt", "/some/symlink.txt")
     vfs.symlink("nonexistent", "/some/dir/link.txt")
+    vfs.symlink("/some/dir/nested", "/some/dirlink")
     vfs.map_file_fh("/some/file.txt", io.BytesIO(b"content"))
     vfs.map_file_fh("/some/dir/file.txt", io.BytesIO(b""))
+    vfs.map_file_fh("/some/dir/nested/file.txt", io.BytesIO(b""))
 
-    yield vfs
+    return vfs
 
 
 def test_target_path_drive(path_fs: VirtualFilesystem) -> None:
@@ -255,7 +284,7 @@ def test_target_path_parents(path_fs: VirtualFilesystem) -> None:
     parents = list(path.parents)
     assert parents == [path_fs.path("/some/dir"), path_fs.path("/some"), path_fs.path("/")]
     assert [p.exists() for p in parents]
-    assert all([p._fs == path_fs for p in parents])
+    assert all(p._fs == path_fs for p in parents)
     assert path.parents[1] == path.parents[-2] == path_fs.path("/some")
 
 
@@ -308,6 +337,7 @@ def test_target_path_is_relative_to(path_fs: VirtualFilesystem) -> None:
     assert not path_fs.path("/some/dir/file.txt").is_relative_to("/some/other")
 
 
+@pytest.mark.skipif(sys.version_info >= (3, 13), reason="deprecated on Python 3.13+")
 def test_target_path_is_reserved(path_fs: VirtualFilesystem) -> None:
     # We currently do not have any reserved names for TargetPath
     assert not path_fs.path("CON").is_reserved()
@@ -374,13 +404,47 @@ def test_target_path_glob(path_fs: VirtualFilesystem) -> None:
 
 
 def test_target_path_rglob(path_fs: VirtualFilesystem) -> None:
-    assert list(path_fs.path("/some").rglob("*.txt")) == [
-        path_fs.path("/some/symlink.txt"),
-        path_fs.path("/some/file.txt"),
-        path_fs.path("/some/dir/link.txt"),
-        path_fs.path("/some/dir/file.txt"),
+    assert list(map(str, path_fs.path("/some").rglob("*.txt"))) == [
+        "/some/symlink.txt",
+        "/some/file.txt",
+        "/some/dir/link.txt",
+        "/some/dir/file.txt",
+        "/some/dir/nested/file.txt",
     ]
+    assert list(path_fs.path("/some").rglob("*.TXT")) == []
     assert list(path_fs.path("/some").rglob("*.csv")) == []
+
+    with patch.object(path_fs, "case_sensitive", False):
+        assert list(map(str, path_fs.path("/some").rglob("*.TXT"))) == [
+            "/some/symlink.txt",
+            "/some/file.txt",
+            "/some/dir/link.txt",
+            "/some/dir/file.txt",
+            "/some/dir/nested/file.txt",
+        ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="requires Python 3.12+")
+def test_target_path_rglob_case_sensitive(path_fs: VirtualFilesystem) -> None:
+    assert list(map(str, path_fs.path("/some").rglob("*.TXT", case_sensitive=False))) == [
+        "/some/symlink.txt",
+        "/some/file.txt",
+        "/some/dir/link.txt",
+        "/some/dir/file.txt",
+        "/some/dir/nested/file.txt",
+    ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 13), reason="requires Python 3.13+")
+def test_target_path_rglob_recurse_symlinks(path_fs: VirtualFilesystem) -> None:
+    assert list(map(str, path_fs.path("/some").rglob("*.txt", recurse_symlinks=True))) == [
+        "/some/symlink.txt",
+        "/some/file.txt",
+        "/some/dirlink/file.txt",
+        "/some/dir/link.txt",
+        "/some/dir/file.txt",
+        "/some/dir/nested/file.txt",
+    ]
 
 
 def test_target_path_is_dir(path_fs: VirtualFilesystem) -> None:
@@ -439,14 +503,16 @@ def test_target_path_iterdir(path_fs: VirtualFilesystem) -> None:
     assert list(path_fs.path("/some").iterdir()) == [
         path_fs.path("/some/dir"),
         path_fs.path("/some/symlink.txt"),
+        path_fs.path("/some/dirlink"),
         path_fs.path("/some/file.txt"),
     ]
 
 
 def test_target_path_walk(path_fs: VirtualFilesystem) -> None:
     assert list(path_fs.path("/some").walk()) == [
-        (path_fs.path("/some"), ["dir"], ["symlink.txt", "file.txt"]),
-        (path_fs.path("/some/dir"), [], ["link.txt", "file.txt"]),
+        (path_fs.path("/some"), ["dir"], ["symlink.txt", "dirlink", "file.txt"]),
+        (path_fs.path("/some/dir"), ["nested"], ["link.txt", "file.txt"]),
+        (path_fs.path("/some/dir/nested"), [], ["file.txt"]),
     ]
 
 
@@ -595,7 +661,7 @@ def test_target_path_not_implemented(path_fs: VirtualFilesystem) -> None:
 
 
 @pytest.mark.parametrize(
-    ("path, alt_separator, result"),
+    ("path", "alt_separator", "result"),
     [
         ("/some/dir/some/file", "", ("/", "some", "dir", "some", "file")),
         ("/some/dir//some/file", "", ("/", "some", "dir", "some", "file")),
@@ -625,8 +691,9 @@ def test_pure_dissect_path__from_parts_flavour(alt_separator: str, case_sensitiv
     vfs = VirtualFilesystem(alt_separator=alt_separator, case_sensitive=case_sensitive)
     pure_dissect_path = fsutil.PureDissectPath(vfs, "/some/dir")
 
-    assert pure_dissect_path._flavour.altsep == alt_separator
-    assert pure_dissect_path._flavour.case_sensitive == case_sensitive
+    obj = getattr(pure_dissect_path, "parser", None) or pure_dissect_path._flavour
+    assert obj.altsep == alt_separator
+    assert obj.case_sensitive == case_sensitive
 
 
 def test_pure_dissect_path__from_parts_no_fs_exception() -> None:
@@ -635,7 +702,7 @@ def test_pure_dissect_path__from_parts_no_fs_exception() -> None:
 
 
 @pytest.mark.parametrize(
-    ("file_name, compressor, content"),
+    ("file_name", "compressor", "content"),
     [
         ("plain", lambda x: x, b"plain\ncontent"),
         ("comp.gz", gzip.compress, b"gzip\ncontent"),
@@ -646,8 +713,11 @@ def test_pure_dissect_path__from_parts_no_fs_exception() -> None:
 )
 def test_open_decompress(file_name: str, compressor: Callable, content: bytes) -> None:
     vfs = VirtualFilesystem()
-    vfs.map_file_fh(file_name, io.BytesIO(compressor(content)))
+    fh = io.BytesIO(compressor(content))
+    vfs.map_file_fh(file_name, fh)
     assert fsutil.open_decompress(vfs.path(file_name)).read() == content
+    fh.seek(2)
+    assert fsutil.open_decompress(fileobj=fh).read() == content
 
 
 def test_open_decompress_text_modes() -> None:
@@ -678,13 +748,13 @@ def test_reverse_readlines() -> None:
 
     expected_range_reverse = ["99"] + [f"{i}\n" for i in range(98, -1, -1)]
 
-    vfs.map_file_fh("file_n", io.BytesIO("\n".join(map(str, range(0, 100))).encode()))
+    vfs.map_file_fh("file_n", io.BytesIO("\n".join(map(str, range(100))).encode()))
     assert list(fsutil.reverse_readlines(vfs.path("file_n").open("rt"))) == expected_range_reverse
 
-    vfs.map_file_fh("file_r", io.BytesIO("\r".join(map(str, range(0, 100))).encode()))
+    vfs.map_file_fh("file_r", io.BytesIO("\r".join(map(str, range(100))).encode()))
     assert list(fsutil.reverse_readlines(vfs.path("file_r").open("rt"))) == expected_range_reverse
 
-    vfs.map_file_fh("file_rn", io.BytesIO("\r\n".join(map(str, range(0, 100))).encode()))
+    vfs.map_file_fh("file_rn", io.BytesIO("\r\n".join(map(str, range(100))).encode()))
     assert list(fsutil.reverse_readlines(vfs.path("file_rn").open("rt"))) == expected_range_reverse
 
     vfs.map_file_fh("file_multi", io.BytesIO("🦊\n🦊🦊\n🦊🦊🦊".encode()))
@@ -698,7 +768,9 @@ def test_reverse_readlines() -> None:
     ]
 
     vfs.map_file_fh("file_multi_long_single", io.BytesIO((("🦊" * 8000) + ("a" * 200)).encode()))
-    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [("🦊" * 8000) + ("a" * 200)]
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [
+        ("🦊" * 8000) + ("a" * 200)
+    ]
 
     vfs.map_file_fh("empty", io.BytesIO(b""))
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
@@ -717,6 +789,21 @@ def test_reverse_readlines() -> None:
         "foobar\n",
         "foobar\n",
     ]
+
+
+def test_reverse_read() -> None:
+    """Test if we read the bytes of a file in reverse succesfully."""
+    fs = VirtualFilesystem()
+
+    fs.map_file_fh("file", io.BytesIO(b"1234567890"))
+    assert list(fsutil.reverse_read(fs.path("file").open("rb"), chunk_size=2)) == [b"09", b"87", b"65", b"43", b"21"]
+
+    fs.map_file_fh("large_emoji", io.BytesIO(("🐱" * 10_000).encode()))
+    content = list(fsutil.reverse_read(fs.path("large_emoji").open("rb")))
+    assert len(content) == 5
+    assert len(content[0]) == 1024 * 8
+    assert len(content[-1]) == 7232
+    assert b"".join(content) == bytes(reversed(("🐱" * 10_000).encode()))
 
 
 @pytest.fixture
@@ -747,7 +834,7 @@ def listxattr_spec(xattrs: dict[str, str]) -> dict[str, Any]:
 @pytest.fixture
 def getxattr_spec(xattrs: dict[str, str]) -> dict[str, Any]:
     # getxattr() is only available on Linux
-    attr_name = list(xattrs.keys())[0]
+    attr_name = next(iter(xattrs.keys()))
     attr_value = xattrs.get(attr_name)
 
     if hasattr(os, "getxattr"):
@@ -775,14 +862,13 @@ def getxattr_spec(xattrs: dict[str, str]) -> dict[str, Any]:
 def test_fs_attrs(
     xattrs: dict[str, bytes], listxattr_spec: dict[str, Any], getxattr_spec: dict[str, Any], follow_symlinks: bool
 ) -> None:
-    with patch("os.listxattr", **listxattr_spec) as listxattr:
-        with patch("os.getxattr", **getxattr_spec) as getxattr:
-            path = "/some/path"
-            attr_name = list(xattrs.keys())[0]
+    with patch("os.listxattr", **listxattr_spec) as listxattr, patch("os.getxattr", **getxattr_spec) as getxattr:
+        path = "/some/path"
+        attr_name = next(iter(xattrs.keys()))
 
-            assert fsutil.fs_attrs(path, follow_symlinks=follow_symlinks) == xattrs
-            listxattr.assert_called_with(path, follow_symlinks=follow_symlinks)
-            getxattr.assert_called_with(path, attr_name, follow_symlinks=follow_symlinks)
+        assert fsutil.fs_attrs(path, follow_symlinks=follow_symlinks) == xattrs
+        listxattr.assert_called_with(path, follow_symlinks=follow_symlinks)
+        getxattr.assert_called_with(path, attr_name, follow_symlinks=follow_symlinks)
 
 
 @contextmanager
@@ -807,7 +893,8 @@ def test_target_path_checks_dirfs(tmp_path: Path, target_win: Target) -> None:
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(b"dummy")
         tf.close()
-        tmpfile_name = os.path.basename(tf.name)
+
+        tmpfile_name = Path(tf.name).name
 
         fs = DirectoryFilesystem(path=tmp_path)
         target_win.filesystems.add(fs)
@@ -821,7 +908,8 @@ def test_target_path_checks_mapped_dir(tmp_path: Path, target_win: Target) -> No
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(b"dummy")
         tf.close()
-        tmpfile_name = os.path.basename(tf.name)
+
+        tmpfile_name = Path(tf.name).name
 
         target_win.filesystems.entries[0].map_dir("test-dir", tmp_path)
         assert target_win.fs.path("C:\\test-dir\\").is_dir()
@@ -882,7 +970,7 @@ def glob_fs() -> VirtualFilesystem:
 
 
 @pytest.mark.parametrize(
-    ("start_path, pattern, results"),
+    ("start_path", "pattern", "results"),
     [
         ("/", "foo/bar/bla/file.*", ["foo/bar/bla/file.ini", "foo/bar/bla/file.txt"]),
         ("/", "foo/bar/*/file.ini", ["foo/bar/bla/file.ini"]),

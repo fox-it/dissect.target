@@ -1,10 +1,17 @@
-from dissect.target.filesystem import Filesystem
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.log.mssql import MssqlPlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
-def test_mssql_errorlog(target_win_users, hive_hklm: VirtualHive, fs_win: Filesystem) -> None:
+
+def test_mssql_errorlog(target_win_users: Target, hive_hklm: VirtualHive, fs_win: Filesystem) -> None:
     errorlog_file = absolute_path("_data/plugins/os/windows/log/mssql/errorlog")
     target_errorlog_name = "/sysvol/Temp/MSSQL/Log/ERRORLOG"
 

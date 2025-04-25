@@ -1,9 +1,15 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target import container
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loader import Loader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class MultiRawLoader(Loader):
@@ -12,6 +18,9 @@ class MultiRawLoader(Loader):
     Use as ``/path/to/disk1+/path/to/disk2`` to load a single target with two disks.
     The disks can be anything that Dissect supports such as EWF, VMDK, etc.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, resolve=False)
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -26,9 +35,6 @@ class MultiRawLoader(Loader):
 
 
 def _split_paths(path: Path) -> list[Path]:
-    if isinstance(path, TargetPath):
-        root = path.joinpath("/")
-    else:
-        root = path.cwd()
+    root = path.joinpath("/") if isinstance(path, TargetPath) else path.cwd()
 
     return [root.joinpath(subpath) for subpath in str(path).split("+")]

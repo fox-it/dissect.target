@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import operator
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.remoteaccess.anydesk import AnydeskPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_anydesk_plugin_log(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
@@ -82,3 +87,23 @@ def test_anydesk_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> 
 
     assert len(target_unix_users.anydesk.trace_files) == 3
     assert len(records) == 3 * 419
+
+
+def test_anydesk_plugin_filetransfer(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
+    fs_win.map_file(
+        "ProgramData/AnyDesk/file_transfer_trace.txt",
+        absolute_path("_data/plugins/apps/remoteaccess/anydesk/file_transfer_trace.txt"),
+    )
+
+    target_win_users.add_plugin(AnydeskPlugin)
+
+    records = list(target_win_users.anydesk.filetransfer())
+    assert len(records) == 2
+
+    assert records[0].ts == datetime(2025, 1, 1, 13, 37, tzinfo=timezone.utc)
+    assert records[0].message == "Clipboard  2025-01-01, 13:37 start  download 'malware.exe' (~0 B out of 4.20 MiB)"
+    assert records[0].source == "sysvol/ProgramData/AnyDesk/file_transfer_trace.txt"
+    assert records[0].filename == "malware.exe"
+    assert records[0].username is None
+    assert records[0].user_id is None
+    assert records[0].user_home is None

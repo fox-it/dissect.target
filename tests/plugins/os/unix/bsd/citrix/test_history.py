@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import datetime
 import gzip
 import textwrap
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.bsd.citrix.history import CitrixCommandHistoryPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
@@ -27,11 +32,13 @@ def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd
     # year from the file's mtime, which in this mocked version is epoch 0 (thus the year 1970)
     assert results[1].ts == datetime.datetime(1970, 8, 9, 12, 56, 0, tzinfo=datetime.timezone.utc)
     assert results[1].command == "find . -name '*ci.php*'"
+    assert results[1].order == -1
     assert results[1].shell == "citrix-netscaler-bash"
     assert results[1].source.as_posix() == "/var/log/bash.log"
 
     assert results[0].ts == datetime.datetime(1970, 8, 10, 11, 57, 39, tzinfo=datetime.timezone.utc)
     assert results[0].command == 'debug "hello world"'
+    assert results[0].order == 0
     assert results[0].shell == "citrix-netscaler-bash"
     assert results[0].source.as_posix() == "/var/log/bash.log"
 
@@ -54,11 +61,13 @@ def test_netscaler_commandhistory_decompress(target_citrix: Target, fs_bsd: Virt
     # Due to the usage of year_rollover_history, the results are returned back-to-front
     assert results[1].ts == datetime.datetime(1970, 8, 9, 12, 56, 0, tzinfo=datetime.timezone.utc)
     assert results[1].command == "find . -name '*ci.php*'"
+    assert results[1].order == -1
     assert results[1].shell == "citrix-netscaler-bash"
     assert results[1].source.as_posix() == "/var/log/bash.log.0.gz"
 
     assert results[0].ts == datetime.datetime(1970, 8, 10, 11, 57, 39, tzinfo=datetime.timezone.utc)
     assert results[0].command == 'debug "hello world"'
+    assert results[0].order == 0
     assert results[0].shell == "citrix-netscaler-bash"
     assert results[0].source.as_posix() == "/var/log/bash.log.0.gz"
 
@@ -79,10 +88,12 @@ def test_netscaler_cli_history(target_citrix: Target, fs_bsd: VirtualFilesystem)
 
     assert not results[0].ts
     assert results[0].command == "help"
+    assert results[0].order == 0
     assert results[0].shell == "citrix-netscaler-cli"
     assert results[0].source.as_posix() == "/var/nstmp/user/.nscli_history"
 
     assert not results[1].ts
     assert results[1].command == "shell"
+    assert results[1].order == 1
     assert results[1].shell == "citrix-netscaler-cli"
     assert results[1].source.as_posix() == "/var/nstmp/user/.nscli_history"

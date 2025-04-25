@@ -1,8 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.windows import ual
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_ual_plugin(target_win, fs_win):
+
+def test_ual_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     ual_dir = absolute_path("_data/plugins/os/windows/ual")
 
     fs_win.map_dir("Windows/System32/LogFiles/Sum", ual_dir)
@@ -24,5 +32,5 @@ def test_ual_plugin(target_win, fs_win):
     domains_seen_records = list(target_win.ual.domains_seen())
     assert len(domains_seen_records) == 12
 
-    ual_all_records = list(target_win.ual.get_all_records())
+    ual_all_records = list(target_win.ual())
     assert len(ual_all_records) == 123

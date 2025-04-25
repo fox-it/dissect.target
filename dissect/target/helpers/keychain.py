@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import csv
 import logging
 from enum import Enum
-from pathlib import Path
-from typing import NamedTuple, Union
+from typing import TYPE_CHECKING, NamedTuple
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -18,9 +22,9 @@ class KeyType(Enum):
 
 class Key(NamedTuple):
     key_type: KeyType
-    value: Union[str, bytes]
-    provider: str = None
-    identifier: str = None
+    value: str | bytes
+    provider: str | None = None
+    identifier: str | None = None
     is_wildcard: bool = False
 
 
@@ -28,13 +32,13 @@ KEYCHAIN: list[Key] = []
 
 
 def register_key(
-    key_type: KeyType, value: str, identifier: str = None, provider: str = None, is_wildcard: bool = False
+    key_type: KeyType, value: str, identifier: str | None = None, provider: str | None = None, is_wildcard: bool = False
 ) -> None:
     if key_type == KeyType.RAW:
         try:
             value = bytes.fromhex(value)
         except ValueError:
-            log.warning("Failed to decode raw key as hex, ignoring: %s", value)
+            log.debug("Failed to decode raw key as hex, ignoring: %s", value)
             return
 
     if key_type in (KeyType.RECOVERY_KEY, KeyType.FILE):
@@ -76,7 +80,7 @@ def register_keychain_file(keychain_path: Path) -> None:
 
         provider,key_type,identifier,value
 
-    Values in columns `key_type` and `value` are required, `provider` and `identifier` are optional.
+    Values in columns ``key_type`` and ``value`` are required, ``provider`` and ``identifier`` are optional.
     Example of the CSV-serialised data:
 
         bitlocker,recovery_key,,312268-409816-583517-486695-627121-599511-664389-145640

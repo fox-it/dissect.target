@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 import zipfile
 
@@ -95,7 +97,7 @@ def zip_virtual_dir() -> io.BytesIO:
 
 
 @pytest.mark.parametrize(
-    "obj, base",
+    ("obj", "base"),
     [
         ("zip_simple", ""),
         ("zip_base", "base/"),

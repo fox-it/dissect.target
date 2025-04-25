@@ -1,8 +1,13 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.configutil import Env
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 EnvironmentFileRecord = TargetRecordDescriptor(
     "application/other/file/environment",
@@ -20,11 +25,11 @@ class EnvironmentFilePlugin(Plugin):
     """Environment file plugin."""
 
     def check_compatible(self) -> None:
-        # `--env-path` is provided at runtime
+        # `--env-path` is required at runtime
         pass
 
     @export(record=EnvironmentFileRecord)
-    @arg("--env-path", help="path to scan environment files in")
+    @arg("--env-path", help="path to scan environment files in", required=True)
     @arg("--extension", help="extension of files to scan", default="env")
     def envfile(self, env_path: str, extension: str = "env") -> Iterator[EnvironmentFileRecord]:
         """Yield environment variables found in ``.env`` files at the provided path."""

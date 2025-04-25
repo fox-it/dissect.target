@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -7,6 +9,9 @@ from dissect.target.helpers.descriptor_extensions import (
 )
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 RunKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/run",
@@ -22,7 +27,7 @@ RunKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, Us
 class RunKeysPlugin(Plugin):
     """Plugin that iterates various Runkey locations."""
 
-    KEYS = [
+    KEYS = (
         "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run",
         "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
         "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
@@ -43,10 +48,10 @@ class RunKeysPlugin(Plugin):
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx",
-    ]
+    )
 
     def check_compatible(self) -> None:
-        if not len(list(self.target.registry.keys(self.KEYS))) > 0:
+        if not next(self.target.registry.keys(self.KEYS), None):
             raise UnsupportedPluginError("No registry run key found")
 
     @export(record=RunKeyRecord)

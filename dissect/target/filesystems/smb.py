@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import stat
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import AlignedStream
 from impacket.nt_errors import STATUS_NOT_A_DIRECTORY
@@ -24,6 +24,9 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 log = logging.getLogger(__name__)
 
@@ -59,9 +62,8 @@ class SmbFilesystem(Filesystem):
             if e.error == STATUS_NOT_A_DIRECTORY:
                 # STATUS_NOT_A_DIRECTORY
                 raise NotADirectoryError(path) from e
-            else:
-                # 0xC000000F is STATUS_NO_SUCH_FILE, but everything else should raise a FileNotFoundError anyway
-                raise FileNotFoundError(path) from e
+            # 0xC000000F is STATUS_NO_SUCH_FILE, but everything else should raise a FileNotFoundError anyway
+            raise FileNotFoundError(path) from e
 
         if len(result) != 1:
             raise FileNotFoundError(path)
@@ -90,7 +92,7 @@ class SmbFilesystemEntry(FilesystemEntry):
 
                 yield entry
         except SessionError as e:
-            log.error("Failed to list directory '%s' share '%s', error: %s", path, self.fs.share_name, e)
+            log.error("Failed to list directory '%s' share '%s', error: %s", path, self.fs.share_name, e)  # noqa: TRY400
 
     def iterdir(self) -> Iterator[str]:
         for entry in self._iterdir():
@@ -124,7 +126,7 @@ class SmbFilesystemEntry(FilesystemEntry):
         return False
 
     def readlink(self) -> str:
-        raise NotASymlinkError()
+        raise NotASymlinkError
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).lstat()

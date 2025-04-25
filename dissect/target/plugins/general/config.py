@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Iterable, Optional, Union
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystems.config import (
     ConfigurationEntry,
@@ -11,6 +10,11 @@ from dissect.target.filesystems.config import (
 )
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugin import Plugin, internal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from dissect.target.target import Target
 
 
 class ConfigurationTreePlugin(Plugin):
@@ -31,18 +35,18 @@ class ConfigurationTreePlugin(Plugin):
         # This should be able to be retrieved, regardless of OS
         if self.config_fs is None:
             raise UnsupportedPluginError(f"{self.dir_path!r} could not be found.")
-        return None
+        return
 
     def __call__(
         self,
-        path: Optional[Union[TargetPath, str]] = None,
-        hint: Optional[str] = None,
-        collapse: Optional[Union[bool, Iterable[str]]] = None,
-        collapse_inverse: Optional[bool] = None,
-        separator: Optional[tuple[str]] = None,
-        comment_prefixes: Optional[tuple[str]] = None,
+        path: TargetPath | str | None = None,
+        hint: str | None = None,
+        collapse: bool | Iterable[str] | None = None,
+        collapse_inverse: bool | None = None,
+        separator: tuple[str] | None = None,
+        comment_prefixes: tuple[str] | None = None,
         as_dict: bool = False,
-    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
+    ) -> ConfigurationFilesystem | ConfigurationEntry | dict:
         """Create a configuration entry from a file, or a :class:`.ConfigurationFilesystem` from a directory.
 
         If a directory is specified in ``path``, the other arguments should be provided in the ``get`` call if needed.
@@ -68,16 +72,16 @@ class ConfigurationTreePlugin(Plugin):
 
     @internal
     def get(
-        self, path: Optional[Union[TargetPath, str]] = None, as_dict: bool = False, *args, **kwargs
-    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
+        self, path: TargetPath | str | None = None, as_dict: bool = False, *args, **kwargs
+    ) -> ConfigurationFilesystem | ConfigurationEntry | dict:
         if collapse := kwargs.pop("collapse", None):
             kwargs.update({"collapse": frozenset(collapse)})
 
         return self._get(path, as_dict, *args, **kwargs)
 
     def _get(
-        self, path: Optional[Union[TargetPath, str]] = None, as_dict: bool = False, *args, **kwargs
-    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
+        self, path: TargetPath | str | None = None, as_dict: bool = False, *args, **kwargs
+    ) -> ConfigurationFilesystem | ConfigurationEntry | dict:
         if not path:
             return self.config_fs
 

@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.plugins.apps.av.mcafee import McAfeeMscFirewallRecord, McAfeePlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_mcafee_plugin_log(target_win, fs_win):
+
+def test_mcafee_plugin_log(target_win: Target, fs_win: VirtualFilesystem) -> None:
     log_dir = absolute_path("_data/plugins/apps/av/mcafee")
     fs_win.map_dir("ProgramData/McAfee/MSC/Logs", log_dir)
 
@@ -31,7 +39,6 @@ def test_mcafee_plugin_log(target_win, fs_win):
             assert record.fkey == "{37E1F90E-471D-40D3-9FAA-37BE30C5B4AA}"
             assert (
                 record.message
-                == "Status Quarantined Scan type Custom  We found one or several threats on your PC. "
-                + "Threat name EICAR test file File C:\\Users\\admin\\Desktop\\eicar.com"
+                == "Status Quarantined Scan type Custom  We found one or several threats on your PC. Threat name EICAR test file File C:\\Users\\admin\\Desktop\\eicar.com"  # noqa: E501
             )
             assert record.keywords == "Custom,EICAR test file,Quarantined"

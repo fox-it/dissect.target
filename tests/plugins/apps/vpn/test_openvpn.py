@@ -1,21 +1,26 @@
+from __future__ import annotations
+
 import io
-from pathlib import Path
-from typing import Union
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.plugins.apps.vpn.openvpn import (
     OpenVPNClient,
     OpenVPNParser,
     OpenVPNPlugin,
     OpenVPNServer,
 )
-from dissect.target.target import Target
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
+
+
+def map_openvpn_configs(filesystem: Filesystem, target_dir: Path) -> None:
     client_config = absolute_path("_data/plugins/apps/vpn/openvpn/client.conf")
     server_config = absolute_path("_data/plugins/apps/vpn/openvpn/server.conf")
     filesystem.map_file(str(target_dir.joinpath("server.conf")), server_config)
@@ -25,7 +30,7 @@ def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
 
 
 @pytest.mark.parametrize(
-    "target, fs, map_path",
+    ("target", "fs", "map_path"),
     [
         (
             "target_win_users",
@@ -44,7 +49,7 @@ def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
         ),
     ],
 )
-def test_openvpn_plugin(target: str, fs: str, map_path: str, request: pytest.FixtureRequest):
+def test_openvpn_plugin(target: str, fs: str, map_path: str, request: pytest.FixtureRequest) -> None:
     target: Target = request.getfixturevalue(target)
     fs: Filesystem = request.getfixturevalue(fs)
     map_openvpn_configs(fs, fs.path(map_path))
@@ -53,7 +58,7 @@ def test_openvpn_plugin(target: str, fs: str, map_path: str, request: pytest.Fix
     _verify_records(records)
 
 
-def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
+def _verify_records(records: list[OpenVPNClient | OpenVPNServer]) -> None:
     assert len(records) == 4
 
     for record in records:
@@ -101,7 +106,7 @@ def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
 
 
 @pytest.mark.parametrize(
-    "data_string, expected_data",
+    ("data_string", "expected_data"),
     [
         (
             "<connection>\nroute data\n</connection>\n",
@@ -115,7 +120,7 @@ def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
         ),
     ],
 )
-def test_openvpn_config(data_string: str, expected_data: Union[dict, list]) -> None:
+def test_openvpn_config(data_string: str, expected_data: dict | list) -> None:
     parser = OpenVPNParser()
     parser.parse_file(io.StringIO(data_string))
 

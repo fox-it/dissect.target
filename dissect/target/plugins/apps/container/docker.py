@@ -3,8 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 from dissect.util import ts
@@ -14,7 +13,12 @@ from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.protobuf import ProtobufVarint
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +36,8 @@ DockerContainerRecord = TargetRecordDescriptor(
         ("datetime", "finished"),
         ("string", "ports"),
         ("string", "names"),
-        ("stringlist", "volumes"),
+        ("string[]", "volumes"),
+        ("string[]", "environment"),
         ("path", "mount_path"),
         ("path", "config_path"),
     ],
@@ -97,8 +102,8 @@ RE_ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 ASCII_MAP = {
     "\x08": "[BS]",
     "\x09": "[TAB]",
-    "\x0A": "",  # \n
-    "\x0D": "",  # \r
+    "\x0a": "",  # \n
+    "\x0d": "",  # \r
 }
 
 
@@ -129,7 +134,7 @@ class DockerPlugin(Plugin):
             images_path = data_root.joinpath("image/overlay2/repositories.json")
 
             if not images_path.exists():
-                self.target.log.debug("No docker images found, file %s does not exist.", images_path)
+                self.target.log.debug("No docker images found, file %s does not exist", images_path)
                 continue
 
             try:
@@ -189,8 +194,10 @@ class DockerPlugin(Plugin):
                 # parse volumes
                 volumes = []
                 if mount_points := config.get("MountPoints", {}):
-                    for mount_point in mount_points.values():
-                        volumes.append(f"{mount_point.get('Source')}:{mount_point.get('Destination')}")
+                    volumes = [
+                        f"{mount_point.get('Source')}:{mount_point.get('Destination')}"
+                        for mount_point in mount_points.values()
+                    ]
 
                 # determine mount point
                 mount_path = None
@@ -215,6 +222,7 @@ class DockerPlugin(Plugin):
                     ports=convert_ports(ports),
                     names=config.get("Name", "").replace("/", "", 1),
                     volumes=volumes,
+                    environment=config.get("Config", {}).get("Env", []),
                     mount_path=mount_path,
                     config_path=config_path,
                     _target=self.target,
@@ -250,7 +258,7 @@ class DockerPlugin(Plugin):
         for data_root in self.installs:
             containers_path = data_root.joinpath("containers")
 
-            for log_file in containers_path.glob(("**/*.log*")):
+            for log_file in containers_path.glob("**/*.log*"):
                 container = log_file.parent
 
                 # json log driver
@@ -260,9 +268,11 @@ class DockerPlugin(Plugin):
                             ts=log_entry.get("time"),
                             container=container.name,  # container hash
                             stream=log_entry.get("stream"),
-                            message=log_entry.get("log")
-                            if raw_messages
-                            else strip_log(log_entry.get("log"), remove_backspaces),
+                            message=(
+                                log_entry.get("log")
+                                if raw_messages
+                                else strip_log(log_entry.get("log"), remove_backspaces)
+                            ),
                             _target=self.target,
                         )
 
@@ -273,9 +283,9 @@ class DockerPlugin(Plugin):
                             ts=ts.from_unix_us(log_entry.ts // 1000),
                             container=container.parent.name,  # container hash
                             stream=log_entry.source,
-                            message=log_entry.message
-                            if raw_messages
-                            else strip_log(log_entry.message, remove_backspaces),
+                            message=(
+                                log_entry.message if raw_messages else strip_log(log_entry.message, remove_backspaces)
+                            ),
                             _target=self.target,
                         )
 
@@ -294,7 +304,7 @@ class DockerPlugin(Plugin):
                         path,
                     )
                 yield entry
-            except EOFError:
+            except EOFError:  # noqa: PERF203
                 break
 
     def _parse_json_log(self, path: Path) -> Iterator[dict]:
@@ -343,18 +353,20 @@ def find_installs(target: Target) -> Iterator[Path]:
         yield default_root
 
     for path in default_config_paths:
-        if (config_file := target.fs.path(path)).exists():
-            if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
-                yield data_root_path
+        if (config_file := target.fs.path(path)).exists() and (
+            data_root_path := target.fs.path(get_data_path(config_file))
+        ).exists():
+            yield data_root_path
 
     for path in user_config_paths:
         for user_details in target.user_details.all_with_home():
-            if (config_file := user_details.home_path.joinpath(path)).exists():
-                if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
-                    yield data_root_path
+            if (config_file := user_details.home_path.joinpath(path)).exists() and (
+                data_root_path := target.fs.path(get_data_path(config_file))
+            ).exists():
+                yield data_root_path
 
 
-def convert_timestamp(timestamp: str | None) -> str:
+def convert_timestamp(timestamp: str | None) -> str | None:
     """Docker sometimes uses (unpadded) 9 digit nanosecond precision
     in their timestamp logs, eg. "2022-12-19T13:37:00.123456789Z".
 
@@ -364,7 +376,7 @@ def convert_timestamp(timestamp: str | None) -> str:
     """
 
     if not timestamp:
-        return
+        return None
 
     timestamp_nanoseconds_plus_postfix = timestamp[19:]
     match = RE_DOCKER_NS.match(timestamp_nanoseconds_plus_postfix)

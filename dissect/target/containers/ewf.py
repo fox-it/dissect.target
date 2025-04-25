@@ -1,20 +1,24 @@
+from __future__ import annotations
+
 import io
 import re
-from pathlib import Path
-from typing import BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.evidence import EWF
 from dissect.evidence.ewf import find_files
 
 from dissect.target.container import Container
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 class EwfContainer(Container):
-    """Expert Witness Disk Image Format"""
+    """Expert Witness Disk Image Format."""
 
     __type__ = "ewf"
 
-    def __init__(self, fh: Union[list, BinaryIO, Path], *args, **kwargs):
+    def __init__(self, fh: list | BinaryIO | Path, *args, **kwargs):
         fhs = [fh] if not isinstance(fh, list) else fh
         if hasattr(fhs[0], "read"):
             self.ewf = EWF(fhs)
@@ -25,13 +29,11 @@ class EwfContainer(Container):
         super().__init__(fh, self.ewf.size, *args, **kwargs)
 
     @staticmethod
-    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        """Detect file header"""
+    def _detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
         return fh.read(3) in (b"EVF", b"LVF", b"LEF")
 
     @staticmethod
-    def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
-        """Detect path"""
+    def detect_path(path: Path, original: list | BinaryIO) -> bool:
         return re.match(r"\.[EeLs]x?01$", path.suffix)
 
     def read(self, length: int) -> bytes:

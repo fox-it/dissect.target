@@ -1,19 +1,17 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
 import argparse
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Union
 
-from dissect.target import Target
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.target import Target
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
-    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
@@ -43,7 +41,7 @@ logging.raiseExceptions = False
 
 
 @catch_sigpipe
-def main():
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="target-info",
@@ -51,17 +49,15 @@ def main():
         formatter_class=help_formatter,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to display info from")
+    parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument("--from-file", nargs="?", type=Path, help="file containing targets to load")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-r", "--record", action="store_true", help="print output as record")
     parser.add_argument("-j", "--json", action="store_true", help="output records as pretty json")
     parser.add_argument("-J", "--jsonlines", action="store_true", help="output records as one-line json")
-    parser.add_argument("-L", "--loader", action="store", default=None, help="select a specific loader (i.e. vmx, raw)")
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-
-    process_generic_arguments(args)
 
     if not args.targets and not args.from_file:
         parser.error("too few arguments")
@@ -75,10 +71,10 @@ def main():
             targets = targets[:-1]
         args.targets = targets
 
-    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
+    process_generic_arguments(args, rest)
 
     try:
-        for i, target in enumerate(Target.open_all(targets)):
+        for i, target in enumerate(Target.open_all(args.targets, include_children=args.children)):
             try:
                 if args.jsonlines:
                     print(json.dumps(get_target_info(target), default=str))
@@ -91,16 +87,18 @@ def main():
                     if i > 0:
                         print("-" * 70)
                     print_target_info(target)
-            except Exception as e:
-                target.log.error("Exception in retrieving information for target: `%s`. Use `-vv` for details.", target)
+            except Exception as e:  # noqa: PERF203
+                target.log.error("Exception in retrieving information for target: `%s`, use `-vv` for details", target)  # noqa: TRY400
                 target.log.debug("", exc_info=e)
     except TargetError as e:
-        log.error(e)
+        log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
-        parser.exit(1)
+        return 1
+
+    return 0
 
 
-def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
+def get_target_info(target: Target) -> dict[str, str | list[str]]:
     return {
         "disks": get_disks_info(target),
         "volumes": get_volumes_info(target),
@@ -118,9 +116,10 @@ def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
     }
 
 
-def get_optional_func(target: Target, func: str) -> Union[str, None]:
+def get_optional_func(target: Target, func: str) -> str | None:
     if target.has_function(func):
         return getattr(target, func)
+    return None
 
 
 def print_target_info(target: Target) -> None:
@@ -148,11 +147,11 @@ def print_target_info(target: Target) -> None:
         print(f"{name.capitalize().replace('_', ' '):14s} : {value}")
 
 
-def get_disks_info(target: Target) -> list[dict[str, Union[str, int]]]:
+def get_disks_info(target: Target) -> list[dict[str, str | int]]:
     return [{"type": d.__class__.__name__, "size": d.size} for d in target.disks]
 
 
-def get_volumes_info(target: Target) -> list[dict[str, Union[str, int]]]:
+def get_volumes_info(target: Target) -> list[dict[str, str | int]]:
     return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
 
 

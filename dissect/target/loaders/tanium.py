@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs
 from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class TaniumLoader(DirLoader):
@@ -43,7 +44,7 @@ class TaniumLoader(DirLoader):
     def map(self, target: Target) -> None:
         find_and_map_dirs(
             target,
-            self.path.joinpath("file"),
+            self.absolute_path.joinpath("file"),
             sds_path="$Secure_$SDS",
             usnjrnl_path="$Extend/$UsnJrnl_$J",
         )

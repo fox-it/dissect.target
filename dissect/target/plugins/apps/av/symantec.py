@@ -1,16 +1,22 @@
+from __future__ import annotations
+
 import csv
 import io
 import ipaddress
 import struct
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, Final
 
 from dissect.util.ts import wintimestamp
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 SEPLogRecord = TargetRecordDescriptor(
     "application/av/symantec/sep/log",
@@ -66,14 +72,18 @@ SEPFirewallRecord = TargetRecordDescriptor(
 
 
 class SymantecPlugin(Plugin):
-    """Symantec Endpoint Security Suite Plugin, based on https://malwaremaloney.blogspot.com/2021/01/"""
+    """Symantec Endpoint Security Suite Plugin.
+
+    References:
+        - https://malwaremaloney.blogspot.com/2021/01/
+    """
 
     __namespace__ = "symantec"
 
     LOG_SEP_AV = "sysvol/ProgramData/Symantec/Symantec Endpoint Protection/*/Data/Logs/AV/*"
     LOG_SEP_NET = "sysvol/ProgramData/Symantec/Symantec Endpoint Protection/*/Data/Logs/tralog.log"
 
-    LOGS = [LOG_SEP_AV, LOG_SEP_NET]
+    LOGS = (LOG_SEP_AV, LOG_SEP_NET)
 
     # Special values
     MARKER_INFECTION = 5
@@ -134,7 +144,7 @@ class SymantecPlugin(Plugin):
     FW_LOCAL_IP6 = 25
     FW_REMOTE_IP6 = 26
 
-    PROTOCOL = {
+    PROTOCOL: Final[dict[int, str]] = {
         301: "TCP initiated",
         302: "UDP datagram",
         303: "Ping request",
@@ -148,7 +158,7 @@ class SymantecPlugin(Plugin):
 
     SEVERITY = ["Critical"] * 4 + ["Major"] * 4 + ["Minor"] * 4 + ["Info"] * 4
 
-    ACTION = {
+    ACTION: Final[dict[int, str]] = {
         1: "Quarantine",
         2: "Rename",
         3: "Delete",
@@ -179,7 +189,7 @@ class SymantecPlugin(Plugin):
         1001: "DNS HOST FILE EXCEPTION",
     }
 
-    VIRUS_TYPE = {
+    VIRUS_TYPE: Final[dict[int, str]] = {
         48: "Heuristic",
         64: "Reputation",
         80: "Hack Tools",
@@ -193,7 +203,7 @@ class SymantecPlugin(Plugin):
         256: "Test",
     }
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.codepage = self.target.codepage or "ascii"
 
@@ -218,7 +228,7 @@ class SymantecPlugin(Plugin):
         hour = int(ts[6:8], 16)
         minute = int(ts[8:10], 16)
         second = int(ts[10:12], 16)
-        return f"{year+1970}-{month+1:0>2}-{day:0>2}T{hour:0>2}:{minute:0>2}:{second:0>2}"
+        return f"{year + 1970}-{month + 1:0>2}-{day:0>2}T{hour:0>2}:{minute:0>2}:{second:0>2}"
 
     def _fw_line(self, line: bytes, line_no: int) -> Iterator[SEPFirewallRecord]:
         try:
@@ -251,8 +261,8 @@ class SymantecPlugin(Plugin):
                 line_no=line_no,
                 _target=self.target,
             )
-        except Exception as error:
-            self.target.log.warning(f"Error: {error} on firewall log line: {line_no}.")
+        except Exception as e:
+            self.target.log.warning("Error: %s on firewall log line: %d", e, line_no)
 
     def _line(self, line: str, line_no: int) -> Iterator[SEPLogRecord]:
         try:
@@ -285,8 +295,8 @@ class SymantecPlugin(Plugin):
                     line_no=line_no,
                     _target=self.target,
                 )
-        except Exception as error:
-            self.target.log.warning(f"Error: {error} on log line: {line_no}.")
+        except Exception as e:
+            self.target.log.warning("Error: %s on log line: %d", e, line_no)
 
     @export(record=SEPLogRecord)
     def logs(self) -> Iterator[SEPLogRecord]:

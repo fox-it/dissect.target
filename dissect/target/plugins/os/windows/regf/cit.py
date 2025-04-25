@@ -4,7 +4,7 @@ import datetime
 import struct
 from binascii import crc32
 from io import BytesIO
-from typing import Iterator, Union, get_args
+from typing import TYPE_CHECKING, Union, get_args
 
 from dissect.cstruct import cstruct
 from dissect.util.compression import lznt1
@@ -17,6 +17,13 @@ from dissect.target.helpers.record import (
     create_extended_descriptor,
 )
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from flow.record import Record
+
+    from dissect.target.target import Target
 
 # Resources:
 # - generaltel.dll
@@ -448,7 +455,7 @@ CITModuleRecord = TargetRecordDescriptor(
 
 
 class CIT:
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         compressed_fh = BytesIO(buf)
         # Compressed size, uncompressed size
         _, _ = struct.unpack("<2I", compressed_fh.read(8))
@@ -472,7 +479,7 @@ class CIT:
         entry_data = self.buf[self.header.EntryDataOffset :]
         self.entries = [Entry(self, entry) for entry in c_cit.CIT_ENTRY[self.header.EntryCount](entry_data)]
 
-    def data(self, offset, size, expected_size=None):
+    def data(self, offset: int, size: int, expected_size: int | None = None) -> bytes:
         if expected_size and size > expected_size:
             size = expected_size
 
@@ -483,7 +490,7 @@ class CIT:
 
         return data
 
-    def iter_bitmap(self, bitmap: bytes):
+    def iter_bitmap(self, bitmap: bytes) -> Iterator[datetime.datetime]:
         bit_delta = datetime.timedelta(seconds=self.header.BitPeriodInS)
         ts = wintimestamp(self.header.PeriodStartLocal).replace(tzinfo=None)
 
@@ -498,7 +505,7 @@ class CIT:
 
 
 class Entry:
-    def __init__(self, cit, entry):
+    def __init__(self, cit: CIT, entry: c_cit.CIT_ENTRY):
         self.cit = cit
         self.entry = entry
 
@@ -519,7 +526,7 @@ class Entry:
             command_line_buf = cit.data(self.program_data.CommandLineOffset, self.program_data.CommandLineSize * 2)
             self.command_line = command_line_buf.decode("utf-16-le")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Entry file_path={self.file_path!r} command_line={self.command_line!r}>"
 
 
@@ -528,7 +535,7 @@ class BaseUseData:
     MIN_SPAN_STATS_SIZE = 0x30
     MIN_STATS_SIZE = 0x18
 
-    def __init__(self, cit, entry):
+    def __init__(self, cit: CIT, entry: c_cit.CIT_ENTRY):
         self.cit = cit
         self.entry = entry
 
@@ -542,22 +549,22 @@ class BaseUseData:
         )
         self.stats = self._parse_stats(cit.data(entry.StatsOffset, entry.StatsSize, self.MIN_STATS_SIZE))
 
-    def _parse_bitmaps(self, bitmaps):
+    def _parse_bitmaps(self, bitmaps: list[bytes]) -> BaseUseDataBitmaps:
         return BaseUseDataBitmaps(self.cit, bitmaps)
 
-    def _parse_span_stats(self, span_stats_data):
+    def _parse_span_stats(self, span_stats_data: bytes) -> None:
         return None
 
-    def _parse_stats(self, stats_data):
+    def _parse_stats(self, stats_data: bytes) -> None:
         return None
 
 
 class BaseUseDataBitmaps:
-    def __init__(self, cit, bitmaps):
+    def __init__(self, cit: CIT, bitmaps: list[bytes]):
         self.cit = cit
         self._bitmaps = bitmaps
 
-    def _parse_bitmap(self, idx):
+    def _parse_bitmap(self, idx: int) -> list[datetime.datetime]:
         return list(self.cit.iter_bitmap(self._bitmaps[idx]))
 
 
@@ -566,18 +573,18 @@ class SystemData(BaseUseData):
     MIN_SPAN_STATS_SIZE = 0x58
     MIN_STATS_SIZE = 0x1C
 
-    def _parse_bitmaps(self, bitmaps):
+    def _parse_bitmaps(self, bitmaps: list[bytes]) -> SystemDataBitmaps:
         return SystemDataBitmaps(self.cit, bitmaps)
 
-    def _parse_span_stats(self, span_stats_data):
+    def _parse_span_stats(self, span_stats_data: bytes) -> c_cit.CIT_SYSTEM_DATA_SPAN_STATS:
         return c_cit.CIT_SYSTEM_DATA_SPAN_STATS(span_stats_data)
 
-    def _parse_stats(self, stats_data):
+    def _parse_stats(self, stats_data: bytes) -> c_cit.CIT_SYSTEM_DATA_STATS:
         return c_cit.CIT_SYSTEM_DATA_STATS(stats_data)
 
 
 class SystemDataBitmaps(BaseUseDataBitmaps):
-    def __init__(self, cit, bitmaps):
+    def __init__(self, cit: CIT, bitmaps: list[bytes]):
         super().__init__(cit, bitmaps)
         self.display_power = self._parse_bitmap(0)
         self.display_request_change = self._parse_bitmap(1)
@@ -588,18 +595,18 @@ class SystemDataBitmaps(BaseUseDataBitmaps):
 
 
 class ProgramUseData(BaseUseData):
-    def _parse_bitmaps(self, bitmaps):
+    def _parse_bitmaps(self, bitmaps: list[bytes]) -> ProgramDataBitmaps:
         return ProgramDataBitmaps(self.cit, bitmaps)
 
-    def _parse_span_stats(self, span_stats_data):
+    def _parse_span_stats(self, span_stats_data: bytes) -> c_cit.CIT_USE_DATA_SPAN_STATS:
         return c_cit.CIT_USE_DATA_SPAN_STATS(span_stats_data)
 
-    def _parse_stats(self, stats_data):
+    def _parse_stats(self, stats_data: bytes) -> c_cit.CIT_USE_DATA_STATS:
         return c_cit.CIT_USE_DATA_STATS(stats_data)
 
 
 class ProgramDataBitmaps(BaseUseDataBitmaps):
-    def __init__(self, cit, use_data):
+    def __init__(self, cit: CIT, use_data: list[bytes]):
         super().__init__(cit, use_data)
         self.foreground = self._parse_bitmap(0)
 
@@ -625,7 +632,7 @@ def decode_name(name: str) -> bytes:
     return bytes(out)
 
 
-def local_wintimestamp(target, ts):
+def local_wintimestamp(target: Target, ts: int) -> datetime.datetime:
     return target.datetime.to_utc(wintimestamp(ts))
 
 
@@ -654,7 +661,7 @@ class CITPlugin(Plugin):
         Some of its values are still unknown. Generally only available before Windows 10.
         """
 
-        for key in self.target.registry.keys("\\".join([self.KEY, "System"])):
+        for key in self.target.registry.keys(f"{self.KEY}\\System"):
             for value in key.values():
                 # The value name is a weird per-byte character-mirrored value that contains copies
                 # of the PeriodStartLocal and AggregationperiodInS fields
@@ -902,7 +909,7 @@ class CITPlugin(Plugin):
         Generally only available before Windows 10.
         """
 
-        for key in self.target.registry.keys("\\".join([self.KEY, "win32k"])):
+        for key in self.target.registry.keys(f"{self.KEY}\\win32k"):
             for version_key in key.subkeys():
                 for value in version_key.values():
                     yield CITTelemetryRecord(
@@ -935,7 +942,7 @@ class CITPlugin(Plugin):
         Generally only available since Windows 10.
         """
 
-        for key in self.target.registry.keys("\\".join([self.KEY, "Module"])):
+        for key in self.target.registry.keys(f"{self.KEY}\\Module"):
             for monitored_dll in key.subkeys():
                 try:
                     overflow_quota = wintimestamp(monitored_dll.value("OverflowQuota").value)
@@ -963,7 +970,9 @@ class CITPlugin(Plugin):
                     )
 
 
-def _yield_bitmap_records(target, cit, bitmap, record):
+def _yield_bitmap_records(
+    target: Target, cit: CIT, bitmap: list[datetime.datetime], record: TargetRecordDescriptor
+) -> Iterator[Record]:
     for entry in bitmap:
         yield record(
             ts=target.datetime.to_utc(entry),

@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import re
 from functools import lru_cache
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException
@@ -13,6 +13,12 @@ from dissect.target import plugin
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugins.os.windows.log.evt import WindowsEventlogsMixin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
 
@@ -29,7 +35,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
     NEEDLE = b"ElfChnk\x00"
     CHUNK_SIZE = 0x10000
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
 
@@ -75,32 +81,37 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
                 self.target.log.exception("Failed to open event log: %s", entry)
                 continue
 
+            self.target.log.info("Processing event log file %s", entry)
+
             for event in evtx.Evtx(entry_data):
-                yield self._build_record(event)
+                yield self._build_record(event, entry)
 
     @plugin.export(record=DynamicDescriptor(["datetime"]))
     def scraped_evtx(self) -> Iterator[DynamicDescriptor]:
-        """Return EVTX log file records scraped from target disks"""
+        """Return EVTX log file records scraped from target disks."""
         yield from self.target.scrape.scrape_chunks_from_disks(
             needle=self.NEEDLE,
             chunk_size=self.CHUNK_SIZE,
             chunk_parser=self._parse_chunk,
         )
 
-    def _parse_chunk(self, _, chunk: bytes) -> Iterator[Record]:
+    def _parse_chunk(self, needle: bytes, chunk: bytes) -> Iterator[Record]:
         chnk = evtx.ElfChnk(chunk)
         try:
             for event in chnk.read():
-                yield self._build_record(event)
+                yield self._build_record(event, None)
         except MalformedElfChnkException:
             pass
 
-    def _build_record(self, evtx_record) -> Record:
+    def _build_record(self, evtx_record: dict, source: Path | None) -> Record:
         # predictable order of fields in the list is important, since we'll
         # be constructing a record descriptor from it.
         evtx_record_fields = sorted(evtx_record.items())
 
-        record_values = {"_target": self.target}
+        record_values = {
+            "_target": self.target,
+            "source": source,
+        }
         record_fields = [
             ("datetime", "ts"),
             ("string", "Provider_Name"),
@@ -114,7 +125,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
             if not key.isprintable():
                 self.target.log.warning(
-                    f"Skipped possibly corrupt field record containing non-printable characters: {key}"
+                    "Skipped possibly corrupt field record containing non-printable characters: %s", key
                 )
                 continue
 
@@ -140,6 +151,9 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
                 if key == "EventID":
                     value = int(value)
 
+                if key in record_values:
+                    key = unique_key(key, record_values)
+
                 record_values[key] = value
 
                 if key in ("Provider_Name", "EventID"):
@@ -147,17 +161,19 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
                 record_fields.append(("string", key))
 
+        record_fields.append(("path", "source"))
+
         # tuple conversion here is needed for lru_cache
         desc = self._create_event_descriptor(tuple(record_fields))
         return desc(**record_values)
 
-    def _create_event_descriptor(self, record_fields) -> TargetRecordDescriptor:
+    def _create_event_descriptor(self, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
 
 def format_value(value: Any) -> Any:
-    if value is None:
-        return
+    if value is None or value == "-":
+        return None
 
     if isinstance(value, evtx.BxmlSub):
         value = value.get()
@@ -169,3 +185,19 @@ def format_value(value: Any) -> Any:
         return utils.to_str(value)
     except UnicodeDecodeError:
         return repr(value)
+
+
+def unique_key(key: str, dictionary: dict[str, Any], count: int | None = None) -> str:
+    """Return a unique key for a given dict of key value pairs.
+
+    Makes the returned key unique by appending an incrementing integer after the given key name (e.g. ``key_2``).
+    Search is case sensitive so provide lower-cased ``key`` and ``dictionary`` arguments if case-insensitiveness
+    is desired.
+    """
+    count = count or 2
+    new_key = f"{key}_{count}_duplicate"
+
+    if new_key in dictionary:
+        return unique_key(key, dictionary, count + 1)
+
+    return new_key
