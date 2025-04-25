@@ -5,6 +5,7 @@ from functools import lru_cache
 from typing import Iterator
 
 from flow.record import RecordDescriptor
+from IPython import embed
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -45,8 +46,8 @@ class VelociraptorRecordBuilder:
                 value = (value.get("MD5"), value.get("SHA1"), value.get("SHA256"))
             elif isinstance(value, str):
                 record_type = "string"
-            # FIXME: Why is there no record type dict?
             elif isinstance(value, dict):
+                # FIXME: nested records
                 record_type = "string"
             else:
                 record_type = "dynamic"

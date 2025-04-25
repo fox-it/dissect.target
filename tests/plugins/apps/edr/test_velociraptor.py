@@ -7,7 +7,7 @@ from tests._utils import absolute_path
 from tests.loaders.test_velociraptor import create_root
 
 
-def test_windows_velociraptor(target_bare: Target, tmp_path: Path) -> None:
+def test_windows_velociraptor(target_win: Target, tmp_path: Path) -> None:
     root = create_root("ntfs", tmp_path)
 
     with open(absolute_path("_data/plugins/apps/edr/velociraptor/windows-uploads.json"), "rb") as fh:
@@ -19,13 +19,24 @@ def test_windows_velociraptor(target_bare: Target, tmp_path: Path) -> None:
     assert VelociraptorLoader.detect(root) is True
 
     loader = VelociraptorLoader(root)
-    loader.map(target_bare)
-    target_bare.apply()
+    loader.map(target_win)
+    target_win.apply()
 
-    target_bare.add_plugin(VelociraptorPlugin)
+    target_win.add_plugin(VelociraptorPlugin)
 
-    results = list(target_bare.velociraptor())
+    results = list(target_win.velociraptor())
 
     record = results[0]
 
-    # FIXME: assert
+    assert record.name == "Microsoft.SharePoint.exe"
+    assert record.pebbaseaddress == "0x295000"
+    assert record.pid == 8120
+    assert (
+        record.imagepathname
+        == "C:\\Users\\IEUser\\AppData\\Local\\Microsoft\\OneDrive\\24.070.0407.0003\\Microsoft.SharePoint.exe"
+    )
+    assert record.commandline == "/silentConfig"
+    assert record.currentdirectory == "C:\\Windows\\system32\\"
+    assert record._desc.name == "velociraptor/windows/windows_memory_processinf"
+    # FIXME: nested record
+    # "Env": { "ALLUSERSPROFILE": "C:\\ProgramData",
