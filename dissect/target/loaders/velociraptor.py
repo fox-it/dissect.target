@@ -136,19 +136,6 @@ class VelociraptorLoader(DirLoader):
         else:
             map_dirs(target, dirs, os_type)
 
-        # Map artifact results collected by Velociraptor
-        target.fs.makedirs(VELOCIRAPTOR_RESULTS)
-
-        results = self.root.joinpath("results")
-        if results.exists() and results.is_dir():
-            # FIXME: The files do exists but can't be found: dissect.target.exceptions.FileNotFoundError
-            for artifact in results.glob("*.json"):
-                target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(artifact.name)), str(artifact))
-
-        uploads = self.root.joinpath("uploads.json")
-        if uploads.exists() and uploads.is_file():
-            target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(uploads.name)), str(uploads))
-
         # Velociraptor URL encodes paths before storing these in a collection, this leads plugins not being able to find
         # these paths. To circumvent this issue, for a zip file the path names are URL decoded before mapping into the
         # VFS and for a directory the paths are URL encoded at lookup time.
@@ -159,6 +146,24 @@ class VelociraptorLoader(DirLoader):
             dirfs=VelociraptorDirectoryFilesystem,
             zipfs=VelociraptorZipFilesystem,
         )
+
+        if (results := self.root.joinpath("results")).exists() and results.is_dir():
+
+            # Map artifact results collected by Velociraptor
+            target.fs.makedirs(VELOCIRAPTOR_RESULTS)
+
+            for artifact in results.iterdir():
+                if not artifact.name.endswith(".json") or not artifact.exists():
+                    continue
+
+                target.fs.map_file_fh(
+                    str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(artifact.name)), artifact.open("rb")
+                )
+
+            if (uploads := self.root.joinpath("uploads.json")).exists():
+                target.fs.map_file_fh(
+                    str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(uploads.name)), uploads.open("rb")
+                )
 
 
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):

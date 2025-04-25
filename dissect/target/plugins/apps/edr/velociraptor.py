@@ -20,8 +20,8 @@ class VelociraptorRecordBuilder:
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
         self.RECORD_NAME = f"velociraptor/{os_type}/{artifact_name}"
 
-    def read_record(self, object: dict, target: Target):
-        """Builds a Velociraptor record"""
+    def build_record(self, object: dict, target: Target) -> TargetRecordDescriptor:
+        """Builds a Velociraptor record."""
         record_values = {}
         record_fields = []
 
@@ -42,7 +42,7 @@ class VelociraptorRecordBuilder:
                 record_type = "varint"
             elif key == "hash":
                 record_type = "digest"
-                value = (value["md5"] or None, value["sha1"] or None, value["sha256"] or None)
+                value = (value.get("MD5"), value.get("SHA1"), value.get("SHA256"))
             elif isinstance(value, str):
                 record_type = "string"
             # FIXME: Why is there no record type dict?
@@ -58,7 +58,7 @@ class VelociraptorRecordBuilder:
         desc = self._create_event_descriptor(tuple(record_fields))
         return desc(**record_values)
 
-    def _create_event_descriptor(self, record_fields: tuple) -> TargetRecordDescriptor:
+    def _create_event_descriptor(self, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
 
@@ -78,21 +78,23 @@ class VelociraptorPlugin(Plugin):
         References:
             - https://docs.velociraptor.app/docs/vql/artifacts/
         """
-        for artifact in self.results.glob("*.json"):
-            fh = self.target.fs.path(artifact).open("rt")
+        # FIXME: .glob("*json") results in TargetPath objects that do not exist
+        for artifact in self.results.iterdir():
+            if not artifact.name.endswith(".json"):
+                continue
 
             # "Windows.KapeFiles.Targets%2FAll\ File\ Metadata.json" becomes "windows_kapefiles_targets"
             artifact_name = urllib.parse.unquote(artifact.name.rstrip(".json")).split("/")[0].lower().replace(".", "_")
             velociraptor_record_builder = VelociraptorRecordBuilder(self.target.os, artifact_name)
 
-            for line in fh:
-                line = line.strip()
-                if not line:
+            for line in artifact.open("rt"):
+
+                if not (line := line.strip()):
                     continue
 
                 try:
                     object = json.loads(line)
-                    yield velociraptor_record_builder.read_record(object, self.target)
+                    yield velociraptor_record_builder.build_record(object, self.target)
                 except json.decoder.JSONDecodeError:
                     self.target.log.warning("Could not decode Velociraptor JSON log line: %s (%s)", line, artifact)
                     continue
