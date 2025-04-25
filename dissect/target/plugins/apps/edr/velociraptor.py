@@ -64,6 +64,8 @@ class VelociraptorRecordBuilder:
 
 
 class VelociraptorPlugin(Plugin):
+    """Returns records from Velociraptor artifacts."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.results = target.fs.path(VELOCIRAPTOR_RESULTS)
