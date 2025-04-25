@@ -16,9 +16,9 @@ ISO_8601_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{
 
 
 class VelociraptorRecordBuilder:
-    def __init__(self, os_type: str, artifact_name: str):
+    def __init__(self, artifact_name: str):
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
-        self.RECORD_NAME = f"velociraptor/{os_type}/{artifact_name}"
+        self.RECORD_NAME = f"velociraptor/{artifact_name}"
 
     def build_record(self, object: dict, target: Target) -> TargetRecordDescriptor:
         """Builds a Velociraptor record."""
@@ -87,7 +87,7 @@ class VelociraptorPlugin(Plugin):
 
             # "Windows.KapeFiles.Targets%2FAll\ File\ Metadata.json" becomes "windows_kapefiles_targets"
             artifact_name = urllib.parse.unquote(artifact.name.rstrip(".json")).split("/")[0].lower().replace(".", "_")
-            velociraptor_record_builder = VelociraptorRecordBuilder(self.target.os, artifact_name)
+            velociraptor_record_builder = VelociraptorRecordBuilder(artifact_name)
 
             for line in artifact.open("rt"):
                 if not (line := line.strip()):
