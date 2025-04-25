@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
 
 
-def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
+def test_iis_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
 
@@ -32,8 +32,8 @@ def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesys
     assert {r.service_status_code for r in records} == {"304", "404", "200"}
 
     # check if metadata fields are present
-    assert {r.log_format for r in records} == {"IIS"}
-    assert {r.log_file for r in records} == {"sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"}
+    assert {r.format for r in records} == {"IIS"}
+    assert {str(r.source) for r in records} == {"sysvol\\Users\\John\\iis-logs\\W3SVC1\\u_in211001.log"}
     assert {r.hostname for r in records} == {target_win_tzinfo.hostname}
 
 
@@ -44,7 +44,7 @@ def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesys
         "_data/plugins/apps/webserver/iis/iis-applicationHost-w3c-logFile-without-directory-attr.config",
     ],
 )
-def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str) -> None:
+def test_iis_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str) -> None:
     config_path = absolute_path(iis_config_path)
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c")
 
@@ -80,8 +80,8 @@ def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, ii
     }
 
     # check if metadata fields are present
-    assert {r.log_format for r in records} == {"W3C"}
-    assert {r.log_file for r in records} == {"C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"}
+    assert {r.format for r in records} == {"W3C"}
+    assert {str(r.source) for r in records} == {"C:\\Users\\John\\w3c-logs\\W3SVC1\\u_ex211001_x.log"}
     assert {r.hostname for r in records} == {target_win.hostname}
 
 
@@ -92,11 +92,10 @@ def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, ii
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
     ],
 )
-def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str) -> None:
-    server = iis.IISLogsPlugin(target_win_tzinfo)
+def test_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str) -> None:
     # should not crash on invalid bytes like \xa7
     with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
-        assert next(iter(getattr(server, method)(Path("/iis")))).server_name == "\\xa7"
+        assert next(iter(getattr(iis, method)(target_win_tzinfo, Path("/iis")))).server_name == "\\xa7"
 
 
 def test_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
@@ -207,7 +206,7 @@ def test_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) ->
         ("w3c"),
     ],
 )
-def test_iis_access_iis_format_noconfig(
+def test_iis_access_noconfig(
     target_win_tzinfo: Target, fs_win: VirtualFilesystem, map_dir: str, log_format: str
 ) -> None:
     data_dir = absolute_path(f"_data/plugins/apps/webserver/iis/iis-logs-{log_format}/W3SVC1")
@@ -217,10 +216,10 @@ def test_iis_access_iis_format_noconfig(
     assert len(results) > 0
 
 
-def test_plugins_apps_webservers_iis_single_file_mode() -> None:
-    data_path = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis/W3SVC1/*.log")
+def test_iis_direct_mode() -> None:
+    data_path = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis/W3SVC1/u_in211001.log")
 
-    target = Target.minimal([str(data_path)])
+    target = Target.open_direct([data_path])
     records = list(target.iis.logs())
 
     assert len(records) == 10

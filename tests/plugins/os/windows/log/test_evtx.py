@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
 def mock_registry_log_location(target_win: Target, reg_key_name: str, mock_log_path: str) -> None:
@@ -166,10 +165,10 @@ def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> 
     assert evtx.unique_key(key, keys) == expected_key
 
 
-def test_evtx_single_file_mode() -> None:
+def test_evtx_direct_mode() -> None:
     data_path = absolute_path("_data/plugins/os/windows/log/evtx/TestLogX.evtx")
 
-    target = Target.minimal([str(data_path)])
+    target = Target.open_direct([data_path])
     records = list(target.evtx())
 
     assert len(records) == 5

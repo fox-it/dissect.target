@@ -34,7 +34,7 @@ from dissect.target.helpers.record import EmptyRecord
 from dissect.target.helpers.utils import StrEnum
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterator
 
     from typing_extensions import Self
 
@@ -436,7 +436,7 @@ class Plugin:
         """Perform a compatibility check with the target."""
         try:
             self.check_compatible()
-        except Exception:
+        except UnsupportedPluginError:
             return False
 
         return True
@@ -444,30 +444,14 @@ class Plugin:
     def check_compatible(self) -> None:
         """Perform a compatibility check with the target.
 
-        This function should return ``None`` if the plugin is compatible with
-        the current target (``self.target``). For example, check if a certain
-        file exists.
-        Otherwise it should raise an ``UnsupportedPluginError``.
-
-        Default implementation delegates to `_check_compatible`
-        if the target mode is not minimal.
+        This function should return ``None`` if the plugin is compatible with the current target (``self.target``).
+        For example, check if a certain file exists. Otherwise it should raise an
+        :class:`UnsupportedPluginError`.
 
         Raises:
             UnsupportedPluginError: If the plugin could not be loaded.
         """
-
-        if not self.target.minimal:
-            self._check_compatible()
-        # No plugin needs a compatibility check in minimal mode yet.
-        # Delegate to self._check_compatible_minimal if needed.
-
-    def _check_compatible(self) -> None:
-        """Perform a compatibility check on an ordinary target.
-
-        To be implemented by subclasses
-        """
-
-        pass
+        raise NotImplementedError
 
     def __call__(self, *args, **kwargs) -> Iterator[Record | Any]:
         """Return the records of all exported methods.
@@ -492,22 +476,23 @@ class Plugin:
                 self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
 
-    def get_files(self, *args, **kwargs) -> Iterable[Path]:
-        if self.target.minimal:
-            yield from self._get_minimal_files(*args, **kwargs)
+    def get_paths(self) -> Iterator[Path]:
+        if self.target.is_direct:
+            yield from self._get_paths_direct()
         else:
-            yield from self._get_files(*args, **kwargs)
+            yield from self._get_paths()
 
-    def _get_minimal_files(self, *args, **kwargs) -> Iterable[Path]:
-        entries = self.target.fs.path().rglob("*")
-        return filter(lambda entry: entry.is_file(), entries)
+    def _get_paths_direct(self) -> Iterator[Path]:
+        """Return all paths as given by the user."""
+        for path in self.target._loader.paths:
+            yield self.target.fs.path(str(path))
 
-    def _get_files(self, *args, **kwargs) -> Iterable[Path]:
+    def _get_paths(self) -> Iterator[Path]:
         """Return all files of interest to the plugin.
 
         To be implemented by the plugin subclass.
         """
-        pass
+        raise NotImplementedError
 
 
 def register(plugincls: type[Plugin]) -> None:
@@ -688,7 +673,7 @@ def _module_path(cls: type[Plugin] | str) -> str:
 
 def _os_match(osfilter: type[OSPlugin], module_path: str) -> bool:
     """Check if the a plugin is compatible with the given OS filter."""
-    if issubclass(osfilter, default._os.DefaultPlugin):
+    if issubclass(osfilter, default._os.DefaultOSPlugin):
         return True
 
     os_parts = _module_path(osfilter).split(".")[:-1]
@@ -712,7 +697,7 @@ def plugins(osfilter: type[OSPlugin] | None = None, *, index: str = "__regular__
     If ``osfilter`` is specified, only plugins related to the provided OSPlugin, or plugins
     with no OS relation are returned. If ``osfilter`` is ``None``, all plugins will be returned.
 
-    One exception to this is if the ``osfilter`` is a (sub-)class of ``DefaultPlugin``, then plugins
+    One exception to this is if the ``osfilter`` is a (sub-)class of ``DefaultOSPlugin``, then plugins
     are returned as if no ``osfilter`` was specified.
 
     The ``index`` parameter can be used to specify the index to return plugins from. By default,
@@ -771,10 +756,7 @@ def functions(osfilter: type[OSPlugin] | None = None, *, index: str = "__regular
 
 
 def lookup(
-    function_name: str,
-    osfilter: type[OSPlugin] | None = None,
-    *,
-    index: str = "__regular__",
+    function_name: str, osfilter: type[OSPlugin] | None = None, *, index: str = "__regular__"
 ) -> Iterator[FunctionDescriptor]:
     """Lookup a function descriptor by function name.
 
@@ -988,9 +970,7 @@ def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) 
 
 
 def _filter_compatible(
-    descriptors: list[FunctionDescriptor],
-    target: Target,
-    ignore_load_errors: bool = False,
+    descriptors: list[FunctionDescriptor], target: Target, ignore_load_errors: bool = False
 ) -> Iterator[FunctionDescriptor]:
     """Filter a list of function descriptors based on compatibility with a target."""
     compatible = set()

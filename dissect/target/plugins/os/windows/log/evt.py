@@ -53,42 +53,35 @@ class WindowsEventlogsMixin:
     EVENTLOG_REGISTRY_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Eventlog"
     LOGS_DIR_PATH = None
 
-    def _get_files(self, logs_dir: str, filename_glob: str) -> Iterator[Path]:
-        if logs_dir:
-            yield from self.get_logs_from_dir(logs_dir, filename_glob=filename_glob)
-        else:
-            yield from self.get_logs(filename_glob=filename_glob)
-
-    def get_logs(self, filename_glob: str = "*") -> list[Path]:
-        file_paths = []
-        file_paths.extend(self.get_logs_from_dir(self.LOGS_DIR_PATH, filename_glob=filename_glob))
+    def _get_paths(self) -> Iterator[Path]:
+        seen = self.get_logs_from_dir(self.LOGS_DIR_PATH)
+        yield from seen
 
         if self.EVENTLOG_REGISTRY_KEY:
-            for reg_path in self.get_logs_from_registry(filename_glob=filename_glob):
+            for reg_path in self.get_logs_from_registry():
                 # We can't filter duplicates on file path alone, since "sysvol" and "C:" can show up interchangeably.
                 try:
-                    if any(fpath.samefile(reg_path) for fpath in file_paths):
+                    if any(fpath.samefile(reg_path) for fpath in seen):
                         continue
                 except FilesystemError:
                     pass
 
-                file_paths.append(reg_path)
+                yield reg_path
 
-        return file_paths
+    def get_logs(self, filename_glob: str = "*") -> list[Path]:
+        re_filename = re.compile(fnmatch.translate(filename_glob), re.IGNORECASE)
+        return [path for path in self.get_paths() if re_filename.match(str(path))]
 
     def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> list[Path]:
-        file_paths = []
-        logs_dir = self.target.fs.path(logs_dir)
-        if logs_dir.exists():
-            file_paths.extend(list(logs_dir.glob(filename_glob)))
+        if (path := self.target.fs.path(logs_dir)).exists():
+            file_paths = list(path.glob(filename_glob))
 
-        self.target.log.debug("Log files found in '%s': %d", self.LOGS_DIR_PATH, len(file_paths))
-        return file_paths
+            self.target.log.debug("Log files found in '%s': %d", self.LOGS_DIR_PATH, len(file_paths))
+            return file_paths
+
+        return []
 
     def get_logs_from_registry(self, filename_glob: str = "*") -> list[Path]:
-        # compile glob into case-insensitive regex
-        filename_regex = re.compile(fnmatch.translate(filename_glob), re.IGNORECASE)
-
         file_paths = []
 
         try:
@@ -105,17 +98,13 @@ class WindowsEventlogsMixin:
                 subkey_value = subkey.value("File")
             except RegistryValueNotFoundError:
                 continue
-            file_paths.append(subkey_value.value)
 
-        # resolve aliases (like `%systemroot%`) in the paths
-        file_paths = [self.target.resolve(p) for p in file_paths]
-        file_paths = [path for path in file_paths if filename_regex.match(str(path))]
-
-        self.target.log.debug("Log files found in '%s': %d", self.EVENTLOG_REGISTRY_KEY, len(file_paths))
+            # resolve aliases (like `%systemroot%`) in the paths
+            file_paths.append(self.target.resolve(subkey_value.value))
 
         return file_paths
 
-    def _check_compatible(self) -> None:
+    def check_compatible(self) -> None:
         if not self.target.fs.path(self.LOGS_DIR_PATH).exists():
             raise UnsupportedPluginError(f'Event log directory "{self.LOGS_DIR_PATH}" not found')
 
@@ -145,8 +134,12 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
             Provider_Name (string): The Provider_Name field of the event.
             EventID (int): The EventID of the event.
         """
+        if logs_dir:
+            log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
+        else:
+            log_paths = self.get_logs(filename_glob=log_file_glob)
 
-        for entry in self.get_files(logs_dir=logs_dir, filename_glob=log_file_glob):
+        for entry in log_paths:
             if not entry.exists():
                 self.target.log.warning("Event log file does not exist: %s", entry)
                 continue

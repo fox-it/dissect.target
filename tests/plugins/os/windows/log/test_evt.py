@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
 def mock_registry_log_location(target_win: Target, reg_key_name: str, mock_log_path: str) -> None:
@@ -104,10 +103,10 @@ def test_evt_scraping(target_win: Target) -> None:
     assert len(scraped_records) == 5
 
 
-def test_evt_single_file_mode() -> None:
+def test_evt_direct_mode() -> None:
     data_path = absolute_path("_data/plugins/os/windows/log/evt/TestLog.evt")
 
-    target = Target.minimal([str(data_path)])
+    target = Target.open_direct([data_path])
     records = list(target.evt())
 
     assert len(records) == 5

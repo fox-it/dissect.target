@@ -65,7 +65,12 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
             EventID (int): The EventID of the event.
         """
 
-        for entry in self.get_files(logs_dir=logs_dir, filename_glob=log_file_glob):
+        if logs_dir:
+            log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
+        else:
+            log_paths = self.get_logs(filename_glob=log_file_glob)
+
+        for entry in log_paths:
             if not entry.exists():
                 self.target.log.warning("Event log file does not exist: %s", entry)
                 continue

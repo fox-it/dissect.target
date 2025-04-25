@@ -140,6 +140,7 @@ def main() -> int:
         default=None,
         help="list (matching) available plugins and loaders",
     )
+    parser.add_argument("--direct", action="store_true", help="treat TARGETS as paths to pass to plugins directly")
 
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
@@ -167,7 +168,6 @@ def main() -> int:
         type=pathlib.Path,
         help="write the query report file to the given directory",
     )
-    parser.add_argument("--single-file", nargs="*", help="glob pattern to match files on local system")
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
@@ -222,7 +222,7 @@ def main() -> int:
         list_plugins(args.targets, args.list, args.children, args.json, rest)
         return 0
 
-    if not args.targets and not args.single_file:
+    if not args.targets:
         parser.error("too few arguments")
 
     if not args.function:
@@ -273,10 +273,7 @@ def main() -> int:
     execution_report.set_event_callbacks(Target)
 
     try:
-        if args.single_file is None:
-            targets = Target.open_all(args.targets, args.children)
-        else:
-            targets = [Target.minimal(args.single_file)]
+        targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
 
         for target in targets:
             if args.child:
