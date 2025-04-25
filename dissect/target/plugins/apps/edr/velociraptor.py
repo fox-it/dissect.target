@@ -46,8 +46,9 @@ class VelociraptorRecordBuilder:
             elif isinstance(value, str):
                 record_type = "string"
             elif isinstance(value, dict):
-                # FIXME: nested records
-                record_type = "string"
+                record_type = "record"
+                # Lower key names in nested records
+                value = {k.lower(): v for k, v in value.items()}
             else:
                 record_type = "dynamic"
 
