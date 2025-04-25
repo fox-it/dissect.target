@@ -79,7 +79,7 @@ class AcquirePlugin(Plugin):
         file is returned.
         """
         if self.open_handles_file.exists():
-            with self.hash_file.open() as fh, gzip.open(fh, "rt") as gz_fh:
+            with self.open_handles_file.open() as fh, gzip.open(fh, "rt") as gz_fh:
                 for row in csv.DictReader(gz_fh):
                     if name := row.get("name"):
                         row.update({"name": self.target.fs.path(name)})
