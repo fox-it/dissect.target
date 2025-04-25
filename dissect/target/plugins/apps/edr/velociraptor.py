@@ -100,8 +100,6 @@ class VelociraptorPlugin(Plugin):
                     yield velociraptor_record_builder.build_record(object, self.target)
                 except json.decoder.JSONDecodeError:
                     self.target.log.warning(
-                        "Could not decode Velociraptor JSON log line: %s (%s)",
-                        line,
-                        artifact,
+                        "Could not decode Velociraptor JSON log line in file %s: %s", artifact, line
                     )
                     continue
