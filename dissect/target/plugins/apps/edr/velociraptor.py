@@ -81,7 +81,6 @@ class VelociraptorPlugin(Plugin):
         References:
             - https://docs.velociraptor.app/docs/vql/artifacts/
         """
-        # FIXME: .glob("*json") results in TargetPath objects that do not exist
         for artifact in self.results.iterdir():
             if not artifact.name.endswith(".json"):
                 continue
