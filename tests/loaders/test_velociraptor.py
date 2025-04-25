@@ -53,16 +53,10 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize(
-    ("sub_dir", "other_dir"),
-    [
-        ("mft", "auto"),
-        ("ntfs", "auto"),
-        ("ntfs_vss", "auto"),
-        ("lazy_ntfs", "auto"),
-        ("auto", "ntfs"),
-    ],
+    "sub_dir",
+    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
-def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_path: Path) -> None:
+def test_windows_ntfs(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
     root = create_root(sub_dir, tmp_path)
 
     assert VelociraptorLoader.detect(root) is True

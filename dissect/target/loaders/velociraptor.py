@@ -126,17 +126,6 @@ class VelociraptorLoader(DirLoader):
 
     def map(self, target: Target) -> None:
         os_type, dirs = find_fs_directories(self.root)
-        if os_type == OperatingSystem.WINDOWS:
-            # Velociraptor doesn't have the correct filenames for the paths "$J" and "$Secure:$SDS"
-            map_dirs(
-                target,
-                dirs,
-                os_type,
-                usnjrnl_path="$Extend/$UsnJrnl%3A$J",
-                sds_path="$Secure%3A$SDS",
-            )
-        else:
-            map_dirs(target, dirs, os_type)
 
         # Velociraptor URL encodes paths before storing these in a collection, this leads plugins not being able to find
         # these paths. To circumvent this issue, for a zip file the path names are URL decoded before mapping into the
