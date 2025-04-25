@@ -86,7 +86,9 @@ class VelociraptorPlugin(Plugin):
                 continue
 
             # "Windows.KapeFiles.Targets%2FAll\ File\ Metadata.json" becomes "windows_kapefiles_targets"
-            artifact_name = urllib.parse.unquote(artifact.name.rstrip(".json")).split("/")[0].lower().replace(".", "_")
+            artifact_name = (
+                urllib.parse.unquote(artifact.name.removesuffix(".json")).split("/")[0].lower().replace(".", "_")
+            )
             velociraptor_record_builder = VelociraptorRecordBuilder(artifact_name)
 
             for line in artifact.open("rt"):
@@ -97,5 +99,9 @@ class VelociraptorPlugin(Plugin):
                     object = json.loads(line)
                     yield velociraptor_record_builder.build_record(object, self.target)
                 except json.decoder.JSONDecodeError:
-                    self.target.log.warning("Could not decode Velociraptor JSON log line: %s (%s)", line, artifact)
+                    self.target.log.warning(
+                        "Could not decode Velociraptor JSON log line: %s (%s)",
+                        line,
+                        artifact,
+                    )
                     continue
