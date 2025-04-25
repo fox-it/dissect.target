@@ -1,24 +1,29 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
-from dissect.cstruct import cstruct
 
 import dissect.target.plugins.os.windows.prefetch as prefetch
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-@pytest.fixture()
+    from dissect.cstruct import cstruct
+
+
+@pytest.fixture
 def mocked_cstruct(version: int) -> Iterator[cstruct]:
     with patch.object(prefetch, "c_prefetch") as mocked_cstruct:
         mocked_cstruct.PREFETCH_HEADER.return_value.version = version
         yield mocked_cstruct
 
 
-@pytest.fixture()
+@pytest.fixture
 def mocked_prefetch() -> prefetch.Prefetch:
-    with patch.object(prefetch, "c_prefetch"):
-        with patch.multiple(prefetch.Prefetch, identify=Mock(), parse=Mock()):
-            return prefetch.Prefetch(Mock())
+    with patch.object(prefetch, "c_prefetch"), patch.multiple(prefetch.Prefetch, identify=Mock(), parse=Mock()):
+        return prefetch.Prefetch(Mock())
 
 
 @pytest.mark.parametrize(
@@ -31,15 +36,15 @@ def mocked_prefetch() -> prefetch.Prefetch:
     ],
 )
 def test_prefetch_valid_versions(mocked_cstruct: cstruct, version: int, dict_output: tuple[str, str]) -> None:
-    with patch.object(prefetch, "prefetch_version_structs") as prefetch_diffs:
-        file_info = getattr(mocked_cstruct, dict_output[0])
-        metric_array = getattr(mocked_cstruct, dict_output[1])
-        prefetch_diffs.get.return_value = (file_info, metric_array)
-        prefetch_diffs.keys.return_value = [version]
-        with patch.object(prefetch.Prefetch, "parse_metrics") as mocked_metric:
-            prefetch_obj = prefetch.Prefetch(Mock())
-            assert prefetch_obj.fn == file_info.return_value
-            mocked_metric.assert_called_with(metric_array_struct=metric_array)
+    file_info = getattr(mocked_cstruct, dict_output[0])
+    metric_array = getattr(mocked_cstruct, dict_output[1])
+    with (
+        patch.dict(prefetch.prefetch_version_structs, {version: (file_info, metric_array)}),
+        patch.object(prefetch.Prefetch, "parse_metrics") as mocked_metric,
+    ):
+        prefetch_obj = prefetch.Prefetch(Mock())
+        assert prefetch_obj.fn == file_info.return_value
+        mocked_metric.assert_called_with(metric_array_struct=metric_array)
 
 
 @pytest.mark.parametrize("version", [0xDEADBEEF])
@@ -70,7 +75,7 @@ def test_prefetch_unknown_attribute(mocked_prefetch: prefetch.Prefetch) -> None:
         ([0x1, 0x0, 0x0, 0x20, 0x0], 2),
     ],
 )
-def test_prefetch_last_run_dates(mocked_prefetch: prefetch.Prefetch, dates: list[int], expected_length: int):
+def test_prefetch_last_run_dates(mocked_prefetch: prefetch.Prefetch, dates: list[int], expected_length: int) -> None:
     mocked_prefetch.fn = Mock()
     mocked_prefetch.fn.last_run_remains = dates
 

@@ -1,16 +1,22 @@
+from __future__ import annotations
+
 import codecs
 import re
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 from dissect.util.ts import wintimestamp
 from flow.record.base import is_valid_field_name
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import Path
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 CAMEL_CASE_PATTERNS = [re.compile(r"(\S)([A-Z][a-z]+)"), re.compile(r"([a-z0-9])([A-Z])"), re.compile(r"(\w)[.\s](\w)")]
 RE_VALID_KEY_START_CHARS = re.compile(r"[a-zA-Z]")
@@ -30,12 +36,12 @@ def _create_record_descriptor(record_name: str, record_fields: list[tuple[str, s
 class WindowsErrorReportingPlugin(Plugin):
     """Plugin for parsing Windows Error Reporting files."""
 
-    WER_LOG_DIRS = [
+    WER_LOG_DIRS = (
         "sysvol/ProgramData/Microsoft/Windows/WER/ReportArchive",
         "sysvol/ProgramData/Microsoft/Windows/WER/ReportQueue",
         "%userprofile%/AppData/Local/Microsoft/Windows/WER/ReportArchive",
         "%userprofile%/AppData/Local/Microsoft/Windows/WER/ReportQueue",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -100,7 +106,7 @@ class WindowsErrorReportingPlugin(Plugin):
                 continue
 
             # Dynamic entry with key and value on the same line
-            elif "]." in name and not key:
+            if "]." in name and not key:
                 category, name = name.split(".", 1)
                 key = f"{category.split('[')[0]}{name}"
 
@@ -111,12 +117,12 @@ class WindowsErrorReportingPlugin(Plugin):
 
             key = self._sanitize_key(key if key else name)
             if not key:
-                self.target.log.warning(f"Sanitizing key resulted in empty key, skipping line '{line}'.")
+                self.target.log.warning("Sanitizing key resulted in empty key, skipping line %r", line)
                 key = None
                 continue
 
             if key in record_values:
-                self.target.log.warning(f"Key does already exist, skipping line '{line}'.")
+                self.target.log.warning("Key does already exist, skipping line %r", line)
                 key = None
                 continue
 
@@ -142,11 +148,11 @@ class WindowsErrorReportingPlugin(Plugin):
 
                     key = self._sanitize_key(f"{category.tag}{value.tag}")
                     if not key:
-                        self.target.log.warning(f"Sanitizing key resulted in empty key, skipping value '{value}'.")
+                        self.target.log.warning("Sanitizing key resulted in empty key, skipping value %r", value)
                         continue
 
                     if key in record_values:
-                        self.target.log.warning(f"Key already exists, skipping value '{value}'.")
+                        self.target.log.warning("Key already exists, skipping value %r", value)
                         continue
 
                     record_fields.append(("string", key))

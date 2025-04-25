@@ -3,13 +3,11 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from pathlib import Path
-from typing import Callable, Iterator
+from typing import TYPE_CHECKING, Callable
 
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.exceptions import FilesystemError
-from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
@@ -20,7 +18,15 @@ from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.loaders.local import LocalLoader
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from typing_extensions import Self
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +51,11 @@ ARCH_MAP = {
 
 
 class UnixPlugin(OSPlugin):
+    """UNIX plugin."""
+
+    # Files to parse for user details
+    PASSWD_FILES = ("/etc/passwd", "/etc/passwd-", "/etc/master.passwd")
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
@@ -63,7 +74,7 @@ class UnixPlugin(OSPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> UnixPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.mount("/", sysvol)
         return cls(target)
 
@@ -76,12 +87,10 @@ class UnixPlugin(OSPlugin):
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
 
-        PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
-
         seen_users = set()
 
         # Yield users found in passwd files.
-        for passwd_file in PASSWD_FILES:
+        for passwd_file in self.PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
                 for line in path.open("rt", errors="surrogateescape"):
                     line = line.strip()
@@ -160,10 +169,14 @@ class UnixPlugin(OSPlugin):
 
     @export(property=True)
     def domain(self) -> str | None:
-        if self._domain is None or self._domain == "localhost":
-            # fall back to /etc/hosts file
-            return self._hosts_dict.get("hostname")
-        return self._domain
+        if self._domain and "localhost" not in self._domain:
+            return self._domain
+
+        # fall back to /etc/hosts file
+        if "localhost" not in (domain := self._hosts_dict.get("hostname", "")):
+            return domain or None
+
+        return None
 
     @export(property=True)
     def os(self) -> str:
@@ -195,10 +208,7 @@ class UnixPlugin(OSPlugin):
             if not (path := self.target.fs.path(path)).exists():
                 continue
 
-            if callable:
-                hostname = callable(path)
-            else:
-                hostname = path.open("rt").read().rstrip()
+            hostname = callable(path) if callable else path.open("rt").read().rstrip()
 
             if hostname and "." in hostname:
                 hostname, domain = hostname.split(".", maxsplit=1)
@@ -221,6 +231,7 @@ class UnixPlugin(OSPlugin):
         for line in path.open("rt"):
             if line.startswith(("127.0.0.1 ", "::1 ")) and "localhost" not in line:
                 return line.split(" ")[1]
+        return None
 
     def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
@@ -241,16 +252,8 @@ class UnixPlugin(OSPlugin):
 
         for dev_id, volume_name, mount_point, fs_type, options in parse_fstab(fstab, self.target.log):
             # Mount nfs, but only when target has been mapped by the `LocalLoader`
-            if fs_type == "nfs" and isinstance(self.target._loader, LocalLoader):
-                if "enable-nfs" in self.target.path_query:
-                    self._add_nfs(dev_id, volume_name, mount_point)
-                else:
-                    log.warning(
-                        "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
-                        dev_id,
-                        volume_name,
-                        mount_point,
-                    )
+            if fs_type == "nfs":
+                self._add_nfs(dev_id, volume_name, mount_point)
                 continue
 
             opts = parse_options_string(options)
@@ -291,10 +294,41 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
+    @property
+    def _is_nfs_enabled(self) -> bool:
+        return isinstance(self.target._loader, LocalLoader) and "enable-nfs" in self.target.path_query
+
+    def _log_nfs_mount_disabled(self, address: str, exported_dir: str, mount_point: str) -> None:
+        if isinstance(self.target._loader, LocalLoader):
+            log.warning(
+                "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
+                address,
+                exported_dir,
+                mount_point,
+            )
+        else:
+            log.warning(
+                "NFS mount %s:%s at %s is unavailable on a non-local target",
+                address,
+                exported_dir,
+                mount_point,
+            )
+
     def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
+        if not self._is_nfs_enabled:
+            self._log_nfs_mount_disabled(address, exported_dir, mount_point)
+            return
+
         # Try all users to see if we can access the share
         def auth_setter(nfs_client: NfsClient, filehandle: FileHandle, _: list[int]) -> None:
-            for user in self.users():
+            users = list(self.users())
+            if not users:
+                self.target.log.debug(
+                    "No users found, trying root for mounting NFS share %s:%s at %s", address, exported_dir, mount_point
+                )
+                users = [UnixUserRecord(uid=0, gid=0)]
+
+            for user in users:
                 if user.uid is None or user.gid is None:
                     continue
                 auth = auth_unix("machine", user.uid, user.gid, [])
@@ -304,14 +338,17 @@ class UnixPlugin(OSPlugin):
                     # Use a readdir to check if we have access.
                     # RdJ: Perhaps an ACCESS call (to be implemented) is better than READDIR
                     nfs_client.readdir(filehandle)
-                    return  # We have access
                 except NfsError as e:
                     if e.nfsstat != NfsStat.ERR_ACCES:
                         self.target.log.warning("Reading NFS share gives %s", e.nfsstat)
                         nfs_client.close()
-                        raise e
+                        raise
+                else:
+                    # We have access
+                    return
 
-            raise FilesystemError("No user has access to NFS share")
+            self.target.log.debug("No user has access to NFS share %s:%s at %s", address, exported_dir, mount_point)
+            raise FilesystemError(f"No user has access to NFS share {address}:{exported_dir} at {mount_point}")
 
         try:
             self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
@@ -363,7 +400,7 @@ class UnixPlugin(OSPlugin):
                         if line.startswith("#"):
                             continue
 
-                        elif "=" not in line:
+                        if "=" not in line:
                             os_release["DISTRIB_DESCRIPTION"] = line.strip()
 
                         else:
@@ -387,7 +424,7 @@ class UnixPlugin(OSPlugin):
                     break
 
         if not path.exists():
-            return
+            return None
 
         fh = path.open("rb")
         fh.seek(4)  # ELF - e_ident[EI_CLASS]
@@ -397,7 +434,7 @@ class UnixPlugin(OSPlugin):
         e_machine = int.from_bytes(fh.read(2), "little")
         arch = ARCH_MAP.get(e_machine, "unknown")
 
-        return f"{arch}_32-{os}" if bits == 1 and not arch[-2:] == "32" else f"{arch}-{os}"
+        return f"{arch}_32-{os}" if bits == 1 and arch[-2:] != "32" else f"{arch}-{os}"
 
 
 def parse_fstab(

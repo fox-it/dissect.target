@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator, Optional
-
-if TYPE_CHECKING:
-    from flow.record import Record
-
-    from dissect.target.target import Target
-    from dissect.target.filesystem import Filesystem
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.plugin import OSPlugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from flow.record import Record
+    from typing_extensions import Self
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 class DefaultPlugin(OSPlugin):
@@ -22,17 +25,17 @@ class DefaultPlugin(OSPlugin):
                 target.fs.mount(f"fs{i}", fs)
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         pass
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> DefaultPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         if sysvol:
             target.fs.mount("/", sysvol)
         return cls(target)
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         pass
 
     @export(property=True)
@@ -40,7 +43,7 @@ class DefaultPlugin(OSPlugin):
         return []
 
     @export(property=True)
-    def version(self) -> Optional[str]:
+    def version(self) -> str | None:
         pass
 
     @export(record=EmptyRecord)
@@ -52,5 +55,5 @@ class DefaultPlugin(OSPlugin):
         return "default"
 
     @export(property=True)
-    def architecture(self) -> Optional[str]:
+    def architecture(self) -> str | None:
         pass

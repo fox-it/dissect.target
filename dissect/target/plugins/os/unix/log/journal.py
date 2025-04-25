@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import logging
 import lzma
-from typing import Any, BinaryIO, Callable, Iterator
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable
 
 import zstandard
 from dissect.cstruct import cstruct
 from dissect.util import ts
 from dissect.util.compression import lz4
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -272,7 +276,7 @@ def get_optional(value: str, to_type: Callable) -> Any | None:
         return to_type(value)
 
     except ValueError as e:
-        log.error("Unable to cast '%s' to %s", value, to_type)
+        log.error("Unable to cast '%s' to %s", value, to_type)  # noqa: TRY400
         log.debug("", exc_info=e)
         return None
 
@@ -288,7 +292,7 @@ class JournalFile:
     References:
         - https://github.com/systemd/systemd/blob/206f0f397edf1144c63a158fb30f496c3e89f256/docs/JOURNAL_FILE_FORMAT.md
         - https://github.com/libyal/dtformats/blob/c4fc2b8102702c64b58f145971821986bf74e6c0/documentation/Systemd%20journal%20file%20format.asciidoc
-    """  # noqa: E501
+    """
 
     def __init__(self, fh: BinaryIO, target: Target):
         self.fh = fh
@@ -398,7 +402,7 @@ class JournalFile:
 class JournalPlugin(Plugin):
     """Systemd Journal plugin."""
 
-    JOURNAL_PATHS = ["/var/log/journal"]  # TODO: /run/systemd/journal
+    JOURNAL_PATHS = ("/var/log/journal",)  # TODO: /run/systemd/journal
     JOURNAL_GLOB = "*/*.journal*"  # The extensions .journal and .journal~
 
     def __init__(self, target: Target):
@@ -419,7 +423,7 @@ class JournalPlugin(Plugin):
         References:
             - https://wiki.archlinux.org/title/Systemd/Journal
             - https://github.com/systemd/systemd/blob/9203abf79f1d05fdef9b039e7addf9fc5a27752d/man/systemd.journal-fields.xml
-        """  # noqa: E501
+        """
         path_function = self.target.fs.path
 
         for journal_file in self.journal_files:

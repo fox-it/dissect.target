@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 import base64
 import itertools
 import json
 from collections import defaultdict
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING
 
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
-from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -23,7 +24,13 @@ from dissect.target.plugins.apps.browser.browser import (
     BrowserPlugin,
     try_idna,
 )
-from dissect.target.plugins.general.users import UserDetails
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.sql.sqlite3 import SQLite3
+
+    from dissect.target.plugins.general.users import UserDetails
 
 try:
     from Crypto.Cipher import AES
@@ -45,7 +52,7 @@ CHROMIUM_DOWNLOAD_RECORD_FIELDS = [
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
-    DIRS = []
+    DIRS = ()
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
@@ -88,7 +95,7 @@ class ChromiumMixin:
         return users_dirs
 
     def _iter_db(
-        self, filename: str, subdirs: Optional[list[str]] = None
+        self, filename: str, subdirs: list[str] | None = None
     ) -> Iterator[tuple[UserDetails, TargetPath, SQLite3]]:
         """Generate a connection to a sqlite database file.
 
@@ -104,7 +111,7 @@ class ChromiumMixin:
             SQLError: If the history file could not be opened.
         """
 
-        dirs = self.DIRS
+        dirs = list(self.DIRS)
         if subdirs:
             dirs.extend([join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subdirs)])
 
@@ -115,7 +122,8 @@ class ChromiumMixin:
             except FileNotFoundError:
                 self.target.log.warning("Could not find %s file: %s", filename, db_file)
             except SQLError as e:
-                self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
+                self.target.log.warning("Could not open %s file: %s", filename, db_file)
+                self.target.log.debug("", exc_info=e)
 
     def _iter_json(self, filename: str) -> Iterator[tuple[UserDetails, TargetPath, dict]]:
         """Iterate over all JSON files in the user directories, yielding a tuple
@@ -142,7 +150,7 @@ class ChromiumMixin:
         if not self._build_userdirs(self.DIRS):
             raise UnsupportedPluginError("No Chromium-based browser directories found")
 
-    def history(self, browser_name: Optional[str] = None) -> Iterator[BrowserHistoryRecord]:
+    def history(self, browser_name: str | None = None) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records from supported Chromium-based browsers.
 
         Args:
@@ -203,10 +211,11 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:
-                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
+            except SQLError as e:  # noqa: PERF203
+                self.target.log.warning("Error processing history file: %s", db_file)
+                self.target.log.debug("", exc_info=e)
 
-    def cookies(self, browser_name: Optional[str] = None) -> Iterator[BrowserCookieRecord]:
+    def cookies(self, browser_name: str | None = None) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records from supported Chromium-based browsers.
 
         Args:
@@ -283,9 +292,10 @@ class ChromiumMixin:
                         _user=user.user,
                     )
             except SQLError as e:
-                self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
+                self.target.log.warning("Error processing cookie file: %s", db_file)
+                self.target.log.debug("", exc_info=e)
 
-    def downloads(self, browser_name: Optional[str] = None) -> Iterator[BrowserDownloadRecord]:
+    def downloads(self, browser_name: str | None = None) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from supported Chromium-based browsers.
 
         Args:
@@ -345,10 +355,11 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:
-                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
+            except SQLError as e:  # noqa: PERF203
+                self.target.log.warning("Error processing history file: %s", db_file)
+                self.target.log.debug("", exc_info=e)
 
-    def extensions(self, browser_name: Optional[str] = None) -> Iterator[BrowserExtensionRecord]:
+    def extensions(self, browser_name: str | None = None) -> Iterator[BrowserExtensionRecord]:
         """Iterates over all installed extensions for a given browser.
 
         Args:
@@ -380,9 +391,7 @@ class ChromiumMixin:
                 try:
                     extensions = content.get("extensions").get("settings")
 
-                    for extension_id in extensions.keys():
-                        extension_data = extensions.get(extension_id)
-
+                    for extension_id, extension_data in extensions.items():
                         ts_install = extension_data.get("first_install_time") or extension_data.get("install_time")
                         ts_update = extension_data.get("last_update_time")
                         if ts_install:
@@ -434,20 +443,21 @@ class ChromiumMixin:
                             _target=self.target,
                             _user=user.user,
                         )
-                except (AttributeError, KeyError) as e:
-                    self.target.log.info("No browser extensions found in: %s", json_file, exc_info=e)
+                except (AttributeError, KeyError) as e:  # noqa: PERF203
+                    self.target.log.warning("No browser extensions found in: %s", json_file)
+                    self.target.log.debug("", exc_info=e)
 
-    def _get_local_state_key(self, local_state_path: TargetPath, username: str) -> Optional[bytes]:
+    def _get_local_state_key(self, local_state_path: TargetPath, username: str) -> bytes | None:
         """Get the Chromium ``os_crypt`` ``encrypted_key`` and decrypt it using DPAPI."""
 
         if not local_state_path.exists():
-            self.target.log.warning("File %s does not exist.", local_state_path)
+            self.target.log.warning("File %s does not exist", local_state_path)
             return None
 
         try:
             local_state_conf = json.loads(local_state_path.read_text())
         except json.JSONDecodeError:
-            self.target.log.warning("File %s does not contain valid JSON.", local_state_path)
+            self.target.log.warning("File %s does not contain valid JSON", local_state_path)
             return None
 
         if "os_crypt" not in local_state_conf:
@@ -457,10 +467,9 @@ class ChromiumMixin:
             return None
 
         encrypted_key = base64.b64decode(local_state_conf["os_crypt"]["encrypted_key"])[5:]
-        decrypted_key = self.target.dpapi.decrypt_user_blob(encrypted_key, username)
-        return decrypted_key
+        return self.target.dpapi.decrypt_user_blob(encrypted_key, username)
 
-    def passwords(self, browser_name: str = None) -> Iterator[BrowserPasswordRecord]:
+    def passwords(self, browser_name: str | None = None) -> Iterator[BrowserPasswordRecord]:
         """Return browser password records from Chromium browsers.
 
         Chromium on Linux has ``basic``, ``gnome`` and ``kwallet`` methods for password storage:
@@ -567,14 +576,14 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
 
     __namespace__ = "chromium"
 
-    DIRS = [
+    DIRS = (
         # Linux
         ".config/chromium/Default",
         ".var/app/org.chromium.Chromium/config/chromium/Default",
         "snap/chromium/common/chromium/Default",
         # Windows
         "AppData/Local/Chromium/User Data/Default",
-    ]
+    )
 
     @export(record=ChromiumMixin.BrowserHistoryRecord)
     def history(self) -> Iterator[ChromiumMixin.BrowserHistoryRecord]:

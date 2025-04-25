@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 IPV4_SEG = r"(?:25[0-5]|2[0-4]\d|[1]\d\d|[1-9]?\d)"
@@ -33,7 +35,7 @@ IPV6_GROUPS = (
     # 2001:db8:3:4::192.0.2.33 - 64:ff9b::192.0.2.33 - 0:0:0:0:0:0:10.0.0.1
     r"(?:" + IPV6_SEG + r":){1,6}:?[^\s:]" + IPV4_ADDR,
 )
-IPV6_ADDR = "|".join(["(?:{})".format(group) for group in IPV6_GROUPS[::-1]])  # Reverse rows for greedy match
+IPV6_ADDR = "|".join([f"(?:{group})" for group in IPV6_GROUPS[::-1]])  # Reverse rows for greedy match
 IP_REGEX = re.compile(f"{IPV6_ADDR}|{IPV4_ADDR}", re.IGNORECASE)
 
 

@@ -4,8 +4,7 @@ import itertools
 import re
 from datetime import datetime
 from functools import cached_property
-from pathlib import Path
-from typing import Iterator, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
@@ -16,7 +15,12 @@ from dissect.target.plugins.apps.webserver.webserver import (
     WebserverHostRecord,
     WebserverPlugin,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class LogFormat(NamedTuple):
@@ -103,11 +107,17 @@ RE_ACCESS_COMMON_PATTERN = r"""
     \s
     (\[(?P<pid>[0-9]+)\]\s)?            # The process ID of the child that serviced the request (optional).
     "
-    (?P<method>.*?)                     # The HTTP Method used for the request.
-    \s
-    (?P<uri>.*?)                        # The HTTP URI of the request.
-    \s
-    ?(?P<protocol>HTTP\/.*?)?           # The request protocol.
+    (
+        -                               # Malformed requests may result in the value "-"
+        |
+        (
+            (?P<method>.*?)             # The HTTP Method used for the request.
+            \s
+            (?P<uri>.*?)                # The HTTP URI of the request.
+            \s
+            ?(?P<protocol>HTTP\/.*?)?   # The request protocol.
+        )
+    )
     "
     \s
     (?P<status_code>\d{3})              # The HTTP Status Code of the response.
@@ -204,25 +214,25 @@ class ApachePlugin(WebserverPlugin):
 
     __namespace__ = "apache"
 
-    DEFAULT_LOG_DIRS = [
+    DEFAULT_LOG_DIRS = (
         "/var/log/apache2",
         "/var/log/apache",
         "/var/log/httpd",
         "/var/log",
         "sysvol/xampp/apache/logs",
         "/opt/lampp/logs",
-    ]
-    ACCESS_LOG_NAMES = ["access.log", "access_log", "httpd-access.log"]
-    ERROR_LOG_NAMES = ["error.log"]
-    DEFAULT_CONFIG_PATHS = [
+    )
+    ACCESS_LOG_NAMES = ("access.log", "access_log", "httpd-access.log")
+    ERROR_LOG_NAMES = ("error.log",)
+    DEFAULT_CONFIG_PATHS = (
         "/etc/apache2/apache2.conf",
         "/usr/local/etc/apache22/httpd.conf",
         "/usr/local/apache2/httpd.conf",
         "/etc/httpd/conf/httpd.conf",
         "/etc/httpd.conf",
-    ]
-    DEFAULT_ENVVAR_PATHS = ["/etc/apache2/envvars", "/etc/sysconfig/httpd", "/etc/rc.conf"]
-    DEFAULT_SERVER_ROOTS = ["/etc/apache2", "/usr/local/apache2", "/etc/httpd", "/home/httpd", "/home/apache2"]
+    )
+    DEFAULT_ENVVAR_PATHS = ("/etc/apache2/envvars", "/etc/sysconfig/httpd", "/etc/rc.conf")
+    DEFAULT_SERVER_ROOTS = ("/etc/apache2", "/usr/local/apache2", "/etc/httpd", "/home/httpd", "/home/apache2")
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -323,10 +333,13 @@ class ApachePlugin(WebserverPlugin):
                     for found_conf in root.glob(f"*{rest}"):
                         self._process_conf_file(found_conf, seen)
 
-                elif self.server_root and (include_path := self.server_root.joinpath(location)).exists():
-                    self._process_conf_file(include_path, seen)
-
-                elif (include_path := self.target.fs.path(location)).exists():
+                elif (
+                    # Relative from server root
+                    (self.server_root and (include_path := self.server_root.joinpath(location)).exists())
+                    or
+                    # Absolute path
+                    ((include_path := self.target.fs.path(location)).exists())
+                ):
                     self._process_conf_file(include_path, seen)
 
                 else:
@@ -396,17 +409,17 @@ class ApachePlugin(WebserverPlugin):
 
                 yield WebserverAccessLogRecord(
                     ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
-                    remote_user=log["remote_user"],
+                    remote_user=clean_value(log["remote_user"]),
                     remote_ip=log["remote_ip"],
-                    local_ip=log.get("local_ip"),
+                    local_ip=clean_value(log.get("local_ip")),
                     method=log["method"],
                     uri=log["uri"],
                     protocol=log["protocol"],
                     status_code=log["status_code"],
-                    bytes_sent=log["bytes_sent"].strip("-") or 0,
+                    bytes_sent=clean_value(log["bytes_sent"]) or 0,
                     pid=log.get("pid"),
-                    referer=log.get("referer"),
-                    useragent=log.get("useragent"),
+                    referer=clean_value(log.get("referer")),
+                    useragent=clean_value(log.get("useragent")),
                     response_time_ms=response_time,
                     source=path,
                     _target=self.target,
@@ -441,7 +454,7 @@ class ApachePlugin(WebserverPlugin):
                     error_source, error_code = error_code, error_source
 
                 # Unlike with access logs, ErrorLogFormat doesn't log the offset to UTC but insteads logs in local time.
-                ts = self.target.datetime.local(datetime.strptime(log["ts"], "%a %b %d %H:%M:%S.%f %Y"))
+                ts = self.target.datetime.local(datetime.strptime(log["ts"], "%a %b %d %H:%M:%S.%f %Y"))  # noqa: DTZ007
 
                 yield WebserverErrorLogRecord(
                     ts=ts,
@@ -515,7 +528,6 @@ class ApachePlugin(WebserverPlugin):
 
         Three default log type examples from Apache (note that the ipv4 could also be ipv6)
 
-
         Combined::
 
             1.2.3.4 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0
@@ -525,6 +537,7 @@ class ApachePlugin(WebserverPlugin):
         Common::
 
             1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312
+            1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 301 -
 
         vhost_combined::
 
@@ -537,10 +550,20 @@ class ApachePlugin(WebserverPlugin):
         if ":" in first_part and "." in first_part:
             # does not start with IP, hence it must be a vhost typed log
             return LOG_FORMAT_ACCESS_VHOST_COMBINED
-        elif line[-1] == '"':
+        if line[-1] == '"':
             # ends with a quotation mark but does not contain a response time, meaning there is only a user agent
             return LOG_FORMAT_ACCESS_COMBINED
-        elif line[-1].isdigit():
+        if line[-1].isdigit() or line[-1] == "-":
+            # ends with a digit or '-' indicating response size in bytes
             return LOG_FORMAT_ACCESS_COMMON
 
         return None
+
+
+def clean_value(value: str | None) -> str | None:
+    """Clean the given value by replacing empty strings and ``"-"`` with ``None``."""
+
+    if value in ("-", ""):
+        return None
+
+    return value

@@ -1,8 +1,9 @@
-import re
-from collections import OrderedDict, namedtuple
-from typing import Iterator, List, Optional, Set
+from __future__ import annotations
 
-from dissect.target import Target
+import re
+from collections import OrderedDict
+from typing import TYPE_CHECKING, NamedTuple
+
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import (
@@ -10,6 +11,11 @@ from dissect.target.helpers.record import (
     create_extended_descriptor,
 )
 from dissect.target.plugin import OperatingSystem, Plugin, export, internal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 EnvironmentRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/environment",
@@ -26,11 +32,12 @@ PathextRecord = TargetRecordDescriptor(
     ],
 )
 
-EnvVarDetails = namedtuple(
-    "EnvVarDetails",
-    ["name", "reg_keys", "reg_value", "default"],
-    defaults=[tuple(), None, None],
-)
+
+class EnvVarDetails(NamedTuple):
+    name: str
+    reg_keys: tuple[str, ...] = ()
+    reg_value: str | None = None
+    default: str | None = None
 
 
 class EnvironmentVariablePlugin(Plugin):
@@ -41,7 +48,7 @@ class EnvironmentVariablePlugin(Plugin):
 
     # More information on the variables below can be found at:
     # https://renenyffenegger.ch/notes/Windows/development/environment-variables/index
-    VARIABLES = [
+    VARIABLES = (
         EnvVarDetails(
             # The value 'sysvol' is dissect specific as we map the system drive
             # to the sysvol drive name / directory in the root fs.
@@ -134,9 +141,9 @@ class EnvironmentVariablePlugin(Plugin):
             ),
             "Path",
         ),
-    ]
+    )
 
-    USER_VARIABLES = [
+    USER_VARIABLES = (
         EnvVarDetails(
             "%userprofile%",
             ("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\{user_sid}",),
@@ -186,7 +193,7 @@ class EnvironmentVariablePlugin(Plugin):
             ),
             "Path",
         ),
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -201,7 +208,7 @@ class EnvironmentVariablePlugin(Plugin):
         """
         for var_name, var_value in env_vars.items():
             # lambda is used to prevent re.sub from doing substitution logic itself
-            value = re.sub(re.escape(var_name), lambda _: var_value, value, flags=re.IGNORECASE)
+            value = re.sub(re.escape(var_name), lambda _, var_value=var_value: var_value, value, flags=re.IGNORECASE)
         return value
 
     @classmethod
@@ -221,7 +228,7 @@ class EnvironmentVariablePlugin(Plugin):
 
         return expanded_env_vars
 
-    def _get_env_vars(self, env_var_details: List[EnvVarDetails]) -> OrderedDict[str, str]:
+    def _get_env_vars(self, env_var_details: list[EnvVarDetails]) -> OrderedDict[str, str]:
         """Get the environment variables defined in the env_var_details list.
 
         An OrderedDict is returned with the variable names as the keys and the
@@ -241,7 +248,7 @@ class EnvironmentVariablePlugin(Plugin):
                 for reg_key in env_var_detail.reg_keys:
                     try:
                         reg_key_value = self.target.registry.value(reg_key, env_var_detail.reg_value).value
-                    except RegistryError:
+                    except RegistryError:  # noqa: PERF203
                         pass
                     else:
                         if env_var_detail.name == "%path%" and var_value is not None:
@@ -269,7 +276,7 @@ class EnvironmentVariablePlugin(Plugin):
 
         return self._env
 
-    def _get_user_env_vars(self, user_sid: Optional[str] = None) -> OrderedDict[str, str]:
+    def _get_user_env_vars(self, user_sid: str | None = None) -> OrderedDict[str, str]:
         """Get the environment variables as seen by the user of the given user SID.
 
         If no user_sid is given, the function gives back the system environment
@@ -294,7 +301,7 @@ class EnvironmentVariablePlugin(Plugin):
             # To preserve the order in USER_VARIABLES, variables which are also
             # present in the system env_vars OrderedDict must be removed
             # before updating it with the user_vars.
-            for user_var in user_vars.keys():
+            for user_var in user_vars:
                 if user_var in env_vars:
                     del env_vars[user_var]
             env_vars.update(user_vars)
@@ -307,12 +314,12 @@ class EnvironmentVariablePlugin(Plugin):
             raise UnsupportedPluginError("Target operating system is not Windows")
 
     @internal
-    def expand_env(self, path: str, user_sid: Optional[str] = None) -> str:
+    def expand_env(self, path: str, user_sid: str | None = None) -> str:
         env_vars = self._get_user_env_vars(user_sid)
         return self._expand_env(path, env_vars)
 
     @internal
-    def user_env(self, user_sid: Optional[str] = None) -> OrderedDict[str, str]:
+    def user_env(self, user_sid: str | None = None) -> OrderedDict[str, str]:
         """Return a dict of all found (user) environment variables.
 
         If no ``user_sid`` is provided, this function will return just the system environment variables.
@@ -353,7 +360,7 @@ class EnvironmentVariablePlugin(Plugin):
                     _user=user,
                 )
 
-    def _get_pathext(self) -> Set[str]:
+    def _get_pathext(self) -> set[str]:
         if self._pathext is None:
             self._pathext = set()
 
@@ -368,7 +375,7 @@ class EnvironmentVariablePlugin(Plugin):
 
     @property
     @internal
-    def pathext(self) -> Set[str]:
+    def pathext(self) -> set[str]:
         """Return a list of all found path extensions."""
         return self._get_pathext()
 

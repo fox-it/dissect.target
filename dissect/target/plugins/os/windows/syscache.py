@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.ntfs import ntfs
 
@@ -6,6 +8,11 @@ from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPlu
 from dissect.target.helpers import regutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 SyscacheRecord = TargetRecordDescriptor(
     "windows/syscache/object",
@@ -30,7 +37,7 @@ class SyscachePlugin(Plugin):
     - https://dfir.ru/2018/12/02/the-cit-database-and-the-syscache-hive/
     """
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.hive = regutil.HiveCollection()
 
@@ -78,7 +85,7 @@ class SyscachePlugin(Plugin):
                 if mft:
                     try:
                         if path := mft(file_segment).full_path():
-                            full_path = self.target.fs.path("\\".join(["sysvol", path]))
+                            full_path = self.target.fs.path(f"sysvol\\{path}")
                     except ntfs.Error:
                         pass
 

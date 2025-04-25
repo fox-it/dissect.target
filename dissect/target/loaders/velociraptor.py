@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import zipfile
-from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
@@ -15,6 +14,7 @@ from dissect.target.plugins.apps.edr.velociraptor import VELOCIRAPTOR_RESULTS
 
 if TYPE_CHECKING:
     from pathlib import Path
+
     from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -70,6 +70,8 @@ def extract_drive_letter(name: str) -> str | None:
     # X: in URL encoding
     if len(name) == 4 and name.endswith("%3A"):
         return name[0].lower()
+    return None
+
     return None
 
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import io
-from typing import TypeVar, Union
+from typing import TYPE_CHECKING, TypeVar, Union
 
 from dissect.target.helpers.nfs.nfs3 import (
     CookieVerf,
@@ -29,6 +28,9 @@ from dissect.target.helpers.sunrpc.serializer import (
     XdrSerializer,
 )
 from dissect.target.helpers.sunrpc.sunrpc import Bool
+
+if TYPE_CHECKING:
+    import io
 
 
 # Used Union because 3.9 does not support '|' here even with future annotations
@@ -167,7 +169,7 @@ class ReadLink3ResultDeserializer(XdrDeserializer[ReadlinkResult]):
         return ReadlinkResult(attributes, target)
 
 
-ResultType = TypeVar("RT")
+ResultType = TypeVar("ResultType")
 
 
 # RdJ: Consider implementing in terms of a monadic bind, using generators

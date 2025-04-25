@@ -1,17 +1,26 @@
+from __future__ import annotations
+
 import datetime
-import sys
+from io import BytesIO
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
 from dissect.target.plugins.os.windows.log.amcache import AmcacheInstallPlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-def test_amcache_new_format(target_win, fs_win):
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
+
+def test_amcache_new_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
     amcache_file = absolute_path("_data/plugins/os/windows/amcache/amcache-new.hve")
     fs_win.map_file("windows/appcompat/programs/amcache.hve", amcache_file)
 
@@ -35,7 +44,7 @@ def test_amcache_new_format(target_win, fs_win):
     assert len(drivers) == 361
 
 
-def test_amcache_old_format(target_win, fs_win):
+def test_amcache_old_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
     amcache_file = absolute_path("_data/plugins/os/windows/amcache/amcache-old.hve")
     fs_win.map_file("windows/appcompat/programs/amcache.hve", amcache_file)
 
@@ -59,8 +68,10 @@ def test_amcache_old_format(target_win, fs_win):
     assert len(drivers) == 0
 
 
-def test_amcache_windows_11_applaunches(target_win, fs_win):
-    applaunch_file = absolute_path("_data/plugins/os/windows/amcache/PcaAppLaunchDic.txt")
+def test_amcache_windows_11_applaunches(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    # Test file taken from https://github.com/AndrewRathbun/DFIRArtifactMuseum/blob/main/Windows/Amcache/Win11/RathbunVM/PcaAppLaunchDic.txt
+    # Licensed under the MIT License, Copyright (c) 2022 DFIR Artifact Museum
+    applaunch_file = absolute_path("_data/plugins/os/windows/amcache/pca/PcaAppLaunchDic.txt")
     fs_win.map_file("windows/appcompat/pca/PcaAppLaunchDic.txt", applaunch_file)
 
     target_win.add_plugin(AmcachePlugin)
@@ -71,7 +82,38 @@ def test_amcache_windows_11_applaunches(target_win, fs_win):
     assert applaunches[0].path == "C:\\ProgramData\\Sophos\\AutoUpdate\\Cache\\sophos_autoupdate1.dir\\su-setup32.exe"
 
 
-def new_read_key_subkeys(self, key):
+def test_amcache_windows_11_general(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    # Test files taken from https://github.com/AndrewRathbun/DFIRArtifactMuseum/blob/main/Windows/Amcache/Win11/RathbunVM/PcaGeneralDb0.txt
+    # and https://github.com/AndrewRathbun/DFIRArtifactMuseum/blob/main/Windows/Amcache/Win11/RathbunVM/PcaGeneralDb1.txt
+    # Licensed under the MIT License, Copyright (c) 2022 DFIR Artifact Museum
+    db0_file = absolute_path("_data/plugins/os/windows/amcache/pca/PcaGeneralDb0.txt")
+    db1_file = absolute_path("_data/plugins/os/windows/amcache/pca/PcaGeneralDb1.txt")
+    fs_win.map_file("windows/appcompat/pca/PcaGeneralDb0.txt", db0_file)
+    fs_win.map_file("windows/appcompat/pca/PcaGeneralDb1.txt", db1_file)
+
+    # To test path resolving
+    fs_win.map_file_fh("C:\\Program Files\\freefilesync\\bin\\freefilesync_x64.exe", BytesIO(b""))
+
+    target_win.add_plugin(AmcachePlugin)
+
+    with patch(
+        "dissect.target.plugins.os.windows.env.EnvironmentVariablePlugin._get_system_env_vars",
+        return_value={"%programfiles%": "C:\\Program Files"},
+    ):
+        records = list(target_win.amcache.general())
+
+        assert len(records) == 176
+        assert records[0].ts == datetime.datetime(2022, 5, 12, 19, 48, 9, 548000, tzinfo=datetime.timezone.utc)
+        assert records[0].path == "C:\\Program Files\\freefilesync\\freefilesync.exe"
+        assert records[0].type == 2
+        assert records[0].name == "freefilesync"
+        assert records[0].copyright == "freefilesync.org"
+        assert records[0].version == "11.20"
+        assert records[0].program_id == "000617915288ba535b4198ae58be4d9e2a4200000904"
+        assert records[0].exit_code == "Abnormal process exit with code 0x2"
+
+
+def mock_read_key_subkeys(self: AmcachePlugin, key: str) -> Iterator[Mock]:
     base_values = {
         "AppxPackageFullName": "Microsoft.Microsoft3DViewer_7.2105.4012.0_x64__8wekyb3d8bbwe",
         "AppxPackageRelativeId": "Microsoft.Microsoft3DViewer",
@@ -106,37 +148,36 @@ def new_read_key_subkeys(self, key):
     mock_values.append(mock_value)
 
     mock_entry = Mock()
-    mock_entry.timestamp = datetime.datetime(2021, 12, 31)
+    mock_entry.timestamp = datetime.datetime(2021, 12, 31, tzinfo=datetime.timezone.utc)
     mock_entry.values = Mock(return_value=mock_values)
 
     yield mock_entry
 
 
 @pytest.mark.parametrize(
-    "test_file_id,expected_file_id",
+    ("test_file_id", "expected_file_id"),
     [
         ("00008e01cdeb9a1c23cee421a647f29c45f67623be97", "8e01cdeb9a1c23cee421a647f29c45f67623be97"),
         ("", None),
         (None, None),
     ],
 )
-@patch.object(AmcachePlugin, "read_key_subkeys", new_read_key_subkeys)
-def test_parse_inventory_application_file(target_win, test_file_id, expected_file_id):
+@patch.object(AmcachePlugin, "read_key_subkeys", mock_read_key_subkeys)
+def test_parse_inventory_application_file(
+    target_win: Target, test_file_id: str | None, expected_file_id: str | None
+) -> None:
     with patch("dissect.target.plugins.os.windows.amcache.ApplicationFileAppcompatRecord") as mock_record:
         amcache_plugin = AmcachePlugin(target_win)
         amcache_plugin._mock_file_id = test_file_id
         records = list(amcache_plugin.parse_inventory_application_file())
 
         assert len(records) == 1
-        if sys.version_info[:2] < (3, 8):
-            call_kwargs = mock_record.call_args[1]
-        else:
-            call_kwargs = mock_record.call_args.kwargs
+        call_kwargs = mock_record.call_args.kwargs
 
         assert call_kwargs.get("digest", None) == (None, expected_file_id, None)
 
 
-def test_amcache_install_entry(target_win: Target):
+def test_amcache_install_entry(target_win: Target) -> None:
     amcache_install_plugin = AmcacheInstallPlugin(target_win)
 
     amcache_install_plugin.logs = Path(absolute_path("_data/plugins/os/windows/amcache/install"))

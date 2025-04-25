@@ -1,19 +1,23 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree as ET
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.chat.chat import (
     ChatAttachmentRecord,
     ChatMessageRecord,
     ChatPlugin,
 )
-from dissect.target.plugins.general.users import UserDetails
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 
 class MSNPlugin(ChatPlugin):
@@ -97,14 +101,16 @@ class MSNPlugin(ChatPlugin):
                                     message=entry.find(".//Text").text,
                                 )
 
-                            elif entry.tag in ["Invitation", "InvitationResponse"]:
-                                if (file := entry.find(".//File")) is not None:
-                                    yield ChatAttachmentRecord(
-                                        **common,
-                                        recipient=None,  # unknown with Invitations
-                                        attachment=file.text,
-                                        description=entry.find(".//Text").text,
-                                    )
+                            elif (
+                                entry.tag in ["Invitation", "InvitationResponse"]
+                                and (file := entry.find(".//File")) is not None
+                            ):
+                                yield ChatAttachmentRecord(
+                                    **common,
+                                    recipient=None,  # unknown with Invitations
+                                    attachment=file.text,
+                                    description=entry.find(".//Text").text,
+                                )
 
 
 def convert_email(string: str) -> int:

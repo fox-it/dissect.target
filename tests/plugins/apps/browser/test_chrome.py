@@ -1,13 +1,12 @@
-from typing import Iterator, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 from dissect.util.ts import webkittimestamp
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import keychain
-from dissect.target.helpers.regutil import VirtualHive
 from dissect.target.plugins.apps.browser.chrome import ChromePlugin
 from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from tests._utils import absolute_path
@@ -20,9 +19,14 @@ from tests.plugins.os.windows.credential.test_lsa import (
 )
 from tests.plugins.os.windows.test__os import map_version_value
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
+    from dissect.target.target import Target
+
 
 @pytest.fixture
-def target_chrome_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+def target_chrome_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\",
         absolute_path("_data/plugins/apps/browser/chrome/"),
@@ -34,21 +38,21 @@ def target_chrome_win(target_win_users: Target, fs_win: VirtualFilesystem) -> It
 
     target_win_users.add_plugin(ChromePlugin)
 
-    yield target_win_users
+    return target_win_users
 
 
 @pytest.fixture
-def target_chrome_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Iterator[Target]:
+def target_chrome_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Target:
     fs_unix.map_dir("/root/.config/google-chrome/Default/", absolute_path("_data/plugins/apps/browser/chrome/"))
     fs_unix.map_dir("/root/.config/google-chrome/Profile 1/", absolute_path("_data/plugins/apps/browser/chrome/"))
 
     target_unix_users.add_plugin(ChromePlugin)
 
-    yield target_unix_users
+    return target_unix_users
 
 
 @pytest.fixture
-def target_chrome_win_snapshot(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+def target_chrome_win_snapshot(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Default",
         absolute_path("_data/plugins/apps/browser/chrome/"),
@@ -61,7 +65,7 @@ def target_chrome_win_snapshot(target_win_users: Target, fs_win: VirtualFilesyst
 
     target_win_users.add_plugin(ChromePlugin)
 
-    yield target_win_users
+    return target_win_users
 
 
 @pytest.mark.parametrize(
@@ -73,7 +77,7 @@ def test_chrome_history(target_platform: Target, request: pytest.FixtureRequest)
     records = list(target_platform.chrome.history())
 
     assert len(records) == 10
-    assert set(["chrome"]) == set(record.browser for record in records)
+    assert {"chrome"} == {record.browser for record in records}
 
     assert (
         records[0].url == "https://www.google.com/search?q=github+fox-it+dissect&oq=github+fox-it+dissect"
@@ -93,7 +97,7 @@ def test_chrome_downloads(target_platform: Target, request: pytest.FixtureReques
     records = list(target_platform.chrome.downloads())
 
     assert len(records) == 2
-    assert set(["chrome"]) == set(record.browser for record in records)
+    assert {"chrome"} == {record.browser for record in records}
 
     assert records[0].id == 6
     assert records[0].ts_start == dt("2023-02-24T11:54:19.726147+00:00")
@@ -110,7 +114,7 @@ def test_chrome_extensions(target_platform: Target, request: pytest.FixtureReque
     records = list(target_platform.chrome.extensions())
 
     assert len(records) == 16
-    assert set(["chrome"]) == set(record.browser for record in records)
+    assert {"chrome"} == {record.browser for record in records}
 
     assert records[0].ts_install == dt("2022-11-24T15:20:43.682152+00:00")
     assert records[0].ts_update == dt("2022-11-24T15:20:43.682152+00:00")
@@ -176,7 +180,7 @@ def test_unix_chrome_passwords_gnome_plugin(target_unix_users: Target, fs_unix: 
 @pytest.fixture
 def target_win_users_dpapi(
     hive_hklm: VirtualHive, hive_hku: VirtualHive, fs_win: VirtualFilesystem, target_win: Target
-) -> Iterator[Target]:
+) -> Target:
     # Add users
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(
@@ -226,18 +230,18 @@ def target_win_users_dpapi(
     )
 
     target_win.add_plugin(DPAPIPlugin)
-    yield target_win
+    return target_win
 
 
 @pytest.mark.parametrize(
-    "keychain_value, expected_password",
+    ("keychain_value", "expected_password"),
     [
         ("user", "StrongPassword"),
         ("invalid", None),
     ],
 )
 def test_windows_chrome_passwords_dpapi(
-    target_win_users_dpapi: Target, fs_win: VirtualFilesystem, keychain_value: str, expected_password: Optional[str]
+    target_win_users_dpapi: Target, fs_win: VirtualFilesystem, keychain_value: str, expected_password: str | None
 ) -> None:
     fs_win.map_dir(
         "Users/user/AppData/Local/Google/Chrome/User Data",
@@ -333,7 +337,7 @@ def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFiles
 
     # Loop over the different types of records and verify we have the same amount of records in each profile directory.
     for records in records_list:
-        assert set(["chrome"]) == set(record.browser for record in records)
+        assert {"chrome"} == {record.browser for record in records}
 
         for base_dir in base_dirs:
             base_path_records = [r for r in records if str(r.source.parent).endswith(base_dir)]

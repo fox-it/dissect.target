@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tempfile
 from io import BytesIO
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 from uuid import UUID
 
@@ -12,6 +12,9 @@ from flow.record.fieldtypes import posix_path
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import UnixPlugin, parse_fstab
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 FSTAB_CONTENT = """
 # /etc/fstab: static file system information.
@@ -106,7 +109,9 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
     [
         (b"", b"", "localhost", None),
         (b"", b"127.0.0.1 mydomain", "mydomain", "mydomain"),
-        (b"", b"127.0.0.1 localhost", "localhost", "localhost"),
+        (b"", b"127.0.0.1 localhost", "localhost", None),
+        (b"hostname", b"127.0.0.1 localhost\n::1 ip6-localhost", "hostname", None),
+        (b"hostname.example.internal", b"127.0.0.1 localhost\n::1 ip6-localhost", "hostname", "example.internal"),
         (b"myhost", b"", "myhost", None),
         (b"myhost.mydomain", b"", "myhost", "mydomain"),
         (b"myhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
@@ -129,8 +134,10 @@ def test_parse_domain(
     fs_unix.map_file_fh("/etc/hosts", BytesIO(hosts_content))
     target_unix.add_plugin(UnixPlugin)
 
-    assert target_unix.hostname == expected_hostname
-    assert target_unix.domain == expected_domain
+    assert target_unix.hostname == expected_hostname, (
+        f"Expected hostname {expected_hostname!r} but got {target_unix.hostname!r}"
+    )
+    assert target_unix.domain == expected_domain, f"Expected domain {expected_domain!r} but got {target_unix.domain!r}"
 
 
 @pytest.mark.parametrize(
@@ -164,8 +171,8 @@ def test_parse_hostname_string(
 
     hostname, domain = target_unix._os._parse_hostname_string()
 
-    assert hostname == expected_hostname
-    assert domain == expected_domain
+    assert hostname == expected_hostname, f"Expected hostname {expected_hostname!r} but got {hostname!r}"
+    assert domain == expected_domain, f"Expected domain {expected_domain!r} but got {domain!r}"
 
 
 def test_users(target_unix_users: Target) -> None:
@@ -193,7 +200,7 @@ def test_users(target_unix_users: Target) -> None:
 
 
 @pytest.mark.parametrize(
-    "expected_arch, elf_buf",
+    ("expected_arch", "elf_buf"),
     [
         # https://launchpad.net/ubuntu/+source/coreutils/9.4-3.1ubuntu1
         ("x86_64-unix", "7f454c4602010100000000000000000003003e0001000000a06d000000000000"),  # amd64
@@ -205,6 +212,6 @@ def test_users(target_unix_users: Target) -> None:
     ],
 )
 def test_architecture(target_unix: Target, fs_unix: VirtualFilesystem, expected_arch: str, elf_buf: str) -> None:
-    """test if we correctly parse unix architecture."""
+    """Test if we correctly parse unix architecture."""
     fs_unix.map_file_fh("/bin/ls", BytesIO(bytes.fromhex(elf_buf)))
     assert target_unix.architecture == expected_arch

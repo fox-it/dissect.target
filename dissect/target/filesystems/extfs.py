@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import stat
-from typing import Any, BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.extfs import extfs
 
@@ -12,6 +14,9 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class ExtFilesystem(Filesystem):
@@ -29,7 +34,7 @@ class ExtFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return ExtFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path: str, node: Optional[extfs.INode] = None) -> extfs.INode:
+    def _get_node(self, path: str, node: extfs.INode | None = None) -> extfs.INode:
         try:
             return self.extfs.get(path, node)
         except extfs.FileNotFoundError as e:
@@ -60,7 +65,7 @@ class ExtFilesystemEntry(FilesystemEntry):
             for f in self.readlink_ext().iterdir():
                 yield f
         else:
-            for f in self.entry.listdir().keys():
+            for f in self.entry.listdir():
                 if f in (".", ".."):
                     continue
 
@@ -98,7 +103,7 @@ class ExtFilesystemEntry(FilesystemEntry):
 
     def readlink(self) -> str:
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
 
         return self.entry.link
 

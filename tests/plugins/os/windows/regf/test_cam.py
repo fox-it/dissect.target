@@ -1,8 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.util.ts import wintimestamp
 
-from dissect.target import Target
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.cam import CamPlugin
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_cam(target_win_users: Target, hive_hku: VirtualHive, hive_hklm: VirtualHive) -> None:

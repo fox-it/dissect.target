@@ -109,29 +109,29 @@ def _categorize_functions(functions: list[plugin.FunctionDescriptor] | None = No
         for part in parts[:-1]:
             obj = obj.setdefault(part, {})
 
-        if parts[-1] not in obj:
-            obj[parts[-1]] = desc.cls
+        obj.setdefault(parts[-1], set()).add(desc.cls)
 
-    return dict(sorted(result.items()))
+    return result
 
 
 def _generate_plugin_tree_overview(
-    plugin_tree: dict | type[Plugin],
+    plugin_tree: dict | set[type[Plugin]],
     print_docs: bool,
     indent: int = 0,
 ) -> list[str]:
     """Create plugin overview with identations."""
 
-    if isinstance(plugin_tree, type) and issubclass(plugin_tree, Plugin):
+    if isinstance(plugin_tree, set):
         return [
             textwrap.indent(
-                get_plugin_overview(plugin_tree, print_docs, print_docs),
+                get_plugin_overview(plugin, print_docs, print_docs),
                 prefix=" " * indent,
             )
+            for plugin in sorted(plugin_tree, key=lambda x: x.__module__)
         ]
 
     result = []
-    for key in plugin_tree.keys():
+    for key in sorted(plugin_tree.keys()):
         result.append(textwrap.indent(key + ":", prefix=" " * indent) if key != "" else "OS plugins")
         result.extend(
             _generate_plugin_tree_overview(

@@ -1,17 +1,22 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from dissect.target.helpers.record import (
-    MacInterfaceRecord,
+    MacOSInterfaceRecord,
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
 from dissect.target.plugins.os.default.network import InterfaceRecord, NetworkPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
-@pytest.fixture(params=[MacInterfaceRecord, WindowsInterfaceRecord, UnixInterfaceRecord])
+@pytest.fixture(params=[MacOSInterfaceRecord, WindowsInterfaceRecord, UnixInterfaceRecord])
 def network_record(request: pytest.FixtureRequest) -> InterfaceRecord:
     return request.param(
         name="interface_name",
@@ -34,7 +39,7 @@ def test_base_network_plugin(target_bare: Target, network_record: InterfaceRecor
         assert network.ips() == ["10.42.42.10"]
         assert network.gateways() == ["10.42.42.1"]
         assert network.macs() == ["DE:AD:BE:EF:00:00"]
-        assert sorted(list(map(str, network.dns()))) == ["1.1.1.1", "8.8.8.8"]
+        assert sorted(map(str, network.dns())) == ["1.1.1.1", "8.8.8.8"]
 
         assert len(list(network.in_cidr("10.42.42.0/24"))) == 1
         assert len(list(network.in_cidr("10.43.42.0/24"))) == 0

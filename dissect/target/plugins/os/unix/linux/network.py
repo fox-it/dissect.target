@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import ip_address, ip_interface
-from typing import TYPE_CHECKING, Any, Iterator, Literal, NamedTuple
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import UnixInterfaceRecord
@@ -12,10 +12,10 @@ from dissect.target.helpers.utils import to_list
 from dissect.target.plugins.os.default.network import NetworkPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from ipaddress import IPv4Address, IPv4Interface, IPv6Address, IPv6Interface
 
-    from dissect.target import Target
-    from dissect.target.target import TargetPath
+    from dissect.target.target import Target, TargetPath
 
     NetAddress = IPv4Address | IPv6Address
     NetInterface = IPv4Interface | IPv6Interface
@@ -60,11 +60,11 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
     Documentation: https://networkmanager.dev/docs/api/latest/nm-settings-keyfile.html
     """
 
-    config_paths: list[str] = [
+    config_paths: tuple[str, ...] = (
         "/etc/NetworkManager/system-connections/",
         "/usr/lib/NetworkManager/system-connections/",
         "/run/NetworkManager/system-connections/",
-    ]
+    )
 
     @dataclass
     class ParserContext:
@@ -177,9 +177,8 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
                 context.dhcp_ipv4 = trimmed == "auto"
             elif ip_version == "ipv6":
                 context.dhcp_ipv6 = trimmed == "auto"
-        elif key.startswith("route"):
-            if gateway := self._parse_route(value):
-                context.gateways.add(gateway)
+        elif key.startswith("route") and (gateway := self._parse_route(value)):
+            context.gateways.add(gateway)
 
     def _parse_vlan(self, sub_type: dict[str, Any], vlan_id_by_interface: VlanIdByInterface) -> None:
         parent_interface = sub_type.get("parent")
@@ -200,12 +199,12 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
     Documentation: https://www.freedesktop.org/software/systemd/man/latest/systemd.network.html
     """
 
-    config_paths: list[str] = [
+    config_paths: tuple[str, ...] = (
         "/etc/systemd/network/",
         "/run/systemd/network/",
         "/usr/lib/systemd/network/",
         "/usr/local/lib/systemd/network/",
-    ]
+    )
 
     class DhcpConfig(NamedTuple):
         ipv4: bool
@@ -299,7 +298,7 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
                     configurator="systemd-networkd",
                     _target=self._target,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 self._target.log.warning("Error parsing network config file %s", config_file)
                 self._target.log.debug("", exc_info=e)
 
@@ -320,11 +319,11 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 
         if value is None or value == "no":
             return self.DhcpConfig(ipv4=False, ipv6=False)
-        elif value == "yes":
+        if value == "yes":
             return self.DhcpConfig(ipv4=True, ipv6=True)
-        elif value == "ipv4":
+        if value == "ipv4":
             return self.DhcpConfig(ipv4=True, ipv6=False)
-        elif value == "ipv6":
+        if value == "ipv6":
             return self.DhcpConfig(ipv4=False, ipv6=True)
 
         raise ValueError(f"Invalid DHCP value: {value}")

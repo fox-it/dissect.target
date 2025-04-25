@@ -1,12 +1,11 @@
+from __future__ import annotations
+
 import base64
 import re
 from itertools import product
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.ssh.ssh import (
     AuthorizedKeysRecord,
@@ -17,6 +16,13 @@ from dissect.target.plugins.apps.ssh.ssh import (
     SSHPrivateKey,
     calculate_fingerprints,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 
 def find_sshd_directory(target: Target) -> TargetPath:
@@ -35,7 +41,7 @@ class OpenSSHPlugin(SSHPlugin):
 
     __namespace__ = "openssh"
 
-    SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
+    SSHD_DIRECTORIES = ("/sysvol/ProgramData/ssh", "/etc/ssh")
 
     def __init__(self, target: Target):
         super().__init__(target)

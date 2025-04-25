@@ -5,16 +5,19 @@ import sys
 import time
 from dataclasses import dataclass
 from struct import pack
-from typing import Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dissect.target import Target
+from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
-class MQTTMock(MagicMock):
-    def __init__(self, *args, **kwargs) -> None:
+class MqttMock(MagicMock):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.disks: list = []
         self.hostname: str = ""
@@ -55,6 +58,9 @@ class MQTTMock(MagicMock):
 @pytest.fixture
 def mock_paho(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
     with monkeypatch.context() as m:
+        if "dissect.target.loaders.mqtt" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.loaders.mqtt")
+
         mock_paho = MagicMock()
         m.setitem(sys.modules, "paho", mock_paho)
         m.setitem(sys.modules, "paho.mqtt", mock_paho.mqtt)
@@ -82,12 +88,12 @@ class MockBroker(MagicMock):
 
 
 @pytest.fixture
-def mock_broker() -> Iterator[MockBroker]:
-    yield MockBroker()
+def mock_broker() -> MockBroker:
+    return MockBroker()
 
 
 @pytest.mark.parametrize(
-    "alias, hosts, disks, disk, seek, read, expected",
+    ("alias", "hosts", "disks", "disk", "seek", "read", "expected"),
     [
         ("host1", ["host1"], [3], 0, 0, 3, b"\x00\x01\x02"),  # basic
         ("host2", ["host2"], [10], 0, 1, 3, b"\x01\x02\x03"),  # + use offset
@@ -108,16 +114,19 @@ def test_remote_loader_stream(
     read: int,
     expected: bytes,
 ) -> None:
-    mock_paho.mqtt.client.Client.return_value = MQTTMock()
+    mock_paho.mqtt.client.Client.return_value = MqttMock()
 
-    from dissect.target.loaders.mqtt import Broker
+    from dissect.target.loaders.mqtt import Broker, MqttLoader
 
     broker = Broker("0.0.0.0", "1884", "key", "crt", "ca", "case1", "user", "pass")
     broker.connect()
     broker.mqtt_client.fill_disks(disks)
     broker.mqtt_client.hostnames = hosts
 
-    with patch("dissect.target.loaders.mqtt.MQTTLoader.broker", broker):
+    with (
+        patch.dict("dissect.target.loader.LOADERS_BY_SCHEME", {"mqtt": MqttLoader}),
+        patch.object(MqttLoader, "broker", broker),
+    ):
         targets = list(
             Target.open_all(
                 [f"mqtt://{alias}?broker=0.0.0.0&port=1884&key=key&crt=crt&ca=ca&peers=1&case=case1"],
@@ -131,9 +140,9 @@ def test_remote_loader_stream(
 
 
 def test_mqtt_loader_prefetch(mock_broker: MockBroker, mock_paho: MagicMock) -> None:
-    from dissect.target.loaders.mqtt import MQTTConnection
+    from dissect.target.loaders.mqtt import MqttConnection
 
-    connection = MQTTConnection(mock_broker, "")
+    connection = MqttConnection(mock_broker, "")
     connection.prefetch_factor_inc = 10
     assert connection.factor == 1
     assert connection.prev == -1
@@ -149,7 +158,7 @@ def test_mqtt_loader_prefetch(mock_broker: MockBroker, mock_paho: MagicMock) -> 
 
 
 @pytest.mark.parametrize(
-    "case_name, parse_result",
+    ("case_name", "parse_result"),
     [
         ("valid_case_name", "valid_case_name"),
         ("ValidCase123", "ValidCase123"),
@@ -172,7 +181,7 @@ def test_mqtt_loader_prefetch(mock_broker: MockBroker, mock_paho: MagicMock) -> 
     ],
 )
 def test_case(
-    case_name, parse_result: str | pytest.RaisesContext[argparse.ArgumentTypeError], mock_paho: MagicMock
+    case_name: str, parse_result: str | pytest.RaisesContext[argparse.ArgumentTypeError], mock_paho: MagicMock
 ) -> None:
     from dissect.target.loaders.mqtt import case
 

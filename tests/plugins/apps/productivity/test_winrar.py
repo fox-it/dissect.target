@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.apps.productivity.winrar import WinRarPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_winrar_windows(target_win_users: Target, hive_hku: VirtualHive) -> None:
-    """test if we detect WinRAR dialog artifacts"""
+    """Test if we detect WinRAR dialog artifacts."""
 
     key_path = "Software\\WinRAR\\DialogEditHistory\\ArcName"
     key = VirtualKey(hive_hku, key_path)

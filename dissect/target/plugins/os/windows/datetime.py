@@ -1,17 +1,23 @@
+from __future__ import annotations
+
 import calendar
-from collections import namedtuple
 from datetime import datetime, timedelta, timezone, tzinfo
+from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import (
     RegistryError,
+    RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
-    UnsupportedPluginError,
 )
 from dissect.target.helpers.mui import MUI_TZ_MAP
-from dissect.target.helpers.regutil import RegistryKey
-from dissect.target.plugin import Plugin, internal
+from dissect.target.plugin import internal
+from dissect.target.plugins.os.default.datetime import DateTimePlugin
+
+if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import RegistryKey
+    from dissect.target.target import Target
 
 tz_def = """
 typedef struct _SYSTEMTIME {
@@ -40,21 +46,19 @@ c_tz = cstruct().load(tz_def)
 # is present in Python 3.9, so we ignore the vermin warnings.
 SUNDAY = calendar.SUNDAY  # novermin
 SundayFirstCalendar = calendar.Calendar(SUNDAY)
-TimezoneInformation = namedtuple(
-    "TimezoneInformation",
-    (
-        # The current bias from UTC
-        "bias",
-        # The additional bias on top of the current bias when in standard time (usually 0)
-        "standard_bias",
-        # The additional bias on top of the current bias when in daylight saving time (usually -60)
-        "daylight_bias",
-        # When standard time starts, or in other words, daylight saving ends (see parse_systemtime_transition)
-        "standard_date",
-        # When daylight saving starts (see parse_systemtime_transition)
-        "daylight_date",
-    ),
-)
+
+
+class TimezoneInformation(NamedTuple):
+    # The current bias from UTC
+    bias: timedelta
+    # The additional bias on top of the current bias when in standard time (usually 0)
+    standard_bias: timedelta
+    # The additional bias on top of the current bias when in daylight saving time (usually -60)
+    daylight_bias: timedelta
+    # When standard time starts, or in other words, daylight saving ends (see parse_systemtime_transition)
+    standard_date: c_tz._SYSTEMTIME
+    # When daylight saving starts (see parse_systemtime_transition)
+    daylight_date: c_tz._SYSTEMTIME
 
 
 ZERO = timedelta(0)
@@ -76,7 +80,7 @@ def parse_systemtime_transition(systemtime: c_tz._SYSTEMTIME, year: int) -> date
     occurrences = [week[systemtime.wDayOfWeek] for week in month if week[systemtime.wDayOfWeek]]
     target_occurrence = -1 if systemtime.wDay == 5 and len(occurrences) < 5 else systemtime.wDay - 1
 
-    return datetime(
+    return datetime(  # noqa: DTZ001
         year,
         systemtime.wMonth,
         occurrences[target_occurrence],
@@ -109,7 +113,7 @@ def parse_dynamic_dst(key: RegistryKey) -> dict[int, TimezoneInformation]:
 
 
 def parse_tzi(tzi: bytes) -> TimezoneInformation:
-    """Parse binary TZI into a TimezoneInformation namedtuple."""
+    """Parse binary TZI into a ``TimezoneInformation`` namedtuple."""
     parsed = c_tz.REG_TZI_FORMAT(tzi)
     return TimezoneInformation(
         parsed.Bias,
@@ -129,7 +133,7 @@ def get_dst_range(tzi: TimezoneInformation, year: int) -> tuple[datetime, dateti
 
 
 class WindowsTimezone(tzinfo):
-    """A datetime.tzinfo class representing a timezone from parsed Windows TZI data.
+    """A ``datetime.tzinfo`` class representing a timezone from parsed Windows TZI data.
 
     Mostly inspired by the examples in the Python documentation.
     """
@@ -161,7 +165,7 @@ class WindowsTimezone(tzinfo):
 
         # Can't compare naive to aware objects, so strip the timezone from dt first
         # Cast to a proper datetime object to avoid issues with subclassed datetime objects
-        dt = datetime(
+        dt = datetime(  # noqa: DTZ001
             dt.year,
             dt.month,
             dt.day,
@@ -179,10 +183,10 @@ class WindowsTimezone(tzinfo):
             result = True
         elif end - HOUR <= dt < end:
             # Fold (an ambiguous hour): use dt.fold to disambiguate.
-            result = False if dt.fold else True
+            result = not dt.fold
         elif start <= dt < start + HOUR:
             # Gap (a non-existent hour): reverse the fold rule.
-            result = True if dt.fold else False
+            result = bool(dt.fold)
         else:
             # DST is off.
             result = False
@@ -204,61 +208,52 @@ class WindowsTimezone(tzinfo):
         return self.dlt_name if self.is_dst(dt) else self.std_name
 
 
-class DateTimePlugin(Plugin):
+class WindowsDateTimePlugin(DateTimePlugin):
     __namespace__ = "datetime"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         tz_name = None
 
-        timezone_information = self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation")
         try:
-            # Windows 7+
-            tz_name = timezone_information.value("TimeZoneKeyName").value
-        except RegistryValueNotFoundError:
-            # < Windows 7 (https://github.com/dateutil/dateutil/issues/210)
-            tz_name_localized = timezone_information.value("StandardName").value
-            for timezone_key in self.target.registry.key(
-                "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"
-            ).subkeys():
-                if tz_name_localized == timezone_key.value("Std").value:
-                    tz_name = timezone_key.name
+            timezone_information = self.target.registry.key(
+                "HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation"
+            )
+
+            try:
+                # Windows 7+
+                tz_name = timezone_information.value("TimeZoneKeyName").value
+            except RegistryValueNotFoundError:
+                # < Windows 7 (https://github.com/dateutil/dateutil/issues/210)
+                tz_name_localized = timezone_information.value("StandardName").value
+                for timezone_key in self.target.registry.key(
+                    "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"
+                ).subkeys():
+                    if tz_name_localized == timezone_key.value("Std").value:
+                        tz_name = timezone_key.name
+        except RegistryKeyNotFoundError:
+            pass
 
         if tz_name is None:
-            self.target.log.error("Failed to load timezone information")
-            self._tzinfo = None
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC for datetime helpers")
+            self._tzinfo = timezone.utc
         else:
             self._tzinfo = self.tz(tz_name)
 
     def check_compatible(self) -> None:
-        if not self._tzinfo:
-            raise UnsupportedPluginError("No time zone information")
+        pass
 
     @internal
     def tz(self, name: str) -> tzinfo:
-        """Return a datetime.tzinfo of the given timezone name."""
+        """Return a ``datetime.tzinfo`` of the given timezone name."""
         tz_data = self.target.registry.key(f"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\{name}")
         return WindowsTimezone(name, tz_data)
 
     @internal(property=True)
     def tzinfo(self) -> tzinfo:
-        """Return a datetime.tzinfo of the current system timezone."""
+        """Return a ``datetime.tzinfo`` of the current system timezone."""
         return self._tzinfo
-
-    @internal
-    def local(self, dt: datetime) -> datetime:
-        """Replace the tzinfo of a given datetime.datetime object with the current system tzinfo without conversion."""
-        return dt.replace(tzinfo=self._tzinfo)
-
-    @internal
-    def to_utc(self, dt: datetime) -> datetime:
-        """Convert any datetime.datetime object into a UTC datetime.datetime object.
-
-        First replaces the current tzinfo with the system tzinfo without conversion, then converts it to an aware
-        UTC datetime object.
-        """
-        return self.local(dt).astimezone(timezone.utc)
 
 
 def translate_tz(key: RegistryKey, name: str) -> str:

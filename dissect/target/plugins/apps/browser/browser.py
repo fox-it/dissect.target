@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 from functools import cache
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers import keychain
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import NamespacePlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 GENERIC_DOWNLOAD_RECORD_FIELDS = [
     ("datetime", "ts_start"),

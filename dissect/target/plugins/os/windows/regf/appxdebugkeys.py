@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -6,8 +8,12 @@ from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
 
 AppxDebugKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/appxdebug/key",
@@ -20,9 +26,9 @@ AppxDebugKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtensi
 
 
 class AppxDebugKeysPlugin(Plugin):
-    """Plugin that iterates various AppX debug key locations"""
+    """Plugin that iterates various AppX debug key locations."""
 
-    REGKEY_GLOBS = [
+    REGKEY_GLOBS = (
         # The first glob are the AppX package names
         # The "(Default Value)" contains the debugger command
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\PackagedAppXDebug\\*",
@@ -30,7 +36,7 @@ class AppxDebugKeysPlugin(Plugin):
         # The second glob are the AppX package components
         # The "DebugPath" value contains the debugger command
         "HKEY_CURRENT_USER\\Software\\Classes\\ActivatableClasses\\Package\\*\\DebugInformation\\*",
-    ]
+    )
 
     def _walk(self, key: RegistryKey) -> Iterator[AppxDebugKeyRecord]:
         user = self.target.registry.get_user(key)

@@ -1,17 +1,23 @@
-from dissect.target.filesystem import VirtualFilesystem
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.unix.linux.proc import ProcPlugin
 from dissect.target.plugins.os.unix.linux.sockets import NetSocketPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
-def test_sockets_plugin(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+def test_sockets_plugin(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets())
     assert len(results) == 24
 
 
-def test_tcp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+def test_tcp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
 
@@ -51,7 +57,7 @@ def test_tcp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesyste
         assert result.cmdline in ("", None, "acquire -p full --proc", "test cmdline")
 
 
-def test_udp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+def test_udp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.udp())
@@ -85,7 +91,7 @@ def test_udp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesyste
         assert result.cmdline in ("", None, "acquire -p full --proc", "sshd", "test cmdline")
 
 
-def test_raw(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+def test_raw(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.raw())
@@ -109,7 +115,7 @@ def test_raw(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesyste
         assert result.cmdline in ("acquire -p full --proc", "test cmdline")
 
 
-def test_packet(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+def test_packet(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.packet())
@@ -126,7 +132,7 @@ def test_packet(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesy
         assert result.owner == "root"
 
 
-def test_unix(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+def test_unix(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.unix())

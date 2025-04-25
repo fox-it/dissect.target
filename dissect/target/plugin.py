@@ -16,7 +16,7 @@ import traceback
 from dataclasses import dataclass, field
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable
 
 try:
     from typing import TypeAlias  # novermin
@@ -34,9 +34,13 @@ from dissect.target.helpers.record import EmptyRecord
 from dissect.target.helpers.utils import StrEnum
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.helpers.record import ChildTargetRecord
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -62,7 +66,8 @@ class OperatingSystem(StrEnum):
     FORTIOS = "fortios"
     IOS = "ios"
     LINUX = "linux"
-    OSX = "osx"
+    MACOS = "macos"
+    OSX = "osx"  # legacy
     PROXMOX = "proxmox"
     UNIX = "unix"
     VYOS = "vyos"
@@ -72,7 +77,7 @@ class OperatingSystem(StrEnum):
 @dataclass(frozen=True, eq=True)
 class PluginDescriptor:
     # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("module", "qualname", "namespace", "path", "findable", "functions", "exports")
+    __slots__ = ("exports", "findable", "functions", "module", "namespace", "path", "qualname")
 
     module: str
     qualname: str
@@ -91,16 +96,16 @@ class PluginDescriptor:
 class FunctionDescriptor:
     # COMPAT: Replace with slots=True when we drop Python 3.9
     __slots__ = (
-        "name",
-        "namespace",
-        "path",
-        "exported",
-        "internal",
-        "findable",
         "alias",
-        "output",
+        "exported",
+        "findable",
+        "internal",
         "method_name",
         "module",
+        "name",
+        "namespace",
+        "output",
+        "path",
         "qualname",
     )
 
@@ -236,14 +241,14 @@ def export(*args, **kwargs) -> Callable[..., Any]:
         # Properties are implicitly cached
         # Important! Currently it's crucial that this is *always* called
         # See the comment in Plugin.__init_subclass__ for more detail regarding Plugin.__call__
-        obj = cache.wrap(obj, no_cache=not kwargs.get("cache", True), cls=kwargs.get("cls", None))
+        obj = cache.wrap(obj, no_cache=not kwargs.get("cache", True), cls=kwargs.get("cls"))
 
         output = kwargs.get("output", "default")
         if output not in OUTPUTS:
             options = ", ".join(OUTPUTS)
             raise ValueError(f'Invalid output method "{output}", must be one of {options}')
 
-        record = kwargs.get("record", None)
+        record = kwargs.get("record")
         if record is not None:
             output = "record"
 
@@ -263,8 +268,7 @@ def export(*args, **kwargs) -> Callable[..., Any]:
 
     if len(args) == 1:
         return decorator(args[0])
-    else:
-        return decorator
+    return decorator
 
 
 def internal(*args, **kwargs) -> Callable[..., Any]:
@@ -285,8 +289,7 @@ def internal(*args, **kwargs) -> Callable[..., Any]:
 
     if len(args) == 1:
         return decorator(args[0])
-    else:
-        return decorator
+    return decorator
 
 
 def arg(*args, **kwargs) -> Callable[..., Any]:
@@ -470,8 +473,9 @@ class Plugin:
 
             try:
                 yield from method()
-            except Exception:
-                self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name, exc_info=True)
+            except Exception as e:
+                self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
 
 
 def register(plugincls: type[Plugin]) -> None:
@@ -495,7 +499,7 @@ def register(plugincls: type[Plugin]) -> None:
         ValueError: If ``plugincls`` is not a subclass of :class:`Plugin`.
     """
     if not issubclass(plugincls, Plugin):
-        raise ValueError("Not a subclass of Plugin")
+        raise TypeError("Not a subclass of Plugin")
 
     # Register the plugin in the correct tree
     __plugins__ = PLUGINS.__plugins__
@@ -570,7 +574,7 @@ def register(plugincls: type[Plugin]) -> None:
         # Namespaces are also callable, so register the namespace itself as well
         # NamespacePlugin needs to register itself for every additional subclass, so allow overwrites here
         functions.append("__call__")
-        if len(exports):
+        if exports:
             exports.append("__call__")
 
         if plugincls.__register__:
@@ -578,8 +582,8 @@ def register(plugincls: type[Plugin]) -> None:
                 name=plugincls.__namespace__,
                 namespace=plugincls.__namespace__,
                 path=module_path,
-                exported=bool(len(exports)),
-                internal=bool(len(functions)) and not bool(len(exports)),
+                exported=len(exports) != 0,
+                internal=len(functions) != 0 and len(exports) == 0,
                 findable=plugincls.__findable__,
                 alias=False,
                 output=getattr(plugincls.__call__, "__output__", None),
@@ -645,7 +649,7 @@ def _module_path(cls: type[Plugin] | str) -> str:
     elif isinstance(cls, str):
         module = cls
     else:
-        raise ValueError(f"Invalid argument type: {cls}")
+        raise TypeError(f"Invalid argument type: {cls}")
 
     return module.replace(MODULE_PATH, "").lstrip(".")
 
@@ -676,7 +680,7 @@ def plugins(osfilter: type[OSPlugin] | None = None, *, index: str = "__regular__
     If ``osfilter`` is specified, only plugins related to the provided OSPlugin, or plugins
     with no OS relation are returned. If ``osfilter`` is ``None``, all plugins will be returned.
 
-    One exception to this is if the ``osfilter`` is a (sub-)class of DefaultPlugin, then plugins
+    One exception to this is if the ``osfilter`` is a (sub-)class of ``DefaultPlugin``, then plugins
     are returned as if no ``osfilter`` was specified.
 
     The ``index`` parameter can be used to specify the index to return plugins from. By default,
@@ -779,9 +783,10 @@ def load(desc: FunctionDescriptor | PluginDescriptor) -> type[Plugin]:
         obj = importlib.import_module(module)
         for part in desc.qualname.split("."):
             obj = getattr(obj, part)
-        return obj
     except Exception as e:
         raise PluginError(f"An exception occurred while trying to load a plugin: {module}") from e
+    else:
+        return obj
 
 
 def os_match(target: Target, descriptor: PluginDescriptor) -> bool:
@@ -800,7 +805,7 @@ def failed() -> list[FailureDescriptor]:
 
 
 @functools.cache
-def _generate_long_paths() -> dict[str, FunctionDescriptor]:
+def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
     """Generate a dictionary of all long paths to their function descriptors."""
     paths = {}
     for value in _get_plugins().__functions__.__regular__.values():
@@ -808,7 +813,8 @@ def _generate_long_paths() -> dict[str, FunctionDescriptor]:
             # Namespace plugins are callable so exclude the explicit __call__ method
             if descriptor.method_name == "__call__":
                 continue
-            paths[descriptor.path] = descriptor
+
+            paths.setdefault(descriptor.path, []).append(descriptor)
 
     return paths
 
@@ -934,17 +940,16 @@ def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) 
         search_pattern += "*"
 
     for path in fnmatch.filter(path_lookup.keys(), search_pattern):
-        descriptor = path_lookup[path]
+        for descriptor in path_lookup[path]:
+            # Skip plugins that don't want to be found by wildcards
+            if not descriptor.exported or (not show_hidden and not descriptor.findable):
+                continue
 
-        # Skip plugins that don't want to be found by wildcards
-        if not descriptor.exported or (not show_hidden and not descriptor.findable):
-            continue
+            # Skip plugins that do not match our OS
+            if os_filter and not _os_match(os_filter, descriptor.path):
+                continue
 
-        # Skip plugins that do not match our OS
-        if os_filter and not _os_match(os_filter, descriptor.path):
-            continue
-
-        yield descriptor
+            yield descriptor
 
 
 def _filter_compatible(
@@ -1011,13 +1016,10 @@ def _find_py_files(path: Path) -> Iterator[Path]:
         path: The path to a directory or file to walk and filter.
     """
     if not path.exists():
-        log.error("Path %s does not exist.", path)
+        log.error("Path %s does not exist", path)
         return
 
-    if path.is_file():
-        it = [path]
-    else:
-        it = path.glob("**/*.py")
+    it = [path] if path.is_file() else path.glob("**/*.py")
 
     for entry in it:
         if not entry.is_file() or entry.name == "__init__.py":
@@ -1054,7 +1056,7 @@ def load_module_from_file(path: Path, base_path: Path) -> None:
         spec.loader.exec_module(module)
         sys.modules[module.__name__] = module
     except Exception as e:
-        log.error("Unable to import %s", path)
+        log.error("Unable to import %s", path)  # noqa: TRY400
         log.debug("Error while trying to import module %s", path, exc_info=e)
         _save_plugin_import_failure(str(path))
 
@@ -1182,7 +1184,7 @@ class OSPlugin(Plugin):
         raise NotImplementedError
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> OSPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         """Initiate this OSPlugin with the given target and detected filesystem.
 
         Args:
@@ -1360,10 +1362,10 @@ class NamespacePlugin(Plugin):
             try:
                 self.target.get_function(entry)
                 at_least_one = True
-            except UnsupportedPluginError:
+            except UnsupportedPluginError:  # noqa: PERF203
                 self.target.log.warning("Subplugin %s is not compatible with target", entry)
             except Exception as e:
-                self.target.log.error("Failed to load subplugin: %s", entry)
+                self.target.log.error("Failed to load subplugin: %s", entry)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
 
         if not at_least_one:
@@ -1371,14 +1373,14 @@ class NamespacePlugin(Plugin):
 
     @staticmethod
     def __generate_aggregator(nsklass: type[NamespacePlugin], method_name: str) -> Callable:
-        def aggregator(self) -> Iterator[Record]:
+        def aggregator(self: NamespacePlugin) -> Iterator[Record]:
             for ns in aggregator.__subplugins__:
                 try:
                     yield from self.target.get_function(f"{ns}.{method_name}")[1]()
-                except UnsupportedPluginError:
+                except UnsupportedPluginError:  # noqa: PERF203
                     continue
                 except Exception as e:
-                    self.target.log.error("Subplugin %s.%s raised an exception", ns, method_name)
+                    self.target.log.error("Subplugin %s.%s raised an exception", ns, method_name)  # noqa: TRY400
                     self.target.log.debug("", exc_info=e)
 
         # Holds the subplugins that share this method

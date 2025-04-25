@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import re
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import (
     RegistryError,
@@ -8,6 +10,9 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 ServiceRecord = TargetRecordDescriptor(
     "windows/service",
@@ -150,11 +155,11 @@ class ServicesPlugin(Plugin):
                     try:
                         value = key.value(service_information).value
                         value = SERVICE_ENUMS[service_information].get(value)
-                        attr = "_".join(["service", service_information.lower()])
+                        attr = f"service_{service_information.lower()}"
                         service_control[attr] = value
-                    except RegistryError:
+                    except RegistryError:  # noqa: PERF203
                         pass
-                err_ctr = service_control["service_errorcontrol"] if "service_errorcontrol" in service_control else None
+                err_ctr = service_control.get("service_errorcontrol")
                 yield ServiceRecord(
                     ts=ts,
                     name=name,
@@ -163,8 +168,8 @@ class ServicesPlugin(Plugin):
                     imagepath=image_path,
                     imagepath_args=image_path_args,
                     objectname=object_name,
-                    start=service_control["service_start"] if "service_start" in service_control else None,
-                    type=service_control["service_type"] if "service_type" in service_control else None,
+                    start=service_control.get("service_start"),
+                    type=service_control.get("service_type"),
                     errorcontrol=err_ctr,
                     _target=self.target,
                 )

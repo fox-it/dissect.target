@@ -1,8 +1,10 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import keychain
-from dissect.target.helpers.regutil import VirtualHive
 from dissect.target.plugins.os.windows.dpapi.crypto import (
     _AES256,
     _DES3,
@@ -11,7 +13,6 @@ from dissect.target.plugins.os.windows.dpapi.crypto import (
 )
 from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIBlob, DPAPIPlugin
 from dissect.target.plugins.os.windows.dpapi.master_key import MasterKeyFile
-from dissect.target.target import Target
 from tests._utils import absolute_path
 from tests.conftest import add_win_user
 from tests.plugins.os.windows.credential.test_lsa import (
@@ -22,6 +23,11 @@ from tests.plugins.os.windows.credential.test_lsa import (
     map_lsa_system_keys,
 )
 from tests.plugins.os.windows.test__os import map_version_value
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
+    from dissect.target.target import Target
 
 """
 You can use the following PowerShell code to generate user and SYSTEM DPAPI encrypted blobs.
@@ -42,7 +48,7 @@ To create mock Windows targets you'll need the following additional data:
 
 
 @pytest.mark.parametrize(
-    "user_type, master_key_guid, enc_data, plaintext",
+    ("user_type", "master_key_guid", "enc_data", "plaintext"),
     [
         (
             "user",
@@ -90,7 +96,7 @@ def test_dpapi_decrypt_blob_win_10(
     enc_data: str,
     plaintext: str,
 ) -> None:
-    """test decrypting a windows 10 dpapi system and user blob"""
+    """Test decrypting a windows 10 dpapi system and user blob."""
 
     add_win_user(
         hive_hklm,
@@ -127,7 +133,7 @@ def test_dpapi_decrypt_blob_win_10(
 
     # user master key
     fs_win.map_file(
-        "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-1555088973-3915578919-3195617063-1003/f5638f3b-9632-480b-ba9c-c73bdabe9f86",  # noqa: E501
+        "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-1555088973-3915578919-3195617063-1003/f5638f3b-9632-480b-ba9c-c73bdabe9f86",
         absolute_path("_data/plugins/os/windows/dpapi/master_keys/f5638f3b-9632-480b-ba9c-c73bdabe9f86"),
     )
 
@@ -167,7 +173,7 @@ def test_dpapi_decrypt_blob_win_10(
 
 
 @pytest.mark.parametrize(
-    "user_type, master_key_guid, enc_data, plaintext",
+    ("user_type", "master_key_guid", "enc_data", "plaintext"),
     [
         (
             "user",
@@ -213,7 +219,7 @@ def test_dpapi_decrypt_blob_win_7(
     enc_data: str,
     plaintext: str,
 ) -> None:
-    """test decrypting a windows 7 user and system blob"""
+    """Test decrypting a windows 7 user and system blob."""
 
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(
@@ -258,7 +264,7 @@ def test_dpapi_decrypt_blob_win_7(
 
     # user master key
     fs_win.map_file(
-        "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-2423314426-1454842194-222297899-1000/835419eb-ce4a-4ae3-a72a-35c1383a6519",  # noqa: E501
+        "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-2423314426-1454842194-222297899-1000/835419eb-ce4a-4ae3-a72a-35c1383a6519",
         absolute_path("_data/plugins/os/windows/dpapi/master_keys/835419eb-ce4a-4ae3-a72a-35c1383a6519"),
     )
 
@@ -292,7 +298,7 @@ def test_dpapi_decrypt_blob_win_7(
 
 
 @pytest.mark.parametrize(
-    "user_type, master_key_guid, enc_data, plaintext",
+    ("user_type", "master_key_guid", "enc_data", "plaintext"),
     [
         (
             "user",
@@ -334,7 +340,7 @@ def test_dpapi_decrypt_blob_win_vista(
     enc_data: str,
     plaintext: str,
 ) -> None:
-    """test decrypting a windows vista user and system blob"""
+    """Test decrypting a windows vista user and system blob."""
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(
         hive_hklm, hive_hku, target_win, sid="S-1-5-21-3694181269-2347385980-100747364-1000", home="C:\\Users\\user"
@@ -381,7 +387,7 @@ def test_dpapi_decrypt_blob_win_vista(
 
     # user master key
     fs_win.map_file(
-        "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-3694181269-2347385980-100747364-1000/8bd87dd9-10fa-40b5-8614-5d0a7e8911c5",  # noqa: E501
+        "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-3694181269-2347385980-100747364-1000/8bd87dd9-10fa-40b5-8614-5d0a7e8911c5",
         absolute_path("_data/plugins/os/windows/dpapi/master_keys/8bd87dd9-10fa-40b5-8614-5d0a7e8911c5"),
     )
 
@@ -415,7 +421,7 @@ def test_dpapi_decrypt_blob_win_vista(
 
 
 @pytest.mark.parametrize(
-    "user_type, master_key_guid, enc_data, plaintext",
+    ("user_type", "master_key_guid", "enc_data", "plaintext"),
     [
         (
             "user",
@@ -457,7 +463,7 @@ def test_dpapi_decrypt_blob_win_xp(
     enc_data: str,
     plaintext: str,
 ) -> None:
-    """test decrypting a windows xp user and system blob"""
+    """Test decrypting a windows xp user and system blob."""
 
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(

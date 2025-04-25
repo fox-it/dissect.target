@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import posixpath
 from collections import Counter
 from datetime import datetime
 from ipaddress import ip_address, ip_interface
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.default.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
     LinuxNetworkConfigParser,
@@ -13,6 +14,10 @@ from dissect.target.plugins.os.unix.linux.network import (
     NetworkManagerConfigParser,
     SystemdNetworkConfigParser,
 )
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:

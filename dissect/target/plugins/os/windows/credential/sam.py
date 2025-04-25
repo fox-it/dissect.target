@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 from hashlib import md5, sha256
 from struct import pack
-from typing import Iterator
 
 try:
     from Crypto.Cipher import AES, ARC4, DES
@@ -9,12 +10,17 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
+from typing import TYPE_CHECKING
+
 from dissect.cstruct import cstruct
 from dissect.util import ts
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 sam_def = """
 struct user_F {
@@ -265,7 +271,7 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
     if sh.revision not in [0x01, 0x02]:
         raise ValueError(f"Unsupported LM/NT hash revision encountered: {sh.revision}")
 
-    d1, d2 = map(lambda k: DES.new(k, DES.MODE_ECB), rid_to_key(rid))
+    d1, d2 = (DES.new(k, DES.MODE_ECB) for k in rid_to_key(rid))
 
     if sh.revision == 0x01:  # LM/NT revision 0x01 involving RC4
         sh_hash = enc_hash[len(c_sam.SAM_HASH) :]
@@ -334,18 +340,18 @@ class SamPlugin(Plugin):
                 raise ValueError("SAM key checksum validation failed!")
             return samkey
 
-        else:  # SAM key revision 0x02 involving AES  (samsrv.dll: KEDecryptKeyWithAES)
-            fk = c_sam.SAM_KEY_AES(f_key)
-            key_data = f_key[len(c_sam.SAM_KEY_AES) : len(c_sam.SAM_KEY_AES) + fk.data_len]
-            checksum_data = f_key[
-                len(c_sam.SAM_KEY_AES) + fk.data_len : len(c_sam.SAM_KEY_AES) + fk.data_len + fk.checksum_len
-            ]
-            samkey = AES.new(syskey, AES.MODE_CBC, fk.salt).decrypt(key_data)[:16]
-            checksum = AES.new(syskey, AES.MODE_CBC, fk.salt).decrypt(checksum_data)[:32]
+        # SAM key revision 0x02 involving AES  (samsrv.dll: KEDecryptKeyWithAES)
+        fk = c_sam.SAM_KEY_AES(f_key)
+        key_data = f_key[len(c_sam.SAM_KEY_AES) : len(c_sam.SAM_KEY_AES) + fk.data_len]
+        checksum_data = f_key[
+            len(c_sam.SAM_KEY_AES) + fk.data_len : len(c_sam.SAM_KEY_AES) + fk.data_len + fk.checksum_len
+        ]
+        samkey = AES.new(syskey, AES.MODE_CBC, fk.salt).decrypt(key_data)[:16]
+        checksum = AES.new(syskey, AES.MODE_CBC, fk.salt).decrypt(checksum_data)[:32]
 
-            if checksum != sha256(samkey).digest():
-                raise ValueError("SAM key checksum validation failed!")
-            return samkey
+        if checksum != sha256(samkey).digest():
+            raise ValueError("SAM key checksum validation failed!")
+        return samkey
 
     @export(record=SamRecord)
     def sam(self) -> Iterator[SamRecord]:

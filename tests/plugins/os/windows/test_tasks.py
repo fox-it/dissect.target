@@ -1,15 +1,19 @@
+from __future__ import annotations
+
 import logging
 import re
 from datetime import datetime, timezone
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 from flow.record import GroupedRecord
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord, TasksPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 @pytest.fixture
@@ -27,7 +31,7 @@ def setup_tasks_test(target_win: Target, fs_win: Filesystem) -> None:
 
 
 @pytest.fixture
-def setup_invalid_tasks_test(target_win: Target, fs_win: Filesystem, setup_tasks_test) -> None:
+def setup_invalid_tasks_test(target_win: Target, fs_win: Filesystem, setup_tasks_test: None) -> None:
     xml_task_file_invalid = absolute_path("_data/plugins/os/windows/tasks/InvalidTask")
 
     fs_win.map_file("windows/system32/tasks/Microsoft/Windows/Maps/InvalidTask", xml_task_file_invalid)
@@ -203,7 +207,7 @@ def assert_at_task_grouped_monthly_date(at_task_grouped: GroupedRecord) -> None:
 
 
 @pytest.mark.parametrize(
-    "assert_func,marker",
+    ("assert_func", "marker"),
     [
         (assert_xml_task_properties, "test_xml.xml.*ComHandler"),
         (assert_xml_task_properties, "MapsToastTask.*toast"),
@@ -211,17 +215,17 @@ def assert_at_task_grouped_monthly_date(at_task_grouped: GroupedRecord) -> None:
     ],
 )
 def test_single_record_properties(
-    target_win: Target, setup_tasks_test: pytest.fixture, assert_func: Callable, marker: str
+    target_win: Target, setup_tasks_test: None, assert_func: Callable, marker: str
 ) -> None:
     records = list(target_win.tasks())
     assert len(records) == 10
     pat = re.compile(rf"{marker}")
     records = filter(lambda x: re.findall(pat, str(x)), records)
-    assert_func(list(records)[0])
+    assert_func(next(iter(records)))
 
 
 @pytest.mark.parametrize(
-    "assert_func,marker",
+    ("assert_func", "marker"),
     [
         (assert_xml_task_grouped_properties, "test_xml.xml.*ComHandler"),
         (assert_xml_task_grouped_properties, "MapsToastTask.*ComHandler"),
@@ -233,19 +237,19 @@ def test_single_record_properties(
     ],
 )
 def test_grouped_record_properties(
-    target_win, setup_invalid_tasks_test: pytest.fixture, assert_func: Callable, marker: str
+    target_win: Target, setup_invalid_tasks_test: pytest.fixture, assert_func: Callable, marker: str
 ) -> None:
     records = list(target_win.tasks())
     assert len(records) == 10
     pat = re.compile(rf"{marker}")
     grouped_records = filter(lambda x: re.findall(pat, str(x)) and isinstance(x, GroupedRecord), records)
-    assert_func(list(grouped_records)[0])
+    assert_func(next(iter(grouped_records)))
 
 
 def test_xml_task_invalid(
     target_win: Target, setup_invalid_tasks_test: pytest.fixture, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.clear()
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, target_win.log.name):
         assert len(list(target_win.tasks())) == 10
         assert "Invalid task file encountered:" in caplog.text

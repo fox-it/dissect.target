@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 import pytest
@@ -6,7 +8,7 @@ from dissect.target.tools.info import main as target_info
 
 
 @pytest.mark.parametrize(
-    "output_type, options",
+    ("output_type", "options"),
     [("json", ["-j"]), ("json", ["-J", "-L", "tar"]), ("record", ["-r", "-s"])],
 )
 def test_target_info(

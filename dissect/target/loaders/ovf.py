@@ -1,10 +1,16 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.hypervisor import ovf
 
 from dissect.target import container
 from dissect.target.loader import Loader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class OvfLoader(Loader):
@@ -15,12 +21,10 @@ class OvfLoader(Loader):
     """
 
     def __init__(self, path: Path, **kwargs):
-        path = path.resolve()
-        super().__init__(path)
+        super().__init__(path, **kwargs)
 
         with path.open("r") as fh:
             self.ovf = ovf.OVF(fh)
-        self.base_dir = path.parent
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -30,7 +34,7 @@ class OvfLoader(Loader):
         for disk in self.ovf.disks():
             disk = disk.replace("\\", "/")
             _, _, fname = disk.rpartition("/")
-            path = self.base_dir.joinpath(fname)
+            path = self.base_path.joinpath(fname)
 
             try:
                 target.disks.add(container.open(path))

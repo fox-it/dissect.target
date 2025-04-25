@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
 import argparse
 import logging
@@ -8,8 +8,8 @@ import sys
 
 from dissect.util.stream import RangeStream
 
-from dissect.target import Target
 from dissect.target.exceptions import TargetError
+from dissect.target.target import Target
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -22,7 +22,7 @@ logging.raiseExceptions = False
 
 
 @catch_sigpipe
-def main():
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -41,22 +41,21 @@ def main():
     try:
         t = Target.open(args.target)
     except TargetError as e:
-        log.error(e)
+        log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
-        parser.exit(1)
+        return 1
 
     if len(t.disks) > 1:
-        parser.exit("Target has more than one disk")
+        log.error("Target has more than one disk")
+        return 1
 
     if not len(t.disks):
-        parser.exit("Target has no disks")
+        log.error("Target has no disks")
+        return 1
 
     fhin = t.disks[0]
 
-    if args.write == "-":
-        fhout = sys.stdout.buffer
-    else:
-        fhout = open(args.write, "wb")
+    fhout = sys.stdout.buffer if args.write == "-" else open(args.write, "wb")  # noqa: PTH123, SIM115
 
     try:
         size = args.bytes if args.bytes != -1 else fhin.size
@@ -67,6 +66,8 @@ def main():
         # We should not close the stdout buffer
         if fhout is not sys.stdout.buffer:
             fhout.close()
+
+    return 0
 
 
 if __name__ == "__main__":

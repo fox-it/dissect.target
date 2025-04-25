@@ -13,8 +13,8 @@ Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
 Serializable = TypeVar("Serializable")
 AuthProtocol = TypeVar("AuthProtocol")
-EnumType = TypeVar("EN", bound=IntEnum)
-ElementType = TypeVar("ET")
+EnumType = TypeVar("EnumType", bound=IntEnum)
+ElementType = TypeVar("ElementType")
 
 
 class MessageType(IntEnum):
@@ -285,7 +285,7 @@ class MessageSerializer(
         if reject_stat == sunrpc.RejectStat.RPC_MISMATCH:
             mismatch = self._read_mismatch(payload)
             return sunrpc.RejectedReply(reject_stat, mismatch)
-        elif reject_stat == sunrpc.RejectStat.AUTH_ERROR:
+        if reject_stat == sunrpc.RejectStat.AUTH_ERROR:
             auth_stat = self._read_enum(payload, sunrpc.AuthStat)
             return sunrpc.RejectedReply(reject_stat, auth_stat)
 

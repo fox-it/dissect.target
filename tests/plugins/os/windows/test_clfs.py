@@ -1,8 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.windows import clfs
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_clfs_plugin(target_win, fs_win):
+
+def test_clfs_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     data_dir = absolute_path("_data/plugins/os/windows/clfs")
 
     fs_win.map_dir("windows/system32/config/", data_dir)
@@ -16,24 +24,24 @@ def test_clfs_plugin(target_win, fs_win):
     expected_stream = "\\Device\\HarddiskVolume3\\wd\\compilerTemp\\BMT.SignCompDB.1lltmqvq.24r\\MetadataEsdGen\\mounted_image\\Windows\\System32\\config\\DRIVERS{53b39e70-18c4-11ea-a811-000d3aa4692b}.TM.blf"  # noqa: E501
     stream_names = {str(r.stream_name) for r in records}
     assert len(stream_names) == 1
-    assert list(stream_names)[0] == expected_stream
+    assert next(iter(stream_names)) == expected_stream
 
     stream_ids = {r.stream_id for r in records}
     assert len(stream_ids) == 1
-    assert list(stream_ids)[0] == 0
+    assert next(iter(stream_ids)) == 0
 
     expected_container = "DRIVERS{53b39e70-18c4-11ea-a811-000d3aa4692b}.TMContainer00000000000000000001.regtrans-ms"
     container_names = {str(r.container_name) for r in records}
     assert len(container_names) == 1
-    assert list(container_names)[0] == expected_container
+    assert next(iter(container_names)) == expected_container
 
     container_ids = {r.container_id for r in records}
     assert len(container_ids) == 1
-    assert list(container_ids)[0] == 0
+    assert next(iter(container_ids)) == 0
 
     container_sizes = {r.container_size for r in records}
     assert len(container_sizes) == 1
-    assert list(container_sizes)[0] == 524288
+    assert next(iter(container_sizes)) == 524288
 
     expected_first_record_offset = 36976
     first_record_offset = records[0].record_offset

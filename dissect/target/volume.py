@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import TYPE_CHECKING, Any, BinaryIO, Iterator
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
@@ -10,6 +10,10 @@ from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.volumes.disk import DissectVolumeSystem
 
@@ -105,7 +109,7 @@ class VolumeSystem:
         Returns:
             ``True`` or ``False`` if the ``VolumeSystem`` can be opened from this file-like object.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _volumes(self) -> Iterator[Volume]:
         """List all valid discovered volumes found on the volume system.
@@ -113,7 +117,7 @@ class VolumeSystem:
         Returns:
             An iterator of all :class:`Volume` of the ``VolumeSystem``.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @property
     def volumes(self) -> list[Volume]:
@@ -209,10 +213,10 @@ class LogicalVolumeSystem(VolumeSystem):
         Returns:
             ``True`` if the given file-like object is part of the logical volume system, ``False`` otherwise.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
-    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         """Open all the discovered logical volume systems from the given file-like objects.
 
         There can be more than one logical volume system on a given set of file-like objects. For example, you can have
@@ -225,7 +229,7 @@ class LogicalVolumeSystem(VolumeSystem):
         Returns:
             An iterator of :class:`LogicalVolumeSystem`.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class Volume(io.IOBase):
@@ -348,7 +352,7 @@ def is_lvm_volume(volume: BinaryIO) -> bool:
         try:
             if logical_vs.detect_volume(volume):
                 return True
-        except ImportError as e:
+        except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", logical_vs)
             log.debug("", exc_info=e)
         except Exception as e:
@@ -367,7 +371,7 @@ def is_encrypted(volume: BinaryIO) -> bool:
         try:
             if manager.detect(volume):
                 return True
-        except ImportError as e:
+        except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", manager)
             log.debug("", exc_info=e)
         except Exception as e:
@@ -394,11 +398,11 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
             if manager_cls.detect(volume):
                 volume_manager = manager_cls(volume)
                 yield from volume_manager.volumes
-        except ImportError as e:
+        except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", manager_cls)
             log.debug("", exc_info=e)
         except Exception as e:
-            log.error(
+            log.error(  # noqa: TRY400
                 "Failed to open an encrypted volume %s with volume manager %s: %s", volume, manager_cls.__type__, e
             )
             log.debug("", exc_info=e)
@@ -417,7 +421,7 @@ def open_lvm(volumes: list[BinaryIO], *args, **kwargs) -> Iterator[VolumeSystem]
     for logical_vs in LOGICAL_VOLUME_MANAGERS:
         try:
             yield from logical_vs.open_all(volumes)
-        except ImportError as e:
+        except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", logical_vs)
             log.debug("", exc_info=e)
         except Exception as e:

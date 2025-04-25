@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import shutil
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -8,8 +11,14 @@ from dissect.target.plugins.os.windows.log import evt
 from dissect.target.plugins.scrape import scrape
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def mock_registry_log_location(target_win, reg_key_name, mock_log_path):
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
+
+def mock_registry_log_location(target_win: Target, reg_key_name: str, mock_log_path: str) -> None:
     # Mock eventlog registry key in a specific control set,
     # CurrentControlSet used in preconfigured value is a soft link
     registry_hive = target_win.registry._root
@@ -31,14 +40,16 @@ def mock_registry_log_location(target_win, reg_key_name, mock_log_path):
 
 
 @pytest.mark.parametrize(
-    "is_in_directory, is_in_registry",
+    ("is_in_directory", "is_in_registry"),
     [
         (True, False),
         (False, True),
         (True, True),
     ],
 )
-def test_evt_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_registry):
+def test_evt_plugin(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, is_in_directory: bool, is_in_registry: bool
+) -> None:
     target_win.add_plugin(evt.EvtPlugin)
 
     evt_log_file = absolute_path("_data/plugins/os/windows/log/evt/TestLog.evt")
@@ -76,16 +87,16 @@ def test_evt_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_registr
     assert len({str(rec.ts) for rec in records}) == 5
 
 
-def test_evt_scraping(target_win):
+def test_evt_scraping(target_win: Target) -> None:
     target_win.add_plugin(scrape.ScrapePlugin)
 
     plugin = evt.EvtPlugin(target_win)
     evt_log_file = absolute_path("_data/plugins/os/windows/log/evt/TestLog.evt")
 
-    with open(evt_log_file, "rb") as f:
-        target_win.disks.add(f)
+    with evt_log_file.open("rb") as fh:
+        target_win.disks.add(fh)
         # Make sure that non-zero initial position does not break scraping
-        f.seek(200)
+        fh.seek(200)
         scraped_records = list(plugin.scraped_evt())
 
     assert len(scraped_records) == 5

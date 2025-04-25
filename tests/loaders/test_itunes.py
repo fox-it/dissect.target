@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import pytest
 
 from dissect.target.loaders.itunes import translate_file_path
 
 
 @pytest.mark.parametrize(
-    "domain, relative_path, result",
+    ("domain", "relative_path", "result"),
     [
         pytest.param(
             "HomeDomain",

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from unittest.mock import MagicMock
 
@@ -6,7 +8,7 @@ import pytest
 from dissect.target.exceptions import NotADirectoryError
 
 
-def test_cb_filesystem_windows(monkeypatch) -> None:
+def test_cb_filesystem_windows(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         mock_cbc_sdk = MagicMock()
         m.setitem(sys.modules, "cbc_sdk", mock_cbc_sdk)

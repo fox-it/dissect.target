@@ -1,4 +1,5 @@
-from pathlib import Path
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 try:
@@ -10,6 +11,8 @@ from dissect.target import container
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dissect.target.target import Target
 
 
@@ -17,8 +20,7 @@ class TargetLoader(Loader):
     """Load target files."""
 
     def __init__(self, path: Path, **kwargs):
-        super().__init__(path)
-        self.base_dir = path.parent
+        super().__init__(path, **kwargs)
         self.definition = YAML(typ="safe").load(path.open("rb"))
 
     @staticmethod
