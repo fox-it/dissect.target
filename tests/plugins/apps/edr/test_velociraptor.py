@@ -10,10 +10,10 @@ from tests.loaders.test_velociraptor import create_root
 def test_windows_velociraptor(target_win: Target, tmp_path: Path) -> None:
     root = create_root("ntfs", tmp_path)
 
-    with open(absolute_path("_data/plugins/apps/edr/velociraptor/windows-uploads.json"), "rb") as fh:
+    with absolute_path("_data/plugins/apps/edr/velociraptor/windows-uploads.json").open("rb") as fh:
         root.joinpath("uploads.json").write_bytes(fh.read())
 
-    with open(absolute_path("_data/plugins/apps/edr/velociraptor/Windows.Memory.ProcessInfo.json"), "rb") as fh:
+    with absolute_path("_data/plugins/apps/edr/velociraptor/Windows.Memory.ProcessInfo.json").open("rb") as fh:
         root.joinpath("results/Windows.Memory.ProcessInfo.json").write_bytes(fh.read())
 
     assert VelociraptorLoader.detect(root) is True

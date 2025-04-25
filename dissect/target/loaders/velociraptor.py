@@ -150,7 +150,6 @@ class VelociraptorLoader(DirLoader):
         )
 
         if (results := self.root.joinpath("results")).exists() and results.is_dir():
-
             # Map artifact results collected by Velociraptor
             target.fs.makedirs(VELOCIRAPTOR_RESULTS)
 
