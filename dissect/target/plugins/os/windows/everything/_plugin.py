@@ -1,4 +1,3 @@
-import logging
 from typing import Iterator
 
 from dissect.target import Target
@@ -23,7 +22,6 @@ EverythingRecord = TargetRecordDescriptor(
         ("string", "source"),
     ],
 )
-logger = logging.getLogger(__name__)
 
 
 class EverythingPlugin(Plugin):
@@ -43,18 +41,13 @@ class EverythingPlugin(Plugin):
         super().__init__(target)
         self.configs = []
         for path_option in self.PATH_GLOBS:
-            for path in self.target.fs.path().glob(path_option):
-                if path.exists():
-                    self.configs.append(path)
+            self.configs.extend(self.target.fs.path().glob(path_option))
 
-        for path in self.find_user_files():
-            self.configs.append(path)
+        self.configs.extend(self.find_user_files())
 
     def find_user_files(self) -> Iterator[TargetPath]:
         for user_details in self.target.user_details.all_with_home():
-            for db in user_details.home_path.glob(self.USER_PATH):
-                if db.exists():
-                    yield db
+            yield from user_details.home_path.glob(self.USER_PATH)
 
     def check_compatible(self) -> None:
         if not self.configs:
@@ -81,4 +74,4 @@ class EverythingPlugin(Plugin):
                             _target=self.target,
                         )
             except (NotImplementedError, ValueError) as e:
-                logger.warning("Invalid EverythingDB %s: %s", path, e)
+                self.target.log.warning("Invalid EverythingDB %s: %s", path, e)
