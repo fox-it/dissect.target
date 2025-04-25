@@ -1,45 +1,57 @@
-import re
-from pathlib import Path
-from typing import Iterator
+from __future__ import annotations
 
-from dissect.target import target, Target, container
+import re
+from typing import TYPE_CHECKING
+
+from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.vbk import VbkFilesystem
-from dissect.target.loader import Loader
-from dissect.target.loaders.vmx import VmxLoader
+from dissect.target.loader import Loader, find_loader
+from dissect.target.loaders.raw import RawLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
+
+
+RE_RAW_DISK = re.compile(r"(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})|(?:DEV__.+)")
 
 
 class VbkLoader(Loader):
     """Load Veaam Backup (VBK) files."""
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path: Path, **kwargs):
         super().__init__(path, **kwargs)
-        self.path = path
+        self.vbkfs = VbkFilesystem(path.open("rb"))
+        self.loader = None
 
     @staticmethod
     def detect(path: Path) -> bool:
         return path.suffix.lower() == ".vbk"
 
-    @staticmethod
-    def find_all(path: Path, **kwargs) -> Iterator[Path]:
-        vbkfs = VbkFilesystem(path.open("rb"))
-        for _, _, files in vbkfs.walk_ext("/"):
-            for file in files:
-                is_vmx = file.path.lower().endswith(".vmx")
-                is_disk = re.match(r'.{8}-.{4}-.{4}-.{4}-.{12}', file.name)
+    def map(self, target: Target) -> None:
+        # We haven't really researched any of the VBK metadata yet, so just try some common formats
+        root = self.vbkfs.path("/")
+        if (base := next(root.glob("*"), None)) is None:
+            raise LoaderError("Unexpected empty VBK filesystem")
 
-                if is_vmx or is_disk:
-                    yield vbkfs.get(file.path)
+        if not (candidates := [path for pattern in ("*.vmx", "*.vmcx") if (path := next(base.glob(pattern), None))]):
+            # Try to look for raw disks
+            if not (disks := [path for path in base.iterdir() if RE_RAW_DISK.match(path.name)]):
+                # Dunno, just give up 🤷‍♂️ should've spent extra time staring at summary.xml
+                raise LoaderError("Unsupported VBK structure")
 
-    def map(self, target: target.Target) -> None:
-        is_vmx = self.path.name.lower().endswith(".vmx")
-        is_disk = re.match(r'.{8}-.{4}-.{4}-.{4}-.{12}', self.path.name)
+            candidates.append(root.joinpath("+".join(map(str, disks))))
 
-        if is_vmx:
-            # TODO: how to open this vmx
-            #VmxLoader(self.path).map(target)
-            pass
-        if is_disk:
-            target.disks.add(self.path.open())
+        # Try to find a loader
+        for candidate in candidates:
+            if (loader := find_loader(candidate, fallbacks=[RawLoader])) is not None:
+                ldr = loader(candidate)
+                ldr.map(target)
 
+                # Store a reference to the loader if we successfully mapped
+                self.loader = ldr
 
-
+                break
+        else:
+            raise LoaderError("Unsupported VBK structure")

@@ -1,21 +1,35 @@
-from pathlib import Path
+from io import BytesIO
+from unittest.mock import Mock, patch
 
+import pytest
+
+from dissect.target.exceptions import LoaderError
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbk import VbkLoader
 from dissect.target.target import Target
-from tests._utils import absolute_path
 
 
-def test_vbk_loader(target_default: Target):
-    archive_path = Path(absolute_path("_data/loaders/vbk/test9.vbk"))
+@patch("dissect.target.loaders.vbk.VbkFilesystem")
+def test_vbk_loader(VbkFilesystem: Mock, target_default: Target) -> None:
+    """Test the VBK loader."""
+    vfs = VirtualFilesystem()
+    VbkFilesystem.return_value = vfs
 
-    loader = VbkLoader(archive_path)
+    loader = VbkLoader(Mock())
+    with pytest.raises(LoaderError, match="Unexpected empty VBK filesystem"):
+        loader.map(target_default)
+
+    vfs.makedirs("a")
+
+    with pytest.raises(LoaderError, match="Unsupported VBK structure"):
+        loader.map(target_default)
+
+    vfs.map_file_fh("a/DEV__dummy", BytesIO("🍖👑".encode()))
+    vfs.map_file_fh("a/summary.xml", BytesIO(b""))
+
     loader.map(target_default)
-    target_default.apply()
-
-    assert len(target_default.filesystems) == 1
-
-    test_file = target_default.fs.path(
-        "/6745a759-2205-4cd2-b172-8ec8f7e60ef8 (78a5467d-87f5-8540-9a84-7569ae2849ad_2d1bb20f-49c1-485d-a689-696693713a5a)/summary.xml")
-
-    assert test_file.exists()
-    assert len(test_file.open().read()) > 0
+    assert isinstance(loader.loader, RawLoader)
+    assert len(target_default.disks) == 1
+    target_default.disks[0].seek(0)
+    assert target_default.disks[0].read().decode() == "🍖👑"
