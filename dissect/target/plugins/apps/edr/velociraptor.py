@@ -1,11 +1,10 @@
 import json
 import re
 import urllib
+from collections.abc import Iterator
 from functools import lru_cache
-from typing import Iterator
 
 from flow.record import RecordDescriptor
-from IPython import embed
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -91,7 +90,6 @@ class VelociraptorPlugin(Plugin):
             velociraptor_record_builder = VelociraptorRecordBuilder(self.target.os, artifact_name)
 
             for line in artifact.open("rt"):
-
                 if not (line := line.strip()):
                     continue
 
