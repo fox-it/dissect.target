@@ -7,6 +7,7 @@ import logging
 from abc import ABC
 from datetime import datetime
 from enum import IntEnum
+from functools import lru_cache
 from packaging.version import Version
 from typing import Any, BinaryIO, Iterator
 
@@ -19,7 +20,6 @@ REFS_MIN_VERSION = Version("1.7.17")
 COMPAT_1 = Version("1.7.9")
 
 log = logging.getLogger(__name__)
-__filesystem_cstruct_cache = {}
 
 
 class EverythingVarInt(BaseType):
@@ -78,10 +78,8 @@ def version_match(stmt: str, cond: bool) -> str:
     return stmt if cond else ""
 
 
+@lru_cache
 def filesystems_cstruct(version: Version) -> cstruct:
-    if cached_fs_cstruct := __filesystem_cstruct_cache.get(version):
-        return cached_fs_cstruct
-
     c_filesystems_def = f"""
     struct filesystem_header {{
         EverythingVarInt type;
@@ -127,7 +125,6 @@ def filesystems_cstruct(version: Version) -> cstruct:
     everything_filesystem_cs.add_custom_type("EverythingVarBytes", EverythingVarBytes)
     everything_filesystem_cs.load(c_filesystems_def)
 
-    __filesystem_cstruct_cache[version] = everything_filesystem_cs
     return everything_filesystem_cs
 
 
