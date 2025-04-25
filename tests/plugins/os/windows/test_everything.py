@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.windows.everything import EverythingPlugin
+from dissect.target.plugins.os.windows.everything._plugin import EverythingPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import bz2
 import contextlib
 import dataclasses
@@ -5,11 +7,11 @@ import logging
 from abc import ABC
 from datetime import datetime
 from enum import IntEnum
+from packaging.version import Version
 from typing import Any, BinaryIO, Iterator
 
 from dissect.cstruct import BaseType, cstruct
 from dissect.util.ts import wintimestamp
-from packaging.version import Version
 
 BZIP_HEADER = b"BZh9"
 FILE_MAGIC = b"ESDb"
@@ -17,6 +19,7 @@ REFS_MIN_VERSION = Version("1.7.17")
 COMPAT_1 = Version("1.7.9")
 
 log = logging.getLogger(__name__)
+__filesystem_cstruct_cache = {}
 
 
 class EverythingVarInt(BaseType):
@@ -28,7 +31,7 @@ class EverythingVarInt(BaseType):
 
     @classmethod
     def _write(cls, stream: BinaryIO, data: Any) -> int:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class EverythingVarBytes(BaseType):
@@ -38,7 +41,7 @@ class EverythingVarBytes(BaseType):
 
     @classmethod
     def _write(cls, stream: BinaryIO, data: Any) -> int:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 c_header_def = """
@@ -76,6 +79,9 @@ def version_match(stmt: str, cond: bool) -> str:
 
 
 def filesystems_cstruct(version: Version) -> cstruct:
+    if cached_fs_cstruct := __filesystem_cstruct_cache.get(version):
+        return cached_fs_cstruct
+
     c_filesystems_def = f"""
     struct filesystem_header {{
         EverythingVarInt type;
@@ -120,6 +126,8 @@ def filesystems_cstruct(version: Version) -> cstruct:
     everything_filesystem_cs.add_custom_type("EverythingVarInt", EverythingVarInt)
     everything_filesystem_cs.add_custom_type("EverythingVarBytes", EverythingVarBytes)
     everything_filesystem_cs.load(c_filesystems_def)
+
+    __filesystem_cstruct_cache[version] = everything_filesystem_cs
     return everything_filesystem_cs
 
 
@@ -297,10 +305,10 @@ class EverythingDBParser:
         if [self.read_byte_or_4(), self.read_byte_or_4(), self.read_byte_or_4()] != [0, 0, 0]:
             raise NotImplementedError("Failed to parse database, unimplemented feature. Please open an issue")
 
-    def __repr__(self):
-        return self.header.__repr__() + " - Filesystems" + self.filesystem_list.__repr__()
+    def __repr__(self) -> str:
+        return f"{self.header} - Filesystems{self.filesystem_list}"
 
-    def __parse_filesystems(self):
+    def __parse_filesystems(self) -> None:
         # TODO - Is there a way for this to be cstructable
         self.filesystem_list: list[EverythingFS] = []
 
@@ -311,7 +319,7 @@ class EverythingDBParser:
             try:
                 fs_type = EverythingFSType(filesystem_header.type)
             except ValueError:
-                raise ValueError(f"Unknown FS type {filesystem_header.type}") from None
+                raise ValueError(f"Unknown FS type {filesystem_header.type}")
             fs = EverythingFSTypeToFS[fs_type]()
             if not fs.supported_version(self.database_version):
                 raise ValueError(f"Unsupported FS type {fs_type} for version {self.database_version}")
@@ -349,7 +357,7 @@ class EverythingDBParser:
             self.filesystem_list.append(fs)
 
     @property
-    def database_version(self):
+    def database_version(self) -> Version:
         return self.header.version
 
     def __iter__(self) -> Iterator[EverythingF]:
@@ -359,7 +367,7 @@ class EverythingDBParser:
         #   index of filesystem
         # This is later used to build a hierarchy for folders
         folder_list = [EverythingIndexObj() for _ in range(self.header.number_of_folders)]
-        for i, folder in enumerate(folder_list):
+        for folder in folder_list:
             parent_index = self.read_u32()
             # `parent_index` is an index into `folder_list`, which points to the parent folder of the current item
             # At the end of the loop, we have a list where each folder has an index to its parent.
@@ -395,14 +403,13 @@ class EverythingDBParser:
             # of the previous buffer, and saving space.
             # The same thing happens later on when parsing filenames
 
-            # I believe this is an actual bug, loading EFU files also cause Everything v1.4.0.704b to crash
+            # I believe this is an actual bug, loading EFU files also causes Everything v1.4.0.704b to crash
             # Leaving the code here in case this is fixed in a newer version
             # if self.filesystem_list[folder.fs_index] == EverythingFSType.EFU:
             #     unk2 = self.read_u8()
             #     logger.debug(f"EFU: unk2: {unk2}")
 
-            new_byte_count = self.read_byte_or_4()
-            if new_byte_count:
+            if new_byte_count := self.read_byte_or_4():
                 trunc_from_prev = self.read_byte_or_4()
                 if trunc_from_prev > len(temp_buf):
                     raise ValueError(f"Error while parsing folder names {trunc_from_prev} > {len(temp_buf)}")
@@ -425,6 +432,7 @@ class EverythingDBParser:
                 folder.date_accessed = self.read_u64()
             if self.header.flag_has_attributes:
                 folder.attributes = self.read_u32()
+
             if isinstance(self.filesystem_list[folder.fs_index], EverythingREFS):
                 # Unknown
                 self.read_u64()
@@ -433,13 +441,14 @@ class EverythingDBParser:
                 # Unknown
                 self.read_u64()
             elif isinstance(self.filesystem_list[folder.fs_index], EverythingEFU):
-                if folder.parent_index is None:
-                    # The EFU format does not contain the root drive, so it just puts random data into
-                    # the metadata.  This will cause errors if passed to flow.record, so we remove it here
-                    folder.date_accessed = None
-                    folder.date_modified = None
-                    folder.date_created = None
-                    folder.size = None
+                if folder.parent_index is not None:
+                    continue
+                # The EFU format does not contain the root drive, so it just puts random data into
+                # the metadata.  This will cause errors if passed to flow.record, so we remove it here
+                folder.date_accessed = None
+                folder.date_modified = None
+                folder.date_created = None
+                folder.size = None
 
         for folder in folder_list:
             yield EverythingF(
@@ -476,8 +485,7 @@ class EverythingDBParser:
             #     logger.debug(f"EFU: unk3: {unk3}")
 
             file_name = folder_list[parent_index].resolve_path(folder_list)
-            new_byte_count = self.read_byte_or_4()
-            if new_byte_count:
+            if new_byte_count := self.read_byte_or_4():
                 trunc_from_prev = self.read_byte_or_4()
                 if trunc_from_prev > len(temp_buf):
                     raise ValueError(f"Error while parsing file name {trunc_from_prev} > {len(temp_buf)}")
