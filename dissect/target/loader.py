@@ -22,15 +22,18 @@ __all__ = [
 
 log = logging.getLogger(__name__)
 
-LOADERS: list[Loader] = []
-LOADERS_BY_SCHEME: dict[str, Loader] = {}
-MODULE_PATH = "dissect.target.loaders"
-
 DirLoader: Loader = import_lazy("dissect.target.loaders.dir").DirLoader
 """A lazy loaded :class:`dissect.target.loaders.dir.DirLoader`."""
 
 RawLoader: Loader = import_lazy("dissect.target.loaders.raw").RawLoader
 """A lazy loaded :class:`dissect.target.loaders.raw.RawLoader`."""
+
+LOADERS: list[Loader] = []
+LOADERS_BY_SCHEME: dict[str, Loader] = {
+    "dir": DirLoader,
+    "raw": RawLoader,
+}
+MODULE_PATH = "dissect.target.loaders"
 
 
 class Loader:
@@ -157,8 +160,8 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
 
 
 def find_loader(
-    item: Path, parsed_path: urllib.parse.ParseResult | None = None, fallbacks: list[Loader] | None = None
-) -> Loader | None:
+    item: Path, parsed_path: urllib.parse.ParseResult | None = None, fallbacks: list[type[Loader]] | None = None
+) -> type[Loader] | None:
     """Finds a :class:`Loader` class for the specific ``item``.
 
     This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
@@ -229,6 +232,7 @@ register("ovf", "OvfLoader")
 register("ova", "OvaLoader")
 register("vbox", "VBoxLoader")
 register("vb", "VBLoader")
+register("vbk", "VbkLoader")
 register("xva", "XvaLoader")
 register("vma", "VmaLoader")
 register("kape", "KapeLoader")
