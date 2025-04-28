@@ -18,7 +18,7 @@ ISO_8601_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{
 class VelociraptorRecordBuilder:
     def __init__(self, artifact_name: str):
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
-        self.RECORD_NAME = f"velociraptor/{artifact_name}"
+        self.record_name = f"velociraptor/{artifact_name}"
 
     def build_record(self, object: dict, target: Target) -> TargetRecordDescriptor:
         """Builds a Velociraptor record."""
@@ -60,7 +60,7 @@ class VelociraptorRecordBuilder:
         return desc(**record_values)
 
     def _create_event_descriptor(self, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
-        return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
+        return TargetRecordDescriptor(self.record_name, record_fields)
 
 
 class VelociraptorPlugin(Plugin):
@@ -100,6 +100,8 @@ class VelociraptorPlugin(Plugin):
                     yield velociraptor_record_builder.build_record(object, self.target)
                 except json.decoder.JSONDecodeError:
                     self.target.log.warning(
-                        "Could not decode Velociraptor JSON log line in file %s: %s", artifact, line
+                        "Could not decode Velociraptor JSON log line in file %s: %s",
+                        artifact,
+                        line,
                     )
                     continue

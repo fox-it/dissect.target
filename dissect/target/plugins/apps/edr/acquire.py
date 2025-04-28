@@ -83,4 +83,4 @@ class AcquirePlugin(Plugin):
                 for row in csv.DictReader(gz_fh):
                     if name := row.get("name"):
                         row.update({"name": self.target.fs.path(name)})
-                    yield AcquireOpenHandlesRecord(_target=self.target, **row)
+                    yield AcquireOpenHandlesRecord(**row, _target=self.target)

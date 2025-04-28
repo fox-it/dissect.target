@@ -32,7 +32,11 @@ def find_fs_directories(path: Path) -> tuple[OperatingSystem | None, list[Path] 
         accessor_root = fs_root.joinpath(accessor)
         if accessor_root.exists():
             os_type, dirs = find_dirs(accessor_root)
-            if os_type in [OperatingSystem.UNIX, OperatingSystem.LINUX, OperatingSystem.OSX]:
+            if os_type in [
+                OperatingSystem.UNIX,
+                OperatingSystem.LINUX,
+                OperatingSystem.OSX,
+            ]:
                 return os_type, [dirs[0]]
 
     # Windows
@@ -72,8 +76,6 @@ def extract_drive_letter(name: str) -> str | None:
         return name[0].lower()
     return None
 
-    return None
-
 
 class VelociraptorLoader(DirLoader):
     """Load Rapid7 Velociraptor forensic image files.
@@ -94,6 +96,7 @@ class VelociraptorLoader(DirLoader):
 
     def __init__(self, path: Path, **kwargs):
         super().__init__(path, **kwargs)
+
         if path.suffix == ".zip":
             self.root = zipfile.Path(path.open("rb"))
             if self.root.root.getinfo("uploads.json").compress_type > 0:
@@ -138,16 +141,17 @@ class VelociraptorLoader(DirLoader):
             zipfs=VelociraptorZipFilesystem,
         )
 
-        if (results := self.root.joinpath("results")).exists() and results.is_dir():
+        if (results := self.root.joinpath("results")).is_dir():
             # Map artifact results collected by Velociraptor
             target.fs.makedirs(VELOCIRAPTOR_RESULTS)
 
             for artifact in results.iterdir():
-                if not artifact.name.endswith(".json") or not artifact.exists():
+                if not artifact.name.endswith(".json"):
                     continue
 
                 target.fs.map_file_fh(
-                    str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(artifact.name)), artifact.open("rb")
+                    str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(artifact.name)),
+                    artifact.open("rb"),
                 )
 
             if (uploads := self.root.joinpath("uploads.json")).exists():
