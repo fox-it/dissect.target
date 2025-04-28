@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 try:
     from Crypto.Cipher import AES, ChaCha20_Poly1305
     from Crypto.Protocol.KDF import PBKDF2
+    from Crypto.Util.Padding import unpad
 
     HAS_CRYPTO = True
 
@@ -503,18 +504,36 @@ class ChromiumMixin:
                     self.target.log.warning("Failed to decrypt local state key: %s", e)
                     self.target.log.debug("", exc_info=e)
 
+            if not db.table("logins"):
+                continue
+
+            notes = {}
+            if table := db.table("password_notes"):
+                for row in table.rows():
+                    notes[str(row.parent_id)] = row.value
+
             for row in db.table("logins").rows():
                 encrypted_password: bytes = row.password_value
                 decrypted_password = None
 
+                # Attempt to decrypt password
                 callable = DECRYPT_MAP.get(self.target.os, {}).get(encrypted_password[0:3], decrypt_unsupported)
-
                 try:
                     decrypted_password = callable(self.target, user, keys, encrypted_password)
-
                 except Exception as e:
                     self.target.log.warning("Failed to decrypt %s Chromium password: %s", callable.__name__, e)
                     self.target.log.debug("", exc_info=e)
+
+                # Attempt to decrypt notes
+                encrypted_notes = None
+                decrypted_notes = None
+                if encrypted_notes := notes.get(str(row.id)):
+                    callable = DECRYPT_MAP.get(self.target.os, {}).get(encrypted_notes[0:3], decrypt_unsupported)
+                    try:
+                        decrypted_notes = callable(self.target, user, keys, encrypted_notes)
+                    except Exception as e:
+                        self.target.log.warning("Failed to decrypt %s Chromium note: %s", callable.__name__, e)
+                        self.target.log.debug("", exc_info=e)
 
                 yield self.BrowserPasswordRecord(
                     ts_created=webkittimestamp(row.date_created),
@@ -524,9 +543,11 @@ class ChromiumMixin:
                     id=row.id,
                     url=row.origin_url,
                     encrypted_username=None,
-                    encrypted_password=base64.b64encode(row.password_value),
+                    encrypted_password=row.password_value,
                     decrypted_username=row.username_value,
                     decrypted_password=decrypted_password,
+                    encrypted_notes=encrypted_notes,
+                    decrypted_notes=decrypted_notes,
                     source=db_file,
                     _target=self.target,
                     _user=user.user,
@@ -540,6 +561,7 @@ class ChromiumMixin:
             - https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html
             - https://github.com/chromium/chromium/tree/main/chrome/browser/os_crypt
             - https://github.com/chromium/chromium/tree/main/chrome/elevation_service
+            - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
         """
 
         if not local_state_path.exists():
@@ -561,7 +583,8 @@ class ChromiumMixin:
 
         keys = {}
 
-        # Chromium version 80 uses an AES ``os_crypt.encrypted_key`` which can be decrypted with user DPAPI master keys.
+        # Windows Chromium version 80 > uses AES ``os_crypt.encrypted_key`` which can be decrypted with user DPAPI keys.
+        # Reference: https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
         try:
             encrypted_key = base64.b64decode(local_state_conf["os_crypt"]["encrypted_key"])[5:]
             aes_key = self.target.dpapi.decrypt_user_blob(encrypted_key, username)
@@ -571,9 +594,10 @@ class ChromiumMixin:
         except (KeyError, ValueError) as e:
             self.target.log.warning("Unable to decode os_crypt encrypted_key in %s: %s", local_state_path, e)
 
-        # Newer Windows versions of Google Chrome (130/127 >) and Microsoft Edge use App Bound Protection
+        # Windows Google Chrome versions > 130 / 127 and Microsoft Edge >~ 130 use App Bound Protection
         # (``os_crypt.app_bound_encrypted_key``) which can be decrypted using System DPAPI -> User DPAPI
-        # -> (optionally AES GCM).
+        # -> (optionally AES GCM if Google Chrome).
+        # Reference: https://github.com/chromium/chromium/tree/main/chrome/elevation_service
         if local_state_conf["os_crypt"].get("app_bound_encrypted_key"):
             if not HAS_CRYPTO:
                 self.target.log.warning("Missing pycryptodome dependency for AES operation: Decrypting ABE key")
@@ -669,42 +693,49 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
         yield from super().passwords("chromium")
 
 
-def remove_padding(decrypted: bytes) -> bytes:
-    number_of_padding_bytes = decrypted[-1]
-    return decrypted[:-number_of_padding_bytes]
+def decrypt_v10_linux(
+    target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes, *, hardcoded_key: str = "peanuts"
+) -> bytes:
+    """Decrypt a version 10 Linux ciphertext.
 
-
-def decrypt_v10(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted_password: bytes) -> bytes:
-    """Decrypt a version 10 encrypted password.
-
-    ``v10`` ciphertexts are encrypted using a PBKDF2 key derivation of the static string ``peanuts``
-    and salt ``saltysalt`` using AES CBC with an IV of ``0x20 * 16``.
+    ``v10`` ciphertexts are encrypted using a PBKDF2 key derivation of the static string ``peanuts`` or ````
+    and salt ``saltysalt`` using AES CBC with an IV of ``0x20 * 16``. Padded using PKCS7.
 
     Args:
-        encrypted_password: The encrypted password bytes.
+        ciphertext: The encrypted bytes.
 
     Returns:
         Decrypted password string.
+
+    Resources:
+        - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_linux.cc
     """
 
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
-    encrypted_password = encrypted_password[3:]
+    ciphertext = encrypted[3:]
 
     salt = b"saltysalt"
     iv = b" " * 16
-    pbkdf_password = "peanuts"
 
-    key = PBKDF2(pbkdf_password, salt, 16, 1)
+    key = PBKDF2(hardcoded_key, salt, 16, 1)
     cipher = AES.new(key, AES.MODE_CBC, IV=iv)
 
-    decrypted = cipher.decrypt(encrypted_password)
-    return remove_padding(decrypted)
+    decrypted = cipher.decrypt(ciphertext)
+
+    # No MAC so no way to verify if decryption worked other than check if unpadding works.
+    # If unpadding failed, we try the legacy-legacy hardcoded empty key.
+    try:
+        return unpad(decrypted, 16)
+    except ValueError:
+        if hardcoded_key == "peanuts":
+            return decrypt_v10_linux(target, user, keys, encrypted, hardcoded_key="")
+        raise ValueError("Decrypting Chromium V10 secret failed")
 
 
-def decrypt_v10_2(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted_password: bytes) -> bytes:
-    """Decrypt a version 10 type 2 password using key ``os_crypt_key``.
+def decrypt_v10_windows(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> bytes:
+    """Decrypt a version 10 Windows ciphertext using key ``os_crypt_key``.
 
     ``v10`` variant 2 (Windows-specific) ciphertexts can be decrypted using a derived AES GCM
     key called ``os_crypt_key`` stored in an encrypted form in ``Local State`` files.
@@ -722,7 +753,7 @@ def decrypt_v10_2(target: Target, user: UserDetails, keys: dict[str, bytes], enc
             }
 
     Args:
-        encrypted_password: The encrypted password bytes.
+        encrypted: Ciphertext bytes.
         key: The encryption key.
 
     Returns:
@@ -735,15 +766,15 @@ def decrypt_v10_2(target: Target, user: UserDetails, keys: dict[str, bytes], enc
     if not keys.get("os_crypt_key"):
         raise ValueError("No OS Crypt key available for v10 version 2 decryption")
 
-    iv = encrypted_password[3:15]
-    ciphertext = encrypted_password[15:]
+    iv = encrypted[3:15]
+    ciphertext = encrypted[15:]
     cipher = AES.new(key=keys.get("os_crypt_key"), mode=AES.MODE_GCM, nonce=iv)
     plaintext = cipher.decrypt(ciphertext)
     return plaintext[:-16]
 
 
-def decrypt_v20(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted_password: bytes) -> bytes:
-    """Decrypt a version 20 ciphertext using ``app_bound_key``.
+def decrypt_v20_windows(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> bytes:
+    """Decrypt a version 20 ciphertext using App Bound Encryption (``app_bound_key``).
 
     ``v20`` (Windows) ciphertexts can be decrypted using a derived AES GCM key called ``app_bound_key``
     stored in a double or triple encrypted form in ``Local State`` files.
@@ -775,29 +806,38 @@ def decrypt_v20(target: Target, user: UserDetails, keys: dict[str, bytes], encry
     if not keys.get("app_bound_key"):
         raise ValueError("No ABE key available for v20 decryption")
 
-    iv = encrypted_password[3 : 3 + 12]
-    ciphertext = encrypted_password[3 + 12 : -16]
-    mac_tag = encrypted_password[-16:]
+    iv = encrypted[3 : 3 + 12]
+    ciphertext = encrypted[3 + 12 : -16]
+    mac_tag = encrypted[-16:]
 
     cipher = AES.new(key=keys.get("app_bound_key"), mode=AES.MODE_GCM, nonce=iv)
     return cipher.decrypt_and_verify(ciphertext, mac_tag)
 
 
-def decrypt_v11(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted_password: bytes) -> None:
+def decrypt_v11_linux(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> None:
     """Decrypt Linux GNOME or Kwallet encrypted passwords. Currently not implemented."""
-    raise ValueError("Decrypting v11 Linux GNOME or Kwallet passwords is not implemented yet.")
+    raise ValueError("Decrypting v11 Linux GNOME or Kwallet Chromium ciphertexts is not implemented.")
 
 
-def decrypt_dpapi(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted_password: bytes) -> bytes:
+def decrypt_dpapi(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> bytes:
     """Decrypt a DPAPI user blob for Windows-based Chromium installs.
 
     Chromium on Windows prior to version 80 encrypts passwords using user DPAPI master keys.
 
     They can be decrypted directly by utilizing the DPAPI plugin.
+
+    Resources:
+        - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
     """
 
+    if not target.has_function("dpapi"):
+        raise ValueError("Missing DPAPI plugin for DPAPI user secret decryption")
+
+    if encrypted.startswith(b"DPAPI"):
+        encrypted = encrypted[:5]
+
     try:
-        plaintext = target.dpapi.decrypt_user_blob(encrypted_password, user.user.name)
+        plaintext = target.dpapi.decrypt_user_blob(encrypted, user.user.name)
 
     except UnsupportedPluginError as e:
         target.log.warning("Target is missing required registry keys for DPAPI")
@@ -806,22 +846,22 @@ def decrypt_dpapi(target: Target, user: UserDetails, keys: dict[str, bytes], enc
     return plaintext
 
 
-def decrypt_unsupported(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted_password: bytes) -> None:
-    raise ValueError(f"Unknown encrypted password found: {encrypted_password!r}")
+def decrypt_unsupported(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> None:
+    raise ValueError(f"Unknown encrypted password found: {encrypted!r}")
 
 
 DECRYPT_MAP = {
     OperatingSystem.WINDOWS.value: {
         b"\x01\x00\x00": decrypt_dpapi,  # First three bytes of DPAPI blob signature.
-        b"v10": decrypt_v10_2,
-        b"v20": decrypt_v20,
+        b"v10": decrypt_v10_windows,
+        b"v20": decrypt_v20_windows,
     },
     OperatingSystem.UNIX.value: {
-        b"v10": decrypt_v10,
-        b"v11": decrypt_v11,
+        b"v10": decrypt_v10_linux,
+        b"v11": decrypt_v11_linux,
     },
     OperatingSystem.LINUX.value: {
-        b"v10": decrypt_v10,
-        b"v11": decrypt_v11,
+        b"v10": decrypt_v10_linux,
+        b"v11": decrypt_v11_linux,
     },
 }
