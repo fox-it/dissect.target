@@ -51,7 +51,7 @@ class LSADefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
                     value = c_defaultpassword.DefaultPassword(default_pass).data
                 except Exception as e:
                     self.target.log.warning(
-                        "Failed to parse LSA %s value (%r): %s", secret, default_pass.decode("utf-16-le"), e
+                        "Failed to parse LSA %s value (%r): %s", secret, default_pass, e
                     )
                     self.target.log.debug("", exc_info=e)
                     continue
