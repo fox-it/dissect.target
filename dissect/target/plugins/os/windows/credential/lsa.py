@@ -120,7 +120,7 @@ class LSAPlugin(Plugin):
         """Yield decrypted LSA secrets from a Windows target."""
         for key, value in self._secrets.items():
             yield LSASecretRecord(
-                ts=self.target.registry.key(f"{self.SECURITY_POLICY_KEY}\\Secrets\\{key}").ts,
+                ts=self.target.registry.key(f"{self.SECURITY_POLICY_KEY}\\Secrets\\{key.replace('_OldVal', '')}").ts,
                 name=key,
                 value=value.hex(),
                 _target=self.target,
