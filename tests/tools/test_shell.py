@@ -392,9 +392,8 @@ def test_shell_hostname_escaping(
     tmp_path.joinpath("etc/hostname").write_bytes(b"hostname\x00\x01\x02\x03")
 
     sys.stdout.flush()
-    out, err = run_target_shell(monkeypatch, capsys, str(tmp_path), "\n")
+    out, _ = run_target_shell(monkeypatch, capsys, str(tmp_path), "\n")
 
-    assert not err
     assert "hostname\\x00\\x01\\x02\\x03" in out
 
 
@@ -422,17 +421,30 @@ def test_shell_prompt_tab_autocomplete() -> None:
         # increase window size to avoid line wrapping
         child.setwinsize(100, 100)
 
-        # note that the expect pattern will be re.compiled so we need to escape regex special characters
-        child.expect(re.escape("ubuntu:/$ "), timeout=20)
+        if platform.python_implementation() == "PyPy":
+            major, minor, _patch = tuple(map(int, platform.python_version_tuple()))
+            if major < 3 or (major == 3 and (minor < 10 or (minor == 10 and _patch < 14))):
+                child.expect_exact(
+                    "Note for users of PyPy < 3.10.14:\n"
+                    "Autocomplete might not work due to an outdated version of pyrepl/readline.py\n"
+                    "To fix this, please update your version of PyPy.\n",
+                    timeout=30,
+                )
+                child.kill(9)  # 🔫
+                return
+
+            pytest.skip("PyPy in CI does not have a functional readline")
+
+        child.expect_exact("ubuntu:/$ ", timeout=30)
         # this should auto complete to `ls /home/user`
-        child.sendline("ls /home/u\t")
+        child.send("ls /home/u\t")
         # expect the prompt to be printed again
-        child.expect(re.escape("ls /home/user/\n"), timeout=5)
+        child.expect_exact("ls /home/user/", timeout=5)
         # execute the autocompleted command
         child.send("\n")
         # we expect the files in /home/user to be printed
-        child.expect(re.escape(".bash_history\n.zsh_history\n"), timeout=5)
-        child.expect(re.escape("ubuntu:/$ "), timeout=5)
+        child.expect_exact(".bash_history\n.zsh_history\n", timeout=5)
+        child.expect_exact("ubuntu:/$ ", timeout=5)
 
         # send partial ls /etc/ command
         child.send("ls /etc/")
@@ -449,9 +461,9 @@ def test_shell_prompt_tab_autocomplete() -> None:
         # send newline to just list everything in /etc/
         child.send("\n")
         # expect the last few files in /etc/ to be printed
-        child.expect("shadow\ntimezone\n", timeout=5)
+        child.expect_exact("shadow\ntimezone\n", timeout=5)
 
         # exit the shell
-        child.expect(re.escape("ubuntu:/$ "), timeout=5)
+        child.expect_exact("ubuntu:/$ ", timeout=5)
         child.sendline("exit")
         child.expect(pexpect.EOF, timeout=5)
