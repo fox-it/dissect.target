@@ -441,7 +441,10 @@ def test_shell_prompt_tab_autocomplete() -> None:
         child.send("\t\t")
 
         # expect the files in /etc/ to be printed
-        child.expect(r"hosts\s+localtime\s+network/\s+os-release\s+passwd\s+shadow\s+timezone\s*\n", timeout=5)
+        child.expect(
+            r"hosts\s+localtime\s+network\/\s+os-release\s+passwd\s+shadow\s+timezone\s*ubuntu:\/\$ ls \/etc\/",
+            timeout=5,
+        )
 
         # send newline to just list everything in /etc/
         child.send("\n")
