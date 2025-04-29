@@ -384,6 +384,7 @@ def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescr
             target.log.debug("Unexpected shell bag entry in MRUListEx entry: %s:%s", key, value)
 
         if record == LastVisitedMRURecord:
+            filepath = "\\".join(el.name for el in parsed_bag) + "\\"
             yield record(
                 regf_mtime=key.ts,
                 index=entry_index,
@@ -398,7 +399,7 @@ def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescr
             yield record(
                 regf_mtime=key.ts,
                 index=entry_index,
-                value=filepath.rstrip("\\"),
+                value=filepath,
                 _target=target,
                 _user=user,
                 _key=key,
@@ -458,11 +459,3 @@ def parse_office_mru_key(target: Target, key: RegistryKey, record: TargetRecordD
         )
 
 
-def get_filepath_from_bag(parsed_bag: list[SHITEM]) -> str:
-    filepath = ""
-    for element in parsed_bag:
-        if element.name.endswith("\\"):
-            filepath += element.name
-        else:
-            filepath += element.name + "\\"
-    return filepath
