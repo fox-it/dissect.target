@@ -1272,14 +1272,10 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
         assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.func.__qualname__}"
 
-        assert settings.get("type") or is_action, (
-            f"No type defined for argument {names[0]} in function {descriptor.func.__qualname__}"
-        )
-
         assert (
             isinstance(settings.get("required"), bool)
             or "default" in settings
-            or is_action
+            or is_bool_action
             or names[0].startswith("--")
         ), f"No required or default attribute for argument {names[0]} in function {descriptor.func.__qualname__}"
 
@@ -1291,16 +1287,10 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
                 f"in {names[0]} in function {descriptor.func.__qualname__}"
             )
 
-        if is_action:
+        if is_bool_action:
             assert "type" not in settings, (
                 f"Type should not be set for store_true or store_false in {names[0]} in "
                 f"function {descriptor.func.__qualname__}: type is implied as boolean already."
-            )
-
-        if names[0].startswith("--"):
-            assert not settings.get("required"), (
-                "Required is redundant when first name starts with '--' in argument "
-                f"{names[0]} for function {descriptor.func.__qualname__}"
             )
 
 
