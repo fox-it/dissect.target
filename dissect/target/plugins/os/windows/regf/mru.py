@@ -14,8 +14,8 @@ from dissect.target.helpers.record import TargetRecordDescriptor, create_extende
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.regf.shellbags import (
     FILE_ENTRY,
-    parse_shell_item_list,
     SHITEM,
+    parse_shell_item_list,
 )
 
 if TYPE_CHECKING:
