@@ -1,10 +1,16 @@
-from pathlib import Path
+from __future__ import annotations
 
-from dissect.target import Target
+from typing import TYPE_CHECKING
+
 from dissect.target.loaders.velociraptor import VelociraptorLoader
 from dissect.target.plugins.apps.edr.velociraptor import VelociraptorPlugin
 from tests._utils import absolute_path
 from tests.loaders.test_velociraptor import create_root
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 def test_windows_velociraptor(target_win: Target, tmp_path: Path) -> None:

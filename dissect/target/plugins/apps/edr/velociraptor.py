@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 import json
 import re
 import urllib.parse
-from collections.abc import Iterator
 from functools import lru_cache
-
-from flow.record import Record
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from flow.record import Record
+
+    from dissect.target.target import Target
 
 VELOCIRAPTOR_RESULTS = "/$velociraptor_results$"
 ISO_8601_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?"
