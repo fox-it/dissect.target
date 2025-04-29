@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from typing import Iterator, Union, get_args
+from typing import TYPE_CHECKING, Union, get_args
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, alias, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
 
 PanelPathRecord = TargetRecordDescriptor(
     "application/productivity/sevenzip/panelpath",

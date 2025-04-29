@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.apps.productivity.sevenzip import SevenZipPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_sevenzip_windows(target_win_users: Target, hive_hku: VirtualHive) -> None:
-    """test if we detect compression and extraction GUI dialog artifacts in 7-Zip."""
+    """Test if we detect compression and extraction GUI dialog artifacts in 7-Zip."""
 
     # Compression dialog artifact
     key_path = "Software\\7-Zip\\Compression"

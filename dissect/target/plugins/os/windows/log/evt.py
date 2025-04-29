@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from pathlib import Path
-from typing import Any, BinaryIO, Iterator
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.eventlog import evt
-from flow.record import Record
 
 from dissect.target.exceptions import (
     FilesystemError,
@@ -17,6 +15,12 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from flow.record import Record
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#]")
 
@@ -176,7 +180,7 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
 
     @export(record=EvtRecordDescriptor)
     def scraped_evt(self) -> Iterator[EvtRecordDescriptor]:
-        """Yields EVT log file records scraped from target disks"""
+        """Yields EVT log file records scraped from target disks."""
         yield from self.target.scrape.scrape_chunks_from_disks(
             needle=self.NEEDLE,
             chunk_size=self.CHUNK_SIZE,
@@ -190,6 +194,6 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
         fh.seek(offset - 4)
         return fh.read(chunk_size)
 
-    def _parse_chunk(self, _, chunk: bytes) -> Iterator[Record]:
+    def _parse_chunk(self, needle: bytes, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
             yield self._build_record(record)

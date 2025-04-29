@@ -1,4 +1,6 @@
-from typing import BinaryIO, Optional
+from __future__ import annotations
+
+from typing import BinaryIO
 
 from dissect.util import cpio
 
@@ -9,8 +11,8 @@ from dissect.target.helpers.fsutil import open_decompress
 class CpioFilesystem(TarFilesystem):
     __type__ = "cpio"
 
-    def __init__(self, fh: BinaryIO, base: Optional[str] = None, *args, **kwargs):
-        super().__init__(open_decompress(fileobj=fh), base, tarinfo=cpio.CpioInfo, *args, **kwargs)
+    def __init__(self, fh: BinaryIO, base: str | None = None, *args, **kwargs):
+        super().__init__(open_decompress(fileobj=fh), base, *args, tarinfo=cpio.CpioInfo, **kwargs)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:

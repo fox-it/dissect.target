@@ -4,11 +4,10 @@ import logging
 import socket
 import ssl
 import time
-import urllib
+import urllib.parse
 from io import DEFAULT_BUFFER_SIZE
-from pathlib import Path
 from struct import pack, unpack
-from typing import Optional, Union
+from typing import TYPE_CHECKING
 
 from dissect.util.stream import AlignedStream
 
@@ -16,13 +15,17 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
 
 class RemoteStream(AlignedStream):
-    def __init__(self, stream: RemoteStreamConnection, disk_id: int, size: Optional[int] = None):
+    def __init__(self, stream: RemoteStreamConnection, disk_id: int, size: int | None = None):
         self.stream = stream
         self.disk_id = disk_id
         super().__init__(size)
@@ -61,7 +64,7 @@ class RemoteStreamConnection:
     CONFIG_CRT = None
 
     @staticmethod
-    def configure(key, crt):
+    def configure(key: str, crt: str) -> None:
         RemoteStreamConnection.CONFIG_KEY = key
         RemoteStreamConnection.CONFIG_CRT = crt
 
@@ -140,7 +143,7 @@ class RemoteStreamConnection:
                     self._socket.close()
                 # Directly re-connecting seem to be less succesful, allow some time to re-connect
                 # seems to yield best results in practice
-                self.log.debug("Unable to connect to agent, next attempt in %d sec.", self._reconnect_wait)
+                self.log.debug("Unable to connect to agent, next attempt in %d sec", self._reconnect_wait)
                 time.sleep(self._reconnect_wait)
                 reconnects += 1
 
@@ -216,20 +219,19 @@ class RemoteStreamConnection:
 class RemoteLoader(Loader):
     """Load a remote target that runs a compatible Dissect agent."""
 
-    def __init__(self, path: Union[Path, str], **kwargs):
-        super().__init__(path)
-        uri = kwargs.get("parsed_path")
-        if uri is None:
+    def __init__(self, path: Path, parsed_path: urllib.parse.ParseResult | None = None):
+        super().__init__(path, parsed_path, resolve=False)
+        if parsed_path is None:
             raise LoaderError("No URI connection details has been passed.")
-        options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
-        self.stream = RemoteStreamConnection(uri.hostname, uri.port, options=options)
-
-    def map(self, target: Target) -> None:
-        self.stream.log = target.log
-        for disk in self.stream.info():
-            target.disks.add(RawContainer(disk))
+        options = dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True))
+        self.stream = RemoteStreamConnection(parsed_path.hostname, parsed_path.port, options=options)
 
     @staticmethod
     def detect(path: Path) -> bool:
         # You can only activate this loader by URI-scheme "remote://"
         return False
+
+    def map(self, target: Target) -> None:
+        self.stream.log = target.log
+        for disk in self.stream.info():
+            target.disks.add(RawContainer(disk))

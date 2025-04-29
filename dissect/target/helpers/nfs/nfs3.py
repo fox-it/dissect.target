@@ -2,25 +2,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import ClassVar, NamedTuple
+from typing import ClassVar
+
+from dissect.target.helpers.sunrpc.sunrpc import ProcedureDescriptor
 
 # See https://datatracker.ietf.org/doc/html/rfc1057
 
 
-class ProcedureDescriptor(NamedTuple):
-    program: int
-    version: int
-    procedure: int
-
+NfsProgram = 100003
+MountProgram = 100005
+NfsVersion = 3
 
 # List of procedure descriptors
-GetPortProc = ProcedureDescriptor(100000, 2, 3)
-MountProc = ProcedureDescriptor(100005, 3, 1)
-ReadDirPlusProc = ProcedureDescriptor(100003, 3, 17)
-ReadFileProc = ProcedureDescriptor(100003, 3, 6)
+MountProc = ProcedureDescriptor(MountProgram, NfsVersion, 1)
+ReadDirPlusProc = ProcedureDescriptor(NfsProgram, NfsVersion, 17)
+ReadFileProc = ProcedureDescriptor(NfsProgram, NfsVersion, 6)
+LookupProc = ProcedureDescriptor(NfsProgram, NfsVersion, 3)
+GetAttrProc = ProcedureDescriptor(NfsProgram, NfsVersion, 1)
+ReadLinkProc = ProcedureDescriptor(NfsProgram, NfsVersion, 5)
 
 
-class Nfs3Stat(IntEnum):
+class NfsStat(IntEnum):
     OK = 0
     ERR_PERM = 1
     ERR_NOENT = 2
@@ -46,7 +48,7 @@ class Nfs3Stat(IntEnum):
 
 
 @dataclass
-class FileHandle3:
+class FileHandle:
     MAXSIZE: ClassVar[int] = 64
     opaque: bytes
 
@@ -56,7 +58,7 @@ class FileHandle3:
 
 
 @dataclass
-class CookieVerf3:
+class CookieVerf:
     MAXSIZE: ClassVar[int] = 8
     opaque: bytes
 
@@ -65,7 +67,7 @@ class CookieVerf3:
             raise ValueError(f"CookieVerf cannot exceed {self.MAXSIZE} bytes")
 
 
-class FileType3(IntEnum):
+class FileType(IntEnum):
     REG = 1  # regular file
     DIR = 2  # directory
     BLK = 3  # block special
@@ -76,35 +78,35 @@ class FileType3(IntEnum):
 
 
 @dataclass
-class SpecData3:
+class SpecData:
     specdata1: int
     specdata2: int
 
 
 @dataclass
-class NfsTime3:
+class NfsTime:
     seconds: int
     nseconds: int
 
 
 @dataclass
-class FileAttributes3:
-    type: FileType3
+class FileAttributes:
+    type: FileType
     mode: int
     nlink: int
     uid: int
     gid: int
     size: int
     used: int
-    rdev: SpecData3
+    rdev: SpecData
     fsid: int
     fileid: int
-    atime: NfsTime3
-    mtime: NfsTime3
-    ctime: NfsTime3
+    atime: NfsTime
+    mtime: NfsTime
+    ctime: NfsTime
 
 
-class MountStat3(IntEnum):
+class MountStat(IntEnum):
     OK = 0  # no error
     ERR_PERM = 1  # Not owner
     ERR_NOENT = 2  # No such file or directory
@@ -118,52 +120,66 @@ class MountStat3(IntEnum):
 
 
 @dataclass
-class MountParams:
-    dirpath: str
-
-
-@dataclass
 class MountOK:
-    filehandle: FileHandle3
+    filehandle: FileHandle
     auth_flavors: list[int]
 
 
 @dataclass
 class ReadDirPlusParams:
-    dir: FileHandle3
+    dir: FileHandle
     cookie: int
-    cookieverf: CookieVerf3
+    cookieverf: CookieVerf
     dir_count: int
     max_count: int
 
 
 @dataclass
-class EntryPlus3:
+class EntryPlus:
     fileid: int
     name: str
     cookie: int
-    attributes: FileAttributes3 | None
-    handle: FileHandle3 | None
+    attributes: FileAttributes | None
+    handle: FileHandle | None
 
 
 @dataclass
-class ReadDirPlusResult3:
-    dir_attributes: FileAttributes3 | None
-    cookieverf: CookieVerf3
-    entries: list[EntryPlus3]
+class ReadDirPlusResult:  # READDIRPLUS3res in RFC
+    dir_attributes: FileAttributes | None
+    cookieverf: CookieVerf
+    entries: list[EntryPlus]
     eof: bool
 
 
 @dataclass
-class Read3args:
-    file: FileHandle3
+class ReadParams:  # READ3args in RFC
+    file: FileHandle
     offset: int
     count: int
 
 
 @dataclass
-class Read3resok:
-    file_attributes: FileAttributes3 | None
+class ReadResult:  # READ3resok in RFC
+    file_attributes: FileAttributes | None
     count: int
     eof: bool
     data: bytes
+
+
+@dataclass
+class DirOpArgs:
+    handle: FileHandle
+    filename: str
+
+
+@dataclass
+class LookupResult:  # LOOKUP3resok in RFC
+    object: FileHandle
+    obj_attributes: FileAttributes | None
+    dir_attributes: FileAttributes | None
+
+
+@dataclass
+class ReadlinkResult:  # READLINK3resok in RFC
+    obj_attributes: FileAttributes | None
+    target: str  # named "data" in the RFC

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from io import BytesIO
 
 import pytest
@@ -7,7 +9,7 @@ from dissect.target.helpers.protobuf import ProtobufVarint, decode_varint, encod
 
 
 @pytest.mark.parametrize(
-    "input, expected_output",
+    ("input", "expected_output"),
     [
         (b"\xd2\x85\xd8\xcc\x04", 1234567890),
         (b"\xd2\x85\xd8\xcc\x04\x01\x02\x03", 1234567890),
@@ -18,7 +20,7 @@ def test_protobuf_varint_decode(input: bytes, expected_output: int) -> None:
 
 
 @pytest.mark.parametrize(
-    "input, expected_output",
+    ("input", "expected_output"),
     [
         (1234567890, b"\xd2\x85\xd8\xcc\x04"),
         (pow(2, 128), b"\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x04"),

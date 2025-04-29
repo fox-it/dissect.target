@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import io
-import logging
 import re
 import string
 from typing import TYPE_CHECKING, BinaryIO, Callable, Union
 
-from dissect.target.helpers.record import TargetRecordDescriptor
-
 if TYPE_CHECKING:
+    import logging
     from collections.abc import Iterator
+
+    from dissect.target.helpers.record import TargetRecordDescriptor
 
 
 Needle = Union[bytes, re.Pattern]
@@ -165,7 +165,7 @@ def scrape_chunks(
                 yield record
                 record_count += 1
             chunk_count += 1
-        except Exception as e:
+        except Exception as e:  # noqa: PERF203
             if log:
                 log.warning("Chunk parsing failed with %r", e)
 
@@ -191,7 +191,7 @@ def recover_string(buf: bytes, encoding: str, *, reverse: bool = False, ascii: b
             try:
                 decoded = buf[-i:].decode(encoding)
                 error_count = 0
-            except UnicodeDecodeError:
+            except UnicodeDecodeError:  # noqa: PERF203
                 error_count += 1
 
                 if error_count > max_error_count:

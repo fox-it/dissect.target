@@ -1,17 +1,21 @@
+from __future__ import annotations
+
 import io
-from pathlib import Path
-from typing import BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.hypervisor.disk import hdd
 from dissect.hypervisor.disk.c_hdd import c_hdd
 
 from dissect.target.container import Container
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 class HdsContainer(Container):
     __type__ = "hds"
 
-    def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | Path, *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):
             f = fh.open("rb")
@@ -20,11 +24,11 @@ class HdsContainer(Container):
         super().__init__(fh, self.hds.size, *args, **kwargs)
 
     @staticmethod
-    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
         return fh.read(16) in (c_hdd.SIGNATURE_STRUCTURED_DISK_V1, c_hdd.SIGNATURE_STRUCTURED_DISK_V2)
 
     @staticmethod
-    def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
+    def detect_path(path: Path, original: list | BinaryIO) -> bool:
         return path.suffix.lower() == ".hds"
 
     def read(self, length: int) -> bytes:

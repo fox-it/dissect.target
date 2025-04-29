@@ -1,20 +1,26 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystems.squashfs import SquashFSFilesystem
 from dissect.target.helpers import configutil
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.record import UnixApplicationRecord
 from dissect.target.plugin import Plugin, alias, export
+from dissect.target.plugins.os.unix.applications import UnixApplicationRecord
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 
 class SnapPlugin(Plugin):
     """Canonical Linux Snapcraft plugin."""
 
-    PATHS = [
-        "/var/lib/snapd/snaps",
-    ]
+    PATHS = ("/var/lib/snapd/snaps",)
 
     def __init__(self, target: Target):
         super().__init__(target)

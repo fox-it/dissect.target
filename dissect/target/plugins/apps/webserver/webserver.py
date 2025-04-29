@@ -1,7 +1,12 @@
-from typing import Iterator, Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import NamespacePlugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 WebserverAccessLogRecord = TargetRecordDescriptor(
     "application/log/webserver/access",
@@ -38,12 +43,25 @@ WebserverErrorLogRecord = TargetRecordDescriptor(
     ],
 )
 
+WebserverHostRecord = TargetRecordDescriptor(
+    "application/log/webserver/host",
+    [
+        ("datetime", "ts"),
+        ("string", "server_name"),
+        ("varint", "server_port"),
+        ("path", "root_path"),
+        ("path", "access_log_config"),
+        ("path", "error_log_config"),
+        ("path", "source"),
+    ],
+)
+
 
 class WebserverPlugin(NamespacePlugin):
     __namespace__ = "webserver"
 
     @export(record=[WebserverAccessLogRecord, WebserverErrorLogRecord])
-    def logs(self) -> Iterator[Union[WebserverAccessLogRecord, WebserverErrorLogRecord]]:
+    def logs(self) -> Iterator[WebserverAccessLogRecord | WebserverErrorLogRecord]:
         """Returns log file records from installed webservers."""
         yield from self.access()
         yield from self.error()

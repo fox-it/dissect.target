@@ -1,8 +1,13 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.configutil import Env
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 EnvironmentFileRecord = TargetRecordDescriptor(
     "application/other/file/environment",

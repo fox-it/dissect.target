@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webserver.nginx import NginxPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_plugins_apps_webservers_nginx_txt(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+
+def test_nginx_txt(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log")
     fs_unix.map_file("var/log/nginx/access.log", data_file)
 
@@ -28,7 +33,7 @@ def test_plugins_apps_webservers_nginx_txt(target_unix: Target, fs_unix: Virtual
     assert record.bytes_sent == 123
 
 
-def test_plugins_apps_webservers_nginx_ipv6(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_nginx_ipv6(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log")
     fs_unix.map_file("var/log/nginx/access.log", data_file)
 
@@ -47,7 +52,7 @@ def test_plugins_apps_webservers_nginx_ipv6(target_unix: Target, fs_unix: Virtua
     assert record.bytes_sent == 123
 
 
-def test_plugins_apps_webservers_nginx_gz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_nginx_gz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log.gz")
     fs_unix.map_file("var/log/nginx/access.log.1.gz", data_file)
 
@@ -66,7 +71,7 @@ def test_plugins_apps_webservers_nginx_gz(target_unix: Target, fs_unix: VirtualF
     assert record.bytes_sent == 123
 
 
-def test_plugins_apps_webservers_nginx_bz2(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_nginx_bz2(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log.bz2")
     fs_unix.map_file("var/log/nginx/access.log.1.bz2", data_file)
 
@@ -85,19 +90,20 @@ def test_plugins_apps_webservers_nginx_bz2(target_unix: Target, fs_unix: Virtual
     assert record.bytes_sent == 123
 
 
-def test_plugins_apps_webservers_nginx_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_nginx_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config_file = absolute_path("_data/plugins/apps/webserver/nginx/nginx.conf")
     fs_unix.map_file("etc/nginx/nginx.conf", config_file)
 
     for i, log in enumerate(["access.log", "domain1.access.log", "domain2.access.log", "big.server.access.log"]):
         fs_unix.map_file_fh(f"opt/logs/{i}/{log}", BytesIO(b"Foo"))
 
-    log_paths = NginxPlugin(target_unix).get_log_paths()
+    target_unix.add_plugin(NginxPlugin)
 
-    assert len(log_paths) == 4
+    assert len(target_unix.nginx.access_paths) == 4
+    assert len(target_unix.nginx.error_paths) == 0
 
 
-def test_plugins_apps_webservers_nginx_config_logs_logrotated(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_nginx_config_logs_logrotated(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config_file = absolute_path("_data/plugins/apps/webserver/nginx/nginx.conf")
     fs_unix.map_file("etc/nginx/nginx.conf", config_file)
     fs_unix.map_file_fh("opt/logs/0/access.log", BytesIO(b"Foo1"))
@@ -106,20 +112,132 @@ def test_plugins_apps_webservers_nginx_config_logs_logrotated(target_unix: Targe
     fs_unix.map_file_fh("opt/logs/1/domain1.access.log", BytesIO(b"Foo4"))
     fs_unix.map_file_fh("var/log/nginx/access.log", BytesIO(b"Foo5"))
 
-    log_paths = NginxPlugin(target_unix).get_log_paths()
+    target_unix.add_plugin(NginxPlugin)
 
-    assert len(log_paths) == 5
+    assert len(target_unix.nginx.access_paths) == 5
+    assert len(target_unix.nginx.error_paths) == 0
 
 
-def test_plugins_apps_webservers_nginx_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_nginx_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config = """
     # access_log      /foo/bar/old.log main;
     access_log      /foo/bar/new.log main;
+
+    # error_log         /foo/bar/error/old.log warn;
+    error_log               /foo/bar/error/new.log;
     """
     fs_unix.map_file_fh("etc/nginx/nginx.conf", BytesIO(textwrap.dedent(config).encode()))
     fs_unix.map_file_fh("foo/bar/new.log", BytesIO(b"New"))
     fs_unix.map_file_fh("foo/bar/old.log", BytesIO(b"Old"))
+    fs_unix.map_file_fh("foo/bar/error/new.log", BytesIO(b""))
+    fs_unix.map_file_fh("foo/bar/error/old.log", BytesIO(b""))
 
-    log_paths = NginxPlugin(target_unix).get_log_paths()
-    assert str(log_paths[0]) == "/foo/bar/old.log"
-    assert str(log_paths[1]) == "/foo/bar/new.log"
+    target_unix.add_plugin(NginxPlugin)
+
+    assert len(target_unix.nginx.access_paths) == 2
+    assert len(target_unix.nginx.error_paths) == 2
+
+    assert sorted(map(str, target_unix.nginx.access_paths)) == ["/foo/bar/new.log", "/foo/bar/old.log"]
+    assert sorted(map(str, target_unix.nginx.error_paths)) == ["/foo/bar/error/new.log", "/foo/bar/error/old.log"]
+
+
+def test_nginx_error_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we detect and parse nginx error logs correctly."""
+
+    errors = """
+    2025/01/31 13:37:01 [alert] 12345#12345: this is a message
+    2025/01/31 13:37:02 [alert] 12345#12345: this is another message
+    2025/01/31 13:37:03 [alert] 12345#12345: and a third message!
+    """
+    fs_unix.map_file_fh("var/log/nginx/error.log", BytesIO(textwrap.dedent(errors).encode()))
+
+    target_unix.add_plugin(NginxPlugin)
+    records = list(target_unix.nginx.error())
+
+    assert len(records) == 3
+
+    assert records[0].ts == datetime(2025, 1, 31, 13, 37, 1, tzinfo=timezone.utc)
+    assert records[0].level == "alert"
+    assert records[0].message == "this is a message"
+    assert records[0].source == "/var/log/nginx/error.log"
+
+
+def test_nginx_parse_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we parse config files and their include directives correctly."""
+
+    base_conf = """
+    user www www;
+    server {
+        listen 1337;
+        server_name example;
+        index index.html;
+        root /var/www/html;
+        include some.conf;
+        access_log /some/access.log;
+    }
+    include /more/confs/*.conf;
+    """
+    fs_unix.map_file_fh("/etc/nginx/nginx.conf", BytesIO(textwrap.dedent(base_conf).encode()))
+
+    some_conf = """
+    error_log /some/error.log;
+    """
+    fs_unix.map_file_fh("/etc/nginx/some.conf", BytesIO(textwrap.dedent(some_conf).encode()))
+
+    more_confs_one = """
+    server {
+        listen 80;
+        server_name eighty;
+        index index.html;
+        root /var/www/eighty;
+        access_log /eighty/access.log;
+        include /bla/foo.conf;
+    }
+    """
+    fs_unix.map_file_fh("/more/confs/one.conf", BytesIO(textwrap.dedent(more_confs_one).encode()))
+
+    foo_conf = """
+    error_log /eighty/error.log;
+    """
+    fs_unix.map_file_fh("/bla/foo.conf", BytesIO(textwrap.dedent(foo_conf).encode()))
+
+    fs_unix.map_file_fh("/some/access.log", BytesIO(b""))
+    fs_unix.map_file_fh("/some/error.log", BytesIO(b""))
+    fs_unix.map_file_fh("/eighty/access.log.1", BytesIO(b""))
+    fs_unix.map_file_fh("/eighty/error.log.1", BytesIO(b""))
+
+    target_unix.add_plugin(NginxPlugin)
+
+    assert sorted(map(str, target_unix.nginx.access_paths)) == [
+        "/eighty/access.log.1",
+        "/some/access.log",
+    ]
+    assert sorted(map(str, target_unix.nginx.error_paths)) == [
+        "/eighty/error.log.1",
+        "/some/error.log",
+    ]
+
+    assert sorted(map(str, target_unix.nginx.host_paths)) == [
+        "/etc/nginx/nginx.conf",
+        "/more/confs/one.conf",
+    ]
+
+    records = sorted(target_unix.nginx.hosts(), key=lambda r: r.source)
+
+    assert len(records) == 2
+
+    assert records[0].ts
+    assert records[0].server_name == "example"
+    assert records[0].server_port == 1337
+    assert records[0].root_path == "/var/www/html"
+    assert records[0].access_log_config == "/some/access.log"
+    assert not records[0].error_log_config
+    assert records[0].source == "/etc/nginx/nginx.conf"
+
+    assert records[1].ts
+    assert records[1].server_name == "eighty"
+    assert records[1].server_port == 80
+    assert records[1].root_path == "/var/www/eighty"
+    assert records[1].access_log_config == "/eighty/access.log"
+    assert not records[1].error_log_config
+    assert records[1].source == "/more/confs/one.conf"

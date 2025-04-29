@@ -1,14 +1,17 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.filesystems.overlay import Overlay2Filesystem
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loader import Loader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 
 class Overlay2Loader(Loader):
-    """Load overlay2 filesystems"""
-
-    def __init__(self, path: TargetPath, **kwargs):
-        super().__init__(path.resolve(), **kwargs)
+    """Load overlay2 filesystems."""
 
     @staticmethod
     def detect(path: TargetPath) -> bool:
@@ -22,10 +25,7 @@ class Overlay2Loader(Loader):
                 return False
 
         # and should have the following parent folders
-        if "image/overlay2/layerdb/mounts/" not in path.as_posix():
-            return False
-
-        return True
+        return not "image/overlay2/layerdb/mounts/" not in path.as_posix()
 
     def map(self, target: Target) -> None:
-        target.filesystems.add(Overlay2Filesystem(self.path))
+        target.filesystems.add(Overlay2Filesystem(self.absolute_path))

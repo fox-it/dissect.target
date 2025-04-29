@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib
 import importlib.resources
 from locale import normalize
@@ -21,10 +23,16 @@ def normalize_timezone(input: str) -> str:
 def normalize_language(input: str) -> str:
     """Returns normalized locales per ISO-3166. Takes Unix LANG locales and Windows registry languages as input.
 
-    Output will be in the format ``ISO-3166-1_ISO-3166-2``, e.g.: ``en_US``, ``nl_NL`` or ``en_GB``.
+    Output will be in the format ``ISO-3166-1-alpha-2-code_ISO-3166-2``, e.g.: ``en_US``, ``nl_NL`` or ``en_GB``.
+
+    Resources:
+        - https://en.wikipedia.org/wiki/ISO_3166
+        - https://en.wikipedia.org/wiki/ISO_3166-1
+        - https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+        - https://en.wikipedia.org/wiki/ISO_3166-2
     """
 
-    return normalize(input).split(".")[0]
+    return normalize(input.replace("-", "_", 1)).split(".")[0]
 
 
 def get_resource_string(path: str) -> str:

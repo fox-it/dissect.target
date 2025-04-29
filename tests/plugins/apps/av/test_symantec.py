@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.av.symantec import (
     SEPFirewallRecord,
     SEPLogRecord,
     SymantecPlugin,
 )
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_symantec_firewall(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -32,7 +37,7 @@ def test_symantec_firewall(target_win: Target, fs_win: VirtualFilesystem) -> Non
     assert records[0].rule_id == 0
     assert records[0].remote_host == ""
     assert records[0].rule_name == "Block all IP traffic"
-    assert records[0].application == Path(".")
+    assert records[0].application == Path()
     assert records[0].line_no == 2
 
 

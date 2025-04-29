@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 import textwrap
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from dissect.target.plugin import load_modules_from_paths
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_registration(tmp_path: Path) -> None:

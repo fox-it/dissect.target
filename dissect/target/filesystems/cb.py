@@ -3,7 +3,7 @@ from __future__ import annotations
 import stat
 from datetime import datetime, timezone
 from enum import IntEnum
-from typing import Any, BinaryIO, Iterator
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from cbc_sdk.live_response_api import LiveResponseError, LiveResponseSession
 from dissect.util import ts
@@ -12,7 +12,9 @@ from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
-EPOCH = datetime(1970, 1, 1)
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 CB_TIMEFORMAT = "%Y-%m-%dT%H:%M:%S%fZ"
 
 
@@ -36,7 +38,7 @@ class CbFilesystem(Filesystem):
             alt_separator = ""
             case_sensitive = True
 
-        super().__init__(alt_separator=alt_separator, case_sensitive=case_sensitive, *args, **kwargs)
+        super().__init__(*args, alt_separator=alt_separator, case_sensitive=case_sensitive, **kwargs)
 
     @staticmethod
     def detect(fh: BinaryIO) -> bool:
@@ -74,7 +76,7 @@ class CbFilesystem(Filesystem):
 
 
 class CbFilesystemEntry(FilesystemEntry):
-    def __init__(self, fs: Filesystem, path: str, entry: Any, cbpath: str) -> None:
+    def __init__(self, fs: Filesystem, path: str, entry: Any, cbpath: str):
         super().__init__(fs, path, entry)
         self.cbpath = cbpath
 

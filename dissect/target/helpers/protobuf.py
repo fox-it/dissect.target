@@ -16,7 +16,7 @@ class ProtobufVarint(BaseType):
     """
 
     @classmethod
-    def _read(cls, stream: BinaryIO, context: dict[str, Any] = None) -> int:
+    def _read(cls, stream: BinaryIO, context: dict[str, Any] | None = None) -> int:
         return decode_varint(stream)
 
     @classmethod

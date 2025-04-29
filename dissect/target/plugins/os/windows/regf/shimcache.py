@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import binascii
+from collections.abc import Iterator
 from datetime import datetime
 from enum import IntEnum
 from io import BytesIO
-from typing import Callable, Generator, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from dissect.cstruct import Structure, cstruct
 from dissect.util.ts import wintimestamp
@@ -10,6 +13,9 @@ from dissect.util.ts import wintimestamp
 from dissect.target.exceptions import Error, RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 ShimcacheRecord = TargetRecordDescriptor(
     "windows/shimcache",
@@ -124,24 +130,16 @@ def win_10_path(ed: Structure) -> str:
 
 
 def win_8_path(ed: Structure) -> str:
-    if ed.path_len:
-        path = ed.path
-    else:
-        path = ed.pkg
-    return path
+    return ed.path if ed.path_len else ed.pkg
 
 
 def nt52_entry_type(fh: bytes) -> Structure:
     entry = c_shim.NT52_ENTRY_32(fh)
 
-    if entry.offset == 0:
-        entry_type = c_shim.NT52_ENTRY_64
-    else:
-        entry_type = c_shim.NT52_ENTRY_32
-    return entry_type
+    return c_shim.NT52_ENTRY_64 if entry.offset == 0 else c_shim.NT52_ENTRY_32
 
 
-def nt61_entry_type(_) -> Structure:
+def nt61_entry_type(fh: bytes) -> Structure:
     return c_shim.NT61_64_ENTRY
 
 
@@ -183,20 +181,20 @@ class CRCMismatchException(Error):
     pass
 
 
-ShimCacheGeneratorType = Union[CRCMismatchException, Tuple[Optional[datetime], str]]
+ShimCacheGeneratorType = Union[CRCMismatchException, tuple[Optional[datetime], str]]
 
 
 class ShimCache:
-    def __init__(self, fh: BytesIO, ntversion: str, noheader: bool = False) -> None:
+    def __init__(self, fh: BytesIO, ntversion: str, noheader: bool = False):
         self.fh = fh
         self.ntversion = ntversion
         self.noheader = noheader
 
         self.version = self.identify()
 
-    def __iter__(self) -> Generator[ShimCacheGeneratorType, None, None]:
-        if not (self.version in list(SHIMCACHE_WIN_TYPE)):
-            raise NotImplementedError()
+    def __iter__(self) -> Iterator[ShimCacheGeneratorType]:
+        if self.version not in list(SHIMCACHE_WIN_TYPE):
+            raise NotImplementedError
 
         arguments = TYPE_VARIATIONS.get(self.version)
 
@@ -238,14 +236,13 @@ class ShimCache:
         if self.ntversion == "6.3":
             if self.noheader:
                 return SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER
-            else:
-                return SHIMCACHE_WIN_TYPE.VERSION_WIN81
+            return SHIMCACHE_WIN_TYPE.VERSION_WIN81
 
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def iter_win_8_plus(
-        self, headers: Tuple[Structure, Structure], offset: int, path_finder: Callable
-    ) -> ShimCacheGeneratorType:
+        self, headers: tuple[Structure, Structure], offset: int, path_finder: Callable
+    ) -> Iterator[ShimCacheGeneratorType]:
         entry_header, data_header = headers
 
         self.fh.seek(offset)
@@ -264,9 +261,7 @@ class ShimCache:
 
             yield wintimestamp(ed.ts) if hasattr(ed, "ts") else None, path
 
-    def iter_nt(
-        self, header: Structure, offset: int, header_function: Callable
-    ) -> Generator[Tuple[datetime, str], None, None]:
+    def iter_nt(self, header: Structure, offset: int, header_function: Callable) -> Iterator[tuple[datetime, str]]:
         self.fh.seek(0)
 
         header = header(self.fh)
@@ -292,21 +287,19 @@ class ShimCache:
 
 
 class ShimcachePlugin(Plugin):
-    """
-    Shimcache plugin.
-    """
+    """Shimcache plugin."""
 
-    KEYS = [
+    KEYS = (
         "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCompatCache",
         "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCompatibility",
-    ]
+    )
 
     def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEYS))) > 0:
             raise UnsupportedPluginError("Could not find shimcache")
 
     @export(record=ShimcacheRecord)
-    def shimcache(self) -> ShimcacheRecord:
+    def shimcache(self) -> Iterator[ShimcacheRecord]:
         """Return the shimcache.
 
         The ShimCache or AppCompatCache stores registry keys related to properties from older Windows versions for
@@ -345,9 +338,7 @@ class ShimcachePlugin(Plugin):
 
                 yield from self._get_records(value_name, cache)
 
-    def _get_records(
-        self, name: str, cache: Generator[ShimCacheGeneratorType, None, None]
-    ) -> Generator[ShimcacheRecord, None, None]:
+    def _get_records(self, name: str, cache: Iterator[ShimCacheGeneratorType]) -> Iterator[ShimcacheRecord]:
         for index, item in enumerate(cache):
             if isinstance(item, CRCMismatchException):
                 self.target.log.warning("A CRC mismatch occured for entry: %s", item)

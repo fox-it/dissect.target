@@ -1,16 +1,21 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.trash import GnomeTrashPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if GNOME Trash plugin finds all deleted files including recursively deleted folders and expunged items."""
+    """Test if GNOME Trash plugin finds all deleted files including recursively deleted folders and expunged items."""
 
     fs_unix.map_file_fh("etc/hostname", BytesIO(b"hostname"))
     fs_unix.map_dir("home/user/.local/share/Trash", absolute_path("_data/plugins/os/unix/trash"))
@@ -21,7 +26,7 @@ def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
     assert target_unix_users.has_function("trash")
     assert target_unix_users.has_function("recyclebin")
 
-    results = sorted(list(target_unix_users.trash()), key=lambda r: r.source)
+    results = sorted(target_unix_users.trash(), key=lambda r: r.source)
     assert len(results) == 11
 
     # test if we find a deleted file
@@ -80,7 +85,7 @@ def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
 
 
 def test_gnome_trash_mounts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if GNOME Trash plugin finds Trash files in mounted devices from ``/etc/fstab``, ``/mnt`` and ``/media``."""
+    """Test if GNOME Trash plugin finds Trash files in mounted devices from ``/etc/fstab``, ``/mnt`` and ``/media``."""
 
     fs_unix.map_file_fh("etc/hostname", BytesIO(b"hostname"))
     fs_unix.map_dir("home/user/.local/share/Trash", absolute_path("_data/plugins/os/unix/trash"))

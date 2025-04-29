@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from typing import TYPE_CHECKING
+
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.cit import CITPlugin
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 CIT_TEST_DATA = bytes.fromhex(
     "9c0500004f0d000091b5000a000c004f0d000000b730bad0906ad7010000bd2d"
@@ -70,7 +75,7 @@ DP_TEST_DATA = bytes.fromhex(
 )
 
 
-def test_cit_cit_plugin(target_win_tzinfo, hive_hklm):
+def test_cit_cit_plugin(target_win_tzinfo: Target, hive_hklm: VirtualHive) -> None:
     system_key_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT\\System"
     system_key = VirtualKey(hive_hklm, system_key_path)
 
@@ -91,11 +96,11 @@ def test_cit_cit_plugin(target_win_tzinfo, hive_hklm):
 
     assert len(results) == 48
 
-    program = [r for r in results if r._desc.name == "windows/registry/cit/program"][0]
+    program = next(r for r in results if r._desc.name == "windows/registry/cit/program")
     assert program.path == "\\DEVICE\\HARDDISKVOLUME2\\WINDOWS\\SYSTEM32\\CSRSS.EXE"
 
 
-def test_cit_puu_plugin(target_win, hive_hklm):
+def test_cit_puu_plugin(target_win: Target, hive_hklm: VirtualHive) -> None:
     cit_key_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT"
     cit_key = VirtualKey(hive_hklm, cit_key_path)
 
@@ -119,7 +124,7 @@ def test_cit_puu_plugin(target_win, hive_hklm):
     assert results[0].build_number == 19042
 
 
-def test_cit_dp_plugin(target_win, hive_hklm):
+def test_cit_dp_plugin(target_win: Target, hive_hklm: VirtualHive) -> None:
     cit_key_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT"
     cit_key = VirtualKey(hive_hklm, cit_key_path)
 
@@ -145,7 +150,7 @@ def test_cit_dp_plugin(target_win, hive_hklm):
     assert results[-3].duration == 3455412
 
 
-def test_cit_telemetry_plugin(target_win, hive_hklm):
+def test_cit_telemetry_plugin(target_win: Target, hive_hklm: VirtualHive) -> None:
     win32k_key_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT\\win32k\\1705"
     win32k_key = VirtualKey(hive_hklm, win32k_key_path)
 
@@ -182,7 +187,7 @@ def test_cit_telemetry_plugin(target_win, hive_hklm):
     assert output_value == ["DEVICECHANGE", "POWERBROADCAST"]
 
 
-def test_cit_modules_plugin(target_win, hive_hklm):
+def test_cit_modules_plugin(target_win: Target, hive_hklm: VirtualHive) -> None:
     module_key_path = (
         "Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT\\Module\\System32/mrt100.dll"
     )

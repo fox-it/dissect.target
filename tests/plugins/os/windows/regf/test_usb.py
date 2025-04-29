@@ -1,14 +1,19 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.usb import UsbPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_windows_usb(target_win_users: Target, hive_hklm: VirtualHive, hive_hku: VirtualHive) -> None:
-    """test discovery of windows usb connection history"""
+    """Test discovery of windows usb connection history."""
 
     usbstor_name = "SYSTEM\\ControlSet001\\Enum\\USBSTOR\\Disk&Ven_SanDisk&Prod_Ultra&Rev_1.00"
     usbstor_key = VirtualKey(hive_hklm, usbstor_name)

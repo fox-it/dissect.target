@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import json
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.sql import sqlite3
 from dissect.util.ts import wintimestamp
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 HitmanAlertRecord = TargetRecordDescriptor(
     "application/av/sophos/hitman/log",
@@ -38,9 +44,9 @@ class SophosPlugin(Plugin):
     LOG_SOPHOS_HITMAN = "sysvol/ProgramData/HitmanPro.Alert/excalibur.db"
     MARKER_INFECTION = '{"command":"clean-threat'
 
-    LOGS = [LOG_SOPHOS_HOME, LOG_SOPHOS_HITMAN]
+    LOGS = (LOG_SOPHOS_HOME, LOG_SOPHOS_HITMAN)
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.codepage = self.target.codepage or "ascii"
 
@@ -70,20 +76,22 @@ class SophosPlugin(Plugin):
         systems, the details field might contain a lot of text, it might
         contain stracktraces etc.
         """
-        try:
-            fh = self.target.fs.path(self.LOG_SOPHOS_HITMAN).open("rb")
-            db = sqlite3.SQLite3(fh)
-            alerts = list(filter(lambda t: t.name == "Alerts", db.tables()))[0]
-            for alert in alerts.rows():
-                yield HitmanAlertRecord(
-                    ts=wintimestamp(alert.Timestamp),  # already utc
-                    alert=alert.AlertType,
-                    description=alert.Description,
-                    details=alert.Details,
-                    _target=self.target,
-                )
-        except Exception as error:
-            self.target.log.error(f"Error occurred during reading alerts: {error}.")
+        if self.target.fs.path(self.LOG_SOPHOS_HITMAN).exists():
+            try:
+                fh = self.target.fs.path(self.LOG_SOPHOS_HITMAN).open("rb")
+                db = sqlite3.SQLite3(fh)
+                alerts = next(filter(lambda t: t.name == "Alerts", db.tables()))
+                for alert in alerts.rows():
+                    yield HitmanAlertRecord(
+                        ts=wintimestamp(alert.Timestamp),  # already utc
+                        alert=alert.AlertType,
+                        description=alert.Description,
+                        details=alert.Details,
+                        _target=self.target,
+                    )
+            except Exception as e:
+                self.target.log.error("Error occurred during reading alerts: %r", e)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
 
     @export(record=SophosLogRecord)
     def sophoshomelogs(self) -> Iterator[SophosLogRecord]:
@@ -98,22 +106,31 @@ class SophosPlugin(Plugin):
             path (path): Path to the infected file (if available).
 
         """
-        log = self.target.fs.path(self.LOG_SOPHOS_HOME).open("rt", 0, "utf-16le")
-        while line := log.readline():
-            if line.find(self.MARKER_INFECTION) > -1:
-                try:
-                    ts, json_data = line.split(" ", maxsplit=2)
-                    details = json.loads(json_data)
+        if self.target.fs.path(self.LOG_SOPHOS_HOME).exists():
+            for line in self.target.fs.path(self.LOG_SOPHOS_HOME).open("rt", 0, "utf-16le"):
+                if line.find(self.MARKER_INFECTION) > -1:
+                    try:
+                        ts, json_data = line.split(" ", maxsplit=2)
+                        details = json.loads(json_data)
 
-                    path_to_infected_file = None
-                    if targets := details.get("targets", None):
-                        path_to_infected_file = targets[0].get("file_path", None)
+                        path_to_infected_file = None
+                        if targets := details.get("targets", None):
+                            path_to_infected_file = targets[0].get("file_path", None)
 
-                    yield SophosLogRecord(
-                        ts=ts,
-                        description=details.get("threat_name", details),
-                        path=self.target.fs.path(path_to_infected_file),
-                        _target=self.target,
-                    )
-                except Exception as error:
-                    self.target.log.warning(f"Error: {error} on log line: {line}.")
+                        # < 3.9.4.1
+                        if path := details.get("file_path"):
+                            path_to_infected_file = path
+                        # > 3.10.3
+                        elif targets := details.get("targets", None):
+                            path_to_infected_file = targets[0].get("file_path", None)
+                            path = (self.target.fs.path(path_to_infected_file),)
+
+                        yield SophosLogRecord(
+                            ts=ts,
+                            description=details.get("threat_name", details),
+                            path=self.target.fs.path(path_to_infected_file),
+                            _target=self.target,
+                        )
+                    except Exception as e:
+                        self.target.log.warning("Error: %r on log line: %s", e, line)
+                        self.target.log.debug("", exc_info=e)

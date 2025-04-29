@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import struct
-from datetime import datetime
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.sid import read_sid
 from dissect.util.ts import from_unix
@@ -17,6 +16,10 @@ from dissect.target.helpers.record import (
     create_extended_descriptor,
 )
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
 
 UserRegistryRecordDescriptor = create_extended_descriptor(
     [
@@ -169,10 +172,10 @@ class GenericPlugin(Plugin):
             try:
                 val = self.target.registry.key(key).value(value).value
                 if val:
-                    val = val.strip("\\")
-                    return val
-            except RegistryError:
+                    return val.strip("\\")
+            except RegistryError:  # noqa: PERF203
                 continue
+        return None
 
     @export(property=True)
     def activity(self) -> datetime | None:
@@ -185,7 +188,6 @@ class GenericPlugin(Plugin):
                     last_seen = f.stat().st_mtime
         except Exception as e:
             self.target.log.debug("Could not determine last activity", exc_info=e)
-            pass
 
         try:
             for f in self.target.fs.scandir("sysvol/windows/system32/config"):
@@ -193,10 +195,9 @@ class GenericPlugin(Plugin):
                     last_seen = f.stat().st_mtime
         except Exception as e:
             self.target.log.debug("Could not determine last activity", exc_info=e)
-            pass
 
         if last_seen == 0:
-            return
+            return None
 
         return from_unix(last_seen)
 
@@ -216,7 +217,7 @@ class GenericPlugin(Plugin):
         try:
             return from_unix(self.target.registry.key(key).value("InstallDate").value)
         except RegistryError:
-            return
+            return None
 
     @export(record=AppInitRecord)
     def appinit(self) -> Iterator[AppInitRecord]:
@@ -233,7 +234,7 @@ class GenericPlugin(Plugin):
             - https://attack.mitre.org/techniques/T1546/010/
             - https://docs.microsoft.com/en-us/windows/win32/win7appqual/appinit-dlls-in-windows-7-and-windows-server-2008-r2?redirectedfrom=MSDN
             - https://docs.microsoft.com/en-US/windows/win32/dlls/secure-boot-and-appinit-dlls
-        """  # noqa: E501
+        """
         keys = [
             (
                 "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows",
@@ -358,7 +359,7 @@ class GenericPlugin(Plugin):
 
         References:
             - https://docs.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/network-access-restrict-anonymous-access-to-named-pipes-and-shares
-        """  # noqa: E501
+        """
         key = "HKLM\\System\\CurrentControlSet\\Services\\LanManServer\\Parameters"
         for r in self.target.registry.keys(key):
             user = self.target.registry.get_user(r)
@@ -419,7 +420,7 @@ class GenericPlugin(Plugin):
         References:
             - https://devblogs.microsoft.com/oldnewthing/20071121-00/?p=24433
             - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc779439%28v=ws.10%29?redirectedfrom=MSDN
-        """  # noqa: E501
+        """
         keys = [
             ("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Command Processor", "AutoRun"),
             ("HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Command Processor", "AutoRun"),
@@ -501,7 +502,7 @@ class GenericPlugin(Plugin):
             - https://forensicatorj.wordpress.com/2014/06/25/interpreting-the-pendingfilerenameoperations-registry-key-for-forensics/
             - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-2000-server/cc960241%28v=technet.10%29?redirectedfrom=MSDN
             - https://qtechbabble.wordpress.com/2020/06/26/use-pendingfilerenameoperations-registry-key-to-automatically-delete-a-file-on-reboot/
-        """  # noqa: E501
+        """
         key = "HKLM\\System\\CurrentControlSet\\Control\\Session Manager"
         for r in self.target.registry.keys(key):
             user = self.target.registry.get_user(r)

@@ -1,34 +1,30 @@
-import os
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.editor.windowsnotepad import (
     WindowsNotepadPlugin,
     WindowsNotepadTab,
 )
-from dissect.target.target import Target
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    import pytest
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
 text1 = "This is an unsaved tab, UTF-8 encoded with Windows (CRLF). It's only 88 characters long."
-text2 = (
-    "Dissect は、インシデント対応のための優れたフレームワークです。 The Notepad window shows UTF-8 as the encoding. This text has 113 "
-    "characters."
-)
+text2 = "Dissect は、インシデント対応のための優れたフレームワークです。 The Notepad window shows UTF-8 as the encoding. This text has 113 characters."  # noqa: E501
 text3 = "This is a very short text."
 text4 = "This is another short test. And we should be able to parse this."
 text5 = "This is a test and the text is longer than 256 bytes. "
 text6 = "This is a test and the text is longer than 65536 bytes. "
-text7 = (
-    "This a text, which is nothing special. But I am going to modify it a bit. For example, "
-    "I have removed quote some stuff. Adding a word in the beginning now... "
-    "At this point, I've edited it quite a lot."
-)
-text8 = (
-    "Closing application now. It's saved but now I'm adding unsaved changes and closing "
-    "the application again. Dit a few deletions!"
-)
-loremipsum = """Lorem ipsum dolor sit amet. Eum error blanditiis eum pariatur delectus ut consequuntur officiis a excepturi dignissimos et doloribus quia 33 perspiciatis soluta nam perspiciatis dolor. Ut repudiandae quidem cum sint modi qui sint consequatur. Aut autem quidem eum enim consequatur qui voluptate consequatur non similique voluptate. A vitae modi vel sint provident ut galisum tenetur sit voluptatem amet. Est impedit perspiciatis est repudiandae voluptates ut fugit alias! Eum magni esse aut velit illum qui excepturi aperiam. Ex dolores asperiores ut debitis omnis qui consequuntur dolore. Est voluptatem mollitia et quibusdam unde ea accusamus fuga. Cum quis galisum et impedit sunt qui aliquam perspiciatis sed modi quidem qui nisi molestias. Aut temporibus architecto ut neque voluptatem et consequatur deleniti sed accusantium quibusdam et omnis dignissimos ad rerum ipsam et rerum quia. Ut nihil repellat et eaque molestias quo iusto ipsum At optio sint eos quidem earum?\r\rEx deleniti unde eum tenetur rerum ea dolore numquam? Eos aperiam officiis et neque explicabo et enim atque ut eaque omnis non illum eveniet est molestias itaque et ratione voluptatem. Ea deserunt nemo et quos tempora et nostrum aperiam sit necessitatibus illo sit culpa placeat. Vel tempore quibusdam ut velit voluptate aut odio facere non voluptas earum est odio galisum et voluptas harum. Et blanditiis sapiente et nostrum laborum aut voluptatem explicabo a quasi assumenda. Est voluptatem quia eum minima galisum quo totam excepturi aut facilis enim vel voluptate repudiandae sit distinctio laboriosam. Quo possimus molestiae et molestiae accusantium est voluptas omnis sed obcaecati natus. Non vitae asperiores qui nostrum enim id saepe fugiat et incidunt quasi.\r\rEos ipsa facilis aut excepturi voluptatem a omnis magni vel magni iste. Sed ipsum consequatur qui reprehenderit deleniti et soluta molestiae. Ut vero assumenda id dolor ipsum in deleniti voluptatem aut quis quisquam sed repudiandae temporibus ab quia inventore. Sed velit fugit vel facere cumque et delectus ullam sed eaque impedit. Est veritatis dignissimos aut doloribus dolorem vel pariatur repellendus sit nesciunt similique eum architecto quia. Ea expedita veritatis eum dolorem molestiae ut enim fugit aut beatae quibusdam. Aut voluptas natus in quidem deleniti aut animi iure est incidunt tenetur qui culpa maiores! Et nostrum quaerat qui consequatur consequatur aut aliquam atque aut praesentium rerum et consequuntur exercitationem. Non accusantium ipsa vel consectetur vitae ut magnam autem et natus rerum ut consectetur inventore est doloremque temporibus 33 dolores doloribus! Aut perferendis optio et nostrum repellendus et fugit itaque ut nisi neque sed sint quaerat. Aut placeat architecto et eius sapiente eum molestiae quam. Quo mollitia sapiente non Quis neque non tempora laudantium. Quo distinctio quos et molestias natus sit veritatis consequuntur aut repellendus neque a porro galisum cum numquam nesciunt et animi earum? Aut dolorum dolore non assumenda omnis et molestiae amet id sint vero est eligendi harum sit temporibus magnam aut ipsam quos.\r\r"""  # noqa: E501
+text7 = "This a text, which is nothing special. But I am going to modify it a bit. For example, I have removed quote some stuff. Adding a word in the beginning now... At this point, I've edited it quite a lot."  # noqa: E501
+text8 = "Closing application now. It's saved but now I'm adding unsaved changes and closing the application again. Dit a few deletions!"  # noqa: E501
+loremipsum = "Lorem ipsum dolor sit amet. Eum error blanditiis eum pariatur delectus ut consequuntur officiis a excepturi dignissimos et doloribus quia 33 perspiciatis soluta nam perspiciatis dolor. Ut repudiandae quidem cum sint modi qui sint consequatur. Aut autem quidem eum enim consequatur qui voluptate consequatur non similique voluptate. A vitae modi vel sint provident ut galisum tenetur sit voluptatem amet. Est impedit perspiciatis est repudiandae voluptates ut fugit alias! Eum magni esse aut velit illum qui excepturi aperiam. Ex dolores asperiores ut debitis omnis qui consequuntur dolore. Est voluptatem mollitia et quibusdam unde ea accusamus fuga. Cum quis galisum et impedit sunt qui aliquam perspiciatis sed modi quidem qui nisi molestias. Aut temporibus architecto ut neque voluptatem et consequatur deleniti sed accusantium quibusdam et omnis dignissimos ad rerum ipsam et rerum quia. Ut nihil repellat et eaque molestias quo iusto ipsum At optio sint eos quidem earum?\r\rEx deleniti unde eum tenetur rerum ea dolore numquam? Eos aperiam officiis et neque explicabo et enim atque ut eaque omnis non illum eveniet est molestias itaque et ratione voluptatem. Ea deserunt nemo et quos tempora et nostrum aperiam sit necessitatibus illo sit culpa placeat. Vel tempore quibusdam ut velit voluptate aut odio facere non voluptas earum est odio galisum et voluptas harum. Et blanditiis sapiente et nostrum laborum aut voluptatem explicabo a quasi assumenda. Est voluptatem quia eum minima galisum quo totam excepturi aut facilis enim vel voluptate repudiandae sit distinctio laboriosam. Quo possimus molestiae et molestiae accusantium est voluptas omnis sed obcaecati natus. Non vitae asperiores qui nostrum enim id saepe fugiat et incidunt quasi.\r\rEos ipsa facilis aut excepturi voluptatem a omnis magni vel magni iste. Sed ipsum consequatur qui reprehenderit deleniti et soluta molestiae. Ut vero assumenda id dolor ipsum in deleniti voluptatem aut quis quisquam sed repudiandae temporibus ab quia inventore. Sed velit fugit vel facere cumque et delectus ullam sed eaque impedit. Est veritatis dignissimos aut doloribus dolorem vel pariatur repellendus sit nesciunt similique eum architecto quia. Ea expedita veritatis eum dolorem molestiae ut enim fugit aut beatae quibusdam. Aut voluptas natus in quidem deleniti aut animi iure est incidunt tenetur qui culpa maiores! Et nostrum quaerat qui consequatur consequatur aut aliquam atque aut praesentium rerum et consequuntur exercitationem. Non accusantium ipsa vel consectetur vitae ut magnam autem et natus rerum ut consectetur inventore est doloremque temporibus 33 dolores doloribus! Aut perferendis optio et nostrum repellendus et fugit itaque ut nisi neque sed sint quaerat. Aut placeat architecto et eius sapiente eum molestiae quam. Quo mollitia sapiente non Quis neque non tempora laudantium. Quo distinctio quos et molestias natus sit veritatis consequuntur aut repellendus neque a porro galisum cum numquam nesciunt et animi earum? Aut dolorum dolore non assumenda omnis et molestiae amet id sint vero est eligendi harum sit temporibus magnam aut ipsam quos.\r\r"  # noqa: E501
 
 
 def test_windows_tab_parsing() -> None:
@@ -62,9 +58,9 @@ def test_windows_tab_plugin_deleted_contents(
 
     fs_win.map_dir("Users\\John", tmp_path)
 
-    for file in file_text_map.keys():
+    for file in file_text_map:
         tab_file = str(tab_dir.joinpath(file))[3:]
-        fs_win.map_file(tab_file, os.path.join(tabcache, file))
+        fs_win.map_file(tab_file, tabcache.joinpath(file))
 
     target_win.add_plugin(WindowsNotepadPlugin)
 
@@ -83,7 +79,11 @@ def test_windows_tab_plugin_deleted_contents(
 
 
 def test_windows_tab_plugin_default(
-    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target, caplog
+    target_win: Target,
+    fs_win: VirtualFilesystem,
+    tmp_path: Path,
+    target_win_users: Target,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     file_text_map = {
         "c515e86f-08b3-4d76-844a-cddfcd43fcbb.bin": (text1, None),
@@ -117,9 +117,9 @@ def test_windows_tab_plugin_default(
 
     fs_win.map_dir("Users\\John", tmp_path)
 
-    for file in file_text_map.keys():
+    for file in file_text_map:
         tab_file = str(tab_dir.joinpath(file))[3:]
-        fs_win.map_file(tab_file, os.path.join(tabcache, file))
+        fs_win.map_file(tab_file, tabcache.joinpath(file))
 
     target_win.add_plugin(WindowsNotepadPlugin)
 
@@ -171,9 +171,9 @@ def test_windows_saved_tab_plugin_extra_fields(
 
     fs_win.map_dir("Users\\John", tmp_path)
 
-    for file in file_text_map.keys():
+    for file in file_text_map:
         tab_file = str(tab_dir.joinpath(file))[3:]
-        fs_win.map_file(tab_file, os.path.join(tabcache, file))
+        fs_win.map_file(tab_file, tabcache.joinpath(file))
 
     target_win.add_plugin(WindowsNotepadPlugin)
 

@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 from io import BytesIO
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.tools.yara import HAS_YARA
 from dissect.target.tools.yara import main as target_yara
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
@@ -25,7 +30,7 @@ def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: p
                 "target-yara",
                 "example.img",
                 "--rules",
-                absolute_path("_data/plugins/filesystem/yara/rule.yar"),
+                str(absolute_path("_data/plugins/filesystem/yara/rule.yar")),
                 "--path",
                 "/",
                 "--check",

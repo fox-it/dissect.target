@@ -4,7 +4,7 @@ import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
-from typing import Callable, Iterator
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 
@@ -13,11 +13,12 @@ from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSyml
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
-from dissect.target.plugin import OSPlugin
+from dissect.target.plugin import _generate_long_paths
 from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
-from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
@@ -27,6 +28,11 @@ from dissect.target.plugins.os.windows import registry
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.plugin import OSPlugin
 
 # Test if the data/ directory is present and if not, as is the case in Python
 # source distributions of dissect.target, we give an error
@@ -39,6 +45,11 @@ if not pathlib.Path(data_dir).is_dir():
         "the dissect.target GitHub repository at:\n"
         "https://github.com/fox-it/dissect.target"
     )
+
+
+@pytest.fixture(autouse=True)
+def clear_caches() -> None:
+    _generate_long_paths.cache_clear()
 
 
 def make_mock_target(tmp_path: pathlib.Path) -> Iterator[Target]:
@@ -77,65 +88,65 @@ def make_mock_targets(request: pytest.FixtureRequest, tmp_path: pathlib.Path) ->
 
 
 @pytest.fixture
-def fs_win(tmp_path: pathlib.Path) -> Iterator[VirtualFilesystem]:
+def fs_win(tmp_path: pathlib.Path) -> VirtualFilesystem:
     fs = VirtualFilesystem(case_sensitive=False, alt_separator="\\")
     fs.map_dir("windows/system32", tmp_path)
     fs.map_dir("windows/system32/config/", tmp_path)
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_unix() -> Iterator[VirtualFilesystem]:
+def fs_unix() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc")
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_linux() -> Iterator[VirtualFilesystem]:
+def fs_linux() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc")
     fs.makedirs("opt")
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_debian() -> Iterator[VirtualFilesystem]:
+def fs_debian() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc/dpkg")
     fs.makedirs("opt")
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_redhat() -> Iterator[VirtualFilesystem]:
+def fs_redhat() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc/sysconfig/network-scripts")
     fs.makedirs("opt")
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_suse() -> Iterator[VirtualFilesystem]:
+def fs_suse() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc/zypp")
     fs.makedirs("opt")
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_linux_sys(fs_linux: VirtualFilesystem) -> Iterator[VirtualFilesystem]:
+def fs_linux_sys(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
     fs_linux.makedirs("sys")
-    yield fs_linux
+    return fs_linux
 
 
 @pytest.fixture
-def fs_linux_proc(fs_linux: VirtualFilesystem) -> Iterator[VirtualFilesystem]:
+def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
     fs = fs_linux
 
     procs = (
@@ -187,53 +198,61 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> Iterator[VirtualFilesystem]:
     fs.map_file_fh("/proc/uptime", BytesIO(b"134368.27 132695.52\n"))
     fs.map_file_fh("/proc/stat", BytesIO(b"btime 1680559854"))
 
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_linux_proc_sockets(fs_linux_proc: VirtualFilesystem) -> Iterator[VirtualFilesystem]:
+def fs_linux_proc_sockets(fs_linux_proc: VirtualFilesystem) -> VirtualFilesystem:
     fs = fs_linux_proc
 
     for filename in ("unix", "packet", "raw6", "raw", "udp6", "udp", "tcp6", "tcp"):
         fs.map_file(f"/proc/net/{filename}", absolute_path(f"_data/plugins/os/unix/linux/proc/net/{filename}"))
 
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_osx() -> Iterator[VirtualFilesystem]:
+def fs_macos() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("Applications")
     fs.makedirs("Library")
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_bsd() -> Iterator[VirtualFilesystem]:
+def fs_ios() -> VirtualFilesystem:
+    fs = VirtualFilesystem()
+    fs.makedirs("/private/var/preferences")
+    fs.makedirs("/private/var/mobile")
+    return fs
+
+
+@pytest.fixture
+def fs_bsd() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.map_file("/bin/freebsd-version", absolute_path("_data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def fs_android() -> Iterator[VirtualFilesystem]:
+def fs_android() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("/data")
     fs.makedirs("/system")
     fs.makedirs("/vendor")
     fs.makedirs("/product")
     fs.map_file("/build.prop", absolute_path("_data/plugins/os/unix/linux/android/build.prop"))
-    yield fs
+    return fs
 
 
 @pytest.fixture
-def hive_hklm() -> Iterator[VirtualHive]:
+def hive_hklm() -> VirtualHive:
     hive = VirtualHive()
 
     # set current control set to ControlSet001 and mock it
     change_controlset(hive, 1)
 
-    yield hive
+    return hive
 
 
 def change_controlset(hive: VirtualHive, num: int) -> None:
@@ -251,10 +270,8 @@ def change_controlset(hive: VirtualHive, num: int) -> None:
 
 
 @pytest.fixture
-def hive_hku() -> Iterator[VirtualHive]:
-    hive = VirtualHive()
-
-    yield hive
+def hive_hku() -> VirtualHive:
+    return VirtualHive()
 
 
 @pytest.fixture
@@ -264,12 +281,12 @@ def target_bare(tmp_path: pathlib.Path) -> Iterator[Target]:
 
 
 @pytest.fixture
-def target_default(tmp_path: pathlib.Path) -> Iterator[Target]:
-    yield make_os_target(tmp_path, DefaultPlugin)
+def target_default(tmp_path: pathlib.Path) -> Target:
+    return make_os_target(tmp_path, DefaultPlugin)
 
 
 @pytest.fixture
-def target_win(tmp_path: pathlib.Path, hive_hklm: VirtualHive, fs_win: Filesystem) -> Iterator[Target]:
+def target_win(tmp_path: pathlib.Path, hive_hklm: VirtualHive, fs_win: Filesystem) -> Target:
     mock_target = make_os_target(tmp_path, WindowsPlugin, root_fs=fs_win, apply_target=False)
 
     mock_target.add_plugin(registry.RegistryPlugin, check_compatible=False)
@@ -283,45 +300,50 @@ def target_win(tmp_path: pathlib.Path, hive_hklm: VirtualHive, fs_win: Filesyste
 
     mock_target.apply()
 
-    yield mock_target
+    return mock_target
 
 
 @pytest.fixture
-def target_unix(tmp_path: pathlib.Path, fs_unix: Filesystem) -> Iterator[Target]:
-    yield make_os_target(tmp_path, UnixPlugin, root_fs=fs_unix)
+def target_unix(tmp_path: pathlib.Path, fs_unix: Filesystem) -> Target:
+    return make_os_target(tmp_path, UnixPlugin, root_fs=fs_unix)
 
 
 @pytest.fixture
-def target_linux(tmp_path: pathlib.Path, fs_linux: Filesystem) -> Iterator[Target]:
-    yield make_os_target(tmp_path, LinuxPlugin, root_fs=fs_linux)
+def target_linux(tmp_path: pathlib.Path, fs_linux: Filesystem) -> Target:
+    return make_os_target(tmp_path, LinuxPlugin, root_fs=fs_linux)
 
 
 @pytest.fixture
-def target_debian(tmp_path: pathlib.Path, fs_debian: Filesystem) -> Iterator[Target]:
-    yield make_os_target(tmp_path, DebianPlugin, root_fs=fs_debian)
+def target_debian(tmp_path: pathlib.Path, fs_debian: Filesystem) -> Target:
+    return make_os_target(tmp_path, DebianPlugin, root_fs=fs_debian)
 
 
 @pytest.fixture
-def target_redhat(tmp_path: pathlib.Path, fs_redhat: Filesystem) -> Iterator[Target]:
-    yield make_os_target(tmp_path, RedHatPlugin, root_fs=fs_redhat)
+def target_redhat(tmp_path: pathlib.Path, fs_redhat: Filesystem) -> Target:
+    return make_os_target(tmp_path, RedHatPlugin, root_fs=fs_redhat)
 
 
 @pytest.fixture
-def target_suse(tmp_path: pathlib.Path, fs_suse: Filesystem) -> Iterator[Target]:
-    yield make_os_target(tmp_path, SuSEPlugin, root_fs=fs_suse)
+def target_suse(tmp_path: pathlib.Path, fs_suse: Filesystem) -> Target:
+    return make_os_target(tmp_path, SuSEPlugin, root_fs=fs_suse)
 
 
 @pytest.fixture
-def target_osx(tmp_path: pathlib.Path, fs_osx: Filesystem) -> Iterator[Target]:
-    mock_target = make_os_target(tmp_path, MacPlugin, root_fs=fs_osx)
+def target_macos(tmp_path: pathlib.Path, fs_macos: Filesystem) -> Target:
+    mock_target = make_os_target(tmp_path, MacOSPlugin, root_fs=fs_macos)
 
-    version = absolute_path("_data/plugins/os/unix/bsd/osx/_os/SystemVersion.plist")
-    fs_osx.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
+    version = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/SystemVersion.plist")
+    fs_macos.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
 
-    system = absolute_path("_data/plugins/os/unix/bsd/osx/_os/preferences.plist")
-    fs_osx.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
+    system = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/preferences.plist")
+    fs_macos.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
 
-    yield mock_target
+    return mock_target
+
+
+@pytest.fixture
+def target_ios(tmp_path: pathlib.Path, fs_ios: Filesystem) -> Target:
+    return make_os_target(tmp_path, IOSPlugin, root_fs=fs_ios)
 
 
 @pytest.fixture
@@ -341,16 +363,16 @@ def target_citrix(tmp_path: pathlib.Path, fs_bsd: VirtualFilesystem) -> Target:
     mock_target.filesystems.add(flash_filesystem)
 
     mock_target.apply()
-    yield mock_target
+    return mock_target
 
 
 @pytest.fixture
-def target_android(tmp_path: pathlib.Path, fs_android: Filesystem) -> Iterator[Target]:
-    yield make_os_target(tmp_path, AndroidPlugin, root_fs=fs_android)
+def target_android(tmp_path: pathlib.Path, fs_android: Filesystem) -> Target:
+    return make_os_target(tmp_path, AndroidPlugin, root_fs=fs_android)
 
 
 def add_win_user(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Target, sid: str, home: str) -> None:
-    """add a user to the provided windows target"""
+    """Add a user to the provided Windows target."""
 
     profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
     try:
@@ -375,17 +397,17 @@ def add_win_user(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Targ
 
 
 @pytest.fixture
-def target_win_users(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Target) -> Iterator[Target]:
-    """minimal windows target with a SYSTEM user and local user John"""
+def target_win_users(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Target) -> Target:
+    """Minimal Windows target with a SYSTEM user and local user John."""
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(
         hive_hklm, hive_hku, target_win, sid="S-1-5-21-3263113198-3007035898-945866154-1002", home="C:\\Users\\John"
     )
-    yield target_win
+    return target_win
 
 
 @pytest.fixture
-def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Iterator[Target]:
+def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Target:
     tz_info_path = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
     tz_info = VirtualKey(hive_hklm, tz_info_path)
     tz_info.add_value("TimeZoneKeyName", "Easter Island Standard Time")
@@ -417,11 +439,11 @@ def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Iterator[Ta
     hive_hklm.map_key(eu_tz_data_path, eu_tz_data)
     hive_hklm.map_key(east_tz_data_path, east_tz_data)
 
-    yield target_win
+    return target_win
 
 
 @pytest.fixture
-def target_win_tzinfo_legacy(hive_hklm: VirtualHive, target_win: Target) -> Iterator[Target]:
+def target_win_tzinfo_legacy(hive_hklm: VirtualHive, target_win: Target) -> Target:
     tz_info_path = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
     tz_info = VirtualKey(hive_hklm, tz_info_path)
     tz_info.add_value("StandardName", "Paaseiland")
@@ -437,57 +459,78 @@ def target_win_tzinfo_legacy(hive_hklm: VirtualHive, target_win: Target) -> Iter
     hive_hklm.map_key(tz_info_path, tz_info)
     hive_hklm.map_key(east_tz_data_path, east_tz_data)
 
-    yield target_win
+    return target_win
 
 
 @pytest.fixture
-def target_unix_users(target_unix: Target, fs_unix: Filesystem) -> Iterator[Target]:
+def target_unix_users(target_unix: Target, fs_unix: Filesystem) -> Target:
     passwd = """
     root:x:0:0:root:/root:/bin/bash
     user:x:1000:1000:user:/home/user:/bin/bash
     +@ngtest:x:::::
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
-    yield target_unix
+    return target_unix
 
 
 @pytest.fixture
-def target_linux_users(target_linux: Target, fs_linux: VirtualFilesystem) -> Iterator[Target]:
+def target_linux_users(target_linux: Target, fs_linux: VirtualFilesystem) -> Target:
     passwd = """
     root:x:0:0:root:/root:/bin/bash
     user:x:1000:1000:user:/home/user:/bin/bash
     """
     fs_linux.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
-    yield target_linux
+    return target_linux
 
 
 @pytest.fixture
-def target_osx_users(target_osx: Target, fs_osx: VirtualFilesystem) -> Iterator[Target]:
-    dissect = absolute_path("_data/plugins/os/unix/bsd/osx/_os/dissect.plist")
-    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
+def target_macos_users(target_macos: Target, fs_macos: VirtualFilesystem) -> Target:
+    dissect = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/dissect.plist")
+    fs_macos.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
 
-    test = absolute_path("_data/plugins/os/unix/bsd/osx/_os/test.plist")
-    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
+    test = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/test.plist")
+    fs_macos.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
 
-    fs_osx.makedirs("/Users/dissect")
+    fs_macos.makedirs("/Users/dissect")
 
-    yield target_osx
+    return target_macos
 
 
 @pytest.fixture
-def fs_docker() -> Iterator[TarFilesystem]:
+def fs_docker() -> TarFilesystem:
     docker_tar = pathlib.Path(absolute_path("_data/plugins/apps/container/docker/docker.tgz"))
     fh = docker_tar.open("rb")
-    docker_fs = TarFilesystem(fh)
-    yield docker_fs
+    return TarFilesystem(fh)
 
 
 @pytest.fixture
-def target_linux_docker(tmp_path: pathlib.Path, fs_docker: TarFilesystem) -> Iterator[Target]:
+def target_linux_docker(tmp_path: pathlib.Path, fs_docker: TarFilesystem) -> Target:
     mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = LinuxPlugin
 
     mock_target.filesystems.add(fs_docker)
     mock_target.fs.mount("/", fs_docker)
     mock_target.apply()
-    yield mock_target
+    return mock_target
+
+
+class TargetUnixFactory:
+    def __init__(self, tmp_path: pathlib.Path):
+        self.tmp_path = tmp_path
+
+    def new(self, hostname: str = "hostname") -> tuple[Target, VirtualFilesystem]:
+        """Initialize a virtual unix target."""
+        fs = VirtualFilesystem()
+
+        fs.makedirs("var")
+        fs.makedirs("etc")
+        fs.map_file_fh("/etc/hostname", BytesIO(hostname.encode()))
+
+        return make_os_target(self.tmp_path, UnixPlugin, root_fs=fs), fs
+
+
+@pytest.fixture
+def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
+    """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
+    to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
+    return TargetUnixFactory(tmp_path)

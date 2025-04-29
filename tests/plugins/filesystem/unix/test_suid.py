@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import stat
+from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
-from dissect.target.filesystem import VirtualFile
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.plugins.filesystem.unix.suid import SuidPlugin
 
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
-def test_suid_plugin(target_unix, fs_unix):
+
+def test_suid_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     vfile = VirtualFile(fs_unix, "binary", None)
     vfile.lstat = Mock()
     vfile.lstat.return_value = fsutil.stat_result([stat.S_IFREG | stat.S_ISUID, 0, 0, 0, 0, 0, 0, 0, 0, 0])

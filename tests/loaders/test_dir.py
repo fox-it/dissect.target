@@ -1,9 +1,18 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.loaders.dir import DirLoader, find_dirs
 from dissect.target.plugin import OperatingSystem
 from tests._utils import mkdirs
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def test_dir_loader_windows(target_bare, tmp_path):
+    from dissect.target.target import Target
+
+
+def test_dir_loader_windows(target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, ["windows/system32"])
 
@@ -19,7 +28,7 @@ def test_dir_loader_windows(target_bare, tmp_path):
     assert len(target_bare.filesystems) == 1
 
 
-def test_dir_loader_winnt(target_bare, tmp_path):
+def test_dir_loader_winnt(target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(tmp_path, ["winnt"])
 
@@ -35,7 +44,7 @@ def test_dir_loader_winnt(target_bare, tmp_path):
     assert len(target_bare.filesystems) == 1
 
 
-def test_dir_loader_linux(target_bare, tmp_path):
+def test_dir_loader_linux(target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, ["etc", "var"])
 
@@ -51,7 +60,7 @@ def test_dir_loader_linux(target_bare, tmp_path):
     assert len(target_bare.filesystems) == 1
 
 
-def test_dir_loader_macos(target_bare, tmp_path):
+def test_dir_loader_macos(target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, ["Library"])
 
@@ -67,7 +76,7 @@ def test_dir_loader_macos(target_bare, tmp_path):
     assert len(target_bare.filesystems) == 1
 
 
-def test_dir_loader_windows_drive_letters(target_bare, tmp_path):
+def test_dir_loader_windows_drive_letters(target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, ["C/windows/system32", "D/test", "E/test"])
 

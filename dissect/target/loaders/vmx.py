@@ -17,12 +17,12 @@ class VmxLoader(Loader):
     """Load VMware virtual machine configuration (VMX) files.
 
     References:
-        - https://docs.vmware.com/en/VMware-Workstation-Pro/17/com.vmware.ws.using.doc/GUID-A968EF50-BA25-450A-9D1F-F8A9DEE640E7.html  # noqa
+        - https://docs.vmware.com/en/VMware-Workstation-Pro/17/com.vmware.ws.using.doc/GUID-A968EF50-BA25-450A-9D1F-F8A9DEE640E7.html
     """
 
     def __init__(self, path: Path, **kwargs):
-        super().__init__(path.resolve())
-        self.vmx = vmx.VMX.parse(self.path.read_text())
+        super().__init__(path, **kwargs)
+        self.vmx = vmx.VMX.parse(path.read_text())
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -30,7 +30,7 @@ class VmxLoader(Loader):
 
     def map(self, target: Target) -> None:
         for disk in self.vmx.disks():
-            path = self.path.parent.joinpath(disk)
+            path = self.base_path.joinpath(disk)
 
             if not path.is_file():
                 base, sep, snapshot_id = path.stem.rpartition("-")

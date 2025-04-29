@@ -1,34 +1,39 @@
 from __future__ import annotations
 
 import logging
-import urllib
-from pathlib import Path
-from typing import TYPE_CHECKING, Generic, Iterator, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.loaderutil import extract_path_info
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    import urllib.parse
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 __all__ = [
-    "open",
     "Loader",
     "RawLoader",
+    "open",
     "register",
 ]
 
 log = logging.getLogger(__name__)
-
-LOADERS: list[Loader] = []
-LOADERS_BY_SCHEME: dict[str, Loader] = {}
-MODULE_PATH = "dissect.target.loaders"
 
 DirLoader: Loader = import_lazy("dissect.target.loaders.dir").DirLoader
 """A lazy loaded :class:`dissect.target.loaders.dir.DirLoader`."""
 
 RawLoader: Loader = import_lazy("dissect.target.loaders.raw").RawLoader
 """A lazy loaded :class:`dissect.target.loaders.raw.RawLoader`."""
+
+LOADERS: list[Loader] = []
+LOADERS_BY_SCHEME: dict[str, Loader] = {
+    "dir": DirLoader,
+    "raw": RawLoader,
+}
+MODULE_PATH = "dissect.target.loaders"
 
 
 class Loader:
@@ -56,13 +61,23 @@ class Loader:
 
     Args:
         path: The target path to load.
+        parsed_path: A URI parsed path to use.
     """
 
-    def __init__(self, path: Path, **kwargs):
+    def __init__(self, path: Path, parsed_path: urllib.parse.ParseResult | None = None, resolve: bool = True, **kwargs):
         self.path = path
+        self.absolute_path = None
+        if resolve:
+            try:
+                self.absolute_path = path.resolve()
+            except Exception:
+                log.debug("Failed to resolve loader path %r", path)
+                self.absolute_path = path
+            self.base_path = self.absolute_path.parent
+        self.parsed_path = parsed_path
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}('{self.path}')"
+        return f"{self.__class__.__name__}({str(self.path)!r})"
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -74,10 +89,10 @@ class Loader:
         Returns:
             ``True`` if the ``path`` can be loaded by a ``Loader`` instance. ``False`` otherwise.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @staticmethod
-    def find_all(path: Path, **kwargs) -> Iterator[Path]:
+    def find_all(path: Path, parsed_path: urllib.parse.ParseResult | None = None) -> Iterator[Path]:
         """Finds all targets to load from ``path``.
 
         This can be used to open multiple targets from a target path that doesn't necessarily map to files on a disk.
@@ -86,6 +101,7 @@ class Loader:
 
         Args:
             path: The location to a target to try and open multiple paths from.
+            parsed_path: A URI parsed path to use.
 
         Returns:
             All the target paths found from the source path.
@@ -98,7 +114,7 @@ class Loader:
         Args:
             target: The target that we're mapping into.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 T = TypeVar("T")
@@ -136,10 +152,7 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
         class_name: The class to load.
         internal: Whether it is an internal module or not.
     """
-    if internal:
-        module = ".".join([MODULE_PATH, module_name])
-    else:
-        module = module_name
+    module = f"{MODULE_PATH}.{module_name}" if internal else module_name
 
     loader = getattr(import_lazy(module), class_name)
     LOADERS.append(loader)
@@ -147,8 +160,8 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
 
 
 def find_loader(
-    item: Path, parsed_path: urllib.parse.ParseResult | None = None, fallbacks: list[Loader] = [DirLoader]
-) -> Loader | None:
+    item: Path, parsed_path: urllib.parse.ParseResult | None = None, fallbacks: list[type[Loader]] | None = None
+) -> type[Loader] | None:
     """Finds a :class:`Loader` class for the specific ``item``.
 
     This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
@@ -165,20 +178,24 @@ def find_loader(
     Returns:
         A :class:`Loader` class for the specific target if one exists.
     """
-    if parsed_path:
-        if loader := LOADERS_BY_SCHEME.get(parsed_path.scheme):
-            return loader
+    if fallbacks is None:
+        fallbacks = [DirLoader]
+
+    if parsed_path and (loader := LOADERS_BY_SCHEME.get(parsed_path.scheme)):
+        return loader
 
     for loader in LOADERS + fallbacks:
         try:
             if loader.detect(item):
                 return loader
-        except ImportError as exception:
+        except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", loader)
-            log.debug("", exc_info=exception)
+            log.debug("", exc_info=e)
+
+    return None
 
 
-def open(item: str | Path, *args, **kwargs) -> Loader:
+def open(item: str | Path, *args, **kwargs) -> Loader | None:
     """Opens a :class:`Loader` for a specific ``item``.
 
     This instantiates a :class:`Loader` for a specific ``item``.
@@ -197,10 +214,12 @@ def open(item: str | Path, *args, **kwargs) -> Loader:
         kwargs["parsed_path"] = parsed_path
         return loader(item, *args, **kwargs)
 
+    return None
+
 
 register("local", "LocalLoader")
 register("remote", "RemoteLoader")
-register("mqtt", "MQTTLoader")
+register("mqtt", "MqttLoader")
 register("asdf", "AsdfLoader")
 register("tar", "TarLoader")
 register("vmx", "VmxLoader")
@@ -213,12 +232,14 @@ register("ovf", "OvfLoader")
 register("ova", "OvaLoader")
 register("vbox", "VBoxLoader")
 register("vb", "VBLoader")
+register("vbk", "VbkLoader")
 register("xva", "XvaLoader")
 register("vma", "VmaLoader")
 register("kape", "KapeLoader")
 register("tanium", "TaniumLoader")
 register("itunes", "ITunesLoader")
 register("ab", "AndroidBackupLoader")
+register("cellebrite", "CellebriteLoader")
 register("target", "TargetLoader")
 register("log", "LogLoader")
 # Disabling ResLoader because of DIS-536

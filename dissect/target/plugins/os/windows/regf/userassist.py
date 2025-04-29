@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import codecs
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
@@ -12,6 +14,9 @@ from dissect.target.helpers.descriptor_extensions import (
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.shell_folder_ids import DESCRIPTIONS
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 userassist_def = """
 struct VERSION5_ENTRY {
@@ -108,10 +113,7 @@ class UserAssistPlugin(Plugin):
                             data = c_userassist.VERSION3_ENTRY(entry.value)
                             timestamp = data.timestamp
                             number_of_executions = data.number_of_executions
-                        elif version == 3 and len(entry.value) == 8:
-                            # Unknown format?
-                            pass
-                        elif version is None and len(entry.value) == 16:
+                        elif (version == 3 and len(entry.value) == 8) or (version is None and len(entry.value) == 16):
                             # Unknown format?
                             pass
                         else:

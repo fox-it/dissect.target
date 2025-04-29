@@ -1,10 +1,24 @@
-from datetime import datetime
-from typing import Iterator
+from __future__ import annotations
+
+import datetime
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import WindowsApplicationRecord
+from dissect.target.helpers.record import (
+    COMMON_APPLICATION_FIELDS,
+    TargetRecordDescriptor,
+)
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
+
+WindowsApplicationRecord = TargetRecordDescriptor(
+    "windows/application",
+    COMMON_APPLICATION_FIELDS,
+)
 
 
 class WindowsApplicationsPlugin(Plugin):
@@ -48,7 +62,9 @@ class WindowsApplicationsPlugin(Plugin):
                 values = {value.name: value.value for value in app.values()}
 
                 if install_date := values.get("InstallDate"):
-                    install_date = datetime.strptime(install_date, "%Y%m%d")
+                    install_date = datetime.datetime.strptime(install_date, "%Y%m%d").replace(
+                        tzinfo=datetime.timezone.utc
+                    )
 
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,

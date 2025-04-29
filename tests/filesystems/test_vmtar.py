@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from dissect.target.filesystems.vmtar import VmtarFilesystem

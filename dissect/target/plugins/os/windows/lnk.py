@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.shellitem.lnk import Lnk
 from dissect.util import ts
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 LnkRecord = TargetRecordDescriptor(
     "windows/filesystem/lnk",
@@ -75,18 +79,17 @@ def parse_lnk_file(target: Target, lnk_file: Lnk, lnk_path: TargetPath) -> LnkRe
         else:
             lnk_full_path = None
 
-        if lnk_file.flag("has_link_info"):
-            if lnk_file.linkinfo.flag("common_network_relative_link_and_pathsuffix"):
-                lnk_net_name = (
-                    lnk_file.linkinfo.common_network_relative_link.net_name.decode()
-                    if lnk_file.linkinfo.common_network_relative_link.net_name
-                    else None
-                )
-                lnk_device_name = (
-                    lnk_file.linkinfo.common_network_relative_link.device_name.decode()
-                    if lnk_file.linkinfo.common_network_relative_link.device_name
-                    else None
-                )
+        if lnk_file.flag("has_link_info") and lnk_file.linkinfo.flag("common_network_relative_link_and_pathsuffix"):
+            lnk_net_name = (
+                lnk_file.linkinfo.common_network_relative_link.net_name.decode()
+                if lnk_file.linkinfo.common_network_relative_link.net_name
+                else None
+            )
+            lnk_device_name = (
+                lnk_file.linkinfo.common_network_relative_link.device_name.decode()
+                if lnk_file.linkinfo.common_network_relative_link.device_name
+                else None
+            )
         try:
             machine_id = lnk_file.extradata.TRACKER_PROPS.machine_id.decode(codepage).strip("\x00")
         except AttributeError:
@@ -117,19 +120,20 @@ def parse_lnk_file(target: Target, lnk_file: Lnk, lnk_path: TargetPath) -> LnkRe
             target_ctime=target_ctime,
             _target=target,
         )
+    return None
 
 
 class LnkPlugin(Plugin):
     """Windows lnk plugin."""
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.folders = ["programdata", "users", "windows"]
 
     def check_compatible(self) -> None:
         for folder in self.folders:
             if self.target.fs.path(f"sysvol/{folder}").exists():
-                return None
+                return
         raise UnsupportedPluginError("No folders containing link files found")
 
     @arg("--path", "-p", type=str, dest="path", default=None, help="Path to directory or .lnk file in target")
@@ -165,7 +169,7 @@ class LnkPlugin(Plugin):
             try:
                 lnk_file = Lnk(entry.open())
                 yield parse_lnk_file(self.target, lnk_file, entry)
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 self.target.log.warning("Failed to parse link file %s", entry)
                 self.target.log.debug("", exc_info=e)
 

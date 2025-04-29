@@ -1,44 +1,32 @@
-from datetime import datetime, timezone, tzinfo
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from __future__ import annotations
 
-from dissect.target.plugin import Plugin, internal
-from dissect.target.target import Target
+from datetime import timezone, tzinfo
+from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfoNotFoundError
+
+from dissect.target.plugin import internal
+from dissect.target.plugins.os.default.datetime import DateTimePlugin
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
-class DateTimePlugin(Plugin):
+class UnixDateTimePlugin(DateTimePlugin):
     __namespace__ = "datetime"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.timezone = target.timezone
-        if not self.timezone:
-            self.target.log.warning("Could not determine timezone of target, falling back to UTC for datetime helpers.")
+
+        try:
+            self._tzinfo = self.tz(target.timezone)
+        except (TypeError, ZoneInfoNotFoundError):
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC for datetime helpers")
+            self._tzinfo = timezone.utc
 
     def check_compatible(self) -> None:
         pass
 
-    @internal
-    def tz(self, name: str) -> tzinfo:
-        return ZoneInfo(name)
-
     @internal(property=True)
     def tzinfo(self) -> tzinfo:
-        """Return a datetime.tzinfo of the current system timezone."""
-        try:
-            return self.tz(self.timezone)
-        except (TypeError, ZoneInfoNotFoundError):
-            return timezone.utc
-
-    @internal
-    def local(self, dt: datetime) -> datetime:
-        """Replace the tzinfo of a given datetime.datetime object with the current system tzinfo without conversion."""
-        return dt.replace(tzinfo=self.tzinfo)
-
-    @internal
-    def to_utc(self, dt: datetime) -> datetime:
-        """Convert any datetime.datetime object into a UTC datetime.datetime object.
-
-        First replaces the current tzinfo with the system tzinfo without conversion, then converts it to an aware
-        UTC datetime object.
-        """
-        return self.local(dt).astimezone(timezone.utc)
+        """Return a ``datetime.tzinfo`` of the current system timezone."""
+        return self._tzinfo

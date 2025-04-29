@@ -1,7 +1,14 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows.credential.lsa import LSAPlugin
-from dissect.target.target import Target
 from tests.plugins.os.windows.test__os import map_version_value
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 SYSTEM_KEY = "SYSTEM\\ControlSet001\\Control\\LSA"
 POLICY_KEY_PATH_NT5 = "SECURITY\\Policy\\PolSecretEncryptionKey"
@@ -31,26 +38,40 @@ def map_lsa_polkey(hive_hklm: VirtualHive, path: str, value: bytes) -> None:
     hive_hklm.map_key(path, policy_key)
 
 
-def map_lsa_secrets(hive_hklm: VirtualHive, secrets: dict[str, bytes]) -> None:
+def map_lsa_secrets(hive_hklm: VirtualHive, secrets: dict[str, bytes | tuple[bytes, bytes]]) -> None:
     """Add given encrypted LSA secrets to the ``hive_hklm`` :class"`VirtualHive`."""
 
     secrets_key = VirtualKey(hive_hklm, SECRETS_KEY)
 
     for name, value in secrets.items():
-        if not isinstance(value, bytes):
-            raise ValueError(f"Given value for {name} should be in bytes!")
+        if not isinstance(value, (bytes, tuple)):
+            raise TypeError(f"Given value for {name} should be in bytes!")
+
+        if isinstance(value, tuple):
+            curr_val, old_val = value
+        else:
+            curr_val = value
+            old_val = None
+
+        secret_key = VirtualKey(hive_hklm, name)
+        secret_key.timestamp = datetime(2025, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
 
         currval_key = VirtualKey(hive_hklm, "CurrVal")
-        currval_key.add_value("(Default)", value)
-        secret_key = VirtualKey(hive_hklm, name)
+        currval_key.add_value("(Default)", curr_val)
         secret_key.add_subkey("CurrVal", currval_key)
+
+        if old_val:
+            oldval_key = VirtualKey(hive_hklm, "OldVal")
+            oldval_key.add_value("(Default)", old_val)
+            secret_key.add_subkey("OldVal", oldval_key)
+
         secrets_key.add_subkey(name, secret_key)
 
     hive_hklm.map_key(SECRETS_KEY, secrets_key)
 
 
 def test_lsa_secrets_win_10(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """test decrypting LSA secrets of a Windows 10 system"""
+    """Test decrypting LSA secrets of a Windows 10 system."""
 
     map_lsa_system_keys(
         hive_hklm,
@@ -77,11 +98,21 @@ def test_lsa_secrets_win_10(target_win: Target, hive_hklm: VirtualHive) -> None:
     map_lsa_secrets(
         hive_hklm,
         {
-            "DPAPI_SYSTEM": bytes.fromhex(
-                "00000001001f9b85984f68a8ed3e9d44dbd5b79c0300000000000000835b4ff6"
-                "6e74154ffab75afd31a2860616c87411bc97d368a068fca62d1564ae1396f88e"
-                "06de87b5e5632c668538ee36c75f67cee98d49ebc1e88fa7e9be16144af31e8e"
-                "5fd78329279e50d792e8a6b35a59cb55016748ecd8e12f148b1d32b3"
+            "DPAPI_SYSTEM": (
+                # CurrVal
+                bytes.fromhex(
+                    "00000001001f9b85984f68a8ed3e9d44dbd5b79c0300000000000000835b4ff6"
+                    "6e74154ffab75afd31a2860616c87411bc97d368a068fca62d1564ae1396f88e"
+                    "06de87b5e5632c668538ee36c75f67cee98d49ebc1e88fa7e9be16144af31e8e"
+                    "5fd78329279e50d792e8a6b35a59cb55016748ecd8e12f148b1d32b3"
+                ),
+                # OldVal
+                bytes.fromhex(
+                    "00000001001f9b85984f68a8ed3e9d44dbd5b79c0300000000000000835b4ff6"
+                    "6e74154ffab75afd31a2860616c87411bc97d368a068fca62d1564ae1396f88e"
+                    "06de87b5e5632c668538ee36c75f67cee98d49ebc1e88fa7e9be16144af31e8e"
+                    "5fd78329279e50d792e8a6b35a59cb55016748ecd8e12f148b1d32b3"
+                ),
             ),
         },
     )
@@ -96,11 +127,32 @@ def test_lsa_secrets_win_10(target_win: Target, hive_hklm: VirtualHive) -> None:
             "2c000000000000000000000000000000010000003ac5746c27b424489300a781"
             "ba237676da7605083e7947c67271c16fc84cc567870148931cf29eb800000000"
         ),
+        "DPAPI_SYSTEM_OldVal": bytes.fromhex(
+            "2c000000000000000000000000000000010000003ac5746c27b424489300a781"
+            "ba237676da7605083e7947c67271c16fc84cc567870148931cf29eb800000000"
+        ),
     }
+
+    records = list(target_win.lsa.secrets())
+    assert len(records) == 2
+
+    assert records[0].ts == datetime(2025, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    assert records[0].name == "DPAPI_SYSTEM"
+    assert (
+        records[0].value
+        == "2c000000000000000000000000000000010000003ac5746c27b424489300a781ba237676da7605083e7947c67271c16fc84cc567870148931cf29eb800000000"  # noqa: E501
+    )
+
+    assert records[1].ts == datetime(2025, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    assert records[1].name == "DPAPI_SYSTEM_OldVal"
+    assert (
+        records[1].value
+        == "2c000000000000000000000000000000010000003ac5746c27b424489300a781ba237676da7605083e7947c67271c16fc84cc567870148931cf29eb800000000"  # noqa: E501
+    )
 
 
 def test_lsa_secrets_win_xp(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """test decrypting LSA secrets of a Windows XP system"""
+    """Test decrypting LSA secrets of a Windows XP system."""
 
     map_lsa_system_keys(
         hive_hklm,
@@ -143,3 +195,12 @@ def test_lsa_secrets_win_xp(target_win: Target, hive_hklm: VirtualHive) -> None:
             "333dac1af5cc9d33ccd97238f3a25ebfaec94ac600000000"
         )
     }
+
+    records = list(target_win.lsa.secrets())
+    assert len(records) == 1
+    assert records[0].ts == datetime(2025, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    assert records[0].name == "DPAPI_SYSTEM"
+    assert (
+        records[0].value
+        == "2c00000001000000010000000307e7679d5bc2d7a2212e216d527af1687f7183333dac1af5cc9d33ccd97238f3a25ebfaec94ac600000000"  # noqa: E501
+    )

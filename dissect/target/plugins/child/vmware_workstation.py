@@ -1,10 +1,16 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 INVENTORY_PATHS = [
     # Windows

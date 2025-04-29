@@ -1,4 +1,6 @@
-from typing import Iterator, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.esedb import EseDB
 from flow.record.fieldtypes import digest
@@ -7,6 +9,11 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import findall
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 try:
     from asn1crypto.cms import ContentInfo
@@ -45,9 +52,10 @@ def _get_package_name(sequence: Sequence) -> str:
         # Key value is stored at index 0, value at index 2
         if "PackageName" in inner_sequence[0].native:
             return inner_sequence[2].native.decode("utf-16-le").strip("\x00")
+    return None
 
 
-def find_package_name(hint_buf: bytes) -> Optional[str]:
+def find_package_name(hint_buf: bytes) -> str | None:
     """Find a sequence that contains the 'PackageName' key and return the value if present."""
     for hint_offset in findall(hint_buf, PACKAGE_NAME_NEEDLE):
         # 7, 6 or 5 bytes before the package_name needle, a sequence starts (starts with b"0\x82" or b"0\x81").
@@ -57,6 +65,7 @@ def find_package_name(hint_buf: bytes) -> Optional[str]:
 
             hint_sequence = Sequence.load(hint_buf[sequence_offset:])
             return _get_package_name(hint_sequence)
+    return None
 
 
 class CatrootPlugin(Plugin):
@@ -67,7 +76,7 @@ class CatrootPlugin(Plugin):
 
     __namespace__ = "catroot"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.catroot_dir = self.target.fs.path("sysvol/windows/system32/catroot")
         self.catroot2_dir = self.target.fs.path("sysvol/windows/system32/catroot2")
@@ -186,8 +195,9 @@ class CatrootPlugin(Plugin):
                         _target=self.target,
                     )
 
-            except Exception as error:
-                self.target.log.error("An error occurred while parsing the catroot file %s: %s", file, error)
+            except Exception as e:
+                self.target.log.error("An error occurred while parsing the catroot file %s: %s", file, e)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
 
     @export(record=CatrootRecord)
     def catdb(self) -> Iterator[CatrootRecord]:

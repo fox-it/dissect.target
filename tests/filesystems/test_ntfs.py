@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 import math
 from unittest.mock import Mock, patch
@@ -15,7 +17,7 @@ from dissect.target.filesystems.ntfs import NtfsFilesystem, NtfsFilesystemEntry
 
 
 @pytest.mark.parametrize(
-    "path, expected_path, expected_ads",
+    ("path", "expected_path", "expected_ads"),
     [
         ("test:data", "test", "data"),
         ("test:$hello", "test", "$hello"),
@@ -33,7 +35,7 @@ def test_ads_ntfs_filesystem(path: str, expected_path: str, expected_ads: str) -
 
 
 @pytest.mark.parametrize(
-    "ads, name, output",
+    ("ads", "name", "output"),
     [
         ("ads", "", "ads"),
         ("ads", "test", "test"),
@@ -67,7 +69,7 @@ def test_ntfs_unknown_file() -> None:
 
 
 @pytest.mark.parametrize(
-    "cluster_size, size, resident, expected_blks",
+    ("cluster_size", "size", "resident", "expected_blks"),
     [
         (0x1000, 0x343, False, 8),
         (0x1000, 0x1001, False, 16),

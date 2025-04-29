@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import datetime
 import struct
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
 
 NetworkHistoryRecord = TargetRecordDescriptor(
     "windows/registry/nethist",
@@ -42,15 +49,17 @@ class NethistPlugin(Plugin):
 
         References:
             - https://web.archive.org/web/20221127181357/https://www.weaklink.org/2016/11/windows-network-profile-registry-keys/
-        """  # noqa: E501
+        """
+        target_tz = self.target.datetime.tzinfo
+
         for key in self.target.registry.keys(self.KEY):
             for kind in key.subkeys():
                 for sig in kind.subkeys():
                     guid = sig.value("ProfileGuid").value
                     profile = self.find_profile(guid)
 
-                    created = parse_ts(profile.value("DateCreated").value)
-                    last_connected = parse_ts(profile.value("DateLastConnected").value)
+                    created = parse_ts(profile.value("DateCreated").value, tzinfo=target_tz)
+                    last_connected = parse_ts(profile.value("DateLastConnected").value, tzinfo=target_tz)
 
                     yield NetworkHistoryRecord(
                         created=created,
@@ -65,16 +74,17 @@ class NethistPlugin(Plugin):
                         _target=self.target,
                     )
 
-    def find_profile(self, guid):
+    def find_profile(self, guid: str) -> RegistryKey | None:
         for key in self.target.registry.keys(self.PROFILE_KEY):
             try:
                 return key.subkey(guid)  # Just return the first one...
-            except RegistryError:
+            except RegistryError:  # noqa: PERF203
                 pass
+        return None
 
 
-def parse_ts(val):
+def parse_ts(val: bytes, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> datetime.datetime:
     items = list(struct.unpack("<8H", val))
     # If we remove the weekday (at position 2), this is a valid datetime tuple
     items.pop(2)
-    return datetime.datetime(*items)
+    return datetime.datetime(*items, tzinfo=tzinfo)

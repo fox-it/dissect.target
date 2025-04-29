@@ -1,10 +1,11 @@
-from typing import Optional
+from __future__ import annotations
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
+from dissect.target.plugins.os.default.locale import LocalePlugin
 
 
-class LocalePlugin(Plugin):
+class FortiOSLocalePlugin(LocalePlugin):
     """FortiOS locale plugin."""
 
     def check_compatible(self) -> None:
@@ -12,7 +13,7 @@ class LocalePlugin(Plugin):
             raise UnsupportedPluginError("FortiOS specific plugin loaded on non-FortiOS target")
 
     @export(property=True)
-    def timezone(self) -> Optional[str]:
+    def timezone(self) -> str | None:
         """Return configured UI/system timezone."""
         try:
             timezone_num = self.target._os._config["global-config"]["system"]["global"]["timezone"][0]
@@ -21,7 +22,7 @@ class LocalePlugin(Plugin):
             pass
 
     @export(property=True)
-    def language(self) -> Optional[str]:
+    def language(self) -> str | None:
         """Return configured UI language."""
         LANG_MAP = {
             "english": "en_US",

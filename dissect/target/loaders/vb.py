@@ -1,19 +1,28 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.loader import Loader
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
+
 
 class VBLoader(Loader):
     @staticmethod
-    def detect(path):
+    def detect(path: Path) -> bool:
         mft_exists = path.joinpath("MFT_C.bin").exists()
         c_drive_exists = path.joinpath("C_drive").exists()
         config_exists = path.joinpath("Windows/System32/config").exists()
 
         return (mft_exists or c_drive_exists) and config_exists
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         remap_overlay = target.fs.append_layer()
         ntfs_overlay = target.fs.append_layer()
         dfs = DirectoryFilesystem(self.path, case_sensitive=False)

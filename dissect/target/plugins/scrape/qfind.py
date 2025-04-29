@@ -5,15 +5,17 @@ import re
 import string
 import sys
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from dissect.cstruct import utils
 
-from dissect.target.container import Container
 from dissect.target.helpers.scrape import recover_string
 from dissect.target.plugin import Plugin, arg, export
-from dissect.target.target import Target
-from dissect.target.volume import Volume
+
+if TYPE_CHECKING:
+    from dissect.target.container import Container
+    from dissect.target.target import Target
+    from dissect.target.volume import Volume
 
 
 class QFindPlugin(Plugin):
@@ -112,7 +114,7 @@ class QFindPlugin(Plugin):
             for codec in encodings:
                 try:
                     encoded_needle = needle.encode(codec)
-                except UnicodeEncodeError:
+                except UnicodeEncodeError:  # noqa: PERF203
                     self.target.log.warning("Cannot encode needle with %s: %s", codec, needle)
                 else:
                     needle_lookup[encoded_needle] = (needle, codec)

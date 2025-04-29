@@ -3,12 +3,16 @@ from __future__ import annotations
 import os
 import stat
 from datetime import datetime, timezone
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers import fsutil
-from dissect.target.helpers.fsutil import TargetPath
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from dissect.target.helpers.fsutil import TargetPath
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
 STAT_TEMPLATE = """  File: {path} {symlink}
@@ -32,8 +36,7 @@ def prepare_ls_colors() -> dict[str, str]:
             continue
 
         ft, _, value = line.partition("=")
-        if ft.startswith("*"):
-            ft = ft[1:]
+        ft = ft.removeprefix("*")
 
         d[ft] = f"\x1b[{value}m{{}}\x1b[0m"
 
@@ -58,7 +61,7 @@ def fmt_ls_colors(ft: str, name: str) -> str:
     return name
 
 
-def human_size(bytes: int, units: list[str] = ["", "K", "M", "G", "T", "P", "E"]) -> str:
+def human_size(bytes: int, units: Sequence[str] = ("", "K", "M", "G", "T", "P", "E")) -> str:
     """Helper function to return the human readable string representation of bytes."""
     return str(bytes) + units[0] if bytes < 1024 else human_size(bytes >> 10, units[1:])
 
@@ -79,6 +82,9 @@ def print_extensive_file_stat_listing(
     if entry is not None:
         try:
             entry_stat = entry.lstat()
+        except FileNotFoundError:
+            pass
+        else:
             if timestamp is None:
                 timestamp = entry_stat.st_mtime
             symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
@@ -93,8 +99,6 @@ def print_extensive_file_stat_listing(
                 file=stdout,
             )
             return
-        except FileNotFoundError:
-            pass
 
     hr_spaces = f"{'':5s}" if human_readable else " "
     regular_spaces = f"{'':10s}" if not human_readable else " "
@@ -123,13 +127,12 @@ def ls_scandir(path: fsutil.TargetPath, color: bool = False) -> list[tuple[fsuti
         # If we happen to scan an NTFS filesystem see if any of the
         # entries has an alternative data stream and also list them.
         entry = file_.get()
-        if isinstance(entry, LayerFilesystemEntry):
-            if entry.entries.fs.__type__ == "ntfs":
-                attrs = entry.lattr()
-                for data_stream in attrs.DATA:
-                    if data_stream.name != "":
-                        name = f"{file_.name}:{data_stream.name}"
-                        result.append((file_, fmt_ls_colors(file_type, name) if color else name))
+        if isinstance(entry, LayerFilesystemEntry) and entry.entries.fs.__type__ == "ntfs":
+            attrs = entry.lattr()
+            for data_stream in attrs.DATA:
+                if data_stream.name != "":
+                    name = f"{file_.name}:{data_stream.name}"
+                    result.append((file_, fmt_ls_colors(file_type, name) if color else name))
 
     result.sort(key=lambda e: e[0].name)
 
@@ -147,7 +150,7 @@ def print_ls(
     use_atime: bool = False,
     color: bool = True,
 ) -> None:
-    """Print ls output"""
+    """Print ls output."""
     subdirs = []
 
     if path.is_dir():
@@ -156,7 +159,7 @@ def print_ls(
         contents = [(path, path.name)]
 
     if depth > 0:
-        print(f"\n{str(path)}:", file=stdout)
+        print(f"\n{path!s}:", file=stdout)
 
     if not long_listing:
         for target_path, name in contents:
@@ -195,10 +198,11 @@ def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = Fals
     def filetype(path: TargetPath) -> str:
         if path.is_dir():
             return "directory"
-        elif path.is_symlink():
+        if path.is_symlink():
             return "symbolic link"
-        elif path.is_file():
+        if path.is_file():
             return "regular file"
+        return "unknown"
 
     res = STAT_TEMPLATE.format(
         path=path,

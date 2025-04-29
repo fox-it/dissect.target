@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target import filesystem, volume
 from dissect.target.containers.vhdx import VhdxContainer
-from dissect.target.filesystem import Filesystem
 from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs
 from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 # KAPE doesn't have the correct filenames for several files, like $J or $Secure_$SDS
@@ -60,9 +62,10 @@ class KapeLoader(DirLoader):
             return is_valid_kape_dir(path)
         if path.suffix.lower() == ".vhdx":
             return is_valid_kape_vhdx(path)
+        return False
 
     def map(self, target: Target) -> None:
-        path = self.path if self.path.is_dir() else next(open_vhdx(self.path)).path()
+        path = self.absolute_path if self.absolute_path.is_dir() else next(open_vhdx(self.absolute_path)).path()
 
         find_and_map_dirs(
             target,

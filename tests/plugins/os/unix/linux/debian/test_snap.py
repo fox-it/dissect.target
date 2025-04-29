@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.linux.debian.snap import SnapPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_snap_packages(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if snap packages are discovered on unix systems"""
+    """Test if snap packages are discovered on unix systems."""
 
     fs_unix.map_file_fh("/etc/hostname", BytesIO(b"hostname"))
     fs_unix.map_file(

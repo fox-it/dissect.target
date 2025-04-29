@@ -3,11 +3,15 @@ from __future__ import annotations
 import io
 import os
 import random
+from typing import TYPE_CHECKING, BinaryIO
 from unittest.mock import Mock
 
 import pytest
 
 from dissect.target.helpers import scrape
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 def test_one_needle() -> None:
@@ -60,7 +64,7 @@ def test_one_needle() -> None:
 
     stream.seek(0)
 
-    def chunk_reader(fp, _needle, offset, _chunk_size):
+    def chunk_reader(fh: BinaryIO, _needle: bytes, offset: int, _chunk_size: int) -> bytes:
         assert needle == _needle
         assert offset in needle_offsets
         assert _chunk_size == chunk_size
@@ -84,7 +88,7 @@ def test_one_needle() -> None:
 
     stream.seek(0)
 
-    def chunk_parser(_needle, chunk):
+    def chunk_parser(_needle: bytes, chunk: bytes) -> Iterator[int]:
         assert _needle == needle
         # check that chunk returned by the default chunk reader is needle + chunk
         assert len(chunk) == chunk_size
@@ -242,7 +246,7 @@ def test_find_needle() -> None:
     mock_progress.assert_called_once_with(0)
 
     buf = io.BytesIO(b"A" * 100 + b"needle" + b"B" * 100 + b"needle" + b"C" * 100 + b"needle" + b"D" * 100)
-    for i, (needle, offset) in enumerate(scrape.find_needles(buf, [b"needle"], lock_seek=False, block_size=100)):
+    for i, (_needle, offset) in enumerate(scrape.find_needles(buf, [b"needle"], lock_seek=False, block_size=100)):
         if i == 0:
             assert offset == 100
             buf.seek(300)

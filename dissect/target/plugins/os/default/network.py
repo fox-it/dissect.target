@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-from typing import Any, Iterator, Union, get_args
+from operator import attrgetter
+from typing import TYPE_CHECKING, Any, Callable, Union, get_args
 
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
-from flow.record.fieldtypes.net.ipv4 import Address, addr_long, addr_str, mask_to_bits
 
 from dissect.target.helpers.record import (
-    MacInterfaceRecord,
+    MacOSInterfaceRecord,
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
 from dissect.target.plugin import Plugin, export, internal
-from dissect.target.target import Target
 
-InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfaceRecord]
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
+InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]
 
 
 class NetworkPlugin(Plugin):
@@ -31,15 +34,15 @@ class NetworkPlugin(Plugin):
     def _interfaces(self) -> Iterator[InterfaceRecord]:
         yield from ()
 
-    def _get_record_type(self, field_name: str) -> Iterator[Any]:
+    def _get_record_type(self, field_name: str, func: Callable[[Any], Any] | None = None) -> Iterator[Any]:
         for record in self.interfaces():
             if (output := getattr(record, field_name, None)) is None:
                 continue
 
-            if isinstance(output, list):
-                yield from output
-            else:
-                yield output
+            if not isinstance(output, list):
+                output = [output]
+
+            yield from (map(func, output) if func else output)
 
     @export(record=get_args(InterfaceRecord))
     def interfaces(self) -> Iterator[InterfaceRecord]:
@@ -53,7 +56,7 @@ class NetworkPlugin(Plugin):
     @export
     def ips(self) -> list[IPAddress]:
         """Return IP addresses as list of :class:`IPAddress`."""
-        return list(set(self._get_record_type("ip")))
+        return list(set(self._get_record_type("cidr", attrgetter("ip"))))
 
     @export
     def gateways(self) -> list[IPAddress]:
@@ -72,26 +75,22 @@ class NetworkPlugin(Plugin):
 
     @internal
     def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:
+        """Yield all interfaces with the given IP address."""
         for interface in self.interfaces():
-            if ip_addr in interface.ip:
+            if any(iface.ip == ip_addr for iface in interface.cidr):
                 yield interface
 
     @internal
     def with_mac(self, mac: str) -> Iterator[InterfaceRecord]:
+        """Yield all interfaces with the given full or partial MAC address."""
         for interface in self.interfaces():
             if mac in interface.mac:
                 yield interface
 
     @internal
     def in_cidr(self, cidr: str) -> Iterator[InterfaceRecord]:
+        """Yield all interfaces with IP addresses in the given CIDR range."""
         cidr = IPNetwork(cidr)
         for interface in self.interfaces():
-            if any(ip_addr in cidr for ip_addr in interface.ip):
+            if any(iface.ip in cidr for iface in interface.cidr):
                 yield interface
-
-    def calculate_network(self, ips: int | Address, subnets: int | Address) -> Iterator[str]:
-        for ip, subnet_mask in zip(ips, subnets):
-            subnet_mask_int = addr_long(subnet_mask)
-            cidr = mask_to_bits(subnet_mask_int)
-            network_address = addr_str(addr_long(ip) & subnet_mask_int)
-            yield f"{network_address}/{cidr}"
