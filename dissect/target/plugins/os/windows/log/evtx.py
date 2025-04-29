@@ -39,7 +39,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
         super().__init__(target)
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
 
-    @plugin.arg("--logs-dir", type=str, required=False, help="logs directory to scan")
+    @plugin.arg("--logs-dir", type=str, help="logs directory to scan")
     @plugin.arg("--log-file-glob", type=str, default=EVTX_GLOB, help="glob pattern to match a log file name")
     @plugin.export(record=DynamicDescriptor(["datetime"]))
     def evtx(self, log_file_glob: str = EVTX_GLOB, logs_dir: str | None = None) -> Iterator[DynamicDescriptor]:

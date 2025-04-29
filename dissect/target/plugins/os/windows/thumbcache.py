@@ -99,15 +99,13 @@ class ThumbcachePlugin(Plugin):
                 self.target.log.error("Error parsing thumbcache: %s", e)  # noqa: TRY400
                 self.target.log.debug(e, exc_info=e)
 
-    @arg(
-        "--output", "-o", dest="output_dir", type=Path, required=False, help="path to extract thumbcache thumbnails to"
-    )
+    @arg("--output", "-o", dest="output_dir", type=Path, help="path to extract thumbcache thumbnails to")
     @export(record=[ThumbcacheRecord, IndexRecord])
     def thumbcache(self, output_dir: Path | None = None) -> Iterator[ThumbcacheRecord | IndexRecord]:
         """Yield thumbcache thumbnails."""
         yield from self._parse_thumbcache(ThumbcacheRecord, "thumbcache", output_dir)
 
-    @arg("--output", "-o", dest="output_dir", type=Path, required=False, help="path to extract iconcache thumbnails to")
+    @arg("--output", "-o", dest="output_dir", type=Path, help="path to extract iconcache thumbnails to")
     @export(record=[IconcacheRecord, IndexRecord])
     def iconcache(self, output_dir: Path | None = None) -> Iterator[IconcacheRecord | IndexRecord]:
         """Yield iconcache thumbnails."""

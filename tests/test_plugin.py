@@ -1263,7 +1263,7 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
     for arg in descriptor.args:
         names, settings = arg
-        is_action = settings.get("action", "") in (
+        is_bool_action = settings.get("action", "") in (
             "store_true",
             "store_false",
         )

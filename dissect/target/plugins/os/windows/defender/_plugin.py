@@ -477,6 +477,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         "-o",
         dest="output_dir",
         type=Path,
+        required=True,
         help="Path to recover quarantined file to.",
     )
     @plugin.export(output="none")

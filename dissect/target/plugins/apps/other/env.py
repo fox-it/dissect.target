@@ -29,8 +29,8 @@ class EnvironmentFilePlugin(Plugin):
         pass
 
     @export(record=EnvironmentFileRecord)
-    @arg("--env-path", type=str, help="path to scan environment files in")
-    @arg("--extension", type=str, help="extension of files to scan", default="env")
+    @arg("--env-path", type=str, required=True, help="path to scan environment files in")
+    @arg("--extension", type=str, default="env", help="extension of files to scan")
     def envfile(self, env_path: str, extension: str = "env") -> Iterator[EnvironmentFileRecord]:
         """Yield environment variables found in ``.env`` files at the provided path."""
 
