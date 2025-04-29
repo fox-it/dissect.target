@@ -61,23 +61,21 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
         docstring = desc.func.__doc__.split("\n\n", 1)[0].strip() if desc.func.__doc__ else None
         arguments = []
 
-        for name, arg in desc.args:
-            is_bool_action = arg.get("action", "").startswith(
-                (
-                    "store_true",
-                    "store_false",
-                )
-            )
+        for name, _arg in desc.args:
+            is_bool_action = arg.get("action", "") in ("store_true", "store_false")
             arg_desc = {
                 "name": name[0],
-                "type": "bool" if is_bool_action else getattr(arg.get("type"), "__name__", None),
-                "help": arg.get("help"),
-                "default": arg.get("default") or arg.get("const"),
-                "required": arg.get("required", False),
+                # infer the type either by store_*, type argument and fallback to default str.
+                # See: https://docs.python.org/3/library/argparse.html#type
+                "type": "bool" if is_bool_action else getattr(_arg.get("type"), "__name__", "str"),
+                "help": _arg.get("help"),
+                "default": _arg.get("default") or _arg.get("const"),
+                # required can either be set explicitly or is implied with '--' style arguments.
+                "required": name[0].startswith("--") or _arg.get("required", False),
             }
 
             if is_bool_action:
-                arg_desc["default"] = True if arg.get("action") == "store_false" else False
+                arg_desc["default"] = _arg.get("action") == "store_false"
 
             arguments.append(arg_desc)
 

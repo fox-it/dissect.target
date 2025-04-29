@@ -1258,27 +1258,40 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
 
-    # Arguments of the plugin should define their type and if they are required.
+    # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
     for arg in descriptor.args:
         names, settings = arg
-        is_action = settings.get("action") in ["store_true", "store_false"]
+        is_action = settings.get("action", "") in (
+            "store_true",
+            "store_false",
+        )
 
         assert names, f"No argument names for argument of function {descriptor.qualname}"
 
         assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.qualname}"
 
-        assert (
-            settings.get("type") or is_action
-        ), f"No type defined for argument {names[0]} in function {descriptor.qualname}"
+        assert settings.get("type") or is_action, (
+            f"No type defined for argument {names[0]} in function {descriptor.qualname}"
+        )
 
         assert (
-            isinstance(settings.get("required"), bool) or "default" in settings or is_action
+            isinstance(settings.get("required"), bool)
+            or "default" in settings
+            or is_action
+            or names[0].startswith("--")
         ), f"No required or default attribute for argument {names[0]} in function {descriptor.qualname}"
 
+        # Inverse checks
+
         if is_action:
-            assert (
-                "type" not in settings
-            ), f"Type cannot be set for store_true or store_false in {names[0]} in function {descriptor.qualname}"
+            assert "type" not in settings, (
+                f"Type should not be set for store_true or store_false in {names[0]} in function {descriptor.qualname}: type is implied as boolean already."
+            )
+
+        if names[0].startswith("--"):
+            assert not settings.get("required"), (
+                f"Required is redundant when first name starts with '--' in argument {names[0]} for function {descriptor.qualname}"
+            )
 
 
 def assert_valid_rst(src: str) -> None:
