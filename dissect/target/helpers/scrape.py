@@ -25,7 +25,7 @@ def find_needles(
     block_size: int = io.DEFAULT_BUFFER_SIZE,
     progress: Callable[[int], None] | None = None,
 ) -> Iterator[tuple[Needle, int, re.Match | None]]:
-    """Yields needles and their offsets found in provided byte stream.
+    """Yields needles, their offsets and optional regex match found in provided byte stream.
 
     Args:
         fh: The byte stream to search for needles.
@@ -113,7 +113,7 @@ def find_needle_chunks(
     lock_seek: bool = True,
     block_size: int = io.DEFAULT_BUFFER_SIZE,
 ) -> Iterator[tuple[bytes, int, bytes, re.Match | None]]:
-    """Yields tuples with an offset, a needle and a byte chunk found in provided byte stream.
+    """Yields tuples with an offset, a needle, a byte chunk and optional regex match found in provided byte stream.
 
     Args:
         fh: The byte stream to search for needles.

@@ -4,29 +4,22 @@ import codecs
 import hashlib
 import re
 import string
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from dissect.cstruct import utils
-
-from dissect.target.container import Container
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dissect.target.container import Container
-    from dissect.target.target import Target
-    from dissect.target.volume import Volume
 
 re_NOFLAG = 0  # re.NOFLAG is Python 3.11 and newer only
-COLOR_GREY = "\033[38;5;248m"
 
 QFindMatchRecord = TargetRecordDescriptor(
     "qfind/match",
     [
+        ("string", "disk"),
         ("varint", "offset"),
         ("string", "needle"),
         ("string", "codec"),
@@ -64,7 +57,7 @@ class QFindPlugin(Plugin):
         window: int = 256,
         strip_null_bytes: bool = False,
         *,
-        progress: bool = False,
+        progress: Callable | None = None,
     ) -> Iterator[QFindMatchRecord]:
         """Find a needle in a haystack.
 
@@ -152,8 +145,8 @@ class QFindPlugin(Plugin):
             needle_lookup = tmp
 
         seen = set()
-        for _, stream, needle, offset, match in self.target.scrape.find(
-            list(needle_lookup.keys()), progress=progress_handler(self.target) if progress else None
+        for disk, stream, needle, offset, match in self.target.scrape.find(
+            list(needle_lookup.keys()), progress=progress
         ):
             original_needle, codec = needle_lookup[needle]
             needle_len = len(needle.pattern if isinstance(needle, re.Pattern) else needle)
@@ -162,10 +155,7 @@ class QFindPlugin(Plugin):
             buf = stream.read((offset - before_offset) + max(window, needle_len))
 
             if unique:
-                if window > 20:
-                    digest = hashlib.sha1(buf).digest()
-                else:
-                    digest = buf
+                digest = hashlib.sha1(buf).digest() if window > 20 else buf
 
                 if digest in seen:
                     continue
@@ -174,6 +164,7 @@ class QFindPlugin(Plugin):
             match = match.group() if match else original_needle
 
             yield QFindMatchRecord(
+                disk=disk,
                 offset=offset,
                 needle=original_needle,
                 codec=codec,
@@ -181,28 +172,3 @@ class QFindPlugin(Plugin):
                 content=buf.strip(b"\x00") if strip_null_bytes else buf,
                 _target=self.target if self.target._os else None,
             )
-
-
-def progress_handler(target: Target) -> Callable[[Container | Volume, int, int], None]:
-    """Progress handler of the qfind plugin."""
-    current_disk = None
-    animation = ["-", "\\", "|", "/"]
-    char = 0
-
-    def update(disk: Container | Volume, offset: int, size: int) -> None:
-        nonlocal current_disk, char
-
-        if current_disk is None:
-            sys.stderr.write(f"{utils.COLOR_WHITE}{target}{utils.COLOR_NORMAL}\n")
-
-        if current_disk != disk:
-            sys.stderr.write(f"\n{utils.COLOR_WHITE}[Current disk: {disk}]{utils.COLOR_NORMAL}\n")
-            current_disk = disk
-
-        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_NORMAL}")
-        sys.stderr.flush()
-
-        if offset % 1337 * 42 == 0:
-            char = 0 if char == 3 else char + 1
-
-    return update

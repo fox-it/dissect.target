@@ -50,10 +50,12 @@ def test_qfind_hex(mock_target: Target) -> None:
 
     assert len(results) == 2
 
+    assert results[0].disk == "<RawContainer size=131072 vs=None>"
     assert results[0].offset == 0x10000
     assert results[0].needle == "ABCD"
     assert results[0].codec == "utf-8"
 
+    assert results[1].disk == "<RawContainer size=131072 vs=None>"
     assert results[1].offset == 0x12000
     assert results[1].needle == "ABCD"
     assert results[1].codec == "hex"
@@ -69,9 +71,11 @@ def test_qfind_needle_file(mock_target: Target, tmp_path: Path) -> None:
 
     assert len(results) == 2
 
+    assert results[0].disk == "<RawContainer size=131072 vs=None>"
     assert results[0].offset == 0x10000
     assert results[0].needle == "ABCD"
 
+    assert results[1].disk == "<RawContainer size=131072 vs=None>"
     assert results[1].offset == 0x12000
     assert results[1].needle == "ABCD"
 
@@ -82,6 +86,7 @@ def test_qfind_codecs(mock_target: Target) -> None:
     results: list[QFindMatchRecord] = list(mock_target.qfind(["ABCD"], encoding="utf-16-le"))
     assert len(results) == 3
 
+    assert results[0].disk == "<RawContainer size=131072 vs=None>"
     assert results[0].offset == 0x10000
     assert results[0].needle == "ABCD"
     assert results[0].codec == "utf-8"
@@ -100,6 +105,7 @@ def test_qfind_codecs(mock_target: Target) -> None:
     results: list[QFindMatchRecord] = list(mock_target.qfind(["ABCD"], no_hex_decode=True))
     assert len(results) == 1
 
+    assert results[0].disk == "<RawContainer size=131072 vs=None>"
     assert results[0].offset == 0x10000
     assert results[0].needle == "ABCD"
     assert results[0].codec == "utf-8"
@@ -113,6 +119,7 @@ def test_qfind_ignore_case(mock_target: Target) -> None:
 
     assert len(results) == 2
 
+    assert results[0].disk == "<RawContainer size=131072 vs=None>"
     assert results[0].offset == 0x10000
     assert results[0].codec == "utf-8"
     assert results[0].needle == "abcd"

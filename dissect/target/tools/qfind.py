@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import sys
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import utils
 
@@ -18,8 +20,16 @@ from dissect.target.tools.utils import (
     process_generic_arguments,
 )
 
+if TYPE_CHECKING:
+    from typing import Callable
+
+    from dissect.target.container import Container
+    from dissect.target.volume import Volume
+
 log = logging.getLogger(__name__)
+
 NO_COLOR = os.getenv("NO_COLOR")
+COLOR_GREY = "\033[38;5;248m"
 
 
 @catch_sigpipe
@@ -53,12 +63,7 @@ def main() -> int:
         log.error("No targets provided")
         return 1
 
-    if args.record or args.json:
-        RECORD_OUTPUT = True
-        rs = record_output(args.strings, args.json)
-
-    else:
-        RECORD_OUTPUT = False
+    rs = None
 
     try:
         for target in Target.open_all(args.targets, args.children):
@@ -73,9 +78,10 @@ def main() -> int:
                 args.unique,
                 args.window,
                 args.strip_null_bytes,
-                progress=True,
+                progress=progress_handler(target),
             ):
-                if RECORD_OUTPUT:
+                if args.record or args.json:
+                    rs = record_output(args.strings, args.json)
                     rs.write(hit)
                     continue
 
@@ -114,15 +120,40 @@ def main() -> int:
                     )
                     print("".join(hit))
 
-        if not RECORD_OUTPUT:
-            print(end="\r\n")
-
     except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
         return 1
 
+    if not rs:
+        print(end="\r\n")
+
     return 0
+
+
+def progress_handler(target: Target) -> Callable[[Container | Volume, int, int], None]:
+    """Progress handler of the qfind plugin."""
+    current_disk = None
+    animation = ["-", "\\", "|", "/"]
+    char = 0
+
+    def update(disk: Container | Volume, offset: int, size: int) -> None:
+        nonlocal current_disk, char
+
+        if current_disk is None:
+            sys.stderr.write(f"{utils.COLOR_WHITE}{target}{utils.COLOR_NORMAL}\n")
+
+        if current_disk != disk:
+            sys.stderr.write(f"\n{utils.COLOR_WHITE}[Current disk: {disk}]{utils.COLOR_NORMAL}\n")
+            current_disk = disk
+
+        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_NORMAL}")
+        sys.stderr.flush()
+
+        if offset % 1337 * 42 == 0:
+            char = 0 if char == 3 else char + 1
+
+    return update
 
 
 if __name__ == "__main__":
