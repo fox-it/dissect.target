@@ -26,6 +26,9 @@ from dissect.target.plugin import Plugin, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.sql.sqlite3 import Row
+
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
 
@@ -124,6 +127,7 @@ class CamPlugin(Plugin):
         super().__init__(target)
         self.app_regf_keys = self._find_apps()
         self.camdb_path = self._find_db()
+        self.camdb = None
 
     def _find_apps(self) -> list[RegistryKey]:
         return [key for store in self.target.registry.keys(self.CONSENT_STORES) for key in store.subkeys()]
@@ -140,7 +144,7 @@ class CamPlugin(Plugin):
                 else:
                     yield key
 
-    def _find_db(self) -> None:
+    def _find_db(self) -> TargetPath | None:
         try:
             # Retrieve the location of the CapabilityAccessManager.db directory from registry
             DatabaseRoot = self.target.registry.key(self.CAP_DB_REG_PATH).value("DatabaseRoot").value
@@ -154,18 +158,33 @@ class CamPlugin(Plugin):
                 "cam.history: Cannot find database location registry key, OS probably not supported"
             )
 
-    def _open_db(self) -> None:
+    def _open_db(self) -> SQLite3 | None:
         if self.camdb_path:
-            db_file = self.target.fs.path(self.camdb_path)
-            return SQLite3(db_file.open("rb"))
+            return SQLite3(self.camdb_path.open("rb"))
         return None
 
-    def _build_context_dict(self) -> None:
+    def _build_context_dict(self) -> defaultdict[str, dict] | None:
         MAPDB = defaultdict(dict)
-        for table in self.CONTEXT_TABLES:
-            for row in self.camdb.table(table):
-                MAPDB[table][row.get("ID")] = row.get("StringValue")
+        for table_name in self.CONTEXT_TABLES:
+            for row in self._yield_rows(table_name):
+                MAPDB[table_name][row.get("ID")] = row.get("StringValue")
         return MAPDB
+
+    def _convert_ts(self, ts: int) -> None:
+        if not ts or ts == 0:
+            return None
+        return wintimestamp(ts)
+
+    def _convert_file_id(self, file_id: str) -> None:
+        if file_id:
+            return digest((None, file_id[4:], None))
+        return None
+
+    def _yield_rows(self, table_name: str) -> Iterator[Row]:
+        table = self.camdb.table(table_name)
+        if not table:
+            yield
+        yield from table
 
     @export(record=[CamUsageHistoryRecord, CamIdentityRelationshipHistoryRecord, CamGlobalPromptHistoryRecord])
     def history(
@@ -176,6 +195,11 @@ class CamPlugin(Plugin):
         Applications are divided into packaged and non-packaged applications meaning Microsoft or
         non-Microsoft applications. Additional historical entries are since Windows 11 available in a SQL database.
 
+        Records are created from the following tables:
+        - NonPackagedUsageHistory
+        - PackagedUsageHistory
+        - NonPackagedIdentityRelationship
+        - NonPackagedGlobalPromptHistory
 
         References:
             - https://medium.com/@cyber.sundae.dfir/capability-access-manager-forensics-in-windows-11-f586ef8aac79
@@ -227,73 +251,74 @@ class CamPlugin(Plugin):
 
         self.camdb = self._open_db()
 
-        # Silently exit the plugin if no database object could be created.
-        # This means the plugin is not compatible with the target.
+        # Silently exit the function if no database object could be created.
+        # This means the function is not compatible with the target.
         if not self.camdb:
             return None
 
         # Create mapping dict for sql 'join' actions.
-        self.MAPDB = self._build_context_dict()
+        MAPDB = self._build_context_dict()
 
-        # Iterate over the 'CONTENT_TABLES' and yield records
-        for table in self.CONTENT_TABLES:
-            for row in self.camdb.table(table):
-                # Resolve user if row contains a UserSid
-                if user := self.target.user_details.find(self.MAPDB["Users"].get(row["UserSid"], "")):
+        # Process NonPackagedUsageHistory and PackagedUsageHistory tables
+        for table_name in ["NonPackagedUsageHistory", "PackagedUsageHistory"]:
+            for row in self._yield_rows(table_name):
+                # Resolve user from UserSID
+                if user := self.target.user_details.find(MAPDB["Users"].get(row["UserSid"], "")):
                     user = user.user
 
-                # Create digest from FileID if field exists in row
-                if FileId_hash := self.MAPDB["FileIDs"].get(row["FileID"]):
-                    FileId_hash = digest((None, FileId_hash[4:], None))
+                # Calculate duration field
+                duration = 0
+                last_used_time_stop = self._convert_ts(row.get("LastUsedTimeStop"))
+                last_used_time_start = self._convert_ts(row.get("LastUsedTimeStart"))
 
-                # Yield record depending on table we are processing
-                if table in ["NonPackagedUsageHistory", "PackagedUsageHistory"]:
-                    last_used_time_stop = wintimestamp(row.get("LastUsedTimeStop", 0))
-                    last_used_time_start = wintimestamp(row.get("LastUsedTimeStart", 0))
+                if all([last_used_time_stop, last_used_time_start]):
+                    duration = last_used_time_stop.timestamp() - last_used_time_start.timestamp()
 
-                    duration = 0
-                    if wintimestamp(0) not in [last_used_time_stop, last_used_time_start]:
-                        duration = last_used_time_stop.timestamp() - last_used_time_start.timestamp()
+                yield CamUsageHistoryRecord(
+                    last_used_time_stop=last_used_time_stop,
+                    last_used_time_start=last_used_time_start,
+                    duration=duration,
+                    package_type=table_name,
+                    capability=MAPDB["Capabilities"].get(row["Capability"]),
+                    file_id=MAPDB["FileIDs"].get(row["FileID"]),
+                    file_id_hash=self._convert_file_id(MAPDB["FileIDs"].get(row["FileID"])),
+                    access_blocked=row["AccessBlocked"],
+                    access_guid=MAPDB["AccessGUIDs"].get(row["AccessGUID"]),
+                    label=row["Label"],
+                    app_name=MAPDB["AppNames"].get(row["AppName"]),
+                    program_id=MAPDB["ProgramIDs"].get(row["ProgramID"]),
+                    binary_full_path=MAPDB["BinaryFullPaths"].get(row["BinaryFullPath"]),
+                    package_family_name=MAPDB["PackageFamilyNames"].get(row["PackageFamilyName"]),
+                    service_name=MAPDB["ServiceNames"].get(row["ServiceName"]),
+                    _target=self.target,
+                    _user=user,
+                )
 
-                    yield CamUsageHistoryRecord(
-                        last_used_time_stop=last_used_time_stop,
-                        last_used_time_start=last_used_time_start,
-                        duration=duration,
-                        package_type=table,
-                        capability=self.MAPDB["Capabilities"].get(row["Capability"]),
-                        file_id=self.MAPDB["FileIDs"].get(row["FileID"]),
-                        file_id_hash=FileId_hash,
-                        access_blocked=row["AccessBlocked"],
-                        access_guid=self.MAPDB["AccessGUIDs"].get(row["AccessGUID"]),
-                        label=row["Label"],
-                        app_name=self.MAPDB["AppNames"].get(row["AppName"]),
-                        program_id=self.MAPDB["ProgramIDs"].get(row["ProgramID"]),
-                        binary_full_path=self.MAPDB["BinaryFullPaths"].get(row["BinaryFullPath"]),
-                        package_family_name=self.MAPDB["PackageFamilyNames"].get(row["PackageFamilyName"]),
-                        service_name=self.MAPDB["ServiceNames"].get(row["ServiceName"]),
-                        _target=self.target,
-                        _user=user,
-                    )
-                elif table == "NonPackagedIdentityRelationship":
-                    yield CamIdentityRelationshipHistoryRecord(
-                        last_observed_time=wintimestamp(row.get("LastObservedTime", 0)),
-                        package_type=table,
-                        file_id=self.MAPDB["FileIDs"].get(row["FileID"]),
-                        file_id_hash=FileId_hash,
-                        program_id=self.MAPDB["ProgramIDs"].get(row["ProgramID"]),
-                        binary_full_path=self.MAPDB["BinaryFullPaths"].get(row["BinaryFullPath"]),
-                        _target=self.target,
-                    )
-                elif table == "NonPackagedGlobalPromptHistory":
-                    yield CamGlobalPromptHistoryRecord(
-                        shown_time=wintimestamp(row.get("ShownTime", 0)),
-                        package_type=table,
-                        capability=self.MAPDB["Capabilities"].get(row["Capability"]),
-                        file_id=self.MAPDB["FileIDs"].get(row["FileID"]),
-                        file_id_hash=FileId_hash,
-                        program_id=self.MAPDB["ProgramIDs"].get(row["ProgramID"]),
-                        _target=self.target,
-                    )
+        # Process table NonPackagedIdentityRelationship
+        table_name = "NonPackagedIdentityRelationship"
+        for row in self._yield_rows(table_name):
+            yield CamIdentityRelationshipHistoryRecord(
+                last_observed_time=self._convert_ts(row.get("LastObservedTime")),
+                package_type=table_name,
+                file_id=MAPDB["FileIDs"].get(row["FileID"]),
+                file_id_hash=self._convert_file_id(MAPDB["FileIDs"].get(row["FileID"])),
+                program_id=MAPDB["ProgramIDs"].get(row["ProgramID"]),
+                binary_full_path=MAPDB["BinaryFullPaths"].get(row["BinaryFullPath"]),
+                _target=self.target,
+            )
+
+        # Process table NonPackagedGlobalPromptHistory
+        table_name = "NonPackagedGlobalPromptHistory"
+        for row in self._yield_rows(table_name):
+            yield CamGlobalPromptHistoryRecord(
+                shown_time=self._convert_ts(row.get("ShownTime")),
+                package_type=table_name,
+                capability=MAPDB["Capabilities"].get(row["Capability"]),
+                file_id=MAPDB["FileIDs"].get(row["FileID"]),
+                file_id_hash=self._convert_file_id(MAPDB["FileIDs"].get(row["FileID"])),
+                program_id=MAPDB["ProgramIDs"].get(row["ProgramID"]),
+                _target=self.target,
+            )
 
     @export(record=CamRegistryRecord)
     def registry(self) -> Iterator[CamRegistryRecord]:

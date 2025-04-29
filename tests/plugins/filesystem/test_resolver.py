@@ -41,7 +41,7 @@ def test_resolve(target_win: Target, target_unix: Target, test_target: str, reso
 
 def test_resolve_no_path(target_win: Target) -> None:
     path = ""
-    assert target_win.resolve(path) is path
+    assert target_win.resolve(path) == target_win.fs.path(path)
 
 
 def mock_expand_env(path: str, user_sid: str | None = None) -> str:
