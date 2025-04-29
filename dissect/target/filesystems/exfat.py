@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import stat
+from datetime import timedelta, timezone
 from typing import TYPE_CHECKING, BinaryIO, Optional
 
 from dissect.fat import exfat
 from dissect.util.stream import RunlistStream
-from dissect.util.ts import UTC, dostimestamp
+from dissect.util.ts import dostimestamp
 
 from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
@@ -127,13 +128,16 @@ class ExfatFilesystemEntry(FilesystemEntry):
 
         # all timestamps are recorded in local time. the utc offset (of the system generating the timestamp in question)
         # is recorded in the associated tz byte
-        c_tz = UTC(self.fs.exfat._utc_timezone(fe.create_timezone))
-        m_tz = UTC(self.fs.exfat._utc_timezone(fe.modified_timezone))
-        a_tz = UTC(self.fs.exfat._utc_timezone(fe.access_timezone))
+        c_tz = self.fs.exfat._utc_timezone(fe.create_timezone)
+        c_tzinfo = timezone(timedelta(minutes=c_tz["offset"]), c_tz["name"])
+        m_tz = self.fs.exfat._utc_timezone(fe.modified_timezone)
+        m_tzinfo = timezone(timedelta(minutes=m_tz["offset"]), m_tz["name"])
+        a_tz = self.fs.exfat._utc_timezone(fe.access_timezone)
+        a_tzinfo = timezone(timedelta(minutes=a_tz["offset"]), a_tz["name"])
 
-        ctime = dostimestamp(fe.create_time, fe.create_offset).replace(tzinfo=c_tz)
-        mtime = dostimestamp(fe.modified_time, fe.modified_offset).replace(tzinfo=m_tz)
-        atime = dostimestamp(fe.access_time).replace(tzinfo=a_tz)
+        ctime = dostimestamp(fe.create_time, fe.create_offset).replace(tzinfo=c_tzinfo)
+        mtime = dostimestamp(fe.modified_time, fe.modified_offset).replace(tzinfo=m_tzinfo)
+        atime = dostimestamp(fe.access_time).replace(tzinfo=a_tzinfo)
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         st_info = [
@@ -144,8 +148,8 @@ class ExfatFilesystemEntry(FilesystemEntry):
             0,
             0,
             size,
-            atime.timetuple().timestamp(),
-            mtime.timetuple().timestamp(),
-            ctime.timetuple().timestamp(),
+            atime.timestamp(),
+            mtime.timestamp(),
+            ctime.timestamp(),
         ]
         return fsutil.stat_result(st_info)
