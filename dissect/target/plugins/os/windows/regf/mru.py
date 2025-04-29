@@ -14,7 +14,6 @@ from dissect.target.helpers.record import TargetRecordDescriptor, create_extende
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.regf.shellbags import (
     FILE_ENTRY,
-    SHITEM,
     parse_shell_item_list,
 )
 
@@ -457,5 +456,3 @@ def parse_office_mru_key(target: Target, key: RegistryKey, record: TargetRecordD
             _user=user,
             _key=key,
         )
-
-
