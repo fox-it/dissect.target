@@ -45,7 +45,7 @@ class QFindPlugin(Plugin):
     @arg("-n", "--needles", type=str, nargs="*", metavar="NEEDLES", help="needles to search for")
     @arg("-nf", "--needle-file", type=Path, help="file containing the needles to search for")
     @arg("-e", "--encoding", type=str, help="encode text needles with these comma separated encodings")
-    @arg("--regex", action="store_true", help="parse needles as regexes")
+    @arg("--regex", action="store_true", help="parse needles as regex patterns")
     @arg("--no-hex-decode", action="store_true", help="do not automatically add decoded hex needles (only in raw mode)")
     @arg("-i", "--ignore-case", action="store_true", help="case insensitive search")
     @arg("-u", "--unique", action="store_true", help="only yield unique string hits (does not apply to raw output)")
@@ -163,9 +163,7 @@ class QFindPlugin(Plugin):
 
             if unique:
                 if window > 20:
-                    m = hashlib.sha1()
-                    m.update(buf)
-                    digest = m.digest()
+                    digest = hashlib.sha1(buf).digest()
                 else:
                     digest = buf
 
@@ -173,7 +171,7 @@ class QFindPlugin(Plugin):
                     continue
                 seen.add(digest)
 
-            match = match.group() if isinstance(needle, re.Pattern) and match else original_needle
+            match = match.group() if match else original_needle
 
             yield QFindMatchRecord(
                 offset=offset,

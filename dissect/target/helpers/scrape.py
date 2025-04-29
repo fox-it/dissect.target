@@ -24,7 +24,7 @@ def find_needles(
     lock_seek: bool = True,
     block_size: int = io.DEFAULT_BUFFER_SIZE,
     progress: Callable[[int], None] | None = None,
-) -> Iterator[tuple[bytes, int, re.Match | None]]:
+) -> Iterator[tuple[Needle, int, re.Match | None]]:
     """Yields needles and their offsets found in provided byte stream.
 
     Args:
