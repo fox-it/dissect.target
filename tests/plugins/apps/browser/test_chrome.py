@@ -29,11 +29,11 @@ if TYPE_CHECKING:
 def target_chrome_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\",
-        absolute_path("_data/plugins/apps/browser/chrome/"),
+        absolute_path("_data/plugins/apps/browser/chrome/generic"),
     )
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 1\\",
-        absolute_path("_data/plugins/apps/browser/chrome/"),
+        absolute_path("_data/plugins/apps/browser/chrome/generic"),
     )
 
     target_win_users.add_plugin(ChromePlugin)
@@ -43,8 +43,8 @@ def target_chrome_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Ta
 
 @pytest.fixture
 def target_chrome_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Target:
-    fs_unix.map_dir("/root/.config/google-chrome/Default/", absolute_path("_data/plugins/apps/browser/chrome/"))
-    fs_unix.map_dir("/root/.config/google-chrome/Profile 1/", absolute_path("_data/plugins/apps/browser/chrome/"))
+    fs_unix.map_dir("/root/.config/google-chrome/Default/", absolute_path("_data/plugins/apps/browser/chrome/generic"))
+    fs_unix.map_dir("/root/.config/google-chrome/Profile 1/", absolute_path("_data/plugins/apps/browser/chrome/generic"))
 
     target_unix_users.add_plugin(ChromePlugin)
 
@@ -55,12 +55,12 @@ def target_chrome_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) ->
 def target_chrome_win_snapshot(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Default",
-        absolute_path("_data/plugins/apps/browser/chrome/"),
+        absolute_path("_data/plugins/apps/browser/chrome/generic"),
     )
 
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Profile 1",
-        absolute_path("_data/plugins/apps/browser/chrome/"),
+        absolute_path("_data/plugins/apps/browser/chrome/generic"),
     )
 
     target_win_users.add_plugin(ChromePlugin)
@@ -303,20 +303,20 @@ def target_win_11_users_dpapi(
 def test_windows_chrome_passwords_dpapi(
     target_win_users_dpapi: Target,
     fs_win: VirtualFilesystem,
+    guarded_keychain: None,
     keychain_value: str,
     expected_password: str | None,
     expected_notes: str | None,
 ) -> None:
     fs_win.map_dir(
         "Users/user/AppData/Local/Google/Chrome/User Data",
-        absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data"),
+        absolute_path("_data/plugins/apps/browser/chrome/dpapi/windows_10/User_Data"),
     )
 
     map_version_value(target_win_users_dpapi, "CurrentVersion", 10.0)
 
     target_win_users_dpapi.add_plugin(ChromePlugin)
 
-    keychain.KEYCHAIN.clear()
     keychain.register_key(
         key_type=keychain.KeyType.PASSPHRASE,
         value=keychain_value,
@@ -340,17 +340,16 @@ def test_windows_chrome_passwords_dpapi(
     assert records[0].decrypted_notes == expected_notes
 
 
-def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: VirtualFilesystem) -> None:
+def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: VirtualFilesystem, guarded_keychain: None) -> None:
     fs_win.map_dir(
         "Users/user/AppData/Local/Google/Chrome/User Data",
-        absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data"),
+        absolute_path("_data/plugins/apps/browser/chrome/dpapi/windows_10/User_Data"),
     )
 
     map_version_value(target_win_users_dpapi, "CurrentVersion", 10.0)
 
     target_win_users_dpapi.add_plugin(ChromePlugin)
 
-    keychain.KEYCHAIN.clear()
     keychain.register_key(
         key_type=keychain.KeyType.PASSPHRASE,
         value="user",
@@ -394,7 +393,7 @@ def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFiles
     for dir in profile_dirs:
         fs_win.map_dir(
             dir,
-            absolute_path("_data/plugins/apps/browser/chrome/"),
+            absolute_path("_data/plugins/apps/browser/chrome/generic"),
         )
 
     target_win_users.add_plugin(ChromePlugin)
@@ -420,7 +419,7 @@ def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFiles
         assert len(base_path_records) == len(snapshot_records)
 
 
-def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win: VirtualFilesystem) -> None:
+def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win: VirtualFilesystem, guarded_keychain: None) -> None:
     """Test if we can decrypt Windows 11 Google Chrome version 127/130 and newer passwords and cookies.
 
     Elevation Service usage by Chromium-based browsers (Google Chrome, Microsoft Edge) depend on several environment
@@ -433,7 +432,6 @@ def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win:
 
     """
 
-    keychain.KEYCHAIN.clear()
     keychain.register_key(
         key_type=keychain.KeyType.PASSPHRASE,
         value="password",
@@ -443,7 +441,7 @@ def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win:
 
     fs_win.map_dir(
         "Users/user/AppData/Local/Google/Chrome/User Data",
-        absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data_Windows_11"),
+        absolute_path("_data/plugins/apps/browser/chrome/dpapi/windows_11/User_Data"),
     )
 
     target_win_11_users_dpapi.add_plugin(ChromePlugin)
