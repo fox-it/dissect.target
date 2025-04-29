@@ -4,6 +4,7 @@ import base64
 import itertools
 import json
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
@@ -287,10 +288,8 @@ class ChromiumMixin:
                     cookie_value = cookie.value
 
                     if not cookie_value and keys and (encrypted_cookie := cookie.get("encrypted_value")):
-                        callable = DECRYPT_MAP.get(self.target.os, {}).get(encrypted_cookie[0:3], decrypt_unsupported)
-
                         try:
-                            cookie_value = callable(self.target, user, keys, encrypted_cookie)
+                            cookie_value = self.decrypt_value(user, keys, encrypted_cookie)
                         except (ValueError, UnicodeDecodeError) as e:
                             self.target.log.warning(
                                 "Failed to decrypt cookie value for %s %s: %s", cookie.host_key, cookie.name, e
@@ -517,22 +516,20 @@ class ChromiumMixin:
                 decrypted_password = None
 
                 # Attempt to decrypt password
-                callable = DECRYPT_MAP.get(self.target.os, {}).get(encrypted_password[0:3], decrypt_unsupported)
                 try:
-                    decrypted_password = callable(self.target, user, keys, encrypted_password)
+                    decrypted_password = self.decrypt_value(user, keys, encrypted_password)
                 except Exception as e:
-                    self.target.log.warning("Failed to decrypt %s Chromium password: %s", callable.__name__, e)
+                    self.target.log.warning("Failed to decrypt %r Chromium password: %s", encrypted_password[0:3], e)
                     self.target.log.debug("", exc_info=e)
 
                 # Attempt to decrypt notes
                 encrypted_notes = None
                 decrypted_notes = None
                 if encrypted_notes := notes.get(str(row.id)):
-                    callable = DECRYPT_MAP.get(self.target.os, {}).get(encrypted_notes[0:3], decrypt_unsupported)
                     try:
-                        decrypted_notes = callable(self.target, user, keys, encrypted_notes)
+                        decrypted_notes = self.decrypt_value(user, keys, encrypted_notes)
                     except Exception as e:
-                        self.target.log.warning("Failed to decrypt %s Chromium note: %s", callable.__name__, e)
+                        self.target.log.warning("Failed to decrypt %r Chromium note: %s", encrypted_notes[0:3], e)
                         self.target.log.debug("", exc_info=e)
 
                 yield self.BrowserPasswordRecord(
@@ -554,8 +551,10 @@ class ChromiumMixin:
                 )
 
     @internal
-    def decryption_keys(self, local_state_path: TargetPath, username: str) -> dict[str, bytes]:
-        """Return dict of decrypted Chromium ``os_crypt.encrypted_key``and ``os_crypt.app_bound_encrypted_key`` values.
+    def decryption_keys(self, local_state_path: TargetPath, username: str) -> ChromiumKeys:
+        """Return decrypted Chromium ``os_crypt.encrypted_key``and ``os_crypt.app_bound_encrypted_key`` values.
+
+        Used by :meth:`ChromiumMixin.passwords` and :meth:`ChromiumMixin.cookies` for Windows targets.
 
         Resources:
             - https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html
@@ -563,25 +562,34 @@ class ChromiumMixin:
             - https://github.com/chromium/chromium/tree/main/chrome/elevation_service
             - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
         """
+        keys = ChromiumKeys()
 
         if not local_state_path.exists():
             self.target.log.warning("File does not exist: %s", local_state_path)
-            return {}
+            return keys
 
         try:
             local_state_conf = json.loads(local_state_path.read_text())
         except json.JSONDecodeError as e:
             self.target.log.warning("File does not contain valid JSON: %s in %s", e, local_state_path)
-            return {}
+            return keys
 
-        if "os_crypt" not in local_state_conf and "app_bound_encrypted_key" not in local_state_conf:
+        if "os_crypt" not in local_state_conf:
             self.target.log.warning(
-                "File does not contain os_crypt or app_bound_encrypted_key, Chromium is likely older than v80: %s",
+                "File does not contain os_crypt, Chromium is likely older than v80: %s",
                 local_state_path,
             )
-            return {}
+            return keys
 
-        keys = {}
+        if not self.target.has_function("dpapi"):
+            self.target.log.warning(
+                "Unable to decrypt Chromium os_crypt keys: DPAPI plugin is not compatible with target"
+            )
+            return keys
+
+        if not HAS_CRYPTO:
+            self.target.log.warning("Missing pycryptodome dependency for crypto operations")
+            return keys
 
         # Windows Chromium version 80 > uses AES ``os_crypt.encrypted_key`` which can be decrypted with user DPAPI keys.
         # Reference: https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
@@ -589,22 +597,20 @@ class ChromiumMixin:
             encrypted_key = base64.b64decode(local_state_conf["os_crypt"]["encrypted_key"])[5:]
             aes_key = self.target.dpapi.decrypt_user_blob(encrypted_key, username)
             self.target.log.info("Decrypted Chromium OS Crypt key: %r", aes_key)
-            keys["os_crypt_key"] = aes_key
+            keys.os_crypt_key = aes_key
+
         except (KeyError, ValueError) as e:
-            self.target.log.warning("Unable to decode os_crypt encrypted_key in %s: %s", local_state_path, e)
+            self.target.log.warning("Unable to decode Chromium os_crypt encrypted_key in %s: %s", local_state_path, e)
             self.target.log.debug("", exc_info=e)
 
         # Windows Google Chrome versions > 130 / 127 and Microsoft Edge >~ 130 use App Bound Protection
         # (``os_crypt.app_bound_encrypted_key``) which can be decrypted using System DPAPI -> User DPAPI
         # -> (optionally AES GCM if Google Chrome).
         # Reference: https://github.com/chromium/chromium/tree/main/chrome/elevation_service
-        if local_state_conf["os_crypt"].get("app_bound_encrypted_key"):
-            if not HAS_CRYPTO:
-                self.target.log.warning("Missing pycryptodome dependency for AES operation: Decrypting ABE key")
-                return keys
-
+        if b64_abe := local_state_conf["os_crypt"].get("app_bound_encrypted_key"):
             try:
-                app_bound_encrypted_key = base64.b64decode(local_state_conf["os_crypt"]["app_bound_encrypted_key"])
+                app_bound_encrypted_key = base64.b64decode(b64_abe)
+
                 if (header := app_bound_encrypted_key[0:4]) != b"APPB":
                     self.target.log.warning(
                         "Encountered unexpected app bound encrypted key in %s: Invalid header %r",
@@ -622,7 +628,7 @@ class ChromiumMixin:
                 if s_plaintext.ciphertext_len == 0x20:
                     # Microsoft Edge just stores the 32 byte decryption key
                     self.target.log.info("Decrypted Microsoft Edge ABE key: %r", s_plaintext.ciphertext)
-                    keys["app_bound_key"] = s_plaintext.ciphertext
+                    keys.app_bound_key = s_plaintext.ciphertext
 
                 else:
                     # Google Chrome has encrypted the AES decryption key using either AES GCM or ChaCha20 Poly1305
@@ -643,7 +649,8 @@ class ChromiumMixin:
                     aes_key = cipher.decrypt_and_verify(data.ciphertext, data.mac_tag)
 
                     self.target.log.info("Decrypted Google Chrome ABE key: %r", aes_key)
-                    keys["app_bound_key"] = aes_key
+                    keys.app_bound_key = aes_key
+
             except (KeyError, ValueError, EOFError) as e:
                 self.target.log.warning(
                     "Unable to decode Chromium os_crypt app_bound_key in %s: %s", local_state_path, e
@@ -651,6 +658,28 @@ class ChromiumMixin:
                 self.target.log.debug("", exc_info=e)
 
         return keys
+
+    @internal
+    def decrypt_value(self, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes | None:
+        """Attempt to decrypt the given encrypted bytes."""
+
+        DECRYPT_MAP = {
+            OperatingSystem.WINDOWS.value: {
+                b"\x01\x00\x00": decrypt_dpapi,  # First three bytes of DPAPI blob signature.
+                b"v10": decrypt_v10_windows,
+                b"v20": decrypt_v20_windows,
+            },
+            OperatingSystem.UNIX.value: {
+                b"v10": decrypt_v10_linux,
+                b"v11": decrypt_v11_linux,
+            },
+            OperatingSystem.LINUX.value: {
+                b"v10": decrypt_v10_linux,
+                b"v11": decrypt_v11_linux,
+            },
+        }
+        callable = DECRYPT_MAP.get(self.target.os, {}).get(encrypted[0:3], decrypt_unsupported)
+        return callable(self.target, user, keys, encrypted)
 
 
 class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
@@ -693,9 +722,20 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
         yield from super().passwords("chromium")
 
 
+@dataclass(eq=True)
+class ChromiumKeys:
+    """Contains decrypted Chromium-variant encryption keys."""
+
+    os_crypt_key: bytes | None = None
+    """Windows Chromium version 80 and up for ``b"v10"`` ciphertexts."""
+
+    app_bound_key: bytes | None = None
+    """Windows Google Chrome and Microsoft Edge versions 127 and up for ``b"v20"`` ciphertexts."""
+
+
 def decrypt_v10_linux(
-    target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes, *, hardcoded_key: str = "peanuts"
-) -> bytes:
+    target: Target, user: UserDetails, keys: ChromiumKeys, encrypted: bytes, *, hardcoded_key: str = "peanuts"
+) -> bytes | None:
     """Decrypt a version 10 Linux ciphertext.
 
     ``v10`` ciphertexts are encrypted using a PBKDF2 key derivation of the static string ``peanuts`` or an empty string
@@ -734,7 +774,7 @@ def decrypt_v10_linux(
         raise ValueError("Decrypting Chromium V10 secret failed")
 
 
-def decrypt_v10_windows(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> bytes:
+def decrypt_v10_windows(target: Target, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes | None:
     """Decrypt a version 10 Windows ciphertext using key ``os_crypt_key``.
 
     ``v10`` variant 2 (Windows-specific) ciphertexts can be decrypted using a derived AES GCM
@@ -763,17 +803,17 @@ def decrypt_v10_windows(target: Target, user: UserDetails, keys: dict[str, bytes
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
-    if not keys.get("os_crypt_key"):
+    if not keys.os_crypt_key:
         raise ValueError("No OS Crypt key available for v10 version 2 decryption")
 
     iv = encrypted[3:15]
     ciphertext = encrypted[15:]
-    cipher = AES.new(key=keys.get("os_crypt_key"), mode=AES.MODE_GCM, nonce=iv)
+    cipher = AES.new(key=keys.os_crypt_key, mode=AES.MODE_GCM, nonce=iv)
     plaintext = cipher.decrypt(ciphertext)
     return plaintext[:-16]
 
 
-def decrypt_v20_windows(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> bytes:
+def decrypt_v20_windows(target: Target, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes | None:
     """Decrypt a version 20 ciphertext using App Bound Encryption (``app_bound_key``).
 
     ``v20`` (Windows) ciphertexts can be decrypted using a derived AES GCM key called ``app_bound_key``
@@ -803,23 +843,23 @@ def decrypt_v20_windows(target: Target, user: UserDetails, keys: dict[str, bytes
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
-    if not keys.get("app_bound_key"):
+    if not keys.app_bound_key:
         raise ValueError("No ABE key available for v20 decryption")
 
     iv = encrypted[3 : 3 + 12]
     ciphertext = encrypted[3 + 12 : -16]
     mac_tag = encrypted[-16:]
 
-    cipher = AES.new(key=keys.get("app_bound_key"), mode=AES.MODE_GCM, nonce=iv)
+    cipher = AES.new(key=keys.app_bound_key, mode=AES.MODE_GCM, nonce=iv)
     return cipher.decrypt_and_verify(ciphertext, mac_tag)
 
 
-def decrypt_v11_linux(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> None:
+def decrypt_v11_linux(target: Target, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> None:
     """Decrypt Linux GNOME or Kwallet encrypted passwords. Currently not implemented."""
     raise ValueError("Decrypting v11 Linux GNOME or Kwallet Chromium ciphertexts is not implemented.")
 
 
-def decrypt_dpapi(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> bytes:
+def decrypt_dpapi(target: Target, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes | None:
     """Decrypt a DPAPI user blob for Windows-based Chromium installs.
 
     Chromium on Windows prior to version 80 encrypts passwords using user DPAPI master keys.
@@ -833,35 +873,19 @@ def decrypt_dpapi(target: Target, user: UserDetails, keys: dict[str, bytes], enc
     if not target.has_function("dpapi"):
         raise ValueError("Missing DPAPI plugin for DPAPI user secret decryption")
 
-    if encrypted.startswith(b"DPAPI"):
-        encrypted = encrypted[:5]
+    if not encrypted.startswith(b"\x01\x00\x00\x00\xd0\x8c\x9d\xdf"):
+        raise ValueError("Provided blob does not look like a DPAPI Blob: {encrypted[:8]!r}")
 
     try:
-        plaintext = target.dpapi.decrypt_user_blob(encrypted, user.user.name)
+        return target.dpapi.decrypt_user_blob(encrypted, user.user.name)
 
     except UnsupportedPluginError as e:
         target.log.warning("Target is missing required registry keys for DPAPI")
         target.log.debug("", exc_info=e)
+    except ValueError as e:
+        target.log.warning("Failed to decrypt DPAPI blob: %e", e)
+        target.log.debug("", exc_info=e)
 
-    return plaintext
 
-
-def decrypt_unsupported(target: Target, user: UserDetails, keys: dict[str, bytes], encrypted: bytes) -> None:
+def decrypt_unsupported(target: Target, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> None:
     raise ValueError(f"Unknown encrypted password found: {encrypted!r}")
-
-
-DECRYPT_MAP = {
-    OperatingSystem.WINDOWS.value: {
-        b"\x01\x00\x00": decrypt_dpapi,  # First three bytes of DPAPI blob signature.
-        b"v10": decrypt_v10_windows,
-        b"v20": decrypt_v20_windows,
-    },
-    OperatingSystem.UNIX.value: {
-        b"v10": decrypt_v10_linux,
-        b"v11": decrypt_v11_linux,
-    },
-    OperatingSystem.LINUX.value: {
-        b"v10": decrypt_v10_linux,
-        b"v11": decrypt_v11_linux,
-    },
-}
