@@ -183,7 +183,7 @@ class CamPlugin(Plugin):
     def _yield_rows(self, table_name: str) -> Iterator[Row]:
         table = self.camdb.table(table_name)
         if not table:
-            yield
+            return
         yield from table
 
     @export(record=[CamUsageHistoryRecord, CamIdentityRelationshipHistoryRecord, CamGlobalPromptHistoryRecord])
