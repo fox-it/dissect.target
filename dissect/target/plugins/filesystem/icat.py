@@ -21,13 +21,13 @@ class ICatPlugin(Plugin):
         if not any(fs.__type__ in self.FS_SUPPORTED for fs in filesystems):
             raise UnsupportedPluginError("No supported filesystems found")
 
-    @arg("--segment", "--inode", "-i", dest="inum", type=int, required=True, help="MFT segment or inode number")
+    @arg("-i", "--inode", "--segment", dest="inum", type=int, required=True, help="MFT segment or inode number")
     @arg(
         "--fs",
         type=int,
         help="optional filesystem index, zero indexed. Defaults to the 'sysvol' or '/' filesystem otherwise",
     )
-    @arg("--ads", type=str, default="", help="Alternate Data Stream name")
+    @arg("--ads", default="", help="Alternate Data Stream name")
     @export(output="none")
     def icat(self, inum: int, fs: int | None, ads: str) -> None:
         """Output the contents of a file based on its MFT segment or inode number. Supports Alternate Data Streams

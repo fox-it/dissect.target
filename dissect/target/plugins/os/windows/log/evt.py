@@ -122,8 +122,8 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
     NEEDLE = b"LfLe"
     CHUNK_SIZE = 0x10000
 
-    @arg("--logs-dir", type=str, help="logs directory to scan")
-    @arg("--log-file-glob", type=str, default=EVT_GLOB, help="glob pattern to match a log file name")
+    @arg("--logs-dir", help="logs directory to scan")
+    @arg("--log-file-glob", default=EVT_GLOB, help="glob pattern to match a log file name")
     @export(record=EvtRecordDescriptor)
     def evt(self, log_file_glob: str = EVT_GLOB, logs_dir: str | None = None) -> Iterator[EvtRecordDescriptor]:
         """Parse Windows Eventlog files (``*.evt``).

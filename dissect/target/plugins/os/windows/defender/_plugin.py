@@ -5,9 +5,9 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
 
-from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.os.windows.defender.mplog import (
     DEFENDER_MPLOG_BLOCK_PATTERNS,
     DEFENDER_MPLOG_LINE,
@@ -137,7 +137,7 @@ def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iter
     return filter(filter_func, records)
 
 
-class MicrosoftDefenderPlugin(plugin.Plugin):
+class MicrosoftDefenderPlugin(Plugin):
     """Plugin that parses artifacts created by Microsoft Defender.
 
     This includes the EVTX logs, as well as recovery of artefacts from the quarantine folder.
@@ -161,7 +161,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         ):
             raise UnsupportedPluginError("No Defender objects found")
 
-    @plugin.export(record=DefenderLogRecord)
+    @export(record=DefenderLogRecord)
     def evtx(self) -> Iterator[DefenderLogRecord]:
         """Parse Microsoft Defender evtx log files."""
 
@@ -185,7 +185,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
-    @plugin.export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
+    @export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
     def quarantine(self) -> Iterator[DefenderQuarantineRecord | DefenderFileQuarantineRecord]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
@@ -225,7 +225,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     # For anything other than a file, we yield a generic DefenderQuarantineRecord.
                     yield DefenderQuarantineRecord(**fields, _target=self.target)
 
-    @plugin.export(record=DefenderExclusionRecord)
+    @export(record=DefenderExclusionRecord)
     def exclusions(self) -> Iterator[DefenderExclusionRecord]:
         """Yield Microsoft Defender exclusions from the Registry."""
 
@@ -413,7 +413,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             yield from self._mplog_line(mplog_line, source, tzinfo=tzinfo)
             yield from self._mplog_block(mplog_line, mplog, source, tzinfo=tzinfo)
 
-    @plugin.export(
+    @export(
         record=[
             DefenderMPLogProcessImageRecord,
             DefenderMPLogMinFilUSSRecord,
@@ -472,15 +472,15 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                 except UnicodeError:
                     continue
 
-    @plugin.arg(
-        "--output",
+    @arg(
         "-o",
+        "--output",
         dest="output_dir",
         type=Path,
         required=True,
         help="Path to recover quarantined file to.",
     )
-    @plugin.export(output="none")
+    @export(output="none")
     def recover(self, output_dir: Path) -> None:
         """Recover files that have been placed into quarantine by Microsoft Defender.
 

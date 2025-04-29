@@ -1269,15 +1269,33 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
         )
 
         assert names, f"No argument names for argument of function {descriptor.func.__qualname__}"
+        assert sorted(names, key=len) == list(names), (
+            f"Argument names {names!r} for function {descriptor.func.__qualname__} should specify short form first"
+        )
+
+        assert settings.get("default", 1) is not None, (
+            f"Superfluous default of None for argument {names[0]} in function {descriptor.func.__qualname__}: "
+            "default is implied as None already."
+        )
 
         assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.func.__qualname__}"
 
-        assert (
-            isinstance(settings.get("required"), bool)
-            or "default" in settings
-            or is_bool_action
-            or names[0].startswith("--")
-        ), f"No required or default attribute for argument {names[0]} in function {descriptor.func.__qualname__}"
+        dest = settings.get("dest") or names[-1].strip("-").replace("-", "_")
+        assert dest in annotations, (
+            f"Missing type annotation for argument {dest} in function {descriptor.func.__qualname__}"
+        )
+
+        # TODO: More strictly check type annotation, use a contains right now to also match optionals
+        type_ = "bool" if is_bool_action else getattr(settings.get("type"), "__name__", "str")
+        assert type_ in annotations[dest], (
+            f"Invalid type annotation for argument {dest} in function {descriptor.func.__qualname__} "
+            f"({annotations[dest]} instead of {type_})"
+        )
+
+        assert settings.get("type") is not str, (
+            f"Superfluous type of str for argument {names[0]} in function {descriptor.func.__qualname__}: "
+            "type is implied as str by default."
+        )
 
         # Inverse checks
 
@@ -1287,10 +1305,23 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
                 f"in {names[0]} in function {descriptor.func.__qualname__}"
             )
 
+        if "required" in settings:
+            assert settings.get("required"), (
+                f"Superfluous required of False for argument {names[0]} in function {descriptor.func.__qualname__}: "
+                "required is implied as False already."
+            )
+
         if is_bool_action:
             assert "type" not in settings, (
                 f"Type should not be set for store_true or store_false in {names[0]} in "
-                f"function {descriptor.func.__qualname__}: type is implied as boolean already."
+                f"function {descriptor.func.__qualname__}: "
+                "type is implied as boolean already."
+            )
+
+            assert "default" not in settings, (
+                f"Default should not be set for store_true or store_false in {names[0]} in "
+                f"function {descriptor.func.__qualname__}: "
+                "default is implied as opposite boolean already."
             )
 
 

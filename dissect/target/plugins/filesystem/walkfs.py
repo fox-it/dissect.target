@@ -40,7 +40,7 @@ class WalkFSPlugin(Plugin):
             raise UnsupportedPluginError("No filesystems to walk")
 
     @export(record=FilesystemRecord)
-    @arg("--walkfs-path", type=str, default="/", help="path to recursively walk")
+    @arg("--walkfs-path", default="/", help="path to recursively walk")
     def walkfs(self, walkfs_path: str = "/") -> Iterator[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries."""
 

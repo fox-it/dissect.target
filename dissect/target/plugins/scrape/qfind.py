@@ -24,9 +24,9 @@ class QFindPlugin(Plugin):
     def check_compatible(self) -> None:
         pass
 
-    @arg("-n", "--needles", type=str, nargs="*", metavar="NEEDLES", help="needles to search for")
+    @arg("-n", "--needles", nargs="*", metavar="NEEDLES", help="needles to search for")
     @arg("-nf", "--needle-file", type=Path, help="file containing the needles to search for")
-    @arg("-e", "--encoding", type=str, help="encode text needles with these comma separated encodings")
+    @arg("-e", "--encoding", help="encode text needles with these comma separated encodings")
     @arg("--no-hex-decode", action="store_true", help="do not automatically add decoded hex needles (only in raw mode)")
     @arg("-R", "--raw", action="store_true", help="show raw hex dumps instead of post-processed string output")
     @arg("-i", "--ignore-case", action="store_true", help="case insensitive search")

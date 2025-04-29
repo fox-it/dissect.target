@@ -70,8 +70,8 @@ class EtcTree(ConfigurationTreePlugin):
                 yield UnixConfigTreeRecord(**data)
 
     @export(record=UnixConfigTreeRecord)
-    @arg("--glob", dest="pattern", required=False, default="*", type=str, help="Glob-style pattern to search for")
-    @arg("--root", dest="root", required=False, default="/", type=str, help="Path to use as root for search")
+    @arg("--glob", dest="pattern", default="*", help="Glob-style pattern to search for")
+    @arg("--root", dest="root", default="/", help="Path to use as root for search")
     def etc(self, pattern: str, root: str) -> Iterator[UnixConfigTreeRecord]:
         """Yield etc configuration records."""
 
