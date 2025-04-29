@@ -100,7 +100,7 @@ class ThumbcachePlugin(Plugin):
                 self.target.log.debug(e, exc_info=e)
 
     @arg(
-        "--output", "-o", dest="output_dir", type=Path, required=False, help="Path to extract thumbcache thumbnails to."
+        "--output", "-o", dest="output_dir", type=Path, required=False, help="path to extract thumbcache thumbnails to"
     )
     @export(record=[ThumbcacheRecord, IndexRecord])
     def thumbcache(self, output_dir: Path | None = None) -> Iterator[ThumbcacheRecord | IndexRecord]:
@@ -108,7 +108,7 @@ class ThumbcachePlugin(Plugin):
         yield from self._parse_thumbcache(ThumbcacheRecord, "thumbcache", output_dir)
 
     @arg(
-        "--output", "-o", dest="output_dir", type=Path, required=False, help="Path to extract iconcache thumbnails to."
+        "--output", "-o", dest="output_dir", type=Path, required=False, help="path to extract iconcache thumbnails to"
     )
     @export(record=[IconcacheRecord, IndexRecord])
     def iconcache(self, output_dir: Path | None = None) -> Iterator[IconcacheRecord | IndexRecord]:

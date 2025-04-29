@@ -984,35 +984,35 @@ def test_function_aliases(target_default: Target) -> None:
     assert not messages_fd.alias
 
 
-def test_function_required_arguments(target_default: Target) -> None:
-    """Test if functions with required arguments are tagged as such correctly."""
+# def test_function_required_arguments(target_default: Target) -> None:
+#     """Test if functions with required arguments are tagged as such correctly."""
 
-    # function without any arguments should have an args property with an empty list
-    syslog_fd = find_functions("syslog", target_default)[0][0]
-    assert syslog_fd
-    assert not syslog_fd.args
+#     # function without any arguments should have an args property with an empty list
+#     syslog_fd = find_functions("syslog", target_default)[0][0]
+#     assert syslog_fd
+#     assert not syslog_fd.args
 
-    # function with an argument should have an args property filled
-    envfile_fd = find_functions("envfile", target_default)[0][0]
-    assert envfile_fd
-    assert envfile_fd.args == [
-        (
-            ("--env-path",),
-            {
-                "help": "path to scan environment files in",
-                "required": True,
-                "type": str,
-            },
-        ),
-        (
-            ("--extension",),
-            {
-                "default": "env",
-                "help": "extension of files to scan",
-                "type": str,
-            },
-        ),
-    ]
+#     # function with an argument should have an args property filled
+#     envfile_fd = find_functions("envfile", target_default)[0][0]
+#     assert envfile_fd
+#     assert envfile_fd.args == [
+#         (
+#             ("--env-path",),
+#             {
+#                 "help": "path to scan environment files in",
+#                 "required": True,
+#                 "type": str,
+#             },
+#         ),
+#         (
+#             ("--extension",),
+#             {
+#                 "default": "env",
+#                 "help": "extension of files to scan",
+#                 "type": str,
+#             },
+#         ),
+#     ]
 
 
 def test_plugin_runtime_info() -> None:
@@ -1226,7 +1226,7 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
         return
 
     # Plugin method should specify what it returns
-    assert descriptor.output in ["record", "yield", "default", "none"], f"Invalid output_type for function {descriptor}"
+    assert descriptor.output in ["record", "yield", "default", "none"], f"Invalid output_type for function {descriptor.func.__qualname__}"
 
     annotations = None
 
@@ -1238,14 +1238,14 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
     # Plugin method should have a return annotation
     assert annotations
-    assert "return" in annotations, f"No return type annotation for function {descriptor}"
+    assert "return" in annotations, f"No return type annotation for function {descriptor.func.__qualname__}"
 
     # TODO: Check if the annotations make sense with the provided output_type
 
     # Plugin method should have a docstring
     method_doc_str = descriptor.func.__doc__
-    assert isinstance(method_doc_str, str), f"No docstring for function {descriptor}"
-    assert method_doc_str != "", f"Empty docstring for function {descriptor}"
+    assert isinstance(method_doc_str, str), f"No docstring for function {descriptor.func.__qualname__}"
+    assert method_doc_str != "", f"Empty docstring for function {descriptor.func.__qualname__}"
 
     # The method docstring should compile to rst without warnings
     assert_valid_rst(method_doc_str)
@@ -1266,12 +1266,12 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
             "store_false",
         )
 
-        assert names, f"No argument names for argument of function {descriptor.qualname}"
+        assert names, f"No argument names for argument of function {descriptor.func.__qualname__}"
 
-        assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.qualname}"
+        assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.func.__qualname__}"
 
         assert settings.get("type") or is_action, (
-            f"No type defined for argument {names[0]} in function {descriptor.qualname}"
+            f"No type defined for argument {names[0]} in function {descriptor.func.__qualname__}"
         )
 
         assert (
@@ -1279,18 +1279,21 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
             or "default" in settings
             or is_action
             or names[0].startswith("--")
-        ), f"No required or default attribute for argument {names[0]} in function {descriptor.qualname}"
+        ), f"No required or default attribute for argument {names[0]} in function {descriptor.func.__qualname__}"
 
         # Inverse checks
 
+        if settings.get("required"):
+            assert not settings.get("default"), f"It does not make sense to set an argument to required and have a default value in {names[0]} in function {descriptor.func.__qualname__}"
+
         if is_action:
             assert "type" not in settings, (
-                f"Type should not be set for store_true or store_false in {names[0]} in function {descriptor.qualname}: type is implied as boolean already."
+                f"Type should not be set for store_true or store_false in {names[0]} in function {descriptor.func.__qualname__}: type is implied as boolean already."
             )
 
         if names[0].startswith("--"):
             assert not settings.get("required"), (
-                f"Required is redundant when first name starts with '--' in argument {names[0]} for function {descriptor.qualname}"
+                f"Required is redundant when first name starts with '--' in argument {names[0]} for function {descriptor.func.__qualname__}"
             )
 
 

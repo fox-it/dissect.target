@@ -381,7 +381,7 @@ class RdpCachePlugin(Plugin):
                 _target=self.target,
             )
 
-    @arg("--output", "-o", dest="output_dir", type=Path, required=True, help="path to recover bitmap files to")
+    @arg("--output", "-o", dest="output_dir", type=Path, help="path to recover bitmap files to")
     @arg(
         "--grid",
         "-g",
