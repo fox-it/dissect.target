@@ -117,7 +117,7 @@ class ScrapePlugin(Plugin):
         block_size: int = io.DEFAULT_BUFFER_SIZE,
         progress: Callable[[Container | Volume, int, int], None] | None = None,
     ) -> Iterator[tuple[Container | Volume, MappingStream, Needle, int, re.Match | None]]:
-        """Yields needles and their offsets found in all disks and volumes of a target.
+        """Yields needles, their offsets and an optional regex match found in all disks and volumes of a target.
 
         Args:
             needles: The needle or list of needles to search for.
