@@ -170,5 +170,5 @@ class QFindPlugin(Plugin):
                 codec=codec,
                 match=match,
                 content=buf.strip(b"\x00") if strip_null_bytes else buf,
-                _target=self.target if self.target._os else None,
+                _target=self.target,
             )
