@@ -44,7 +44,9 @@ def target_chrome_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Ta
 @pytest.fixture
 def target_chrome_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Target:
     fs_unix.map_dir("/root/.config/google-chrome/Default/", absolute_path("_data/plugins/apps/browser/chrome/generic"))
-    fs_unix.map_dir("/root/.config/google-chrome/Profile 1/", absolute_path("_data/plugins/apps/browser/chrome/generic"))
+    fs_unix.map_dir(
+        "/root/.config/google-chrome/Profile 1/", absolute_path("_data/plugins/apps/browser/chrome/generic")
+    )
 
     target_unix_users.add_plugin(ChromePlugin)
 
@@ -340,7 +342,9 @@ def test_windows_chrome_passwords_dpapi(
     assert records[0].decrypted_notes == expected_notes
 
 
-def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: VirtualFilesystem, guarded_keychain: None) -> None:
+def test_windows_chrome_cookies_dpapi(
+    target_win_users_dpapi: Target, fs_win: VirtualFilesystem, guarded_keychain: None
+) -> None:
     fs_win.map_dir(
         "Users/user/AppData/Local/Google/Chrome/User Data",
         absolute_path("_data/plugins/apps/browser/chrome/dpapi/windows_10/User_Data"),
@@ -419,7 +423,9 @@ def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFiles
         assert len(base_path_records) == len(snapshot_records)
 
 
-def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win: VirtualFilesystem, guarded_keychain: None) -> None:
+def test_chrome_windows_11_decryption(
+    target_win_11_users_dpapi: Target, fs_win: VirtualFilesystem, guarded_keychain: None
+) -> None:
     """Test if we can decrypt Windows 11 Google Chrome version 127/130 and newer passwords and cookies.
 
     Elevation Service usage by Chromium-based browsers (Google Chrome, Microsoft Edge) depend on several environment

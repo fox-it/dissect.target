@@ -555,7 +555,7 @@ class ChromiumMixin:
 
     @internal
     def decryption_keys(self, local_state_path: TargetPath, username: str) -> dict[str, bytes]:
-        """Returns dict of decrypted Chromium ``os_crypt.encrypted_key`` and ``os_crypt.app_bound_encrypted_key`` values.
+        """Return dict of decrypted Chromium ``os_crypt.encrypted_key``and ``os_crypt.app_bound_encrypted_key`` values.
 
         Resources:
             - https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html

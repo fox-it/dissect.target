@@ -536,6 +536,7 @@ def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
     to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
     return TargetUnixFactory(tmp_path)
 
+
 @pytest.fixture
 def guarded_keychain() -> Iterator[None]:
     """This fixture clears the keychain from any previously added values."""
