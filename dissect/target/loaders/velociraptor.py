@@ -5,6 +5,7 @@ import zipfile
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers.fsutil import basename, dirname, join
@@ -143,21 +144,18 @@ class VelociraptorLoader(DirLoader):
 
         if (results := self.root.joinpath("results")).is_dir():
             # Map artifact results collected by Velociraptor
-            target.fs.makedirs(VELOCIRAPTOR_RESULTS)
+            vfs = VirtualFilesystem()
 
             for artifact in results.iterdir():
                 if not artifact.name.endswith(".json"):
                     continue
 
-                target.fs.map_file_fh(
-                    str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(artifact.name)),
-                    artifact.open("rb"),
-                )
+                vfs.map_file_fh(artifact.name, artifact.open("rb"))
 
             if (uploads := self.root.joinpath("uploads.json")).exists():
-                target.fs.map_file_fh(
-                    str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(uploads.name)), uploads.open("rb")
-                )
+                vfs.map_file_fh(uploads.name, uploads.open("rb"))
+
+            target.fs.mount(VELOCIRAPTOR_RESULTS, vfs)
 
 
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):

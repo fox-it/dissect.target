@@ -1,10 +1,10 @@
 import json
 import re
-import urllib
+import urllib.parse
 from collections.abc import Iterator
 from functools import lru_cache
 
-from flow.record import RecordDescriptor
+from flow.record import Record
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -20,7 +20,7 @@ class VelociraptorRecordBuilder:
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
         self.record_name = f"velociraptor/{artifact_name}"
 
-    def build_record(self, object: dict, target: Target) -> TargetRecordDescriptor:
+    def build(self, object: dict, target: Target) -> TargetRecordDescriptor:
         """Builds a Velociraptor record."""
         record_values = {}
         record_fields = []
@@ -66,30 +66,29 @@ class VelociraptorRecordBuilder:
 class VelociraptorPlugin(Plugin):
     """Returns records from Velociraptor artifacts."""
 
+    __namespace__ = "velociraptor"
+
     def __init__(self, target: Target):
         super().__init__(target)
-        self.results = target.fs.path(VELOCIRAPTOR_RESULTS)
+        self.results_dir = target.fs.path(VELOCIRAPTOR_RESULTS)
 
     def check_compatible(self) -> None:
-        if not self.results.exists():
+        if not self.results_dir.exists():
             raise UnsupportedPluginError("No Velociraptor artifacts found")
 
     @export(record=DynamicDescriptor(["datetime"]))
-    def velociraptor(self) -> Iterator[RecordDescriptor]:
+    def results(self) -> Iterator[Record]:
         """Return Rapid7 Velociraptor artifacts.
 
         References:
             - https://docs.velociraptor.app/docs/vql/artifacts/
         """
-        for artifact in self.results.iterdir():
-            if not artifact.name.endswith(".json"):
-                continue
-
+        for artifact in self.results_dir.glob("*.json"):
             # "Windows.KapeFiles.Targets%2FAll\ File\ Metadata.json" becomes "windows_kapefiles_targets"
             artifact_name = (
                 urllib.parse.unquote(artifact.name.removesuffix(".json")).split("/")[0].lower().replace(".", "_")
             )
-            velociraptor_record_builder = VelociraptorRecordBuilder(artifact_name)
+            record_builder = VelociraptorRecordBuilder(artifact_name)
 
             for line in artifact.open("rt"):
                 if not (line := line.strip()):
@@ -97,7 +96,7 @@ class VelociraptorPlugin(Plugin):
 
                 try:
                     object = json.loads(line)
-                    yield velociraptor_record_builder.build_record(object, self.target)
+                    yield record_builder.build(object, self.target)
                 except json.decoder.JSONDecodeError:
                     self.target.log.warning(
                         "Could not decode Velociraptor JSON log line in file %s: %s",

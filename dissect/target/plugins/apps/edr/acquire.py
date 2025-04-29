@@ -60,7 +60,6 @@ class AcquirePlugin(Plugin):
         An Acquire file container contains a file hashes csv when the hashes module was used. The content of this csv
         file is returned.
         """
-
         if self.hash_file.exists():
             with self.hash_file.open() as fh, gzip.open(fh, "rt") as gz_fh:
                 for row in csv.DictReader(gz_fh):
