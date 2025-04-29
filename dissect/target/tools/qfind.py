@@ -64,6 +64,8 @@ def main() -> int:
         return 1
 
     rs = None
+    if args.record or args.json:
+        rs = record_output(args.strings, args.json)
 
     try:
         for target in Target.open_all(args.targets, args.children):
@@ -80,8 +82,7 @@ def main() -> int:
                 args.strip_null_bytes,
                 progress=progress_handler(target),
             ):
-                if args.record or args.json:
-                    rs = record_output(args.strings, args.json)
+                if rs:
                     rs.write(hit)
                     continue
 
