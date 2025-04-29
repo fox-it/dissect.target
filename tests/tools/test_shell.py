@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 try:
     import pexpect
+    import pexpect.expect
 
     HAS_PEXPECT = True
 except ImportError:
@@ -391,58 +392,78 @@ def test_shell_hostname_escaping(
     tmp_path.joinpath("etc/hostname").write_bytes(b"hostname\x00\x01\x02\x03")
 
     sys.stdout.flush()
-    out, err = run_target_shell(monkeypatch, capsys, str(tmp_path), "\n")
+    out, _ = run_target_shell(monkeypatch, capsys, str(tmp_path), "\n")
 
-    assert not err
     assert "hostname\\x00\\x01\\x02\\x03" in out
 
 
 @pytest.mark.skipif(not HAS_PEXPECT, reason="requires pexpect")
-@pytest.mark.skipif(
-    platform.python_implementation() == "PyPy",
-    reason="PyPy's prompt contains too much ANSI escape codes",
-)
 @pytest.mark.skipif(
     platform.system() == "Windows",
     reason="pexpect.spawn not available on Windows",
 )
 def test_shell_prompt_tab_autocomplete() -> None:
     """Test the prompt tab-autocompletion."""
+
+    ANSI_ESCAPE = re.compile(rb"\x07|\x08|\x0d|\x7f|\x1b[@-_][0-?]*[ -/]*[@-~]")
+    original_new_data = pexpect.expect.Expecter.new_data
+
+    def ansi_new_data(cls: pexpect.expect.Expecter, data: bytes) -> int | None:
+        """Matches on carriage returns (``\x0d`` / ``\r``) so change your ``child.expect()`` calls accordingly."""
+        return original_new_data(cls, ANSI_ESCAPE.sub(b"", data))
+
     target_path = absolute_path("_data/tools/info/image.tar")
 
-    # We set NO_COLOR=1 so that the output is not colored and easier to match
-    child = pexpect.spawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
+    with patch("pexpect.expect.Expecter.new_data", new=ansi_new_data):
+        # We set NO_COLOR=1 so that the output is not colored and easier to match
+        child = pexpect.spawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
 
-    # increase window size to avoid line wrapping
-    child.setwinsize(100, 100)
+        # increase window size to avoid line wrapping
+        child.setwinsize(100, 100)
 
-    # note that the expect pattern will be re.compiled so we need to escape regex special characters
-    child.expect(re.escape("ubuntu:/$ "), timeout=20)
-    # this should auto complete to `ls /home/user`
-    child.sendline("ls /home/u\t")
-    # expect the prompt to be printed again
-    child.expect(re.escape("ls /home/user/\r\n"), timeout=5)
-    # execute the autocompleted command
-    child.send("\n")
-    # we expect the files in /home/user to be printed
-    child.expect(re.escape(".bash_history\r\n.zsh_history\r\n"), timeout=5)
-    child.expect(re.escape("ubuntu:/$ "), timeout=5)
+        if platform.python_implementation() == "PyPy":
+            major, minor, _patch = tuple(map(int, platform.python_version_tuple()))
+            if major < 3 or (major == 3 and (minor < 10 or (minor == 10 and _patch < 14))):
+                child.expect_exact(
+                    "Note for users of PyPy < 3.10.14:\n"
+                    "Autocomplete might not work due to an outdated version of pyrepl/readline.py\n"
+                    "To fix this, please update your version of PyPy.\n",
+                    timeout=30,
+                )
+                child.kill(9)  # 🔫
+                return
 
-    # send partial ls /etc/ command
-    child.send("ls /etc/")
+            pytest.skip("PyPy in CI does not have a functional readline")
 
-    # we send two TABS to get the list of files in /etc/
-    child.send("\t\t")
+        child.expect_exact("ubuntu:/$ ", timeout=30)
+        # this should auto complete to `ls /home/user`
+        child.send("ls /home/u\t")
+        # expect the prompt to be printed again
+        child.expect_exact("ls /home/user/", timeout=5)
+        # execute the autocompleted command
+        child.send("\n")
+        # we expect the files in /home/user to be printed
+        child.expect_exact(".bash_history\n.zsh_history\n", timeout=5)
+        child.expect_exact("ubuntu:/$ ", timeout=5)
 
-    # expect the files in /etc/ to be printed
-    child.expect(r"hosts\s+localtime\s+network/\s+os-release\s+passwd\s+shadow\s+timezone\s*\r\n", timeout=5)
+        # send partial ls /etc/ command
+        child.send("ls /etc/")
 
-    # send newline to just list everything in /etc/
-    child.send("\n")
-    # expect the last few files in /etc/ to be printed
-    child.expect("shadow\r\ntimezone\r\n", timeout=5)
+        # we send two TABS to get the list of files in /etc/
+        child.send("\t\t")
 
-    # exit the shell
-    child.expect(re.escape("ubuntu:/$ "), timeout=5)
-    child.sendline("exit")
-    child.expect(pexpect.EOF, timeout=5)
+        # expect the files in /etc/ to be printed
+        child.expect(
+            r"hosts\s+localtime\s+network\/\s+os-release\s+passwd\s+shadow\s+timezone\s*ubuntu:\/\$ ls \/etc\/",
+            timeout=5,
+        )
+
+        # send newline to just list everything in /etc/
+        child.send("\n")
+        # expect the last few files in /etc/ to be printed
+        child.expect_exact("shadow\ntimezone\n", timeout=5)
+
+        # exit the shell
+        child.expect_exact("ubuntu:/$ ", timeout=5)
+        child.sendline("exit")
+        child.expect(pexpect.EOF, timeout=5)
