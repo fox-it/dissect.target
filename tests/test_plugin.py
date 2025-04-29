@@ -1226,7 +1226,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
         return
 
     # Plugin method should specify what it returns
-    assert descriptor.output in ["record", "yield", "default", "none"], f"Invalid output_type for function {descriptor.func.__qualname__}"
+    assert descriptor.output in ["record", "yield", "default", "none"], (
+        f"Invalid output_type for function {descriptor.func.__qualname__}"
+    )
 
     annotations = None
 
@@ -1284,16 +1286,21 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
         # Inverse checks
 
         if settings.get("required"):
-            assert not settings.get("default"), f"It does not make sense to set an argument to required and have a default value in {names[0]} in function {descriptor.func.__qualname__}"
+            assert not settings.get("default"), (
+                "It does not make sense to set an argument to required and have a default value"
+                f"in {names[0]} in function {descriptor.func.__qualname__}"
+            )
 
         if is_action:
             assert "type" not in settings, (
-                f"Type should not be set for store_true or store_false in {names[0]} in function {descriptor.func.__qualname__}: type is implied as boolean already."
+                f"Type should not be set for store_true or store_false in {names[0]} in "
+                f"function {descriptor.func.__qualname__}: type is implied as boolean already."
             )
 
         if names[0].startswith("--"):
             assert not settings.get("required"), (
-                f"Required is redundant when first name starts with '--' in argument {names[0]} for function {descriptor.func.__qualname__}"
+                "Required is redundant when first name starts with '--' in argument "
+                f"{names[0]} for function {descriptor.func.__qualname__}"
             )
 
 

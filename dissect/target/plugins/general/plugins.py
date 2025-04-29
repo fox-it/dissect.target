@@ -71,7 +71,8 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
                 "help": _arg.get("help"),
                 "default": _arg.get("default") or _arg.get("const"),
                 # required can either be set explicitly or is implied with '--' style arguments.
-                "required": name[0].startswith("--") or _arg.get("required", False),
+                "required": (name[0].startswith("--") and not _arg.get("default") and not is_bool_action)
+                or _arg.get("required", False),
             }
 
             if is_bool_action:
