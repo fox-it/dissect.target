@@ -395,6 +395,7 @@ def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescr
                 _key=key,
             )
         elif record == OpenSaveMRURecord:
+            filepath = "\\".join(el.name.rstrip("\\") for el in parsed_bag)
             yield record(
                 regf_mtime=key.ts,
                 index=entry_index,
