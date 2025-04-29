@@ -382,7 +382,6 @@ def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescr
         parsed_bag = list(parse_shell_item_list(bag))
         if len(parsed_bag) != 1 or not isinstance(parsed_bag, FILE_ENTRY):
             target.log.debug("Unexpected shell bag entry in MRUListEx entry: %s:%s", key, value)
-        filepath = get_filepath_from_bag(parsed_bag)
 
         if record == LastVisitedMRURecord:
             yield record(
