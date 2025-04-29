@@ -555,7 +555,7 @@ class ChromiumMixin:
 
     @internal
     def decryption_keys(self, local_state_path: TargetPath, username: str) -> dict[str, bytes]:
-        """Returns dict of decrypted Chromium ``os_crypt.encrypted_key`` and ``os_crypt.app_bound_encrypted_key`` values
+        """Returns dict of decrypted Chromium ``os_crypt.encrypted_key`` and ``os_crypt.app_bound_encrypted_key`` values.
 
         Resources:
             - https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html
@@ -590,9 +590,9 @@ class ChromiumMixin:
             aes_key = self.target.dpapi.decrypt_user_blob(encrypted_key, username)
             self.target.log.info("Decrypted Chromium OS Crypt key: %r", aes_key)
             keys["os_crypt_key"] = aes_key
-
         except (KeyError, ValueError) as e:
             self.target.log.warning("Unable to decode os_crypt encrypted_key in %s: %s", local_state_path, e)
+            self.target.log.debug("", exc_info=e)
 
         # Windows Google Chrome versions > 130 / 127 and Microsoft Edge >~ 130 use App Bound Protection
         # (``os_crypt.app_bound_encrypted_key``) which can be decrypted using System DPAPI -> User DPAPI
@@ -644,11 +644,11 @@ class ChromiumMixin:
 
                     self.target.log.info("Decrypted Google Chrome ABE key: %r", aes_key)
                     keys["app_bound_key"] = aes_key
-
             except (KeyError, ValueError, EOFError) as e:
                 self.target.log.warning(
                     "Unable to decode Chromium os_crypt app_bound_key in %s: %s", local_state_path, e
                 )
+                self.target.log.debug("", exc_info=e)
 
         return keys
 
@@ -698,7 +698,7 @@ def decrypt_v10_linux(
 ) -> bytes:
     """Decrypt a version 10 Linux ciphertext.
 
-    ``v10`` ciphertexts are encrypted using a PBKDF2 key derivation of the static string ``peanuts`` or ````
+    ``v10`` ciphertexts are encrypted using a PBKDF2 key derivation of the static string ``peanuts`` or an empty string
     and salt ``saltysalt`` using AES CBC with an IV of ``0x20 * 16``. Padded using PKCS7.
 
     Args:

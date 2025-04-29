@@ -430,6 +430,7 @@ def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win:
     .. code-block::
 
         (chrome.exe|msedge.exe) --enable-features=UseElevator
+
     """
 
     keychain.KEYCHAIN.clear()
