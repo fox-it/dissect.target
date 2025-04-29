@@ -94,8 +94,7 @@ class IISLogsPlugin(WebserverPlugin):
             for log_file_element in xml_data.findall("*/sites/*/logFile"):
                 log_format = log_file_element.get("logFormat") or "W3C"
                 if log_dir := log_file_element.get("directory"):
-                    log_dir = self.target.resolve(log_dir)
-                    log_paths.add((log_format, log_dir))
+                    log_paths.add((log_format, self.target.resolve(log_dir)))
 
         except (ElementTree.ParseError, DissectFileNotFoundError) as e:
             self.target.log.warning("Error while parsing %s:%s", self.config, e)

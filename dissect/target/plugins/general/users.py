@@ -72,7 +72,7 @@ class UsersPlugin(InternalPlugin):
         # Resolving the user home can not use the user's environment variables,
         # as those depend on the user's home to be known first. So we resolve
         # without providing the user (s)id.
-        home_path = self.target.fs.path(self.target.resolve(str(user.home))) if user.home else None
+        home_path = self.target.resolve(str(user.home)) if user.home else None
         return UserDetails(user=user, home_path=home_path)
 
     def all(self) -> Iterator[UserDetails]:

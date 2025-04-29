@@ -49,6 +49,7 @@ def main() -> int:
         formatter_class=help_formatter,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to display info from")
+    parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument("--from-file", nargs="?", type=Path, help="file containing targets to load")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-r", "--record", action="store_true", help="print output as record")
@@ -73,7 +74,7 @@ def main() -> int:
     process_generic_arguments(args, rest)
 
     try:
-        for i, target in enumerate(Target.open_all(args.targets)):
+        for i, target in enumerate(Target.open_all(args.targets, include_children=args.children)):
             try:
                 if args.jsonlines:
                     print(json.dumps(get_target_info(target), default=str))
