@@ -38,7 +38,7 @@ class VelociraptorRecordBuilder:
             if key.startswith("_"):
                 continue
 
-            key = key.lower()
+            key = key.lower().replace("(", "_").replace(")", "_")
 
             if re.match(ISO_8601_PATTERN, str(value)):
                 record_type = "datetime"
@@ -53,8 +53,7 @@ class VelociraptorRecordBuilder:
                 record_type = "string"
             elif isinstance(value, dict):
                 record_type = "record"
-                # Lower key names in nested records
-                value = {k.lower(): v for k, v in value.items()}
+                value = self.build(value, target)
             else:
                 record_type = "dynamic"
 
