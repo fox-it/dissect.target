@@ -57,7 +57,7 @@ class QFindPlugin(Plugin):
         window: int = 256,
         strip_null_bytes: bool = False,
         *,
-        progress: Callable | None = None,
+        progress: Callable[[Container | Volume, int, int], None] | None = None,
     ) -> Iterator[QFindMatchRecord]:
         """Find a needle in a haystack.
 
@@ -140,8 +140,8 @@ class QFindPlugin(Plugin):
 
         elif regex:
             tmp = {}
-            for needle, _ in needle_lookup.items():
-                tmp[re.compile(needle, re.IGNORECASE if ignore_case else re_NOFLAG)] = _
+            for encoded_needle, _ in needle_lookup.items():
+                tmp[re.compile(encoded_needle, re.IGNORECASE if ignore_case else re_NOFLAG)] = _
             needle_lookup = tmp
 
         seen = set()
@@ -164,7 +164,7 @@ class QFindPlugin(Plugin):
             match = match.group() if match else original_needle
 
             yield QFindMatchRecord(
-                disk=disk,
+                disk=repr(disk),
                 offset=offset,
                 needle=original_needle,
                 codec=codec,

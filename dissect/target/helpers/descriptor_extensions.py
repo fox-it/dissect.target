@@ -81,6 +81,10 @@ class TargetRecordDescriptorExtension(RecordDescriptorExtensionBase):
         if target:
             try:
                 hostname = target.hostname
+            except PluginError:
+                pass
+
+            try:
                 domain = target.domain
             except PluginError:
                 pass
