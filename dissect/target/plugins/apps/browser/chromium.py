@@ -16,7 +16,7 @@ from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath, join
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import OperatingSystem, export, internal
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
@@ -550,7 +550,6 @@ class ChromiumMixin:
                     _user=user.user,
                 )
 
-    @internal
     def decryption_keys(self, local_state_path: TargetPath, username: str) -> ChromiumKeys:
         """Return decrypted Chromium ``os_crypt.encrypted_key``and ``os_crypt.app_bound_encrypted_key`` values.
 
@@ -659,7 +658,6 @@ class ChromiumMixin:
 
         return keys
 
-    @internal
     def decrypt_value(self, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes | None:
         """Attempt to decrypt the given encrypted bytes."""
 
