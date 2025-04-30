@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import importlib.util
 import logging
 from typing import TYPE_CHECKING
 
+import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.plugins.os.unix.log.journal import JournalPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    import pytest
+    from pytest_benchmark.fixture import BenchmarkFixture
 
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
+
+
+HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -39,7 +44,8 @@ def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None
     assert record.source == "/var/log/journal/1337/user-1000.journal"
 
 
-def test_journal_plugin_benchmark(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+def test_benchmark_journal(benchmark: BenchmarkFixture, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse some large journal files. this demonstrates how slow the journal plugin is."""
 
     system_journal = absolute_path("_data/plugins/os/unix/log/journal/system.journal")
@@ -49,7 +55,8 @@ def test_journal_plugin_benchmark(target_unix: Target, fs_unix: VirtualFilesyste
     fs_unix.map_file("/var/log/journal/deadbeef/user-1000.journal", user_journal)
     target_unix.add_plugin(JournalPlugin)
 
-    results = list(target_unix.journal())
+    results = benchmark(lambda: list(target_unix.journal()))
+
     assert len(results) == 252 + 17986
 
 

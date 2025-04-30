@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import io
 import os
 import random
@@ -12,6 +13,11 @@ from dissect.target.helpers import scrape
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from pytest_benchmark.fixture import BenchmarkFixture
+
+
+HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 def test_one_needle() -> None:
@@ -271,3 +277,8 @@ def test_find_needle() -> None:
 )
 def test_recover_string(buf: bytes, encoding: str, reverse: bool, ascii: bool, expected: str) -> None:
     assert scrape.recover_string(buf, encoding, reverse=reverse, ascii=ascii) == expected
+
+
+@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+def test_benchmark_scrape(benchmark: BenchmarkFixture) -> None:
+    benchmark(lambda: test_multiple_needles())

@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
+
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.loaders.tar import TarLoader
 from dissect.target.plugins.filesystem.walkfs import WalkFSPlugin
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
+
     from dissect.target.target import Target
+
+
+HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -37,3 +48,16 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
         "/root_file",
         "/var",
     ]
+
+
+@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
+def test_benchmark_walkfs(benchmark: BenchmarkFixture, target_bare: Target) -> None:
+    """Benchmark walkfs performance on a small tar archive with ~500 files."""
+
+    loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine.tar")))
+    loader.map(target_bare)
+    target_bare.apply()
+    target_bare.add_plugin(WalkFSPlugin)
+
+    result = benchmark(lambda: list(target_bare.walkfs()))
+    assert len(result) == 533
