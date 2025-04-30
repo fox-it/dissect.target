@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 
 def test_windows_velociraptor(target_win: Target, tmp_path: Path) -> None:
+    """Test that a Windows Velociraptor artefact result is correctly parsed."""
     root = create_root("ntfs", tmp_path)
 
     with absolute_path("_data/plugins/apps/edr/velociraptor/windows-uploads.json").open("rb") as fh:
