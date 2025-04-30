@@ -678,8 +678,7 @@ class ChromiumMixin:
                 b"v11": decrypt_v11_linux,
             },
         }
-        callable = DECRYPT_MAP.get(self.target.os, {}).get(encrypted[0:3], decrypt_unsupported)
-        return callable(self.target, user, keys, encrypted)
+        return DECRYPT_MAP.get(self.target.os, {}).get(encrypted[0:3], decrypt_unsupported)(self.target, keys, encrypted)
 
 
 class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
