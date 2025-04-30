@@ -658,7 +658,7 @@ class ChromiumMixin:
 
         return keys
 
-    def decrypt_value(self, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes | None:
+    def decrypt_value(self, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes:
         """Attempt to decrypt the given encrypted bytes."""
 
         DECRYPT_MAP = {
