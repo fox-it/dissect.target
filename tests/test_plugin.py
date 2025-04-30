@@ -984,35 +984,33 @@ def test_function_aliases(target_default: Target) -> None:
     assert not messages_fd.alias
 
 
-# def test_function_required_arguments(target_default: Target) -> None:
-#     """Test if functions with required arguments are tagged as such correctly."""
+def test_function_required_arguments(target_default: Target) -> None:
+    """Test if functions with required arguments are tagged as such correctly."""
 
-#     # function without any arguments should have an args property with an empty list
-#     syslog_fd = find_functions("syslog", target_default)[0][0]
-#     assert syslog_fd
-#     assert not syslog_fd.args
+    # function without any arguments should have an args property with an empty list
+    syslog_fd = find_functions("syslog", target_default)[0][0]
+    assert syslog_fd
+    assert not syslog_fd.args
 
-#     # function with an argument should have an args property filled
-#     envfile_fd = find_functions("envfile", target_default)[0][0]
-#     assert envfile_fd
-#     assert envfile_fd.args == [
-#         (
-#             ("--env-path",),
-#             {
-#                 "help": "path to scan environment files in",
-#                 "required": True,
-#                 "type": str,
-#             },
-#         ),
-#         (
-#             ("--extension",),
-#             {
-#                 "default": "env",
-#                 "help": "extension of files to scan",
-#                 "type": str,
-#             },
-#         ),
-#     ]
+    # function with an argument should have an args property filled
+    envfile_fd = find_functions("envfile", target_default)[0][0]
+    assert envfile_fd
+    assert envfile_fd.args == [
+        (
+            ("--env-path",),
+            {
+                "help": "path to scan environment files in",
+                "required": True,
+            },
+        ),
+        (
+            ("--extension",),
+            {
+                "default": "env",
+                "help": "extension of files to scan",
+            },
+        ),
+    ]
 
 
 def test_plugin_runtime_info() -> None:
