@@ -381,34 +381,33 @@ class RdpCachePlugin(Plugin):
                 _target=self.target,
             )
 
-    @arg("--output", "-o", dest="output_dir", type=Path, required=True, help="path to recover bitmap files to")
+    @arg("-o", "--output", dest="output_dir", type=Path, required=True, help="path to recover bitmap files to")
     @arg(
-        "--grid",
         "-g",
+        "--grid",
         dest="as_grid",
         action="store_true",
         help="assemble all recovered tiles of a cache into a single grid image with borders around each tile",
     )
     @arg(
-        "--collage",
         "-c",
+        "--collage",
         dest="as_collage",
         action="store_true",
         help="assemble all recovered tiles of a cache into one image",
     )
     @arg(
-        "--no-tiles",
         "-n",
+        "--no-tiles",
         dest="no_individual_tiles",
         action="store_true",
         help="do not save each recovered tile as a separate bitmap",
     )
     @arg(
-        "--remnants",
         "-r",
+        "--remnants",
         choices=["only", "include", "exclude"],
         default="exclude",
-        type=str,
         help="include old leftover colordata in between tiles as separate, 'remnant' tiles",
     )
     @export(output="none")

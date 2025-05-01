@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 from defusedxml import ElementTree
 from flow.record.base import RE_VALID_FIELD_NAME
 
-from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError as DissectFileNotFoundError
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverPlugin,
@@ -302,7 +302,7 @@ class IISLogsPlugin(WebserverPlugin):
                 **{normalise_field_name(field): raw.get(field) for field in extra_fields},
             )
 
-    @plugin.export(record=BasicRecordDescriptor)
+    @export(record=BasicRecordDescriptor)
     def logs(self) -> Iterator[TargetRecordDescriptor]:
         """Return contents of IIS (v7 and above) log files.
 
@@ -323,7 +323,7 @@ class IISLogsPlugin(WebserverPlugin):
             self.target.log.info("Parsing IIS log file %s in %s format", log_file, log_format)
             yield from parse_func(log_file)
 
-    @plugin.export(record=WebserverAccessLogRecord)
+    @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Return contents of IIS (v7 and above) log files in unified WebserverAccessLogRecord format.
 

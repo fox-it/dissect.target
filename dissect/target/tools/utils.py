@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
-    parser.add_argument("-L", "--loader", action="store", default=None, help="select a specific loader (i.e. vmx, raw)")
+    parser.add_argument("-L", "--loader", action="store", help="select a specific loader (i.e. vmx, raw)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", action="store_true", help="print version")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
