@@ -11,6 +11,7 @@ import pytest
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import _generate_long_paths
@@ -553,3 +554,11 @@ def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
     """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
     to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
     return TargetUnixFactory(tmp_path)
+
+
+@pytest.fixture
+def guarded_keychain() -> Iterator[None]:
+    """This fixture clears the keychain from any previously added values."""
+    keychain.KEYCHAIN.clear()
+    yield
+    keychain.KEYCHAIN.clear()
