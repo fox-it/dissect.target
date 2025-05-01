@@ -159,7 +159,7 @@ class CamPlugin(Plugin):
             )
 
     def _open_db(self) -> SQLite3 | None:
-        if self.camdb_path:
+       return SQLite3(self.camdb_path.open("rb")) if self.camdb_path else None
             return SQLite3(self.camdb_path.open("rb"))
         return None
 
