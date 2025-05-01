@@ -176,7 +176,7 @@ class CamPlugin(Plugin):
         return wintimestamp(ts)
 
     def _convert_file_id(self, file_id: str) -> None:
-        if file_id:
+        return digest((None, file_id[4:], None)) if file_id else None
             return digest((None, file_id[4:], None))
         return None
 
