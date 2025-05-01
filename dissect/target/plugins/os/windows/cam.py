@@ -171,7 +171,7 @@ class CamPlugin(Plugin):
         return MAPDB
 
     def _convert_ts(self, ts: int) -> None:
-        if not ts or ts == 0:
+        if not ts:
             return None
         return wintimestamp(ts)
 
