@@ -309,7 +309,7 @@ class CamPlugin(Plugin):
             )
 
         # Process table NonPackagedGlobalPromptHistory
-        table_name = "NonPackagedGlobalPromptHistory"
+        for row in self._yield_rows("NonPackagedGlobalPromptHistory"):
         for row in self._yield_rows(table_name):
             yield CamGlobalPromptHistoryRecord(
                 shown_time=self._convert_ts(row.get("ShownTime")),
