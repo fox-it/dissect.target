@@ -1062,7 +1062,7 @@ class TargetCli(TargetCmd):
     @arg("path")
     @arg("-n", "--length", type=int, default=16 * 20, help="amount of bytes to read")
     @arg("-s", "--skip", type=int, default=0, help="skip offset bytes from the beginning")
-    @arg("-p", "--hex", action="store_true", default=False, help="output in plain hexdump style")
+    @arg("-p", "--hex", action="store_true", help="output in plain hexdump style")
     @arg("-C", "--canonical", action="store_true")
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:

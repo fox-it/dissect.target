@@ -59,16 +59,24 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
 
     for desc in functions or _get_default_functions():
         docstring = desc.func.__doc__.split("\n\n", 1)[0].strip() if desc.func.__doc__ else None
-        arguments = [
-            {
+        arguments = []
+
+        for name, _arg in desc.args:
+            is_bool_action = _arg.get("action", "") in ("store_true", "store_false")
+            arg_desc = {
                 "name": name[0],
-                "type": getattr(arg.get("type"), "__name__", None),
-                "help": arg.get("help"),
-                "default": arg.get("default"),
-                "required": arg.get("required", False),
+                # infer the type either by store_*, type argument and fallback to default str.
+                # See: https://docs.python.org/3/library/argparse.html#type
+                "type": "bool" if is_bool_action else getattr(_arg.get("type"), "__name__", "str"),
+                "help": _arg.get("help"),
+                "default": _arg.get("action") == "store_false"
+                if is_bool_action
+                else (_arg.get("default") or _arg.get("const")),
+                # required can either be set explicitly or is implied with '--' style arguments.
+                "required": _arg.get("required", False),
             }
-            for name, arg in desc.args
-        ]
+
+            arguments.append(arg_desc)
 
         loaded.append(
             {
@@ -151,12 +159,12 @@ class PluginListPlugin(Plugin):
         pass
 
     @export(output="none", cache=False)
-    @arg("--docs", dest="print_docs", action="store_true")
+    @arg("--docs", dest="print_docs", action="store_true", help="output docstrings")
     # NOTE: We would prefer to re-use arguments across plugins from argparse in query.py, but that is not possible yet.
     # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
     # https://github.com/fox-it/dissect.target/pull/841
     # https://github.com/fox-it/dissect.target/issues/889
-    @arg("--as-json", dest="as_json", action="store_true")
+    @arg("--as-json", dest="as_json", action="store_true", help="output in JSON format")
     def plugins(self, print_docs: bool = False, as_json: bool = False) -> None:
         """Print all available plugins."""
         if as_json:
