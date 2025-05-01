@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import pathlib
 import tempfile
 import textwrap
@@ -35,6 +36,16 @@ if TYPE_CHECKING:
     from dissect.target.plugin import OSPlugin
 
 
+HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    if not HAS_BENCHMARK:
+        # If we don't have pytest-benchmark (or pytest-codspeed) installed, register the benchmark marker ourselves
+        # to avoid pytest warnings
+        config.addinivalue_line("markers", "benchmark: mark test for benchmarking (requires pytest-benchmark)")
+
+
 def pytest_sessionstart(session: pytest.Session) -> None:
     # Test if the _data/ directory is present and if not, as is the case in Python
     # source distributions of dissect.target, we give an error
@@ -64,6 +75,11 @@ def pytest_sessionstart(session: pytest.Session) -> None:
                         "\n! !"
                     )
             break
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    if not HAS_BENCHMARK and item.get_closest_marker("benchmark") is not None:
+        pytest.skip("pytest-benchmark is not installed")
 
 
 @pytest.fixture(autouse=True)

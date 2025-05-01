@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import logging
 from typing import TYPE_CHECKING
 
@@ -15,9 +14,6 @@ if TYPE_CHECKING:
 
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
-
-
-HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -44,8 +40,8 @@ def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None
     assert record.source == "/var/log/journal/1337/user-1000.journal"
 
 
-@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
-def test_benchmark_journal(benchmark: BenchmarkFixture, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+@pytest.mark.benchmark
+def test_benchmark_journal(target_unix: Target, fs_unix: VirtualFilesystem, benchmark: BenchmarkFixture) -> None:
     """Test if we can parse some large journal files. this demonstrates how slow the journal plugin is."""
 
     system_journal = absolute_path("_data/plugins/os/unix/log/journal/system.journal")

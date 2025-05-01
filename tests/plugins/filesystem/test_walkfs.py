@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,9 +14,6 @@ if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
 
     from dissect.target.target import Target
-
-
-HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
 
 def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -50,8 +46,8 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     ]
 
 
-@pytest.mark.skipif(not HAS_BENCHMARK, reason="pytest-benchmark not installed")
-def test_benchmark_walkfs(benchmark: BenchmarkFixture, target_bare: Target) -> None:
+@pytest.mark.benchmark
+def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> None:
     """Benchmark walkfs performance on a small tar archive with ~500 files."""
 
     loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine.tar")))
