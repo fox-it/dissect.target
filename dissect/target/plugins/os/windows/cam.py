@@ -181,7 +181,8 @@ class CamPlugin(Plugin):
         return None
 
     def _yield_rows(self, table_name: str) -> Iterator[Row]:
-        table = self.camdb.table(table_name)
+        if not (table := self.camdb.table(table_name)):
+            return
         if not table:
             return
         yield from table
