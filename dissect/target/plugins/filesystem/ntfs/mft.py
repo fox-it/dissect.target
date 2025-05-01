@@ -158,7 +158,7 @@ class MftPlugin(NamespacePlugin):
         action="store_true",
         help="compacts the MFT entry timestamps into a single record",
     )
-    @arg("--fs", type=int, default=None, help="optional filesystem index, zero indexed")
+    @arg("--fs", type=int, help="optional filesystem index, zero indexed")
     @arg("--start", type=int, default=0, help="the first MFT segment number")
     @arg("--end", type=int, default=-1, help="the last MFT segment number")
     @arg(

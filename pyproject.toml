@@ -109,6 +109,7 @@ dev = [
     "dissect.volume[dev]>=3.0.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
     "pexpect",
+    "docutils",
     "typing_extensions",
 ]
 yara = [
