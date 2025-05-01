@@ -15,7 +15,7 @@ from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import _generate_long_paths
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
@@ -302,7 +302,7 @@ def target_bare(tmp_path: pathlib.Path) -> Iterator[Target]:
 
 @pytest.fixture
 def target_default(tmp_path: pathlib.Path) -> Target:
-    return make_os_target(tmp_path, DefaultPlugin)
+    return make_os_target(tmp_path, DefaultOSPlugin)
 
 
 @pytest.fixture

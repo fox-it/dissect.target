@@ -6,7 +6,7 @@ import textwrap
 from dissect.target import plugin
 from dissect.target.helpers.docs import INDENT_STEP, get_plugin_overview
 from dissect.target.plugin import Plugin, arg, export
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 
 def generate_functions_overview(
@@ -97,7 +97,7 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
 
 def _get_default_functions() -> list[plugin.FunctionDescriptor]:
     return [f for f in plugin.functions() if f.exported] + [
-        f for f in plugin.functions(index="__os__") if f.exported and f.module == DefaultPlugin.__module__
+        f for f in plugin.functions(index="__os__") if f.exported and f.module == DefaultOSPlugin.__module__
     ]
 
 

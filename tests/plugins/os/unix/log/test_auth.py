@@ -10,16 +10,16 @@ import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.plugins.os.unix.log.auth import AuthPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
-def test_auth_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_auth(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
     data_path = "_data/plugins/os/unix/log/auth/auth.log"
@@ -39,7 +39,7 @@ def test_auth_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
         assert results[-1].message == "pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
-def test_auth_plugin_with_gz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_auth_with_gz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Pacific/Honolulu"))
 
     empty_file = absolute_path("_data/plugins/os/unix/log/empty.log")
@@ -62,7 +62,7 @@ def test_auth_plugin_with_gz(target_unix: Target, fs_unix: VirtualFilesystem) ->
         assert results[-1].message == "pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
-def test_auth_plugin_with_bz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_auth_with_bz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"America/Nuuk"))
 
     empty_file = absolute_path("_data/plugins/os/unix/log/empty.log")
@@ -85,7 +85,7 @@ def test_auth_plugin_with_bz(target_unix: Target, fs_unix: VirtualFilesystem) ->
         assert results[-1].message == "pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
-def test_auth_plugin_year_rollover(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_auth_year_rollover(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Etc/UTC"))
 
     data_path = "_data/plugins/os/unix/log/auth/secure"
@@ -289,7 +289,7 @@ def test_auth_plugin_year_rollover(target_unix: Target, fs_unix: VirtualFilesyst
         ),
     ],
 )
-def test_auth_plugin_additional_fields(
+def test_auth_additional_fields(
     target_unix: Target, fs_unix: VirtualFilesystem, tmp_path: Path, message: str, results: dict[str, str | int]
 ) -> None:
     data_path = tmp_path / "auth.log"
@@ -310,7 +310,7 @@ def test_auth_plugin_additional_fields(
         assert plugin_result == value
 
 
-def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_auth_iso_date_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we correctly handle Ubuntu 24.04 ISO formatted dates."""
 
     fs_unix.map_file("/var/log/auth.log", absolute_path("_data/plugins/os/unix/log/auth/iso.log"))
@@ -331,3 +331,12 @@ def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesy
         results[0].message
         == "user : TTY=pts/0 ; PWD=/home/user ; USER=root ; COMMAND=/usr/bin/chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg"  # noqa: E501
     )
+
+
+def test_auth_direct_mode() -> None:
+    data_path = absolute_path("_data/plugins/os/unix/log/auth/auth.log")
+
+    target = Target.open_direct([data_path])
+    results = list(target.authlog())
+
+    assert len(results) == 10
