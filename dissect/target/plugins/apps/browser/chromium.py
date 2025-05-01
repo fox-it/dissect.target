@@ -677,7 +677,7 @@ class ChromiumMixin:
             },
         }
         return DECRYPT_MAP.get(self.target.os, {}).get(encrypted[0:3], decrypt_unsupported)(
-            self.target, keys, encrypted
+            self.target, user, keys, encrypted
         )
 
 
