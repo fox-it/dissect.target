@@ -27,7 +27,7 @@ def main() -> int:
     )
 
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("-s", "--strings", default=False, action="store_true", help="print output as string")
+    parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("--children", action="store_true", help="include children")
 
     for args, kwargs in getattr(YaraPlugin.yara, "__args__", []):

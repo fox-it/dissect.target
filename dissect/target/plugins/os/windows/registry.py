@@ -122,7 +122,7 @@ class RegistryPlugin(Plugin):
 
                 if hive_file.stat().st_size == 0:
                     # Only log to debug if we have found a valid hive in a previous path
-                    log_level = logging.DEBUG if log_empty_to_debug and fname in opened_hives else logging.WARNING
+                    log_level = logging.DEBUG if log_empty_to_debug or fname in opened_hives else logging.WARNING
                     self.target.log.log(log_level, "Empty hive: %s", hive_file)
                     continue
 

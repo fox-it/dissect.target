@@ -159,9 +159,7 @@ class CamPlugin(Plugin):
             )
 
     def _open_db(self) -> SQLite3 | None:
-       return SQLite3(self.camdb_path.open("rb")) if self.camdb_path else None
-            return SQLite3(self.camdb_path.open("rb"))
-        return None
+        return SQLite3(self.camdb_path.open("rb")) if self.camdb_path else None
 
     def _build_context_dict(self) -> defaultdict[str, dict] | None:
         MAPDB = defaultdict(dict)
@@ -177,13 +175,9 @@ class CamPlugin(Plugin):
 
     def _convert_file_id(self, file_id: str) -> None:
         return digest((None, file_id[4:], None)) if file_id else None
-            return digest((None, file_id[4:], None))
-        return None
 
     def _yield_rows(self, table_name: str) -> Iterator[Row]:
         if not (table := self.camdb.table(table_name)):
-            return
-        if not table:
             return
         yield from table
 
@@ -297,7 +291,6 @@ class CamPlugin(Plugin):
 
         # Process table NonPackagedIdentityRelationship
         for row in self._yield_rows("NonPackagedIdentityRelationship"):
-        for row in self._yield_rows(table_name):
             yield CamIdentityRelationshipHistoryRecord(
                 last_observed_time=self._convert_ts(row.get("LastObservedTime")),
                 package_type=table_name,
@@ -310,7 +303,6 @@ class CamPlugin(Plugin):
 
         # Process table NonPackagedGlobalPromptHistory
         for row in self._yield_rows("NonPackagedGlobalPromptHistory"):
-        for row in self._yield_rows(table_name):
             yield CamGlobalPromptHistoryRecord(
                 shown_time=self._convert_ts(row.get("ShownTime")),
                 package_type=table_name,
@@ -366,11 +358,19 @@ class CamPlugin(Plugin):
             if last_started and last_stopped:
                 duration = (last_stopped - last_started).seconds
 
+            # The "device" is derived from the subkey (webcam in this case) of ConsentStore example:
+            # HKLM\\...\\CapabilityAccessManager\\ConsentStore\\webcam\\C:#Program Files#Mozilla Firefox#firefox.exe
+            device = key.path.split("\\")[-2]
+
+            # The application/or path of the application using the device is the key.name itself:
+            # C:#Program Files#Mozilla Firefox#firefox.exe
+            path = windows_path(key.name.replace("#", "\\")) if "#" in key.name else None
+
             yield CamRegistryRecord(
                 ts=key.ts,
-                device=key.path.split("\\")[-2],
+                device=device,
                 app_name=key.name,
-                path=windows_path(key.name.replace("#", "\\")) if "#" in key.name else None,
+                path=path,
                 last_started=last_started,
                 last_stopped=last_stopped,
                 duration=duration,

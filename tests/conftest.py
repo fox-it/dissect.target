@@ -11,10 +11,11 @@ import pytest
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import _generate_long_paths
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
@@ -34,17 +35,36 @@ if TYPE_CHECKING:
 
     from dissect.target.plugin import OSPlugin
 
-# Test if the data/ directory is present and if not, as is the case in Python
-# source distributions of dissect.target, we give an error
-data_dir = absolute_path("_data")
-if not pathlib.Path(data_dir).is_dir():
-    raise pytest.PytestConfigWarning(
-        f"No test data directory {data_dir} found.\n"
-        "This can happen when you have downloaded the source distribution\n"
-        "of dissect.target from pypi.org. If so, retrieve the test data from\n"
-        "the dissect.target GitHub repository at:\n"
-        "https://github.com/fox-it/dissect.target"
-    )
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    # Test if the _data/ directory is present and if not, as is the case in Python
+    # source distributions of dissect.target, we give an error
+    data_dir = absolute_path("_data")
+    if not data_dir.is_dir():
+        session.shouldfail = (
+            "! !\n"
+            f"No test data directory {data_dir} found.\n"
+            "This can happen when you have downloaded the source distribution\n"
+            "of dissect.target from pypi.org. If so, retrieve the test data from\n"
+            "the dissect.target GitHub repository at:\n"
+            "https://github.com/fox-it/dissect.target"
+            "\n! !"
+        )
+    else:
+        # Test if the test data looks like LFS references and if so, we give an error
+        # This can happen when git-lfs is not installed or not configured correctly
+        for file in (path for path in data_dir.rglob("*") if path.is_file()):
+            with file.open("rb") as fh:
+                if fh.read(42) == b"version https://git-lfs.github.com/spec/v1":
+                    session.shouldfail = (
+                        "! !\n"
+                        "Test data files look like git-lfs references.\n"
+                        "This can happen when git-lfs is not installed or not configured correctly.\n"
+                        "Install git-lfs and run: \n"
+                        "git lfs install && git lfs pull"
+                        "\n! !"
+                    )
+            break
 
 
 @pytest.fixture(autouse=True)
@@ -282,7 +302,7 @@ def target_bare(tmp_path: pathlib.Path) -> Iterator[Target]:
 
 @pytest.fixture
 def target_default(tmp_path: pathlib.Path) -> Target:
-    return make_os_target(tmp_path, DefaultPlugin)
+    return make_os_target(tmp_path, DefaultOSPlugin)
 
 
 @pytest.fixture
@@ -534,3 +554,11 @@ def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
     """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
     to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
     return TargetUnixFactory(tmp_path)
+
+
+@pytest.fixture
+def guarded_keychain() -> Iterator[None]:
+    """This fixture clears the keychain from any previously added values."""
+    keychain.KEYCHAIN.clear()
+    yield
+    keychain.KEYCHAIN.clear()

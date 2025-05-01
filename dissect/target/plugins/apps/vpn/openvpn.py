@@ -162,7 +162,7 @@ class OpenVPNPlugin(Plugin):
         return parser.parsed_data
 
     @export(record=[OpenVPNServer, OpenVPNClient])
-    @arg("--export-key", action="store_true")
+    @arg("--export-key", action="store_true", help="export private keys to records")
     def config(self, export_key: bool = False) -> Iterator[OpenVPNServer | OpenVPNClient]:
         """Parses config files from openvpn interfaces."""
         # We define the parser here so we can reuse it

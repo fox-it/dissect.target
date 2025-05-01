@@ -1062,7 +1062,7 @@ class TargetCli(TargetCmd):
     @arg("path")
     @arg("-n", "--length", type=int, default=16 * 20, help="amount of bytes to read")
     @arg("-s", "--skip", type=int, default=0, help="skip offset bytes from the beginning")
-    @arg("-p", "--hex", action="store_true", default=False, help="output in plain hexdump style")
+    @arg("-p", "--hex", action="store_true", help="output in plain hexdump style")
     @arg("-C", "--canonical", action="store_true")
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1583,11 +1583,12 @@ def main() -> int:
     # PyPy < 3.10.14 readline is stuck in Python 2.7
     if platform.python_implementation() == "PyPy":
         major, minor, patch = tuple(map(int, platform.python_version_tuple()))
-        if major <= 3 and minor <= 10 and patch < 14:
+        if major < 3 or (major == 3 and (minor < 10 or (minor == 10 and patch < 14))):
             print(
                 "Note for users of PyPy < 3.10.14:\n"
                 "Autocomplete might not work due to an outdated version of pyrepl/readline.py\n"
-                "To fix this, please update your version of PyPy."
+                "To fix this, please update your version of PyPy.",
+                file=sys.stderr,
             )
 
     try:

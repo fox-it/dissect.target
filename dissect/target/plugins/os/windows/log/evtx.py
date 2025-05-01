@@ -9,9 +9,9 @@ from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException
 from flow.record import Record, utils
 
-from dissect.target import plugin
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.os.windows.log.evt import WindowsEventlogsMixin
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
 EVTX_GLOB = "*.evtx"
 
 
-class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
+class EvtxPlugin(WindowsEventlogsMixin, Plugin):
     """Plugin for fetching and parsing Windows Eventlog Files (``*.evtx``)."""
 
     RECORD_NAME = "filesystem/windows/evtx"
@@ -39,9 +39,9 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
         super().__init__(target)
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
 
-    @plugin.arg("--logs-dir", help="logs directory to scan")
-    @plugin.arg("--log-file-glob", default=EVTX_GLOB, help="glob pattern to match a log file name")
-    @plugin.export(record=DynamicDescriptor(["datetime"]))
+    @arg("--logs-dir", help="logs directory to scan")
+    @arg("--log-file-glob", default=EVTX_GLOB, help="glob pattern to match a log file name")
+    @export(record=DynamicDescriptor(["datetime"]))
     def evtx(self, log_file_glob: str = EVTX_GLOB, logs_dir: str | None = None) -> Iterator[DynamicDescriptor]:
         """Return entries from Windows Event log files (``*.evtx``).
 
@@ -86,7 +86,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
             for event in evtx.Evtx(entry_data):
                 yield self._build_record(event, entry)
 
-    @plugin.export(record=DynamicDescriptor(["datetime"]))
+    @export(record=DynamicDescriptor(["datetime"]))
     def scraped_evtx(self) -> Iterator[DynamicDescriptor]:
         """Return EVTX log file records scraped from target disks."""
         yield from self.target.scrape.scrape_chunks_from_disks(
