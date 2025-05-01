@@ -296,7 +296,7 @@ class CamPlugin(Plugin):
                 )
 
         # Process table NonPackagedIdentityRelationship
-        table_name = "NonPackagedIdentityRelationship"
+        for row in self._yield_rows("NonPackagedIdentityRelationship"):
         for row in self._yield_rows(table_name):
             yield CamIdentityRelationshipHistoryRecord(
                 last_observed_time=self._convert_ts(row.get("LastObservedTime")),
