@@ -127,7 +127,7 @@ class CamPlugin(Plugin):
         super().__init__(target)
         self.app_regf_keys = self._find_apps()
         self.camdb_path = self._find_db()
-        self.camdb = None
+        self.camdb: SQLite3 | None = None
 
     def _find_apps(self) -> list[RegistryKey]:
         return [key for store in self.target.registry.keys(self.CONSENT_STORES) for key in store.subkeys()]
