@@ -162,7 +162,7 @@ def get_mounts_info(target: Target) -> list[dict[str, str | None]]:
 
 
 def get_children_info(target: Target) -> list[dict[str, str]]:
-    return [{"type": c.type, "path": str(c.path)} for c in target.list_children()]
+    return [{"#": i, "type": c.type, "path": str(c.path)} for i, c in enumerate(target.list_children())]
 
 
 if __name__ == "__main__":
