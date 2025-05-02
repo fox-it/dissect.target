@@ -30,10 +30,15 @@ def test_child_vmware_workstation(
     fs = request.getfixturevalue(fs)
 
     fs.map_file(inventory_path, absolute_path("_data/plugins/child/vmware_workstation/inventory.vmls"))
+
     target.add_plugin(VmwareWorkstationChildTargetPlugin)
-    children = list(target.list_children())
+    children = [child for _, child in target.list_children()]
 
     assert len(children) == 3
+    assert children[0].type == "vmware_workstation"
+    assert children[0].name == "First Virtual Machine"
+    assert children[0].path == "/path/to/first/vm/vm.vmx"
+
     assert [c.path for c in children] == [
         "/path/to/first/vm/vm.vmx",
         "/path/to/second/vm/vm.vmx",
