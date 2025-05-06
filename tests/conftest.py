@@ -11,10 +11,11 @@ import pytest
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import _generate_long_paths
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
@@ -301,7 +302,7 @@ def target_bare(tmp_path: pathlib.Path) -> Iterator[Target]:
 
 @pytest.fixture
 def target_default(tmp_path: pathlib.Path) -> Target:
-    return make_os_target(tmp_path, DefaultPlugin)
+    return make_os_target(tmp_path, DefaultOSPlugin)
 
 
 @pytest.fixture
@@ -553,3 +554,11 @@ def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
     """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
     to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
     return TargetUnixFactory(tmp_path)
+
+
+@pytest.fixture
+def guarded_keychain() -> Iterator[None]:
+    """This fixture clears the keychain from any previously added values."""
+    keychain.KEYCHAIN.clear()
+    yield
+    keychain.KEYCHAIN.clear()

@@ -17,9 +17,9 @@ def target_brave(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     base_path_default = "Users\\John\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default"
     base_path_profile = "Users\\John\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Profile 1"
     files = [
-        ("History", "_data/plugins/apps/browser/chrome/History"),
-        ("Preferences", "_data/plugins/apps/browser/chrome/Preferences"),
-        ("Secure Preferences", "_data/plugins/apps/browser/chrome/Secure Preferences"),
+        ("History", "_data/plugins/apps/browser/chrome/generic/History"),
+        ("Preferences", "_data/plugins/apps/browser/chrome/generic/Preferences"),
+        ("Secure Preferences", "_data/plugins/apps/browser/chrome/generic/Secure Preferences"),
         ("Network\\Cookies", "_data/plugins/apps/browser/chromium/Cookies"),
         ("Login Data", "_data/plugins/apps/browser/chromium/Login Data"),
     ]

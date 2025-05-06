@@ -296,7 +296,7 @@ def test_target_win_force_dirfs(mocked_win_volumes_fs: tuple[Mock, Mock, Mock]) 
     # original volumes are attached
     assert len(target.volumes) == 2
 
-    # FSs from both volumes, bad and good, are mounted + 2 mounts by DefaultPlugin
+    # FSs from both volumes, bad and good, are mounted + 2 mounts by DefaultOSPlugin
     assert set(target.fs.mounts.keys()) == {
         mock_bad_volume.drive_letter,
         mock_good_volume.drive_letter,
@@ -322,7 +322,7 @@ def test_target_win_fallback_dirfs(mocked_win_volumes_fs: tuple[Mock, Mock, Mock
     # both volumes are present
     assert len(target.volumes) == 2
 
-    # FSs from both volumes, bad and good, are mounted + 2 mounts by DefaultPlugin
+    # FSs from both volumes, bad and good, are mounted + 2 mounts by DefaultOSPlugin
     assert set(target.fs.mounts.keys()) == {
         mock_bad_volume.drive_letter,
         mock_good_volume.drive_letter,

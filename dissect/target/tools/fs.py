@@ -108,7 +108,7 @@ def main() -> int:
     parser.add_argument("target", type=pathlib.Path, help="Target to load", metavar="TARGET")
 
     baseparser = argparse.ArgumentParser(add_help=False)
-    baseparser.add_argument("path", type=str, help="path to perform an action on", metavar="PATH")
+    baseparser.add_argument("path", help="path to perform an action on", metavar="PATH")
 
     subparsers = parser.add_subparsers(dest="subcommand", help="subcommands for performing various actions")
     parser_ls = subparsers.add_parser(
@@ -139,7 +139,7 @@ def main() -> int:
         help="copy multiple files to a directory specified by --output",
         parents=[baseparser],
     )
-    parser_cp.add_argument("-o", "--output", type=str, default=".", help="output directory")
+    parser_cp.add_argument("-o", "--output", default=".", help="output directory")
     parser_cp.set_defaults(handler=cp)
     configure_generic_arguments(parser)
 

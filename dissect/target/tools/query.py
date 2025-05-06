@@ -140,6 +140,7 @@ def main() -> int:
         default=None,
         help="list (matching) available plugins and loaders",
     )
+    parser.add_argument("--direct", action="store_true", help="treat TARGETS as paths to pass to plugins directly")
 
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
@@ -272,7 +273,9 @@ def main() -> int:
     execution_report.set_event_callbacks(Target)
 
     try:
-        for target in Target.open_all(args.targets, args.children):
+        targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
+
+        for target in targets:
             if args.child:
                 try:
                     target = target.open_child(args.child)

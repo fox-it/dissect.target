@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.plugins.apps.browser.chromium import ChromiumPlugin, decrypt_v10
+from dissect.target.plugins.apps.browser.chromium import ChromiumPlugin, decrypt_v10_linux
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -153,7 +153,15 @@ def test_unix_chromium_passwords_gnome(target_unix_users: Target, fs_unix: Virtu
     assert records[0].url == "https://test.com/"
 
 
-def test_decrypt_v10() -> None:
-    encrypted = b"v10\xd0&E\xbb\x85\xe7_\xfd\xf8\x93\x90/\x08{'\xa9"
-    decrypted = decrypt_v10(encrypted)
-    assert decrypted == "password"
+def test_decrypt_v10_linux_peanuts_key() -> None:
+    """Test if we can decrypt a Linux V10 peanuts ciphertext."""
+    encrypted = bytes.fromhex("763130d02645bb85e75ffdf893902f087b27a9")
+    decrypted = decrypt_v10_linux(None, None, None, encrypted)
+    assert decrypted == b"password"
+
+
+def test_decrypt_v10_linux_empty_key() -> None:
+    """Test if we can decrypt a Linux V10 empty key ciphertext."""
+    encrypted = bytes.fromhex("763130195b29422c335652fb7a909368cbb3c6")
+    decrypted = decrypt_v10_linux(None, None, None, encrypted)
+    assert decrypted == b"password"

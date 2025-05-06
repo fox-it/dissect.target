@@ -1,22 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-import pytest
 
 from dissect.target.helpers import keychain
 from tests._utils import absolute_path
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-
-@pytest.fixture
-def guarded_keychain() -> Iterator[None]:
-    keychain.KEYCHAIN.clear()
-    yield
-    keychain.KEYCHAIN.clear()
 
 
 def test_keychain_register_keychain_file(guarded_keychain: None) -> None:

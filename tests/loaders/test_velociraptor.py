@@ -24,6 +24,7 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/$Extend",
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/windows/system32",
         f"uploads/{sub_dir}/%5C%5C.%5CC%3A/%2ETEST",
+        "results",
     ]
     root = tmp_path
     mkdirs(root, paths)
@@ -52,16 +53,10 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize(
-    ("sub_dir", "other_dir"),
-    [
-        ("mft", "auto"),
-        ("ntfs", "auto"),
-        ("ntfs_vss", "auto"),
-        ("lazy_ntfs", "auto"),
-        ("auto", "ntfs"),
-    ],
+    "sub_dir",
+    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
-def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_path: Path) -> None:
+def test_windows_ntfs(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
     root = create_root(sub_dir, tmp_path)
 
     assert VelociraptorLoader.detect(root) is True

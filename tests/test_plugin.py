@@ -41,7 +41,7 @@ from dissect.target.plugin import (
 )
 from dissect.target.plugins.apps.other.env import EnvironmentFilePlugin
 from dissect.target.plugins.general.users import UsersPlugin
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
@@ -952,7 +952,7 @@ def test_plugins_default_plugin(target_default: Target) -> None:
     assert default_plugin_plugins == all_plugins
 
     # The all_with_home is a sentinel function, which should be loaded for a
-    # target with DefaultPlugin as OS plugin.
+    # target with DefaultOSPlugin as OS plugin.
     sentinel_function = "all_with_home"
     has_sentinel_function = False
     for p in default_plugin_plugins:
@@ -1219,12 +1219,14 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     Resources:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
-    # Ignore DefaultPlugin and NamespacePlugin instances
-    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultPlugin:
+    # Ignore DefaultOSPlugin and NamespacePlugin instances
+    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultOSPlugin:
         return
 
     # Plugin method should specify what it returns
-    assert descriptor.output in ["record", "yield", "default", "none"], f"Invalid output_type for function {descriptor}"
+    assert descriptor.output in ["record", "yield", "default", "none"], (
+        f"Invalid output_type for function {descriptor.func.__qualname__}"
+    )
 
     annotations = None
 
@@ -1236,14 +1238,14 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
     # Plugin method should have a return annotation
     assert annotations
-    assert "return" in annotations, f"No return type annotation for function {descriptor}"
+    assert "return" in annotations, f"No return type annotation for function {descriptor.func.__qualname__}"
 
     # TODO: Check if the annotations make sense with the provided output_type
 
     # Plugin method should have a docstring
     method_doc_str = descriptor.func.__doc__
-    assert isinstance(method_doc_str, str), f"No docstring for function {descriptor}"
-    assert method_doc_str != "", f"Empty docstring for function {descriptor}"
+    assert isinstance(method_doc_str, str), f"No docstring for function {descriptor.func.__qualname__}"
+    assert method_doc_str != "", f"Empty docstring for function {descriptor.func.__qualname__}"
 
     # The method docstring should compile to rst without warnings
     assert_valid_rst(method_doc_str)
@@ -1255,6 +1257,70 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
+
+    # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
+    for arg in descriptor.args:
+        names, settings = arg
+        is_bool_action = settings.get("action", "") in (
+            "store_true",
+            "store_false",
+        )
+
+        assert names, f"No argument names for argument of function {descriptor.func.__qualname__}"
+        assert sorted(names, key=len) == list(names), (
+            f"Argument names {names!r} for function {descriptor.func.__qualname__} should specify short form first"
+        )
+
+        assert settings.get("default", 1) is not None, (
+            f"Superfluous default of None for argument {names[0]} in function {descriptor.func.__qualname__}: "
+            "default is implied as None already."
+        )
+
+        assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.func.__qualname__}"
+
+        dest = settings.get("dest") or names[-1].strip("-").replace("-", "_")
+        assert dest in annotations, (
+            f"Missing type annotation for argument {dest} in function {descriptor.func.__qualname__}"
+        )
+
+        # TODO: More strictly check type annotation, use a contains right now to also match optionals
+        type_ = "bool" if is_bool_action else getattr(settings.get("type"), "__name__", "str")
+        assert type_ in annotations[dest], (
+            f"Invalid type annotation for argument {dest} in function {descriptor.func.__qualname__} "
+            f"({annotations[dest]} instead of {type_})"
+        )
+
+        assert settings.get("type") is not str, (
+            f"Superfluous type of str for argument {names[0]} in function {descriptor.func.__qualname__}: "
+            "type is implied as str by default."
+        )
+
+        # Inverse checks
+
+        if settings.get("required"):
+            assert not settings.get("default"), (
+                "It does not make sense to set an argument to required and have a default value"
+                f"in {names[0]} in function {descriptor.func.__qualname__}"
+            )
+
+        if "required" in settings:
+            assert settings.get("required"), (
+                f"Superfluous required of False for argument {names[0]} in function {descriptor.func.__qualname__}: "
+                "required is implied as False already."
+            )
+
+        if is_bool_action:
+            assert "type" not in settings, (
+                f"Type should not be set for store_true or store_false in {names[0]} in "
+                f"function {descriptor.func.__qualname__}: "
+                "type is implied as boolean already."
+            )
+
+            assert "default" not in settings, (
+                f"Default should not be set for store_true or store_false in {names[0]} in "
+                f"function {descriptor.func.__qualname__}: "
+                "default is implied as opposite boolean already."
+            )
 
 
 def assert_valid_rst(src: str) -> None:
