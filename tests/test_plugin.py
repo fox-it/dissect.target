@@ -370,7 +370,7 @@ class MockOSWarpPlugin(OSPlugin):
 @pytest.mark.parametrize(
     ("search", "assert_num_found"),
     [
-        ("*", 2),  # Found with tree search using wildcard, excluding OS plugins and unfindable
+        ("*", 3),  # Found with tree search using wildcard, excluding unfindable plugins
         ("test.x13.*", 1),  # Found with tree search using wildcard, expands to test.x13.f3
         ("test.x13", 1),  # Found with tree search, same as above, because users expect +*
         ("test.x13.f3", 1),
@@ -380,13 +380,13 @@ class MockOSWarpPlugin(OSPlugin):
         ("test.???.??", 1),  # Found with tree search, using question marks
         ("x13", 0),  # Not Found: Part of namespace but no match
         ("Warp.*", 0),  # Not Found: Namespace != Module so 0
-        ("os.warp._os.f6", 0),  # OS plugins are excluded from tree search
+        ("os.warp._os.f6", 1),  # OS plugins are included in tree search
         ("f6", 1),  # Found with direct match
         ("f22", 1),  # Unfindable has no effect on direct match
         ("Warp.f3", 1),  # Found with namespace + function
         ("f3", 1),  # Found direct match
-        ("os.*", 1),  # Found matching os.f3
-        ("os", 1),  # No tree search for "os" because it's a direct match
+        ("os.*", 2),  # Found matching os.f3
+        ("os", 2),  # No tree search for "os" because it's a direct match
     ],
 )
 def test_find_functions(target: MagicMock, plugins: dict, search: str, assert_num_found: int) -> None:
@@ -1298,8 +1298,8 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     References:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
-    # Ignore DefaultOSPlugin and NamespacePlugin instances
-    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultOSPlugin:
+    # Ignore DefaultOSPlugin, NamespacePlugin and OSPlugin instances
+    if issubclass(descriptor.cls, (NamespacePlugin, OSPlugin)) or descriptor.cls is DefaultOSPlugin:
         return
 
     # Plugin method should specify what it returns
