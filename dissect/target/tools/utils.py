@@ -227,6 +227,8 @@ def list_plugins(
             print(generate_functions_json(collected), end="")
         else:
             print(generate_functions_overview(collected, include_docs=fargs.print_docs))
+    elif json:
+        print("{", end="")
 
     # No real targets specified, show the available loaders
     if not targets:
