@@ -13,6 +13,9 @@ from dissect.target.plugin import Plugin, arg, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.container import Container
+    from dissect.target.volume import Volume
+
 
 re_NOFLAG = 0  # re.NOFLAG is Python 3.11 and newer only
 
