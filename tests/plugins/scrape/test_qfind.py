@@ -90,17 +90,17 @@ def test_qfind_codecs(mock_target: Target) -> None:
     assert results[0].offset == 0x10000
     assert results[0].needle == "ABCD"
     assert results[0].codec == "utf-8"
-    assert results[0].match == "ABCD"
+    assert results[0].match == b"ABCD"
 
     assert results[1].offset == 0x11000
     assert results[1].needle == "ABCD"
     assert results[1].codec == "utf-16-le"
-    assert results[1].match == "ABCD"
+    assert results[1].match == b"ABCD"
 
     assert results[2].offset == 0x12000
     assert results[2].needle == "ABCD"
     assert results[2].codec == "hex"
-    assert results[2].match == "ABCD"
+    assert results[2].match == b"ABCD"
 
     results: list[QFindMatchRecord] = list(mock_target.qfind(["ABCD"], no_hex_decode=True))
     assert len(results) == 1
@@ -109,7 +109,7 @@ def test_qfind_codecs(mock_target: Target) -> None:
     assert results[0].offset == 0x10000
     assert results[0].needle == "ABCD"
     assert results[0].codec == "utf-8"
-    assert results[0].match == "ABCD"
+    assert results[0].match == b"ABCD"
 
 
 def test_qfind_ignore_case(mock_target: Target) -> None:
@@ -123,16 +123,25 @@ def test_qfind_ignore_case(mock_target: Target) -> None:
     assert results[0].offset == 0x10000
     assert results[0].codec == "utf-8"
     assert results[0].needle == "abcd"
-    assert results[0].match == "ABCD"
+    assert results[0].match == b"ABCD"
 
     assert results[1].offset == 0x12000
     assert results[1].codec == "hex"
     assert results[1].needle == "abcd"
-    assert results[1].match == "\udcab\udccd"
+    assert results[1].match == b"\xab\xcd"
 
 
 def test_qfind_regex(mock_target: Target) -> None:
     """Test if qfind can compile and search for regex needles."""
+
+    results: list[QFindMatchRecord] = list(mock_target.qfind([r"[a-d]{4}"], regex=True, ignore_case=True))
+
+    assert len(results) == 1
+    assert results[0].offset == 0x10000
+    assert results[0].needle == r"[a-d]{4}"
+    assert results[0].codec == "utf-8"
+    assert results[0].match == b"ABCD"
+    assert results[0].content == (b"\x00" * 256) + b"ABCD" + (b"\x00" * 252)
 
 
 def test_qfind_unique(target_bare: Target, capsys: pytest.CaptureFixture) -> None:

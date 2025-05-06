@@ -26,7 +26,7 @@ QFindMatchRecord = TargetRecordDescriptor(
         ("varint", "offset"),
         ("string", "needle"),
         ("string", "codec"),
-        ("string", "match"),
+        ("bytes", "match"),
         ("bytes", "content"),
     ],
 )
@@ -114,7 +114,7 @@ class QFindPlugin(Plugin):
             else:
                 encodings.add(codec)
 
-        needle_lookup = {}
+        needle_lookup: dict[bytes, tuple[str, str]] = {}
         for needle in all_needles:
             encoded_needle = needle.encode("utf-8")
             needle_lookup[encoded_needle] = (needle, "utf-8")
@@ -164,7 +164,7 @@ class QFindPlugin(Plugin):
                     continue
                 seen.add(digest)
 
-            match = match.group() if match else original_needle
+            match = match.group() if match else original_needle.encode()
 
             yield QFindMatchRecord(
                 disk=repr(disk),
