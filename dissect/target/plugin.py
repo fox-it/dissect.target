@@ -27,7 +27,7 @@ except ImportError:
 from flow.record import Record, RecordDescriptor
 
 import dissect.target.plugins.os.default as default
-from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import EmptyRecord
@@ -431,6 +431,23 @@ class Plugin:
 
     def __init__(self, target: Target):
         self.target = target
+
+    def __getattr__(self, name: str, /) -> Any:
+        if not self.__namespace__:
+            raise AttributeError(name)
+
+        funcs = self.__functions__
+        if isinstance(self, NamespacePlugin):
+            funcs = self.__subplugins__
+
+        if name not in funcs:
+            raise AttributeError(name)
+
+        class_, func = self.target.get_function(name)
+
+        if isinstance(func, Plugin):
+            return class_
+        return func
 
     def is_compatible(self) -> bool:
         """Perform a compatibility check with the target."""
