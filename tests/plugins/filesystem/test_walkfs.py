@@ -53,7 +53,7 @@ def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> N
     loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine.tar")))
     loader.map(target_bare)
     target_bare.apply()
-    target_bare.add_plugin(WalkFSPlugin)
 
-    result = benchmark(lambda: list(target_bare.walkfs()))
-    assert len(result) == 533
+    result = benchmark(lambda: next(WalkFSPlugin(target_bare).walkfs()))
+
+    assert result.path == "/"

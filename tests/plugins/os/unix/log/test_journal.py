@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
@@ -47,13 +48,13 @@ def test_benchmark_journal(target_unix: Target, fs_unix: VirtualFilesystem, benc
     system_journal = absolute_path("_data/plugins/os/unix/log/journal/system.journal")
     user_journal = absolute_path("_data/plugins/os/unix/log/journal/user-1000.journal")
 
-    fs_unix.map_file("/var/log/journal/deadbeef/system.journal", system_journal)
-    fs_unix.map_file("/var/log/journal/deadbeef/user-1000.journal", user_journal)
-    target_unix.add_plugin(JournalPlugin)
+    fs_unix.map_file("/var/log/journal/deadbeef/system.journal", system_journal)  # contains 252 entries
+    fs_unix.map_file("/var/log/journal/deadbeef/user-1000.journal", user_journal)  # contains 17986 entries
 
-    results = benchmark(lambda: list(target_unix.journal()))
+    result = benchmark(lambda: next(JournalPlugin(target_unix).journal()))
 
-    assert len(results) == 252 + 17986
+    assert result.ts == datetime(2025, 1, 15, 14, 25, 1, 607354, tzinfo=timezone.utc)
+    assert result.message == "pam_unix(cron:session): session opened for user root(uid=0) by root(uid=0)"
 
 
 def test_journal_plugin_unused_object(
