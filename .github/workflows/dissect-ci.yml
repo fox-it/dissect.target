@@ -13,6 +13,7 @@ jobs:
     uses: fox-it/dissect-workflow-templates/.github/workflows/dissect-ci-template.yml@main
     with:
       deb-packages: 'liblzo2-dev'
+      run-benchmarks: true
     secrets: inherit
 
   publish:
