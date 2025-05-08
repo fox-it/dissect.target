@@ -302,9 +302,12 @@ class AuthPlugin(Plugin):
         self._auth_log_builder = AuthLogRecordBuilder(target)
 
     def check_compatible(self) -> None:
-        var_log = self.target.fs.path("/var/log")
-        if not any(var_log.glob("auth.log*")) and not any(var_log.glob("secure*")):
+        if not any(self._get_paths()):
             raise UnsupportedPluginError("No auth log files found")
+
+    def _get_paths(self) -> Iterator[Path]:
+        var_log = self.target.fs.path("/var/log")
+        return chain(var_log.glob("auth.log*"), var_log.glob("secure*"))
 
     @alias("securelog")
     @export(record=DynamicDescriptor(["datetime", "path", "string"]))
@@ -331,8 +334,7 @@ class AuthPlugin(Plugin):
         """
         target_tz = self.target.datetime.tzinfo
 
-        var_log = self.target.fs.path("/var/log")
-        for auth_file in chain(var_log.glob("auth.log*"), var_log.glob("secure*")):
+        for auth_file in self.get_paths():
             if is_iso_fmt(auth_file):
                 iterable = iso_readlines(auth_file)
             else:

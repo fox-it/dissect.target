@@ -80,10 +80,12 @@ GENERIC_PASSWORD_RECORD_FIELDS = [
     ("string", "browser"),
     ("varint", "id"),
     ("uri", "url"),
-    ("string", "encrypted_username"),
-    ("string", "encrypted_password"),
+    ("bytes", "encrypted_username"),
+    ("bytes", "encrypted_password"),
+    ("bytes", "encrypted_notes"),
     ("string", "decrypted_username"),
     ("string", "decrypted_password"),
+    ("string", "decrypted_notes"),
     ("path", "source"),
 ]
 

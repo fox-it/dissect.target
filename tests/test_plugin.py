@@ -41,7 +41,7 @@ from dissect.target.plugin import (
 )
 from dissect.target.plugins.apps.other.env import EnvironmentFilePlugin
 from dissect.target.plugins.general.users import UsersPlugin
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
@@ -952,7 +952,7 @@ def test_plugins_default_plugin(target_default: Target) -> None:
     assert default_plugin_plugins == all_plugins
 
     # The all_with_home is a sentinel function, which should be loaded for a
-    # target with DefaultPlugin as OS plugin.
+    # target with DefaultOSPlugin as OS plugin.
     sentinel_function = "all_with_home"
     has_sentinel_function = False
     for p in default_plugin_plugins:
@@ -1219,8 +1219,8 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     Resources:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
-    # Ignore DefaultPlugin and NamespacePlugin instances
-    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultPlugin:
+    # Ignore DefaultOSPlugin and NamespacePlugin instances
+    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultOSPlugin:
         return
 
     # Plugin method should specify what it returns

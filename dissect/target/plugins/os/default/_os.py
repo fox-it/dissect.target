@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-class DefaultPlugin(OSPlugin):
+class DefaultOSPlugin(OSPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         if len(target.filesystems) == 1:
