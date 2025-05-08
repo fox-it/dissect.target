@@ -44,6 +44,15 @@ def test_docker_plugin_data_roots(target_unix_users: Target, fs_unix: VirtualFil
     ]
 
 
+def test_docker_plugin_data_roots_empty(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    fs_unix.makedirs("var/lib/docker")
+    fs_unix.map_file_fh("/etc/docker/daemon.json", BytesIO(b"{}"))
+
+    assert [str(p) for p in find_installs(target_unix_users)] == [
+        "/var/lib/docker",
+    ]
+
+
 def test_docker_plugin_images(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file(
         "/var/lib/docker/image/overlay2/repositories.json",
