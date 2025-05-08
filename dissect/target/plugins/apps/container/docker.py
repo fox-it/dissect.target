@@ -336,19 +336,19 @@ def find_installs(target: Target) -> Iterator[Path]:
         - https://docs.docker.com/config/daemon/
     """
 
+    default_data_paths = [
+        # Linux
+        "/var/lib/docker",
+        # Windows
+        "sysvol/ProgramData/docker",
+    ]
+
     default_config_paths = [
         # Linux
         "/etc/docker/daemon.json",
         "/var/snap/docker/current/config/daemon.json",
         # Windows
         "sysvol/ProgramData/docker/config/daemon.json",
-    ]
-
-    default_data_paths = [
-        # Linux
-        "/var/lib/docker",
-        # Windows
-        "sysvol/ProgramData/docker",
     ]
 
     user_config_paths = [
