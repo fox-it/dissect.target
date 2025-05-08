@@ -960,7 +960,7 @@ def _filter_tree_match(
     pattern: str, os_filter: type[OSPlugin] | None, show_hidden: bool = False
 ) -> Iterator[FunctionDescriptor]:
     """Perform a slow filter tree match for the given pattern on all ``__regular__``
-    and ``__os`` :class:`FunctionDescriptor` instances.
+    and ``__os__`` :class:`FunctionDescriptor` instances.
     """
 
     path_lookup = _generate_long_paths()
