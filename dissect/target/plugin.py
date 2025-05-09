@@ -14,7 +14,7 @@ import os
 import sys
 import traceback
 from dataclasses import dataclass, field
-from itertools import zip_longest
+from itertools import chain, zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -823,9 +823,10 @@ def failed() -> list[FailureDescriptor]:
 
 @functools.cache
 def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
-    """Generate a dictionary of all long paths to their function descriptors."""
+    """Generate a dictionary of all long paths to their function descriptors for regular and OS functions."""
     paths = {}
-    for value in _get_plugins().__functions__.__regular__.values():
+    functions = _get_plugins().__functions__
+    for value in chain(functions.__regular__.values(), functions.__os__.values()):
         for descriptor in value.values():
             # Namespace plugins are callable so exclude the explicit __call__ method
             if descriptor.method_name == "__call__":
@@ -927,7 +928,7 @@ def find_functions_by_record_field_type(
 
 
 def _filter_exact_match(
-    pattern: str, os_filter: str, exact_match: bool, exact_os_match: bool
+    pattern: str, os_filter: type[OSPlugin] | None, exact_match: bool, exact_os_match: bool
 ) -> Iterator[FunctionDescriptor]:
     if exact_match:
         descriptors = lookup(pattern, os_filter)
@@ -941,7 +942,13 @@ def _filter_exact_match(
         yield descriptor
 
 
-def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) -> Iterator[FunctionDescriptor]:
+def _filter_tree_match(
+    pattern: str, os_filter: type[OSPlugin] | None, show_hidden: bool = False
+) -> Iterator[FunctionDescriptor]:
+    """Perform a slow filter tree match for the given pattern on all ``__regular__``
+    and ``__os__`` :class:`FunctionDescriptor` instances.
+    """
+
     path_lookup = _generate_long_paths()
 
     # Change the treematch pattern into an fnmatch-able pattern to give back all functions from the sub-tree
