@@ -68,6 +68,14 @@ def record_output(strings: bool = False, json: bool = False) -> AbstractWriter:
     return RecordStreamWriter(fp)
 
 
+def list_children(targets: list[str]) -> None:
+    for name, target in [[name, target := Target.open(name)] for name in targets]:
+        print(f"Processing target: {name} (hostname={target.name})")
+        for index, child in enumerate(target.list_children()):
+            print(f"- [#{index}]: type={child.type}, path={child.path}")
+    return
+
+
 def list_plugins(
     targets: list[str] | None = None,
     patterns: str = "",
@@ -129,7 +137,13 @@ def main() -> int:
         action="store_true",
         help="do not execute the functions, but just print which functions would be executed",
     )
-    parser.add_argument("--child", help="load a specific child path or index")
+    parser.add_argument("--child", help="load a specific child path or index, see --list-children")
+    parser.add_argument(
+        "--list-children",
+        action=argparse.BooleanOptionalAction,
+        help="list all children by index and path output to be used in --child",
+    )
+
     parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument(
         "-l",
@@ -223,7 +237,11 @@ def main() -> int:
         return 0
 
     if not args.targets:
-        parser.error("too few arguments")
+        parser.error("too few arguments - missing targets")
+
+    # List found children on targets and exit
+    if args.list_children:
+        return list_children(args.targets)
 
     if not args.function:
         parser.error("argument -f/--function is required")
