@@ -9,6 +9,7 @@ from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundErr
 from dissect.target.filesystem import FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
+from dissect.target.helpers.fsutil import TargetPath
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -122,7 +123,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
         entry = file_entry
         config_parser = None
         try:
-            config_parser = parse(entry, *args, **kwargs)
+            target_path = TargetPath(entry.fs, entry.path)
+            config_parser = parse(target_path, *args, **kwargs)
         except ConfigurationParsingError as e:
             # If a parsing error gets created, it should return the `entry`
             log.debug("Error when parsing %s with message '%s'", entry.path, e)
