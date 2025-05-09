@@ -336,6 +336,13 @@ def find_installs(target: Target) -> Iterator[Path]:
         - https://docs.docker.com/config/daemon/
     """
 
+    default_data_paths = [
+        # Linux
+        "/var/lib/docker",
+        # Windows
+        "sysvol/ProgramData/docker",
+    ]
+
     default_config_paths = [
         # Linux
         "/etc/docker/daemon.json",
@@ -349,20 +356,25 @@ def find_installs(target: Target) -> Iterator[Path]:
         ".docker/daemon.json",
     ]
 
-    if (default_root := target.fs.path("/var/lib/docker")).exists():
-        yield default_root
+    for path in default_data_paths:
+        if (path := target.fs.path(path)).exists():
+            yield path
 
     for path in default_config_paths:
-        if (config_file := target.fs.path(path)).exists() and (
-            data_root_path := target.fs.path(get_data_path(config_file))
-        ).exists():
+        if (
+            (config_file := target.fs.path(path)).exists()
+            and (data_root_path := get_data_path(config_file))
+            and (data_root_path := target.fs.path(data_root_path)).exists()
+        ):
             yield data_root_path
 
     for path in user_config_paths:
         for user_details in target.user_details.all_with_home():
-            if (config_file := user_details.home_path.joinpath(path)).exists() and (
-                data_root_path := target.fs.path(get_data_path(config_file))
-            ).exists():
+            if (
+                (config_file := user_details.home_path.joinpath(path)).exists()
+                and (data_root_path := get_data_path(config_file))
+                and (data_root_path := target.fs.path(data_root_path)).exists()
+            ):
                 yield data_root_path
 
 
