@@ -1014,11 +1014,19 @@ def _filter_compatible(
             raise
 
         try:
-            if plugincls(target).is_compatible():
-                compatible.add(descriptor.qualname)
-                yield descriptor
+            if issubclass(plugincls, OSPlugin):
+                if issubclass(plugincls, target._os_plugin):
+                    compatible.add(descriptor.qualname)
+                    yield descriptor
+                else:
+                    incompatible.add(descriptor.qualname)
+                    continue
             else:
-                incompatible.add(descriptor.qualname)
+                if plugincls(target).is_compatible():
+                    compatible.add(descriptor.qualname)
+                    yield descriptor
+                else:
+                    incompatible.add(descriptor.qualname)
         except Exception:
             incompatible.add(descriptor.qualname)
 
