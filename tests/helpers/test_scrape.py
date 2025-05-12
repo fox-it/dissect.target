@@ -13,6 +13,8 @@ from dissect.target.helpers import scrape
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pytest_benchmark.fixture import BenchmarkFixture
+
 
 def test_one_needle() -> None:
     needle = b"ABCD"
@@ -246,7 +248,7 @@ def test_find_needle() -> None:
     mock_progress.assert_called_once_with(0)
 
     buf = io.BytesIO(b"A" * 100 + b"needle" + b"B" * 100 + b"needle" + b"C" * 100 + b"needle" + b"D" * 100)
-    for i, (_needle, offset) in enumerate(scrape.find_needles(buf, [b"needle"], lock_seek=False, block_size=100)):
+    for i, (_, offset) in enumerate(scrape.find_needles(buf, [b"needle"], lock_seek=False, block_size=100)):
         if i == 0:
             assert offset == 100
             buf.seek(300)
@@ -271,3 +273,10 @@ def test_find_needle() -> None:
 )
 def test_recover_string(buf: bytes, encoding: str, reverse: bool, ascii: bool, expected: str) -> None:
     assert scrape.recover_string(buf, encoding, reverse=reverse, ascii=ascii) == expected
+
+
+@pytest.mark.benchmark
+def test_benchmark_find_needles(benchmark: BenchmarkFixture) -> None:
+    buf = b"A" * 100 + b"needle" + b"B" * 100
+    needles = [b"needle"]
+    benchmark(lambda: list(scrape.find_needles(io.BytesIO(buf), needles)))
