@@ -405,7 +405,7 @@ def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pyt
             }
         ],
         "alias": False,
-        "path": "os.unix._os.users",
+        "path": "os.unix.linux._os.users",
     }
 
 
