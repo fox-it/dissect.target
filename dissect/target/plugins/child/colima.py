@@ -13,8 +13,19 @@ if TYPE_CHECKING:
     from dissect.target import Target
 
 
+def find_containers(paths: list[Path]) -> Iterator[Path]:
+    for path in paths:
+        for config_path in path.iterdir():
+            if (config_file := config_path.joinpath("colima.yaml")).exists():
+                name = f"-{config_file.parts[-2]}" if config_file.parts[-2] != "default" else ""
+                if (disk_path := path.joinpath("_lima", f"colima{name}", "diffdisk")).exists():
+                    yield disk_path
+
+
 class ColimaChildTargetPlugin(ChildTargetPlugin):
     """Child target plugin that yields Colima configuration.
+
+    Colima is a container runtime for macOS and Linux.
 
     Resources:
         - https://github.com/abiosoft/colima/blob/5d2e91c4a491d4ae35d69fb2583f4f959401bc37
@@ -24,29 +35,20 @@ class ColimaChildTargetPlugin(ChildTargetPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.configuration_paths = list(self.find_configurations())
-
-    def find_configurations(self) -> Iterator[Path]:
-        for user_details in self.target.user_details.all_with_home():
-            if (path := user_details.home_path.joinpath(".colima")).exists():
-                yield path
-
-    def find_vms(self, configuration_paths: list[Path]) -> Iterator[Path]:
-        for config_path in configuration_paths:
-            for path in config_path.iterdir():
-                if (path := path.joinpath("colima.yaml")).exists():
-                    name = f"-{path.parts[-2]}" if path.parts[-2] != "default" else ""
-                    if (disk_path := config_path.joinpath(f"_lima/colima{name}/diffdisk")).exists():
-                        yield disk_path
+        self.paths = [
+            path
+            for user in self.target.user_details.all_with_home()
+            if (path := user.home_path.joinpath(".colima")).exists()
+        ]
 
     def check_compatible(self) -> None:
-        if not self.configuration_paths:
+        if not self.paths:
             raise UnsupportedPluginError("No Colima configurations found")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
-        for vm in self.find_vms(self.configuration_paths):
+        for container in find_containers(self.paths):
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=vm,
+                path=container,
                 _target=self.target,
             )
