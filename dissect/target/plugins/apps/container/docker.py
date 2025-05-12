@@ -339,6 +339,7 @@ def find_installs(target: Target) -> Iterator[Path]:
     default_data_paths = [
         # Linux
         "/var/lib/docker",
+        "/var/snap/docker/common/var-lib-docker",
         # Windows
         "sysvol/ProgramData/docker",
     ]
@@ -361,21 +362,21 @@ def find_installs(target: Target) -> Iterator[Path]:
             yield path
 
     for path in default_config_paths:
-        if (
-            (config_file := target.fs.path(path)).exists()
-            and (data_root_path := get_data_path(config_file))
-            and (data_root_path := target.fs.path(data_root_path)).exists()
-        ):
-            yield data_root_path
+        if (config_file := target.fs.path(path)).exists():
+            if not (data_path := get_data_path(config_file)):
+                target.log.info("Unable to get data-root from docker daemon file %s", config_file)
+                continue
+            if (data_root_path := target.fs.path(data_path)).exists():
+                yield data_root_path
 
     for path in user_config_paths:
         for user_details in target.user_details.all_with_home():
-            if (
-                (config_file := user_details.home_path.joinpath(path)).exists()
-                and (data_root_path := get_data_path(config_file))
-                and (data_root_path := target.fs.path(data_root_path)).exists()
-            ):
-                yield data_root_path
+            if (config_file := user_details.home_path.joinpath(path)).exists():
+                if not (data_path := get_data_path(config_file)):
+                    target.log.info("Unable to get data-root from docker daemon file %s", config_file)
+                    continue
+                if (data_root_path := target.fs.path(data_path)).exists():
+                    yield data_root_path
 
 
 def convert_timestamp(timestamp: str | None) -> str | None:
