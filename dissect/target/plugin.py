@@ -1001,7 +1001,7 @@ def _filter_compatible(
 
         try:
             if issubclass(plugincls, OSPlugin):
-                if issubclass(plugincls, target._os_plugin):
+                if issubclass(target._os_plugin, plugincls):
                     compatible.add(descriptor.qualname)
                     yield descriptor
                 else:
