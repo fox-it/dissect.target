@@ -153,6 +153,6 @@ def oci_layers(path: Path) -> list[tuple[str, Path]]:
     layers = [("/", path.joinpath("diff"))]
     for symlink in path.joinpath("lower").read_text().split(":"):
         if symlink:
-            layers.append(("/", path.parent.joinpath(symlink).resolve()))
+            layers.append(("/", path.parent.joinpath(symlink).resolve()))  # noqa: PERF401
 
     return layers

@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.container.podman import PodmanPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 @pytest.fixture
-def target_unix_podman(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Iterator[Target]:
+def target_unix_podman(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Target:
     for id, file in [
         ("ae30bde8949f4d4e5b90ad839bbbaffa03db7d9eccbcad7163c34665084d1b70", "httpd"),
         ("4e82f2c6d0ba1a41eacaa5622fcbb9c4e22c9531e6345291a68f6a2219ac9d1a", "nginx"),
@@ -31,7 +35,7 @@ def target_unix_podman(target_unix_users: Target, fs_unix: VirtualFilesystem) ->
         absolute_path("_data/plugins/apps/container/podman/images.json"),
     )
 
-    yield target_unix_users
+    return target_unix_users
 
 
 def test_podman_images(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:

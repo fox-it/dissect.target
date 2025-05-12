@@ -3,11 +3,10 @@ from __future__ import annotations
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loaders.overlay import OverlayLoader
-from tests.plugins.apps.container.test_podman import target_unix_podman  # noqa: F401
 
 if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
 

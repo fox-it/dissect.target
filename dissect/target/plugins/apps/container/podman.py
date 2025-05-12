@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
 from enum import Enum
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.sql import Error as SQLError
 from dissect.sql import SQLite3
@@ -18,8 +17,13 @@ from dissect.target.plugins.apps.container.container import (
     ContainerPlugin,
 )
 from dissect.target.plugins.apps.container.docker import hash_to_image_id
-from dissect.target.plugins.general.users import UserDetails
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 PodmanImageRecord = TargetRecordDescriptor(
     "apps/containers/podman/image",
@@ -65,18 +69,18 @@ class PodmanPlugin(ContainerPlugin):
 
     __namespace__ = "podman"
 
-    SYSTEM_PATHS = [
+    SYSTEM_PATHS = (
         # Linux
         "/var/lib/containers",
         # Windows
         "sysvol/ProgramData/containers",
         "sysvol/Program Files/RedHat/Podman/containers",
-    ]
+    )
 
-    USER_PATHS = [
+    USER_PATHS = (
         # Linux and Windows
         ".local/share/containers",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -92,7 +96,7 @@ class PodmanPlugin(ContainerPlugin):
                 if (dir := user_details.home_path.joinpath(path)).exists():
                     yield dir, user_details
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self.installs:
             raise UnsupportedPluginError("No Podman install folders found on target")
 
@@ -140,8 +144,7 @@ class PodmanPlugin(ContainerPlugin):
         """
         for dir, _ in self.installs:
             if (db_path := dir.joinpath("storage/db.sql")).exists():
-                for container in self._find_containers_sqlite(db_path):
-                    yield container
+                yield from self._find_containers_sqlite(db_path)
 
     def _find_containers_sqlite(self, db_path: Path) -> Iterator:
         """Find Podman containers from existing ``db.sql``.
@@ -171,7 +174,7 @@ class PodmanPlugin(ContainerPlugin):
             volumes = []
             for mount_point in container.get("spec", {}).get("mounts", []):
                 if mount_point.get("type") == "bind":
-                    volumes.append(f"{mount_point.get('source')}:{mount_point.get('destination')}")
+                    volumes.append(f"{mount_point.get('source')}:{mount_point.get('destination')}")  # noqa: PERF401
 
             # $PODMAN/storage/overlay-containers/<ID>/userdata/config.json -> `.root.path` contains the root folder,
             # this does not seem to be stored in the database at all so we have to resort to loading the `config.json`.
@@ -180,7 +183,7 @@ class PodmanPlugin(ContainerPlugin):
                 config = json.loads(config_path.read_text())
                 mount_path = config.get("root", {}).get("path")
                 if not mount_path:
-                    raise ValueError(f"No root path found in {config_path}")
+                    raise ValueError(f"No root path found in {config_path}")  # noqa: TRY301
                 mount_path = mount_path.replace("/merged", "")
 
             except Exception as e:

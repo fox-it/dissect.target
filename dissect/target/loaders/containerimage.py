@@ -10,6 +10,7 @@ from dissect.target.loaders.tar import TarSubLoader
 
 if TYPE_CHECKING:
     import tarfile
+    from pathlib import Path
 
     from dissect.target.target import Target
 

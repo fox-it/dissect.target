@@ -95,7 +95,7 @@ def test_container_image_filesystem_oci_podman(target_bare: Target) -> None:
         },
     }
 
-    assert sorted(list(map(str, target_bare.fs.path("/").iterdir()))) == [
+    assert sorted(map(str, target_bare.fs.path("/").iterdir())) == [
         "/$fs$",
         "/bin",
         "/dev",
