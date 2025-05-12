@@ -23,7 +23,7 @@ def find_containers(paths: list[Path]) -> Iterator[Path]:
 
 
 class ColimaChildTargetPlugin(ChildTargetPlugin):
-    """Child target plugin that yields Colima configuration.
+    """Child target plugin that yields Colima containers.
 
     Colima is a container runtime for macOS and Linux.
 
