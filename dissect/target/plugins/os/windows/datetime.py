@@ -76,13 +76,16 @@ def parse_systemtime_transition(systemtime: c_tz._SYSTEMTIME, year: int) -> date
     Reference:
         - https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/ns-timezoneapi-time_zone_information
     """
-    month = SundayFirstCalendar.monthdayscalendar(year, systemtime.wMonth)
+    system_month = systemtime.wMonth or 1
+    system_day = systemtime.wDay or 1
+
+    month = SundayFirstCalendar.monthdayscalendar(year, system_month)
     occurrences = [week[systemtime.wDayOfWeek] for week in month if week[systemtime.wDayOfWeek]]
-    target_occurrence = -1 if systemtime.wDay == 5 and len(occurrences) < 5 else systemtime.wDay - 1
+    target_occurrence = -1 if system_day == 5 and len(occurrences) < 5 else system_day - 1
 
     return datetime(  # noqa: DTZ001
         year,
-        systemtime.wMonth,
+        system_month,
         occurrences[target_occurrence],
         systemtime.wHour,
         systemtime.wMinute,
