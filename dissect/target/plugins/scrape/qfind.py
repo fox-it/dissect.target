@@ -135,15 +135,10 @@ class QFindPlugin(Plugin):
             self.target.log.error("No needles to search for (use '--needles' or '--needle-file')")
             return
 
-        if ignore_case and not regex:
+        if ignore_case or regex:
             tmp = {}
             for encoded_needle, _ in needle_lookup.items():
-                tmp[re.compile(re.escape(encoded_needle), re.IGNORECASE)] = _
-            needle_lookup = tmp
-
-        elif regex:
-            tmp = {}
-            for encoded_needle, _ in needle_lookup.items():
+                encoded_needle = encoded_needle if regex else re.escape(encoded_needle)
                 tmp[re.compile(encoded_needle, re.IGNORECASE if ignore_case else re_NOFLAG)] = _
             needle_lookup = tmp
 
