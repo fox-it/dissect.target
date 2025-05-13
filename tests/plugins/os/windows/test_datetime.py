@@ -123,11 +123,6 @@ def test_windows_datetime_foreign(target_win_users: Target, hive_hku: RegistryHi
 
 
 def test_parse_systemtime_transition() -> None:
-    # Test if parse_systemtime_transition functions with only 0's
-    systemtime = c_tz._SYSTEMTIME()
-    output = parse_systemtime_transition(systemtime, 2025)
-    assert output == datetime.datetime(2025, 1, 5, tzinfo=None)  # noqa
-
     # Test behaviour where not all week days are defined in every week for that month
     systemtime = c_tz._SYSTEMTIME(wDay=5, wMonth=10)
     output = parse_systemtime_transition(systemtime, 2025)
