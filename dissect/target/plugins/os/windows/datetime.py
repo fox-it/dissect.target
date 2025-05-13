@@ -158,6 +158,9 @@ class WindowsTimezone(tzinfo):
         assert dt.tzinfo is self
 
         tzi = self.dynamic_dst.get(dt.year, self.tzi)
+        if tzi.daylight_date.wMonth == 0 or tzi.standard_date.wMonth == 0:
+            return False
+
         start, end = get_dst_range(tzi, dt.year)
 
         # DST is flipped in some regions

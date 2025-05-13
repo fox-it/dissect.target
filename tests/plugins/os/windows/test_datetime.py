@@ -61,6 +61,10 @@ def test_windows_datetime(target_win_tzinfo: Target) -> None:
     assert not eu_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 2, 0, 0, tzinfo=eu_tzinfo))
     assert eu_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 3, 0, 0, tzinfo=eu_tzinfo))
 
+    # Test utc tzinfo is_dst
+    utc_tzinfo = target_win_tzinfo.datetime.tz("UTC")
+    assert not utc_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 2, 0, 0, tzinfo=utc_tzinfo))
+
 
 def test_windows_timezone_legacy(target_win_tzinfo_legacy: Target) -> None:
     # Older Windows version (prior to Windows 7) use localized time zone ids like "Paaseiland"
