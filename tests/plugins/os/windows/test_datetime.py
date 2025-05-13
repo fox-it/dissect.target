@@ -3,8 +3,10 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING
 
+import pytest
+
 from dissect.target.helpers.regutil import RegistryHive, VirtualKey, VirtualValue
-from dissect.target.plugins.os.windows.datetime import WindowsDateTimePlugin
+from dissect.target.plugins.os.windows.datetime import WindowsDateTimePlugin, c_tz, parse_systemtime_transition
 from dissect.target.plugins.os.windows.locale import WindowsLocalePlugin
 
 if TYPE_CHECKING:
@@ -118,3 +120,25 @@ def test_windows_datetime_foreign(target_win_users: Target, hive_hku: RegistryHi
 
     target_win_users.add_plugin(WindowsLocalePlugin)
     assert target_win_users.timezone == "America/Los_Angeles"
+
+
+def test_parse_systemtime_transition() -> None:
+    # Test if parse_systemtime_transition functions with only 0's
+    systemtime = c_tz._SYSTEMTIME()
+    output = parse_systemtime_transition(systemtime, 2025)
+    assert output == datetime.datetime(2025, 1, 5, tzinfo=None)  # noqa
+
+    # Test behaviour where not all week days are defined in every week for that month
+    systemtime = c_tz._SYSTEMTIME(wDay=5, wMonth=10)
+    output = parse_systemtime_transition(systemtime, 2025)
+    assert output == datetime.datetime(2025, 10, 26, tzinfo=None)  # noqa
+
+    # Test behaviour where a weekday of the month occurs 5 times during that month
+    systemtime = c_tz._SYSTEMTIME(wDay=5, wMonth=10, wDayOfWeek=4)
+    output = parse_systemtime_transition(systemtime, 2025)
+    assert output == datetime.datetime(2025, 10, 30, tzinfo=None)  # noqa
+
+    # wDay in this case should only go between 1-5, so this should crash
+    systemtime = c_tz._SYSTEMTIME(wDay=10)
+    with pytest.raises(ValueError, match="systemtime.wDay cannot be larger than 5"):
+        parse_systemtime_transition(systemtime, 2025)

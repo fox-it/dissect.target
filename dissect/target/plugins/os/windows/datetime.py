@@ -79,6 +79,9 @@ def parse_systemtime_transition(systemtime: c_tz._SYSTEMTIME, year: int) -> date
     system_month = systemtime.wMonth or 1
     system_day = systemtime.wDay or 1
 
+    if system_day > 5:
+        raise ValueError("systemtime.wDay cannot be larger than 5")
+
     month = SundayFirstCalendar.monthdayscalendar(year, system_month)
     occurrences = [week[systemtime.wDayOfWeek] for week in month if week[systemtime.wDayOfWeek]]
     target_occurrence = -1 if system_day == 5 and len(occurrences) < 5 else system_day - 1
