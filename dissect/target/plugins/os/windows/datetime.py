@@ -158,6 +158,7 @@ class WindowsTimezone(tzinfo):
         assert dt.tzinfo is self
 
         tzi = self.dynamic_dst.get(dt.year, self.tzi)
+        # If the time zone does not support daylight saving time the wMonth member is zero
         if tzi.daylight_date.wMonth == 0 or tzi.standard_date.wMonth == 0:
             return False
 
