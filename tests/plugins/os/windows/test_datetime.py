@@ -3,8 +3,10 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING
 
+import pytest
+
 from dissect.target.helpers.regutil import RegistryHive, VirtualKey, VirtualValue
-from dissect.target.plugins.os.windows.datetime import WindowsDateTimePlugin
+from dissect.target.plugins.os.windows.datetime import WindowsDateTimePlugin, c_tz, parse_systemtime_transition
 from dissect.target.plugins.os.windows.locale import WindowsLocalePlugin
 
 if TYPE_CHECKING:
@@ -58,6 +60,10 @@ def test_windows_datetime(target_win_tzinfo: Target) -> None:
     # Test the switch moment to DST
     assert not eu_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 2, 0, 0, tzinfo=eu_tzinfo))
     assert eu_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 3, 0, 0, tzinfo=eu_tzinfo))
+
+    # Test utc tzinfo is_dst
+    utc_tzinfo = target_win_tzinfo.datetime.tz("UTC")
+    assert not utc_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 2, 0, 0, tzinfo=utc_tzinfo))
 
 
 def test_windows_timezone_legacy(target_win_tzinfo_legacy: Target) -> None:
@@ -118,3 +124,24 @@ def test_windows_datetime_foreign(target_win_users: Target, hive_hku: RegistryHi
 
     target_win_users.add_plugin(WindowsLocalePlugin)
     assert target_win_users.timezone == "America/Los_Angeles"
+
+
+def test_parse_systemtime_transition() -> None:
+    # Test behaviour where not all week days are defined in every week for that month
+    systemtime = c_tz._SYSTEMTIME(wDay=5, wMonth=10)
+    output = parse_systemtime_transition(systemtime, 2025)
+    assert output == datetime.datetime(2025, 10, 26, tzinfo=None)  # noqa
+
+    # Test behaviour where a weekday of the month occurs 5 times during that month
+    systemtime = c_tz._SYSTEMTIME(wDay=5, wMonth=10, wDayOfWeek=4)
+    output = parse_systemtime_transition(systemtime, 2025)
+    assert output == datetime.datetime(2025, 10, 30, tzinfo=None)  # noqa
+
+    # wDay in this case should only go between 1-5, so this should crash
+    systemtime = c_tz._SYSTEMTIME(wDay=6)
+    with pytest.raises(ValueError, match="systemtime.wDay should be between 1 and 5"):
+        parse_systemtime_transition(systemtime, 2025)
+
+    systemtime = c_tz._SYSTEMTIME(wDay=0)
+    with pytest.raises(ValueError, match="systemtime.wDay should be between 1 and 5"):
+        parse_systemtime_transition(systemtime, 2025)
