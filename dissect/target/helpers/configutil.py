@@ -9,7 +9,6 @@ from collections import deque
 from collections.abc import ItemsView, Iterable, Iterator, KeysView
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -24,6 +23,7 @@ from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundErr
 from dissect.target.helpers.utils import to_list
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from types import TracebackType
 
     from typing_extensions import Self
@@ -207,7 +207,8 @@ class ConfigurationParser:
                     dict1[key] = value2
             else:
                 combined = to_list(value1) + to_list(value2)
-                # None resets list to empty
+                # An empty string clears the list of values for the current key
+                # Possibly turn this into an option if other parsers require different behavior
                 combined = combined[combined.index("") + 1 :] if "" in combined else combined
                 dict1[key] = combined
 
@@ -969,31 +970,23 @@ def parse_config(
         open_file = io.TextIOWrapper(fh, encoding="utf-8") if not isinstance(parser, Bin) else io.BytesIO(fh.read())
         parser.read_file(open_file)
 
-    if isinstance(parser, SystemD) and isinstance(entry, Path):
+    if isinstance(parser, SystemD):
         return _parse_drop_files(entry, options, parser)
 
     return parser
 
 
-def _parse_drop_files(
-    pathOrEntry: Path, options: ParserOptions, main_parser: ConfigurationParser
-) -> ConfigurationParser:
-    if not isinstance(pathOrEntry, Path):
+def _parse_drop_files(path: Path, options: ParserOptions, main_parser: ConfigurationParser) -> ConfigurationParser:
+    if not (drop_folder := path.with_name(path.name + ".d")).exists():
         return main_parser
 
-    drop_folder = pathOrEntry.with_name(pathOrEntry.name + ".d")
-    if not drop_folder.exists():
-        return main_parser
-    drop_files = sorted(drop_folder.glob("*.conf"))
-
-    for drop_file in drop_files:
+    for drop_file in sorted(drop_folder.glob("*.conf")):
         if not drop_file.is_file():
             continue
 
         drop_file_parser = ParserConfig(SystemD).create_parser(options)
-        with drop_file.open("rb") as fh:
-            open_drop_file = io.TextIOWrapper(fh, encoding="utf-8")
-            drop_file_parser.read_file(open_drop_file)
+        with drop_file.open("r") as fh:
+            drop_file_parser.read_file(fh)
             main_parser.merge(drop_file_parser)
 
     return main_parser
@@ -1004,7 +997,7 @@ def _select_parser(path: Path, hint: str | None = None) -> ParserConfig:
         return parser_type
 
     for match, value in MATCH_MAP.items():
-        if path.match(f"{match}"):
+        if path.match(match):
             return value
 
     extention_parser = CONFIG_MAP.get(path.suffix.lstrip("."), ParserConfig(Default))
