@@ -138,6 +138,10 @@ def test_parse_systemtime_transition() -> None:
     assert output == datetime.datetime(2025, 10, 30, tzinfo=None)  # noqa
 
     # wDay in this case should only go between 1-5, so this should crash
-    systemtime = c_tz._SYSTEMTIME(wDay=10)
-    with pytest.raises(ValueError, match="systemtime.wDay cannot be larger than 5"):
+    systemtime = c_tz._SYSTEMTIME(wDay=6)
+    with pytest.raises(ValueError, match="systemtime.wDay should be between 1 and 5"):
+        parse_systemtime_transition(systemtime, 2025)
+
+    systemtime = c_tz._SYSTEMTIME(wDay=0)
+    with pytest.raises(ValueError, match="systemtime.wDay should be between 1 and 5"):
         parse_systemtime_transition(systemtime, 2025)

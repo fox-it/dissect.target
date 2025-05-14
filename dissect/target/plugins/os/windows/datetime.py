@@ -76,8 +76,8 @@ def parse_systemtime_transition(systemtime: c_tz._SYSTEMTIME, year: int) -> date
     Reference:
         - https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/ns-timezoneapi-time_zone_information
     """
-    if systemtime.wDay > 5:
-        raise ValueError("systemtime.wDay cannot be larger than 5")
+    if not (1 <= systemtime.wDay <= 5):
+        raise ValueError("systemtime.wDay should be between 1 and 5")
 
     month = SundayFirstCalendar.monthdayscalendar(year, systemtime.wMonth)
     occurrences = [week[systemtime.wDayOfWeek] for week in month if week[systemtime.wDayOfWeek]]
