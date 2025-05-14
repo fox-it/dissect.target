@@ -9,7 +9,6 @@ from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundErr
 from dissect.target.filesystem import FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
-from dissect.target.helpers.fsutil import TargetPath
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
