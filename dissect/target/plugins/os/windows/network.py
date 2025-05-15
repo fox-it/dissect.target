@@ -244,8 +244,12 @@ def _get_config_value(key: RegistryKey, name: str, sep: str | None = None) -> se
 
 def _construct_interface(key: RegistryKey, ip_key: str, subnet_key: str) -> set[str]:
     interface = ""
+
     if ip := _get_config_value(key, ip_key):
         interface = next(iter(ip))
+
+    if not interface:
+        return set()
 
     if subnet := _get_config_value(key, subnet_key):
         interface = f"{interface}/{next(iter(subnet))}"
