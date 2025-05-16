@@ -47,4 +47,4 @@ class QCow2Container(Container):
         return self.qcow2.tell()
 
     def close(self) -> None:
-        pass
+        self.qcow2.fh.close()
