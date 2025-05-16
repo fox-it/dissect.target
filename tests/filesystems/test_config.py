@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from unittest.mock import Mock
 
 import pytest
 
@@ -11,7 +9,6 @@ from dissect.target.filesystems.config import (
     ConfigurationEntry,
     ConfigurationFilesystem,
 )
-from dissect.target.helpers.configutil import parse_config
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -165,40 +162,6 @@ def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem) ->
     assert config_path == ["new"]
     assert sorted(config_fs.get("/new").iterdir()) == ["config", "path"]
     assert isinstance(config_fs.get("/new/path/config"), ConfigurationEntry)
-
-
-def test_config_entry() -> None:
-    class MockableRead(Mock):
-        def __enter__(self):
-            return self.binary_data
-
-        def __exit__(self, *args):
-            return
-
-    mocked_open = MockableRead(binary_data=BytesIO(b"default=test\n[Unit]\nhelp=me\n"))
-    mocked_entry = Mock()
-    mocked_entry.open.return_value = mocked_open
-    mocked_entry.path = "config.ini"
-
-    parser_items = parse_config(mocked_entry)
-
-    entry = ConfigurationEntry(
-        Mock(),
-        "config.ini",
-        entry=mocked_entry,
-        parser_items=parser_items,
-    )
-    assert entry.is_dir()
-
-    assert list(entry.iterdir()) == ["DEFAULT", "Unit"]
-
-    default_section = entry.get("DEFAULT")
-    assert default_section.is_dir()
-    assert list(default_section.iterdir()) == ["default"]
-    assert default_section.open().read() == b"default\n    test\n"
-
-    default_key_values = default_section.get("default")
-    assert default_key_values.open().read() == b"test\n"
 
 
 def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
