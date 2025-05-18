@@ -23,7 +23,7 @@ class AcquireTarSubLoader(TarSubLoader):
     @staticmethod
     def detect(tarfile: tf.TarFile) -> bool:
         for member in tarfile.getmembers():
-            if not member.name.startswith((f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/",
+            if member.name.startswith((f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/",
                                            f"/{FILESYSTEMS_LEGACY_ROOT}/", f"{FILESYSTEMS_LEGACY_ROOT}/")):
                 return True
         return False
