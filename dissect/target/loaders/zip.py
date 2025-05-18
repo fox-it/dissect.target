@@ -1,23 +1,15 @@
 from __future__ import annotations
 
 import logging
-import re
-import tarfile as tf
 import zipfile as zf
 from typing import TYPE_CHECKING
 
 from build.lib.dissect.target.loaders.dir import find_and_map_dirs
-from dissect.target import filesystem, target
-from dissect.target.filesystems.tar import (
-    TarFilesystemDirectoryEntry,
-    TarFilesystemEntry,
-)
-from dissect.target.helpers import fsutil, loaderutil
+from dissect.target import target
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.loader import Loader, SubLoader
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
     from pathlib import Path
 
 log = logging.getLogger(__name__)

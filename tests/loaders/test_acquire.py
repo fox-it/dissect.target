@@ -63,7 +63,7 @@ def test_tar_loader_windows_sysvol_formats_zip(target_default: Target) -> None:
     assert WindowsPlugin.detect(target_default)
     # NOTE: for the sysvol archives, this also tests the backwards compatibility
     assert sorted(target_default.fs.mounts.keys()) == ["c:"]
-    assert target_default.fs.get(f"c:/Windows/System32/foo.txt")
+    assert target_default.fs.get("c:/Windows/System32/foo.txt")
 
 
 def test_tar_anonymous_filesystems(target_default: Target) -> None:
