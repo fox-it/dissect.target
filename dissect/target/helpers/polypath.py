@@ -15,8 +15,7 @@ re_normalize_sbs_path = re.compile(r"[\\/]+")
 def normalize(path: str, alt_separator: str = "") -> str:
     if alt_separator == "\\":
         return re_normalize_sbs_path.sub("/", path)
-    else:
-        return re_normalize_path.sub("/", path)
+    return re_normalize_path.sub("/", path)
 
 
 def isabs(path: str, alt_separator: str = "") -> bool:

@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
@@ -16,13 +18,16 @@ from dissect.target.plugins.apps.browser.chromium import (
     ChromiumMixin,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 class EdgePlugin(ChromiumMixin, BrowserPlugin):
     """Edge browser plugin."""
 
     __namespace__ = "edge"
 
-    DIRS = [
+    DIRS = (
         # Linux
         ".config/microsoft-edge/Default/",
         ".config/microsoft-edge/Profile*",
@@ -36,7 +41,7 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         # Macos
         "Library/Application Support/Microsoft Edge/Default",
         "Library/Application Support/Microsoft Edge/Profile*",
-    ]
+    )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/history", GENERIC_HISTORY_RECORD_FIELDS

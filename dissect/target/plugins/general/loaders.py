@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 from dissect.target.helpers.docs import INDENT_STEP, get_docstring
@@ -16,7 +18,7 @@ class LoaderListPlugin(Plugin):
     # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
     # https://github.com/fox-it/dissect.target/pull/841
     # https://github.com/fox-it/dissect.target/issues/889
-    @arg("--as-json", dest="as_json", action="store_true")
+    @arg("--as-json", dest="as_json", action="store_true", help="output in JSON format")
     def loaders(self, as_json: bool = False) -> None:
         """List the available loaders."""
 
@@ -25,7 +27,7 @@ class LoaderListPlugin(Plugin):
             try:
                 docstring = get_docstring(loader, "No documentation.").splitlines()[0].strip()
                 loaders_info[key] = docstring
-            except ImportError:
+            except ImportError:  # noqa: PERF203
                 continue
 
         loaders = sorted(loaders_info.items())

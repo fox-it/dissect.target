@@ -1,10 +1,17 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.cim import cim
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 ConsumerBindingRecord = TargetRecordDescriptor(
     "filesystem/windows/cim/consumerbinding",
@@ -22,7 +29,7 @@ class CimPlugin(Plugin):
 
     __namespace__ = "cim"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._repo = None
 
@@ -32,11 +39,12 @@ class CimPlugin(Plugin):
             objects = repodir.joinpath("objects.data")
             mappings = [repodir.joinpath(f"mapping{i}.map") for i in range(1, 4)]
 
-            if all([index.exists(), objects.exists(), all([m.exists() for m in mappings])]):
+            if all([index.exists(), objects.exists(), all(m.exists() for m in mappings)]):
                 try:
                     self._repo = cim.CIM(index.open(), objects.open(), [m.open() for m in mappings])
                 except cim.Error as e:
-                    self.target.log.warning("Error opening CIM database", exc_info=e)
+                    self.target.log.warning("Error opening CIM database")
+                    self.target.log.debug("", exc_info=e)
 
     def check_compatible(self) -> None:
         if not self._repo:
@@ -69,6 +77,6 @@ class CimPlugin(Plugin):
                         query=query.value,
                         _target=self.target,
                     )
-        except Exception as e:  # noqa
-            self.target.log.warning("Error during consumerbindings execution", exc_info=e)
-            pass
+        except Exception as e:
+            self.target.log.warning("Error during consumerbindings execution")
+            self.target.log.debug("", exc_info=e)

@@ -2,18 +2,21 @@ from __future__ import annotations
 
 import logging
 import zipfile
-from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers.fsutil import basename, dirname, join
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
+from dissect.target.plugins.apps.edr.velociraptor import VELOCIRAPTOR_RESULTS
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +33,11 @@ def find_fs_directories(path: Path) -> tuple[OperatingSystem | None, list[Path] 
         accessor_root = fs_root.joinpath(accessor)
         if accessor_root.exists():
             os_type, dirs = find_dirs(accessor_root)
-            if os_type in [OperatingSystem.UNIX, OperatingSystem.LINUX, OperatingSystem.OSX]:
+            if os_type in [
+                OperatingSystem.UNIX,
+                OperatingSystem.LINUX,
+                OperatingSystem.OSX,
+            ]:
                 return os_type, [dirs[0]]
 
     # Windows
@@ -68,6 +75,7 @@ def extract_drive_letter(name: str) -> str | None:
     # X: in URL encoding
     if len(name) == 4 and name.endswith("%3A"):
         return name[0].lower()
+    return None
 
 
 class VelociraptorLoader(DirLoader):
@@ -76,7 +84,7 @@ class VelociraptorLoader(DirLoader):
     As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
     Generic.Collectors.File (Unix) uses the accessors file and auto. The loader supports the following configuration::
 
-        {"Generic.Collectors.File":{"Root":"/","collectionSpec":"Glob\\netc/**\\nvar/log/**"}}
+        {"Generic.Collectors.File": {"Root": "/", "collectionSpec": "Glob\\netc/**\\nvar/log/**"}}
 
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
     ntfs_vss and auto. The loader supports a collection where multiple accessors were used.
@@ -88,7 +96,7 @@ class VelociraptorLoader(DirLoader):
     """
 
     def __init__(self, path: Path, **kwargs):
-        super().__init__(path)
+        super().__init__(path, **kwargs)
 
         if path.suffix == ".zip":
             self.root = zipfile.Path(path.open("rb"))
@@ -133,6 +141,21 @@ class VelociraptorLoader(DirLoader):
             dirfs=VelociraptorDirectoryFilesystem,
             zipfs=VelociraptorZipFilesystem,
         )
+
+        if (results := self.root.joinpath("results")).is_dir():
+            # Map artifact results collected by Velociraptor
+            vfs = VirtualFilesystem()
+
+            for artifact in results.iterdir():
+                if not artifact.name.endswith(".json"):
+                    continue
+
+                vfs.map_file_fh(artifact.name, artifact.open("rb"))
+
+            if (uploads := self.root.joinpath("uploads.json")).exists():
+                vfs.map_file_fh(uploads.name, uploads.open("rb"))
+
+            target.fs.mount(VELOCIRAPTOR_RESULTS, vfs)
 
 
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 import stat
-import tarfile
-from typing import BinaryIO, Iterator, Optional
+import tarfile as tf
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import BufferedStream
 
@@ -22,6 +22,9 @@ from dissect.target.filesystem import (
 )
 from dissect.target.helpers import fsutil
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 log = logging.getLogger(__name__)
 
 
@@ -33,15 +36,20 @@ class TarFilesystem(Filesystem):
     def __init__(
         self,
         fh: BinaryIO,
-        base: Optional[str] = None,
-        tarinfo: Optional[tarfile.TarInfo] = None,
-        *args,
+        base: str | None = None,
+        *,
+        tarinfo: tf.TarInfo | None = None,
+        tarfile: tf.TarFile | None = None,
         **kwargs,
     ):
-        super().__init__(fh, *args, **kwargs)
-        fh.seek(0)
+        super().__init__(fh, **kwargs)
 
-        self.tar = tarfile.open(mode="r", fileobj=fh, tarinfo=tarinfo)
+        if tarfile:
+            self.tar = tarfile
+        else:
+            fh.seek(0)
+            self.tar = tf.open(mode="r", fileobj=fh, tarinfo=tarinfo)  # noqa: SIM115
+
         self.base = base or ""
 
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
@@ -63,9 +71,9 @@ class TarFilesystem(Filesystem):
         fh = fsutil.open_decompress(fileobj=fh)
 
         fh.seek(257)
-        return fh.read(8) in (tarfile.GNU_MAGIC, tarfile.POSIX_MAGIC)
+        return fh.read(8) in (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
-    def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
+    def get(self, path: str, relentry: FilesystemEntry | None = None) -> FilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
         return self._fs.get(path, relentry=relentry)
 
@@ -82,7 +90,7 @@ class TarFilesystemEntry(VirtualFile):
                 f.size = f.raw.size
             return BufferedStream(f, size=f.size)
         except Exception:
-            raise FileNotFoundError()
+            raise FileNotFoundError
 
     def iterdir(self) -> Iterator[str]:
         if self.is_dir():
@@ -115,7 +123,7 @@ class TarFilesystemEntry(VirtualFile):
     def readlink(self) -> str:
         """Read the link if this entry is a symlink. Returns a string."""
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
         return self.entry.linkname
 
     def readlink_ext(self) -> FilesystemEntry:
@@ -147,7 +155,7 @@ class TarFilesystemEntry(VirtualFile):
 
 
 class TarFilesystemDirectoryEntry(VirtualDirectory):
-    def __init__(self, fs: TarFilesystem, path: str, entry: tarfile.TarInfo):
+    def __init__(self, fs: TarFilesystem, path: str, entry: tf.TarInfo):
         super().__init__(fs, path)
         self.entry = entry
 

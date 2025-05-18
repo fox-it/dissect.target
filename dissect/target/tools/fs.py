@@ -1,22 +1,24 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
 import argparse
 import logging
-import os
 import pathlib
 import shutil
 import sys
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import TargetError
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.target import Target
 from dissect.target.tools.fsutils import print_ls, print_stat
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
+
+if TYPE_CHECKING:
+    from dissect.target.helpers.fsutil import TargetPath
 
 log = logging.getLogger(__name__)
 logging.lastResort = None
@@ -59,15 +61,16 @@ def walk(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
 
 
 def cp(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
-    output = os.path.abspath(os.path.expanduser(args.output))
+    output = pathlib.Path(args.output).expanduser().resolve()
+
     if path.is_file():
-        _extract_path(path, os.path.join(output, path.name))
+        _extract_path(path, output.joinpath(path.name))
     elif path.is_dir():
         for extract_path in path.rglob("*"):
-            out_path = os.path.join(output, str(extract_path.relative_to(path)))
+            out_path = output.joinpath(str(extract_path.relative_to(path)))
             _extract_path(extract_path, out_path)
     else:
-        print("[!] Failed, unsuported file type: %s" % path)
+        print(f"[!] Failed, unsuported file type: {path}")
 
 
 def stat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
@@ -76,30 +79,26 @@ def stat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     print_stat(path, sys.stdout, args.dereference)
 
 
-def _extract_path(path: TargetPath, output_path: str) -> None:
-    print("%s -> %s" % (path, output_path))
+def _extract_path(path: TargetPath, output_path: pathlib.Path) -> None:
+    print(f"{path} -> {output_path}")
 
-    out_dir = ""
-    if path.is_dir():
-        out_dir = output_path
-    elif path.is_file():
-        out_dir = os.path.dirname(output_path)
+    out_dir = output_path if path.is_dir() else output_path.parent
 
     try:
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+        if not out_dir.exists():
+            out_dir.mkdir(parents=True)
 
         if path.is_file():
-            with open(output_path, "wb") as fh:
+            with output_path.open("wb") as fh:
                 shutil.copyfileobj(path.open(), fh)
 
-    except Exception as e:
-        print("[!] Failed: %s" % path)
-        log.exception(e)
+    except Exception:
+        print(f"[!] Failed: {path}")
+        log.exception("Error extracting file: %s -> %s", path, output_path)
 
 
 @catch_sigpipe
-def main() -> None:
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -109,7 +108,7 @@ def main() -> None:
     parser.add_argument("target", type=pathlib.Path, help="Target to load", metavar="TARGET")
 
     baseparser = argparse.ArgumentParser(add_help=False)
-    baseparser.add_argument("path", type=str, help="path to perform an action on", metavar="PATH")
+    baseparser.add_argument("path", help="path to perform an action on", metavar="PATH")
 
     subparsers = parser.add_subparsers(dest="subcommand", help="subcommands for performing various actions")
     parser_ls = subparsers.add_parser(
@@ -140,7 +139,7 @@ def main() -> None:
         help="copy multiple files to a directory specified by --output",
         parents=[baseparser],
     )
-    parser_cp.add_argument("-o", "--output", type=str, default=".", help="output directory")
+    parser_cp.add_argument("-o", "--output", default=".", help="output directory")
     parser_cp.set_defaults(handler=cp)
     configure_generic_arguments(parser)
 
@@ -153,17 +152,19 @@ def main() -> None:
     try:
         target = Target.open(args.target)
     except TargetError as e:
-        log.error(e)
+        log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
-        parser.exit(1)
+        return 1
 
     path = target.fs.path(args.path)
 
     if not path.exists():
         print("[!] Path doesn't exist")
-        sys.exit(1)
+        return 1
 
     args.handler(target, path, args)
+
+    return 0
 
 
 if __name__ == "__main__":

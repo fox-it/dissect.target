@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 from itertools import chain
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 RECORD_NAME = "linux/service"
 
@@ -21,16 +26,16 @@ LinuxServiceRecord = TargetRecordDescriptor(RECORD_NAME, DEFAULT_ELEMENTS)
 class ServicesPlugin(Plugin):
     """Linux services plugin."""
 
-    SYSTEMD_PATHS = [
+    SYSTEMD_PATHS = (
         "/etc/systemd/system",
         "/lib/systemd/system",
         "/usr/lib/systemd/system",
-    ]
+    )
 
-    INITD_PATHS = ["/etc/rc.d/init.d", "/etc/init.d"]
+    INITD_PATHS = ("/etc/rc.d/init.d", "/etc/init.d")
 
     def check_compatible(self) -> None:
-        if not any([self.target.fs.path(p).exists() for p in self.SYSTEMD_PATHS + self.INITD_PATHS]):
+        if not any(self.target.fs.path(p).exists() for p in self.SYSTEMD_PATHS + self.INITD_PATHS):
             raise UnsupportedPluginError("No supported service directories found")
 
     @export(record=LinuxServiceRecord)

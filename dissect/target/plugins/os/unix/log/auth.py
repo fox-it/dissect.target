@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import logging
 import re
 from abc import ABC, abstractmethod
-from datetime import datetime
 from functools import lru_cache
 from itertools import chain
-from pathlib import Path
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any, Final
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.regex.ipaddress import extract_ips
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
 from dissect.target.plugins.os.unix.log.helpers import (
@@ -21,17 +18,14 @@ from dissect.target.plugins.os.unix.log.helpers import (
     iso_readlines,
 )
 
-log = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
-# Generic regular expressions
-RE_IPV4_ADDRESS = re.compile(
-    r"""
-    ((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}   # First three octets
-    (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)          # Last octet
-    """,
-    re.VERBOSE,
-)
 RE_USER = re.compile(r"for ([^\s]+)")
 
 
@@ -61,11 +55,7 @@ class SudoService(BaseService):
         if not (match := cls.RE_SUDO_COMMAND.search(message)):
             return {}
 
-        additional_fields = {}
-        for key, value in match.groupdict().items():
-            additional_fields[key] = value
-
-        return additional_fields
+        return match.groupdict()
 
 
 class SshdService(BaseService):
@@ -76,11 +66,16 @@ class SshdService(BaseService):
 
     @classmethod
     def parse(cls, message: str) -> dict[str, str | int]:
-        """Parse message from sshd"""
+        """Parse message from sshd."""
         additional_fields = {}
-        if ip_address := RE_IPV4_ADDRESS.search(message):
+        if ip_address := extract_ips(message):
             field_name = "host_ip" if "listening" in message else "remote_ip"
-            additional_fields[field_name] = ip_address.group(0)
+
+            if len(ip_address) > 1:
+                field_name += "s"
+
+            additional_fields[field_name] = ip_address[0] if len(ip_address) == 1 else ip_address
+
         if port := cls.RE_SSHD_PORTREGEX.search(message):
             additional_fields["port"] = int(port.group(1))
         if user := cls.RE_USER.search(message):
@@ -114,7 +109,7 @@ class SystemdLogindService(BaseService):
     )
 
     @classmethod
-    def parse(cls, message: str):
+    def parse(cls, message: str) -> dict[str, str]:
         """Parse auth log message from systemd-logind."""
         additional_fields = {}
         # Example: Nov 14 07:14:09 ubuntu-1 systemd-logind[4]: Removed session 4.
@@ -122,8 +117,7 @@ class SystemdLogindService(BaseService):
             additional_fields["action"] = "removed session"
             additional_fields["session"] = message.split()[-1].strip(".")
         elif "Watching" in message and (match := cls.RE_SYSTEMD_LOGIND_WATCHING.search(message)):
-            for key, value in match.groupdict().items():
-                additional_fields[key] = value
+            additional_fields.update(match.groupdict())
         # Example: New session 4 of user sampleuser.
         elif "New session" in message:
             parts = message.removeprefix("New session ").split()
@@ -184,7 +178,7 @@ class PkexecService(BaseService):
 
     @classmethod
     def parse(cls, message: str) -> dict[str, str]:
-        """Parse auth log message from pkexec"""
+        """Parse auth log message from pkexec."""
         additional_fields = {}
         if exec_cmd := cls.RE_PKEXEC_COMMAND.search(message):
             additional_fields["action"] = "executing command"
@@ -207,7 +201,7 @@ class PamUnixService(BaseService):
     )
 
     @classmethod
-    def parse(cls, message):
+    def parse(cls, message: str) -> dict[str, str | int]:
         """Parse auth log message from pluggable authentication modules (PAM)."""
         if not (match := cls.RE_PAM_UNIX.search(message)):
             return {}
@@ -225,7 +219,7 @@ class AuthLogRecordBuilder:
     """Class for dynamically creating auth log records."""
 
     RECORD_NAME = "linux/log/auth"
-    SERVICES: dict[str, BaseService] = {
+    SERVICES: Final[dict[str, BaseService]] = {
         "su": SuService,
         "sudo": SudoService,
         "sshd": SshdService,
@@ -251,7 +245,7 @@ class AuthLogRecordBuilder:
         except Exception as e:
             self.target.log.warning("Parsing additional fields in message '%s' for service %s failed", message, service)
             self.target.log.debug("", exc_info=e)
-            raise e
+            raise
 
     def build_record(self, ts: datetime, source: Path, line: str) -> TargetRecordDescriptor:
         """Builds an ``AuthLog`` event record."""
@@ -279,8 +273,15 @@ class AuthLogRecordBuilder:
 
         for key, value in self._parse_additional_fields(record_values["service"], line).items():
             record_type = "string"
+
             if isinstance(value, int):
                 record_type = "varint"
+
+            elif key.startswith(("remote_ip", "host_ip")):
+                record_type = "net.ipaddress"
+
+            if isinstance(value, list):
+                record_type += "[]"
 
             record_fields.append((record_type, key))
             record_values[key] = value
@@ -289,7 +290,7 @@ class AuthLogRecordBuilder:
         desc = self._create_event_descriptor(tuple(record_fields))
         return desc(**record_values)
 
-    def _create_event_descriptor(self, record_fields) -> TargetRecordDescriptor:
+    def _create_event_descriptor(self, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
 
@@ -301,9 +302,12 @@ class AuthPlugin(Plugin):
         self._auth_log_builder = AuthLogRecordBuilder(target)
 
     def check_compatible(self) -> None:
-        var_log = self.target.fs.path("/var/log")
-        if not any(var_log.glob("auth.log*")) and not any(var_log.glob("secure*")):
+        if not any(self._get_paths()):
             raise UnsupportedPluginError("No auth log files found")
+
+    def _get_paths(self) -> Iterator[Path]:
+        var_log = self.target.fs.path("/var/log")
+        return chain(var_log.glob("auth.log*"), var_log.glob("secure*"))
 
     @alias("securelog")
     @export(record=DynamicDescriptor(["datetime", "path", "string"]))
@@ -328,15 +332,13 @@ class AuthPlugin(Plugin):
         Resources:
             - https://help.ubuntu.com/community/LinuxLogFiles
         """
+        target_tz = self.target.datetime.tzinfo
 
-        tzinfo = self.target.datetime.tzinfo
-
-        var_log = self.target.fs.path("/var/log")
-        for auth_file in chain(var_log.glob("auth.log*"), var_log.glob("secure*")):
+        for auth_file in self.get_paths():
             if is_iso_fmt(auth_file):
                 iterable = iso_readlines(auth_file)
             else:
-                iterable = year_rollover_helper(auth_file, RE_TS, "%b %d %H:%M:%S", tzinfo)
+                iterable = year_rollover_helper(auth_file, RE_TS, "%b %d %H:%M:%S", target_tz)
 
             for ts, line in iterable:
                 yield self._auth_log_builder.build_record(ts, auth_file, line)

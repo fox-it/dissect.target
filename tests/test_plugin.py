@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 import os
 import sys
 import textwrap
 from functools import reduce
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from docutils.core import publish_string
 from docutils.utils import SystemMessage
-from flow.record import Record
 
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -26,7 +27,6 @@ from dissect.target.plugin import (
     PluginDescriptorLookup,
     PluginRegistry,
     _find_py_files,
-    _generate_long_paths,
     _save_plugin_import_failure,
     alias,
     environment_variable_paths,
@@ -41,48 +41,50 @@ from dissect.target.plugin import (
 )
 from dissect.target.plugins.apps.other.env import EnvironmentFilePlugin
 from dissect.target.plugins.general.users import UsersPlugin
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.target import Target
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-@pytest.fixture(autouse=True)
-def clear_caches() -> Iterator[None]:
-    _generate_long_paths.cache_clear()
+    from flow.record import Record
 
 
 def test_save_plugin_import_failure() -> None:
     test_trace = ["test-trace"]
     test_module_name = "test-module"
 
-    with patch("traceback.format_exception", Mock(return_value=test_trace)):
-        with patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry) as mock_plugins:
-            _save_plugin_import_failure(test_module_name)
+    with (
+        patch("traceback.format_exception", Mock(return_value=test_trace)),
+        patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry) as mock_plugins,
+    ):
+        _save_plugin_import_failure(test_module_name)
 
-            assert len(mock_plugins.__failed__) == 1
-            assert mock_plugins.__failed__[0].module == test_module_name
-            assert mock_plugins.__failed__[0].stacktrace == test_trace
+        assert len(mock_plugins.__failed__) == 1
+        assert mock_plugins.__failed__[0].module == test_module_name
+        assert mock_plugins.__failed__[0].stacktrace == test_trace
 
 
 @pytest.mark.parametrize(
-    "env_value, expected_output",
+    ("env_value", "expected_output"),
     [
         (None, []),
         ("", []),
-        (":", [Path(""), Path("")]),
+        (":", [Path(), Path()]),
     ],
 )
-def test_load_environment_variable(env_value: Optional[str], expected_output: list[Path]) -> None:
+def test_load_environment_variable(env_value: str | None, expected_output: list[Path]) -> None:
     with patch.object(os, "environ", {"DISSECT_PLUGINS": env_value}):
         assert environment_variable_paths() == expected_output
 
 
 def test_load_module_paths() -> None:
-    assert get_external_module_paths([Path(""), Path("")]) == [Path("")]
+    assert get_external_module_paths([Path(), Path()]) == [Path()]
 
 
 def test_load_paths_with_env() -> None:
     with patch.object(os, "environ", {"DISSECT_PLUGINS": ":"}):
-        assert get_external_module_paths([Path(""), Path("")]) == [Path("")]
+        assert get_external_module_paths([Path(), Path()]) == [Path()]
 
 
 def test_load_environment_variable_empty_string() -> None:
@@ -93,8 +95,8 @@ def test_load_environment_variable_empty_string() -> None:
 
 def test_load_environment_variable_comma_seperated_string() -> None:
     with patch("dissect.target.plugin._find_py_files") as mocked_find_py_files:
-        load_modules_from_paths([Path(""), Path("")])
-        mocked_find_py_files.assert_called_with(Path(""))
+        load_modules_from_paths([Path(), Path()])
+        mocked_find_py_files.assert_called_with(Path())
 
 
 def test_filter_file(tmp_path: Path) -> None:
@@ -145,7 +147,7 @@ def test_filesystem_module_registration(tmp_path: Path, filename: str, expected_
 
     load_modules_from_paths([tmp_path])
 
-    assert expected_module in sys.modules.keys()
+    assert expected_module in sys.modules
 
 
 def test_plugin_registration(tmp_path: Path) -> None:
@@ -273,7 +275,7 @@ def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
 
 
 class MockOSWarpPlugin(OSPlugin):
-    __exports__ = ["f6"]  # OS exports f6
+    __exports__ = ("f6",)  # OS exports f6
     __register__ = False
     __name__ = "warp"
 
@@ -361,7 +363,7 @@ class MockOSWarpPlugin(OSPlugin):
 )
 @patch("dissect.target.Target", create=True)
 @pytest.mark.parametrize(
-    "search, assert_num_found",
+    ("search", "assert_num_found"),
     [
         ("*", 2),  # Found with tree search using wildcard, excluding OS plugins and unfindable
         ("test.x13.*", 1),  # Found with tree search using wildcard, expands to test.x13.f3
@@ -407,7 +409,7 @@ def test_find_functions_linux(target_linux: Target) -> None:
 
 
 def test_find_functions_compatible_check(target_linux: Target) -> None:
-    """test if we correctly check for compatibility in ``find_functions`` and ``_filter_compatible``."""
+    """Test if we correctly check for compatibility in ``find_functions`` and ``_filter_compatible``."""
 
     found, _ = find_functions("*", target_linux, compatibility=True)
     assert "os.unix.log.messages.syslog.syslog" not in [f"{f.path}.{f.name}" for f in found]
@@ -439,7 +441,7 @@ class _TestNSPlugin(NamespacePlugin):
     __register__ = False
 
     @export(record=TestRecord)
-    def test_all(self):
+    def test_all(self) -> Iterator[TestRecord]:
         # Iterate all functions of all subclasses
         yield from self.test()
 
@@ -449,7 +451,7 @@ class _TestSubPlugin1(_TestNSPlugin):
     __register__ = False
 
     @export(record=TestRecord)
-    def test(self):
+    def test(self) -> Iterator[TestRecord]:
         yield TestRecord(value="test1")
 
 
@@ -458,7 +460,7 @@ class _TestSubPlugin2(_TestNSPlugin):
     __register__ = False
 
     @export(record=TestRecord)
-    def test(self):
+    def test(self) -> Iterator[TestRecord]:
         yield TestRecord(value="test2")
 
 
@@ -468,10 +470,10 @@ class _TestSubPlugin3(_TestSubPlugin2):
 
     # Override the test() function of t2
     @export(record=TestRecord)
-    def test(self):
+    def test(self) -> Iterator[TestRecord]:
         yield TestRecord(value=self._value())
 
-    def _value(self):
+    def _value(self) -> str:
         return "test3"
 
 
@@ -480,15 +482,15 @@ class _TestSubPlugin4(_TestSubPlugin3):
     __register__ = False
 
     # Do not override the test() function of t3, but change the _value function instead.
-    def _value(self):
+    def _value(self) -> str:
         return "test4"
 
     @export(record=TestRecord)
-    def test_other(self):
+    def test_other(self) -> Iterator[TestRecord]:
         yield TestRecord(value="test4-other")
 
     @export(record=TestRecord)
-    def test_all(self):
+    def test_all(self) -> Iterator[TestRecord]:
         yield TestRecord(value="overridden")
 
 
@@ -497,7 +499,7 @@ class _TestSubPlugin5(_TestNSPlugin):
     __register__ = False
 
     @export(record=TestRecord2)
-    def test_other(self):
+    def test_other(self) -> Iterator[TestRecord2]:
         yield TestRecord2(value=69)
 
 
@@ -544,7 +546,7 @@ def test_namespace_plugin(target_win: Target) -> None:
             __register__ = False
 
             @export(output="yield")
-            def test(self):
+            def test(self) -> Iterator[str]:
                 yield "faulty"
 
 
@@ -557,13 +559,39 @@ def test_namespace_plugin_registration(mock_plugins: PluginRegistry) -> None:
         __namespace__ = "t1"
 
         @export(record=TestRecord)
-        def test(self):
-            ...
+        def test(self) -> None: ...
 
     assert next(lookup("NS")).exported
     assert next(lookup("NS.test")).exported
     assert next(lookup("t1")).exported
     assert next(lookup("t1.test")).exported
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_namesplace_plugin_multiple_same_module(mock_plugins: PluginRegistry) -> None:
+    class NS(NamespacePlugin):
+        __namespace__ = "ns"
+
+        def check_compatible(self) -> None:
+            return None
+
+    class Foo(NS):
+        __namespace__ = "foo"
+
+        @export(output="yield")
+        def baz(self) -> Iterator[str]:
+            yield from ["foo"]
+
+    class Bar(NS):
+        __namespace__ = "bar"
+
+        @export(output="yield")
+        def baz(self) -> Iterator[str]:
+            yield from ["bar"]
+
+    result, _ = find_functions("*.baz")
+    assert len(result) == 2
+    assert sorted(desc.name for desc in result) == ["bar.baz", "foo.baz"]
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
@@ -597,12 +625,12 @@ def test_find_plugin_function_default(target_default: Target) -> None:
     ],
 )
 def test_find_plugin_function_order(target_win: Target, pattern: str) -> None:
-    found = ",".join(reduce(lambda rs, el: rs + [el.method_name], find_functions(pattern, target_win)[0], []))
+    found = ",".join(reduce(lambda rs, el: [*rs, el.method_name], find_functions(pattern, target_win)[0], []))
     assert found == pattern
 
 
 class _TestIncompatiblePlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         raise UnsupportedPluginError("My incompatible plugin error")
 
 
@@ -847,7 +875,7 @@ MOCK_PLUGINS = PluginRegistry(
 
 
 @pytest.mark.parametrize(
-    "osfilter, index, expected_plugins",
+    ("osfilter", "index", "expected_plugins"),
     [
         (
             None,
@@ -924,7 +952,7 @@ def test_plugins_default_plugin(target_default: Target) -> None:
     assert default_plugin_plugins == all_plugins
 
     # The all_with_home is a sentinel function, which should be loaded for a
-    # target with DefaultPlugin as OS plugin.
+    # target with DefaultOSPlugin as OS plugin.
     sentinel_function = "all_with_home"
     has_sentinel_function = False
     for p in default_plugin_plugins:
@@ -940,7 +968,7 @@ def test_plugins_default_plugin(target_default: Target) -> None:
 
 
 def test_function_aliases(target_default: Target) -> None:
-    """test if alias functions are tagged as such correctly."""
+    """Test if alias functions are tagged as such correctly."""
 
     # function that is an alias should have an alias property set to True
     syslog_fd = find_functions("syslog", target_default)[0][0]
@@ -957,7 +985,7 @@ def test_function_aliases(target_default: Target) -> None:
 
 
 def test_function_required_arguments(target_default: Target) -> None:
-    """test if functions with required arguments are tagged as such correctly."""
+    """Test if functions with required arguments are tagged as such correctly."""
 
     # function without any arguments should have an args property with an empty list
     syslog_fd = find_functions("syslog", target_default)[0][0]
@@ -1046,7 +1074,7 @@ class MockOS1(OSPlugin):
     __register__ = False
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         pass
 
     @export(property=True)
@@ -1054,7 +1082,7 @@ class MockOS1(OSPlugin):
         pass
 
     @export(property=True)
-    def version(self) -> Optional[str]:
+    def version(self) -> str | None:
         pass
 
     @export(record=EmptyRecord)
@@ -1066,7 +1094,7 @@ class MockOS1(OSPlugin):
         pass
 
     @export(property=True)
-    def architecture(self) -> Optional[str]:
+    def architecture(self) -> str | None:
         pass
 
 
@@ -1074,38 +1102,32 @@ class MockOS2(OSPlugin):
     __register__ = False
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
-        """Test docstring hostname"""
-        pass
+    def hostname(self) -> str | None:
+        """Test docstring hostname."""
 
     @export(property=True)
     def ips(self) -> list[str]:
-        """Test docstring ips"""
-        pass
+        """Test docstring ips."""
 
     @export(property=True)
-    def version(self) -> Optional[str]:
-        """Test docstring version"""
-        pass
+    def version(self) -> str | None:
+        """Test docstring version."""
 
     @export(record=EmptyRecord)
     def users(self) -> list[Record]:
-        """Test docstring users"""
-        pass
+        """Test docstring users."""
 
     @export(property=True)
     def os(self) -> str:
-        """Test docstring os"""
-        pass
+        """Test docstring os."""
 
     @export(property=True)
-    def architecture(self) -> Optional[str]:
-        """Test docstring architecture"""
-        pass
+    def architecture(self) -> str | None:
+        """Test docstring architecture."""
 
 
 @pytest.mark.parametrize(
-    "subclass, replaced",
+    ("subclass", "replaced"),
     [
         (MockOS1, True),
         (MockOS2, False),
@@ -1134,7 +1156,7 @@ def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -
 
         assert (os_docstring == subclass_docstring) is replaced
         if not replaced:
-            assert subclass_docstring == f"Test docstring {method_name}"
+            assert subclass_docstring == f"Test docstring {method_name}."
 
 
 class _TestInternalPlugin(InternalPlugin):
@@ -1172,12 +1194,12 @@ class ExampleFooPlugin(Plugin):
     @alias("bar")
     @alias(name="baz")
     def foo(self) -> Iterator[str]:
-        """Yield foo!"""
+        """Yield foo!."""
         yield "foo!"
 
 
 def test_plugin_alias(target_bare: Target) -> None:
-    """test ``@alias`` decorator behaviour"""
+    """Test ``@alias`` decorator behaviour."""
     target_bare.add_plugin(ExampleFooPlugin)
     assert target_bare.has_function("foo")
     assert target_bare.foo.__aliases__ == ["baz", "bar"]
@@ -1197,12 +1219,14 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     Resources:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
-    # Ignore DefaultPlugin and NamespacePlugin instances
-    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultPlugin:
+    # Ignore DefaultOSPlugin and NamespacePlugin instances
+    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultOSPlugin:
         return
 
     # Plugin method should specify what it returns
-    assert descriptor.output in ["record", "yield", "default", "none"], f"Invalid output_type for function {descriptor}"
+    assert descriptor.output in ["record", "yield", "default", "none"], (
+        f"Invalid output_type for function {descriptor.func.__qualname__}"
+    )
 
     annotations = None
 
@@ -1213,14 +1237,15 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
         annotations = descriptor.func.fget.__annotations__
 
     # Plugin method should have a return annotation
-    assert annotations and "return" in annotations.keys(), f"No return type annotation for function {descriptor}"
+    assert annotations
+    assert "return" in annotations, f"No return type annotation for function {descriptor.func.__qualname__}"
 
     # TODO: Check if the annotations make sense with the provided output_type
 
     # Plugin method should have a docstring
     method_doc_str = descriptor.func.__doc__
-    assert isinstance(method_doc_str, str), f"No docstring for function {descriptor}"
-    assert method_doc_str != "", f"Empty docstring for function {descriptor}"
+    assert isinstance(method_doc_str, str), f"No docstring for function {descriptor.func.__qualname__}"
+    assert method_doc_str != "", f"Empty docstring for function {descriptor.func.__qualname__}"
 
     # The method docstring should compile to rst without warnings
     assert_valid_rst(method_doc_str)
@@ -1233,6 +1258,70 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
 
+    # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
+    for arg in descriptor.args:
+        names, settings = arg
+        is_bool_action = settings.get("action", "") in (
+            "store_true",
+            "store_false",
+        )
+
+        assert names, f"No argument names for argument of function {descriptor.func.__qualname__}"
+        assert sorted(names, key=len) == list(names), (
+            f"Argument names {names!r} for function {descriptor.func.__qualname__} should specify short form first"
+        )
+
+        assert settings.get("default", 1) is not None, (
+            f"Superfluous default of None for argument {names[0]} in function {descriptor.func.__qualname__}: "
+            "default is implied as None already."
+        )
+
+        assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.func.__qualname__}"
+
+        dest = settings.get("dest") or names[-1].strip("-").replace("-", "_")
+        assert dest in annotations, (
+            f"Missing type annotation for argument {dest} in function {descriptor.func.__qualname__}"
+        )
+
+        # TODO: More strictly check type annotation, use a contains right now to also match optionals
+        type_ = "bool" if is_bool_action else getattr(settings.get("type"), "__name__", "str")
+        assert type_ in annotations[dest], (
+            f"Invalid type annotation for argument {dest} in function {descriptor.func.__qualname__} "
+            f"({annotations[dest]} instead of {type_})"
+        )
+
+        assert settings.get("type") is not str, (
+            f"Superfluous type of str for argument {names[0]} in function {descriptor.func.__qualname__}: "
+            "type is implied as str by default."
+        )
+
+        # Inverse checks
+
+        if settings.get("required"):
+            assert not settings.get("default"), (
+                "It does not make sense to set an argument to required and have a default value"
+                f"in {names[0]} in function {descriptor.func.__qualname__}"
+            )
+
+        if "required" in settings:
+            assert settings.get("required"), (
+                f"Superfluous required of False for argument {names[0]} in function {descriptor.func.__qualname__}: "
+                "required is implied as False already."
+            )
+
+        if is_bool_action:
+            assert "type" not in settings, (
+                f"Type should not be set for store_true or store_false in {names[0]} in "
+                f"function {descriptor.func.__qualname__}: "
+                "type is implied as boolean already."
+            )
+
+            assert "default" not in settings, (
+                f"Default should not be set for store_true or store_false in {names[0]} in "
+                f"function {descriptor.func.__qualname__}: "
+                "default is implied as opposite boolean already."
+            )
+
 
 def assert_valid_rst(src: str) -> None:
     """Attempts to compile the given string to rst."""
@@ -1244,4 +1333,4 @@ def assert_valid_rst(src: str) -> None:
         # Limited context was provided to docutils, so some exceptions could incorrectly be raised.
         # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
         if "Unknown interpreted text role" not in str(e):
-            assert str(e) in src  # makes reading pytest error easier
+            pytest.fail(f"Invalid rst: {e}", pytrace=False)

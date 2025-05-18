@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import hashlib
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pytest
-
-from dissect.target import Target
 from dissect.target.helpers import keychain
 from dissect.target.loaders.ab import AndroidBackupLoader
 from dissect.target.loaders.ab import main as ab_main
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    import pytest
+
+    from dissect.target.target import Target
 
 
 def test_ab_loader(target_bare: Target) -> None:
@@ -33,7 +38,7 @@ def test_ab_loader(target_bare: Target) -> None:
     assert hashlib.sha1(buf).hexdigest() == "7177d340414d5ca2a835603c347e64e3d2625e47"
 
 
-def test_ab_unwrapper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+def test_ab_unwrapper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ab_path = Path(absolute_path("_data/loaders/ab/test.ab"))
 
     with monkeypatch.context() as m:

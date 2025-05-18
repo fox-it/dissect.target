@@ -1,16 +1,21 @@
+from __future__ import annotations
+
 import textwrap
 from datetime import timedelta, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webserver.caddy import CaddyPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_plugins_apps_webservers_caddy_txt(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+
+def test_caddy_txt(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     tz = timezone(timedelta(hours=-7))
     fs_unix.map_file_fh(
         "var/log/caddy_access.log",
@@ -32,7 +37,7 @@ def test_plugins_apps_webservers_caddy_txt(target_unix: Target, fs_unix: Virtual
     assert record.bytes_sent == 2326
 
 
-def test_plugins_apps_webservers_caddy_json(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_caddy_json(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file(
         "var/log/caddy_access.log",
         absolute_path("_data/plugins/apps/webserver/caddy/access.log"),
@@ -53,7 +58,7 @@ def test_plugins_apps_webservers_caddy_json(target_unix: Target, fs_unix: Virtua
     assert record.bytes_sent == 12
 
 
-def test_plugins_apps_webservers_caddy_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_caddy_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config_file = absolute_path("_data/plugins/apps/webserver/caddy/Caddyfile")
     fs_unix.map_file("etc/caddy/Caddyfile", config_file)
 
@@ -68,7 +73,7 @@ def test_plugins_apps_webservers_caddy_config(target_unix: Target, fs_unix: Virt
     assert str(log_paths[1]) == "/var/www/log/access.log"
 
 
-def test_plugins_apps_webservers_caddy_config_logs_logrotated(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_caddy_config_logs_logrotated(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config_file = absolute_path("_data/plugins/apps/webserver/caddy/Caddyfile")
     fs_unix.map_file("etc/caddy/Caddyfile", config_file)
 
@@ -82,7 +87,7 @@ def test_plugins_apps_webservers_caddy_config_logs_logrotated(target_unix: Targe
     assert len(log_paths) == 4
 
 
-def test_plugins_apps_webservers_caddy_config_commented(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_caddy_config_commented(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config = """
     root /var/www/html
     1.example.com {

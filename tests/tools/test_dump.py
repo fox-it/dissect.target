@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import json
 import pathlib
+from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
 import pytest
@@ -9,9 +12,15 @@ from dissect.target.plugins.os.windows import amcache
 from dissect.target.tools.dump import run, state, utils
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
 
 @pytest.fixture
-def target_win_iis_amcache(target_win_tzinfo, fs_win):
+def target_win_iis_amcache(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> iis.Target:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
 
@@ -28,7 +37,7 @@ def target_win_iis_amcache(target_win_tzinfo, fs_win):
 
 
 @pytest.mark.parametrize(
-    "serialization_name,compression_name",
+    ("serialization_name", "compression_name"),
     [
         ("jsonlines", "gzip"),
         ("jsonlines", "bzip2"),
@@ -39,23 +48,24 @@ def target_win_iis_amcache(target_win_tzinfo, fs_win):
     ],
 )
 def test_execute_pipeline(
-    compression_name,
-    serialization_name,
-    target_win_iis_amcache,
-    tmp_path,
-):
-    def mock_get_targets(_):
+    serialization_name: str,
+    compression_name: str | None,
+    target_win_iis_amcache: Target,
+    tmp_path: pathlib.Path,
+) -> None:
+    def mock_get_targets(targets: list[str]) -> Iterator[Target]:
         yield target_win_iis_amcache
 
-    def mock_log_progress(stream):
+    def mock_log_progress(stream: Iterable[Any]) -> Iterator[Any]:
         count = 0
         for element in stream:
             yield element
             count += 1
         assert count == 128
 
-    with patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets), patch(
-        "dissect.target.tools.dump.run.log_progress", new=mock_log_progress
+    with (
+        patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets),
+        patch("dissect.target.tools.dump.run.log_progress", new=mock_log_progress),
     ):
         output_dir = tmp_path / "output"
 
@@ -101,8 +111,7 @@ def test_execute_pipeline(
         state_path = output_dir / state.STATE_FILE_NAME
         assert state_path.exists()
 
-        with open(state_path, "r") as f:
-            state_blob = json.loads(f.read())
+        state_blob = json.loads(state_path.read_text())
 
         assert state_blob["compression"] == compression_name
         assert state_blob["serialization"] == serialization_name
@@ -130,11 +139,11 @@ def test_execute_pipeline(
 
 
 @pytest.mark.parametrize("limit", [5, 15, None])
-def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmp_path):
-    def mock_get_targets(_):
+def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Target, tmp_path: pathlib.Path) -> None:
+    def mock_get_targets(targets: list[str]) -> Iterator[Target]:
         yield target_win_iis_amcache
 
-    def mock_log_progress(stream):
+    def mock_log_progress(stream: Iterable[Any]) -> Iterator[Any]:
         count = 0
         for element in stream:
             yield element
@@ -145,8 +154,9 @@ def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmp_path):
         else:
             assert count == 128
 
-    with patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets), patch(
-        "dissect.target.tools.dump.run.log_progress", new=mock_log_progress
+    with (
+        patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets),
+        patch("dissect.target.tools.dump.run.log_progress", new=mock_log_progress),
     ):
         output_dir = tmp_path / "output"
 
@@ -174,8 +184,7 @@ def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmp_path):
         state_path = output_dir / state.STATE_FILE_NAME
         assert state_path.exists()
 
-        with open(state_path, "r") as f:
-            state_blob = json.loads(f.read())
+        state_blob = json.loads(state_path.read_text())
 
         assert state_blob["compression"] is None
         sink_blobs = state_blob["sinks"]

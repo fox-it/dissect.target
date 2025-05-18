@@ -1,19 +1,25 @@
+from __future__ import annotations
+
 import json
 import re
 from datetime import datetime
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
-from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import basename, open_decompress
+from dissect.target.plugin import export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverPlugin,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 LOG_FILE_REGEX = re.compile(r"(log|output file) (?P<log_file>.*)( \{)?$")
 LOG_REGEX = re.compile(
@@ -89,7 +95,7 @@ class CaddyPlugin(WebserverPlugin):
 
         return log_paths
 
-    @plugin.export(record=WebserverAccessLogRecord)
+    @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Parses Caddy V1 CRF and Caddy V2 JSON access logs.
 

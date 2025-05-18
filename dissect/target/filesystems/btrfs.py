@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import BinaryIO, Iterator, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 import dissect.btrfs as btrfs
 from dissect.btrfs.c_btrfs import c_btrfs
@@ -16,12 +16,15 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 class BtrfsFilesystem(Filesystem):
     __type__ = "btrfs"
     __multi_volume__ = True
 
-    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.btrfs = btrfs.Btrfs(fh)
         self.subfs = self.open_subvolume()
@@ -36,7 +39,7 @@ class BtrfsFilesystem(Filesystem):
         return magic == c_btrfs.BTRFS_MAGIC
 
     @staticmethod
-    def _detect_id(fh: BinaryIO) -> Optional[bytes]:
+    def _detect_id(fh: BinaryIO) -> bytes | None:
         # First field is csum, followed by fsid
         fh.seek(c_btrfs.BTRFS_SUPER_INFO_OFFSET + c_btrfs.BTRFS_CSUM_SIZE)
         return fh.read(c_btrfs.BTRFS_FSID_SIZE)
@@ -48,7 +51,7 @@ class BtrfsFilesystem(Filesystem):
                 continue
             yield self.open_subvolume(subvolid=subvol.objectid)
 
-    def open_subvolume(self, subvol: Optional[str] = None, subvolid: Optional[int] = None) -> BtrfsSubvolumeFilesystem:
+    def open_subvolume(self, subvol: str | None = None, subvolid: int | None = None) -> BtrfsSubvolumeFilesystem:
         return BtrfsSubvolumeFilesystem(self, subvol, subvolid)
 
     def get(self, path: str) -> FilesystemEntry:
@@ -58,7 +61,7 @@ class BtrfsFilesystem(Filesystem):
 class BtrfsSubvolumeFilesystem(Filesystem):
     __type__ = "btrfs"
 
-    def __init__(self, fs: BtrfsFilesystem, subvol: Optional[str] = None, subvolid: Optional[int] = None):
+    def __init__(self, fs: BtrfsFilesystem, subvol: str | None = None, subvolid: int | None = None):
         super().__init__(fs.volume, alt_separator=fs.alt_separator, case_sensitive=fs.case_sensitive)
         if subvol is not None and subvolid is not None:
             raise ValueError("Only one of subvol or subvolid is allowed")
@@ -75,7 +78,7 @@ class BtrfsSubvolumeFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return BtrfsFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path: str, node: Optional[btrfs.INode] = None) -> btrfs.INode:
+    def _get_node(self, path: str, node: btrfs.INode | None = None) -> btrfs.INode:
         try:
             return self.subvolume.get(path, node)
         except btrfs.FileNotFoundError as e:
@@ -142,7 +145,7 @@ class BtrfsFilesystemEntry(FilesystemEntry):
 
     def readlink(self) -> str:
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
 
         return self.entry.link
 

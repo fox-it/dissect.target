@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import hashlib
+from typing import TYPE_CHECKING
 
 from Crypto.Hash import MD4
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.plugins.os.windows.credential.credhist import (
     CredHistFile,
@@ -11,12 +12,16 @@ from dissect.target.plugins.os.windows.credential.credhist import (
 )
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
 
 def test_credhist() -> None:
     """The provided CREDHIST file has the following password history: ``user -> password -> password3``.
     The current password of the user is ``password4``.
     """
-    with open(absolute_path("_data/plugins/os/windows/credhist/CREDHIST"), "rb") as fh:
+    with absolute_path("_data/plugins/os/windows/credhist/CREDHIST").open("rb") as fh:
         ch = CredHistFile(fh)
 
     assert len(ch.entries) == 3

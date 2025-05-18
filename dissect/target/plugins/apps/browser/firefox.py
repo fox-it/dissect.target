@@ -1,19 +1,20 @@
+from __future__ import annotations
+
+import base64
 import hmac
 import json
 import logging
 from base64 import b64decode
 from hashlib import pbkdf2_hmac, sha1
 from itertools import chain
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING
 
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
-from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
@@ -25,7 +26,15 @@ from dissect.target.plugins.apps.browser.browser import (
     BrowserPlugin,
     try_idna,
 )
-from dissect.target.plugins.general.users import UserRecord
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.sql.sqlite3 import SQLite3
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.plugins.general.users import UserRecord
+    from dissect.target.target import Target
 
 try:
     from asn1crypto import algos, core
@@ -58,7 +67,7 @@ class FirefoxPlugin(BrowserPlugin):
 
     __namespace__ = "firefox"
 
-    USER_DIRS = [
+    USER_DIRS = (
         # Windows
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
@@ -68,11 +77,9 @@ class FirefoxPlugin(BrowserPlugin):
         ".var/app/org.mozilla.firefox/.mozilla/firefox",
         # macOS
         "Library/Application Support/Firefox",
-    ]
+    )
 
-    SYSTEM_DIRS = [
-        "/data/data/org.mozilla.vrbrowser/files/mozilla",
-    ]
+    SYSTEM_DIRS = ("/data/data/org.mozilla.vrbrowser/files/mozilla",)
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
@@ -95,7 +102,7 @@ class FirefoxPlugin(BrowserPlugin):
         "browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.dirs: list[tuple[UserRecord, TargetPath]] = []
 
@@ -177,10 +184,7 @@ class FirefoxPlugin(BrowserPlugin):
             from_url (uri): URL of the "from" visit.
             source: (path): The source file of the history record.
         """
-        if self.target.os == OperatingSystem.ANDROID:
-            from_timestamp = from_unix_ms
-        else:
-            from_timestamp = from_unix_us
+        from_timestamp = from_unix_ms if self.target.os == OperatingSystem.ANDROID else from_unix_us
 
         for user, db_file, db in self._iter_db("places.sqlite"):
             try:
@@ -216,8 +220,9 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user,
                     )
-            except SQLError as e:
-                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
+            except SQLError as e:  # noqa: PERF203
+                self.target.log.warning("Error processing history file: %s", db_file)
+                self.target.log.debug("", exc_info=e)
 
     @export(record=BrowserCookieRecord)
     def cookies(self) -> Iterator[BrowserCookieRecord]:
@@ -262,8 +267,9 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user,
                     )
-            except SQLError as e:
-                self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
+            except SQLError as e:  # noqa: PERF203
+                self.target.log.warning("Error processing cookie file: %s", db_file)
+                self.target.log.debug("", exc_info=e)
 
     @export(record=BrowserDownloadRecord)
     def downloads(self) -> Iterator[BrowserDownloadRecord]:
@@ -295,10 +301,7 @@ class FirefoxPlugin(BrowserPlugin):
                 for row in db.table("moz_annos"):
                     attribute_name = attributes.get(row.anno_attribute_id, row.anno_attribute_id)
 
-                    if attribute_name == "downloads/metaData":
-                        content = json.loads(row.content)
-                    else:
-                        content = row.content
+                    content = json.loads(row.content) if attribute_name == "downloads/metaData" else row.content
 
                     if row.place_id not in annotations:
                         annotations[row.place_id] = {"id": row.id}
@@ -353,7 +356,8 @@ class FirefoxPlugin(BrowserPlugin):
                         _user=user,
                     )
             except SQLError as e:
-                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
+                self.target.log.warning("Error processing history file: %s", db_file)
+                self.target.log.debug("", exc_info=e)
 
     @export(record=BrowserExtensionRecord)
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
@@ -491,8 +495,8 @@ class FirefoxPlugin(BrowserPlugin):
                         browser="firefox",
                         id=login.get("id"),
                         url=login.get("hostname"),
-                        encrypted_username=login.get("encryptedUsername"),
-                        encrypted_password=login.get("encryptedPassword"),
+                        encrypted_username=base64.b64decode(login.get("encryptedUsername", "")),
+                        encrypted_password=base64.b64decode(login.get("encryptedPassword", "")),
                         decrypted_username=decrypted_username,
                         decrypted_password=decrypted_password,
                         source=login_file,
@@ -711,11 +715,10 @@ def decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, glo
 
     if algos.EncryptionAlgorithmId.map(algorithm) == "pbes2":
         return decrypt_pbes2(decoded_item, primary_password, global_salt), algorithm
-    elif algorithm == pbeWithSha1AndTripleDES_CBC:
+    if algorithm == pbeWithSha1AndTripleDES_CBC:
         return decrypt_sha1_triple_des_cbc(decoded_item, primary_password, global_salt), algorithm
-    else:
-        # Firefox supports other algorithms (i.e. Firefox before 2018), but decrypting these is not (yet) supported.
-        return b"", algorithm
+    # Firefox supports other algorithms (i.e. Firefox before 2018), but decrypting these is not (yet) supported.
+    return b"", algorithm
 
 
 def query_global_salt(key4_file: TargetPath) -> tuple[str, str]:
@@ -724,13 +727,15 @@ def query_global_salt(key4_file: TargetPath) -> tuple[str, str]:
         for row in db.table("metadata").rows():
             if row.get("id") == "password":
                 return row.get("item1", ""), row.get("item2", "")
+        return None
 
 
 def query_master_key(key4_file: TargetPath) -> tuple[str, str]:
     with key4_file.open("rb") as fh:
         db = sqlite3.SQLite3(fh)
-        for row in db.table("nssPrivate").rows():
+        if row := next(db.table("nssPrivate").rows(), None):
             return row.get("a11", ""), row.get("a102", "")
+        return None
 
 
 def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple[bytes, str]:
@@ -782,7 +787,7 @@ def decrypt_field(key: bytes, field: tuple[bytes, bytes, bytes]) -> bytes:
 
 def decrypt(
     username: str, password: str, key4_file: TargetPath, primary_password: str = ""
-) -> tuple[Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None]:
     """Decrypt a stored username and password using provided credentials and key4 file.
 
     Args:

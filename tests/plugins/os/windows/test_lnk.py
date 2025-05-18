@@ -1,4 +1,6 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 from flow.record.fieldtypes import datetime
@@ -6,9 +8,13 @@ from flow.record.fieldtypes import datetime
 from dissect.target.plugins.os.windows.lnk import LnkPlugin, LnkRecord
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
 
 @pytest.mark.parametrize(
-    "path, error",
+    ("path", "error"),
     [
         pytest.param(None, False, id="No directory provided"),
         pytest.param("sysvol/users/", False, id="Directory provided"),
@@ -16,7 +22,9 @@ from tests._utils import absolute_path
         pytest.param("sysvol/users/non-existing.lnk", True, id="Non-existing file provided"),
     ],
 )
-def test_lnk(target_win, fs_win, path: Optional[str], error: bool, caplog):
+def test_lnk(
+    target_win: Target, fs_win: VirtualFilesystem, path: str | None, error: bool, caplog: pytest.LogCaptureFixture
+) -> None:
     lnk_file = absolute_path("_data/plugins/os/windows/lnk/pestudio.lnk")
     fs_win.map_file("Users/pestudio.lnk", lnk_file)
 

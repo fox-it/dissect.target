@@ -2,34 +2,45 @@ from __future__ import annotations
 
 import random
 import socket
+import sys
+from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from dissect.target.helpers.sunrpc import sunrpc
 from dissect.target.helpers.sunrpc.serializer import (
+    AuthFlavor,
     AuthNullSerializer,
     AuthSerializer,
     AuthUnixSerializer,
+    Deserializer,
     MessageSerializer,
-    XdrDeserializer,
-    XdrSerializer,
+    PortMappingSerializer,
+    Serializer,
+    UInt32Serializer,
 )
 
 if TYPE_CHECKING:
     from types import TracebackType
+
+    from typing_extensions import Self
 
     from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
 
 
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
+ConCredentials = TypeVar("ConCredentials")
+ConVerifier = TypeVar("ConVerifier")
 Params = TypeVar("Params")
 Results = TypeVar("Results")
 
 
 @dataclass
 class AuthScheme(Generic[Credentials, Verifier]):
+    flavor: int
     credentials: Credentials
     verifier: Verifier
     credentials_serializer: AuthSerializer[Credentials]
@@ -37,7 +48,9 @@ class AuthScheme(Generic[Credentials, Verifier]):
 
 
 def auth_null() -> AuthScheme[sunrpc.AuthNull, sunrpc.AuthNull]:
-    return AuthScheme(sunrpc.AuthNull(), sunrpc.AuthNull(), AuthNullSerializer(), AuthNullSerializer())
+    return AuthScheme(
+        AuthFlavor.AUTH_NULL.value, sunrpc.AuthNull(), sunrpc.AuthNull(), AuthNullSerializer(), AuthNullSerializer()
+    )
 
 
 def auth_unix(machine: str | None, uid: int, gid: int, gids: list[int]) -> AuthScheme[sunrpc.AuthUnix, sunrpc.AuthNull]:
@@ -47,6 +60,7 @@ def auth_unix(machine: str | None, uid: int, gid: int, gids: list[int]) -> AuthS
         machine = "dissect"
 
     return AuthScheme(
+        AuthFlavor.AUTH_UNIX.value,
         sunrpc.AuthUnix(stamp, machine, uid, gid, gids),
         sunrpc.AuthNull(),
         AuthUnixSerializer(),
@@ -54,7 +68,6 @@ def auth_unix(machine: str | None, uid: int, gid: int, gids: list[int]) -> AuthS
     )
 
 
-# RdJ: Error handing is a bit minimalistic. Expand later on.
 class MismatchXidError(Exception):
     pass
 
@@ -67,27 +80,119 @@ class IncompleteMessage(Exception):
     pass
 
 
-class Client(AbstractContextManager, Generic[Credentials, Verifier]):
+class InvalidPortMapping(Exception):
+    pass
+
+
+class AbstractClient(ABC):
+    @abstractmethod
+    def call(
+        self,
+        proc_desc: ProcedureDescriptor,
+        params: Params,
+        params_serializer: Serializer[Params],
+        result_deserializer: Deserializer[Results],
+    ) -> Results:
+        pass
+
+    @abstractmethod
+    def close(self) -> None:
+        pass
+
+    @abstractmethod
+    def rebind_auth(self, auth: AuthScheme[ConCredentials, ConVerifier]) -> None:
+        pass
+
+
+class LocalPortPolicy(IntEnum):
+    """Policy for binding to a local port."""
+
+    ANY = 0  # Bind to any free port
+    PRIVILEGED = -1  # Bind to the first free privileged port
+
+
+class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifier]):
     PMAP_PORT = 111
+    TCP_KEEPIDLE = 60
+    TCP_KEEPINTVL = 10
+    TCP_KEEPCNT = 3
 
     @classmethod
-    def connect_port_mapper(cls, hostname: str) -> Client:
-        return cls.connect(hostname, cls.PMAP_PORT, auth_null())
+    def connect_port_mapper(
+        cls, hostname: str, timeout_in_seconds: float | None = 5.0
+    ) -> Client[sunrpc.AuthNull, sunrpc.AuthNull]:
+        """Connect to the port mapper service on a remote host."""
+        return cls.connect(
+            hostname,
+            cls.PMAP_PORT,
+            auth_null(),
+            local_port=0,
+            timeout_in_seconds=timeout_in_seconds,
+        )
 
     @classmethod
-    def connect(cls, hostname: str, port: int, auth: AuthScheme[Credentials, Verifier], local_port: int = 0) -> Client:
+    def connect(
+        cls,
+        hostname: str,
+        port: int,
+        auth: AuthScheme[ConCredentials, ConVerifier],
+        local_port: int | LocalPortPolicy = 0,
+        timeout_in_seconds: float | None = 5.0,
+    ) -> Client[ConCredentials, ConVerifier]:
+        """Connect to a RPC server.
+
+        Args:
+            hostname: The remote hostname.
+            port: The remote port.
+            auth: The authentication scheme.
+            local_port: The local port to bind to.
+                If equal to ``LocalPortPolicy.PRIVILEGED`` or -1, bind to the first free privileged port.
+                If equal to ``LocalPortPolicy.ANY`` or 0, bind to any free port.
+                Otherwise, bind to the specified port.
+            timeout_in_seconds: The timeout for making the connection.
+        """
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("", local_port))
+
+        if not sys.platform.startswith("darwin"):
+            # MacOS does not support TCP_KEEPIDLE, and TCP_KEEPALIVE is only available in Python 3.10
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, cls.TCP_KEEPIDLE)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, cls.TCP_KEEPINTVL)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, cls.TCP_KEEPCNT)
+
+        local_port_int = local_port.value if isinstance(local_port, LocalPortPolicy) else local_port
+        if local_port_int == LocalPortPolicy.PRIVILEGED:
+            cls._bind_free_privileged_port(sock)
+        else:
+            sock.bind(("", local_port_int))
+
+        sock.settimeout(timeout_in_seconds)
         sock.connect((hostname, port))
+        sock.settimeout(None)  # Back to blocking mode
 
         return Client(sock, auth)
+
+    @classmethod
+    def _bind_free_privileged_port(cls, sock: socket.socket) -> None:
+        """Bind to a free privileged port (1-1023)."""
+        for port in range(1, 1024):
+            try:
+                return sock.bind(("", port))
+            except OSError:  # noqa: PERF203
+                continue
+
+        raise OSError("No free privileged port available")
 
     def __init__(self, sock: socket.socket, auth: AuthScheme[Credentials, Verifier], fragment_size: int = 8192):
         self._sock = sock
         self._auth = auth
         self._fragment_size = fragment_size
         self._xid = 1
+
+    def __enter__(self) -> Self:
+        """Return ``self`` upon entering the runtime context."""
+        return self  # type: Necessary for type checker
 
     def __exit__(self, _: type[BaseException] | None, __: BaseException | None, ___: TracebackType | None) -> bool:
         self.close()
@@ -100,14 +205,28 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
             pass  # Ignore errors if the socket is already closed
         self._sock.close()
 
+    def rebind_auth(self, auth: AuthScheme[ConCredentials, ConVerifier]) -> Client[ConCredentials, ConVerifier]:
+        """Return a new client with the same socket, but different authentication credentials."""
+        fd = self._sock.detach()  # Move underlying file descriptor to new socket
+        new_sock = socket.socket(fileno=fd)
+        return Client(new_sock, auth, self._fragment_size)
+
+    def query_port_mapping(self, program: int, version: int) -> int:
+        """Query port number of specified program and version."""
+        arg = sunrpc.PortMapping(program=program, version=version, protocol=sunrpc.Protocol.TCP)
+        result = self.call(sunrpc.GetPortProc, arg, PortMappingSerializer(), UInt32Serializer())
+        if result == 0:
+            raise InvalidPortMapping("Invalid port mapping")
+        return result
+
     def call(
         self,
         proc_desc: ProcedureDescriptor,
         params: Params,
-        params_serializer: XdrSerializer[Params],
-        result_deserializer: XdrDeserializer[Results],
+        params_serializer: Serializer[Params],
+        result_deserializer: Deserializer[Results],
     ) -> Results:
-        """Synchronously call an RPC procedure and return the result"""
+        """Synchronously call an RPC procedure and return the result."""
 
         call_body = sunrpc.CallBody(
             proc_desc.program,

@@ -25,7 +25,7 @@ from __future__ import annotations
 import posixpath
 import sys
 from pathlib import Path, PurePath
-from typing import IO, TYPE_CHECKING, Iterator
+from typing import IO, TYPE_CHECKING, ClassVar
 
 from dissect.target import filesystem
 from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
@@ -33,6 +33,10 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem, FilesystemEntry
     from dissect.target.helpers.fsutil import stat_result
 
@@ -42,7 +46,7 @@ class _DissectFlavour:
     altsep = ""
     case_sensitive = False
 
-    __variant_instances = {}
+    __variant_instances: ClassVar[dict[tuple[bool, str], _DissectFlavour]] = {}
 
     def __new__(cls, case_sensitive: bool = False, alt_separator: str = ""):
         idx = (case_sensitive, alt_separator)
@@ -107,7 +111,7 @@ class PureDissectPath(PurePath):
         if not isinstance(fs, filesystem.Filesystem):
             raise TypeError(
                 "invalid PureDissectPath initialization: missing filesystem, "
-                "got %r (this might be a bug, please report)" % (fs, *pathsegments)
+                "got {!r} (this might be a bug, please report)".format(fs, *pathsegments)
             )
 
         alt_separator = fs.alt_separator
@@ -121,7 +125,7 @@ class PureDissectPath(PurePath):
         self._fs = fs
         self._flavour = _DissectFlavour(alt_separator=fs.alt_separator, case_sensitive=fs.case_sensitive)
 
-    def with_segments(self, *pathsegments) -> TargetPath:
+    def with_segments(self, *pathsegments) -> Self:
         return type(self)(self._fs, *pathsegments)
 
     # NOTE: This is copied from pathlib.py but turned into an instance method so we get access to the correct flavour
@@ -167,8 +171,7 @@ class TargetPath(Path, PureDissectPath):
         """
         if follow_symlinks:
             return self.get().stat()
-        else:
-            return self.get().lstat()
+        return self.get().lstat()
 
     def open(
         self,
@@ -201,7 +204,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.write_text() is unsupported")
 
-    def iterdir(self) -> Iterator[TargetPath]:
+    def iterdir(self) -> Iterator[Self]:
         """Iterate over the files in this directory.  Does not yield any
         result for the special paths '.' and '..'.
         """
@@ -217,18 +220,18 @@ class TargetPath(Path, PureDissectPath):
         return path_common.scandir(self)
 
     @classmethod
-    def cwd(cls) -> TargetPath:
+    def cwd(cls) -> Self:
         """Return a new path pointing to the current working directory."""
         raise NotImplementedError("TargetPath.cwd() is unsupported")
 
     @classmethod
-    def home(cls) -> TargetPath:
+    def home(cls) -> Self:
         """Return a new path pointing to the user's home directory (as
         returned by os.path.expanduser('~')).
         """
         raise NotImplementedError("TargetPath.home() is unsupported")
 
-    def absolute(self) -> TargetPath:
+    def absolute(self) -> Self:
         """Return an absolute version of this path by prepending the current
         working directory. No normalization or symlink resolution is performed.
 
@@ -237,7 +240,7 @@ class TargetPath(Path, PureDissectPath):
         raise NotImplementedError("TargetPath.absolute() is unsupported in Dissect")
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
-    def resolve(self, strict: bool = False) -> TargetPath:
+    def resolve(self, strict: bool = False) -> Self:
         """
         Make the path absolute, resolving all symlinks on the way and also
         normalizing it.
@@ -268,7 +271,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.group() is unsupported")
 
-    def readlink(self) -> TargetPath:
+    def readlink(self) -> Self:
         """
         Return the path to which the symbolic link points.
         """
@@ -312,7 +315,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.rmdir() is unsupported")
 
-    def rename(self, target: str) -> TargetPath:
+    def rename(self, target: str) -> Self:
         """
         Rename this path to the target path.
 
@@ -324,7 +327,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.rename() is unsupported")
 
-    def replace(self, target: str) -> TargetPath:
+    def replace(self, target: str) -> Self:
         """
         Rename this path to the target path, overwriting if that path exists.
 
@@ -351,7 +354,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.hardlink_to() is unsupported")
 
-    def expanduser(self) -> TargetPath:
+    def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
         (as returned by os.path.expanduser)
         """

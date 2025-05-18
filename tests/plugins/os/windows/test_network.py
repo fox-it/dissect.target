@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -9,8 +10,10 @@ import pytest
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.network import WindowsNetworkPlugin
-from dissect.target.target import Target
 from tests.conftest import change_controlset
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @dataclass
@@ -25,9 +28,9 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
 
 
 @pytest.mark.parametrize(
-    "mock_values, expected_values",
+    ("mock_values", "expected_values"),
     [
-        (
+        pytest.param(
             {
                 "VlanID": 12,
                 "NetCfgInstanceId": "TESTINGINSTANCEID",
@@ -44,23 +47,23 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
                 "EnableDHCP": 1,
             },
             {
-                "ip": ["10.10.10.10"],
-                "dns": ["10.10.10.2"],
-                "gateway": ["10.10.10.1"],
-                "mac": ["DE:AD:BE:EF:DE:AD"],
-                "network": ["10.10.10.0/24"],
-                "subnetmask": ["255.255.255.0"],
-                "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
-                "type": "OTHER",
-                "vlan": 12,
                 "name": "ETHERNET 0",
-                "search_domain": ["work"],
-                "metric": 15,
-                "dhcp": True,
+                "type": "OTHER",
                 "enabled": True,
+                "cidr": ["10.10.10.10/24"],
+                "ip": ["10.10.10.10"],
+                "gateway": ["10.10.10.1"],
+                "dns": ["10.10.10.2"],
+                "mac": ["DE:AD:BE:EF:DE:AD"],
+                "metric": 15,
+                "search_domain": ["work"],
+                "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
+                "dhcp": True,
+                "vlan": 12,
             },
+            id="DHCP enabled",
         ),
-        (
+        pytest.param(
             {
                 "VlanID": 11,
                 "NetCfgInstanceId": "TESTINGINSTANCEID",
@@ -76,23 +79,21 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
                 "EnableDHCP": 0,
             },
             {
-                "ip": ["10.10.10.10"],
-                "dns": ["10.10.10.2"],
-                "gateway": ["10.10.10.1"],
-                "mac": ["DE:AD:BE:EF:DE:AD"],
-                "subnetmask": ["255.255.255.0"],
-                "network": ["10.10.10.0/24"],
-                "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
                 "type": "ETHERNET_CSMACD",
-                "vlan": 11,
-                "name": None,
-                "search_domain": ["local"],
+                "cidr": ["10.10.10.10/24"],
+                "ip": ["10.10.10.10"],
+                "gateway": ["10.10.10.1"],
+                "dns": ["10.10.10.2"],
+                "mac": ["DE:AD:BE:EF:DE:AD"],
                 "metric": 5,
+                "search_domain": ["local"],
+                "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
                 "dhcp": False,
-                "enabled": None,
+                "vlan": 11,
             },
+            id="DHCP disabled",
         ),
-        (
+        pytest.param(
             {
                 "NetCfgInstanceId": "TESTINGINSTANCEID",
                 "*IfType": 1,
@@ -101,21 +102,11 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
             {
                 "type": "OTHER",
                 "gateway": ["10.10.10.1"],
-                "subnetmask": [],
-                "ip": [],
-                "dns": [],
-                "mac": [],
-                "network": [],
-                "search_domain": [],
-                "first_connected": None,
-                "vlan": None,
-                "name": None,
-                "metric": None,
                 "dhcp": False,
-                "enabled": None,
             },
+            id="OTHER",
         ),
-        (
+        pytest.param(
             {
                 "NetCfgInstanceId": "TESTINGINSTANCEID",
                 "*IfType": 1,
@@ -134,19 +125,24 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
             {
                 "type": "OTHER",
                 "gateway": ["10.10.10.2"],
-                "subnetmask": [],
-                "mac": [],
-                "ip": [],
-                "first_connected": None,
-                "dns": [],
-                "network": [],
                 "search_domain": [],
-                "vlan": None,
-                "metric": None,
-                "name": None,
                 "dhcp": False,
-                "enabled": None,
             },
+            id="OTHER empty",
+        ),
+        pytest.param(
+            {
+                "NetCfgInstanceId": "TESTINGINSTANCEID",
+                "EnableDHCP": 1,
+                "DhcpIPAddress": "0.0.0.0",
+                "DhcpSubnetMask": "255.255.255.0",
+            },
+            {
+                "_NO_INTERFACES": True,
+                "enabled": True,
+                "cidr": {},  # and not {'/255.255.255.0'}
+            },
+            id="invalid cidr",
         ),
     ],
 )
@@ -180,22 +176,26 @@ def test_windows_network(
         patch.object(target_win, "registry", mock_registry),
     ):
         network = target_win.network
-        assert network.ips() == expected_values["ip"]
-        assert network.dns() == expected_values["dns"]
-        assert network.gateways() == expected_values["gateway"]
-        assert network.macs() == expected_values["mac"]
+        assert network.ips() == expected_values.get("ip", [])
+        assert network.dns() == expected_values.get("dns", [])
+        assert network.gateways() == expected_values.get("gateway", [])
+        assert network.macs() == expected_values.get("mac", [])
 
-        network_interface = list(network.interfaces())[0]
-        assert network_interface.network == expected_values["network"]
-        assert network_interface.first_connected == expected_values["first_connected"]
-        assert network_interface.type == expected_values["type"]
-        assert network_interface.vlan == expected_values["vlan"]
-        assert network_interface.name == expected_values["name"]
-        assert network_interface.search_domain == expected_values["search_domain"]
-        assert network_interface.metric == expected_values["metric"]
-        assert network_interface.subnetmask == expected_values["subnetmask"]
-        assert network_interface.dhcp == expected_values["dhcp"]
-        assert network_interface.enabled == expected_values["enabled"]
+        if expected_values.get("_NO_INTERFACES"):
+            with pytest.raises(StopIteration):
+                next(iter(network.interfaces()))
+            return
+
+        network_interface = next(iter(network.interfaces()))
+        assert network_interface.name == expected_values.get("name")
+        assert network_interface.type == expected_values.get("type")
+        assert network_interface.enabled == expected_values.get("enabled")
+        assert network_interface.cidr == expected_values.get("cidr", [])
+        assert network_interface.metric == expected_values.get("metric")
+        assert network_interface.search_domain == expected_values.get("search_domain", [])
+        assert network_interface.first_connected == expected_values.get("first_connected")
+        assert network_interface.dhcp == expected_values.get("dhcp")
+        assert network_interface.vlan == expected_values.get("vlan")
 
 
 @pytest.mark.parametrize(
@@ -244,7 +244,7 @@ def test_windows_network_none(
 
 
 @pytest.mark.parametrize(
-    "mock_values, expected_values",
+    ("mock_values", "expected_values"),
     [
         (
             {
@@ -268,36 +268,34 @@ def test_windows_network_none(
             },
             [
                 {
-                    "ip": ["192.168.0.10"],
-                    "dns": ["192.168.0.2"],
-                    "gateway": ["192.168.0.1"],
-                    "mac": ["FE:EE:EE:EE:EE:ED"],
-                    "subnetmask": ["255.255.255.0"],
-                    "network": ["192.168.0.0/24"],
-                    "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
-                    "type": "SOFTWARE_LOOPBACK",
-                    "vlan": 10,
                     "name": None,
-                    "search_domain": ["corp"],
-                    "metric": 20,
-                    "dhcp": True,
+                    "type": "SOFTWARE_LOOPBACK",
                     "enabled": True,
+                    "cidr": ["192.168.0.10/24"],
+                    "ip": ["192.168.0.10"],
+                    "gateway": ["192.168.0.1"],
+                    "dns": ["192.168.0.2"],
+                    "mac": ["FE:EE:EE:EE:EE:ED"],
+                    "metric": 20,
+                    "search_domain": ["corp"],
+                    "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
+                    "dhcp": True,
+                    "vlan": 10,
                 },
                 {
-                    "ip": ["10.0.0.10"],
-                    "dns": ["10.0.0.2", "10.0.0.3"],
-                    "gateway": ["10.0.0.1"],
-                    "mac": ["FE:EE:EE:EE:EE:ED"],
-                    "subnetmask": ["255.255.255.0"],
-                    "network": ["10.0.0.0/24"],
-                    "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
-                    "type": "SOFTWARE_LOOPBACK",
-                    "vlan": 10,
                     "name": None,
-                    "search_domain": ["corp"],
-                    "metric": 20,
-                    "dhcp": False,
+                    "type": "SOFTWARE_LOOPBACK",
                     "enabled": None,
+                    "cidr": ["10.0.0.10/24"],
+                    "ip": ["10.0.0.10"],
+                    "gateway": ["10.0.0.1"],
+                    "dns": ["10.0.0.2", "10.0.0.3"],
+                    "mac": ["FE:EE:EE:EE:EE:ED"],
+                    "metric": 20,
+                    "search_domain": ["corp"],
+                    "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
+                    "dhcp": False,
+                    "vlan": 10,
                 },
             ],
         ),
@@ -307,7 +305,7 @@ def test_network_dhcp_and_static(
     mock_values: dict[str, str | int | list[str] | None],
     expected_values: list[dict[str, str | int | list[str] | None]],
     target_win: Target,
-):
+) -> None:
     mock_value_dict = {key: MockRegVal(name=key, value=value) for key, value in mock_values.items()}
     mock_registry = Mock()
     mock_registry.keys.return_value = [mock_registry]
@@ -341,25 +339,24 @@ def test_network_dhcp_and_static(
         macs = set()
 
         for interface, expected in zip(interfaces, expected_values):
-            ips.update(interface.ip)
+            ips.update({iface.ip for iface in interface.cidr})
             dns.update(interface.dns)
             gateways.update(interface.gateway)
             macs.update(interface.mac)
 
-            assert sorted(map(str, interface.ip)) == expected["ip"]
+            assert sorted(str(x.ip) for x in interface.cidr) == expected["ip"]
             assert sorted(map(str, interface.dns)) == expected["dns"]
+            assert interface.name == expected["name"]
+            assert interface.type == expected["type"]
+            assert interface.enabled == expected["enabled"]
+            assert interface.cidr == expected["cidr"]
             assert interface.gateway == expected["gateway"]
             assert interface.mac == expected["mac"]
-            assert interface.network == expected["network"]
             assert interface.first_connected == expected["first_connected"]
-            assert interface.type == expected["type"]
-            assert interface.vlan == expected["vlan"]
-            assert interface.name == expected["name"]
-            assert interface.search_domain == expected["search_domain"]
             assert interface.metric == expected["metric"]
-            assert interface.subnetmask == expected["subnetmask"]
+            assert interface.search_domain == expected["search_domain"]
             assert interface.dhcp == expected["dhcp"]
-            assert interface.enabled == expected["enabled"]
+            assert interface.vlan == expected["vlan"]
 
         assert network.ips() == list(ips)
         assert network.dns() == list(dns)
@@ -372,7 +369,7 @@ def test_network_dhcp_and_static(
     property(MagicMock(return_value=["ControlSet001", "ControlSet002", "ControlSet003"])),
 )
 def test_regression_duplicate_ips(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """Regression test for https://github.com/fox-it/dissect.target/issues/877"""
+    """Regression test for https://github.com/fox-it/dissect.target/issues/877."""
 
     change_controlset(hive_hklm, 3)
 
@@ -411,6 +408,6 @@ def test_regression_duplicate_ips(target_win: Target, hive_hklm: VirtualHive) ->
     target_win.add_plugin(WindowsNetworkPlugin)
 
     assert isinstance(target_win.ips, list)
-    assert all([isinstance(ip, str) for ip in target_win.ips])
+    assert all(isinstance(ip, str) for ip in target_win.ips)
     assert len(target_win.ips) == 2
     assert sorted(target_win.ips) == ["1.2.3.4", "5.6.7.8"]

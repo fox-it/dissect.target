@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @pytest.fixture
-def target_win_mru(target_win_users):
+def target_win_mru(target_win_users: Target) -> Target:
     user_details = target_win_users.user_details.find(sid="S-1-5-21-3263113198-3007035898-945866154-1002")
 
     user_hive = VirtualHive()
@@ -18,7 +26,7 @@ def target_win_mru(target_win_users):
 
     # RecentDocs
     recentdocs_key = VirtualKey(user_hive, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs")
-    recentdocs_key.add_value("MRUListEx", VirtualValue(user_hive, "MRUListEx", b"\x00\x00\x00\x00\xFF\xFF\xFF\xFF"))
+    recentdocs_key.add_value("MRUListEx", VirtualValue(user_hive, "MRUListEx", b"\x00\x00\x00\x00\xff\xff\xff\xff"))
     recentdocs_value = bytes.fromhex(
         "55006e007400690074006c0065006400"
         "20002d0020004e006f00740065007000"
@@ -64,7 +72,7 @@ def target_win_mru(target_win_users):
     acmru_key.add_value("001", VirtualValue(user_hive, "001", "value"))
     # ACMru wordwheel query
     wordwheel_key = VirtualKey(user_hive, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery")
-    wordwheel_key.add_value("MRUListEx", VirtualValue(user_hive, "MRUListEx", b"\x00\x00\x00\x00\xFF\xFF\xFF\xFF"))
+    wordwheel_key.add_value("MRUListEx", VirtualValue(user_hive, "MRUListEx", b"\x00\x00\x00\x00\xff\xff\xff\xff"))
     wordwheel_key.add_value("0", VirtualValue(user_hive, "0", b"h\x00e\x00l\x00l\x00o\x00\x00\x00"))
 
     # Map Network Drive MRU
@@ -122,7 +130,7 @@ def target_win_mru(target_win_users):
     return target_win_users
 
 
-def test_mru_plugin(target_win_mru):
+def test_mru_plugin(target_win_mru: Target) -> None:
     run = list(target_win_mru.mru.run())
     recentdocs = list(target_win_mru.mru.recentdocs())
     opensave = list(target_win_mru.mru.opensave())

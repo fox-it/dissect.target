@@ -1,11 +1,17 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import call, patch
 
-from dissect.hypervisor.descriptor.vmx import VMX
-
-from dissect.target.containers.vmdk import VmdkContainer
 from dissect.target.loaders.vmwarevm import VmwarevmLoader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.hypervisor.descriptor.vmx import VMX
+
+    from dissect.target.containers.vmdk import VmdkContainer
+    from dissect.target.target import Target
 
 
 @patch("dissect.target.loaders.vmx.VmdkContainer")

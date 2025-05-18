@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Final
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -6,8 +8,13 @@ from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
+    from dissect.target.target import Target
 
 CLSIDRecordDescriptor = create_extended_descriptor(
     [
@@ -41,12 +48,12 @@ class CLSIDPlugin(Plugin):
 
     __namespace__ = "clsid"
 
-    KEYS = {
+    KEYS: Final[dict[str, str]] = {
         "user": "HKEY_CURRENT_USER\\Software\\Classes\\CLSID",
         "machine": "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID",
     }
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
     def check_compatible(self) -> None:

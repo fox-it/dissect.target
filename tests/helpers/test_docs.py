@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target.helpers import docs
 from dissect.target.plugins.apps.webserver.iis import IISLogsPlugin
 
@@ -40,7 +42,7 @@ def test_docs_get_func_description() -> None:
     func = IISLogsPlugin.logs
     func_desc = docs.get_func_description(func, with_docstrings=False)
 
-    assert "iis.logs - Return contents of IIS (v7 and above) log files. (output: records)" == func_desc
+    assert func_desc == "iis.logs - Return contents of IIS (v7 and above) log files. (output: records)"
 
     func_desc = docs.get_func_description(func, with_docstrings=True)
     lines_bag = get_nonempty_lines_set(func_desc)

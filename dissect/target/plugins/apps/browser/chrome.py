@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
@@ -16,13 +18,16 @@ from dissect.target.plugins.apps.browser.chromium import (
     ChromiumMixin,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 class ChromePlugin(ChromiumMixin, BrowserPlugin):
     """Chrome browser plugin."""
 
     __namespace__ = "chrome"
 
-    DIRS = [
+    DIRS = (
         # Windows
         "AppData/Local/Google/Chrome/User Data/Default",
         "AppData/Local/Google/Chrome/User Data/Profile*",
@@ -40,7 +45,7 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
         # Macos
         "Library/Application Support/Google/Chrome/Default",
         "Library/Application Support/Google/Chrome/Profile*",
-    ]
+    )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS

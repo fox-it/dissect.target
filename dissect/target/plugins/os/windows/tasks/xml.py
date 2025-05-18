@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import warnings
-from typing import Iterator, Optional
-from xml.etree.ElementTree import Element
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 from flow.record import GroupedRecord, RecordDescriptor
 
 from dissect.target.exceptions import InvalidTaskError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugins.os.windows.tasks.records import (
     BootTriggerRecord,
     ComHandlerRecord,
@@ -22,7 +19,11 @@ from dissect.target.plugins.os.windows.tasks.records import (
     TriggerRecord,
 )
 
-warnings.simplefilter(action="ignore", category=FutureWarning)
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from xml.etree.ElementTree import Element
+
+    from dissect.target.helpers.fsutil import TargetPath
 
 
 class ScheduledTasks:
@@ -50,17 +51,15 @@ class ScheduledTasks:
             ns_length = data.tag.find("}")
             ns = data.tag[0 : ns_length + 1]
             for element in data.iter():
-                if element.tag.startswith(ns):
-                    element.tag = element.tag[len(ns) :]
+                element.tag = element.tag.removeprefix(ns)
         return data
 
-    def get_tasks(self):
+    def get_tasks(self) -> list[XmlTask]:
         tasks = []
         if self.xml_data.tag == "Task":
             tasks.append(XmlTask(self.xml_data, self.task_path))
         else:
-            for task_element in self.xml_data.findall(".//{*}Task"):
-                tasks.append(XmlTask(task_element, self.task_path))
+            tasks.extend(XmlTask(task_element, self.task_path) for task_element in self.xml_data.findall(".//{*}Task"))
 
         return tasks
 
@@ -154,13 +153,10 @@ class XmlTask:
             ns_length = data.tag.find("}")
             ns = data.tag[0 : ns_length + 1]
             for element in data.iter():
-                if element.tag.startswith(ns):
-                    element.tag = element.tag[len(ns) :]
+                element.tag = element.tag.removeprefix(ns)
         return data
 
-    def get_element(
-        self, xml_path: str, xml_data: Element | None = None, attribute: Optional[str] = None
-    ) -> str | None:
+    def get_element(self, xml_path: str, xml_data: Element | None = None, attribute: str | None = None) -> str | None:
         """Get the value of the specified XML element.
 
         Args:
@@ -175,7 +171,7 @@ class XmlTask:
         data = xml_data.find(xml_path)
 
         if data is None:
-            return
+            return None
         if attribute:
             return data.get(attribute)
 
@@ -193,6 +189,7 @@ class XmlTask:
         data = self.task_element.find(xml_path) if xml_path else self.task_element
         if data is not None:
             return ElementTree.tostring(data, encoding="utf-8").strip()
+        return None
 
     def get_triggers(self) -> Iterator[GroupedRecord]:
         """Get the triggers from the XML task data.

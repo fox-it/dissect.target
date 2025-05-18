@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-import argparse
 import dataclasses
 import textwrap
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dissect.target import Target
-from dissect.target.plugin import FunctionDescriptor, Plugin, PluginRegistry
-from dissect.target.target import Event
+from dissect.target.target import Event, Target
+
+if TYPE_CHECKING:
+    import argparse
+
+    from dissect.target.plugin import FunctionDescriptor, Plugin, PluginRegistry
 
 BLOCK_INDENT = 4 * " "
 
@@ -29,7 +31,7 @@ class TargetExecutionReport:
     def add_registered_plugin(self, plugin_name: str) -> None:
         self.registered_plugins.add(plugin_name)
 
-    def add_func_error(self, func, stacktrace: str) -> None:
+    def add_func_error(self, func: str, stacktrace: str) -> None:
         self.func_errors[func] = stacktrace
 
     def as_dict(self) -> dict[str, Any]:
@@ -78,13 +80,13 @@ class ExecutionReport:
         return target_report
 
     @staticmethod
-    def _get_plugin_name(plugin_cls) -> str:
+    def _get_plugin_name(plugin_cls: type[Plugin]) -> str:
         return f"{plugin_cls.__module__}.{plugin_cls.__qualname__}"
 
     def log_incompatible_plugin(
         self,
         target: Target,
-        _,
+        _: Event,
         plugin_cls: type[Plugin] | None = None,
         plugin_desc: FunctionDescriptor | None = None,
     ) -> None:
@@ -100,17 +102,17 @@ class ExecutionReport:
 
         target_report.add_incompatible_plugin(plugin_name)
 
-    def log_registered_plugin(self, target: Target, _, plugin_inst: Plugin) -> None:
+    def log_registered_plugin(self, target: Target, _: Event, plugin_inst: Plugin) -> None:
         target_report = self.get_target_report(target, create=True)
         plugin_cls = type(plugin_inst)
         plugin_name = self._get_plugin_name(plugin_cls)
         target_report.add_registered_plugin(plugin_name)
 
-    def log_func_error(self, target: Target, _, func: str, stacktrace: str) -> None:
+    def log_func_error(self, target: Target, _: Event, func: str, stacktrace: str) -> None:
         target_report = self.get_target_report(target, create=True)
         target_report.add_func_error(func, stacktrace)
 
-    def log_func_execution(self, target: Target, _, func: str) -> None:
+    def log_func_execution(self, target: Target, _: Event, func: str) -> None:
         target_report = self.get_target_report(target, create=True)
         target_report.func_execs.add(func)
 
@@ -149,10 +151,10 @@ def make_cli_args_overview(report: ExecutionReport) -> str:
 
     block = "\n".join(rows)
     block = textwrap.indent(block, prefix=BLOCK_INDENT)
-    return "\n".join([header, block])
+    return f"{header}\n{block}"
 
 
-def make_plugin_import_errors_overview(report: ExecutionReport, short=True) -> str:
+def make_plugin_import_errors_overview(report: ExecutionReport, short: bool = True) -> str:
     header = "Plugin import errors:"
 
     rows = []
@@ -163,7 +165,7 @@ def make_plugin_import_errors_overview(report: ExecutionReport, short=True) -> s
 
     block = "\n".join(rows)
     block = textwrap.indent(block, prefix=BLOCK_INDENT)
-    return "\n".join([header, block])
+    return f"{header}\n{block}"
 
 
 def format_target_report(target_report: TargetExecutionReport) -> str:
@@ -176,7 +178,7 @@ def format_target_report(target_report: TargetExecutionReport) -> str:
         prefix=BLOCK_INDENT,
     )
     registered_plugins_block = textwrap.indent(
-        "\n".join([registered_plugins_header, registered_plugins_rows_block]),
+        f"{registered_plugins_header}\n{registered_plugins_rows_block}",
         prefix=BLOCK_INDENT,
     )
     blocks.append(registered_plugins_block)
@@ -188,7 +190,7 @@ def format_target_report(target_report: TargetExecutionReport) -> str:
         prefix=BLOCK_INDENT,
     )
     incompatible_plugins_block = textwrap.indent(
-        "\n".join([incompatible_plugins_header, incompatible_plugins_rows_block]),
+        f"{incompatible_plugins_header}\n{incompatible_plugins_rows_block}",
         prefix=BLOCK_INDENT,
     )
     blocks.append(incompatible_plugins_block)
@@ -201,7 +203,7 @@ def format_target_report(target_report: TargetExecutionReport) -> str:
 
     func_errors_rows_block = textwrap.indent("\n".join(func_errors_rows), prefix=BLOCK_INDENT)
     func_errors_block = textwrap.indent(
-        "\n".join([func_errors_header, func_errors_rows_block]),
+        f"{func_errors_header}\n{func_errors_rows_block}",
         prefix=BLOCK_INDENT,
     )
     blocks.append(func_errors_block)
@@ -210,7 +212,7 @@ def format_target_report(target_report: TargetExecutionReport) -> str:
     func_execs_rows = sorted(target_report.func_execs)
     func_execs_rows_block = textwrap.indent("\n".join(func_execs_rows), prefix=BLOCK_INDENT)
     func_execs_block = textwrap.indent(
-        "\n".join([func_execs_header, func_execs_rows_block]),
+        f"{func_execs_header}\n{func_execs_rows_block}",
         prefix=BLOCK_INDENT,
     )
     blocks.append(func_execs_block)

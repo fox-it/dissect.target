@@ -2,15 +2,11 @@ from __future__ import annotations
 
 import textwrap
 from io import BytesIO, StringIO
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.fsutil import stat_result
-from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.target import Target
 from dissect.target.tools import fsutils
 from dissect.target.tools.diff import (
     DifferentialCli,
@@ -21,7 +17,10 @@ from dissect.target.tools.diff import (
 )
 from dissect.target.tools.diff import main as target_diff
 from tests._utils import absolute_path
-from tests.conftest import make_os_target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
+    from tests.conftest import TargetUnixFactory
 
 PASSWD_CONTENTS = """
             root:x:0:0:root:/root:/bin/bash
@@ -29,30 +28,8 @@ PASSWD_CONTENTS = """
             """
 
 
-class TargetUnixFactory:
-    def __init__(self, tmp_path: Path):
-        self.tmp_path = tmp_path
-
-    def new(self, hostname: str) -> tuple[Target, VirtualFilesystem]:
-        """Initialize a virtual unix target."""
-        fs = VirtualFilesystem()
-
-        fs.makedirs("var")
-        fs.makedirs("etc")
-        fs.map_file_fh("/etc/hostname", BytesIO(hostname.encode()))
-
-        return make_os_target(self.tmp_path, UnixPlugin, root_fs=fs), fs
-
-
 @pytest.fixture
-def target_unix_factory(tmp_path: Path) -> TargetUnixFactory:
-    """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
-    to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
-    return TargetUnixFactory(tmp_path)
-
-
-@pytest.fixture
-def src_target(target_unix_factory: TargetUnixFactory) -> Iterator[Target]:
+def src_target(target_unix_factory: TargetUnixFactory) -> Target:
     target, fs_unix = target_unix_factory.new("src_target")
 
     passwd_contents = PASSWD_CONTENTS + "\nsrc_user:x:1001:1001:src_user:/home/src_user:/bin/bash"
@@ -68,11 +45,11 @@ def src_target(target_unix_factory: TargetUnixFactory) -> Iterator[Target]:
 
     fs_unix.map_file_fh("changes/file_on_src", BytesIO(b"Hello From Source Target"))
     fs_unix.map_file_fh("changes/dir_on_src/file", BytesIO(b"Hello From Source Target"))
-    yield target
+    return target
 
 
 @pytest.fixture
-def dst_target(target_unix_factory: TargetUnixFactory) -> Iterator[Target]:
+def dst_target(target_unix_factory: TargetUnixFactory) -> Target:
     target, fs_unix = target_unix_factory.new("dst_target")
 
     passwd_contents = PASSWD_CONTENTS + "\ndst_user:x:1002:1002:dst_user:/home/dst_user:/bin/bash"
@@ -88,7 +65,7 @@ def dst_target(target_unix_factory: TargetUnixFactory) -> Iterator[Target]:
 
     fs_unix.map_file_fh("changes/dir_on_src", BytesIO(b"Hello From Destination Target"))
     fs_unix.map_file_fh("changes/file_on_src/file", BytesIO(b"Hello From Destination Target"))
-    yield target
+    return target
 
 
 def test_scandir(src_target: Target, dst_target: Target) -> None:
@@ -149,7 +126,7 @@ def test_walkdir(src_target: Target, dst_target: Target) -> None:
 
     subdirectories_only_on_dst = ["/changes/subdirectory_dst", "/changes/file_on_src"]
     for subdirectory in subdirectories_only_on_dst:
-        differential = next((differential for differential in differentials if differential.directory == subdirectory))
+        differential = next(differential for differential in differentials if differential.directory == subdirectory)
 
         # All entries should be 'created' as this directory doesn't exist on the source target
         assert len(differential.modified) == 0
@@ -161,7 +138,7 @@ def test_walkdir(src_target: Target, dst_target: Target) -> None:
     subdirectories_only_on_src = ["/changes/subdirectory_src", "/changes/dir_on_src"]
 
     for subdirectory in subdirectories_only_on_src:
-        differential = next((differential for differential in differentials if differential.directory == subdirectory))
+        differential = next(differential for differential in differentials if differential.directory == subdirectory)
 
         # All entries should be 'created' as this directory doesn't exist on the destination target
         assert len(differential.modified) == 0
@@ -315,8 +292,8 @@ def test_target_diff_shell(capsys: pytest.CaptureFixture, monkeypatch: pytest.Mo
     with monkeypatch.context() as m:
         m.setattr(fsutils, "LS_COLORS", {})
         m.setenv("NO_COLOR", "1")
-        src_target_path = absolute_path("_data/tools/diff/src.tar")
-        dst_target_path = absolute_path("_data/tools/diff/dst.tar")
+        src_target_path = str(absolute_path("_data/tools/diff/src.tar"))
+        dst_target_path = str(absolute_path("_data/tools/diff/dst.tar"))
         m.setattr("sys.argv", ["target-diff", "--deep", "shell", src_target_path, dst_target_path])
         m.setattr("sys.stdin", StringIO("ls changes"))
         target_diff()
@@ -339,8 +316,8 @@ def test_target_diff_shell(capsys: pytest.CaptureFixture, monkeypatch: pytest.Mo
 
 def test_target_diff_fs(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
-        src_target_path = absolute_path("_data/tools/diff/src.tar")
-        dst_target_path = absolute_path("_data/tools/diff/dst.tar")
+        src_target_path = str(absolute_path("_data/tools/diff/src.tar"))
+        dst_target_path = str(absolute_path("_data/tools/diff/dst.tar"))
         m.setattr("sys.argv", ["target-diff", "--deep", "fs", "--strings", src_target_path, dst_target_path])
         target_diff()
         out, _ = capsys.readouterr()
@@ -352,8 +329,8 @@ def test_target_diff_fs(capsys: pytest.CaptureFixture, monkeypatch: pytest.Monke
 
 def test_target_diff_query(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
-        src_target_path = absolute_path("_data/tools/diff/src.tar")
-        dst_target_path = absolute_path("_data/tools/diff/dst.tar")
+        src_target_path = str(absolute_path("_data/tools/diff/src.tar"))
+        dst_target_path = str(absolute_path("_data/tools/diff/dst.tar"))
         m.setattr("sys.argv", ["target-diff", "query", "--strings", "-f", "users", src_target_path, dst_target_path])
         target_diff()
         out, _ = capsys.readouterr()
@@ -364,7 +341,7 @@ def test_target_diff_query(capsys: pytest.CaptureFixture, monkeypatch: pytest.Mo
 
 
 def test_target_diff_fs_reverse_read(target_unix_factory: TargetUnixFactory) -> None:
-    """test if we detect the difference in an appended file correctly."""
+    """Test if we detect the difference in an appended file correctly."""
 
     src_target, fs_src = target_unix_factory.new("src_target")
     dst_target, fs_dst = target_unix_factory.new("dst_target")

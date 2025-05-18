@@ -1,10 +1,15 @@
-from datetime import datetime
-from typing import Iterator
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
 
 from dissect.target.filesystems.ffs import FfsFilesystem, FfsFilesystemEntry
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 NANOSECONDS_IN_SECOND = 1_000_000_000
 
@@ -18,11 +23,11 @@ def ffs_fs() -> Iterator[FfsFilesystem]:
 
 
 @pytest.fixture
-def ffs_fs_entry(ffs_fs: FfsFilesystem) -> Iterator[FfsFilesystemEntry]:
-    atime = datetime(2024, 10, 1, 12, 0, 0)
-    mtime = datetime(2024, 10, 2, 12, 0, 0)
-    ctime = datetime(2024, 10, 3, 12, 0, 0)
-    btime = datetime(2024, 10, 4, 12, 0, 0)
+def ffs_fs_entry(ffs_fs: FfsFilesystem) -> FfsFilesystemEntry:
+    atime = datetime(2024, 10, 1, 12, 0, 0, tzinfo=timezone.utc)
+    mtime = datetime(2024, 10, 2, 12, 0, 0, tzinfo=timezone.utc)
+    ctime = datetime(2024, 10, 3, 12, 0, 0, tzinfo=timezone.utc)
+    btime = datetime(2024, 10, 4, 12, 0, 0, tzinfo=timezone.utc)
 
     raw_inode = Mock(di_uid=1000, di_nlink=1, di_guid=999, di_size=165002)
     inode = Mock(
@@ -43,8 +48,7 @@ def ffs_fs_entry(ffs_fs: FfsFilesystem) -> Iterator[FfsFilesystemEntry]:
         is_symlink=lambda: False,
     )
 
-    entry = FfsFilesystemEntry(ffs_fs, "/some_file", inode)
-    yield entry
+    return FfsFilesystemEntry(ffs_fs, "/some_file", inode)
 
 
 def test_jffs2_stat(ffs_fs_entry: FfsFilesystemEntry) -> None:

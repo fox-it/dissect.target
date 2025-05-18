@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import io
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume.ddf.ddf import DDF, DEFAULT_SECTOR_SIZE, DDFPhysicalDisk
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
 
 
 class DdfVolumeSystem(LogicalVolumeSystem):
@@ -16,7 +21,7 @@ class DdfVolumeSystem(LogicalVolumeSystem):
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         sets: dict[bytes, list[DDFPhysicalDisk]] = {}
 
         for vol in volumes:
@@ -29,7 +34,7 @@ class DdfVolumeSystem(LogicalVolumeSystem):
         for devs in sets.values():
             try:
                 yield cls(devs)
-            except Exception:
+            except Exception:  # noqa: PERF203
                 continue
 
     @staticmethod

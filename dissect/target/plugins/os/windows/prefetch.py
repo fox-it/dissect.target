@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
 from dissect.util import lzxpress_huffman
@@ -12,6 +12,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from datetime import datetime
 
     from dissect.target.target import Target
@@ -196,7 +197,7 @@ class Prefetch:
         self.fh.seek(0)
         version = self.header.version
 
-        if version in prefetch_version_structs.keys():
+        if version in prefetch_version_structs:
             return version
 
         raise NotImplementedError
@@ -260,7 +261,7 @@ class PrefetchPlugin(Plugin):
 
     @export(record=[PrefetchRecord, GroupedPrefetchRecord])
     @arg("--grouped", action="store_true", help="Group the prefetch record")
-    def prefetch(self, grouped=False) -> Iterator[PrefetchRecord | GroupedPrefetchRecord]:
+    def prefetch(self, grouped: bool = False) -> Iterator[PrefetchRecord | GroupedPrefetchRecord]:
         """Return the content of all prefetch files.
 
         Prefetch is a memory management feature in Windows. It contains information (for example run count and
@@ -304,7 +305,8 @@ class PrefetchPlugin(Plugin):
             try:
                 scca = Prefetch(entry.open())
             except Exception as e:
-                self.target.log.warning("Failed to parse prefetch file: %s", entry, exc_info=e)
+                self.target.log.warning("Failed to parse prefetch file: %s", entry)
+                self.target.log.debug("", exc_info=e)
                 continue
 
             filename = self.target.fs.path(scca.header.name.decode("utf-16-le", errors="ignore").split("\x00")[0])
@@ -321,7 +323,7 @@ class PrefetchPlugin(Plugin):
                     _target=self.target,
                 )
             else:
-                run_dates = [scca.latest_timestamp] + scca.previous_timestamps
+                run_dates = [scca.latest_timestamp, *scca.previous_timestamps]
                 for linked_file in scca.metrics:
                     for date in run_dates:
                         yield PrefetchRecord(

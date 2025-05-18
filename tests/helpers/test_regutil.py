@@ -24,7 +24,7 @@ from tests._utils import absolute_path
 def test_regflex() -> None:
     regflex = RegFlex()
 
-    with open(absolute_path("_data/helpers/regutil/regflex.reg"), "rt") as fh:
+    with absolute_path("_data/helpers/regutil/regflex.reg").open() as fh:
         regflex.map_definition(fh)
 
     assert "HKEY_CURRENT_USER" in regflex.hives
@@ -86,7 +86,7 @@ def test_regflex() -> None:
 
 
 @pytest.mark.parametrize(
-    "pattern, has_glob",
+    ("pattern", "has_glob"),
     [
         ("", False),
         ("foo\\bar", False),
@@ -101,7 +101,7 @@ def test_has_glob_magic(pattern: str, has_glob: bool) -> None:
 
 
 @pytest.mark.parametrize(
-    "pattern, part1, part2",
+    ("pattern", "part1", "part2"),
     [
         ("", "", ""),
         ("foo\\bar", "foo\\bar", ""),
@@ -129,7 +129,7 @@ def test_has_glob_magic(pattern: str, has_glob: bool) -> None:
     ],
 )
 def test_glob_split(pattern: str, part1: str, part2: str) -> None:
-    assert glob_split(pattern) == tuple([part1, part2])
+    assert glob_split(pattern) == (part1, part2)
 
 
 @pytest.fixture
@@ -165,7 +165,7 @@ def key_collection(hivecollection: HiveCollection) -> KeyCollection:
 
 
 @pytest.mark.parametrize(
-    "key_path, key_name",
+    ("key_path", "key_name"),
     [
         ("\\", "VROOT"),
         ("\\some\\path\\to\\foo", "foo"),
@@ -184,7 +184,7 @@ def test_registry_key_get(hive: RegistryHive, key_path: str, key_name: str | Reg
 
 
 @pytest.mark.parametrize(
-    "key_path, key_name",
+    ("key_path", "key_name"),
     [
         ("\\", "VROOT"),
         ("\\some\\path\\to\\foo", "foo"),
@@ -205,7 +205,7 @@ def test_key_collection_get(
 
 
 @pytest.mark.parametrize(
-    "key_path, key_names",
+    ("key_path", "key_names"),
     [
         ("\\some\\path\\to\\foo", ["foo"]),
         ("\\non\\existing\\key", []),
@@ -214,15 +214,13 @@ def test_key_collection_get(
 def test_glob_ext0(key_collection: KeyCollection, key_path: str, key_names: list[str]) -> None:
     key_collections = glob_ext0(key_collection, key_path)
 
-    collection_names = []
-    for key_collection in key_collections:
-        collection_names.append(key_collection.name)
+    collection_names = [key_collection.name for key_collection in key_collections]
 
     assert collection_names == key_names
 
 
 @pytest.mark.parametrize(
-    "pattern, key_names",
+    ("pattern", "key_names"),
     [
         (
             "*",
@@ -239,19 +237,17 @@ def test_glob_ext0(key_collection: KeyCollection, key_path: str, key_names: list
         ),
     ],
 )
-def test_glob_ext1(hivecollection: HiveCollection, pattern, key_names) -> None:
+def test_glob_ext1(hivecollection: HiveCollection, pattern: str, key_names: list[str]) -> None:
     key_collection = hivecollection.key("\\some\\path\\to\\")
     key_collections = glob_ext1(key_collection, pattern)
 
-    collection_names = []
-    for key_collection in key_collections:
-        collection_names.append(key_collection.name)
+    collection_names = [key_collection.name for key_collection in key_collections]
 
     assert sorted(collection_names) == sorted(key_names)
 
 
 @pytest.mark.parametrize(
-    "pattern, key_paths",
+    ("pattern", "key_paths"),
     [
         (
             "\\some\\path\\to\\foo",
@@ -317,10 +313,6 @@ def test_glob_ext1(hivecollection: HiveCollection, pattern, key_names) -> None:
             [],
         ),
         (
-            "\\some\\path\\to\\foo",
-            ["\\some\\path\\to\\foo"],
-        ),
-        (
             "\\some\\non-existing\\path\\to\\foo",
             [],
         ),
@@ -335,15 +327,13 @@ def test_glob_ext1(hivecollection: HiveCollection, pattern, key_names) -> None:
 )
 def test_glob_ext(key_collection: KeyCollection, pattern: str, key_paths: list[str]) -> None:
     key_collections = glob_ext(key_collection, pattern)
-    collection_paths = []
-    for key_collection in key_collections:
-        collection_paths.append(key_collection.path)
+    collection_paths = [key_collection.path for key_collection in key_collections]
 
     assert sorted(collection_paths) == sorted(key_paths)
 
 
 @pytest.mark.parametrize(
-    "input, expected_name, expected_value",
+    ("input", "expected_name", "expected_value"),
     [
         (c_regf.REG_NONE, "NONE", 0),
         (c_regf.REG_SZ, "SZ", 1),
@@ -361,7 +351,7 @@ def test_glob_ext(key_collection: KeyCollection, pattern: str, key_paths: list[s
     ],
 )
 def test_registry_value_type_enum(input: int, expected_name: str | None, expected_value: int) -> None:
-    """test if registry value types are not parsed strictly within the Enum"""
+    """Test if registry value types are not parsed strictly within the Enum."""
     regf_value = RegistryValueType(input)
     assert regf_value == expected_value
     assert regf_value.name == expected_name

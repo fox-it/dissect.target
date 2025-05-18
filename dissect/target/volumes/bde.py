@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.fve import bde
-from dissect.util.stream import AlignedStream
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers.keychain import KeyType
 from dissect.target.volume import EncryptedVolumeSystem, Volume
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.util.stream import AlignedStream
 
 log = logging.getLogger(__name__)
 
@@ -31,20 +35,20 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
 
     def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):
-            volume_details = dict(
-                number=self.fh.number,
-                offset=self.fh.offset,
-                vtype=self.fh.type,
-                name=self.fh.name,
-                guid=self.fh.guid,
-            )
+            volume_details = {
+                "number": self.fh.number,
+                "offset": self.fh.offset,
+                "vtype": self.fh.type,
+                "name": self.fh.name,
+                "guid": self.fh.guid,
+            }
         else:
-            volume_details = dict(
-                number=1,
-                offset=0,
-                vtype=None,
-                name=None,
-            )
+            volume_details = {
+                "number": 1,
+                "offset": 0,
+                "vtype": None,
+                "name": None,
+            }
 
         stream = self.unlock_volume()
         yield Volume(
@@ -86,6 +90,13 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
                 if not is_wildcard:
                     log.exception("Failed to unlock BDE volume with BEK file %s", bek_file)
 
+    def unlock_with_fvek(self, raw_key: bytes, is_wildcard: bool = False) -> None:
+        try:
+            self.bde.unlock_with_fvek(raw_key)
+        except ValueError:
+            if not is_wildcard:
+                log.exception("Failed to unlock BDE volume with raw FVEK key (%r)", raw_key)
+
     def unlock_volume(self) -> AlignedStream:
         if self.bde.has_clear_key():
             self.bde.unlock_with_clear_key()
@@ -101,6 +112,8 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
                 elif key.key_type == KeyType.FILE:
                     bek_file = pathlib.Path(key.value)
                     self.unlock_with_bek_file(bek_file, key.is_wildcard)
+                elif key.key_type == KeyType.RAW:
+                    self.unlock_with_fvek(key.value, key.is_wildcard)
 
                 if self.bde.unlocked:
                     log.info("Volume %s with identifiers %s unlocked with %s", self.fh, identifiers, key)
@@ -108,5 +121,4 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
 
         if self.bde.unlocked:
             return self.bde.open()
-        else:
-            raise BitlockerVolumeSystemError("Failed to unlock BDE volume")
+        raise BitlockerVolumeSystemError("Failed to unlock BDE volume")

@@ -1,14 +1,20 @@
+from __future__ import annotations
+
 import textwrap
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, call, patch
 
 from dissect.target.loaders.utm import UtmLoader
-from dissect.target.target import Target
 from tests._utils import mkdirs
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 @patch("dissect.target.loaders.utm.container")
-def test_utm_loader(container: MagicMock, target_bare: Target, tmp_path: Path):
+def test_utm_loader(container: MagicMock, target_bare: Target, tmp_path: Path) -> None:
     dummy_plist = """<?xml version="1.0" encoding="UTF-8"?>
     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
     <plist version="1.0">

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import bz2
 import datetime
 import enum
@@ -7,7 +9,7 @@ import json
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, BinaryIO, Callable, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, TextIO
 
 import structlog
 
@@ -27,12 +29,17 @@ except ImportError:
     HAS_ZSTD = False
 
 
-from flow.record import RecordDescriptor, RecordStreamWriter
+from flow.record import Record, RecordDescriptor, RecordStreamWriter
 from flow.record.adapter.jsonfile import JsonfileWriter
 from flow.record.jsonpacker import JsonRecordPacker
 
-from dissect.target import Target
-from dissect.target.plugin import FunctionDescriptor
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.plugin import FunctionDescriptor
+    from dissect.target.target import Target
+    from dissect.target.tools.dump.run import RecordStreamElement
+    from dissect.target.tools.dump.state import DumpState
 
 log = structlog.get_logger(__name__)
 
@@ -70,7 +77,7 @@ OPEN_WRITERS_LIMIT = 10
 
 def get_nested_attr(obj: Any, nested_attr: str) -> Any:
     parts = nested_attr.split(".")
-    return functools.reduce(getattr, [obj] + parts)
+    return functools.reduce(getattr, [obj, *parts])
 
 
 @lru_cache(maxsize=DEST_DIR_CACHE_SIZE)
@@ -93,12 +100,9 @@ def slugify_descriptor_name(descriptor_name: str) -> str:
 def get_sink_filename(
     record_descriptor: RecordDescriptor,
     serialization: Serialization,
-    compression: Optional[Compression] = None,
+    compression: Compression | None = None,
 ) -> str:
-    """
-    Return a sink filename for provided record descriptor, serialization
-    and compression.
-    """
+    """Return a sink filename for provided record descriptor, serialization and compression."""
     record_type = slugify_descriptor_name(record_descriptor.name)
 
     serialization_details = SERIALIZERS[serialization]
@@ -113,21 +117,21 @@ def get_sink_filename(
     return ".".join(parts)
 
 
-def get_relative_sink_path(element, serialization, compression=None):
-    """
-    Return a sink path relative to an output directory.
-    """
+def get_relative_sink_path(
+    element: RecordStreamElement, serialization: str, compression: Compression | None = None
+) -> Path:
+    """Return a sink path relative to an output directory."""
     sink_dir = get_sink_dir_by_target(element.target, element.func)
     sink_filename = get_sink_filename(element.record._desc, serialization, compression)
     return sink_dir / sink_filename
 
 
-def open_path(path: Path, mode: str, compression: Optional[Compression] = None) -> BinaryIO:
-    """Open `path` using `mode`, with specified `compression` and return a file object"""
+def open_path(path: Path, mode: str, compression: Compression | None = None) -> BinaryIO:
+    """Open ``path`` using ``mode``, with specified ``compression`` and return a file object."""
     if compression == Compression.GZIP:
-        fh = gzip.open(path, mode)
+        fh = gzip.open(path, mode)  # noqa: SIM115
     elif compression == Compression.BZIP2:
-        fh = bz2.open(path, mode)
+        fh = bz2.open(path, mode)  # noqa: SIM115
     elif compression == Compression.LZ4:
         if not HAS_LZ4:
             raise ValueError("Python module lz4 is not available")
@@ -136,36 +140,36 @@ def open_path(path: Path, mode: str, compression: Optional[Compression] = None) 
         if not HAS_ZSTD:
             raise ValueError("Python module zstandard is not available")
         cctx = zstandard.ZstdCompressor()
-        fh = cctx.stream_writer(open(path, mode))
+        fh = cctx.stream_writer(path.open(mode))
     elif compression == Compression.NONE:
-        fh = open(path, mode)
+        fh = path.open(mode)
     else:
         raise ValueError(f"Unrecognised compression method: {compression}")
     return fh
 
 
 class JsonLinesWriter(JsonfileWriter):
-    def __init__(self, fp, **kwargs):
+    def __init__(self, fp: TextIO, **kwargs):
         self.fp = fp
         self.packer = SortedKeysJsonRecordPacker(indent=None)
         self.packer.on_descriptor.add_handler(self.packer_on_new_descriptor)
 
-    def _write(self, obj):
+    def _write(self, obj: Record | RecordDescriptor) -> None:
         record_json = self.packer.pack(obj)
         line = record_json + "\n"
         line = line.encode("utf-8")
         self.fp.write(line)
 
-    def flush(self):
+    def flush(self) -> None:
         if not self.fp.closed:
             self.fp.flush()
 
-    def close(self):
+    def close(self) -> None:
         self.fp.close()
 
 
 class SortedKeysJsonRecordPacker(JsonRecordPacker):
-    def pack(self, obj):
+    def pack(self, obj: Record | RecordDescriptor) -> str:
         return json.dumps(
             obj,
             default=self.pack_obj,
@@ -189,9 +193,9 @@ SERIALIZERS = {
 def get_sink_writer(
     full_sink_path: Path,
     serialization: Serialization,
-    compression: Optional[Compression] = None,
+    compression: Compression | None = None,
     new_sink: bool = True,
-) -> Union[JsonfileWriter, RecordStreamWriter]:
+) -> JsonfileWriter | RecordStreamWriter:
     # create parent directories if they are missing
     full_sink_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -199,23 +203,22 @@ def get_sink_writer(
 
     fh = open_path(full_sink_path, mode=mode, compression=compression)
     writer_cls = SERIALIZERS[serialization]["writer"]
-    writer = writer_cls(fh)
-    return writer
+    return writer_cls(fh)
 
 
 @contextmanager
-def cached_sink_writers(state) -> Iterator[Callable]:
+def cached_sink_writers(state: DumpState) -> Iterator[Callable]:
     # Poor man's cache that cleans up when it hits the limit of `OPEN_WRITERS_LIMIT`.
     # The cache is needed to reduce file handler open/close flickering for unsorted records stream.
     writers_cache = {}
 
-    def close_writers():
+    def close_writers() -> None:
         for path, writer in writers_cache.items():
             writer.close()
             log.debug("Sink writer closed", writer=writer, path=path)
         writers_cache.clear()
 
-    def write_element(element) -> int:
+    def write_element(element: RecordStreamElement) -> int:
         sink_path = get_relative_sink_path(
             element,
             state.serialization,
@@ -228,7 +231,7 @@ def cached_sink_writers(state) -> Iterator[Callable]:
         if sink and not sink.is_dirty:
             log.error("Can not write to a clean finished sink", sink=sink, state=state.path)
             raise ValueError("Can not write to a clean finished sink")
-        elif not sink:
+        if not sink:
             sink = state.create_sink(sink_path, element)
             new_sink = True
 

@@ -1,23 +1,26 @@
 from __future__ import annotations
 
-import logging
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from dissect.target.plugins.os.unix.linux.network_managers import (
     LinuxNetworkManager,
     parse_unix_dhcp_leases,
     parse_unix_dhcp_log_messages,
 )
 from dissect.target.plugins.os.windows._os import WindowsPlugin
-from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
+    """Linux plugin."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.network_manager = LinuxNetworkManager(target)
@@ -51,7 +54,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
 
         for fs in target.filesystems:
             # We explicitly exclude filesystems that look more like a macOS or Windows sysvol.
-            if MacPlugin.detect(target) or WindowsPlugin.detect(target):
+            if MacOSPlugin.detect(target) or IOSPlugin.detect(target) or WindowsPlugin.detect(target):
                 continue
 
             # Dirs /var and /etc make this a Unix-like system (see UnixPlugin.detect),
@@ -62,6 +65,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
             # This filesystem could be a volatile collection of a Linux system.
             if fs.exists("/sys/module") or fs.exists("/proc/sys"):
                 return fs
+        return None
 
     @export(property=True)
     def ips(self) -> list[str]:

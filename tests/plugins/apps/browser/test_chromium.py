@@ -1,16 +1,20 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.apps.browser.chromium import ChromiumPlugin, decrypt_v10
+from dissect.target.plugins.apps.browser.chromium import ChromiumPlugin, decrypt_v10_linux
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 @pytest.fixture
-def target_chromium_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+def target_chromium_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Chromium\\User Data\\Default\\",
         absolute_path("_data/plugins/apps/browser/chromium/"),
@@ -18,15 +22,15 @@ def target_chromium_win(target_win_users: Target, fs_win: VirtualFilesystem) -> 
 
     target_win_users.add_plugin(ChromiumPlugin)
 
-    yield target_win_users
+    return target_win_users
 
 
 @pytest.fixture
-def target_chromium_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Iterator[Target]:
+def target_chromium_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Target:
     fs_unix.map_dir("/root/.config/chromium/Default/", absolute_path("_data/plugins/apps/browser/chromium/"))
     target_unix_users.add_plugin(ChromiumPlugin)
 
-    yield target_unix_users
+    return target_unix_users
 
 
 @pytest.mark.parametrize(
@@ -38,7 +42,7 @@ def test_chromium_history(target_platform: Target, request: pytest.FixtureReques
     records = list(target_platform.chromium.history())
 
     assert len(records) == 5
-    assert set(["chromium"]) == set(record.browser for record in records)
+    assert {"chromium"} == {record.browser for record in records}
 
     assert (
         records[0].url
@@ -59,7 +63,7 @@ def test_chromium_downloads(target_platform: Target, request: pytest.FixtureRequ
     records = list(target_platform.chromium.downloads())
 
     assert len(records) == 1
-    assert set(["chromium"]) == set(record.browser for record in records)
+    assert {"chromium"} == {record.browser for record in records}
 
     assert records[0].id == 1
     assert records[0].ts_start == dt("2022-12-22T12:14:38.440832+00:00")
@@ -76,9 +80,9 @@ def test_chromium_cookies(target_platform: Target, request: pytest.FixtureReques
     records = list(target_platform.chromium.cookies())
 
     assert len(records) == 5
-    assert set(["chromium"]) == set(record.browser for record in records)
+    assert {"chromium"} == {record.browser for record in records}
 
-    assert sorted([*map(lambda c: c.name, records)]) == [
+    assert sorted([*(c.name for c in records)]) == [
         "pl",
         "ssa-did",
         "ssa-sid",
@@ -96,7 +100,7 @@ def test_chromium_extensions(target_platform: Target, request: pytest.FixtureReq
     records = list(target_platform.chromium.extensions())
 
     assert len(records) == 4
-    assert set(["chromium"]) == set(record.browser for record in records)
+    assert {"chromium"} == {record.browser for record in records}
 
     assert records[0].ts_install == dt("2023-04-18T08:43:37.773874+00:00")
     assert records[0].ts_update == dt("2023-04-18T08:43:37.773874+00:00")
@@ -149,7 +153,15 @@ def test_unix_chromium_passwords_gnome(target_unix_users: Target, fs_unix: Virtu
     assert records[0].url == "https://test.com/"
 
 
-def test_decrypt_v10():
-    encrypted = b"v10\xd0&E\xbb\x85\xe7_\xfd\xf8\x93\x90/\x08{'\xa9"
-    decrypted = decrypt_v10(encrypted)
-    assert decrypted == "password"
+def test_decrypt_v10_linux_peanuts_key() -> None:
+    """Test if we can decrypt a Linux V10 peanuts ciphertext."""
+    encrypted = bytes.fromhex("763130d02645bb85e75ffdf893902f087b27a9")
+    decrypted = decrypt_v10_linux(None, None, None, encrypted)
+    assert decrypted == b"password"
+
+
+def test_decrypt_v10_linux_empty_key() -> None:
+    """Test if we can decrypt a Linux V10 empty key ciphertext."""
+    encrypted = bytes.fromhex("763130195b29422c335652fb7a909368cbb3c6")
+    decrypted = decrypt_v10_linux(None, None, None, encrypted)
+    assert decrypted == b"password"

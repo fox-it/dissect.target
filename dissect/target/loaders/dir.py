@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import zipfile
 from collections import defaultdict
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem
@@ -15,7 +14,9 @@ from dissect.target.loader import Loader
 from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 PREFIXES = ["", "fs"]
 ANON_FS_RE = re.compile(r"^fs[0-9]+$")
@@ -29,14 +30,15 @@ class DirLoader(Loader):
         return find_entry_path(path) is not None
 
     def map(self, target: Target) -> None:
-        self.path /= find_entry_path(self.path)
-        find_and_map_dirs(target, self.path)
+        path = self.absolute_path.joinpath(find_entry_path(self.absolute_path))
+        find_and_map_dirs(target, path)
 
 
 def find_entry_path(path: Path) -> str | None:
     for prefix in PREFIXES:
         if find_dirs(path / prefix)[0] is not None:
             return prefix
+    return None
 
 
 def map_dirs(
@@ -112,6 +114,7 @@ def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
     Args:
         target: The target to map into.
         path: The path to map from.
+            If path is a local path, must be provided as an absolute path in order to work with ``target-mount``.
         **kwargs: Optional arguments for :func:`loaderutil.add_virtual_ntfs_filesystem
             <dissect.target.helpers.loaderutil.add_virtual_ntfs_filesystem>`.
     """

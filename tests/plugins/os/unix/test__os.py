@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import tempfile
 from io import BytesIO
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 from uuid import UUID
 
@@ -10,6 +12,9 @@ from flow.record.fieldtypes import posix_path
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import UnixPlugin, parse_fstab
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 FSTAB_CONTENT = """
 # /etc/fstab: static file system information.
@@ -43,6 +48,8 @@ UUID=F631-BECA                            /boot/efi    vfat    defaults,discard,
 /dev/disk/by-uuid/af0b9707-0945-499a-a37d-4da23d8dd245 /moredata auto default      0    2
 
 LABEL=foo                                 /foo         auto    default             0    2
+
+localhost:/home/user/nfstest              /mnt/nfs     nfs     ro                  0    0
 """  # noqa
 
 
@@ -70,6 +77,7 @@ def test_parse_fstab(tmp_path: Path) -> None:
         (None, "vg--main-lv--var", "/var", "auto", "default"),
         (None, "vg--main-lv--data", "/data", "auto", "default"),
         (None, "foo", "/foo", "auto", "default"),
+        ("localhost", "/home/user/nfstest", "/mnt/nfs", "nfs", "ro"),
     }
 
 
@@ -97,6 +105,42 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
 
 
 @pytest.mark.parametrize(
+    ("hostname_content", "hosts_content", "expected_hostname", "expected_domain"),
+    [
+        (b"", b"", "localhost", None),
+        (b"", b"127.0.0.1 mydomain", "mydomain", "mydomain"),
+        (b"", b"127.0.0.1 localhost", "localhost", None),
+        (b"hostname", b"127.0.0.1 localhost\n::1 ip6-localhost", "hostname", None),
+        (b"hostname.example.internal", b"127.0.0.1 localhost\n::1 ip6-localhost", "hostname", "example.internal"),
+        (b"myhost", b"", "myhost", None),
+        (b"myhost.mydomain", b"", "myhost", "mydomain"),
+        (b"myhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+        (b"myhost.mydomain", b"127.0.0.1 localhost", "myhost", "mydomain"),
+        (b"myhost.localhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+        (b"myhost.mycoolerdomain", b"127.0.0.1 mydomain", "myhost", "mycoolerdomain"),
+        (b"localhost.mycoolerdomain", b"127.0.0.1 mydomain", "localhost", "mycoolerdomain"),
+        (b"localhost.mycoolerdomain", b"127.0.0.1 localhost", "localhost", "mycoolerdomain"),
+    ],
+)
+def test_parse_domain(
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
+    hostname_content: bytes,
+    hosts_content: bytes,
+    expected_domain: str,
+    expected_hostname: str,
+) -> None:
+    fs_unix.map_file_fh("/etc/hostname", BytesIO(hostname_content))
+    fs_unix.map_file_fh("/etc/hosts", BytesIO(hosts_content))
+    target_unix.add_plugin(UnixPlugin)
+
+    assert target_unix.hostname == expected_hostname, (
+        f"Expected hostname {expected_hostname!r} but got {target_unix.hostname!r}"
+    )
+    assert target_unix.domain == expected_domain, f"Expected domain {expected_domain!r} but got {target_unix.domain!r}"
+
+
+@pytest.mark.parametrize(
     ("path", "expected_hostname", "expected_domain", "file_content"),
     [
         ("/etc/hostname", "myhost", "mydomain.com", b"myhost.mydomain.com"),
@@ -119,16 +163,16 @@ def test_parse_hostname_string(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
     path: Path,
-    expected_hostname: str,
-    expected_domain: str,
+    expected_hostname: str | None,
+    expected_domain: str | None,
     file_content: str,
 ) -> None:
     fs_unix.map_file_fh(path, BytesIO(file_content))
 
-    hostname_dict = target_unix._os._parse_hostname_string()
+    hostname, domain = target_unix._os._parse_hostname_string()
 
-    assert hostname_dict["hostname"] == expected_hostname
-    assert hostname_dict["domain"] == expected_domain
+    assert hostname == expected_hostname, f"Expected hostname {expected_hostname!r} but got {hostname!r}"
+    assert domain == expected_domain, f"Expected domain {expected_domain!r} but got {domain!r}"
 
 
 def test_users(target_unix_users: Target) -> None:
@@ -156,7 +200,7 @@ def test_users(target_unix_users: Target) -> None:
 
 
 @pytest.mark.parametrize(
-    "expected_arch, elf_buf",
+    ("expected_arch", "elf_buf"),
     [
         # https://launchpad.net/ubuntu/+source/coreutils/9.4-3.1ubuntu1
         ("x86_64-unix", "7f454c4602010100000000000000000003003e0001000000a06d000000000000"),  # amd64
@@ -168,6 +212,6 @@ def test_users(target_unix_users: Target) -> None:
     ],
 )
 def test_architecture(target_unix: Target, fs_unix: VirtualFilesystem, expected_arch: str, elf_buf: str) -> None:
-    """test if we correctly parse unix architecture."""
+    """Test if we correctly parse unix architecture."""
     fs_unix.map_file_fh("/bin/ls", BytesIO(bytes.fromhex(elf_buf)))
     assert target_unix.architecture == expected_arch

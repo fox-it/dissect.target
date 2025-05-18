@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
@@ -6,6 +8,9 @@ from dissect.util.ts import wintimestamp
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 bam_def = """
     struct entry {
@@ -26,12 +31,12 @@ BamDamRecord = TargetRecordDescriptor(
 class BamDamPlugin(Plugin):
     """Plugin for bam/dam registry keys."""
 
-    KEYS = [
+    KEYS = (
         "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\bam\\UserSettings",
         "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\dam\\UserSettings",
         "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\bam\\State\\UserSettings",
         "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\dam\\State\\UserSettings",
-    ]
+    )
 
     def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEYS))) > 0:

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from dissect.target.exceptions import PluginError
 
 
@@ -6,27 +10,28 @@ class RecordDescriptorExtensionBase:
     _input_fields = ()
     _prepend_fields = False
 
-    def _fill_default_fields(self, record_kwargs):
-        raise NotImplementedError()
+    def _fill_default_fields(self, record_kwargs: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError
 
 
 class UserRecordDescriptorExtension(RecordDescriptorExtensionBase):
-    _default_fields = [
+    _default_fields = (
         ("string", "username"),
         ("string", "user_id"),
         ("string", "user_group"),
         ("string", "user_home"),
-    ]
+    )
 
     _input_fields = ("_user",)
 
-    def _fill_default_fields(self, record_kwargs):
-        user = record_kwargs.get("_user", None)
+    def _fill_default_fields(self, record_kwargs: dict[str, Any]) -> dict[str, Any]:
+        user = record_kwargs.get("_user")
 
         username = None
         user_id = None
         user_group = None
         user_home = None
+
         if user:
             username = user.name
             user_id = getattr(user, "sid", None)
@@ -42,15 +47,15 @@ class UserRecordDescriptorExtension(RecordDescriptorExtensionBase):
 
 
 class RegistryRecordDescriptorExtension(RecordDescriptorExtensionBase):
-    _default_fields = [
+    _default_fields = (
         ("string", "regf_hive_path"),
         ("string", "regf_key_path"),
-    ]
+    )
 
     _input_fields = ("_key", "_hive")
 
-    def _fill_default_fields(self, record_kwargs):
-        key = record_kwargs.get("_key", None)
+    def _fill_default_fields(self, record_kwargs: dict[str, Any]) -> dict[str, Any]:
+        key = record_kwargs.get("_key")
         hive = record_kwargs.get("_hive", key.hive if hasattr(key, "hive") else None)
         record_kwargs["regf_key_path"] = key.path if hasattr(key, "path") else None
         record_kwargs["regf_hive_path"] = hive.filepath if hasattr(hive, "filepath") else None
@@ -58,21 +63,21 @@ class RegistryRecordDescriptorExtension(RecordDescriptorExtensionBase):
 
 
 class TargetRecordDescriptorExtension(RecordDescriptorExtensionBase):
-    _default_fields = [
+    _default_fields = (
         ("string", "hostname"),
         ("string", "domain"),
-    ]
+    )
 
     _input_fields = ("_target",)
 
     _prepend_fields = True
 
-    def _fill_default_fields(self, record_kwargs):
+    def _fill_default_fields(self, record_kwargs: dict[str, Any]) -> dict[str, Any]:
         hostname = None
         domain = None
         source = None
 
-        target = record_kwargs.get("_target", None)
+        target = record_kwargs.get("_target")
         if target:
             hostname = target.hostname
             try:

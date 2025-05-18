@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import sys
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 
@@ -9,8 +11,8 @@ def custom_obj_renderer(
     logger: structlog.types.WrappedLogger,
     name: str,
     event_dict: structlog.types.EventDict,
-) -> Dict[Any, str]:
-    """Simple str() serialization for the event dict values for purely aesthetic reasons"""
+) -> dict[Any, str]:
+    """Simple ``str()`` serialization for the event dictionary values for purely aesthetic reasons."""
     return {key: str(value) for key, value in event_dict.items()}
 
 
@@ -18,29 +20,27 @@ def render_stacktrace_only_in_debug_or_less(
     logger: structlog.types.WrappedLogger,
     name: str,
     event_dict: structlog.types.EventDict,
-) -> Dict[Any, str]:
+) -> dict[Any, str]:
+    """Render a stack trace of an exception only if ``logger`` is configured with ``DEBUG`` or lower level,
+    otherwise render ``str()`` representation of an exception.
     """
-    Render a stack trace of an exception only if `logger` is configured with `DEBUG` or lower level,
-    otherwise render `str()` representation of an exception.
-    """
-    if event_dict.get("exc_info"):
-        # If configured logging level is less permissive than DEBUG,
-        # do not render full stack trace
-        # https://docs.python.org/3/library/logging.html#logging-levels
-        if logger.getEffectiveLevel() > logging.DEBUG:
-            event_dict.pop("exc_info")
-            _, exc, _ = sys.exc_info()
-            event_dict["exc"] = str(exc)
+    # If configured logging level is less permissive than DEBUG,
+    # do not render full stack trace
+    # https://docs.python.org/3/library/logging.html#logging-levels
+    if event_dict.get("exc_info") and logger.getEffectiveLevel() > logging.DEBUG:
+        event_dict.pop("exc_info")
+        _, exc, _ = sys.exc_info()
+        event_dict["exc"] = str(exc)
     return event_dict
 
 
-def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = True):
-    """Configure logging level for `dissect` root logger.
+def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = True) -> None:
+    """Configure logging level for ``dissect`` root logger.
 
-    By default, if `verbose_value` is not set (equals 0) and `be_quiet` is False,
-    set logging level for `dissect` root logger to `WARNING`.
+    By default, if ``verbose_value`` is not set (equals ``0``) and ``be_quiet`` is ``False``,
+    set logging level for ``dissect`` root logger to ``WARNING``.
 
-    If `be_quiet` is set to True, logging level is set to the least noisy `CRITICAL` level.
+    If ``be_quiet`` is set to ``True``, logging level is set to the least noisy ``CRITICAL`` level.
     """
 
     renderer = (
@@ -63,9 +63,7 @@ def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = 
             [
                 # If log level is too low, abort pipeline and throw away log entry.
                 structlog.stdlib.filter_by_level,
-            ]
-            + attr_processors
-            + [
+                *attr_processors,
                 # Perform %-style formatting.
                 structlog.stdlib.PositionalArgumentsFormatter(),
                 # If the "stack_info" key in the event dict is true, remove it and
@@ -88,7 +86,7 @@ def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = 
         cache_logger_on_first_use=True,
     )
 
-    # warnings issued by the ``warnings`` module will be
+    # Warnings issued by the ``warnings`` module will be
     # redirected to the ``py.warnings`` logger
     logging.captureWarnings(True)
 
@@ -109,5 +107,16 @@ def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = 
 
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
-    # set handler on a root logger
-    logging.getLogger().handlers = [handler]
+
+    # Check if we need to cleanup old logging handlers
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        if isinstance(handler, logging.StreamHandler) and isinstance(
+            handler.formatter, structlog.stdlib.ProcessorFormatter
+        ):
+            # We already configured logging once, assume we want to reconfigure
+            root_logger.removeHandler(handler)
+            handler.close()
+
+    # Add the new handler to the root logger
+    root_logger.addHandler(handler)

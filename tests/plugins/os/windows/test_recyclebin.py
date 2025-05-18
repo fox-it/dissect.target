@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import io
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
@@ -9,16 +10,16 @@ import pytest
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.recyclebin import RecyclebinPlugin, c_recyclebin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @pytest.fixture
-def recycle_bin() -> Iterator[VirtualFilesystem]:
+def recycle_bin(tmp_path: Path) -> VirtualFilesystem:
     recycle_bin = VirtualFilesystem()
-
-    with TemporaryDirectory() as tmp_dir:
-        recycle_bin.map_dir("$a_random_recycle_bin_file", tmp_dir)
-        yield recycle_bin
+    recycle_bin.map_dir("$a_random_recycle_bin_file", tmp_path)
+    return recycle_bin
 
 
 def test_recycle_bin_compatibility_failed(target_win: Target) -> None:
@@ -47,7 +48,7 @@ def test_filtered_name(target_win: Target) -> None:
 
     mocked_file.name = "hello"
 
-    assert [] == list(RecyclebinPlugin(target_win).read_recycle_bin(mocked_file))
+    assert list(RecyclebinPlugin(target_win).read_recycle_bin(mocked_file)) == []
 
 
 def test_read_recycle_bin_directory(target_win: Target) -> None:
@@ -70,7 +71,7 @@ def test_read_recycle_bin_directory(target_win: Target) -> None:
 
 
 @pytest.mark.parametrize(
-    "version_number, expected_header",
+    ("version_number", "expected_header"),
     [
         (b"\x00" * 8, "header_v1"),
         (b"\x01" * 8, "header_v1"),
@@ -128,7 +129,7 @@ def test_recyclebin_plugin_wrong_prefix(target_win: Target, recycle_bin: Virtual
 
 
 @pytest.mark.parametrize(
-    "path, expected_output",
+    ("path", "expected_output"),
     [
         ("C:/$Recycle.bin/sid-data/file", "sid-data"),
         ("$Recycle.bin/sid-data/file", "sid-data"),

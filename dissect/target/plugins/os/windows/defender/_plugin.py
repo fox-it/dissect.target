@@ -1,15 +1,13 @@
 from __future__ import annotations
 
+import datetime
 import re
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Iterator, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
 
-from flow.record import Record
-
-from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.os.windows.defender.mplog import (
     DEFENDER_MPLOG_BLOCK_PATTERNS,
     DEFENDER_MPLOG_LINE,
@@ -35,6 +33,11 @@ from dissect.target.plugins.os.windows.defender.quarantine import (
     QuarantineEntry,
     recover_quarantined_file_streams,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from flow.record import Record
 
 DEFENDER_EVTX_FIELDS = [
     ("datetime", "ts"),
@@ -118,14 +121,13 @@ DefenderExclusionRecord = TargetRecordDescriptor(
 )
 
 
-def parse_iso_datetime(datetime_value: str) -> datetime:
-    """Parse ISO8601 serialized datetime with `Z` ending."""
-    return datetime.strptime(datetime_value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+def parse_iso_datetime(datetime_value: str) -> datetime.datetime:
+    """Parse ISO8601 serialized datetime with ``Z`` ending."""
+    return datetime.datetime.strptime(datetime_value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
 
 
 def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iterator[DefenderLogRecord]:
-    """
-    Apply a filter on an Iterable of records, returning only records that have the given field value for the given
+    """Apply a filter on an Iterable of records, returning only records that have the given field value for the given
     field name.
     """
 
@@ -135,7 +137,7 @@ def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iter
     return filter(filter_func, records)
 
 
-class MicrosoftDefenderPlugin(plugin.Plugin):
+class MicrosoftDefenderPlugin(Plugin):
     """Plugin that parses artifacts created by Microsoft Defender.
 
     This includes the EVTX logs, as well as recovery of artefacts from the quarantine folder.
@@ -159,9 +161,9 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         ):
             raise UnsupportedPluginError("No Defender objects found")
 
-    @plugin.export(record=DefenderLogRecord)
+    @export(record=DefenderLogRecord)
     def evtx(self) -> Iterator[DefenderLogRecord]:
-        """Parse Microsoft Defender evtx log files"""
+        """Parse Microsoft Defender evtx log files."""
 
         defender_evtx_field_names = [field_name for _, field_name in DEFENDER_EVTX_FIELDS]
 
@@ -183,7 +185,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
-    @plugin.export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
+    @export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
     def quarantine(self) -> Iterator[DefenderQuarantineRecord | DefenderFileQuarantineRecord]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
@@ -223,7 +225,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     # For anything other than a file, we yield a generic DefenderQuarantineRecord.
                     yield DefenderQuarantineRecord(**fields, _target=self.target)
 
-    @plugin.export(record=DefenderExclusionRecord)
+    @export(record=DefenderExclusionRecord)
     def exclusions(self) -> Iterator[DefenderExclusionRecord]:
         """Yield Microsoft Defender exclusions from the Registry."""
 
@@ -246,40 +248,62 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                         _target=self.target,
                     )
 
-    def _mplog_processimage(self, data: dict) -> Iterator[DefenderMPLogProcessImageRecord]:
+    def _mplog_processimage(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogProcessImageRecord]:
         yield DefenderMPLogProcessImageRecord(**data)
 
-    def _mplog_minfiluss(self, data: dict) -> Iterator[DefenderMPLogMinFilUSSRecord]:
+    def _mplog_minfiluss(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogMinFilUSSRecord]:
         yield DefenderMPLogMinFilUSSRecord(**data)
 
-    def _mplog_blockedfile(self, data: dict) -> Iterator[DefenderMPLogMinFilBlockedFileRecord]:
+    def _mplog_blockedfile(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogMinFilBlockedFileRecord]:
         yield DefenderMPLogMinFilBlockedFileRecord(**data)
 
-    def _mplog_bmtelemetry(self, data: dict) -> Iterator[DefenderMPLogBMTelemetryRecord]:
-        data["ts"] = datetime.strptime(data["ts"], "%m-%d-%Y %H:%M:%S")
+    def _mplog_bmtelemetry(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogBMTelemetryRecord]:
+        data["ts"] = datetime.datetime.strptime(data["ts"], "%m-%d-%Y %H:%M:%S").replace(tzinfo=tzinfo)
         yield DefenderMPLogBMTelemetryRecord(**data)
 
-    def _mplog_ems(self, data: dict) -> Iterator[DefenderMPLogEMSRecord]:
+    def _mplog_ems(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogEMSRecord]:
         yield DefenderMPLogEMSRecord(**data)
 
-    def _mplog_originalfilename(self, data: dict) -> Iterator[DefenderMPLogOriginalFileNameRecord]:
+    def _mplog_originalfilename(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogOriginalFileNameRecord]:
         yield DefenderMPLogOriginalFileNameRecord(**data)
 
-    def _mplog_exclusion(self, data: dict) -> Iterator[DefenderMPLogExclusionRecord]:
+    def _mplog_exclusion(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogExclusionRecord]:
         yield DefenderMPLogExclusionRecord(**data)
 
-    def _mplog_lowfi(self, data: dict) -> Iterator[DefenderMPLogLowfiRecord]:
+    def _mplog_lowfi(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogLowfiRecord]:
         yield DefenderMPLogLowfiRecord(**data)
 
-    def _mplog_detectionadd(self, data: dict) -> Iterator[DefenderMPLogDetectionAddRecord]:
+    def _mplog_detectionadd(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogDetectionAddRecord]:
         yield DefenderMPLogDetectionAddRecord(**data)
 
-    def _mplog_threat(self, data: dict) -> Iterator[DefenderMPLogThreatRecord]:
+    def _mplog_threat(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogThreatRecord]:
         yield DefenderMPLogThreatRecord(**data)
 
-    def _mplog_resourcescan(self, data: dict) -> Iterator[DefenderMPLogResourceScanRecord]:
-        data["start_time"] = datetime.strptime(data["start_time"], "%m-%d-%Y %H:%M:%S")
-        data["end_time"] = datetime.strptime(data["end_time"], "%m-%d-%Y %H:%M:%S")
+    def _mplog_resourcescan(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogResourceScanRecord]:
+        data["start_time"] = datetime.datetime.strptime(data["start_time"], "%m-%d-%Y %H:%M:%S").replace(tzinfo=tzinfo)
+        data["end_time"] = datetime.datetime.strptime(data["end_time"], "%m-%d-%Y %H:%M:%S").replace(tzinfo=tzinfo)
         data["ts"] = data["start_time"]
         rest = data.pop("rest")
         yield DefenderMPLogResourceScanRecord(
@@ -288,8 +312,10 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             **data,
         )
 
-    def _mplog_threataction(self, data: dict) -> Iterator[DefenderMPLogThreatActionRecord]:
-        data["ts"] = datetime.strptime(data["ts"], "%m-%d-%Y %H:%M:%S")
+    def _mplog_threataction(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogThreatActionRecord]:
+        data["ts"] = datetime.datetime.strptime(data["ts"], "%m-%d-%Y %H:%M:%S").replace(tzinfo=tzinfo)
         rest = data.pop("rest")
         yield DefenderMPLogThreatActionRecord(
             threats=re.findall("Threat Name:([^\n]+)", rest),
@@ -298,12 +324,14 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             **data,
         )
 
-    def _mplog_rtp_log(self, data: dict) -> Iterator[DefenderMPLogRTPRecord]:
+    def _mplog_rtp_log(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogRTPRecord]:
         times = {}
         for dtkey in ["ts", "last_perf", "first_rtp_scan"]:
             try:
-                times[dtkey] = datetime.strptime(data[dtkey], "%m-%d-%Y %H:%M:%S")
-            except ValueError:
+                times[dtkey] = datetime.datetime.strptime(data[dtkey], "%m-%d-%Y %H:%M:%S").replace(tzinfo=tzinfo)
+            except ValueError:  # noqa: PERF203
                 pass
 
         yield DefenderMPLogRTPRecord(
@@ -316,11 +344,13 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             ext_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["ext_exclusions"]),
         )
 
-    def _mplog_detectionevent(self, data: dict) -> Iterator[DefenderMPLogDetectionEventRecord]:
+    def _mplog_detectionevent(
+        self, data: dict, tzinfo: datetime.tzinfo = datetime.timezone.utc
+    ) -> Iterator[DefenderMPLogDetectionEventRecord]:
         yield DefenderMPLogDetectionEventRecord(**data)
 
     def _mplog_line(
-        self, mplog_line: str, source: Path
+        self, mplog_line: str, source: Path, tzinfo: datetime.tzinfo = datetime.timezone.utc
     ) -> Iterator[
         DefenderMPLogProcessImageRecord
         | DefenderMPLogMinFilUSSRecord
@@ -338,32 +368,31 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                 data = match.groupdict()
                 data["_target"] = self.target
                 data["source_log"] = source
-                yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data)
+                yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data, tzinfo=tzinfo)
 
     def _mplog_block(
-        self, mplog_line: str, mplog: TextIO, source: Path
+        self, mplog_line: str, mplog: TextIO, source: Path, tzinfo: datetime.tzinfo = datetime.timezone.utc
     ) -> Iterator[DefenderMPLogResourceScanRecord | DefenderMPLogThreatActionRecord | DefenderMPLogRTPRecord]:
         block = ""
         for prefix, suffix, pattern, record in DEFENDER_MPLOG_BLOCK_PATTERNS:
             if prefix.search(mplog_line):
                 block += mplog_line
-                break
-        if block:
-            while mplog_line := mplog.readline():
-                block += mplog_line
-                if suffix.search(mplog_line):
-                    break
-            match = pattern.match(block)
-            if not match:
-                return
 
-            data = match.groupdict()
-            data["_target"] = self.target
-            data["source_log"] = source
-            yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data)
+                while mplog_line := mplog.readline():
+                    block += mplog_line
+                    if suffix.search(mplog_line):
+                        break
+                match = pattern.match(block)
+                if not match:
+                    return
+
+                data = match.groupdict()
+                data["_target"] = self.target
+                data["source_log"] = source
+                yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data, tzinfo=tzinfo)
 
     def _mplog(
-        self, mplog: TextIO, source: Path
+        self, mplog: TextIO, source: Path, tzinfo: datetime.tzinfo = datetime.timezone.utc
     ) -> Iterator[
         DefenderMPLogProcessImageRecord
         | DefenderMPLogMinFilUSSRecord
@@ -381,10 +410,10 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         | DefenderMPLogRTPRecord
     ]:
         while mplog_line := mplog.readline():
-            yield from self._mplog_line(mplog_line, source)
-            yield from self._mplog_block(mplog_line, mplog, source)
+            yield from self._mplog_line(mplog_line, source, tzinfo=tzinfo)
+            yield from self._mplog_block(mplog_line, mplog, source, tzinfo=tzinfo)
 
-    @plugin.export(
+    @export(
         record=[
             DefenderMPLogProcessImageRecord,
             DefenderMPLogMinFilUSSRecord,
@@ -427,6 +456,8 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             - https://www.intrinsec.com/hunt-mplogs/
             - https://github.com/Intrinsec/mplog_parser
         """
+        target_tz = self.target.datetime.tzinfo
+
         mplog_directory = self.target.fs.path(DEFENDER_MPLOG_DIR)
 
         if not (mplog_directory.exists() and mplog_directory.is_dir()):
@@ -436,20 +467,20 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             for encoding in ["UTF-16", "UTF-8"]:
                 try:
                     with mplog_file.open("rt", encoding=encoding) as mplog:
-                        yield from self._mplog(mplog, self.target.fs.path(mplog_file))
+                        yield from self._mplog(mplog, self.target.fs.path(mplog_file), tzinfo=target_tz)
                     break
                 except UnicodeError:
                     continue
 
-    @plugin.arg(
-        "--output",
+    @arg(
         "-o",
+        "--output",
         dest="output_dir",
         type=Path,
         required=True,
         help="Path to recover quarantined file to.",
     )
-    @plugin.export(output="none")
+    @export(output="none")
     def recover(self, output_dir: Path) -> None:
         """Recover files that have been placed into quarantine by Microsoft Defender.
 

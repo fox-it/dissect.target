@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.sql import sqlite3
 from dissect.util.ts import from_unix
@@ -10,6 +9,12 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+
+    from dissect.target.target import Target
 
 ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/activitiescache",
@@ -51,7 +56,7 @@ class ActivitiesCachePlugin(Plugin):
         - https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/
     """
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.cachefiles = []
 

@@ -1,13 +1,20 @@
+from __future__ import annotations
+
 import datetime
+from typing import TYPE_CHECKING
+
+import pytest
 
 from dissect.target.helpers.regutil import RegistryHive, VirtualKey, VirtualValue
-from dissect.target.plugins.os.windows.datetime import DateTimePlugin
-from dissect.target.plugins.os.windows.locale import LocalePlugin as WindowsLocalePlugin
-from dissect.target.target import Target
+from dissect.target.plugins.os.windows.datetime import WindowsDateTimePlugin, c_tz, parse_systemtime_transition
+from dissect.target.plugins.os.windows.locale import WindowsLocalePlugin
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_windows_datetime(target_win_tzinfo: Target) -> None:
-    target_win_tzinfo.add_plugin(DateTimePlugin)
+    target_win_tzinfo.add_plugin(WindowsDateTimePlugin)
 
     # Easter Island has a flipped DST to Amsterdam
     assert target_win_tzinfo.datetime.tzinfo.display == "(UTC-06:00) Easter Island"
@@ -15,8 +22,8 @@ def test_windows_datetime(target_win_tzinfo: Target) -> None:
     assert target_win_tzinfo.datetime.tzinfo.std_name == "Easter Island Standard Time"
     assert 2019 in target_win_tzinfo.datetime.tzinfo.dynamic_dst
 
-    naive_dt_may = datetime.datetime(2019, 5, 4, 12, 0, 0)
-    naive_dt_march = datetime.datetime(2019, 3, 4, 12, 0, 0)
+    naive_dt_may = datetime.datetime(2019, 5, 4, 12, 0, 0)  # noqa: DTZ001
+    naive_dt_march = datetime.datetime(2019, 3, 4, 12, 0, 0)  # noqa: DTZ001
 
     local_east_st_dt = target_win_tzinfo.datetime.local(naive_dt_may)
     local_east_dt_dt = target_win_tzinfo.datetime.local(naive_dt_march)
@@ -54,10 +61,14 @@ def test_windows_datetime(target_win_tzinfo: Target) -> None:
     assert not eu_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 2, 0, 0, tzinfo=eu_tzinfo))
     assert eu_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 3, 0, 0, tzinfo=eu_tzinfo))
 
+    # Test utc tzinfo is_dst
+    utc_tzinfo = target_win_tzinfo.datetime.tz("UTC")
+    assert not utc_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 2, 0, 0, tzinfo=utc_tzinfo))
+
 
 def test_windows_timezone_legacy(target_win_tzinfo_legacy: Target) -> None:
     # Older Windows version (prior to Windows 7) use localized time zone ids like "Paaseiland"
-    target_win_tzinfo_legacy.add_plugin(DateTimePlugin)
+    target_win_tzinfo_legacy.add_plugin(WindowsDateTimePlugin)
     assert target_win_tzinfo_legacy.datetime.tzinfo.display == "(UTC-06:00) Easter Island"
 
 
@@ -106,10 +117,31 @@ def test_windows_datetime_foreign(target_win_users: Target, hive_hku: RegistryHi
     timezoneinformation_key.add_value("TimeZoneKeyName", "Pacific Standard Time")
     hive_hklm.map_key(timezoneinformation_key_name, timezoneinformation_key)
 
-    target_win_users.add_plugin(DateTimePlugin)
+    target_win_users.add_plugin(WindowsDateTimePlugin)
     assert target_win_users.datetime.tzinfo.display == "(UTC-08:00) Pacific Time (US & Canada)"
     assert target_win_users.datetime.tzinfo.std_name == "Pacific Standard Time"
     assert target_win_users.datetime.tzinfo.dlt_name == "Pacific Daylight Time"
 
     target_win_users.add_plugin(WindowsLocalePlugin)
     assert target_win_users.timezone == "America/Los_Angeles"
+
+
+def test_parse_systemtime_transition() -> None:
+    # Test behaviour where not all week days are defined in every week for that month
+    systemtime = c_tz._SYSTEMTIME(wDay=5, wMonth=10)
+    output = parse_systemtime_transition(systemtime, 2025)
+    assert output == datetime.datetime(2025, 10, 26, tzinfo=None)  # noqa
+
+    # Test behaviour where a weekday of the month occurs 5 times during that month
+    systemtime = c_tz._SYSTEMTIME(wDay=5, wMonth=10, wDayOfWeek=4)
+    output = parse_systemtime_transition(systemtime, 2025)
+    assert output == datetime.datetime(2025, 10, 30, tzinfo=None)  # noqa
+
+    # wDay in this case should only go between 1-5, so this should crash
+    systemtime = c_tz._SYSTEMTIME(wDay=6)
+    with pytest.raises(ValueError, match="systemtime.wDay should be between 1 and 5"):
+        parse_systemtime_transition(systemtime, 2025)
+
+    systemtime = c_tz._SYSTEMTIME(wDay=0)
+    with pytest.raises(ValueError, match="systemtime.wDay should be between 1 and 5"):
+        parse_systemtime_transition(systemtime, 2025)

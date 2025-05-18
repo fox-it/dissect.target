@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from pathlib import Path
-from typing import Any, BinaryIO, Iterator
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.eventlog import evt
-from flow.record import Record
 
 from dissect.target.exceptions import (
     FilesystemError,
@@ -17,6 +15,12 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from flow.record import Record
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#]")
 
@@ -49,36 +53,35 @@ class WindowsEventlogsMixin:
     EVENTLOG_REGISTRY_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Eventlog"
     LOGS_DIR_PATH = None
 
-    def get_logs(self, filename_glob: str = "*") -> list[Path]:
-        file_paths = []
-        file_paths.extend(self.get_logs_from_dir(self.LOGS_DIR_PATH, filename_glob=filename_glob))
+    def _get_paths(self) -> Iterator[Path]:
+        seen = self.get_logs_from_dir(self.LOGS_DIR_PATH)
+        yield from seen
 
         if self.EVENTLOG_REGISTRY_KEY:
-            for reg_path in self.get_logs_from_registry(filename_glob=filename_glob):
+            for reg_path in self.get_logs_from_registry():
                 # We can't filter duplicates on file path alone, since "sysvol" and "C:" can show up interchangeably.
                 try:
-                    if any(fpath.samefile(reg_path) for fpath in file_paths):
+                    if any(fpath.samefile(reg_path) for fpath in seen):
                         continue
                 except FilesystemError:
                     pass
 
-                file_paths.append(reg_path)
+                yield reg_path
 
-        return file_paths
+    def get_logs(self, filename_glob: str = "*") -> list[Path]:
+        re_filename = re.compile(fnmatch.translate(filename_glob), re.IGNORECASE)
+        return [path for path in self.get_paths() if re_filename.match(str(path))]
 
     def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> list[Path]:
-        file_paths = []
-        logs_dir = self.target.fs.path(logs_dir)
-        if logs_dir.exists():
-            file_paths.extend(list(logs_dir.glob(filename_glob)))
+        if (path := self.target.fs.path(logs_dir)).exists():
+            file_paths = list(path.glob(filename_glob))
 
-        self.target.log.debug("Log files found in '%s': %d", self.LOGS_DIR_PATH, len(file_paths))
-        return file_paths
+            self.target.log.debug("Log files found in '%s': %d", self.LOGS_DIR_PATH, len(file_paths))
+            return file_paths
+
+        return []
 
     def get_logs_from_registry(self, filename_glob: str = "*") -> list[Path]:
-        # compile glob into case-insensitive regex
-        filename_regex = re.compile(fnmatch.translate(filename_glob), re.IGNORECASE)
-
         file_paths = []
 
         try:
@@ -95,13 +98,9 @@ class WindowsEventlogsMixin:
                 subkey_value = subkey.value("File")
             except RegistryValueNotFoundError:
                 continue
-            file_paths.append(subkey_value.value)
 
-        # resolve aliases (like `%systemroot%`) in the paths
-        file_paths = [self.target.resolve(p) for p in file_paths]
-        file_paths = [path for path in file_paths if filename_regex.match(str(path))]
-
-        self.target.log.debug("Log files found in '%s': %d", self.EVENTLOG_REGISTRY_KEY, len(file_paths))
+            # resolve aliases (like `%systemroot%`) in the paths
+            file_paths.append(self.target.resolve(subkey_value.value))
 
         return file_paths
 
@@ -135,7 +134,6 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
             Provider_Name (string): The Provider_Name field of the event.
             EventID (int): The EventID of the event.
         """
-
         if logs_dir:
             log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
         else:
@@ -176,7 +174,7 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
 
     @export(record=EvtRecordDescriptor)
     def scraped_evt(self) -> Iterator[EvtRecordDescriptor]:
-        """Yields EVT log file records scraped from target disks"""
+        """Yields EVT log file records scraped from target disks."""
         yield from self.target.scrape.scrape_chunks_from_disks(
             needle=self.NEEDLE,
             chunk_size=self.CHUNK_SIZE,
@@ -190,6 +188,6 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
         fh.seek(offset - 4)
         return fh.read(chunk_size)
 
-    def _parse_chunk(self, _, chunk: bytes) -> Iterator[Record]:
+    def _parse_chunk(self, needle: bytes, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
             yield self._build_record(record)

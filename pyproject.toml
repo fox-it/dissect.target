@@ -31,7 +31,7 @@ dependencies = [
     "dissect.evidence>=3,<4",
     "dissect.hypervisor>=3,<4",
     "dissect.ntfs>=3.4,<4",
-    "dissect.regf>=3.3,<4",
+    "dissect.regf>=3.13.dev,<4",  # TODO: update on release
     "dissect.util>=3,<4",
     "dissect.volume>=2,<4",
     "flow.record~=3.19.0",
@@ -56,9 +56,10 @@ full = [
     "dissect.extfs>=3,<4",
     "dissect.fat>=3,<4",
     "dissect.ffs>=3,<4",
-    "dissect.fve>=4,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
-    "dissect.jffs>=1,<2",
+    "dissect.fve>=4.2.dev,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",  # TODO: update on release
+    "dissect.jffs>=1.5.dev,<2",  # TODO: update on release
     "dissect.ole>=3,<4",
+    "dissect.qnxfs>=0.1.dev,<2",  # TODO: update on release
     "dissect.shellitem>=3,<4",
     "dissect.squashfs>=1,<2",
     "dissect.sql>=3,<4",
@@ -93,11 +94,12 @@ dev = [
     "dissect.extfs[dev]>=3.0.dev,<4.0.dev",
     "dissect.fat[dev]>=3.0.dev,<4.0.dev",
     "dissect.ffs[dev]>=3.0.dev,<4.0.dev",
-    "dissect.fve[dev]>=4.0.dev,<5.0.dev; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
+    "dissect.fve[dev]>=4.2.dev,<5.0.dev; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
     "dissect.hypervisor[dev]>=3.0.dev,<4.0.dev",
-    "dissect.jffs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.jffs[dev]>=1.5.dev,<2.0.dev",
     "dissect.ntfs[dev]>=3.4.dev,<4.0.dev",
-    "dissect.regf[dev]>=3.3.dev,<4.0.dev",
+    "dissect.qnxfs[dev]>=0.0.dev,<2.0.dev",  # TODO: update on release
+    "dissect.regf[dev]>=3.13.dev,<4.0.dev",  # TODO: update on release
     "dissect.shellitem[dev]>=3.0.dev,<4.0.dev",
     "dissect.sql[dev]>=3.0.dev,<4.0.dev",
     "dissect.squashfs[dev]>=1.0.dev,<2.0.dev",
@@ -107,6 +109,8 @@ dev = [
     "dissect.volume[dev]>=3.0.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
     "pexpect",
+    "docutils",
+    "typing_extensions",
 ]
 yara = [
     # Grab the dependencies for dissect.target
@@ -143,13 +147,56 @@ target-shell = "dissect.target.tools.shell:main"
 target-yara = "dissect.target.tools.yara:main"
 target-qfind = "dissect.target.tools.qfind:main"
 
-[tool.black]
+[tool.ruff]
 line-length = 120
+required-version = ">=0.11.0"
 
-[tool.isort]
-profile = "black"
-known_first_party = ["dissect.target"]
-known_third_party = ["dissect"]
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+  "F",
+  "E",
+  "W",
+  "I",
+  "UP",
+  "YTT",
+  "ANN",
+  "B",
+  "C4",
+  "DTZ",
+  "T10",
+  "FA",
+  "ISC",
+  "G",
+  "INP",
+  "PIE",
+  "PYI",
+  "PT",
+  "Q",
+  "RSE",
+  "RET",
+  "SLOT",
+  "SIM",
+  "TID",
+  "TCH",
+  "PTH",
+  "PLC",
+  "TRY",
+  "FLY",
+  "PERF",
+  "FURB",
+  "RUF",
+]
+ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/_docs/**" = ["INP001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dissect.target"]
+known-third-party = ["dissect"]
 
 [tool.setuptools]
 license-files = ["LICENSE", "COPYRIGHT"]

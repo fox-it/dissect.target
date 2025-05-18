@@ -6,10 +6,9 @@ from datetime import datetime, timedelta
 from enum import IntEnum
 from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
-from pathlib import Path
 from socket import htonl
 from struct import pack, unpack
-from typing import Iterator, Optional, Union
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
@@ -17,10 +16,17 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystem import fsutil
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import Plugin, internal
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from typing_extensions import Self
+
+    from dissect.target.target import Target
 
 
-def parse_ip(addr: Union[str, int], version: int = 4) -> Union[IPv6Address, IPv4Address]:
+def parse_ip(addr: str | int, version: int = 4) -> IPv6Address | IPv4Address:
     """Convert ``/proc/net`` IPv4 or IPv6 hex address into their standard IP notation."""
 
     if version == 6:
@@ -47,30 +53,30 @@ class NetSocket:
     uid: int  # uid
     timeout: str  # unanswered 0-window probes
     inode: int  # inode
-    ref: Optional[str] = None  # socket reference count
-    pointer: Optional[str] = None  # location of socket in memory
-    drops: Optional[str] = None  # retransmit timeout
-    predicted_tick: Optional[str] = None  # predicted tick of soft slock (delayed ACK control data)
-    ack_pingpong: Optional[str] = None  # ack.quick<<1|ack.pingpong
-    congestion_window: Optional[str] = None  # sending congestion window
-    size_threshold: Optional[str] = None  # slow start size threshhold or -f if the threshold is >= 0xFFFF
+    ref: str | None = None  # socket reference count
+    pointer: str | None = None  # location of socket in memory
+    drops: str | None = None  # retransmit timeout
+    predicted_tick: str | None = None  # predicted tick of soft slock (delayed ACK control data)
+    ack_pingpong: str | None = None  # ack.quick<<1|ack.pingpong
+    congestion_window: str | None = None  # sending congestion window
+    size_threshold: str | None = None  # slow start size threshhold or -f if the threshold is >= 0xFFFF
 
     # Values parsed from raw values listed above.
-    protocol_string: Optional[str] = None
-    local_ip: Optional[str] = None  # parsed value from local_address
-    local_port: Optional[int] = None  # parsed value from local_address
-    remote_ip: Optional[str] = None  # parsed value from rem_address
-    remote_port: Optional[int] = None  # parsed value from rem_address
-    state_string: Optional[str] = None  # parsed value from state
-    owner: Optional[str] = None  # resolved owner name of the socket, else "0".
-    rx_queue: Optional[int] = None  # parsed value from tx_rx_queue
-    tx_queue: Optional[int] = None  # parsed value from tx_rx_queue
-    pid: Optional[int] = None  # pid of the socket
-    name: Optional[str] = None  # process name associated to the socket
-    cmdline: Optional[str] = None  # process cmdline associated to the socket
+    protocol_string: str | None = None
+    local_ip: str | None = None  # parsed value from local_address
+    local_port: int | None = None  # parsed value from local_address
+    remote_ip: str | None = None  # parsed value from rem_address
+    remote_port: int | None = None  # parsed value from rem_address
+    state_string: str | None = None  # parsed value from state
+    owner: str | None = None  # resolved owner name of the socket, else "0".
+    rx_queue: int | None = None  # parsed value from tx_rx_queue
+    tx_queue: int | None = None  # parsed value from tx_rx_queue
+    pid: int | None = None  # pid of the socket
+    name: str | None = None  # process name associated to the socket
+    cmdline: str | None = None  # process cmdline associated to the socket
 
     @classmethod
-    def from_line(cls, line: str, ip_vers: int = 4) -> NetSocket:
+    def from_line(cls, line: str, ip_vers: int = 4) -> Self:
         socket = cls(*line.split())
 
         socket.uid = int(socket.uid)
@@ -96,16 +102,16 @@ class UnixSocket:
     type: int  # the socket type: 1 for SOCK_STREAM, 2 for SOCK_DGRAM and 5 for SOCK_SEQPACKET sockets
     state: int  # the internal state of the socket
     inode: int  # the inode number of the socket. the inode is commonly refered to as port in tools as ss and netstat
-    path: Optional[str] = None  # sockets in the abstract namespace are included in the list,
+    path: str | None = None  # sockets in the abstract namespace are included in the list,
     # and are shown with a Path that commences with the character '@'
 
     # Values parsed from raw values listed above.
-    state_string: Optional[str] = None
-    stream_type_string: Optional[str] = None
+    state_string: str | None = None
+    stream_type_string: str | None = None
     protocol_string: str = "unix"
 
     @classmethod
-    def from_line(cls, line: str) -> UnixSocket:
+    def from_line(cls, line: str) -> Self:
         socket = cls(*line.split())
 
         socket.type = int(socket.type)
@@ -130,19 +136,17 @@ class PacketSocket:
     inode: int  # inode
 
     # Values parsed from raw values listed above
-    pid: Optional[int] = None  # pid of the socket
-    name: Optional[str] = None  # process name associated to the socket
-    cmdline: Optional[str] = None  # process cmdline associated to the socket
-    protocol_type: Optional[int] = None  # value parsed from protocol field
-    owner: Optional[str] = None  # resolved owner from user (uid) field
+    pid: int | None = None  # pid of the socket
+    name: str | None = None  # process name associated to the socket
+    cmdline: str | None = None  # process cmdline associated to the socket
+    protocol_type: int | None = None  # value parsed from protocol field
+    owner: str | None = None  # resolved owner from user (uid) field
     protocol_string: str = "packet"
 
     @classmethod
-    def from_line(cls, line: str) -> PacketSocket:
+    def from_line(cls, line: str) -> Self:
         parts = line.split()
-        socket = cls(*[int(parts[0], 16)] + list(map(int, parts[1:])))
-
-        return socket
+        return cls(*[int(parts[0], 16), *list(map(int, parts[1:]))])
 
 
 @dataclass
@@ -405,7 +409,7 @@ class Sockets:
 
 
 class ProcProcess:
-    def __init__(self, target: Target, pid: Union[int, str], proc_root: str = "/proc"):
+    def __init__(self, target: Target, pid: int | str, proc_root: str = "/proc"):
         self.target = target
         self.root = proc_root
         self._pid = int(pid)
@@ -436,7 +440,7 @@ class ProcProcess:
 
         return status_dict
 
-    def _parse_proc_stat_entry(self) -> dict[str, Union[str, int]]:
+    def _parse_proc_stat_entry(self) -> dict[str, str | int]:
         """Internal function to parse the contents of ``/proc/[pid]/stat``."""
         status_dict = {}
         entry = self.get("stat")
@@ -450,7 +454,7 @@ class ProcProcess:
 
             head = status[:start_name]
             tail = status[end_name:]
-            name = status[start_name + 1 : end_name]  # noqa: E203
+            name = status[start_name + 1 : end_name]
             status = head + tail
 
             for idx, part in enumerate(status.split()[: len(PROC_STAT_NAMES)]):
@@ -496,6 +500,7 @@ class ProcProcess:
                 continue
 
             return int(line.split()[1])
+        return None
 
     def get(self, path: str) -> Path:
         """Returns a TargetPath relative to this process."""
@@ -513,7 +518,7 @@ class ProcProcess:
     @property
     def uid(self) -> int:
         """Return the user ID (uid) of the owner of this process."""
-        uid = int((self.get("loginuid").read_bytes()))
+        uid = int(self.get("loginuid").read_bytes())
         # loginuid can hold the value "4294967295" (0xFFFFFFFF).
         # Which is defined as "not set" and -1 should be returned.
         return -1 if uid == 0xFFFFFFFF else uid
@@ -524,23 +529,25 @@ class ProcProcess:
         return self._pid
 
     @property
-    def parent(self) -> Optional[ProcProcess]:
+    def parent(self) -> ProcProcess | None:
         """Returns the parent :class:`ProcProcess` of this process."""
         if self.pid == 0:
             return None
         return ProcProcess(self.target, self._stat_file.get("ppid"))
 
     @property
-    def ppid(self) -> Optional[int]:
+    def ppid(self) -> int | None:
         """Returns the parent process ID (ppid) associated to this process."""
         if parent := self.parent:
             return parent.pid
+        return None
 
     @property
-    def parent_name(self) -> Optional[str]:
+    def parent_name(self) -> str | None:
         """Returns the name associated to the parent process ID (ppid) of this process."""
         if parent := self.parent:
             return parent.name
+        return None
 
     @property
     def state(self) -> str:
@@ -559,14 +566,12 @@ class ProcProcess:
     @property
     def runtime(self) -> timedelta:
         """Returns the runtime of a process until the moment of acquisition."""
-        runtime = self.now - self.starttime
-        return runtime
+        return self.now - self.starttime
 
     @property
     def now(self) -> datetime:
         """Returns the ``now()`` timestamp of the system at the moment of acquisition."""
-        now = self.uptime + from_unix(self._boottime)
-        return now
+        return self.uptime + from_unix(self._boottime)
 
     def environ(self) -> Iterator[Environ]:
         """Yields the content of the environ file associated with the process."""
@@ -606,7 +611,7 @@ class ProcProcess:
 class ProcPlugin(Plugin):
     __namespace__ = "proc"
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.sockets = Sockets(self.target)
 
@@ -645,7 +650,7 @@ class ProcPlugin(Plugin):
         return self.inode_map.get(inode, [])
 
     @internal
-    def process(self, pid: Union[int, str]) -> ProcProcess:
+    def process(self, pid: int | str) -> ProcProcess:
         return ProcProcess(self.target, pid)
 
     @internal

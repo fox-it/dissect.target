@@ -1,10 +1,15 @@
-from datetime import datetime
-from typing import Iterator
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
 
 from dissect.target.filesystems.xfs import XfsFilesystem, XfsFilesystemEntry
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 NANOSECONDS_IN_SECOND = 1_000_000_000
 
@@ -19,11 +24,11 @@ def xfs_fs() -> Iterator[XfsFilesystem]:
 
 
 @pytest.fixture
-def xfs_fs_entry(xfs_fs: XfsFilesystem) -> Iterator[XfsFilesystemEntry]:
-    atime = datetime(2024, 10, 1, 12, 0, 0)
-    mtime = datetime(2024, 10, 2, 12, 0, 0)
-    ctime = datetime(2024, 10, 3, 12, 0, 0)
-    crtime = datetime(2024, 10, 4, 12, 0, 0)
+def xfs_fs_entry(xfs_fs: XfsFilesystem) -> XfsFilesystemEntry:
+    atime = datetime(2024, 10, 1, 12, 0, 0, tzinfo=timezone.utc)
+    mtime = datetime(2024, 10, 2, 12, 0, 0, tzinfo=timezone.utc)
+    ctime = datetime(2024, 10, 3, 12, 0, 0, tzinfo=timezone.utc)
+    crtime = datetime(2024, 10, 4, 12, 0, 0, tzinfo=timezone.utc)
 
     dinode = Mock(di_mode=0o100750, di_nlink=1, di_uid=1000, di_gid=999)
     inode = Mock(
@@ -40,8 +45,7 @@ def xfs_fs_entry(xfs_fs: XfsFilesystem) -> Iterator[XfsFilesystemEntry]:
         crtime=crtime,
         crtime_ns=crtime.timestamp() * NANOSECONDS_IN_SECOND,
     )
-    entry = XfsFilesystemEntry(xfs_fs, "/some_file", inode)
-    yield entry
+    return XfsFilesystemEntry(xfs_fs, "/some_file", inode)
 
 
 def test_xfs_stat(xfs_fs: XfsFilesystem, xfs_fs_entry: XfsFilesystemEntry) -> None:

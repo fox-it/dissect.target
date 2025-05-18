@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
-from os import stat
+from typing import TYPE_CHECKING
 
 import pytest
 from flow.record.fieldtypes import path
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.apps.ssh.putty import PuTTYPlugin, construct_public_key
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_putty_plugin_ssh_host_keys_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -76,7 +80,7 @@ def test_putty_plugin_ssh_host_keys_windows(
         VirtualValue(
             hive_hku,
             "ssh-ed25519@22:192.168.123.130",
-            "0x12812d95024c0d8683879fd38f977e9caa7e733334f75965bc50eba6e872e70a,0x2a564844fb9b6beb5e0491cefd9d03fe3af8caf03467c6c5fb9fe2bf78db2575",  # noqa E501
+            "0x12812d95024c0d8683879fd38f977e9caa7e733334f75965bc50eba6e872e70a,0x2a564844fb9b6beb5e0491cefd9d03fe3af8caf03467c6c5fb9fe2bf78db2575",
         ),
     )
     hive_hku.map_key(key_name, key)
@@ -103,7 +107,7 @@ def test_putty_plugin_saved_sessions_unix(target_unix_users: Target, fs_unix: Vi
     assert len(records) == 1
 
     assert records[0].ts == datetime.fromtimestamp(
-        stat(absolute_path("_data/plugins/apps/ssh/putty/sessions/example-saved-session")).st_mtime,
+        absolute_path("_data/plugins/apps/ssh/putty/sessions/example-saved-session").stat().st_mtime,
         tz=timezone.utc,
     )
     assert records[0].session_name == "example-saved-session"
@@ -149,7 +153,7 @@ def test_putty_plugin_saved_sessions_windows(
 
 
 def test_construct_public_key() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError, match="Invalid key_type or iv"):
         construct_public_key(None, None)
 
     assert construct_public_key("unsupported", "some-iv") == (

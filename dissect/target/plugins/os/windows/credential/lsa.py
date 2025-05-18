@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 from functools import cached_property
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 try:
     from Crypto.Cipher import AES, ARC4, DES
@@ -33,6 +36,7 @@ class LSAPlugin(Plugin):
         - https://learn.microsoft.com/en-us/windows/win32/secauthn/lsa-authentication
         - https://moyix.blogspot.com/2008/02/decrypting-lsa-secrets.html (Windows XP)
         - https://github.com/fortra/impacket/blob/master/impacket/examples/secretsdump.py
+        - ReVaulting decryption and opportunities SANS Summit Prague 2015
     """
 
     __namespace__ = "lsa"
@@ -83,23 +87,31 @@ class LSAPlugin(Plugin):
 
     @cached_property
     def _secrets(self) -> dict[str, bytes] | None:
-        """Return dict of Windows system decrypted LSA secrets."""
+        """Return dict of Windows system decrypted LSA secrets.
+
+        Includes current values (``CurrVal``) and the previous value (``OldVal``).
+        Key names are suffixed with ``_OldVal`` if an old value is found in the registry.
+        """
         if not self.target.ntversion:
             raise ValueError("Unable to determine Windows NT version")
 
         result = {}
         for subkey in self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets").subkeys():
-            enc_data = subkey.subkey("CurrVal").value("(Default)").value
+            for val in ["CurrVal", "OldVal"]:
+                try:
+                    enc_data = subkey.subkey(val).value("(Default)").value
+                except RegistryKeyNotFoundError:
+                    continue
 
-            # Windows Vista or newer
-            if float(self.target.ntversion) >= 6.0:
-                secret = _decrypt_aes(enc_data, self.lsakey)
+                # Windows Vista or newer
+                if float(self.target.ntversion) >= 6.0:
+                    secret = _decrypt_aes(enc_data, self.lsakey)
 
-            # Windows XP
-            else:
-                secret = _decrypt_des(enc_data, self.lsakey)
+                # Windows XP
+                else:
+                    secret = _decrypt_des(enc_data, self.lsakey)
 
-            result[subkey.name] = secret
+                result[f"{subkey.name}{'_OldVal' if val == 'OldVal' else ''}"] = secret
 
         return result
 
@@ -108,7 +120,7 @@ class LSAPlugin(Plugin):
         """Yield decrypted LSA secrets from a Windows target."""
         for key, value in self._secrets.items():
             yield LSASecretRecord(
-                ts=self.target.registry.key(f"{self.SECURITY_POLICY_KEY}\\Secrets\\{key}").ts,
+                ts=self.target.registry.key(f"{self.SECURITY_POLICY_KEY}\\Secrets\\{key.replace('_OldVal', '')}").ts,
                 name=key,
                 value=value.hex(),
                 _target=self.target,
@@ -168,7 +180,8 @@ def _decrypt_des(data: bytes, key: bytes) -> bytes:
 def _transform_key(key: bytes) -> bytes:
     new_key = []
     new_key.append(((key[0] >> 0x01) << 1) & 0xFE)
-    for i in range(0, 6):
-        new_key.append((((key[i] & ((1 << (i + 1)) - 1)) << (6 - i) | (key[i + 1] >> (i + 2))) << 1) & 0xFE)
+    new_key.extend(
+        (((key[i] & ((1 << (i + 1)) - 1)) << (6 - i) | (key[i + 1] >> (i + 2))) << 1) & 0xFE for i in range(6)
+    )
     new_key.append(((key[6] & 0x7F) << 1) & 0xFE)
     return bytes(new_key)

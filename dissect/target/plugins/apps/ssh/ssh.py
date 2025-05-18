@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import binascii
 from hashlib import md5, sha1, sha256
@@ -124,7 +126,7 @@ def calculate_fingerprints(public_key_decoded: bytes, ssh_keygen_format: bool = 
         raise ValueError("No decoded public key provided")
 
     if not isinstance(public_key_decoded, bytes):
-        raise ValueError("Provided public key should be bytes")
+        raise TypeError("Provided public key should be bytes")
 
     if public_key_decoded[0:3] != b"\x00\x00\x00":
         raise ValueError("Provided value does not look like a public key")

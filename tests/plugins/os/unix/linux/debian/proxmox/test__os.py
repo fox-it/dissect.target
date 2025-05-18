@@ -23,7 +23,7 @@ def test_proxmox_os(target_bare: Target) -> None:
     target_bare.apply()
 
     assert target_bare.os == "proxmox"
-    assert sorted(list(map(str, target_bare.fs.path("/etc/pve").rglob("*")))) == [
+    assert sorted(map(str, target_bare.fs.path("/etc/pve").rglob("*"))) == [
         "/etc/pve/__version__",
         "/etc/pve/authkey.pub",
         "/etc/pve/authkey.pub.old",

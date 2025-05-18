@@ -1,16 +1,20 @@
 from __future__ import annotations
 
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 RecycleBinRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/filesystem/recyclebin",
@@ -45,7 +49,7 @@ c_recyclebin = cstruct().load(recyclebin_def)
 class RecyclebinPlugin(Plugin):
     """Recyclebin plugin."""
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.recyclebin_paths = []
         for fs_entry in self.target.fs.path("/").iterdir():
@@ -65,7 +69,7 @@ class RecyclebinPlugin(Plugin):
         return path.name != "sysvol" and path.joinpath("$recycle.bin").exists()
 
     @export(record=RecycleBinRecord)
-    def recyclebin(self) -> Generator[RecycleBinRecord, None, None]:
+    def recyclebin(self) -> Iterator[RecycleBinRecord]:
         """
         Return files located in the recycle bin ($Recycle.Bin).
 
@@ -88,10 +92,10 @@ class RecyclebinPlugin(Plugin):
             yield from self.read_recycle_bin(recyclebin)
 
     def _is_recycle_file(self, path: TargetPath) -> bool:
-        """Check wether the path is a recycle bin metadata file"""
+        """Check wether the path is a recycle bin metadata file."""
         return path.name and path.name.lower().startswith("$i")
 
-    def read_recycle_bin(self, bin_path: TargetPath) -> Generator[RecycleBinRecord, None, None]:
+    def read_recycle_bin(self, bin_path: TargetPath) -> Iterator[RecycleBinRecord]:
         if self._is_recycle_file(bin_path):
             yield self.read_bin_file(bin_path)
             return
@@ -130,10 +134,9 @@ class RecyclebinPlugin(Plugin):
         return parent_path.name
 
     def select_header(self, data: bytes) -> c_recyclebin.header_v1 | c_recyclebin.header_v2:
-        """Selects the correct header based on the version field in the header"""
+        """Selects the correct header based on the version field in the header."""
 
         header_version = c_recyclebin.uint64(data[:8])
         if header_version == 2:
             return c_recyclebin.header_v2
-        else:
-            return c_recyclebin.header_v1
+        return c_recyclebin.header_v1

@@ -3,15 +3,19 @@ from __future__ import annotations
 import fnmatch
 import re
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import arg, export
 from dissect.target.plugins.general.config import (
     ConfigurationEntry,
     ConfigurationTreePlugin,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 UnixConfigTreeRecord = TargetRecordDescriptor(
     "unix/config",
@@ -66,12 +70,12 @@ class EtcTree(ConfigurationTreePlugin):
                 yield UnixConfigTreeRecord(**data)
 
     @export(record=UnixConfigTreeRecord)
-    @arg("--glob", dest="pattern", required=False, default="*", type=str, help="Glob-style pattern to search for")
-    @arg("--root", dest="root", required=False, default="/", type=str, help="Path to use as root for search")
+    @arg("--glob", dest="pattern", default="*", help="Glob-style pattern to search for")
+    @arg("--root", dest="root", default="/", help="Path to use as root for search")
     def etc(self, pattern: str, root: str) -> Iterator[UnixConfigTreeRecord]:
         """Yield etc configuration records."""
 
-        for entry, subs, items in self.config_fs.walk(root):
+        for entry, _, items in self.config_fs.walk(root):
             for item in items:
                 try:
                     path = Path(entry) / item
@@ -79,6 +83,5 @@ class EtcTree(ConfigurationTreePlugin):
 
                     if isinstance(config_object, ConfigurationEntry):
                         yield from self._sub(config_object, path, orig_path=path, pattern=pattern)
-                except Exception:
+                except Exception:  # noqa: PERF203
                     self.target.log.warning("Could not open configuration item: %s", item)
-                    pass

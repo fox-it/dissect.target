@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import shutil
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.loaders.velociraptor import VelociraptorLoader
 from tests._utils import absolute_path, mkdirs
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 def create_root(sub_dir: str, tmp_path: Path) -> Path:
@@ -18,6 +24,7 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/$Extend",
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/windows/system32",
         f"uploads/{sub_dir}/%5C%5C.%5CC%3A/%2ETEST",
+        "results",
     ]
     root = tmp_path
     mkdirs(root, paths)
@@ -27,8 +34,8 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
     (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/Microsoft-Windows-Windows Defender%254WHC.evtx").write_bytes(b"{}")
     (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/other.txt").write_text("my first file")
 
-    with open(absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw"), "rb") as fh:
-        mft = fh.read(10 * 1025)
+    with absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw").open("rb") as fh:
+        mft = fh.read(10 * 1024)
 
     root.joinpath(paths[0]).joinpath("$MFT").write_bytes(mft)
     root.joinpath(paths[3]).joinpath("$MFT").write_bytes(mft)
@@ -46,16 +53,10 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize(
-    "sub_dir, other_dir",
-    [
-        ("mft", "auto"),
-        ("ntfs", "auto"),
-        ("ntfs_vss", "auto"),
-        ("lazy_ntfs", "auto"),
-        ("auto", "ntfs"),
-    ],
+    "sub_dir",
+    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
-def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_path: Path) -> None:
+def test_windows_ntfs(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
     root = create_root(sub_dir, tmp_path)
 
     assert VelociraptorLoader.detect(root) is True
@@ -140,7 +141,6 @@ def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "paths",
     [
-        (["uploads/file/etc", "uploads/file/var", "uploads/file/%2ETEST"]),
         (["uploads/file/etc", "uploads/file/var", "uploads/file/%2ETEST"]),
         (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/%2ETEST"]),
         (["uploads/file/etc", "uploads/file/var", "uploads/file/opt", "uploads/file/%2ETEST"]),

@@ -3,9 +3,7 @@ from __future__ import annotations
 import itertools
 from enum import Enum
 from functools import lru_cache
-from pathlib import Path
-from typing import Iterable, Iterator, Literal, NamedTuple
-from xml.etree.ElementTree import Element
+from typing import TYPE_CHECKING, Final, Literal, NamedTuple
 
 from defusedxml import ElementTree
 from flow.record.fieldtypes import windows_path
@@ -13,10 +11,16 @@ from flow.record.fieldtypes import windows_path
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.helpers.regutil import KeyCollection
 from dissect.target.helpers.utils import to_list
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+    from xml.etree.ElementTree import Element
+
+    from dissect.target.helpers.regutil import KeyCollection
+    from dissect.target.target import Target
 
 OfficeStartupItem = TargetRecordDescriptor(
     "application/productivity/msoffice/startup_item",
@@ -58,7 +62,7 @@ class ClickOnceDeploymentManifestParser:
     Can be extended to a .NET assembly parser in the future.
     """
 
-    XML_NAMESPACE = {"": "urn:schemas-microsoft-com:asm.v2"}
+    XML_NAMESPACE: Final[dict[str, str]] = {"": "urn:schemas-microsoft-com:asm.v2"}
 
     class Assembly(NamedTuple):
         installed: bool
@@ -72,7 +76,7 @@ class ClickOnceDeploymentManifestParser:
         self._codebases: set[Path] = set()
 
     def find_codebases(self, manifest_path: str) -> set[Path]:
-        """Dig for executables given a manifest"""
+        """Dig for executables given a manifest."""
 
         assemblies = self._parse_manifest(manifest_path)
         # Ignore pre-installed assemblies
@@ -92,7 +96,7 @@ class ClickOnceDeploymentManifestParser:
             self._target.log.debug("", exc_info=e)
             return set()
 
-        dependent_assemblies: set[self.Assembly] = set()
+        dependent_assemblies: set[ClickOnceDeploymentManifestParser.Assembly] = set()
         dependent_assembly_elements = manifest_tree.findall(".//dependentAssembly", self.XML_NAMESPACE)
         for dependent_assembly_element in dependent_assembly_elements:
             dependent_assemblies |= self._parse_dependent_assembly(dependent_assembly_element, manifest_path.parent)
@@ -136,35 +140,35 @@ class MSOffice(Plugin):
 
     __namespace__ = "msoffice"
 
-    HIVES = ["HKLM", "HKCU"]
+    HIVES = ("HKLM", "HKCU")
     OFFICE_KEY = "Software\\Microsoft\\Office"
-    OFFICE_COMPONENTS = ["Access", "Excel", "Outlook", "PowerPoint", "Word", "OneNote"]
+    OFFICE_COMPONENTS = ("Access", "Excel", "Outlook", "PowerPoint", "Word", "OneNote")
     ADD_IN_KEY = "Addins"
-    OFFICE_DEFAULT_USER_STARTUP = [
+    OFFICE_DEFAULT_USER_STARTUP = (
         "%APPDATA%/Microsoft/Templates",
         "%APPDATA%/Microsoft/Word/Startup",
         "%APPDATA%/Microsoft/Excel/XLSTART",
         "%APPDATA%/Microsoft/Outlook/Startup",
         "%APPDATA%/Microsoft/PowerPoint/Startup",
-    ]
+    )
 
     OFFICE_DEFAULT_ROOT = "C:/Program Files/Microsoft Office/root/Office16/"
 
     # Office is fixed at version 16.0 since Microsoft Office 2016 (released in 2015)
     # Powerpoint and Outlook do not have a alternate startup folder
-    OFFICE_STARTUP_OPTIONS = [
+    OFFICE_STARTUP_OPTIONS = (
         ("Software\\Microsoft\\Office\\16.0\\Word\\Options", "STARTUP-PATH"),
         ("Software\\Microsoft\\Office\\16.0\\Word\\Options", "UserTemplates"),
         ("Software\\Microsoft\\Office\\16.0\\Excel\\Options", "AltStartup"),
-    ]
+    )
 
-    CLASSES_ROOTS = [
+    CLASSES_ROOTS = (
         "HKCR",
         # Click To Run Application Virtualization:
         "HKLM\\SOFTWARE\\Microsoft\\Office\\ClickToRun\\REGISTRY\\MACHINE\\Software\\Classes",
         # For 32-bit software running under 64-bit Windows:
         "HKLM\\SOFTWARE\\Wow6432Node\\Classes",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -201,7 +205,7 @@ class MSOffice(Plugin):
         for manifest_file in self._wef_cache_folders():
             try:
                 yield self._parse_web_addin_manifest(manifest_file)
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 self.target.log.warning("Error parsing web-addin manifest %s", manifest_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -262,7 +266,7 @@ class MSOffice(Plugin):
                 )
 
     @export(record=OfficeStartupItem)
-    def startup(self) -> Iterable[OfficeStartupItem]:
+    def startup(self) -> Iterator[OfficeStartupItem]:
         """Returns all startup items found in Microsoft Office startup folders.
 
         Office startup folders are specific directories where Microsoft Office looks add-ins, macros, templates, or custom scripts.
@@ -299,7 +303,7 @@ class MSOffice(Plugin):
                     user_sid = user.sid if user else None
                     yield from self._walk_startup_folder(alt_startup_folder.value, user_sid)
 
-    def _wef_cache_folders(self) -> Iterable[Path]:
+    def _wef_cache_folders(self) -> Iterator[Path]:
         """List cache folders which contain office web-addin data."""
 
         WEB_ADDIN_MANIFEST_GLOB = "AppData/Local/Microsoft/Office/16.0/Wef/**/Manifests/**/*"
@@ -308,11 +312,10 @@ class MSOffice(Plugin):
                 if manifest_path.is_file() and manifest_path.suffix != ".metadata":
                     yield manifest_path
 
-    def _walk_startup_folder(self, startup_folder: str, user_sid: str | None = None) -> Iterable[OfficeStartupItem]:
-        """Resolve the given path and return all statup items"""
+    def _walk_startup_folder(self, startup_folder: str, user_sid: str | None = None) -> Iterator[OfficeStartupItem]:
+        """Resolve the given path and return all statup items."""
 
-        resolved_startup_folder_str = self.target.resolve(startup_folder, user_sid)
-        resolved_startup_folder: Path = self.target.fs.path(resolved_startup_folder_str)
+        resolved_startup_folder: Path = self.target.resolve(startup_folder, user_sid)
         if not resolved_startup_folder.is_dir():
             return
 
@@ -332,8 +335,10 @@ class MSOffice(Plugin):
                 cls_id = self.target.registry.value(f"{classes_root}\\{prog_id}\\CLSID", "(Default)").value
                 inproc_key = f"{classes_root}\\CLSID\\{cls_id}\\InprocServer32"
                 return self.target.registry.value(inproc_key, "(Default)").value
-            except RegistryError:
+            except RegistryError:  # noqa: PERF203
                 pass
+
+        return None
 
     def _parse_vsto_manifest(self, manifest_path_str: str, user_sid: str) -> set[str]:
         """Parse a vsto manifest.
@@ -372,7 +377,7 @@ class MSOffice(Plugin):
         )
 
     def _office_install_root(self, component: Literal["Word", "Excel"]) -> str:
-        """Return the installation root for a office component"""
+        """Return the installation root for a office component."""
 
         # Typically, all components share the same root.
         # Curiously enough, the "Common" component has no InstallRoot defined.
@@ -382,8 +387,8 @@ class MSOffice(Plugin):
         except RegistryError:
             return self.OFFICE_DEFAULT_ROOT
 
-    def _machine_startup_folders(self) -> Iterable[str]:
-        """Return machine-scoped office startup folders"""
+    def _machine_startup_folders(self) -> Iterator[str]:
+        """Return machine-scoped office startup folders."""
 
         yield fsutil.join(self._office_install_root("Word"), "STARTUP", alt_separator="\\")
         yield fsutil.join(self._office_install_root("Excel"), "XLSTART", alt_separator="\\")
@@ -393,26 +398,26 @@ class MSOffice(Plugin):
     def _parse_plugin_status(self, addin: KeyCollection) -> NativePluginStatus | None:
         """Parse the registry value which controls if the add-in autostarts.
 
-        See https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins?view=vs-2022#LoadBehavior # noqa: E501
+        See https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins?view=vs-2022#LoadBehavior
         """
 
         load_behavior = addin.value("LoadBehavior", None).value
 
         if load_behavior is None:
             return None
-        elif load_behavior == 0:
+        if load_behavior == 0:
             return NativePluginStatus(loaded=False, load_behavior=LoadBehavior.Manual)
-        elif load_behavior == 1:
+        if load_behavior == 1:
             return NativePluginStatus(loaded=True, load_behavior=LoadBehavior.Manual)
-        elif load_behavior == 2:
+        if load_behavior == 2:
             return NativePluginStatus(loaded=False, load_behavior=LoadBehavior.Autostart)
-        elif load_behavior == 3:
+        if load_behavior == 3:
             return NativePluginStatus(loaded=True, load_behavior=LoadBehavior.Autostart)
-        elif load_behavior == 8:
+        if load_behavior == 8:
             return NativePluginStatus(loaded=False, load_behavior=LoadBehavior.OnDemand)
-        elif load_behavior == 9:
+        if load_behavior == 9:
             return NativePluginStatus(loaded=True, load_behavior=LoadBehavior.OnDemand)
-        elif load_behavior == 16:
+        if load_behavior == 16:
             return NativePluginStatus(loaded=False, load_behavior=LoadBehavior.FistTime)
 
         return None

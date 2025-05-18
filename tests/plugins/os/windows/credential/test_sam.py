@@ -1,8 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.helpers.regutil import VirtualKey
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from tests.plugins.os.windows.credential.test_lsa import map_lsa_system_keys
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 try:
     from Crypto.Hash import MD4
@@ -18,7 +25,7 @@ SYSTEM_KEY_PATH = "SYSTEM\\ControlSet001\\Control\\LSA"
 
 
 @pytest.mark.skipif(not HAS_CRYPTO, reason="requires pycryptodome")
-def test_sam_plugin_rev1(target_win_users, hive_hklm):
+def test_sam_plugin_rev1(target_win_users: Target, hive_hklm: VirtualHive) -> None:
     sam_key = VirtualKey(hive_hklm, SAM_KEY_PATH)
     sam_key.add_value(
         "F",
@@ -143,7 +150,7 @@ def test_sam_plugin_rev1(target_win_users, hive_hklm):
 
 
 @pytest.mark.skipif(not HAS_CRYPTO, reason="requires pycryptodome")
-def test_sam_plugin_rev2(target_win_users, hive_hklm):
+def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> None:
     sam_key = VirtualKey(hive_hklm, SAM_KEY_PATH)
     sam_key.add_value(
         "F",

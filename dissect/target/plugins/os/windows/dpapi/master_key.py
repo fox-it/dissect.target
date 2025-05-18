@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 from io import BytesIO
@@ -70,7 +72,7 @@ c_master_key = cstruct().load(master_key_def)
 
 
 class MasterKey:
-    def __init__(self, data: bytes) -> None:
+    def __init__(self, data: bytes):
         buf = BytesIO(data)
         self._mk = c_master_key.MasterKey(buf)
         self._mk_key = buf.read()

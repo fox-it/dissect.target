@@ -1,19 +1,12 @@
-from pathlib import Path
+from __future__ import annotations
 
-import pytest
+from pathlib import Path
 
 from dissect.target.helpers import keychain
 from tests._utils import absolute_path
 
 
-@pytest.fixture
-def guarded_keychain():
-    keychain.KEYCHAIN.clear()
-    yield
-    keychain.KEYCHAIN.clear()
-
-
-def test_keychain_register_keychain_file(guarded_keychain):
+def test_keychain_register_keychain_file(guarded_keychain: None) -> None:
     keychain_file = Path(absolute_path("_data/helpers/keychain/keychain.csv"))
 
     keychain.register_keychain_file(keychain_file)
@@ -23,7 +16,7 @@ def test_keychain_register_keychain_file(guarded_keychain):
     assert len(keychain.get_keys_for_provider("bitlocker")) == 2
 
 
-def test_keychain_register_wildcard_value(guarded_keychain):
+def test_keychain_register_wildcard_value(guarded_keychain: None) -> None:
     keychain.register_wildcard_value("test-value")
 
     # Number of keys registered is equal number of supported key types, minus one for an invalid raw key
@@ -37,4 +30,6 @@ def test_keychain_register_wildcard_value(guarded_keychain):
 
     keychain.KEYCHAIN.clear()
     keychain.register_wildcard_value("'312268-409816-583517-486695-627121-599511-664389-145640'")
-    keychain.get_all_keys()[0].value == "312268-409816-583517-486695-627121-599511-664389-145640"
+    for key in keychain.get_all_keys():
+        if key.key_type in (keychain.KeyType.RECOVERY_KEY, keychain.KeyType.FILE):
+            assert key.value == "312268-409816-583517-486695-627121-599511-664389-145640"
