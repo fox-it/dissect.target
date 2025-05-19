@@ -4,7 +4,8 @@ import logging
 import zipfile as zf
 from typing import TYPE_CHECKING
 
-from build.lib.dissect.target.loaders.dir import find_and_map_dirs
+from dissect.target.loaders.dir import find_and_map_dirs
+
 from dissect.target import target
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.loader import Loader, SubLoader
