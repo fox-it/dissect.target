@@ -29,7 +29,7 @@ else:
 
 log = logging.getLogger(__name__)
 
-CACHE_SIZE = 1024 * 1024
+CACHE_SIZE = 128 * 1024
 
 
 class DissectMount(Operations):
