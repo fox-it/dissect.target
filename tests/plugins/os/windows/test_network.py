@@ -130,6 +130,20 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
             },
             id="OTHER empty",
         ),
+        pytest.param(
+            {
+                "NetCfgInstanceId": "TESTINGINSTANCEID",
+                "EnableDHCP": 1,
+                "DhcpIPAddress": "0.0.0.0",
+                "DhcpSubnetMask": "255.255.255.0",
+            },
+            {
+                "_NO_INTERFACES": True,
+                "enabled": True,
+                "cidr": {},  # and not {'/255.255.255.0'}
+            },
+            id="invalid cidr",
+        ),
     ],
 )
 def test_windows_network(
@@ -166,6 +180,11 @@ def test_windows_network(
         assert network.dns() == expected_values.get("dns", [])
         assert network.gateways() == expected_values.get("gateway", [])
         assert network.macs() == expected_values.get("mac", [])
+
+        if expected_values.get("_NO_INTERFACES"):
+            with pytest.raises(StopIteration):
+                next(iter(network.interfaces()))
+            return
 
         network_interface = next(iter(network.interfaces()))
         assert network_interface.name == expected_values.get("name")
