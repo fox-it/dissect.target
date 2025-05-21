@@ -273,8 +273,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, help="limit number of records produced")
     configure_generic_arguments(parser)
 
-    args, _ = parser.parse_known_args()
-    process_generic_arguments(args)
+    args, rest = parser.parse_known_args()
+    process_generic_arguments(args, rest)
 
     return args
 
