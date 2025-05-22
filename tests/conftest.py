@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import pathlib
 import tempfile
 import textwrap
@@ -36,6 +37,16 @@ if TYPE_CHECKING:
     from dissect.target.plugin import OSPlugin
 
 
+HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    if not HAS_BENCHMARK:
+        # If we don't have pytest-benchmark (or pytest-codspeed) installed, register the benchmark marker ourselves
+        # to avoid pytest warnings
+        config.addinivalue_line("markers", "benchmark: mark test for benchmarking (requires pytest-benchmark)")
+
+
 def pytest_sessionstart(session: pytest.Session) -> None:
     # Test if the _data/ directory is present and if not, as is the case in Python
     # source distributions of dissect.target, we give an error
@@ -65,6 +76,11 @@ def pytest_sessionstart(session: pytest.Session) -> None:
                         "\n! !"
                     )
             break
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    if not HAS_BENCHMARK and item.get_closest_marker("benchmark") is not None:
+        pytest.skip("pytest-benchmark is not installed")
 
 
 @pytest.fixture(autouse=True)
@@ -448,6 +464,13 @@ def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Target:
     east_tzi = bytes.fromhex("6801000000000000c4ffffff0000040006000100160000000000000000000900060001001600000000000000")
     east_tz_data.add_value("TZI", east_tzi)
 
+    utc_tz_data_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\UTC"
+    utc_tz_data = VirtualKey(hive_hklm, utc_tz_data_path)
+    utc_tz_data.add_value("Display", "(UTC) Coordinated Universal Time")
+    utc_tz_data.add_value("Dlt", "Coordinated Universal Time")
+    utc_tz_data.add_value("Std", "Coordinated Universal Time")
+    utc_tz_data.add_value("TZI", b"\x00" * 44)
+
     dynamic_dst = VirtualKey(hive_hklm, east_tz_data_path + "\\Dynamic DST")
     dynamic_dst.add_value("FirstEntry", 2019)
     dynamic_dst.add_value("LastEntry", 2019)
@@ -458,6 +481,7 @@ def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Target:
     hive_hklm.map_key(tz_info_path, tz_info)
     hive_hklm.map_key(eu_tz_data_path, eu_tz_data)
     hive_hklm.map_key(east_tz_data_path, east_tz_data)
+    hive_hklm.map_key(utc_tz_data_path, utc_tz_data)
 
     return target_win
 

@@ -9,8 +9,6 @@ from collections import deque
 from collections.abc import ItemsView, Iterable, Iterator, KeysView
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
-from fnmatch import fnmatch
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,14 +20,13 @@ from typing import (
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.utils import to_list
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from types import TracebackType
 
     from typing_extensions import Self
-
-    from dissect.target.filesystem import FilesystemEntry
 
 try:
     from ruamel.yaml import YAML
@@ -54,9 +51,8 @@ log = logging.getLogger(__name__)
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
-    if prev_value := current.get(key):
-        if isinstance(prev_value, dict):
-            # We can assume the value would be a dict too here.
+    if (prev_value := current.get(key)) is not None:  #  "" is a value
+        if isinstance(prev_value, dict) and isinstance(value, dict):
             prev_value.update(value)
             return
 
@@ -179,6 +175,44 @@ class ConfigurationParser:
 
         if not isinstance(self.parsed_data, dict):
             self.parsed_data = self._collapse_dict(self.parsed_data, False)
+
+    def merge(self, other: ConfigurationParser) -> ConfigurationParser:
+        """Merge the contents of another parser into this one.
+        On conflict, the values of the other parser will be used.
+
+        Args:
+            other: The other parser to merge.
+
+        Returns:
+            The merged parser.
+        """
+
+        self._merge(self.parsed_data, other.parsed_data)
+        return self
+
+    def _merge(self, dict1: dict, dict2: dict) -> dict:
+        for key, value2 in dict2.items():
+            value1 = dict1.get(key)
+            if value1 is None:
+                # Result does not have key yet, add it
+                dict1[key] = value2
+                continue
+
+            collapse = self.collapse_all or self._collapse_check(key)
+
+            if collapse:
+                if isinstance(value1, dict) and isinstance(value2, dict):
+                    self._merge(value1, value2)  # There should only be one, merge both
+                else:
+                    dict1[key] = value2
+            else:
+                combined = to_list(value1) + to_list(value2)
+                # An empty string clears the list of values for the current key
+                # Possibly turn this into an option if other parsers require different behavior
+                combined = combined[combined.index("") + 1 :] if "" in combined else combined
+                dict1[key] = combined
+
+        return dict1
 
     def keys(self) -> KeysView:
         return self.parsed_data.keys()
@@ -568,13 +602,26 @@ class ScopeManager:
 
     def push(self, name: str, keep_prev: bool = False) -> Literal[True]:
         """Push a new key to the :attr:`_current` dictionary and return that we did."""
-        child = self._current.get(name, {})
-
+        child = self._current.get(name)
+        new_child = {}
         parent = self._current
-        self._parents[id(child)] = parent
-        parent[name] = child
+        if isinstance(child, dict):
+            # A second scope with the same name, turn the existing one into a list and append a new one
+            parent[name] = [child, new_child]
+            child = parent[name]
+        elif isinstance(child, list):
+            # Multiple scopes with the same name, append a new one to the list
+            child.append(new_child)
+        elif isinstance(child, str):
+            # Child is not a scope but a scalar value, do nothing
+            pass
+        else:
+            # Create a new scope
+            parent[name] = new_child
+
+        self._parents[id(new_child)] = parent
         self._set_prev(keep_prev)
-        self._current = child
+        self._current = new_child
         return True
 
     def pop(self, keep_prev: bool = False) -> bool:
@@ -888,7 +935,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
 }
 
 
-def parse(path: FilesystemEntry | TargetPath | Path, hint: str | None = None, *args, **kwargs) -> ConfigurationParser:
+def parse(path: Path, hint: str | None = None, *args, **kwargs) -> ConfigurationParser:
     """Parses the content of an ``path`` or ``entry`` to a dictionary.
 
     Args:
@@ -903,42 +950,55 @@ def parse(path: FilesystemEntry | TargetPath | Path, hint: str | None = None, *a
         FileNotFoundError: If the ``path`` is not a file.
     """
 
-    entry = path
-    if isinstance(path, TargetPath):
-        entry = path.get()
-
-    if not isinstance(entry, Path) and not entry.is_file(follow_symlinks=True):
+    if not path.is_file():
         raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 
     options = ParserOptions(*args, **kwargs)
 
-    return parse_config(entry, hint, options)
+    return parse_config(path, hint, options)
 
 
 def parse_config(
-    entry: FilesystemEntry | Path,
+    entry: Path,
     hint: str | None = None,
     options: ParserOptions | None = None,
 ) -> ConfigurationParser:
     parser_type = _select_parser(entry, hint)
 
     parser = parser_type.create_parser(options)
-    with entry.open("rb") if isinstance(entry, Path) else entry.open() as fh:
+    with entry.open("rb") as fh:
         open_file = io.TextIOWrapper(fh, encoding="utf-8") if not isinstance(parser, Bin) else io.BytesIO(fh.read())
         parser.read_file(open_file)
+
+    if isinstance(parser, SystemD):
+        return _parse_drop_files(entry, options, parser)
 
     return parser
 
 
-def _select_parser(entry: FilesystemEntry, hint: str | None = None) -> ParserConfig:
+def _parse_drop_files(path: Path, options: ParserOptions, main_parser: ConfigurationParser) -> ConfigurationParser:
+    if not (drop_folder := path.with_name(path.name + ".d")).exists():
+        return main_parser
+
+    for drop_file in sorted(drop_folder.glob("*.conf")):
+        if not drop_file.is_file():
+            continue
+
+        drop_file_parser = ParserConfig(SystemD).create_parser(options)
+        with drop_file.open("r") as fh:
+            drop_file_parser.read_file(fh)
+            main_parser.merge(drop_file_parser)
+
+    return main_parser
+
+
+def _select_parser(path: Path, hint: str | None = None) -> ParserConfig:
     if hint and (parser_type := CONFIG_MAP.get(hint)):
         return parser_type
 
     for match, value in MATCH_MAP.items():
-        if fnmatch(entry.path, f"{match}"):
+        if path.match(match):
             return value
 
-    extension = entry.path.rsplit(".", 1)[-1]
-
-    extention_parser = CONFIG_MAP.get(extension, ParserConfig(Default))
-    return KNOWN_FILES.get(entry.name, extention_parser)
+    extention_parser = CONFIG_MAP.get(path.suffix.lstrip("."), ParserConfig(Default))
+    return KNOWN_FILES.get(path.name, extention_parser)

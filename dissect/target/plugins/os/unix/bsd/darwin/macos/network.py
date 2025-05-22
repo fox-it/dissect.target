@@ -29,7 +29,7 @@ class MacOSNetworkPlugin(NetworkPlugin):
 
     def _plistnetwork(self) -> dict:
         if (preferences := self.target.fs.path("/Library/Preferences/SystemConfiguration/preferences.plist")).exists():
-            return plistlib.load(preferences.open())
+            return plistlib.load(preferences.open()) or {}
 
         raise FileNotFoundError("Couldn't find preferences file")
 
