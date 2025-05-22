@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from defusedxml import ElementTree as ET
 from dissect.hypervisor import hyperv
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -40,6 +41,28 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
         if not self.data_vmcx.exists() and not self.vm_xml:
             raise UnsupportedPluginError("No registered VMs and no data.vmcx file found")
 
+    def _get_child_name_vmcx(self, vm_path: str) -> str | None:
+        try:
+            with self.target.fs.path(vm_path).open("rb") as fh:
+                config = hyperv.HyperVFile(fh).as_dict()
+                return config.get("configuration", {}).get("properties", {}).get("name")
+        except Exception as e:
+            print(f"Error fetching child name from vm_path {vm_path}: {e}")
+            return None
+
+    def _get_child_name_from_xml(self, vm_path: str) -> str | None:
+        try:
+            # Parse XML and search for the first <name> under <properties>
+            xml = ET.parse(self.target.fs.path(vm_path).open("rb"))
+            name_element = xml.find(".//properties/name")
+
+            if name_element is not None:
+                return name_element.text
+
+        except Exception as e:
+            raise ValueError(f"Error parsing XML vm_path={vm_path} for vm name: {e}")
+        return None
+
     def list_children(self) -> Iterator[ChildTargetRecord]:
         if self.data_vmcx.exists():
             data = hyperv.HyperVFile(self.data_vmcx.open()).as_dict()
@@ -47,14 +70,17 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
             if virtual_machines := data["Configurations"].get("VirtualMachines"):
                 for vm_path in virtual_machines.values():
                     yield ChildTargetRecord(
+                        name=self._get_child_name_vmcx(vm_path),
                         type=self.__type__,
                         path=self.target.fs.path(vm_path),
                         _target=self.target,
                     )
 
         for xml_path in self.vm_xml:
+            vm_path = xml_path.resolve()
             yield ChildTargetRecord(
+                name=self._get_child_name_from_xml(vm_path),
                 type=self.__type__,
-                path=xml_path.resolve(),
+                path=vm_path,
                 _target=self.target,
             )
