@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
 
@@ -58,9 +59,19 @@ class WSLChildTargetPlugin(ChildTargetPlugin):
         if not len(self.installs):
             raise UnsupportedPluginError("No WSL installs found")
 
+    def _get_child_name(self, vm_path: TargetPath) -> str | None:
+        try:
+            vm_guid = vm_path.parent.name
+            vm_key = self.target.registry.key(f"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{vm_guid}")
+            return vm_key.value("DistributionName").value
+        except Exception as e:
+            print("Error parsing registry key for child name: %s", e)
+        return None
+
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for install_path in self.installs:
             yield ChildTargetRecord(
+                name=self._get_child_name(install_path),
                 type=self.__type__,
                 path=install_path,
                 _target=self.target,

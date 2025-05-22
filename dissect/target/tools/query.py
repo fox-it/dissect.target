@@ -31,6 +31,7 @@ from dissect.target.tools.utils import (
     find_and_filter_plugins,
     open_targets,
     persist_execution_report,
+    print_children,
     process_generic_arguments,
     process_plugin_arguments,
 )
@@ -75,11 +76,17 @@ def main() -> int:
         add_help=False,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("--child", help="load a specific child path or index, see --list-children")
+    parser.add_argument("--child", help="load a specific child path or index, see --list-children(-recursive)")
     parser.add_argument(
         "--list-children",
         action=argparse.BooleanOptionalAction,
-        help="list all children by index and path output to be used in --child",
+        help="list all children by index and path output to be used in --child - does not process anything",
+    )
+    parser.add_argument(
+        "--list-children-recursive",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="list all children (recursively) by index and path - does not process anything",
     )
     parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument("--direct", action="store_true", help="treat TARGETS as paths to pass to plugins directly")
@@ -143,9 +150,10 @@ def main() -> int:
     if not args.targets:
         parser.error("too few arguments - missing targets")
 
-    if args.list_children:
-        # List found children on targets and exit
-        return list_children(args.targets)
+    # List found children on targets and exit
+    if args.list_children or args.list_children_recursive:
+        targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
+        return print_children(targets, recursive=args.list_children_recursive)
 
     if args.report_dir and not args.report_dir.is_dir():
         parser.error(f"--report-dir {args.report_dir} is not a valid directory")

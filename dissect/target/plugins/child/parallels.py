@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from defusedxml import ElementTree as ET
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -65,9 +67,20 @@ class ParallelsChildTargetPlugin(ChildTargetPlugin):
         if not self.pvms:
             raise UnsupportedPluginError("No Parallels pvm file(s) found")
 
+    def _get_child_name(self, vm_path: str) -> str | None:
+        try:
+            # The .pvm path is a directory, it contains the actual config.pvs configuration file
+            vm_dir = self.target.fs.path(vm_path)
+            vm_file = vm_dir.joinpath("config.pvs")
+            config = ET.fromstring(vm_file.open().read())
+            return config.find(".//VmName").text
+        except Exception as e:
+            print("failed to get VmName from config.pvs in vm_path=%s, error: %s", vm_path, e)
+
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for pvm in self.pvms:
             yield ChildTargetRecord(
+                name=self._get_child_name(pvm),
                 type=self.__type__,
                 path=pvm,
                 _target=self.target,
