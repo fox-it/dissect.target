@@ -35,19 +35,31 @@ class ColimaChildTargetPlugin(ChildTargetPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.paths = [
-            path
-            for user in self.target.user_details.all_with_home()
-            if (path := user.home_path.joinpath(".colima")).exists()
-        ]
+        self.paths = []
+        for user in self.target.user_details.all_with_home():
+            # check .colima folder in home_path
+            if (path := user.home_path.joinpath(".colima")).exists():
+                self.paths.append(path)
+            # check .colima folder in home_patha/.config/
+            if (path := user.home_path.joinpath(".config", "colima")).exists():
+                self.paths.append(path)
 
     def check_compatible(self) -> None:
         if not self.paths:
             raise UnsupportedPluginError("No Colima configurations found")
 
+    def _get_child_name(self, vm_path: str) -> str | None:
+        try:
+            if (vm := self.target.fs.path(vm_path)).exists():
+                return vm.parent.name
+        except Exception:
+            print("Failed parsing container name from path=%s", vm_path)
+        return None
+
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for container in find_containers(self.paths):
             yield ChildTargetRecord(
+                name=self._get_child_name(container),
                 type=self.__type__,
                 path=container,
                 _target=self.target,
