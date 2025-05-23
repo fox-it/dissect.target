@@ -54,6 +54,11 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
                 try:
                     full_key, value = map(str.strip, line.split("=", 1))
                     vm, key = full_key.split(".", 1)
+
+                    # Only process vmlist entries, not index entries
+                    if "vmlist" not in vm:
+                        continue
+
                     config[vm][key] = value.strip('"')
                 except ValueError:
                     self.log.warning("Skipping malformed line: %r", line)
@@ -67,8 +72,8 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
             for vm in inventory:
                 vm_config = inventory[vm]
                 yield ChildTargetRecord(
-                    name=vm_config["DisplayName"],
+                    name=vm_config.get("DisplayName"),
                     type=self.__type__,
-                    path=vm_config["config"],
+                    path=vm_config.get("config"),
                     _target=self.target,
                 )
