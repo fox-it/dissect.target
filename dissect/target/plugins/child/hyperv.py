@@ -60,7 +60,7 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
                 return name_element.text
 
         except Exception as e:
-            raise ValueError(f"Error parsing XML vm_path={vm_path} for vm name: {e}")
+            raise ValueError("Error parsing XML vm_path=%s for vm name: %s", vm_path, e)
         return None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:

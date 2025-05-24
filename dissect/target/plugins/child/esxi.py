@@ -25,9 +25,9 @@ class ESXiChildTargetPlugin(ChildTargetPlugin):
         try:
             with self.target.fs.path(vm_path).open("rt") as fh:
                 strings = fh.read()
-                return vmx._parse_dictionary(strings).get(["displayname"])
+                return vmx._parse_dictionary(strings).get("displayname")
         except Exception as e:
-            print("Failed parsing displayname vm_path={vm_path}:", e)
+            print("Failed parsing displayname vm_path=%s: %s", vm_path, e)
         return None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
