@@ -40,6 +40,7 @@ from dissect.target.tools.utils import (
     generate_argparse_for_plugin_class,
     generate_argparse_for_unbound_method,
     persist_execution_report,
+    print_children,
     process_generic_arguments,
 )
 
@@ -66,6 +67,14 @@ def record_output(strings: bool = False, json: bool = False) -> AbstractWriter:
         return RecordPrinter(fp)
 
     return RecordStreamWriter(fp)
+
+
+def list_children(targets: list[str]) -> None:
+    for name, target in [[name, target := Target.open(name)] for name in targets]:
+        print(f"Processing target: {name} (hostname={target.name})")
+        for index, child in enumerate(target.list_children()):
+            print(f"- [#{index}]: type={child.type}, path={child.path}")
+    return
 
 
 def list_plugins(
@@ -129,7 +138,18 @@ def main() -> int:
         action="store_true",
         help="do not execute the functions, but just print which functions would be executed",
     )
-    parser.add_argument("--child", help="load a specific child path or index")
+    parser.add_argument("--child", help="load a specific child path or index, see --list-children(-recursive)")
+    parser.add_argument(
+        "--list-children",
+        action=argparse.BooleanOptionalAction,
+        help="list all children by index and path output to be used in --child - does not process anything",
+    )
+    parser.add_argument(
+        "--list-children-recursive",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="list all children (recursively) by index and path - does not process anything",
+    )
     parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument(
         "-l",
@@ -223,7 +243,15 @@ def main() -> int:
         return 0
 
     if not args.targets:
-        parser.error("too few arguments")
+        parser.error("too few arguments - missing targets")
+
+    if len(args.targets) > 1 and args.child:
+        parser.error("When using --child, only a single target should be supplied")
+
+    # List found children on targets and exit
+    if args.list_children or args.list_children_recursive:
+        targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
+        return print_children(targets, recursive=args.list_children_recursive)
 
     if not args.function:
         parser.error("argument -f/--function is required")
@@ -282,6 +310,8 @@ def main() -> int:
                 except Exception as e:
                     target.log.exception("Exception while opening child %r: %s", args.child, e)  # noqa: TRY401
                     target.log.debug("", exc_info=e)
+                    # Do not continue processing, as target is now still pointing to the parent.
+                    continue
 
             if args.dry_run:
                 print(f"Dry run on: {target}")

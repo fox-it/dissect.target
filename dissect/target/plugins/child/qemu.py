@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from defusedxml import ElementTree as ET
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -19,6 +21,15 @@ class QemuChildTargetPlugin(ChildTargetPlugin):
         if not self.target.fs.path("/etc/libvirt/qemu").exists():
             raise UnsupportedPluginError("No libvirt QEMU installation found")
 
+    def _get_child_name(self, vm_path: str) -> str | None:
+        try:
+            vm_path = self.target.fs.path(vm_path)
+            config = ET.fromstring(vm_path.open().read_text())
+            return config.find("name").text
+        except Exception:
+            print("Error parsing name from vmpath=%s", vm_path)
+        return None
+
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for domain in self.target.fs.path("/etc/libvirt/qemu").glob("*.xml"):
-            yield ChildTargetRecord(type=self.__type__, path=domain)
+            yield ChildTargetRecord(name=self._get_child_name(domain), type=self.__type__, path=domain)
