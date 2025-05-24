@@ -189,6 +189,8 @@ def open_targets(args: argparse.Namespace) -> Iterator[Target]:
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
                 target.log.debug("", exc_info=e)
+                # Do not continue processing, as target is now still pointing to the parent.
+                continue
 
         if getattr(args, "dry_run", False):
             print(f"Dry run on: {target}")
