@@ -150,6 +150,9 @@ def main() -> int:
     if not args.targets:
         parser.error("too few arguments - missing targets")
 
+    if len(args.targets) > 1 and args.child:
+        parser.error("When using --child, only a single target should be supplied")
+
     # List found children on targets and exit
     if args.list_children or args.list_children_recursive:
         targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
