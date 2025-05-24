@@ -483,3 +483,7 @@ def print_children(targets: list[str], recursive: bool = False) -> None:
             # Always cast child_id to str to match _recursive()
             prefix = "-" * str(child_id).count(".")
             print(f" {prefix}[#{child_id}]: type={child.type}, name={child.name}, path={child.path}")
+
+    # Check if any children were found, if not print msg
+    if "child_id" not in locals():
+        print("No children found on target(s)")
