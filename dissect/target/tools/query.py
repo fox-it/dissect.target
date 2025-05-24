@@ -245,6 +245,9 @@ def main() -> int:
     if not args.targets:
         parser.error("too few arguments - missing targets")
 
+    if len(args.targets) > 1 and args.child:
+        parser.error("When using --child, only a single target should be supplied")
+
     # List found children on targets and exit
     if args.list_children or args.list_children_recursive:
         targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
@@ -307,6 +310,8 @@ def main() -> int:
                 except Exception as e:
                     target.log.exception("Exception while opening child %r: %s", args.child, e)  # noqa: TRY401
                     target.log.debug("", exc_info=e)
+                    # Do not continue processing, as target is now still pointing to the parent.
+                    continue
 
             if args.dry_run:
                 print(f"Dry run on: {target}")
