@@ -78,7 +78,7 @@ def map_dirs(
         if isinstance(path, zipfile.Path):
             dfs = zipfs(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
         elif hasattr(path, "_fs") and isinstance(path._fs, TarFilesystem):
-            dfs = tarfs(path._fs.tar.fileobj, str(path), alt_separator=alt_separator, case_sensitive=case_sensitive)
+            dfs = tarfs(tarfile=path._fs.tar, base=str(path), alt_separator=alt_separator, case_sensitive=case_sensitive)
         else:
             dfs = dirfs(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
 

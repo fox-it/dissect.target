@@ -1,12 +1,15 @@
 from pathlib import Path
 
 import pytest
+from dissect.target.loader import Loader
 
 from dissect.target import Target
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.loaders.zip import ZipLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from tests._utils import absolute_path
+
+from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def test_case_sensitive_drive_letter(target_bare: Target) -> None:
@@ -75,3 +78,17 @@ def test_anonymous_filesystems(target_default: Target) -> None:
 
     assert target_default.fs.get("$fs$/fs0/foo").open().read() == b"hello world\n"
     assert target_default.fs.get("$fs$/fs1/bar").open().read() == b"hello world\n"
+
+
+@pytest.mark.parametrize(
+    "archive,loader",
+    [
+        ("_data/loaders/acquire/test-windows-fs-c-relative.tar", TarLoader),
+        ("_data/loaders/acquire/test-windows-fs-c.zip", ZipLoader),
+    ],
+)
+@pytest.mark.benchmark
+def test_benchmark(benchmark: BenchmarkFixture, target_default: Target, archive: str, loader: Loader) -> None:
+    file = Path(absolute_path(archive))
+
+    benchmark(lambda: loader(file).map(target_default))
