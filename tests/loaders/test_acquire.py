@@ -9,7 +9,7 @@ from dissect.target.plugins.os.windows._os import WindowsPlugin
 from tests._utils import absolute_path
 
 
-def test_tar_sensitive_drive_letter(target_bare: Target) -> None:
+def test_case_sensitive_drive_letter(target_bare: Target) -> None:
     tar_file = absolute_path("_data/loaders/acquire/uppercase_driveletter.tar")
 
     loader = TarLoader(Path(tar_file))
@@ -41,7 +41,7 @@ def test_tar_sensitive_drive_letter(target_bare: Target) -> None:
         ("_data/loaders/acquire/test-windows-fs-x.tar", "x:"),
     ],
 )
-def test_tar_loader_windows_sysvol_formats(target_default: Target, archive: str, expected_drive_letter: str) -> None:
+def test_windows_sysvol_formats(target_default: Target, archive: str, expected_drive_letter: str) -> None:
     path = Path(absolute_path(archive))
     assert TarLoader.detect(path)
 
@@ -53,7 +53,7 @@ def test_tar_loader_windows_sysvol_formats(target_default: Target, archive: str,
     assert sorted(target_default.fs.mounts.keys()) == [expected_drive_letter]
     assert target_default.fs.get(f"{expected_drive_letter}/Windows/System32/foo.txt")
 
-def test_tar_loader_windows_sysvol_formats_zip(target_default: Target) -> None:
+def test_windows_sysvol_formats_zip(target_default: Target) -> None:
     path = Path(absolute_path("_data/loaders/acquire/test-windows-fs-c.zip"))
     assert ZipLoader.detect(path)
 
@@ -66,7 +66,7 @@ def test_tar_loader_windows_sysvol_formats_zip(target_default: Target) -> None:
     assert target_default.fs.get("c:/Windows/System32/foo.txt")
 
 
-def test_tar_anonymous_filesystems(target_default: Target) -> None:
+def test_anonymous_filesystems(target_default: Target) -> None:
     tar_file = Path(absolute_path("_data/loaders/acquire/test-anon-filesystems.tar"))
     assert TarLoader.detect(tar_file)
 

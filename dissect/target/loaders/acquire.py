@@ -18,7 +18,7 @@ FILESYSTEMS_LEGACY_ROOT = "sysvol"
 
 
 class AcquireTarSubLoader(TarSubLoader):
-    """Tar implementation for parsing Acquire collects"""
+    """Loader for tar-based Acquire collections."""
 
     @staticmethod
     def detect(tarfile: tf.TarFile) -> bool:
@@ -34,7 +34,7 @@ class AcquireTarSubLoader(TarSubLoader):
 
 
 class AcquireZipSubLoader(ZipSubLoader):
-    """Zip implementation for parsing Acquire collects"""
+    """Loader for zip-based Acquire collections."""
 
     @staticmethod
     def detect(zipfile: zf.Path) -> bool:
