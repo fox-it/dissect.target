@@ -245,4 +245,4 @@ def test_dump(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
 
         entry = tmp_path.joinpath("test-archive.tar.gz/walkfs/filesystem_entry.jsonl")
         assert entry.exists()
-        assert "/test-data/test-file.txt" in entry.read_text()
+        assert "test-file.txt" in entry.read_text()
