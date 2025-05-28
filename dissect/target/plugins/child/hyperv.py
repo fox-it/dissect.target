@@ -47,7 +47,8 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
                 config = hyperv.HyperVFile(fh).as_dict()
                 return config.get("configuration", {}).get("properties", {}).get("name")
         except Exception as e:
-            print(f"Error fetching child name from vm_path {vm_path}: {e}")
+            self.target.log.error("Failed parsing child name from vm_path=%s", vm_path)
+            self.target.log.debug("", exc_info=e)
             return None
 
     def _get_child_name_from_xml(self, vm_path: str) -> str | None:
@@ -60,7 +61,8 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
                 return name_element.text
 
         except Exception as e:
-            raise ValueError("Error parsing XML vm_path=%s for vm name: %s", vm_path, e)
+            self.target.log.error("Failed parsing XML from vm_path=%s", vm_path)
+            self.target.log.debug("", exc_info=e)
         return None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
