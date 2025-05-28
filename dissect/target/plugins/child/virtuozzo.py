@@ -54,7 +54,7 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
                     if line.startswith("NAME="):
                         return line.split("=", 1)[1].strip()
         except Exception as e:
-            self.target.log.error("Failed parsing NAME from vm_path=%s", vm_path)
+            self.target.log.exception("Failed parsing NAME from vm_path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
         return None
 

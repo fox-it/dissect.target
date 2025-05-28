@@ -60,9 +60,9 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
                         continue
 
                     config[vm][key] = value.strip('"')
-            return config
+                return config
         except Exception as e:
-            self.target.log.error("Failed parsing inventory file from inventory=%s", inventory)
+            self.target.log.exception("Failed parsing inventory file from inventory=%s", inventory)
             self.target.log.debug("", exc_info=e)
         return None
 
