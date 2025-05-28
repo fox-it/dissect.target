@@ -47,7 +47,7 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
                 config = hyperv.HyperVFile(fh).as_dict()
                 return config.get("configuration", {}).get("properties", {}).get("name")
         except Exception as e:
-            self.target.log.error("Failed parsing child name from vm_path=%s", vm_path)
+            self.target.log.exception("Failed parsing child name from vm_path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
             return None
 
@@ -61,7 +61,7 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
                 return name_element.text
 
         except Exception as e:
-            self.target.log.error("Failed parsing XML from vm_path=%s", vm_path)
+            self.target.log.exception("Failed parsing XML from vm_path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
         return None
 

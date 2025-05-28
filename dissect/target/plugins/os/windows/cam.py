@@ -360,7 +360,7 @@ class CamPlugin(Plugin):
 
             # The "device" is derived from the subkey (webcam in this case) of ConsentStore example:
             # HKLM\\...\\CapabilityAccessManager\\ConsentStore\\webcam\\C:#Program Files#Mozilla Firefox#firefox.exe
-            device = key.path.split("\\")[-2]
+            device = key.path.split("\\")[-3]
 
             # The application/or path of the application using the device is the key.name itself:
             # C:#Program Files#Mozilla Firefox#firefox.exe

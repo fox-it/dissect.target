@@ -75,7 +75,7 @@ class ParallelsChildTargetPlugin(ChildTargetPlugin):
             config = ET.fromstring(vm_file.open().read())
             return config.find(".//VmName").text
         except Exception as e:
-            self.target.log.error("Failed parsing VmName from config.pvs in vm_path=%s", vm_path)
+            self.target.log.exception("Failed parsing VmName from config.pvs in vm_path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
         return None
 

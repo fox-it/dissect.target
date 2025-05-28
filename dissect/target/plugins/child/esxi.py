@@ -27,7 +27,7 @@ class ESXiChildTargetPlugin(ChildTargetPlugin):
                 strings = fh.read()
                 return vmx._parse_dictionary(strings).get("displayname")
         except Exception as e:
-            self.target.log.error("Failed parsing displayname from vm_path=%s", vm_path)
+            self.target.log.exception("Failed parsing displayname from vm_path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
         return None
 

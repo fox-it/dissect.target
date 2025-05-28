@@ -99,7 +99,7 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
             config = ET.fromstring(path.open().read())
             return config.find(f".//{VBox.VBOX_XML_NAMESPACE}Machine").attrib["name"]
         except Exception as e:
-            self.target.log.error("Failed parsing name from vm_path=%s", vm_path)
+            self.target.log.exception("Failed parsing name from vm_path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
         return None
 
