@@ -93,9 +93,20 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
         if not self.vboxes:
             raise UnsupportedPluginError("No VirtualBox children found on target")
 
+    def _get_child_name(self, vm_path: str) -> str | None:
+        try:
+            path = self.target.fs.path(vm_path)
+            config = ET.fromstring(path.open().read())
+            return config.find(f".//{VBox.VBOX_XML_NAMESPACE}Machine").attrib["name"]
+        except Exception as e:
+            self.target.log.exception("Failed parsing name from vm_path=%s", vm_path)
+            self.target.log.debug("", exc_info=e)
+        return None
+
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for vbox in self.vboxes:
             yield ChildTargetRecord(
+                name=self._get_child_name(vbox),
                 type=self.__type__,
                 path=vbox,
                 _target=self.target,

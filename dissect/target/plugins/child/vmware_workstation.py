@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -44,23 +45,36 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
         if not self.inventories:
             raise UnsupportedPluginError("No VMWare inventories found")
 
+    def inventory_to_dict(self, inventory: TargetPath) -> dict | None:
+        config = defaultdict(dict)
+        try:
+            with inventory.open("rt") as fh:
+                for line in map(str.strip, fh):
+                    if not line or line.startswith("."):
+                        continue
+                    full_key, value = map(str.strip, line.split("=", 1))
+                    vm, key = full_key.split(".", 1)
+
+                    # Only process vmlist entries, not index entries
+                    if "vmlist" not in vm:
+                        continue
+
+                    config[vm][key] = value.strip('"')
+                return config
+        except Exception as e:
+            self.target.log.exception("Failed parsing inventory file from inventory=%s", inventory)
+            self.target.log.debug("", exc_info=e)
+        return None
+
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for inv in self.inventories:
-            for line in inv.open("rt"):
-                line = line.strip()
-                if not line.startswith("vmlist"):
-                    continue
+            inventory = self.inventory_to_dict(inv)
 
-                key, _, value = line.partition("=")
-                if not key.strip().endswith(".config"):
-                    continue
-
-                value = value.strip().strip('"')
-                if value.startswith("folder") or not value:
-                    continue
-
+            for vm in inventory:
+                vm_config = inventory[vm]
                 yield ChildTargetRecord(
+                    name=vm_config.get("DisplayName"),
                     type=self.__type__,
-                    path=self.target.fs.path(value.strip('"')),
+                    path=vm_config.get("config"),
                     _target=self.target,
                 )
