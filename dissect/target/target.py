@@ -497,7 +497,7 @@ class Target:
                 # Attempt to open the target for next iteration of recrusive
                 target = self.open_child(child.path)
             except TargetError:
-                self.log.exception("Failed to open child target %s", target)
+                self.log.exception("Failed to open child target %s", child.path)
                 continue
 
             # Yield the child_id and ChildTargetRecord

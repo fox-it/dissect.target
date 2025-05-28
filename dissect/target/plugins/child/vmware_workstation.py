@@ -47,11 +47,11 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
 
     def inventory_to_dict(self, inventory: TargetPath) -> dict | None:
         config = defaultdict(dict)
-        with inventory.open("rt") as fh:
-            for line in map(str.strip, fh):
-                if not line or line.startswith("."):
-                    continue
-                try:
+        try:
+            with inventory.open("rt") as fh:
+                for line in map(str.strip, fh):
+                    if not line or line.startswith("."):
+                        continue
                     full_key, value = map(str.strip, line.split("=", 1))
                     vm, key = full_key.split(".", 1)
 
@@ -60,10 +60,11 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
                         continue
 
                     config[vm][key] = value.strip('"')
-                except ValueError:
-                    self.log.warning("Skipping malformed line: %r", line)
-                    return None
-        return config
+            return config
+        except Exception as e:
+            self.target.log.error("Failed parsing inventory file from inventory=%s", inventory)
+            self.target.log.debug("", exc_info=e)
+        return None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for inv in self.inventories:

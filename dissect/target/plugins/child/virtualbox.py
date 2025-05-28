@@ -99,7 +99,9 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
             config = ET.fromstring(path.open().read())
             return config.find(f".//{VBox.VBOX_XML_NAMESPACE}Machine").attrib["name"]
         except Exception as e:
-            print("Failed to retrieve name from vm config file=%s, error: %s", vm_path, e)
+            self.target.log.error("Failed parsing name from vm_path=%s", vm_path)
+            self.target.log.debug("", exc_info=e)
+        return None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for vbox in self.vboxes:

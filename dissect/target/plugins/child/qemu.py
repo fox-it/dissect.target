@@ -26,8 +26,9 @@ class QemuChildTargetPlugin(ChildTargetPlugin):
             vm_path = self.target.fs.path(vm_path)
             config = ET.fromstring(vm_path.open().read_text())
             return config.find("name").text
-        except Exception:
-            print("Error parsing name from vmpath=%s", vm_path)
+        except Exception as e:
+            self.target.log.error("Failed parsing name from vm_path=%s", vm_path)
+            self.target.log.debug("", exc_info=e)
         return None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
