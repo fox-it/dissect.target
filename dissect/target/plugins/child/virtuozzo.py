@@ -54,7 +54,8 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
                     if line.startswith("NAME="):
                         return line.split("=", 1)[1].strip()
         except Exception as e:
-            print("Failed to retrieve container name for CTID=%s Error: %s", vm_path.name, e)
+            self.target.log.error("Failed parsing NAME from vm_path=%s", vm_path)
+            self.target.log.debug("", exc_info=e)
         return None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:

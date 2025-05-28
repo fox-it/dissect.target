@@ -20,14 +20,18 @@ class ProxmoxChildTargetPlugin(ChildTargetPlugin):
             raise UnsupportedPluginError("Not a Proxmox operating system")
 
     def _get_child_name(self, vm_path: str) -> str | None:
-        vm_path = self.target.fs.path(vm_path)
-        with vm_path.open("rt") as fh:
-            for line in map(str.strip, fh):
-                if not line:
-                    continue
+        try:
+            vm_path = self.target.fs.path(vm_path)
+            with vm_path.open("rt") as fh:
+                for line in map(str.strip, fh):
+                    if not line:
+                        continue
 
-                if (key_value := line.split(":", 1)) and key_value[0] == "name":
-                    return key_value[1].strip()
+                    if (key_value := line.split(":", 1)) and key_value[0] == "name":
+                        return key_value[1].strip()
+        except Exception as e:
+            self.target.log.error("Failed parsing name from vm_path=%s", vm_path)
+            self.target.log.debug("", exc_info=e)
         return None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
