@@ -53,7 +53,7 @@ class ColimaChildTargetPlugin(ChildTargetPlugin):
             if (vm := self.target.fs.path(vm_path)).exists():
                 return vm.parent.name
         except Exception as e:
-            self.target.log.error("Failed parsing container name from vm_path=%s", vm_path)
+            self.target.log.exception("Failed parsing container name from vm_path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
         return None
 
