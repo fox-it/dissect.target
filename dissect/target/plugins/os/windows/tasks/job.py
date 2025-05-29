@@ -203,7 +203,7 @@ class AtTask:
         self.data = self.at_data.user_data
 
         # check which prio bit is set
-        for key, value in self.at_data.task_prio._values.items():
+        for key, value in self.at_data.task_prio.__values__.items():
             if value:
                 self.priority = key
 
