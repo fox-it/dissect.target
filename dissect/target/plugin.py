@@ -27,7 +27,7 @@ except ImportError:
 from flow.record import Record, RecordDescriptor
 
 import dissect.target.plugins.os.default as default
-from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
+from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import EmptyRecord
@@ -559,6 +559,10 @@ def register(plugincls: type[Plugin]) -> None:
 
     module_key = f"{module_path}.{plugincls.__qualname__}"
 
+    namespace = plugincls.__namespace__
+    if issubclass(plugincls, NamespacePlugin):
+        namespace = full_namespace(plugincls)
+
     if not issubclass(plugincls, ChildTargetPlugin):
         # First pass to resolve aliases
         for attr in _get_nonprivate_attributes(plugincls):
@@ -582,14 +586,16 @@ def register(plugincls: type[Plugin]) -> None:
 
                 if plugincls.__register__:
                     name = attr.__name__
+                    namespaced_name = None
                     if plugincls.__namespace__:
+                        namespaced_name = f"{namespace}.{name}"
                         name = f"{plugincls.__namespace__}.{name}"
 
                     path = f"{module_path}.{attr.__name__}"
 
                     descriptor = FunctionDescriptor(
                         name=name,
-                        namespace=plugincls.__namespace__,
+                        namespace=namespace,
                         path=path,
                         exported=exported,
                         internal=internal,
@@ -604,6 +610,9 @@ def register(plugincls: type[Plugin]) -> None:
                     # Register the functions in the lookup
                     function_index.setdefault(name, {})[module_key] = descriptor
 
+                    # register the function using the namespace path
+                    if namespaced_name:
+                        function_index.setdefault(namespaced_name, {})[module_key] = descriptor
     if plugincls.__namespace__:
         # Namespaces are also callable, so register the namespace itself as well
         # NamespacePlugin needs to register itself for every additional subclass, so allow overwrites here
@@ -614,7 +623,7 @@ def register(plugincls: type[Plugin]) -> None:
         if plugincls.__register__:
             descriptor = FunctionDescriptor(
                 name=plugincls.__namespace__,
-                namespace=plugincls.__namespace__,
+                namespace=namespace,
                 path=module_path,
                 exported=len(exports) != 0,
                 internal=len(functions) != 0 and len(exports) == 0,
@@ -636,7 +645,7 @@ def register(plugincls: type[Plugin]) -> None:
         plugin_index[module_key] = PluginDescriptor(
             module=plugincls.__module__,
             qualname=plugincls.__qualname__,
-            namespace=plugincls.__namespace__,
+            namespace=namespace,
             path=module_path,
             findable=plugincls.__findable__,
             functions=functions,
@@ -849,6 +858,9 @@ def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
                 continue
 
             paths.setdefault(descriptor.path, []).append(descriptor)
+
+            if descriptor.namespace:
+                paths.setdefault(descriptor.namespace, []).append(descriptor)
 
     return paths
 
@@ -1330,11 +1342,22 @@ class ChildTargetPlugin(Plugin):
         raise NotImplementedError
 
 
+def full_namespace(namespace_plugin: type[NamespacePlugin]) -> None:
+    namespace = namespace_plugin.__namespace__
+    for klass in namespace_plugin.mro()[1:]:
+        if hasattr(klass, "__namespace__") and klass.__namespace__:
+            namespace = f"{klass.__namespace__}.{namespace}"
+    return namespace
+
+
 class NamespacePlugin(Plugin):
     """A namespace plugin provides services to access functionality from a group of subplugins.
 
     Support is currently limited to shared exported functions with output type ``record`` and ``yield``.
     """
+
+    __subplugins__: set[str] = None
+    __nsplugin__: type[Self] = None
 
     def __init_subclass__(cls, **kwargs):
         # Upon subclassing, decide whether this is a direct subclass of NamespacePlugin
@@ -1360,13 +1383,16 @@ class NamespacePlugin(Plugin):
             super().__init_subclass__(**kwargs)
 
             cls.__nsplugin__ = cls
-            if not hasattr(cls, "__subplugins__"):
+            if cls.__subplugins__ is None:
                 cls.__subplugins__ = set()
 
     def __init_subclass_subplugin__(cls, **kwargs) -> None:
         # Register the current plugin class as a subplugin with
         # the direct subclass of NamespacePlugin
-        cls.__nsplugin__.__subplugins__.add(cls.__namespace__)
+
+        namespace = cls.__namespace__
+
+        cls.__nsplugin__.__subplugins__.add(namespace)
 
         # Generate a tuple of class names for which we do not want to add subplugin functions, which is the
         # NamespacePlugin and all of its superclasses (minus the base object)
