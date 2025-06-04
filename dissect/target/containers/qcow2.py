@@ -22,10 +22,7 @@ class QCow2Container(Container):
         *args,
         **kwargs,
     ):
-        f = fh
-        if not hasattr(fh, "read"):
-            f = fh.open("rb")
-        self.qcow2 = qcow2.QCow2(f, data_file, backing_file)
+        self.qcow2 = qcow2.QCow2(fh, data_file, backing_file)
 
         super().__init__(fh, self.qcow2.size, *args, **kwargs)
 
