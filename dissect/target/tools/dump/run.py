@@ -59,7 +59,7 @@ def get_targets(targets: list[str]) -> Iterator[Target]:
     yield from Target.open_all(targets)
 
 
-def execute_function(target: Target, function: FunctionDescriptor) -> TargetRecordDescriptor:
+def execute_function(target: Target, function: FunctionDescriptor, rest: list[str]) -> Iterator[TargetRecordDescriptor]:
     """Execute function ``function`` on provided target ``target`` and return a generator
     with the records produced.
 
@@ -69,7 +69,7 @@ def execute_function(target: Target, function: FunctionDescriptor) -> TargetReco
     local_log = log.bind(func=function, target=target)
     local_log.debug("Function execution")
     if function.output != "record":
-        log.info(
+        local_log.info(
             "Skipping target/func pair since its output type is not a record",
             target=target.path,
             func=function.name,
@@ -117,7 +117,7 @@ def produce_target_func_pairs(
         pairs_to_skip.update((str(sink.target_path), sink.func) for sink in state.finished_sinks)
 
     for target in targets:
-        for func_def in find_and_filter_plugins(functions, target):
+        for func_def in find_and_filter_plugins(state.functions, target, state.excluded_functions):
             if state and (target.path, func_def.name) in pairs_to_skip:
                 log.info(
                     "Skipping target/func pair since its marked as done in provided state",
@@ -126,17 +126,20 @@ def produce_target_func_pairs(
                     state=state.path,
                 )
                 continue
+
             yield (target, func_def)
             state.mark_as_finished(target, func_def.name)
 
 
-def execute_functions(target_func_stream: Iterable[tuple[Target, str]]) -> Iterator[RecordStreamElement]:
+def execute_functions(
+    target_func_stream: Iterable[tuple[Target, FunctionDescriptor]], rest: list[str]
+) -> Iterator[RecordStreamElement]:
     """Execute a function on a target for target / function pairs in the stream.
 
     Returns a generator of ``RecordStreamElement`` objects.
     """
     for target, func in target_func_stream:
-        for record in execute_function(target, func):
+        for record in execute_function(target, func, rest):
             yield RecordStreamElement(target=target, func=func, record=record)
 
 
@@ -232,7 +235,7 @@ def execute_pipeline(
     """Run the record generation, processing and sinking pipeline."""
 
     target_func_pairs_stream = produce_target_func_pairs(targets, state)
-    record_stream = execute_functions(target_func_pairs_stream, rest)
+    record_stream = execute_functions(target_func_pairs_stream, dry_run, rest)
 
     if limit:
         record_stream = itertools.islice(record_stream, limit)
