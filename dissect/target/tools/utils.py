@@ -77,6 +77,52 @@ def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None
     load_modules_from_paths(paths)
 
 
+def configure_plugin_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("-f", "--function", help="one or more comma separated functions to execute")
+    parser.add_argument("-xf", "--excluded-functions", help="functions to exclude from execution", default="")
+    parser.add_argument(
+        "-l",
+        "--list",
+        action="store",
+        nargs="?",
+        const="",
+        default=None,
+        help="list (matching) available plugins and loaders",
+    )
+    parser.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="do not execute the functions, but just print which functions would be executed",
+    )
+
+
+def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace, rest: list[str]) -> None:
+    """It puts the excluded function paths inside args.excluded_functions as a side effect"""
+    # Show the list of available plugins for the given optional target and optional
+    # search pattern, only display plugins that can be applied to ANY targets
+    if args.list is not None:
+        from dissect.target.tools.query import list_plugin
+
+        list_plugins(args.targets, args.list, getattr(args, "children", False), getattr(args, "json", False), rest)
+        parser.exit(0)
+
+    if not args.function:
+        parser.error("argument -f/--function is required")
+
+    funcs, invalid_funcs = find_functions(args.function)
+    if any(invalid_funcs):
+        parser.error(f"argument -f/--function contains invalid plugins(s): {', '.join(invalid_funcs)}")
+
+    excluded_funcs, invalid_excluded_funcs = find_functions(args.excluded_functions)
+    if any(invalid_excluded_funcs):
+        parser.error(
+            f"argument -xf/--excluded-functions contains invalid plugin(s): {', '.join(invalid_excluded_funcs)}",
+        )
+
+    args.excluded_functions = list({excluded.path for excluded in excluded_funcs})
+
+
 def generate_argparse_for_bound_method(
     method: Callable,
     usage_tmpl: str | None = None,
