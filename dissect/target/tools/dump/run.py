@@ -48,7 +48,7 @@ log = structlog.get_logger("dissect.target.tools.dump.run")
 @dataclass
 class RecordStreamElement:
     target: Target
-    func: str
+    func: FunctionDescriptor
     record: Record
     end_pos: int | None = None
     sink_path: Path | None = None
