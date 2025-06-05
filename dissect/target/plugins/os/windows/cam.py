@@ -362,7 +362,7 @@ class CamPlugin(Plugin):
             # HKLM\\...\\CapabilityAccessManager\\ConsentStore\\webcam\\C:#Program Files#Mozilla Firefox#firefox.exe
             # However, sometimes there is an additional subfolder such as "NonPackaged" in between. Example:
             # HKLM\\...\\CapabilityAccessManager\\ConsentStore\\webcam\\NonPackaged\\C:#...#Mozilla Firefox#firefox.exe
-            # Code below determines the location of 'ConsentStore' in the path and grabs the sub-folder.
+            # Code below determines the location of 'ConsentStore' (always present) in the path and grabs the sub-folder.
             path_list = key.path.split("\\")
             device = path_list[path_list.index("ConsentStore") + 1]
 
