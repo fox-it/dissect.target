@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import ip_address, ip_interface
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from dissect.target.helpers import configutil
@@ -199,6 +200,8 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
     Documentation: https://www.freedesktop.org/software/systemd/man/latest/systemd.network.html
     """
 
+    collapsable_items: tuple[str, ...] = ("Match", "Network", "Link", "MACAddress", "Name", "Type")
+
     config_paths: tuple[str, ...] = (
         "/etc/systemd/network/",
         "/run/systemd/network/",
@@ -245,7 +248,7 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
         """Parse network configurations from systemd network configuration files."""
         for config_file in self._config_files(self.config_paths, "*.network"):
             try:
-                config = configutil.parse(config_file, hint="systemd")
+                config = configutil.parse(config_file, hint="systemd", collapse=self.collapsable_items)
 
                 match_section: dict[str, str] = config.get("Match", {})
                 network_section: dict[str, str] = config.get("Network", {})
@@ -276,10 +279,9 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
                     if ids := virtual_networks.get(vlan_name):
                         vlan_ids.update(ids)
 
-                # There are possibly multiple route sections, but they are collapsed into one by the parser.
-                route_section: dict[str, Any] = config.get("Route", {})
-                gateway_values = to_list(route_section.get("Gateway", []))
-                gateways.update(filter(None, map(self._parse_gateway, gateway_values)))
+                route_sections: list[dict[str, Any]] = config.get("Route", [])
+                gateway_values = (to_list(route_section.get("Gateway", [])) for route_section in route_sections)
+                gateways.update(filter(None, map(self._parse_gateway, chain.from_iterable(gateway_values))))
 
                 dhcp_ipv4, dhcp_ipv6 = self._parse_dhcp(network_section.get("DHCP"))
 
