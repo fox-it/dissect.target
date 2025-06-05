@@ -99,7 +99,7 @@ def test_cam_registry(target_win_users: Target, hive_hku: VirtualHive, hive_hklm
     microsoft_camera_key.add_value("LastUsedTimeStart", VirtualValue(hive_hku, "LastUsedTimeStart", 133784711366495858))
     microsoft_camera_key.add_value("LastUsedTimeStop", VirtualValue(hive_hku, "LastUsedTimeStop", 133784711515887950))
 
-    firefox_key = VirtualKey(hive_hku, f"{hive_hku}\\{hku_cam_key.path}\\C:#Program Files#Mozilla Firefox#firefox.exe")
+    firefox_key = VirtualKey(hive_hku, f"{hive_hku}\\{hku_cam_key.path}\\NonPackaged\\C:#Program Files#Mozilla Firefox#firefox.exe")
     firefox_key.add_value("LastUsedTimeStart", VirtualValue(hive_hku, "LastUsedTimeStart", 133788466426086184))
     firefox_key.add_value("LastUsedTimeStop", VirtualValue(hive_hku, "LastUsedTimeStop", 133788466774490036))
 
