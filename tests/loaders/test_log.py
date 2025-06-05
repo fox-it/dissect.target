@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     ],
 )
 def test_log_loader(target_default: Target, path: str, uri: str, input_file: str, expected_mapping: str) -> None:
-    with pytest.deprecated_call(match="The LogLoader is deprecated in favor of single files"):
+    with pytest.deprecated_call(match="The LogLoader is deprecated in favor of direct files"):
         vfs = VirtualFilesystem()
         vfs.map_file_fh(input_file, io.BytesIO(b"\x00"))
         log_loader = LogLoader(vfs.path(path), parsed_path=urlparse(uri))
