@@ -63,7 +63,6 @@ def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem
 
 def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     fixture_dir = "tests/_data/plugins/os/unix/linux/systemd.network/"
-    fs_linux.makedirs("/etc/systemd/network")
 
     fs_linux.map_file(
         "/etc/systemd/network/20-wired-static.network", posixpath.join(fixture_dir, "20-wired-static.network")
@@ -146,6 +145,49 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     assert wireless_ipv6.source == "/usr/local/lib/systemd/network/40-wireless-ipv6.network"
     assert not wireless_ipv6.dhcp_ipv4
     assert wireless_ipv6.dhcp_ipv6
+
+
+def test_systemd_network_drop(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    fixture_dir = "tests/_data/plugins/os/unix/linux/systemd.network/"
+
+    fs_linux.map_file(
+        "/etc/systemd/network/30-wired-static-complex.network",
+        posixpath.join(fixture_dir, "30-wired-static-complex.network"),
+    )
+    fs_linux.map_file(
+        "/etc/systemd/network/30-wired-static-complex.network.d/10-override.conf",
+        posixpath.join(fixture_dir, "30-wired-static-complex.network.d/10-override.conf"),
+    )
+    fs_linux.map_file(
+        "/etc/systemd/network/30-wired-static-complex.network.d/20-override.conf",
+        posixpath.join(fixture_dir, "30-wired-static-complex.network.d/20-override.conf"),
+    )
+
+    systemd_network_config_parser = SystemdNetworkConfigParser(target_linux)
+    interfaces = list(systemd_network_config_parser.interfaces())
+
+    assert len(interfaces) == 1
+    [wired_static_complex] = interfaces
+
+    assert wired_static_complex.name == "wlp2s0"
+    assert wired_static_complex.type == "wifi"
+    assert wired_static_complex.enabled is None
+    assert Counter(wired_static_complex.cidr) == Counter([ip_interface("10.1.10.11/16")])
+    assert Counter(wired_static_complex.gateway) == Counter(
+        [ip_address("10.1.6.3"), ip_address("10.1.10.2"), ip_address("10.1.9.3"), ip_address("10.1.10.4")]
+    )
+    assert Counter(wired_static_complex.dns) == Counter(
+        [ip_address("10.1.10.1"), ip_address("10.1.10.2"), ip_address("1111:2222::3333")]
+    )
+    assert Counter(wired_static_complex.mac) == Counter(
+        ["aa::bb::cc::dd::ee::ff", "ff::ee::dd::cc::bb::aa", "cc::ff::bb::aa::dd", "bb::aa::dd::cc::ff"]
+    )
+    assert wired_static_complex.source == "/etc/systemd/network/30-wired-static-complex.network"
+    assert wired_static_complex.dhcp_ipv4
+    assert not wired_static_complex.dhcp_ipv6
+    assert wired_static_complex.last_connected is None
+    assert wired_static_complex.vlan == []
+    assert wired_static_complex.configurator == "systemd-networkd"
 
 
 def test_linux_network_plugin_interfaces(target_linux: Target) -> None:
