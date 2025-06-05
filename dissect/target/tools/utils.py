@@ -107,8 +107,14 @@ def configure_plugin_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace, rest: list[str]) -> None:
-    """It puts the excluded function paths inside args.excluded_functions as a side effect"""
+def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace, rest: list[str]) -> set:
+    """Processes the arguments concerting plugin functions (-f, --function) and exclusion list (-xf, --exclude-funciton)
+
+    It puts the excluded function paths inside args.excluded_functions as a side effect
+
+    Returns:
+        True if there are multiple output types detected, false otherwise.
+    """
 
     # Show help for a function or in general
     if "-h" in rest or "--help" in rest:
@@ -152,6 +158,20 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
         )
 
     args.excluded_functions = list({excluded.path for excluded in excluded_funcs})
+
+    # Verify uniformity of output types, otherwise default to records.
+    # Note that this is a heuristic, the targets are not opened yet because of
+    # performance, so it might generate a false positive
+    # (os.* on Windows includes other OS plugins),
+    # however this is highly hypothetical, most plugins across OSes have
+    # the same output types and most output types are records anyway.
+    # Furthermore we really want the notification at the top, so this is the only
+    # way forward. In the very unlikely case you have a
+    # collection of non-record plugins that have record counterparts for
+    # other OSes just refine the wildcard to exclude other OSes.
+    # The only scenario that might cause this is with
+    # custom plugins with idiosyncratic output across OS-versions/branches.
+    return {func.output for func in funcs if func.path not in args.excluded_functions}
 
 
 def open_targets(args: argparse.Namespace) -> Iterator[Target]:

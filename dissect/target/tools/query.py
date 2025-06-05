@@ -29,14 +29,15 @@ from dissect.target.tools.report import ExecutionReport
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    configure_plugin_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_plugin_class,
     generate_argparse_for_unbound_method,
-    list_plugins,
     open_targets,
     persist_execution_report,
     process_generic_arguments,
+    process_plugin_arguments,
 )
 
 if TYPE_CHECKING:
@@ -74,26 +75,11 @@ def main() -> int:
         add_help=False,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("-f", "--function", help="function to execute")
-    parser.add_argument("-xf", "--excluded-functions", help="functions to exclude from execution", default="")
-    parser.add_argument(
-        "-n",
-        "--dry-run",
-        action="store_true",
-        help="do not execute the functions, but just print which functions would be executed",
-    )
     parser.add_argument("--child", help="load a specific child path or index")
     parser.add_argument("--children", action="store_true", help="include children")
-    parser.add_argument(
-        "-l",
-        "--list",
-        action="store",
-        nargs="?",
-        const="",
-        default=None,
-        help="list (matching) available plugins and loaders",
-    )
     parser.add_argument("--direct", action="store_true", help="treat TARGETS as paths to pass to plugins directly")
+
+    configure_plugin_arguments(parser)
 
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
@@ -147,78 +133,17 @@ def main() -> int:
                 "The --rewrite-cache option will be ignored as --no-cache or --only-read-cache are specified",
             )
 
-    # Show help for a function or in general
-    if "-h" in rest or "--help" in rest:
-        found_functions, _ = find_functions(args.function)
-        if not len(found_functions):
-            parser.error("function(s) not found, see -l for available plugins")
-
-        func = found_functions[0]
-        plugin_class = plugin.load(func)
-        if issubclass(plugin_class, OSPlugin):
-            obj = getattr(OSPlugin, func.method_name)
-        else:
-            obj = getattr(plugin_class, func.method_name)
-
-        if isinstance(obj, type) and issubclass(obj, Plugin):
-            parser = generate_argparse_for_plugin_class(obj, usage_tmpl=USAGE_FORMAT_TMPL)
-        elif isinstance(obj, (Callable, property)):
-            parser = generate_argparse_for_unbound_method(getattr(obj, "fget", obj), usage_tmpl=USAGE_FORMAT_TMPL)
-        else:
-            parser.error(f"can't find plugin with function `{func.method_name}`")
-        parser.print_help()
-        return 0
-
-    # Show the list of available plugins for the given optional target and optional
-    # search pattern, only display plugins that can be applied to ANY targets
-    if args.list is not None:
-        list_plugins(args.targets, args.list, args.children, args.json, rest)
-        return 0
+    different_output_types = process_plugin_arguments(parser, args, rest)
 
     if not args.targets:
         parser.error("too few arguments")
 
-    if not args.function:
-        parser.error("argument -f/--function is required")
-
     if args.report_dir and not args.report_dir.is_dir():
         parser.error(f"--report-dir {args.report_dir} is not a valid directory")
 
-    funcs, invalid_funcs = find_functions(args.function)
-    if any(invalid_funcs):
-        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
-
-    excluded_funcs, invalid_excluded_funcs = find_functions(args.excluded_functions)
-    if any(invalid_excluded_funcs):
-        parser.error(
-            f"argument -xf/--excluded-functions contains invalid plugin(s): {', '.join(invalid_excluded_funcs)}",
-        )
-
-    # Verify uniformity of output types, otherwise default to records.
-    # Note that this is a heuristic, the targets are not opened yet because of
-    # performance, so it might generate a false positive
-    # (os.* on Windows includes other OS plugins),
-    # however this is highly hypothetical, most plugins across OSes have
-    # the same output types and most output types are records anyway.
-    # Furthermore we really want the notification at the top, so this is the only
-    # way forward. In the very unlikely case you have a
-    # collection of non-record plugins that have record counterparts for
-    # other OSes just refine the wildcard to exclude other OSes.
-    # The only scenario that might cause this is with
-    # custom plugins with idiosyncratic output across OS-versions/branches.
-    output_types = set()
-    excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
-
-    for func in funcs:
-        if func.path in excluded_func_paths:
-            continue
-        output_types.add(func.output)
-
     default_output_type = None
-
-    if len(output_types) > 1:
-        # Give this warning beforehand, if mixed, set default to record (no errors)
-        log.warning("Mixed output types detected: %s, only outputting records", ",".join(output_types))
+    if len(different_output_types) > 1:
+        log.warning("Mixed output types detected: %s, only outputting records", ",".join(different_output_types))
         default_output_type = "record"
 
     execution_report = ExecutionReport()
@@ -236,7 +161,7 @@ def main() -> int:
 
             first_seen_output_type = default_output_type
 
-            for func_def in find_and_filter_plugins(args.function, target, excluded_func_paths):
+            for func_def in find_and_filter_plugins(args.function, target, args.excluded_functions):
                 # If the default type is record (meaning we skip everything else)
                 # and actual output type is not record, continue.
                 # We perform this check here because plugins that require output files/dirs
@@ -257,7 +182,6 @@ def main() -> int:
                         func_def.name,
                         e.root_cause_str(),
                     )
-
                     target.log.debug("%s", func_def, exc_info=e)
                     continue
                 except PluginNotFoundError:
