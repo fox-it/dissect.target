@@ -27,7 +27,6 @@ from dissect.target.plugin import (
 from dissect.target.target import Target, plugin
 from dissect.target.tools.report import ExecutionReport
 from dissect.target.tools.utils import (
-    open_targets,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
@@ -35,6 +34,7 @@ from dissect.target.tools.utils import (
     generate_argparse_for_plugin_class,
     generate_argparse_for_unbound_method,
     list_plugins,
+    open_targets,
     persist_execution_report,
     process_generic_arguments,
 )
