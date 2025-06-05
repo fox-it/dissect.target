@@ -27,9 +27,11 @@ from dissect.target.tools.dump.utils import (
 from dissect.target.tools.utils import (
     FunctionDescriptor,
     configure_generic_arguments,
+    configure_plugin_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
     process_generic_arguments,
+    process_plugin_arguments,
 )
 
 if TYPE_CHECKING:
@@ -232,7 +234,7 @@ def execute_pipeline(
     log.info("Pipeline has finished")
 
 
-def parse_arguments() -> argparse.Namespace:
+def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -240,14 +242,16 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=help_formatter,
         add_help=True,
     )
-    parser.add_argument("targets", metavar="TARGET", nargs="+", help="targets to load")
-    parser.add_argument("-f", "--function", required=True, help="one or more comma separated functions to execute")
+    parser.add_argument("targets", metavar="TARGET", nargs="*", help="targets to load")
+    configure_plugin_arguments(parser)
 
     parser.add_argument(
         "-c",
         "--compression",
         choices=[c.value for c in Compression if c is not Compression.NONE],
+        type=Compression,
         help="compression method",
+        default=Compression.NONE,
     )
     parser.add_argument(
         "--restart",
@@ -259,7 +263,8 @@ def parse_arguments() -> argparse.Namespace:
         "-s",
         "--serialization",
         choices=[s.value for s in Serialization],
-        default=Serialization.JSONLINES.value,
+        default=Serialization.JSONLINES,
+        type=Serialization,
         help="serialization method",
     )
     parser.add_argument(
@@ -275,12 +280,13 @@ def parse_arguments() -> argparse.Namespace:
 
     args, rest = parser.parse_known_args()
     process_generic_arguments(args, rest)
+    process_plugin_arguments(parser, args, rest)
 
-    return args
+    return args, rest
 
 
 def main() -> None:
-    args = parse_arguments()
+    args, rest = parse_arguments()
 
     try:
         execute_pipeline(
