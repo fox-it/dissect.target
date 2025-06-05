@@ -6,7 +6,7 @@ import logging
 import pathlib
 import sys
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from flow.record import Record, RecordPrinter, RecordStreamWriter, RecordWriter
 
@@ -20,11 +20,8 @@ from dissect.target.helpers import cache, record_modifier
 from dissect.target.plugin import (
     PLUGINS,
     FunctionDescriptor,
-    OSPlugin,
-    Plugin,
-    find_functions,
 )
-from dissect.target.target import Target, plugin
+from dissect.target.target import Target
 from dissect.target.tools.report import ExecutionReport
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -32,8 +29,6 @@ from dissect.target.tools.utils import (
     configure_plugin_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
-    generate_argparse_for_plugin_class,
-    generate_argparse_for_unbound_method,
     open_targets,
     persist_execution_report,
     process_generic_arguments,
@@ -48,9 +43,6 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
-
-
-USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
 def record_output(strings: bool = False, json: bool = False) -> AbstractWriter:
