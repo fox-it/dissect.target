@@ -8,6 +8,7 @@ import os
 import sys
 import textwrap
 import urllib.parse
+from collections.abc import Iterable
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -29,13 +30,13 @@ from dissect.target.plugins.general.plugins import (
     generate_functions_json,
     generate_functions_overview,
 )
+from dissect.target.target import Target
 from dissect.target.tools.logging import configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from datetime import datetime
 
-    from dissect.target.target import Target
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
