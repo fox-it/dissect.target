@@ -23,6 +23,12 @@ from dissect.target.plugin import (
     get_external_module_paths,
     load_modules_from_paths,
 )
+from dissect.target.plugins.general.plugins import (
+    _get_default_functions,
+    _get_os_functions,
+    generate_functions_json,
+    generate_functions_overview,
+)
 from dissect.target.tools.logging import configure_logging
 
 if TYPE_CHECKING:
@@ -30,6 +36,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from dissect.target.target import Target
+USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
@@ -102,8 +109,6 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list is not None:
-        from dissect.target.tools.query import list_plugin
-
         list_plugins(args.targets, args.list, getattr(args, "children", False), getattr(args, "json", False), rest)
         parser.exit(0)
 
@@ -121,6 +126,8 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
         )
 
     args.excluded_functions = list({excluded.path for excluded in excluded_funcs})
+
+
 def open_targets(args: argparse.Namespace) -> Iterator[Target]:
     direct: bool = getattr(args, "direct", False)
     children: bool = getattr(args, "children", False)
@@ -182,6 +189,52 @@ def generate_argparse_for_unbound_method(
     parser.usage = usage_tmpl.format(prog=parser.prog, name=func_name, usage=usage[offset:])
 
     return parser
+
+
+def list_plugins(
+    targets: list[str] | None = None,
+    patterns: str = "",
+    include_children: bool = False,
+    as_json: bool = False,
+    argv: list[str] | None = None,
+) -> None:
+    collected = set()
+    if targets or patterns:
+        collected.update(_get_os_functions())
+
+    if targets:
+        for target in Target.open_all(targets, include_children):
+            funcs, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
+            collected.update(funcs)
+    elif patterns:
+        funcs, _ = find_functions(patterns, Target(), show_hidden=True)
+        collected.update(funcs)
+    else:
+        collected.update(_get_default_functions())
+
+    target = Target()
+    fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
+    fargs, rest = fparser.parse_known_args(argv or [])
+
+    # Display in a user friendly manner
+    if collected:
+        if as_json:
+            print('{"plugins": ', end="")
+            print(generate_functions_json(collected), end="")
+        else:
+            print(generate_functions_overview(collected, include_docs=fargs.print_docs))
+
+    # No real targets specified, show the available loaders
+    if not targets:
+        fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
+        fargs, rest = fparser.parse_known_args(rest)
+        del fargs.as_json
+        if as_json:
+            print(', "loaders": ', end="")
+        target.loaders(**vars(fargs), as_json=as_json)
+
+    if as_json:
+        print("}")
 
 
 def generate_argparse_for_plugin_class(

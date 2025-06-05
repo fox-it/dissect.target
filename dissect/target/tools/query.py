@@ -24,23 +24,17 @@ from dissect.target.plugin import (
     Plugin,
     find_functions,
 )
-from dissect.target.plugins.general.plugins import (
-    _get_default_functions,
-    _get_os_functions,
-    generate_functions_json,
-    generate_functions_overview,
-)
 from dissect.target.target import Target, plugin
 from dissect.target.tools.report import ExecutionReport
 from dissect.target.tools.utils import (
-    open_targets,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
-    generate_argparse_for_bound_method,
     generate_argparse_for_plugin_class,
     generate_argparse_for_unbound_method,
+    list_plugins,
+    open_targets,
     persist_execution_report,
     process_generic_arguments,
 )
@@ -68,53 +62,6 @@ def record_output(strings: bool = False, json: bool = False) -> AbstractWriter:
         return RecordPrinter(fp)
 
     return RecordStreamWriter(fp)
-
-
-def list_plugins(
-    targets: list[str] | None = None,
-    patterns: str = "",
-    include_children: bool = False,
-    as_json: bool = False,
-    argv: list[str] | None = None,
-) -> None:
-    collected = set()
-    if targets or patterns:
-        collected.update(_get_os_functions())
-
-    if targets:
-        for target in Target.open_all(targets, include_children):
-            funcs, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
-            collected.update(funcs)
-
-    elif patterns:
-        funcs, _ = find_functions(patterns, Target(), show_hidden=True)
-        collected.update(funcs)
-    else:
-        collected.update(_get_default_functions())
-
-    target = Target()
-    fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
-    fargs, rest = fparser.parse_known_args(argv or [])
-
-    # Display in a user friendly manner
-    if collected:
-        if as_json:
-            print('{"plugins": ', end="")
-            print(generate_functions_json(collected), end="")
-        else:
-            print(generate_functions_overview(collected, include_docs=fargs.print_docs))
-
-    # No real targets specified, show the available loaders
-    if not targets:
-        fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
-        fargs, rest = fparser.parse_known_args(rest)
-        del fargs.as_json
-        if as_json:
-            print(', "loaders": ', end="")
-        target.loaders(**vars(fargs), as_json=as_json)
-
-    if as_json:
-        print("}")
 
 
 @catch_sigpipe
