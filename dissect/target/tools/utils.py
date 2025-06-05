@@ -19,9 +19,11 @@ from dissect.target.helpers.docs import get_docstring
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     FunctionDescriptor,
+    OSPlugin,
     Plugin,
     find_functions,
     get_external_module_paths,
+    load,
     load_modules_from_paths,
 )
 from dissect.target.plugins.general.plugins import (
@@ -107,11 +109,34 @@ def configure_plugin_arguments(parser: argparse.ArgumentParser) -> None:
 
 def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace, rest: list[str]) -> None:
     """It puts the excluded function paths inside args.excluded_functions as a side effect"""
+
+    # Show help for a function or in general
+    if "-h" in rest or "--help" in rest:
+        found_functions, _ = find_functions(args.function)
+        if not len(found_functions):
+            parser.error("function(s) not found, see -l for available plugins")
+
+        func = found_functions[0]
+        plugin_class = load(func)
+        if issubclass(plugin_class, OSPlugin):
+            obj = getattr(OSPlugin, func.method_name)
+        else:
+            obj = getattr(plugin_class, func.method_name)
+
+        if isinstance(obj, type) and issubclass(obj, Plugin):
+            parser = generate_argparse_for_plugin_class(obj, usage_tmpl=USAGE_FORMAT_TMPL)
+        elif isinstance(obj, (Callable, property)):
+            parser = generate_argparse_for_unbound_method(getattr(obj, "fget", obj), usage_tmpl=USAGE_FORMAT_TMPL)
+        else:
+            parser.error(f"can't find plugin with function `{func.method_name}`")
+        parser.print_help()
+        sys.exit(0)
+
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list is not None:
         list_plugins(args.targets, args.list, getattr(args, "children", False), getattr(args, "json", False), rest)
-        parser.exit(0)
+        sys.exit(0)
 
     if not args.function:
         parser.error("argument -f/--function is required")

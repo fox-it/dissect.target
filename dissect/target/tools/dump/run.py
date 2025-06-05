@@ -264,7 +264,7 @@ def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
         description="dissect.target",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
-        add_help=True,
+        add_help=False,
     )
     parser.add_argument("targets", metavar="TARGET", nargs="*", help="targets to load")
 
@@ -305,6 +305,11 @@ def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
 
     args, rest = parser.parse_known_args()
     process_generic_arguments(args, rest)
+
+    if not args.function and ("-h" in rest or "--help" in rest):
+        parser.print_help()
+        parser.exit(0)
+
     process_plugin_arguments(parser, args, rest)
 
     return args, rest
