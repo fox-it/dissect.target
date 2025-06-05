@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.exceptions import FatalError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.target import Target
 from dissect.target.tools.dump.state import (
     DumpState,
@@ -67,18 +67,29 @@ def execute_function(target: Target, function: FunctionDescriptor) -> TargetReco
 
     local_log = log.bind(func=function, target=target)
     local_log.debug("Function execution")
-
+    if function.output != "record":
+        log.info(
+            "Skipping target/func pair since its output type is not a record",
+            target=target.path,
+            func=function.name,
+        )
+        return
     try:
         output_type, target_attr = execute_function_on_target(target, function)
-    except UnsupportedPluginError:
-        local_log.error("Function is not supported for target", exc_info=True)
+    except UnsupportedPluginError as e:
+        local_log.error("Unsupported plugin for %s: %s", function.name, e.root_cause_str())
+        local_log.debug("%s", function, exc_info=e)
         return
-    except PluginError:
-        local_log.error("Plugin error while executing function for target", exc_info=True)
+    except PluginNotFoundError:
+        local_log.error("Cannot find plugin `%s`", function)
         return
-
-    if output_type != "record":
-        local_log.warn("Output format is not supported", output=output_type)
+    except FatalError as e:
+        e.emit_last_message(local_log.error)
+        sys.exit(1)
+    except Exception as e:
+        local_log.error("Exception while executing function %s (%s): %s", function.name, function.path, e)
+        local_log.debug("", exc_info=e)
+        local_log.debug("Function info: %s", function)
         return
 
     # no support for function-specific arguments
@@ -86,8 +97,9 @@ def execute_function(target: Target, function: FunctionDescriptor) -> TargetReco
 
     try:
         yield from result
-    except Exception:
-        local_log.error("Error while executing function", exc_info=True)
+    except Exception as e:
+        local_log.error("Error occorred while processing output of %s.%s: %s", function.qualname, function.name, e)
+        local_log.debug("", exc_info=e)
         return
 
 
