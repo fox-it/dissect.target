@@ -51,7 +51,8 @@ class Sink:
 @dataclass
 class DumpState:
     target_paths: list[str]
-    functions: list[str]
+    functions: str
+    excluded_functions: list[str]
     serialization: str
     compression: str
     start_time: datetime.datetime
@@ -147,6 +148,7 @@ class DumpState:
         return cls(
             target_paths=state_dict["target_paths"],
             functions=state_dict["functions"],
+            excluded_functions=state_dict["excluded_functions"],
             serialization=Serialization(state_dict["serialization"]),
             compression=Compression(state_dict["compression"]),
             start_time=parse_datetime_iso(state_dict["start_time"]),
@@ -216,7 +218,8 @@ def create_state(
     *,
     output_dir: Path,
     target_paths: list[str],
-    functions: list[str],
+    functions: str,
+    excluded_functions: set[str],
     serialization: Serialization,
     compression: Compression = None,
 ) -> DumpState:
@@ -225,6 +228,7 @@ def create_state(
     return DumpState(
         target_paths=target_paths,
         functions=functions,
+        excluded_functions=excluded_functions,
         serialization=serialization,
         compression=compression,
         start_time=current_time,
