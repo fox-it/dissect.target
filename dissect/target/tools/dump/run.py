@@ -30,6 +30,7 @@ from dissect.target.tools.utils import (
     configure_plugin_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
+    open_targets,
     process_generic_arguments,
     process_plugin_arguments,
 )
@@ -301,13 +302,14 @@ def main() -> None:
     args, rest = parse_arguments()
 
     try:
+        targets = open_targets(args)
         execute_pipeline(
-            targets=args.targets,
             functions=args.function,
             output_dir=args.output,
             serialization=Serialization(args.serialization),
             compression=Compression(args.compression),
             restart=args.restart,
+            targets=targets,
             limit=args.limit,
         )
     except Exception:

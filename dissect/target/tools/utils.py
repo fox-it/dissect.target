@@ -121,6 +121,22 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
         )
 
     args.excluded_functions = list({excluded.path for excluded in excluded_funcs})
+def open_targets(args: argparse.Namespace) -> Iterator[Target]:
+    direct: bool = getattr(args, "direct", False)
+    children: bool = getattr(args, "children", False)
+    child: str | None = getattr(args, "child", None)
+    targets: Iterable[Target] = (
+        [Target.open_direct(args.targets)] if direct else Target.open_all(args.targets, children)
+    )
+
+    for target in targets:
+        if child:
+            try:
+                target: Target = target.open_child(child)
+            except Exception as e:
+                target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
+                target.log.debug("", exc_info=e)
+        yield target
 
 
 def generate_argparse_for_bound_method(

@@ -33,6 +33,7 @@ from dissect.target.plugins.general.plugins import (
 from dissect.target.target import Target, plugin
 from dissect.target.tools.report import ExecutionReport
 from dissect.target.tools.utils import (
+    open_targets,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
@@ -278,16 +279,7 @@ def main() -> int:
     execution_report.set_event_callbacks(Target)
 
     try:
-        targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
-
-        for target in targets:
-            if args.child:
-                try:
-                    target = target.open_child(args.child)
-                except Exception as e:
-                    target.log.exception("Exception while opening child %r: %s", args.child, e)  # noqa: TRY401
-                    target.log.debug("", exc_info=e)
-
+        for target in open_targets(args):
             if args.dry_run:
                 print(f"Dry run on: {target}")
 
