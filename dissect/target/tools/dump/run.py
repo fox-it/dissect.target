@@ -59,7 +59,9 @@ def get_targets(targets: list[str]) -> Iterator[Target]:
     yield from Target.open_all(targets)
 
 
-def execute_function(target: Target, function: FunctionDescriptor, rest: list[str]) -> Iterator[TargetRecordDescriptor]:
+def execute_function(
+    target: Target, function: FunctionDescriptor, dry_run: bool, rest: list[str]
+) -> Iterator[TargetRecordDescriptor]:
     """Execute function ``function`` on provided target ``target`` and return a generator
     with the records produced.
 
@@ -68,6 +70,11 @@ def execute_function(target: Target, function: FunctionDescriptor, rest: list[st
 
     local_log = log.bind(func=function, target=target)
     local_log.debug("Function execution")
+
+    if dry_run:
+        print(f"  execute: {function.name} ({function.path})")
+        return
+
     if function.output != "record":
         local_log.info(
             "Skipping target/func pair since its output type is not a record",
@@ -132,14 +139,14 @@ def produce_target_func_pairs(
 
 
 def execute_functions(
-    target_func_stream: Iterable[tuple[Target, FunctionDescriptor]], rest: list[str]
+    target_func_stream: Iterable[tuple[Target, FunctionDescriptor]], dry_run: bool, rest: list[str]
 ) -> Iterator[RecordStreamElement]:
     """Execute a function on a target for target / function pairs in the stream.
 
     Returns a generator of ``RecordStreamElement`` objects.
     """
     for target, func in target_func_stream:
-        for record in execute_function(target, func, rest):
+        for record in execute_function(target, func, dry_run, rest):
             yield RecordStreamElement(target=target, func=func, record=record)
 
 
@@ -229,6 +236,7 @@ def configure_state(args: argparse.Namespace) -> DumpState:
 def execute_pipeline(
     state: DumpState,
     targets: Iterator[Target],
+    dry_run: bool,
     rest: list[str],
     limit: int | None = None,
 ) -> None:
@@ -312,6 +320,7 @@ def main() -> None:
             state=state,
             targets=targets,
             rest=rest,
+            dry_run=args.dry_run,
             limit=args.limit,
         )
     except Exception:
