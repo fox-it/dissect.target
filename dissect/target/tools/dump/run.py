@@ -106,7 +106,6 @@ def execute_function(target: Target, function: FunctionDescriptor) -> TargetReco
 
 def produce_target_func_pairs(
     targets: Iterable[Target],
-    functions: str,
     state: DumpState,
 ) -> Iterator[tuple[Target, FunctionDescriptor]]:
     """Return a generator with target and function pairs for execution.
@@ -183,29 +182,18 @@ def persist_processing_state(
             yield element
 
 
-def execute_pipeline(
-    targets: list[str],
-    functions: str,
-    output_dir: Path,
-    serialization: Serialization,
-    compression: Compression | None = None,
-    restart: bool | None = False,
-    limit: int | None = None,
-) -> None:
-    """Run the record generation, processing and sinking pipeline."""
-
-    compression = compression or Compression.NONE
-
-    state = None if restart else load_state(output_dir=output_dir)
+def configure_state(args: argparse.Namespace) -> DumpState:
+    state = None if args.restart else load_state(output_dir=args.output)
 
     if state:
-        log.info("Resuming state", output=output_dir, state=state.path)
+        log.info("Resuming state", output=args.output, state=state.path)
 
         if (
-            state.serialization != serialization
-            or state.compression != compression
-            or state.functions != functions
-            or state.target_paths != targets
+            state.serialization != args.serialization
+            or state.compression != args.compression
+            or state.functions != args.function
+            or state.excluded_functions != args.excluded_functions
+            or state.target_paths != args.targets
         ):
             log.error(
                 "Configuration of the existing state conflicts with parameters provided",
@@ -213,26 +201,38 @@ def execute_pipeline(
                 state_compression=state.compression,
                 state_targets=state.target_paths,
                 state_functions=state.functions,
-                targets=targets,
-                functions=functions,
-                serialization=serialization,
-                compression=compression,
+                state_excluded_fucntions=state.excluded_functions,
+                targets=args.targets,
+                functions=args.function,
+                serialization=args.serialization,
+                compression=args.compression,
                 state_path=state.path,
             )
-            return
+            raise RuntimeError("Issue with the existing state")
     else:
         state = create_state(
-            output_dir=output_dir,
-            target_paths=targets,
-            functions=functions,
-            serialization=serialization,
-            compression=compression,
+            output_dir=args.output,
+            target_paths=args.targets,
+            functions=args.function,
+            excluded_functions=args.excluded_functions,
+            serialization=args.serialization,
+            compression=args.compression,
         )
-        log.info("New state created", restart=restart, state=state.path)
+        log.info("New state created", restart=args.restart, state=state.path)
 
-    targets_stream = get_targets(targets)
-    target_func_pairs_stream = produce_target_func_pairs(targets_stream, functions, state)
-    record_stream = execute_functions(target_func_pairs_stream)
+    return state
+
+
+def execute_pipeline(
+    state: DumpState,
+    targets: Iterator[Target],
+    rest: list[str],
+    limit: int | None = None,
+) -> None:
+    """Run the record generation, processing and sinking pipeline."""
+
+    target_func_pairs_stream = produce_target_func_pairs(targets, state)
+    record_stream = execute_functions(target_func_pairs_stream, rest)
 
     if limit:
         record_stream = itertools.islice(record_stream, limit)
@@ -256,6 +256,7 @@ def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
         add_help=True,
     )
     parser.add_argument("targets", metavar="TARGET", nargs="*", help="targets to load")
+
     configure_plugin_arguments(parser)
 
     parser.add_argument(
@@ -271,7 +272,6 @@ def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
         action="store_true",
         help="restart the session and overwrite the state file if it exists",
     )
-
     parser.add_argument(
         "-s",
         "--serialization",
@@ -289,6 +289,7 @@ def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
         help="output directory",
     )
     parser.add_argument("--limit", type=int, help="limit number of records produced")
+
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
@@ -302,14 +303,12 @@ def main() -> None:
     args, rest = parse_arguments()
 
     try:
+        state = configure_state(args)
         targets = open_targets(args)
         execute_pipeline(
-            functions=args.function,
-            output_dir=args.output,
-            serialization=Serialization(args.serialization),
-            compression=Compression(args.compression),
-            restart=args.restart,
+            state=state,
             targets=targets,
+            rest=rest,
             limit=args.limit,
         )
     except Exception:
