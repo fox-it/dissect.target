@@ -115,6 +115,7 @@ def DynamicDescriptor(types: Sequence[str]) -> RecordDescriptor:
 ChildTargetRecord = TargetRecordDescriptor(
     "target/child",
     [
+        ("string", "name"),
         ("string", "type"),
         ("path", "path"),
     ],
