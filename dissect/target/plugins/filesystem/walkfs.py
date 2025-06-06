@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import stat
+from typing import TYPE_CHECKING, Union
 
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+from dissect.target.plugins.filesystem.unix.capability import parse_entry as parse_capability_entry
+
+CapabilityRecord = import_lazy("dissect.target.plugins.filesystem.unix.capability").CapabilityRecord
+SuidRecord = import_lazy("dissect.target.plugins.filesystem.unix.suid").SuidRecord
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -27,12 +33,16 @@ FilesystemRecord = TargetRecordDescriptor(
         ("uint32", "mode"),
         ("uint32", "uid"),
         ("uint32", "gid"),
-        ("string[]", "fstypes"),
+        ("boolean", "suid"),
+        ("string[]", "attr"),
+        ("string[]", "fs_types"),
     ],
 )
 
+WalkFsRecord = Union[FilesystemRecord, SuidRecord, CapabilityRecord]
 
-class WalkFSPlugin(Plugin):
+
+class WalkFsPlugin(Plugin):
     """Filesystem agnostic walkfs plugin."""
 
     def check_compatible(self) -> None:
@@ -41,8 +51,43 @@ class WalkFSPlugin(Plugin):
 
     @export(record=FilesystemRecord)
     @arg("--walkfs-path", default="/", help="path to recursively walk")
-    def walkfs(self, walkfs_path: str = "/") -> Iterator[FilesystemRecord]:
-        """Walk a target's filesystem and return all filesystem entries."""
+    @arg("--suid", action="store_true", help="output suid records")
+    @arg("--capability", action="store_true", help="output capability records")
+    def walkfs(self, walkfs_path: str = "/", suid: bool = False, capability: bool = False) -> Iterator[WalkFsRecord]:
+        """Walk a target's filesystem and return all filesystem entries.
+
+        Can return additional SUID and Capability records when given ``--suid`` and/or ``--capability`` arguments.
+
+        XFS and ExtFS filesystems can set extended attributes (``xattr``) on filesystem entries.
+
+        Resources:
+            - https://man7.org/linux/man-pages/man2/lstat.2.html
+            - https://man7.org/linux/man-pages/man7/inode.7.html
+            - https://man7.org/linux/man-pages/man7/xattr.7.html
+            - https://man7.org/linux/man-pages/man2/execve.2.html
+            - https://steflan-security.com/linux-privilege-escalation-suid-binaries/
+            - https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
+
+        Yields FilesystemRecords and optionally SuidRecords and CapabilityRecords.
+
+        .. code-block:: text
+
+            hostname (string): The target hostname.
+            domain (string): The target domain.
+            mtime (datetime): modified timestamp indicates the last time the contents of a file were modified.
+            atime (datetime): access timestamp indicates the last time a file was accessed.
+            ctime (datetime): changed timestamp indicates the last time metadata of a file was modified.
+            btime (datetime): birth timestamp indicates the time when a file was created.
+            ino (varint): number of the corresponding underlying filesystem inode.
+            path (path): path location of the entry.
+            size (filesize): size of the file in bytes on the filesystem.
+            mode (uint32): contains the file type and mode.
+            uid (uint32): the user id of the owner of the entry.
+            gid (uint32): the group id of the owner of the entry.
+            suid (boolean): denotes if the entry has the set-user-id bit set.
+            attr (string[]): list of key-value pair attributes separated by '='.
+            fs_types (string[]): list of filesystem type(s) of the entry.
+        """
 
         path = self.target.fs.path(walkfs_path)
 
@@ -56,45 +101,70 @@ class WalkFSPlugin(Plugin):
 
         for entry in self.target.fs.recurse(walkfs_path):
             try:
-                yield generate_record(self.target, entry)
+                yield from generate_record(self.target, entry, suid, capability)
 
             except FileNotFoundError as e:  # noqa: PERF203
                 self.target.log.warning("File not found: %s", entry)
                 self.target.log.debug("", exc_info=e)
             except Exception as e:
-                self.target.log.warning("Exception generating record for: %s", entry)
+                self.target.log.warning("Exception generating walkfs record for %s: %s", entry, e)
                 self.target.log.debug("", exc_info=e)
                 continue
 
 
-def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
-    """Generate a :class:`FilesystemRecord` from the given :class:`FilesystemEntry`.
+def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capability: bool) -> Iterator[WalkFsRecord]:
+    """Generate a :class:`WalkFsRecord` from the given :class:`FilesystemEntry`.
 
     Args:
         target: :class:`Target` instance
         entry: :class:`FilesystemEntry` instance
 
     Returns:
-        Generated :class:`FilesystemRecord` for the given :class:`FilesystemEntry`.
+        Generator of :class:`WalkFsRecord` for the given :class:`FilesystemEntry`.
     """
-    stat = entry.lstat()
+    entry_stat = entry.lstat()
 
     if isinstance(entry, LayerFilesystemEntry):
         fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
     else:
         fs_types = [entry.fs.__type__]
 
-    return FilesystemRecord(
-        atime=from_unix(stat.st_atime),
-        mtime=from_unix(stat.st_mtime),
-        ctime=from_unix(stat.st_ctime),
-        btime=from_unix(stat.st_birthtime) if stat.st_birthtime else None,
-        ino=stat.st_ino,
-        path=entry.path,
-        size=stat.st_size,
-        mode=stat.st_mode,
-        uid=stat.st_uid,
-        gid=stat.st_gid,
-        fstypes=fs_types,
+    XATTR_CAPABLE = any(fs for fs in fs_types if fs in ("extfs", "xfs"))
+
+    is_suid = bool(entry_stat.st_mode & stat.S_ISUID)
+
+    fields = {
+        "atime": from_unix(entry_stat.st_atime),
+        "mtime": from_unix(entry_stat.st_mtime),
+        "ctime": from_unix(entry_stat.st_ctime),
+        "btime": from_unix(entry_stat.st_birthtime) if entry_stat.st_birthtime else None,
+        "ino": entry_stat.st_ino,
+        "path": entry.path,
+        "size": entry_stat.st_size,
+        "mode": entry_stat.st_mode,
+        "uid": entry_stat.st_uid,
+        "gid": entry_stat.st_gid,
+        "suid": is_suid,
+        "fs_types": fs_types,
+    }
+
+    if XATTR_CAPABLE:
+        try:
+            fields["attr"] = [f"{attr.name}={attr.value.hex()}" for attr in entry.lattr()]
+        except Exception as e:
+            target.log.warning("Unable to expand xattr for entry %s: %s", entry.path, e)
+            target.log.debug("", exc_info=e)
+
+    yield FilesystemRecord(
+        **fields,
         _target=target,
     )
+
+    if suid and is_suid:
+        yield SuidRecord(
+            **fields,
+            _target=target,
+        )
+
+    if capability and XATTR_CAPABLE and fields.get("attr"):
+        yield from parse_capability_entry(entry, target)
