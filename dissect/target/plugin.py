@@ -473,7 +473,7 @@ class Plugin:
             try:
                 yield from method()
             except Exception as e:
-                self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name)  # noqa: TRY400
+                self.target.log.error("Error while executing `%s.%s`: %s", self.__namespace__, method_name, e)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
 
     def get_paths(self) -> Iterator[Path]:
@@ -1397,7 +1397,7 @@ class NamespacePlugin(Plugin):
                 except UnsupportedPluginError:  # noqa: PERF203
                     continue
                 except Exception as e:
-                    self.target.log.error("Subplugin %s.%s raised an exception", ns, method_name)  # noqa: TRY400
+                    self.target.log.error("Subplugin %s.%s raised an exception: %s", ns, method_name, e)  # noqa: TRY400
                     self.target.log.debug("", exc_info=e)
 
         # Holds the subplugins that share this method
