@@ -1,4 +1,5 @@
-from typing import Iterator
+from collections.abc import Iterator
+from typing import ClassVar
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -31,11 +32,11 @@ class EverythingPlugin(Plugin):
 
     __namespace__ = "everything"
 
-    PATH_GLOBS = [
+    PATH_GLOBS: ClassVar = [
         "C:\\Program Files\\Everything\\Everything*.db",
         "C:\\Program Files (x86)\\Everything\\Everything*.db",
     ]
-    USER_PATH = "AppData\\Local\\Everything\\Everything*.db"
+    USER_PATH: ClassVar = "AppData\\Local\\Everything\\Everything*.db"
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -73,5 +74,5 @@ class EverythingPlugin(Plugin):
                             source=path,
                             _target=self.target,
                         )
-            except (NotImplementedError, ValueError) as e:
+            except (NotImplementedError, ValueError) as e:  # noqa: PERF203
                 self.target.log.warning("Invalid EverythingDB %s: %s", path, e)

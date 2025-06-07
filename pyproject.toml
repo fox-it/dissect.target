@@ -36,6 +36,7 @@ dependencies = [
     "dissect.volume>=2,<4",
     "flow.record~=3.19.0",
     "structlog",
+    "packaging",
 ]
 dynamic = ["version"]
 

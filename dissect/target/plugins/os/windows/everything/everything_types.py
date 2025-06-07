@@ -4,15 +4,19 @@ import bz2
 import contextlib
 import dataclasses
 import logging
+import struct
 from abc import ABC
-from datetime import datetime
-from enum import IntEnum
+from enum import Flag, IntEnum
 from functools import lru_cache
-from packaging.version import Version
-from typing import Any, BinaryIO, Iterator
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.cstruct import BaseType, cstruct
 from dissect.util.ts import wintimestamp
+from packaging.version import Version
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
 
 BZIP_HEADER = b"BZh9"
 FILE_MAGIC = b"ESDb"
@@ -22,29 +26,28 @@ COMPAT_1 = Version("1.7.9")
 log = logging.getLogger(__name__)
 
 
-class EverythingVarInt(BaseType):
-    """TODO - Maybe this can be built using cstruct in a roundabout way?"""
-
+class EverythingVarInt(int, BaseType):
     @classmethod
-    def _read(cls, stream: BinaryIO, context: dict[str, Any] = None) -> int:
+    def _read(cls, stream: BinaryIO, context: dict[str, Any] | None = None) -> int:
         return read_byte_or_4(stream)
 
     @classmethod
-    def _write(cls, stream: BinaryIO, data: Any) -> int:
-        raise NotImplementedError
-
-
-class EverythingVarBytes(BaseType):
-    @classmethod
-    def _read(cls, stream: BinaryIO, context: dict[str, Any] = None) -> bytes:
-        return read_len_then_data(stream)
-
-    @classmethod
-    def _write(cls, stream: BinaryIO, data: Any) -> int:
-        raise NotImplementedError
+    def _write(cls, stream: BinaryIO, data: int) -> int:
+        res = dump_byte_or_4(data)
+        stream.write(res)
+        return len(res)
 
 
 c_header_def = """
+flag EntryAttributes : uint32_t {
+    has_file_size = 1,
+    has_date_created = 2,
+    has_date_modified = 4,
+    has_date_accessed = 8,
+    has_attributes = 16,
+    has_folder_size = 32
+};
+
 struct everything_db_header {
     // Note - File header may be equal to `BZIP_HEADER`. In this case, file must be handled as a bzip compressed file
     char magic[4];
@@ -55,12 +58,7 @@ struct everything_db_header {
     uint8_t version_major;
 
     // Flags
-    uint32_t flag_has_file_size:1;
-    uint32_t flag_has_date_created:1;
-    uint32_t flag_has_date_modified:1;
-    uint32_t flag_has_date_accessed:1;
-    uint32_t flag_has_attributes:1;
-    uint32_t flag_has_folder_size:1;
+    EntryAttributes   entry_attributes;
 
     uint32_t number_of_folders;
     uint32_t number_of_files;
@@ -68,9 +66,9 @@ struct everything_db_header {
 
 };
 """
-everything_header_cs = cstruct()
-everything_header_cs.add_custom_type("EverythingVarInt", EverythingVarInt)
-everything_header_cs.load(c_header_def)
+c_everything_header = cstruct()
+c_everything_header.add_custom_type("EverythingVarInt", EverythingVarInt)
+c_everything_header.load(c_header_def)
 
 
 def version_match(stmt: str, cond: bool) -> str:
@@ -81,6 +79,11 @@ def version_match(stmt: str, cond: bool) -> str:
 @lru_cache
 def filesystems_cstruct(version: Version) -> cstruct:
     c_filesystems_def = f"""
+    struct EverythingVarBytes {{
+        EverythingVarInt len;
+        uint8_t data[len];
+    }};
+
     struct filesystem_header {{
         EverythingVarInt type;
         {version_match("uint8_t out_of_date;", version >= COMPAT_1)}
@@ -122,7 +125,6 @@ def filesystems_cstruct(version: Version) -> cstruct:
     """
     everything_filesystem_cs = cstruct()
     everything_filesystem_cs.add_custom_type("EverythingVarInt", EverythingVarInt)
-    everything_filesystem_cs.add_custom_type("EverythingVarBytes", EverythingVarBytes)
     everything_filesystem_cs.load(c_filesystems_def)
 
     return everything_filesystem_cs
@@ -138,7 +140,7 @@ class EverythingFS(ABC):
     def supported_version(cls, version: Version) -> bool:
         if cls.MIN_VERSION and version < cls.MIN_VERSION:
             return False
-        if cls.MAX_VERSION and version > cls.MAX_VERSION:
+        if cls.MAX_VERSION and version > cls.MAX_VERSION:  # noqa: SIM103
             return False
         return True
 
@@ -222,14 +224,12 @@ class EverythingIndexObj:
     def resolve_path(self, folder_list: list) -> str:
         if self.parent_index is not None:
             return folder_list[self.parent_index].resolve_path(folder_list) + "\\" + self.file_path
-        else:
-            return self.file_path
+        return self.file_path
 
     def resolve_fs(self, folder_list: list) -> int | None:
         if self.fs_index is not None:
             return self.fs_index
-        else:
-            return folder_list[self.parent_index].resolve_fs(folder_list)
+        return folder_list[self.parent_index].resolve_fs(folder_list)
 
 
 @dataclasses.dataclass
@@ -238,12 +238,7 @@ class EverythingDBMetadata:
 
     version: Version
 
-    flag_has_file_size: bool
-    flag_has_date_created: bool
-    flag_has_date_modified: bool
-    flag_has_date_accessed: bool
-    flag_has_attributes: bool
-    flag_has_folder_size: bool
+    entry_attributes_flags: Flag
 
     number_of_folders: int
     number_of_files: int
@@ -255,37 +250,31 @@ class EverythingDBParser:
         self.fh = fh
 
         # Check if file is bzipped
-        header = self.read(4)
+        header = self.fh.read(4)
         self.fh.seek(-4, 1)
         # Everything supports BZipped databases. Everything is the same under the compression
         if header == BZIP_HEADER:
-            self.fh: BinaryIO = bz2.open(self.fh)  # type:ignore
+            self.fh: BinaryIO = bz2.open(self.fh)  # noqa: SIM115
 
-        header = everything_header_cs.everything_db_header(self.fh)
+        header = c_everything_header.everything_db_header(self.fh)
         if header.magic != FILE_MAGIC:
             raise ValueError(f"Invalid Everything magic header {header.magic}")
 
         self.header = EverythingDBMetadata(
             magic=header.magic,
             version=Version(f"{header.version_major}.{header.version_minor}.{header.version_patch}"),
-            flag_has_file_size=header.flag_has_file_size,
-            flag_has_date_created=header.flag_has_date_created,
-            flag_has_date_modified=header.flag_has_date_modified,
-            flag_has_date_accessed=header.flag_has_date_accessed,
-            flag_has_attributes=header.flag_has_attributes,
-            flag_has_folder_size=header.flag_has_folder_size,
+            entry_attributes_flags=header.entry_attributes,
             number_of_folders=header.number_of_folders,
             number_of_files=header.number_of_files,
             number_of_filesystems=header.number_of_filesystems,
         )
-
         self.filesystems_cstruct = filesystems_cstruct(self.header.version)
         self.__parse_filesystems()
 
         # This might be hidden/system files/folders, or maybe a list of folders to exclude?
         # TODO - Check what happens when changing exclude hidden/system files/folders
         if self.database_version > COMPAT_1:
-            exclude_flags = self.read_u8()
+            exclude_flags = c_everything_header.uint8_t(self.fh)
             log.debug("Exclude flags: %s", exclude_flags)
 
         # There is some logic here, but in my test file it doesn't affect the data
@@ -295,11 +284,11 @@ class EverythingDBParser:
         # If any of these fail, then I'd have to reverse this function and add support
 
         # I expect 0 here because the inner implementation of the function is:
-        # for i in range(self.read_byte_or_4()):
+        # for i in range(read_byte_or_4(self.fh)):
         #   do something
         # and the function is called 3 times one after another. As long as zero is returned each time, we don't need
         # to implement the logic
-        if [self.read_byte_or_4(), self.read_byte_or_4(), self.read_byte_or_4()] != [0, 0, 0]:
+        if [read_byte_or_4(self.fh), read_byte_or_4(self.fh), read_byte_or_4(self.fh)] != [0, 0, 0]:
             raise NotImplementedError("Failed to parse database, unimplemented feature. Please open an issue")
 
     def __repr__(self) -> str:
@@ -330,23 +319,23 @@ class EverythingDBParser:
                     c_fs = self.filesystems_cstruct.ntfs_header(self.fh)
                 else:
                     c_fs = self.filesystems_cstruct.refs_header(self.fh)
-                fs.guid = c_fs.guid
-                fs.path = c_fs.path
-                fs.root = c_fs.root
+                fs.guid = bytes(c_fs.guid.data).decode()
+                fs.path = bytes(c_fs.path.data).decode()
+                fs.root = bytes(c_fs.root.data).decode()
                 with contextlib.suppress(AttributeError):
-                    fs.include_only = c_fs.include_only
+                    fs.include_only = bytes(c_fs.include_only.data).decode()
                     fs.journal_id = c_fs.journal_id
                     fs.next_usn = c_fs.next_usn
 
             elif fs_type == EverythingFSType.EFU:
                 c_fs = self.filesystems_cstruct.efu_header(self.fh)
-                fs.source_path = c_fs.source_path
+                fs.source_path = bytes(c_fs.source_path.data).decode()
                 with contextlib.suppress(AttributeError):
                     fs.unk1 = c_fs.unk1
 
             elif fs_type == EverythingFSType.FOLDER:
                 c_fs = self.filesystems_cstruct.folder_header(self.fh)
-                fs.path = c_fs.path
+                fs.path = bytes(c_fs.path.data).decode()
                 with contextlib.suppress(AttributeError):
                     fs.next_update_time = c_fs.next_update_time
             else:
@@ -365,7 +354,7 @@ class EverythingDBParser:
         # This is later used to build a hierarchy for folders
         folder_list = [EverythingIndexObj() for _ in range(self.header.number_of_folders)]
         for folder in folder_list:
-            parent_index = self.read_u32()
+            parent_index = c_everything_header.uint32_t(self.fh)
             # `parent_index` is an index into `folder_list`, which points to the parent folder of the current item
             # At the end of the loop, we have a list where each folder has an index to its parent.
             # Root folders (Such as C:\) don't have parents, instead they have an index into self.filesystem_list,
@@ -382,11 +371,15 @@ class EverythingDBParser:
                 folder.parent_index = parent_index
 
         # This recursively resolves fs_index, so every folder will have it.
-        for f in folder_list:
-            f.fs_index = f.resolve_fs(folder_list)
+        for folder in folder_list:
+            folder.fs_index = folder.resolve_fs(folder_list)
 
+        yield from self.parse_folders(folder_list)
+
+        yield from self.parse_files(folder_list)
+
+    def parse_folders(self, folder_list: list[EverythingIndexObj]) -> Iterator[EverythingF]:
         temp_buf = b""
-
         for folder in folder_list:
             # Explanation:
             # Everything has an "Optimization", where it saves all the basenames of the folders (and files)
@@ -400,18 +393,17 @@ class EverythingDBParser:
             # of the previous buffer, and saving space.
             # The same thing happens later on when parsing filenames
 
-            # I believe this is an actual bug, loading EFU files also causes Everything v1.4.0.704b to crash
-            # Leaving the code here in case this is fixed in a newer version
-            # if self.filesystem_list[folder.fs_index] == EverythingFSType.EFU:
-            #     unk2 = self.read_u8()
-            #     logger.debug(f"EFU: unk2: {unk2}")
+            # There is a bug loading EFU files, (which causes Everything v1.4.0.704b to crash)
+            # where it tries to read an extra byte, which is not present in the file.
+            # If at any point parsing EFU files fails, it is likely because of this bug,
+            # and can be fixed by reading and discarding a single byte here.
 
-            if new_byte_count := self.read_byte_or_4():
-                trunc_from_prev = self.read_byte_or_4()
+            if new_byte_count := read_byte_or_4(self.fh):
+                trunc_from_prev = read_byte_or_4(self.fh)
                 if trunc_from_prev > len(temp_buf):
                     raise ValueError(f"Error while parsing folder names {trunc_from_prev} > {len(temp_buf)}")
                 temp_buf = temp_buf[: len(temp_buf) - trunc_from_prev]
-            temp_buf += self.read(new_byte_count)
+            temp_buf += self.fh.read(new_byte_count)
 
             folder.file_path = temp_buf.decode()
 
@@ -419,24 +411,24 @@ class EverythingDBParser:
             folder.attributes = 16
 
             # The yield can't happen here, because we can only call resolve_path once we finish this loop
-            if self.header.flag_has_folder_size:
-                folder.size = self.read_u64()
-            if self.header.flag_has_date_created:
-                folder.date_created = self.read_u64()
-            if self.header.flag_has_date_modified:
-                folder.date_modified = self.read_u64()
-            if self.header.flag_has_date_accessed:
-                folder.date_accessed = self.read_u64()
-            if self.header.flag_has_attributes:
-                folder.attributes = self.read_u32()
+            if self.header.entry_attributes_flags.has_folder_size in self.header.entry_attributes_flags:
+                folder.size = c_everything_header.uint64_t(self.fh)
+            if self.header.entry_attributes_flags.has_date_created in self.header.entry_attributes_flags:
+                folder.date_created = c_everything_header.uint64_t(self.fh)
+            if self.header.entry_attributes_flags.has_date_modified in self.header.entry_attributes_flags:
+                folder.date_modified = c_everything_header.uint64_t(self.fh)
+            if self.header.entry_attributes_flags.has_date_accessed in self.header.entry_attributes_flags:
+                folder.date_accessed = c_everything_header.uint64_t(self.fh)
+            if self.header.entry_attributes_flags.has_attributes in self.header.entry_attributes_flags:
+                folder.attributes = c_everything_header.uint32_t(self.fh)
 
             if isinstance(self.filesystem_list[folder.fs_index], EverythingREFS):
                 # Unknown
-                self.read_u64()
-                self.read_u64()
+                c_everything_header.uint64_t(self.fh)
+                c_everything_header.uint64_t(self.fh)
             elif isinstance(self.filesystem_list[folder.fs_index], EverythingNTFS):
                 # Unknown
-                self.read_u64()
+                c_everything_header.uint64_t(self.fh)
             elif isinstance(self.filesystem_list[folder.fs_index], EverythingEFU):
                 if folder.parent_index is not None:
                     continue
@@ -458,10 +450,11 @@ class EverythingDBParser:
                 file_type="directory",
             )
 
+    def parse_files(self, folder_list: list[EverythingIndexObj]) -> Iterator[EverythingF]:
         temp_buf = b""
         for _ in range(self.header.number_of_files):
             # See comment above for explanation of this loop
-            parent_index = self.read_u32()
+            parent_index = c_everything_header.uint32_t(self.fh)
             if parent_index > self.header.number_of_filesystems + self.header.number_of_folders:
                 raise ValueError(
                     "Error while parsing file names. Parent index out of bounds "
@@ -474,25 +467,43 @@ class EverythingDBParser:
             if parent_index >= self.header.number_of_folders:
                 raise ValueError("Something weird, this points to filesystem_index")
 
-            # This is what the code wants me to do, but this causes everything (including the original code) to fail.
-            # I believe this is an actual bug, EFU files also cause Everything v1.4.0.704b to crash when parsing DB
-            # Keeping this commented out for now
-            # if self.filesystem_list[folder_list[parent_index].fs_index] == EverythingFSType.EFU:
-            #     unk3 = self.read_u8()
-            #     logger.debug(f"EFU: unk3: {unk3}")
+            # There is a bug loading EFU files, (which causes Everything v1.4.0.704b to crash)
+            # where it tries to read an extra byte, which is not present in the file.
+            # If at any point parsing EFU files fails, it is likely because of this bug,
+            # and can be fixed by reading and discarding a single byte here.
 
             file_name = folder_list[parent_index].resolve_path(folder_list)
-            if new_byte_count := self.read_byte_or_4():
-                trunc_from_prev = self.read_byte_or_4()
+            if new_byte_count := read_byte_or_4(self.fh):
+                trunc_from_prev = read_byte_or_4(self.fh)
                 if trunc_from_prev > len(temp_buf):
                     raise ValueError(f"Error while parsing file name {trunc_from_prev} > {len(temp_buf)}")
                 temp_buf = temp_buf[: len(temp_buf) - trunc_from_prev]
-            temp_buf += self.read(new_byte_count)
-            file_size = self.read_u64() if self.header.flag_has_file_size else None
-            date_created = wintimestamp(self.read_u64()) if self.header.flag_has_date_created else None
-            date_modified = wintimestamp(self.read_u64()) if self.header.flag_has_date_modified else None
-            date_accessed = wintimestamp(self.read_u64()) if self.header.flag_has_date_accessed else None
-            attributes = self.read_u32() if self.header.flag_has_attributes else None
+            temp_buf += self.fh.read(new_byte_count)
+            file_size = (
+                c_everything_header.uint64_t(self.fh)
+                if self.header.entry_attributes_flags.has_file_size in self.header.entry_attributes_flags
+                else None
+            )
+            date_created = (
+                wintimestamp(c_everything_header.uint64_t(self.fh))
+                if self.header.entry_attributes_flags.has_date_created in self.header.entry_attributes_flags
+                else None
+            )
+            date_modified = (
+                wintimestamp(c_everything_header.uint64_t(self.fh))
+                if self.header.entry_attributes_flags.has_date_modified in self.header.entry_attributes_flags
+                else None
+            )
+            date_accessed = (
+                wintimestamp(c_everything_header.uint64_t(self.fh))
+                if self.header.entry_attributes_flags.has_date_accessed in self.header.entry_attributes_flags
+                else None
+            )
+            attributes = (
+                c_everything_header.uint32_t(self.fh)
+                if self.header.entry_attributes_flags.has_attributes in self.header.entry_attributes_flags
+                else None
+            )
 
             try:
                 yield EverythingF(
@@ -506,25 +517,7 @@ class EverythingDBParser:
                 )
             # This shouldn't be possible, but it happened in my tests to folders in the recycle bin
             except UnicodeDecodeError as e:
-                log.warning(f"Failed parsing filepath: {file_name}\\{temp_buf}", exc_info=e)
-
-    def read(self, i: int) -> bytes:
-        return self.fh.read(i)
-
-    def read_u8(self) -> int:
-        return self.fh.read(1)[0]
-
-    def read_u32(self) -> int:
-        return int.from_bytes(self.fh.read(4), byteorder="little")
-
-    def read_u64(self) -> int:
-        return int.from_bytes(self.fh.read(8), byteorder="little")
-
-    def read_byte_or_4(self) -> int:
-        return read_byte_or_4(self.fh)
-
-    def read_len_then_data(self):
-        return read_len_then_data(self.fh)
+                log.warning("Failed parsing filepath: %s\\%s", file_name, temp_buf, exc_info=e)
 
 
 def read_byte_or_4(stream: BinaryIO) -> int:
@@ -538,14 +531,12 @@ def read_byte_or_4(stream: BinaryIO) -> int:
     """
     first = stream.read(1)[0]
     if first == 0xFF:
-        # This has never actually happened to me, so debating leaving this here for now.
-        # Is this signed? recv is signed so I assume so
-        raise NotImplementedError("Untested feature, can remove comment and see if this still works :)")
         return int.from_bytes(stream.read(4), byteorder="little", signed=True)
-    else:
-        return first
+    return first
 
 
-def read_len_then_data(stream: BinaryIO) -> bytes:
-    data_len = read_byte_or_4(stream)
-    return stream.read(data_len)
+def dump_byte_or_4(data: int) -> bytes:
+    # Strings under 0xFF are stored as a single unsigned byte, and everything else is stored as 0xFF + 4 bytes signed
+    if data < 0xFF:
+        return struct.pack("<B", data)
+    return struct.pack("<Bi", 0xFF, data)
