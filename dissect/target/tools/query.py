@@ -144,9 +144,6 @@ def main() -> int:
 
     try:
         for target in open_targets(args):
-            if args.dry_run:
-                print(f"Dry run on: {target}")
-
             record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []
