@@ -73,10 +73,6 @@ class AndroidPlugin(LinuxPlugin):
 
         return full_version
 
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.ANDROID.value
-
     @export(record=EmptyRecord)
     def users(self) -> Iterator[EmptyRecord]:
         yield from ()

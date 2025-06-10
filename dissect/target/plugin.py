@@ -1259,6 +1259,8 @@ class OSPlugin(Plugin):
         Returns:
             A slug of the OS name, e.g. 'windows' or 'linux'.
         """
+        if self.__os__:
+            return self.__os__.value
         raise NotImplementedError
 
     @export(property=True)

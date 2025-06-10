@@ -169,7 +169,3 @@ class CitrixPlugin(BsdPlugin):
             # of the filesystem, we set the user home to None if their home is equivalent to '/'
             user.home = user.home if user.home != "/" else None
             yield user
-
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.CITRIX.value

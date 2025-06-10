@@ -56,7 +56,3 @@ class VyosPlugin(LinuxPlugin):
     @export(property=True)
     def version(self) -> str:
         return self._version
-
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.VYOS.value

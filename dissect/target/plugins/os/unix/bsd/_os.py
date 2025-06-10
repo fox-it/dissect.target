@@ -28,10 +28,6 @@ class BsdPlugin(UnixPlugin):
         return None
 
     @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.BSD.value
-
-    @export(property=True)
     def hostname(self) -> str | None:
         fh = self.target.fs.path("/etc/rc.conf")
 

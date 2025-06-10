@@ -92,10 +92,6 @@ class MacOSPlugin(DarwinPlugin):
             pass
 
     @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.MACOS.value
-
-    @export(property=True)
     def architecture(self) -> str | None:
         if arch := detect_macho_arch(
             paths=[

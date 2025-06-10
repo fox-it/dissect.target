@@ -204,10 +204,6 @@ class ESXiPlugin(UnixPlugin):
     def configstore(self) -> dict[str, Any]:
         return self._configstore
 
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.ESXI.value
-
     def _mount_nfs_shares(self) -> None:
         """Mount NFS shares found in the configstore."""
         if not self._configstore:

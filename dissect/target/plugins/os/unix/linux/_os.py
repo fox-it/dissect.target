@@ -122,7 +122,3 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
             distrib_description = f"{name} {version}"
 
         return distrib_description or None
-
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.LINUX.value

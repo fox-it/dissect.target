@@ -315,7 +315,3 @@ class WindowsPlugin(OSPlugin):
                     home=self.target.resolve(home),
                     _target=self.target,
                 )
-
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.WINDOWS.value

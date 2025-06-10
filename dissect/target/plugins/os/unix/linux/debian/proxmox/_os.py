@@ -56,10 +56,6 @@ class ProxmoxPlugin(DebianPlugin):
                 return f"{pkg.name} {pkg.version} ({distro_name})"
         return None
 
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.PROXMOX.value
-
 
 DT_DIR = 4
 DT_REG = 8

@@ -180,10 +180,6 @@ class UnixPlugin(OSPlugin):
 
         return None
 
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.UNIX.value
-
     def _parse_hostname_string(
         self, paths: list[tuple[str, Callable[[Path], str] | None]] | None = None
     ) -> tuple[str | None, str | None]:

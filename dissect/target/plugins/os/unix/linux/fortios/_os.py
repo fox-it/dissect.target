@@ -327,10 +327,6 @@ class FortiOSPlugin(LinuxPlugin):
                 self.target.log.debug("", exc_info=e)
 
     @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.FORTIOS.value
-
-    @export(property=True)
     def architecture(self) -> str | None:
         """Return architecture FortiOS runs on."""
         for path in ["/lib/libav.so", "/bin/ctr", "/bin/grep"]:
