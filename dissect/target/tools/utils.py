@@ -136,20 +136,20 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
         else:
             parser.error(f"can't find plugin with function `{func.method_name}`")
         parser.print_help()
-        sys.exit(0)
+        parser.exit(0)
 
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list is not None:
         list_plugins(args.targets, args.list, getattr(args, "children", False), getattr(args, "json", False), rest)
-        sys.exit(0)
+        parser.exit(0)
 
     if not args.function:
         parser.error("argument -f/--function is required")
 
     funcs, invalid_funcs = find_functions(args.function)
     if any(invalid_funcs):
-        parser.error(f"argument -f/--function contains invalid plugins(s): {', '.join(invalid_funcs)}")
+        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
 
     excluded_funcs, invalid_excluded_funcs = find_functions(args.excluded_functions)
     if any(invalid_excluded_funcs):

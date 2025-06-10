@@ -19,7 +19,9 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "--list"])
 
-        target_query()
+        with pytest.raises(SystemExit):
+            target_query()
+
         out, _ = capsys.readouterr()
 
         assert out.startswith("Available plugins:")
@@ -234,11 +236,6 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
 
         with (
             patch(
-                "dissect.target.tools.query.find_functions",
-                autospec=True,
-                side_effect=mock_find_functions,
-            ),
-            patch(
                 "dissect.target.tools.utils.find_functions",
                 autospec=True,
                 side_effect=mock_find_functions,
@@ -286,7 +283,8 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
 
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "-l", "-j"])
-        target_query()
+        with pytest.raises(SystemExit):
+            target_query()
         out, _ = capsys.readouterr()
 
     try:
