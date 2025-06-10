@@ -66,6 +66,8 @@ class ESXiPlugin(UnixPlugin):
         9: vmkcore (ESXi 6)
     """
 
+    __os__: OperatingSystem = OperatingSystem.ESXI
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._config = None

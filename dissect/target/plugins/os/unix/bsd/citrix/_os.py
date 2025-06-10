@@ -25,6 +25,8 @@ RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')
 
 
 class CitrixPlugin(BsdPlugin):
+    __os__: OperatingSystem = OperatingSystem.CITRIX
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._ips = []

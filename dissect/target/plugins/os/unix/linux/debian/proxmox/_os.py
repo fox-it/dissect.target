@@ -14,7 +14,7 @@ from dissect.target.filesystem import (
     VirtualFilesystem,
 )
 from dissect.target.helpers import fsutil
-from dissect.target.plugins.os.unix._os import OperatingSystem, export
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
 
 if TYPE_CHECKING:
@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 
 class ProxmoxPlugin(DebianPlugin):
+    __os__: OperatingSystem = OperatingSystem.PROXMOX
+
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:

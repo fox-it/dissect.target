@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 
 class BsdPlugin(UnixPlugin):
+    __os__: OperatingSystem = OperatingSystem.BSD
+
     def __init__(self, target: Target):
         super().__init__(target)
 

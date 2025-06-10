@@ -26,6 +26,8 @@ ARCH_MAP = {
 
 
 class WindowsPlugin(OSPlugin):
+    __os__: OperatingSystem = OperatingSystem.WINDOWS
+
     CURRENT_VERSION_KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion"
 
     def __init__(self, target: Target):

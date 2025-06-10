@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 
 class MacOSPlugin(DarwinPlugin):
+    __os__: OperatingSystem = OperatingSystem.MACOS
+
     VERSION = "/System/Library/CoreServices/SystemVersion.plist"
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"
     SYSTEM = "/Library/Preferences/SystemConfiguration/preferences.plist"

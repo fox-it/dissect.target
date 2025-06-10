@@ -68,6 +68,8 @@ def create_tar_filesystem(fileobj: BinaryIO) -> TarFilesystem:
 class FortiOSPlugin(LinuxPlugin):
     """FortiOS plugin for various Fortinet appliances."""
 
+    __os__: OperatingSystem = OperatingSystem.FORTIOS
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._version = None

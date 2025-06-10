@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
     """Linux plugin."""
 
+    __os__: OperatingSystem = OperatingSystem.LINUX
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.network_manager = LinuxNetworkManager(target)

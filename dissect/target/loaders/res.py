@@ -13,7 +13,7 @@ from dissect.util import ts
 from dissect.target import filesystem
 from dissect.target.helpers import fsutil, record, regutil
 from dissect.target.loader import Loader
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
@@ -150,6 +150,8 @@ class ResFile(filesystem.VirtualFile):
 
 
 class ResOSPlugin(OSPlugin):
+    __os__: OperatingSystem = OperatingSystem.WINDOWS
+
     @classmethod
     def detect(cls, target: Target) -> bool:
         return True

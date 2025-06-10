@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 
 class AndroidPlugin(LinuxPlugin):
+    __os__: OperatingSystem = OperatingSystem.ANDROID
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.target = target

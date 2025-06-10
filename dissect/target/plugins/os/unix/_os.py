@@ -53,6 +53,8 @@ ARCH_MAP = {
 class UnixPlugin(OSPlugin):
     """UNIX plugin."""
 
+    __os__ = OperatingSystem.UNIX
+
     # Files to parse for user details
     PASSWD_FILES = ("/etc/passwd", "/etc/passwd-", "/etc/master.passwd")
 

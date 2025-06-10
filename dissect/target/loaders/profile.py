@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.loader import Loader
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
@@ -37,6 +37,8 @@ class ProfileLoader(Loader):
 
 
 class ProfileOSPlugin(OSPlugin):
+    __os__: OperatingSystem = OperatingSystem.WINDOWS
+
     @classmethod
     def detect(cls, target: Target) -> bool:
         return True

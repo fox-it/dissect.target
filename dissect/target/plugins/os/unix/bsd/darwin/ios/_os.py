@@ -29,6 +29,8 @@ class IOSPlugin(DarwinPlugin):
         - https://corp.digitalcorpora.org/corpora/mobile/iOS17/
     """
 
+    __os__: OperatingSystem = OperatingSystem.IOS
+
     SYSTEM = "/private/var/preferences/SystemConfiguration/preferences.plist"
     GLOBAL = "/private/var/mobile/Library/Preferences/.GlobalPreferences.plist"
     VERSION = "/System/Library/CoreServices/SystemVersion.plist"

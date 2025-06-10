@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 
 class VyosPlugin(LinuxPlugin):
+    __os__: OperatingSystem = OperatingSystem.VYOS
+
     def __init__(self, target: Target):
         self.target = target
 
