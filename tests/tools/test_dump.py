@@ -10,6 +10,7 @@ import pytest
 from dissect.target.plugins.apps.webserver import iis
 from dissect.target.plugins.os.windows import amcache
 from dissect.target.tools.dump import run, state, utils
+from dissect.target.tools.dump.run import create_state
 from dissect.target.tools.dump.run import main as target_dump
 from tests._utils import absolute_path
 
@@ -65,22 +66,29 @@ def test_execute_pipeline(
         assert count == 128
 
     with (
-        patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets),
         patch("dissect.target.tools.dump.run.log_progress", new=mock_log_progress),
     ):
         output_dir = tmp_path / "output"
 
         serialization = utils.Serialization(serialization_name)
-        compression = utils.Compression(compression_name)
+        compression = utils.Compression(compression_name) if compression_name else utils.Compression.NONE
 
         functions = "iis.logs,amcache.applications"
-
-        run.execute_pipeline(
-            targets=["dummy"],
-            functions=functions,
+        _state = create_state(
             output_dir=output_dir,
+            target_paths=["dummy"],
+            functions=functions,
+            excluded_functions=[],
             serialization=serialization,
             compression=compression,
+        )
+
+        run.execute_pipeline(
+            state=_state,
+            targets=mock_get_targets(["dummy"]),
+            rest=[],
+            dry_run=False,
+            limit=0,
         )
 
         target_name = target_win_iis_amcache.name
@@ -114,7 +122,7 @@ def test_execute_pipeline(
 
         state_blob = json.loads(state_path.read_text())
 
-        assert state_blob["compression"] == compression_name
+        assert state_blob["compression"] == str(compression_name)
         assert state_blob["serialization"] == serialization_name
         assert state_blob["target_paths"] == ["dummy"]
         assert state_blob["functions"] == functions
@@ -162,12 +170,20 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
         output_dir = tmp_path / "output"
 
         functions = "iis.logs,amcache.applications"
+        _state = create_state(
+            output_dir=output_dir,
+            target_paths=["dummy"],
+            functions=functions,
+            excluded_functions=[],
+            serialization=utils.Serialization.JSONLINES,
+            compression=utils.Compression.NONE,
+        )
 
         run.execute_pipeline(
-            targets=["dummy"],
-            functions=functions,
-            output_dir=output_dir,
-            serialization=utils.Serialization.JSONLINES,
+            state=_state,
+            targets=mock_get_targets(["dummy"]),
+            rest=[],
+            dry_run=False,
             limit=limit,
         )
 
@@ -187,7 +203,7 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
 
         state_blob = json.loads(state_path.read_text())
 
-        assert state_blob["compression"] is None
+        assert state_blob["compression"] == str(None)
         sink_blobs = state_blob["sinks"]
 
         iis_sink_blob = next(s for s in state_blob["sinks"] if s["func"] == "iis.logs")
