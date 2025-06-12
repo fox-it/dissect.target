@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import tarfile as tf
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 from dissect.target import filesystem, target
@@ -196,11 +197,28 @@ def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
         return False
 
     with path.open("rb") as fh:
-        headers = [fh.read(6)]
-        fh.seek(257)
-        headers.append(fh.read(8))
+        # The minimum file size of an uncompressed tar is 512 bytes,
+        # but a compressed tar file could be smaller.
+        try:
+            fh.seek(0)
+            buf = fh.read(tf.BLOCKSIZE)
+        except EOFError:
+            fh.seek(0)
+            buf = fh.read()
+
+        headers = [buf[0:6]]  # assume the file is at least 6 bytes long
+        if len(buf) >= 265:
+            headers.append(buf[257 : 257 + 8])
+
         for header in headers:
             if header.startswith(magics):
+                # We could be dealing with a compressed file that is not actually a tar.
+                # To weed out a false positive we try to decompress and read ustar from
+                # the first 512 bytes (or less) of the file.
+                try:
+                    tf.open(mode="r:*", fileobj=BytesIO(buf))  # noqa: SIM115
+                except (tf.ReadError, tf.CompressionError, ValueError, EOFError):
+                    continue
                 return True
     return False
 
