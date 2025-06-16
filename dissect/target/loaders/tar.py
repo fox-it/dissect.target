@@ -197,16 +197,10 @@ def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
         return False
 
     with path.open("rb") as fh:
-        # The minimum file size of an uncompressed tar is 512 bytes,
-        # but a compressed tar file could be smaller.
-        try:
-            fh.seek(0)
-            buf = fh.read(tf.BLOCKSIZE)
-        except EOFError:
-            fh.seek(0)
-            buf = fh.read()
-
-        headers = [buf[0:6]]  # assume the file is at least 6 bytes long
+        # The minimum file size of an uncompressed tar is 512 bytes, but a compressed tar file could be smaller.
+        fh.seek(0)
+        buf = fh.read(tf.BLOCKSIZE)
+        headers = [buf[0:6]]
         if len(buf) >= 265:
             headers.append(buf[257 : 257 + 8])
 
