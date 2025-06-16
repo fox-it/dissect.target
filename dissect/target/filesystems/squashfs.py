@@ -28,7 +28,7 @@ class SquashFSFilesystem(Filesystem):
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
-        return int.from_bytes(fh.read(4), "little") == c_squashfs.c_squashfs.SQUASHFS_MAGIC
+        return int.from_bytes(fh.read(4), "little") in [c_squashfs.c_squashfs.SQUASHFS_MAGIC, c_squashfs.c_squashfs.CIGAM_SFHSAUQS]
 
     def get(self, path: str) -> FilesystemEntry:
         return SquashFSFilesystemEntry(self, path, self._get_node(path))
