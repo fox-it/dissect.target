@@ -880,7 +880,7 @@ def find_functions(
     Returns:
         A tuple containing a list of matching function descriptors and a set of invalid patterns.
     """
-    found = []
+    found = set()
 
     __functions__ = _get_plugins().__functions__
 
@@ -900,20 +900,20 @@ def find_functions(
 
         if exact_match or exact_os_match:
             if matches := list(_filter_exact_match(pattern, os_filter, exact_match, exact_os_match)):
-                found.extend(matches)
+                found.update(matches)
             else:
                 invalid_functions.add(pattern)
         else:
             # If we don't have an exact function match, do a slower treematch
             if matches := list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden)):
-                found.extend(matches)
+                found.update(matches)
             else:
                 invalid_functions.add(pattern)
 
     if compatibility and target is not None:
         result = list(_filter_compatible(found, target, ignore_load_errors))
     else:
-        result = found
+        result = list(found)
 
     return result, invalid_functions
 
