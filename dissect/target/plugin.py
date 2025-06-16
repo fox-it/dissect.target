@@ -586,9 +586,7 @@ def register(plugincls: type[Plugin]) -> None:
 
                 if plugincls.__register__:
                     name = attr.__name__
-                    namespaced_name = None
                     if plugincls.__namespace__:
-                        namespaced_name = f"{namespace}.{name}"
                         name = f"{plugincls.__namespace__}.{name}"
 
                     path = f"{module_path}.{attr.__name__}"
@@ -610,9 +608,6 @@ def register(plugincls: type[Plugin]) -> None:
                     # Register the functions in the lookup
                     function_index.setdefault(name, {})[module_key] = descriptor
 
-                    # register the function using the namespace path
-                    if namespaced_name:
-                        function_index.setdefault(namespaced_name, {})[module_key] = descriptor
     if plugincls.__namespace__:
         # Namespaces are also callable, so register the namespace itself as well
         # NamespacePlugin needs to register itself for every additional subclass, so allow overwrites here
@@ -860,7 +855,8 @@ def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
             paths.setdefault(descriptor.path, []).append(descriptor)
 
             if descriptor.namespace:
-                paths.setdefault(descriptor.namespace, []).append(descriptor)
+                func_part = descriptor.name.split(".")[-1]
+                paths.setdefault(f"{descriptor.namespace}.{func_part}", []).append(descriptor)
 
     return paths
 
@@ -880,7 +876,7 @@ def find_functions(
     Returns:
         A tuple containing a list of matching function descriptors and a set of invalid patterns.
     """
-    found = set()
+    found = []
 
     __functions__ = _get_plugins().__functions__
 
@@ -900,20 +896,20 @@ def find_functions(
 
         if exact_match or exact_os_match:
             if matches := list(_filter_exact_match(pattern, os_filter, exact_match, exact_os_match)):
-                found.update(matches)
+                found.extend(matches)
             else:
                 invalid_functions.add(pattern)
         else:
             # If we don't have an exact function match, do a slower treematch
             if matches := list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden)):
-                found.update(matches)
+                found.extend(match for match in matches if match not in found)
             else:
                 invalid_functions.add(pattern)
 
     if compatibility and target is not None:
         result = list(_filter_compatible(found, target, ignore_load_errors))
     else:
-        result = list(found)
+        result = found
 
     return result, invalid_functions
 
