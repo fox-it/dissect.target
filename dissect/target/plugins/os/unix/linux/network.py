@@ -337,4 +337,91 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
         return ip_address(value)
 
 
-MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser]
+class ProcConfigParser(LinuxNetworkConfigParser):
+    """Parser for /proc/net/route that aggregates routes per interface."""
+
+    @dataclass
+    class ParserContext:
+        name: str | None = None
+        type: str = ""
+        ip_interfaces: set[NetInterface] = field(default_factory=set)
+        gateways: set[NetAddress] = field(default_factory=set)
+
+        def to_record(self, target: Target) -> UnixInterfaceRecord:
+            return UnixInterfaceRecord(
+                name=self.name,
+                enabled=None,
+                cidr=self.ip_interfaces,
+                gateway=list(self.gateways),
+                source="/proc/net/route",
+                configurator="proc",
+                _target=target,
+            )
+
+    def interfaces(self) -> Iterator:
+        try:
+            with self._target.fs.open("/proc/net/route") as f:
+                lines = f.read().decode().splitlines()
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/route does not exist")
+            return
+        except Exception as e:
+            self._target.log.warning("Error parsing /proc/net/route")
+            self._target.log.debug("", exc_info=e)
+            return
+
+        interfaces: dict[str, ProcConfigParser.ParserContext] = {}
+
+        # Skip header
+        for line in lines[1:]:
+            fields = line.split()
+            if len(fields) < 8:
+                self._target.log.warning("Skipping malformed line in /proc/net/route: %s", line)
+                continue
+
+            iface_name = fields[0]
+            destination_hex = fields[1]
+            gateway_hex = fields[2]
+            mask = fields[7]
+
+            # Only add CIDR if not default route
+            if (addr := self._be_hex_to_int(destination_hex)) != 0:
+                mask_bit_count = self._be_hex_to_int(mask).bit_count()
+                iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                iface.ip_interfaces.add(ip_interface((addr, mask_bit_count)))
+
+            # Add gateway if not 0.0.0.0
+            if (gateway := self._be_hex_to_int(gateway_hex)) != 0:
+                iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                iface.gateways.add(ip_address(gateway))
+
+        # Parse IPv6 from /proc/net/if_inet6 and add to existing interfaces
+        try:
+            with self._target.fs.open("/proc/net/if_inet6") as f:
+                for line in f.read().decode().splitlines():
+                    parts = line.split()
+                    if len(parts) < 6:
+                        continue
+                    ipv6_hex, _, prefixlen, _, _, iface_name = parts
+                    if iface_name in interfaces:
+                        # Convert hex to IPv6 address
+                        ipv6_addr = ":".join(ipv6_hex[i:i+4] for i in range(0, 32, 4))
+                        iface = interfaces[iface_name]
+                        iface.ip_interfaces.add(ip_interface(f"{ipv6_addr}/{int(prefixlen, 16)}"))
+
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/if_inet6 does not exist")
+        except Exception as e:
+            self._target.log.warning("Error parsing /proc/net/if_inet6")
+            self._target.log.debug("", exc_info=e)
+
+        for iface in interfaces.values():
+            yield iface.to_record(self._target)
+
+    def _be_hex_to_int(self, be_hex: str) -> int:
+        return int.from_bytes(bytes.fromhex(be_hex), "little")
+
+
+
+
+MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
