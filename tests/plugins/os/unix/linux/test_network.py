@@ -12,6 +12,7 @@ from dissect.target.plugins.os.unix.linux.network import (
     LinuxNetworkConfigParser,
     LinuxNetworkPlugin,
     NetworkManagerConfigParser,
+    ProcConfigParser,
     SystemdNetworkConfigParser,
 )
 
@@ -208,3 +209,25 @@ def test_linux_network_plugin_interfaces(target_linux: Target) -> None:
         assert len(interfaces) == 1
         MockLinuxConfigParser1.return_value.interfaces.assert_called_once()
         MockLinuxConfigParser2.return_value.interfaces.assert_called_once()
+
+
+def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    fixture_dir = "tests/_data/plugins/os/unix/linux/proc/"
+    fs_linux.map_file("/proc/net/route", posixpath.join(fixture_dir, "route"))
+    fs_linux.map_file("/proc/net/tcp", posixpath.join(fixture_dir, "tcp"))
+    fs_linux.map_file("/proc/net/if_inet6", posixpath.join(fixture_dir, "if_inet6"))
+
+    parser = ProcConfigParser(target_linux)
+    interfaces = list(parser.interfaces())
+
+    # Destructure interfaces by name for easy assertions
+    assert len(interfaces) == 2
+    wlp, lo = interfaces
+
+    assert Counter(wlp.cidr) == Counter(
+        [ip_interface("fe80::f66c:ff08:22f4:9090/64"), ip_interface("192.168.1.109/24")]
+    )
+    assert Counter(wlp.gateway) == Counter([ip_address("192.168.1.1")])
+
+    # lo assertions (from if_inet6)
+    assert Counter(lo.cidr) == Counter([ip_interface("::1/128")])
