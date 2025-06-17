@@ -377,7 +377,7 @@ class MockOSWarpPlugin(OSPlugin):
         ("test.[!y]*", 1),  # Found with tree search, all in test not starting with y (so x13 is ok)
         ("test.???.??", 1),  # Found with tree search, using question marks
         ("x13", 0),  # Not Found: Part of namespace but no match
-        ("Warp.*", 0),  # Not Found: Namespace != Module so 0
+        ("Warp.*", 1),  # Found: Using the namespace
         ("os.warp._os.f6", 0),  # OS plugins are excluded from tree search
         ("f6", 1),  # Found with direct match
         ("f22", 1),  # Unfindable has no effect on direct match
@@ -625,12 +625,8 @@ def test_nested_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> 
         def baz(self) -> Iterator[str]:
             yield from ["bar"]
 
-    class FooSpace(NamespacePlugin, NS):
+    class FooSpace(NS, NamespacePlugin):
         __namespace__ = "foo"
-
-        @export(output="yield")
-        def baz(self) -> Iterator[str]:
-            yield from ["foo"]
 
     class Foo1(FooSpace):
         __namespace__ = "foo1"
