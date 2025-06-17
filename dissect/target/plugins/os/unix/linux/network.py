@@ -338,7 +338,12 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 
 
 class ProcConfigParser(LinuxNetworkConfigParser):
-    """Parser for /proc/net/route that aggregates routes per interface."""
+    """Parser for dynamic network configuration data from /proc/net.
+
+    Parse gateways, interace namem and network from /proc/net/route.
+    Corroborare with TCP connections from /proc/net/tcp to find local IP addresses.
+    Locally bound Ipv6 addresses are parsed from /proc/net/if_inet6.
+    """
 
     @dataclass
     class ParserContext:
@@ -346,7 +351,6 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         type: str = ""
         ip_interfaces: set[NetInterface] = field(default_factory=set)
         gateways: set[NetAddress] = field(default_factory=set)
-        mac_addresses: set[str] = field(default_factory=set)
 
         def to_record(self, target: Target) -> UnixInterfaceRecord:
             return UnixInterfaceRecord(
@@ -356,7 +360,6 @@ class ProcConfigParser(LinuxNetworkConfigParser):
                 gateway=list(self.gateways),
                 source="/proc/net/route",
                 configurator="proc",
-                mac=list(self.mac_addresses),
                 _target=target,
             )
 
@@ -370,17 +373,14 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
         interfaces: dict[str, ProcConfigParser.ParserContext] = {}
 
-        route_interfaces : dict[str, set[IPv4Interface]] = {}
+        route_interfaces: dict[str, set[IPv4Interface]] = {}
         for line in lines[1:]:  # Skip header
             fields = line.split()
             if len(fields) < 8:
                 self._target.log.warning("Skipping malformed line in /proc/net/route: %s", line)
                 continue
 
-            iface_name = fields[0]
-            destination_hex = fields[1]
-            gateway_hex = fields[2]
-            mask = fields[7]
+            iface_name, destination_hex, gateway_hex, *_, mask = fields[:8]
 
             # Only add CIDR if not default route
             if (addr := self._be_hex_to_int(destination_hex)) != 0:
@@ -392,42 +392,23 @@ class ProcConfigParser(LinuxNetworkConfigParser):
                 iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
                 iface.gateways.add(ip_address(gateway))
 
-        # Parse IPv4 addresses from /proc/net/arp and update interfaces
-        arp_ipv4_by_iface: dict[str, set[str]] = {}
-        try:
-            with self._target.fs.open("/proc/net/arp") as f:
-                lines = f.read().decode().splitlines()
-                for line in lines[1:]:  # skip header
-                    parts = line.split()
-                    if len(parts) < 6:
-                        self._target.log.warning("Skipping malformed line in /proc/net/route: %s", line)
-                        continue
-                    ip4_addr = ip_address(parts[0])
-                    iface_name = parts[5]
-                    arp_ipv4_by_iface.setdefault(iface_name, set()).add(ip4_addr)
+        # Find locally bound IPv4 addresses from /proc/net/tcp and correlate with routes
+        tcp_local_ipv4 = self.parse_proc_net_tcp_local_ipv4()
+        for route_name, route_ifaces in route_interfaces.items():
+            for route_iface in route_ifaces:
+                for ipv4 in tcp_local_ipv4:
+                    if ipv4 in route_iface.network:
+                        iface = interfaces.setdefault(route_name, ProcConfigParser.ParserContext(name=route_name))
+                        iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
+                        break
 
-                    iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
-                    iface.mac_addresses.add(parts[3])
-
-        except FileNotFoundError:
-            self._target.log.info("File /proc/net/arp does not exist")
-
-        for iface_name, arp_ipv4s in arp_ipv4_by_iface.items():
-            if (route_ifaces := route_interfaces.get(iface_name)) is not None:
-                for ipv4 in arp_ipv4s:
-                    for route_iface in route_ifaces:
-                        if ipv4 in route_iface.network:
-                            iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
-                            iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
-                            break
-
-        # Parse IPv6 from /proc/net/if_inet6 and add to existing interfaces
+        # Parse IPv6 from /proc/net/if_inet6
         try:
             with self._target.fs.open("/proc/net/if_inet6") as f:
                 for line in f.read().decode().splitlines():
                     parts = line.split()
                     if len(parts) < 6:
-                        self._target.log.warning("Skipping malformed line in /proc/net/route: %s", line)
+                        self._target.log.warning("Skipping malformed line in /proc/net/if_inet6: %s", line)
                         continue
                     ipv6_hex, _, prefixlen_hex, _, _, iface_name = parts
                     iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
@@ -441,14 +422,37 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             self._target.log.warning("Error parsing /proc/net/if_inet6")
             self._target.log.debug("", exc_info=e)
 
-
         for iface in interfaces.values():
             yield iface.to_record(self._target)
 
     def _be_hex_to_int(self, be_hex: str) -> int:
         return int.from_bytes(bytes.fromhex(be_hex), "little")
 
+    def parse_proc_net_tcp_local_ipv4(self) -> set[IPv4Address]:
+        try:
+            with self._target.fs.open("/proc/net/tcp") as f:
+                lines = f.read().decode().splitlines()
+        except Exception:
+            self._target.log.exception("Error reading /proc/net/tcp")
+            return set()
 
+        local_ips = set()
+        for line in lines[1:]:  # skip header
+            fields = line.split()
+            if len(fields) < 4:
+                continue
+            local_address = fields[1]
+            state = fields[3]
+            if state == "0A":  # 0A: systemd pollutes outgoing connections so we filter them out
+                continue
+            try:
+                ip_hex, _ = local_address.split(":", 1)
+                addr = ip_address(self._be_hex_to_int(ip_hex))
+                local_ips.add(addr)
+            except Exception:
+                self._target.log.warning("Failed to parse local address in /proc/net/tcp: %s", local_address)
+                continue
+        return local_ips
 
 
 MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
