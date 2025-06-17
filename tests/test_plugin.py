@@ -655,6 +655,10 @@ def test_nested_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> 
     assert isinstance(target_bare.ns.foo.foo1, Foo1)
     assert isinstance(target_bare.ns.foo.foo2, Foo2)
 
+    result, _ = find_functions("ns.foo.*.fizz")
+    assert len(result) == 2
+    assert sorted(desc.name for desc in result) == ["foo1.fizz", "foo2.fizz"]
+
 
 def test_find_plugin_function_default(target_default: Target) -> None:
     found, _ = find_functions("services", target_default)
