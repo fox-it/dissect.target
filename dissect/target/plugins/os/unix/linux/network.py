@@ -346,6 +346,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         type: str = ""
         ip_interfaces: set[NetInterface] = field(default_factory=set)
         gateways: set[NetAddress] = field(default_factory=set)
+        mac_addresses: set[str] = field(default_factory=set)
 
         def to_record(self, target: Target) -> UnixInterfaceRecord:
             return UnixInterfaceRecord(
@@ -355,6 +356,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
                 gateway=list(self.gateways),
                 source="/proc/net/route",
                 configurator="proc",
+                mac=list(self.mac_addresses),
                 _target=target,
             )
 
@@ -363,17 +365,13 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             with self._target.fs.open("/proc/net/route") as f:
                 lines = f.read().decode().splitlines()
         except FileNotFoundError:
-            self._target.log.info("File /proc/net/route does not exist")
-            return
-        except Exception as e:
-            self._target.log.warning("Error parsing /proc/net/route")
-            self._target.log.debug("", exc_info=e)
+            self._target.log.info("File /proc/net/route not found")
             return
 
         interfaces: dict[str, ProcConfigParser.ParserContext] = {}
 
-        # Skip header
-        for line in lines[1:]:
+        route_interfaces : dict[str, set[IPv4Interface]] = {}
+        for line in lines[1:]:  # Skip header
             fields = line.split()
             if len(fields) < 8:
                 self._target.log.warning("Skipping malformed line in /proc/net/route: %s", line)
@@ -387,13 +385,41 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             # Only add CIDR if not default route
             if (addr := self._be_hex_to_int(destination_hex)) != 0:
                 mask_bit_count = self._be_hex_to_int(mask).bit_count()
-                iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
-                iface.ip_interfaces.add(ip_interface((addr, mask_bit_count)))
+                route_interfaces.setdefault(iface_name, set()).add(ip_interface((addr, mask_bit_count)))
 
             # Add gateway if not 0.0.0.0
             if (gateway := self._be_hex_to_int(gateway_hex)) != 0:
                 iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
                 iface.gateways.add(ip_address(gateway))
+
+        # Parse IPv4 addresses from /proc/net/arp and update interfaces
+        arp_ipv4_by_iface: dict[str, set[str]] = {}
+        try:
+            with self._target.fs.open("/proc/net/arp") as f:
+                lines = f.read().decode().splitlines()
+                for line in lines[1:]:  # skip header
+                    parts = line.split()
+                    if len(parts) < 6:
+                        self._target.log.warning("Skipping malformed line in /proc/net/route: %s", line)
+                        continue
+                    ip4_addr = ip_address(parts[0])
+                    iface_name = parts[5]
+                    arp_ipv4_by_iface.setdefault(iface_name, set()).add(ip4_addr)
+
+                    iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                    iface.mac_addresses.add(parts[3])
+
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/arp does not exist")
+
+        for iface_name, arp_ipv4s in arp_ipv4_by_iface.items():
+            if (route_ifaces := route_interfaces.get(iface_name)) is not None:
+                for ipv4 in arp_ipv4s:
+                    for route_iface in route_ifaces:
+                        if ipv4 in route_iface.network:
+                            iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                            iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
+                            break
 
         # Parse IPv6 from /proc/net/if_inet6 and add to existing interfaces
         try:
@@ -401,19 +427,20 @@ class ProcConfigParser(LinuxNetworkConfigParser):
                 for line in f.read().decode().splitlines():
                     parts = line.split()
                     if len(parts) < 6:
+                        self._target.log.warning("Skipping malformed line in /proc/net/route: %s", line)
                         continue
-                    ipv6_hex, _, prefixlen, _, _, iface_name = parts
-                    if iface_name in interfaces:
-                        # Convert hex to IPv6 address
-                        ipv6_addr = ":".join(ipv6_hex[i:i+4] for i in range(0, 32, 4))
-                        iface = interfaces[iface_name]
-                        iface.ip_interfaces.add(ip_interface(f"{ipv6_addr}/{int(prefixlen, 16)}"))
+                    ipv6_hex, _, prefixlen_hex, _, _, iface_name = parts
+                    iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                    ipv6_addr = int(ipv6_hex, 16)
+                    prefix_len = int(prefixlen_hex, 16)
+                    iface.ip_interfaces.add(ip_interface((ipv6_addr, prefix_len)))
 
         except FileNotFoundError:
             self._target.log.info("File /proc/net/if_inet6 does not exist")
         except Exception as e:
             self._target.log.warning("Error parsing /proc/net/if_inet6")
             self._target.log.debug("", exc_info=e)
+
 
         for iface in interfaces.values():
             yield iface.to_record(self._target)
