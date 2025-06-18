@@ -391,6 +391,12 @@ def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pyt
 
     # general plugin
     users_plugin = get_plugin(output, "users")
+    assert isinstance(users_plugin, dict)
+
+    # We expect path to be "os.unix.linux._os.users"
+    # https://github.com/fox-it/dissect.target/issues/1178
+    users_plugin.pop("path")
+
     assert users_plugin == {
         "name": "users",
         "description": "Yield unix user records from passwd files or syslog session logins.",
@@ -405,7 +411,6 @@ def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pyt
             }
         ],
         "alias": False,
-        "path": "os.unix.linux._os.users",
     }
 
 
