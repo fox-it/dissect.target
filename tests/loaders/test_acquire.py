@@ -15,19 +15,19 @@ from pytest_benchmark.fixture import BenchmarkFixture
 def test_case_sensitive_drive_letter(target_bare: Target) -> None:
     tar_file = absolute_path("_data/loaders/acquire/uppercase_driveletter.tar")
 
-    loader = TarLoader(Path(tar_file))
-    assert loader.detect(Path(tar_file))
+    loader = TarLoader(tar_file)
     loader.map(target_bare)
 
-    # mounts = c:
-    assert sorted(target_bare.fs.mounts.keys()) == ["c:"]
+    # mounts = / and c:
+    assert sorted(target_bare.fs.mounts.keys()) == ["c:", "fs"]
+    assert "C:" not in target_bare.fs.mounts
 
     # Initialize our own WindowsPlugin to override the detection
     target_bare._os_plugin = WindowsPlugin.create(target_bare, target_bare.fs.mounts["c:"])
     target_bare._init_os()
 
     # sysvol is now added
-    assert sorted(target_bare.fs.mounts.keys()) == ["c:", "sysvol"]
+    assert sorted(target_bare.fs.mounts.keys()) == ["c:", "fs", "sysvol"]
 
     # WindowsPlugin sets the case sensitivity to False
     assert target_bare.fs.get("C:/test.file").open().read() == b"hello_world"

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+import re
 import tarfile as tf
 import zipfile as zf
-from pathlib import Path
 
 from dissect.target import filesystem
 from dissect.target.filesystems.tar import TarFilesystemDirectoryEntry, TarFilesystemEntry
@@ -19,6 +19,7 @@ FILESYSTEMS_ROOT = "fs"
 FILESYSTEMS_LEGACY_ROOT = "sysvol"
 
 ANON_FS_RE = re.compile(r"^fs[0-9]+$")
+
 
 class AcquireTarSubLoader(TarSubLoader):
     """Loader for tar-based Acquire collections."""
@@ -99,13 +100,7 @@ class AcquireZipSubLoader(ZipSubLoader):
         return zipfile.joinpath(FILESYSTEMS_ROOT).exists() or zipfile.joinpath(FILESYSTEMS_LEGACY_ROOT).exists()
 
     def map(self, target: Target) -> None:
-        map_acquire(target, self.zip)
-
-
-def map_acquire(target: Target, path: Path):
-    """
-    Map Acquire filestructure
-    """
-    if path.joinpath(FILESYSTEMS_ROOT).exists():
-        path = path.joinpath(FILESYSTEMS_ROOT)
-    find_and_map_dirs(target, path)
+        path = self.zip
+        if path.joinpath(FILESYSTEMS_ROOT).exists():
+            path = path.joinpath(FILESYSTEMS_ROOT)
+        find_and_map_dirs(target, path)
