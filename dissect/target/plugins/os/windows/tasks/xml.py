@@ -331,13 +331,11 @@ class XmlTask:
 
             elif trigger_type == "CalendarTrigger":
                 if days_between_triggers := self.get_element("ScheduleByDay/DaysInterval", trigger):
-                    interval_type = "Days"
                     record = DailyTriggerRecord(
                         days_between_triggers=int(days_between_triggers),
                     )
 
                 elif weeks_between_triggers := self.get_element("ScheduleByWeek/WeeksInterval", trigger):
-                    interval_type = "Weeks"
                     days_of_week = [day.tag for day in trigger.find("ScheduleByWeek/DaysOfWeek/").iter("*")]
                     record = WeeklyTriggerRecord(
                         weeks_between_triggers=int(weeks_between_triggers),
@@ -345,7 +343,6 @@ class XmlTask:
                     )
 
                 elif trigger.find("ScheduleByMonth/"):
-                    interval_type = "Month"
                     day_of_month = [int(day.text) for day in trigger.iter("Day")]
                     months_of_year = [month.tag for month in trigger.findall("*/Months/*")]
                     record = MonthlyDateTriggerRecord(
@@ -354,7 +351,6 @@ class XmlTask:
                     )
 
                 elif trigger.find("ScheduleByMonthDayOfWeek/"):
-                    interval_type = "Month Day"
                     which_week = [int(week.text) for week in trigger.iter("Week")]
                     days_of_week = [day.tag for day in trigger.findall("*/DaysOfWeek/*")]
                     months_of_year = [month.tag for month in trigger.findall("*/Months/*")]
@@ -367,11 +363,7 @@ class XmlTask:
                 else:
                     raise TypeError("Unknown calender type")
 
-                calendat_record = CalendarTriggerRecord(
-                    interval_type=interval_type,
-                )
-
-                yield GroupedRecord(CalendarTriggerRecord.name, [base, calendat_record, record])
+                yield GroupedRecord(CalendarTriggerRecord.name, [base, record])
 
             elif trigger_type == "WnfStateChangeTrigger":
                 state_name = self.get_element("StateName", trigger)

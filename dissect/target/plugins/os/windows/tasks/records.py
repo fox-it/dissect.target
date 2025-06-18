@@ -9,9 +9,7 @@ BootTriggerRecord = TargetRecordDescriptor(
 
 CalendarTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/calendar_trigger",
-    [
-        ("string", "interval_type"),
-    ],
+    [],
 )
 
 DailyTriggerRecord = TargetRecordDescriptor(
