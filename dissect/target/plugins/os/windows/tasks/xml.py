@@ -84,7 +84,6 @@ class XmlTask:
         self.comment = self.get_element("Properties", attribute="comment")
         self.run_as = self.get_element("Properties", attribute="runAs")
         self.cpassword = self.get_element("Properties", attribute="cpassword")
-        self.enabled = self.get_element("Properties", attribute="enabled")
         self.action = self.get_element("Properties", attribute="action")
 
         self.uri = self.get_element("RegistrationInfo/URI")
@@ -107,36 +106,91 @@ class XmlTask:
         self.required_privileges = self.get_element("Principals/Principal/RequiredPrivileges")
 
         # Settings
-        self.allow_start_on_demand = self.get_element("Settings/AllowStartOnDemand")
+        self.allow_start_on_demand = self.str_to_bool(self.get_element("Settings/AllowStartOnDemand"))
         self.restart_on_failure_interval = self.get_element("Settings/RestartOnFailure/Interval")
         self.restart_on_failure_count = self.get_element("Settings/RestartOnFailure/Count")
         self.mutiple_instances_policy = self.get_element("Settings/MultipleInstancesPolicy")
-        self.dissalow_start_on_batteries = self.get_element("Settings/DisallowStartIfOnBatteries")
-        self.stop_going_on_batteries = self.get_element("Settings/StopIfGoingOnBatteries")
+        self.dissalow_start_on_batteries = self.str_to_bool(self.get_element("Settings/DisallowStartIfOnBatteries"))
+        self.stop_going_on_batteries = self.str_to_bool(self.get_element("Settings/StopIfGoingOnBatteries"))
         self.allow_hard_terminate = self.get_element("Settings/AllowHardTerminate")
-        self.start_when_available = self.get_element("Settings/StartWhenAvailable")
+        self.start_when_available = self.str_to_bool(self.get_element("Settings/StartWhenAvailable"))
         self.network_profile_name = self.get_element("Settings/NetworkProfileName")
-        self.run_only_network_available = self.get_element("Settings/RunOnlyIfNetworkAvailable")
-        self.wake_to_run = self.get_element("Settings/WakeToRun")
-        self.enabled = self.get_element("Settings/Enabled")
-        self.hidden = self.get_element("Settings/Hidden")
+        self.run_only_network_available = self.str_to_bool(self.get_element("Settings/RunOnlyIfNetworkAvailable"))
+        self.wake_to_run = self.str_to_bool(self.get_element("Settings/WakeToRun"))
+
+        self.hidden = self.str_to_bool(self.get_element("Settings/Hidden"))
         self.delete_expired_task_after = self.get_element("Settings/DeleteExpiredTaskAfter")
         self.idle_duration = self.get_element("Settings/IdleSettings/Duration")
         self.idle_wait_timeout = self.get_element("Settings/IdleSettings/WaitTimeout")
-        self.idle_stop_on_idle_end = self.get_element("Settings/IdleSettings/StopOnIdleEnd")
-        self.idle_restart_on_idle = self.get_element("Settings/IdleSettings/RestartOnIdle")
+        self.idle_stop_on_idle_end = self.str_to_bool(self.get_element("Settings/IdleSettings/StopOnIdleEnd"))
+        self.idle_restart_on_idle = self.str_to_bool(self.get_element("Settings/IdleSettings/RestartOnIdle"))
         self.network_settings_name = self.get_element("Settings/NetworkSettings/Name")
         self.network_settings_id = self.get_element("Settings/NetworkSettings/Id")
         self.execution_time_limit = self.get_element("Settings/ExecutionTimeLimit")
         self.priority = self.get_element("Settings/Priority")
-        self.run_only_idle = self.get_element("Settings/RunOnlyIfIdle")
-        self.unified_scheduling_engine = self.get_element("Settings/UseUnifiedSchedulingEngine")
-        self.disallow_start_on_remote_app_session = self.get_element("Settings/DisallowStartOnRemoteAppSession")
+        self.run_only_idle = self.str_to_bool(self.get_element("Settings/RunOnlyIfIdle"))
+        self.unified_scheduling_engine = self.str_to_bool(self.get_element("Settings/UseUnifiedSchedulingEngine"))
+        self.disallow_start_on_remote_app_session = self.str_to_bool(
+            self.get_element("Settings/DisallowStartOnRemoteAppSession")
+        )
+
+        # Enabled
+        self.enabled = self.extract_enabled_falg()
 
         # Data
         self.data = self.get_raw("Data")
 
         self.raw_data = self.get_raw()
+
+    def extract_enabled_falg(self) -> bool:
+        """Extracts the enabled flag from a Windows Task Scheduler XML.
+
+        This method attempts to determine whether a scheduled task is enabled.
+        It first checks the `<Settings><Enabled>` element, and then (for legacy or
+        non-standard formats) checks for an `enabled` attribute under a `<Properties>` element.
+        If neither is present, it returns `True` by default, as tasks without an explicit
+        enabled flag are considered enabled according to Microsoft's specification.
+
+        Returns:
+            `True` if the task is enabled, `False` if explicitly disabled.
+
+        References:
+            - https://learn.microsoft.com/en-us/windows/win32/taskschd/settings-enabled
+        """
+        enabled = self.str_to_bool(self.get_element("Settings/Enabled"))
+        if enabled is not None:
+            return enabled
+
+        enabled = self.str_to_bool(self.get_element("Properties", attribute="enabled"))
+        if enabled is not None:
+            return enabled
+
+        return True
+
+    @staticmethod
+    def str_to_bool(string_to_convert: str) -> bool | None:
+        """Convert a string to a boolean value.
+
+        The conversion is case-insensitive and only accepts 'true' or 'false'
+        (with optional surrounding whitespace). Raises a ValueError for any
+        other input.
+
+        Args:
+            string_to_convert: The input string to convert. Should be 'true' or 'false', case-insensitively.
+
+        Returns:
+            None for an empty string, True if the input string is 'true' (case-insensitive), False if 'false'.
+        """
+        if not string_to_convert:
+            return None
+
+        string_to_convert_lower = string_to_convert.strip().lower()
+        if string_to_convert_lower == "true":
+            return True
+        if string_to_convert_lower == "false":
+            return False
+
+        raise ValueError(f"Invalid boolean string: '{string_to_convert}' (expected 'true' or 'false')")
 
     def strip_namespace(self, data: Element) -> Element:
         """Strip namespace from XML data.
@@ -199,12 +253,12 @@ class XmlTask:
         """
         for trigger in self.task_element.findall("Triggers/*"):
             trigger_type = trigger.tag
-            enabled = self.get_element("Enabled", trigger)
+            enabled = self.str_to_bool(self.get_element("Enabled", trigger))
             start_boundary = self.get_element("StartBoundary", trigger)
             end_boundary = self.get_element("EndBoundary", trigger)
             repetition_interval = self.get_element("Repetition/Interval", trigger)
             repetition_duration = self.get_element("Repetition/Duration", trigger)
-            repetition_stop_duration_end = self.get_element("Repetition/StopAtDurationEnd", trigger)
+            repetition_stop_duration_end = self.str_to_bool(self.get_element("Repetition/StopAtDurationEnd", trigger))
             execution_time_limit = self.get_element("ExecutionTimeLimit", trigger)
 
             base = TriggerRecord(

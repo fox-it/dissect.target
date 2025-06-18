@@ -248,18 +248,14 @@ class AtTask:
             s_year = trigger.begin_year
             s_month = trigger.begin_month
             s_day = trigger.begin_day
-            start_boundary = (
-                datetime.datetime(year=s_year, month=s_month, day=s_day, tzinfo=self.tzinfo).date().isoformat()
-            )
+            start_boundary = datetime.datetime(year=s_year, month=s_month, day=s_day, tzinfo=self.tzinfo)
 
             e_year = trigger.end_year
             e_month = trigger.end_month
             e_day = trigger.end_day
             end_boundary = None
             if trigger.trigger_flags.has_end_date:
-                end_boundary = (
-                    datetime.datetime(year=e_year, month=e_month, day=e_day, tzinfo=self.tzinfo).date().isoformat()
-                )
+                end_boundary = datetime.datetime(year=e_year, month=e_month, day=e_day, tzinfo=self.tzinfo)
 
             repetition_interval = self.minutes_duration_to_iso(trigger.minutes_interval)
             repetition_duration = self.minutes_duration_to_iso(trigger.minutes_duration)

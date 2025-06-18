@@ -43,7 +43,7 @@ EventTriggerRecord = TargetRecordDescriptor(
         ("string", "subscription"),
         ("string", "delay"),
         ("string", "period_of_occurence"),
-        ("string", "number_of_occurences"),
+        ("uint16", "number_of_occurences"),
         ("string", "matching_elements"),
         ("string", "value_queries"),
     ],
@@ -82,12 +82,12 @@ TimeTriggerRecord = TargetRecordDescriptor(
 TriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger",
     [
-        ("string", "enabled"),
-        ("string", "start_boundary"),
-        ("string", "end_boundary"),
+        ("boolean", "enabled"),
+        ("datetime", "start_boundary"),
+        ("datetime", "end_boundary"),
         ("string", "repetition_interval"),
         ("string", "repetition_duration"),
-        ("string", "repetition_stop_duration_end"),
+        ("boolean", "repetition_stop_duration_end"),
         ("string", "execution_time_limit"),
     ],
 )

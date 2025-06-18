@@ -68,25 +68,25 @@ def assert_xml_task_properties(xml_task: TaskRecord) -> None:
     assert xml_task.restart_on_failure_interval is None
     assert xml_task.restart_on_failure_count is None
     assert xml_task.mutiple_instances_policy == "Queue"
-    assert xml_task.dissalow_start_on_batteries == "false"
-    assert xml_task.stop_going_on_batteries == "false"
-    assert xml_task.start_when_available == "true"
+    assert not xml_task.dissalow_start_on_batteries
+    assert not xml_task.stop_going_on_batteries
+    assert xml_task.start_when_available
     assert xml_task.network_profile_name is None
     assert xml_task.run_only_network_available is None
     assert xml_task.wake_to_run is None
     assert xml_task.enabled is None
-    assert xml_task.hidden == "true"
+    assert xml_task.hidden
     assert xml_task.delete_expired_task_after is None
     assert xml_task.idle_duration is None
     assert xml_task.idle_wait_timeout is None
-    assert xml_task.idle_stop_on_idle_end == "false"
-    assert xml_task.idle_restart_on_idle == "false"
+    assert not xml_task.idle_stop_on_idle_end
+    assert not xml_task.idle_restart_on_idle
     assert xml_task.network_settings_name is None
     assert xml_task.network_settings_id is None
     assert xml_task.execution_time_limit == "PT5S"
     assert xml_task.priority is None
     assert xml_task.run_only_idle is None
-    assert xml_task.unified_scheduling_engine == "true"
+    assert xml_task.unified_scheduling_engine
     assert xml_task.disallow_start_on_remote_app_session is None
     assert xml_task.data is None
 
@@ -113,24 +113,24 @@ def assert_at_task_properties(at_task: TaskRecord) -> None:
     assert at_task.restart_on_failure_interval is None
     assert at_task.restart_on_failure_count == "0"
     assert at_task.mutiple_instances_policy is None
-    assert at_task.dissalow_start_on_batteries == "True"
-    assert at_task.stop_going_on_batteries == "True"
+    assert at_task.dissalow_start_on_batteries
+    assert at_task.stop_going_on_batteries
     assert at_task.start_when_available is None
     assert at_task.network_profile_name is None
-    assert at_task.run_only_network_available == "False"
-    assert at_task.wake_to_run == "True"
-    assert at_task.enabled == "True"
-    assert at_task.hidden == "False"
+    assert not at_task.run_only_network_available
+    assert at_task.wake_to_run
+    assert at_task.enabled
+    assert not at_task.hidden
     assert at_task.delete_expired_task_after is None
     assert at_task.idle_duration == "PT15M"
     assert at_task.idle_wait_timeout == "PT1H"
-    assert at_task.idle_stop_on_idle_end == "True"
-    assert at_task.idle_restart_on_idle == "False"
+    assert at_task.idle_stop_on_idle_end
+    assert not at_task.idle_restart_on_idle
     assert at_task.network_settings_name is None
     assert at_task.network_settings_id is None
     assert at_task.execution_time_limit == "P3D"
     assert at_task.priority == "normal"
-    assert at_task.run_only_idle == "True"
+    assert at_task.run_only_idle
     assert at_task.unified_scheduling_engine is None
     assert at_task.disallow_start_on_remote_app_session is None
     assert at_task.data == "[]"
