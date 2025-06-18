@@ -7,7 +7,6 @@ BootTriggerRecord = TargetRecordDescriptor(
     [],
 )
 
-# TODO: Use & Fix types here
 CalendarTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/calendar_trigger",
     [
