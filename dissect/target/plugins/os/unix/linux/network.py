@@ -340,22 +340,20 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 class ProcConfigParser(LinuxNetworkConfigParser):
     """Parser for dynamic network configuration data from /proc/net.
 
-    Parse gateways, interace namem and network from /proc/net/route.
-    Corroborare with TCP connections from /proc/net/tcp to find local IP addresses.
+    Parse gateways, interface names and network from /proc/net/route.
+    Corroborate with TCP connections from /proc/net/tcp to find local IP addresses.
     Locally bound Ipv6 addresses are parsed from /proc/net/if_inet6.
     """
 
     @dataclass
     class ParserContext:
         name: str | None = None
-        type: str = ""
         ip_interfaces: set[NetInterface] = field(default_factory=set)
         gateways: set[NetAddress] = field(default_factory=set)
 
         def to_record(self, target: Target) -> UnixInterfaceRecord:
             return UnixInterfaceRecord(
                 name=self.name,
-                enabled=None,
                 cidr=self.ip_interfaces,
                 gateway=list(self.gateways),
                 source="/proc/net/route",
@@ -364,18 +362,40 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             )
 
     def interfaces(self) -> Iterator:
+        interfaces: dict[str, ProcConfigParser.ParserContext] = {}
+
+        routes = self._parse_proc_net_route(interfaces)
+
+        # Find locally bound IPv4 addresses from /proc/net/tcp and correlate with routes
+        tcp_local_ipv4 = self._parse_proc_net_tcp_local_ipv4()
+        for ipv4 in tcp_local_ipv4:
+            for route_name, route_ifaces in routes.items():
+                for route_iface in route_ifaces:
+                    if ipv4 in route_iface.network:
+                        iface = interfaces.setdefault(route_name, ProcConfigParser.ParserContext(name=route_name))
+                        iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
+                        break
+
+        self._parse_proc_net_if_inet6(interfaces)
+
+        for iface in interfaces.values():
+            yield iface.to_record(self._target)
+
+    def _be_hex_to_int(self, be_hex: str) -> int:
+        """Convert big-endian hex string to integer."""
+        return int.from_bytes(bytes.fromhex(be_hex), "little")
+
+    def _parse_proc_net_route(self, ctx: dict[str, ProcConfigParser.ParserContext]) -> dict[str, set[IPv4Interface]]:
         try:
             with self._target.fs.open("/proc/net/route") as f:
                 lines = f.read().decode().splitlines()
         except FileNotFoundError:
             self._target.log.info("File /proc/net/route not found")
-            return
+            return {}
         except Exception as e:
             self._target.log.warning("Error reading /proc/net/route")
             self._target.log.debug("", exc_info=e)
-            return
-
-        interfaces: dict[str, ProcConfigParser.ParserContext] = {}
+            return {}
 
         route_interfaces: dict[str, set[IPv4Interface]] = {}
         for line in lines[1:]:  # Skip header
@@ -393,19 +413,12 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
             # Add gateway if not 0.0.0.0
             if (gateway := self._be_hex_to_int(gateway_hex)) != 0:
-                iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                iface = ctx.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
                 iface.gateways.add(ip_address(gateway))
 
-        # Find locally bound IPv4 addresses from /proc/net/tcp and correlate with routes
-        tcp_local_ipv4 = self.parse_proc_net_tcp_local_ipv4()
-        for route_name, route_ifaces in route_interfaces.items():
-            for route_iface in route_ifaces:
-                for ipv4 in tcp_local_ipv4:
-                    if ipv4 in route_iface.network:
-                        iface = interfaces.setdefault(route_name, ProcConfigParser.ParserContext(name=route_name))
-                        iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
-                        break
+        return route_interfaces
 
+    def _parse_proc_net_if_inet6(self, ctx: dict[str, ProcConfigParser.ParserContext]) -> None:
         # Parse IPv6 from /proc/net/if_inet6
         try:
             with self._target.fs.open("/proc/net/if_inet6") as f:
@@ -415,7 +428,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
                         self._target.log.warning("Skipping malformed line in /proc/net/if_inet6: %s", line)
                         continue
                     ipv6_hex, _, prefixlen_hex, _, _, iface_name = parts
-                    iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                    iface = ctx.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
                     ipv6_addr = int(ipv6_hex, 16)
                     prefix_len = int(prefixlen_hex, 16)
                     iface.ip_interfaces.add(ip_interface((ipv6_addr, prefix_len)))
@@ -426,13 +439,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             self._target.log.warning("Error parsing /proc/net/if_inet6")
             self._target.log.debug("", exc_info=e)
 
-        for iface in interfaces.values():
-            yield iface.to_record(self._target)
-
-    def _be_hex_to_int(self, be_hex: str) -> int:
-        return int.from_bytes(bytes.fromhex(be_hex), "little")
-
-    def parse_proc_net_tcp_local_ipv4(self) -> set[IPv4Address]:
+    def _parse_proc_net_tcp_local_ipv4(self) -> set[IPv4Address]:
         try:
             with self._target.fs.open("/proc/net/tcp") as f:
                 lines = f.read().decode().splitlines()
@@ -449,14 +456,12 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             fields = line.split()
             if len(fields) < 4:
                 continue
-            local_address = fields[1]
-            state = fields[3]
+            _, local_address, _, state, *_ = fields
             if state == "0A":  # 0A: systemd pollutes outgoing connections so we filter them out
                 continue
             try:
                 ip_hex, _ = local_address.split(":", 1)
-                addr = ip_address(self._be_hex_to_int(ip_hex))
-                local_ips.add(addr)
+                local_ips.add(ip_address(self._be_hex_to_int(ip_hex)))
             except Exception:
                 self._target.log.warning("Failed to parse local address in /proc/net/tcp: %s", local_address)
                 continue
