@@ -559,9 +559,7 @@ def register(plugincls: type[Plugin]) -> None:
 
     module_key = f"{module_path}.{plugincls.__qualname__}"
 
-    namespace = plugincls.__namespace__
-    if issubclass(plugincls, NamespacePlugin):
-        namespace = full_namespace(plugincls)
+    namespace = full_namespace(plugincls)
 
     if not issubclass(plugincls, ChildTargetPlugin):
         # First pass to resolve aliases
@@ -855,6 +853,8 @@ def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
             paths.setdefault(descriptor.path, []).append(descriptor)
 
             if descriptor.namespace:
+                # This adds the ``<namespace>.<function_name>`` to the generated paths.
+                # Then we can find the namespace (function) using its namespace
                 func_part = descriptor.name.split(".")[-1]
                 paths.setdefault(f"{descriptor.namespace}.{func_part}", []).append(descriptor)
 
@@ -902,7 +902,8 @@ def find_functions(
         else:
             # If we don't have an exact function match, do a slower treematch
             if matches := list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden)):
-                found.extend(match for match in matches if match not in found)
+                matched_dict = dict.fromkeys(matches)
+                found.extend(matched_dict.keys())
             else:
                 invalid_functions.add(pattern)
 
@@ -1338,12 +1339,18 @@ class ChildTargetPlugin(Plugin):
         raise NotImplementedError
 
 
-def full_namespace(namespace_plugin: type[NamespacePlugin]) -> None:
-    namespace = namespace_plugin.__namespace__
-    for klass in namespace_plugin.mro()[1:]:
-        if hasattr(klass, "__namespace__") and klass.__namespace__:
-            namespace = f"{klass.__namespace__}.{namespace}"
-    return namespace
+def full_namespace(plugin_cls: type[Plugin]) -> str | None:
+    """Returns the full namespace of ``plugin_cls`` using the mro()
+
+    When ``plugin_cls`` has multiple plugins as its base, the namespace will reflect that
+    """
+    if plugin_cls.__namespace__ is None:
+        return None
+
+    mro = plugin_cls.mro()
+    mro.reverse()
+    # Join all the namespaces together
+    return ".".join(klass.__namespace__ for klass in mro if issubclass(klass, Plugin) and klass.__namespace__)
 
 
 class NamespacePlugin(Plugin):
@@ -1386,9 +1393,7 @@ class NamespacePlugin(Plugin):
         # Register the current plugin class as a subplugin with
         # the direct subclass of NamespacePlugin
 
-        namespace = cls.__namespace__
-
-        cls.__nsplugin__.__subplugins__.add(namespace)
+        cls.__nsplugin__.__subplugins__.add(cls.__namespace__)
 
         # Generate a tuple of class names for which we do not want to add subplugin functions, which is the
         # NamespacePlugin and all of its superclasses (minus the base object)
