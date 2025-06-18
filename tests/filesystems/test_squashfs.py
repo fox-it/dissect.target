@@ -10,11 +10,11 @@ from tests._utils import absolute_path
 
 @pytest.mark.parametrize("type", ["gzip", "gzip-opts", "lz4", "lzma", "lzo", "xz", "zstd"])
 def test_filesystem_squashfs(type: str) -> None:
-    """test if we detect and correctly iterate SquashFS filesystems."""
+    """Test if we detect and correctly iterate SquashFS filesystems."""
 
-    sqfs_gzip = Path(absolute_path(f"_data/filesystems/squashfs/{type}.sqfs"))
+    sqfs_bin = absolute_path(f"_data/filesystems/squashfs/{type}.sqfs")
 
-    with sqfs_gzip.open("rb") as fh:
+    with sqfs_bin.open("rb") as fh:
         assert SquashFSFilesystem.detect(fh)
 
         fs = SquashFSFilesystem(fh)
