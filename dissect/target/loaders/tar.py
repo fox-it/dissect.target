@@ -42,8 +42,6 @@ TAR_MAGIC_COMP = (
 )
 TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
-ANON_FS_RE = re.compile(r"^fs[0-9]+$")
-
 WINDOWS_MEMBERS = (
     "windows/system32",
     "/windows/system32",
@@ -71,8 +69,6 @@ class TarSubLoader(SubLoader[tf.TarFile]):
 
 class GenericTarSubLoader(TarSubLoader):
     """Generic tar sub loader.
-
-    Recognises acquire tar files and regular tar files. Attempts to map sysvol and c: volume names.
     """
 
     @staticmethod

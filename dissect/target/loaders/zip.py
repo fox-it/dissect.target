@@ -13,8 +13,6 @@ from dissect.target.loader import Loader, SubLoader
 if TYPE_CHECKING:
     from pathlib import Path
 
-log = logging.getLogger(__name__)
-
 ZIP_EXT = (".zip",)
 
 class ZipSubLoader(SubLoader[zf.Path]):
