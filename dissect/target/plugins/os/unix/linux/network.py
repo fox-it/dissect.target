@@ -370,6 +370,10 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         except FileNotFoundError:
             self._target.log.info("File /proc/net/route not found")
             return
+        except Exception as e:
+            self._target.log.warning("Error reading /proc/net/route")
+            self._target.log.debug("", exc_info=e)
+            return
 
         interfaces: dict[str, ProcConfigParser.ParserContext] = {}
 
@@ -384,7 +388,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
             # Only add CIDR if not default route
             if (addr := self._be_hex_to_int(destination_hex)) != 0:
-                mask_bit_count = self._be_hex_to_int(mask).bit_count()
+                mask_bit_count = bin(self._be_hex_to_int(mask)).count("1")
                 route_interfaces.setdefault(iface_name, set()).add(ip_interface((addr, mask_bit_count)))
 
             # Add gateway if not 0.0.0.0
@@ -432,8 +436,12 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         try:
             with self._target.fs.open("/proc/net/tcp") as f:
                 lines = f.read().decode().splitlines()
-        except Exception:
-            self._target.log.exception("Error reading /proc/net/tcp")
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/tcp does not exist")
+            return set()
+        except Exception as e:
+            self._target.log.warning("Error reading /proc/net/route")
+            self._target.log.debug("", exc_info=e)
             return set()
 
         local_ips = set()
