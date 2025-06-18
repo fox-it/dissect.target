@@ -243,7 +243,7 @@ class AtTask:
         }
         for trigger in self.at_data.task_triggers:
             trigger_type = TRIGGER_TYPE_NAMES.get(trigger.trigger_type, None)
-            enabled = not trigger.trigger_flags.trigger_disabled
+            trigger_enabled = not trigger.trigger_flags.trigger_disabled
 
             s_year = trigger.begin_year
             s_month = trigger.begin_month
@@ -263,7 +263,7 @@ class AtTask:
             execution_time_limit = self.minutes_duration_to_iso(round(self.at_data.max_run_time / 60000))
 
             base = TriggerRecord(
-                enabled=enabled,
+                trigger_enabled=trigger_enabled,
                 start_boundary=start_boundary,
                 end_boundary=end_boundary,
                 repetition_interval=repetition_interval,
@@ -332,7 +332,7 @@ class AtTask:
                 months_of_year = self.get_months_of_year(trigger.trigger_specific2)
 
                 record = MonthlyDateTriggerRecord(
-                    day_of_month=day_of_month,
+                    day_of_month=[day_of_month],
                     months_of_year=months_of_year,
                 )
 
@@ -340,18 +340,10 @@ class AtTask:
 
             if trigger_type == "MONTHLYDOW":
                 week = trigger.trigger_specific0
-                week_strings = [
-                    "FIRST_WEEK",
-                    "SECOND_WEEK",
-                    "THIRD_WEEK",
-                    "FOURTH_WEEK",
-                    "LAST_WEEK",
-                ]
-                week = week_strings[week - 1]
                 days = self.get_days_of_week(trigger.trigger_specific1)
                 months = self.get_months_of_year(trigger.trigger_specific2)
                 record = MonthlyDowTriggerRecord(
-                    which_week=week,
+                    which_week=[week],
                     days_of_week=days,
                     months_of_year=months,
                 )

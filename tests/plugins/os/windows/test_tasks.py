@@ -139,6 +139,7 @@ def assert_at_task_properties(at_task: TaskRecord) -> None:
 def assert_xml_task_grouped_properties(xml_task_grouped: GroupedRecord) -> None:
     assert xml_task_grouped.action_type == "ComHandler"
     assert xml_task_grouped.class_id == "{9885AEF2-BD9F-41E0-B15E-B3141395E803}"
+    assert xml_task_grouped.com_data == "<Data>$(Arg0);$(Arg1);$(Arg2);$(Arg3);$(Arg4);$(Arg5);$(Arg6);$(Arg7)</Data>"
     assert xml_task_grouped.data is None
 
 
@@ -167,21 +168,23 @@ def assert_at_task_grouped_padding(at_task_grouped: GroupedRecord) -> None:
 
 
 def assert_at_task_grouped_monthlydow(at_task_grouped: GroupedRecord) -> None:
-    assert at_task_grouped.records[1].enabled
+    assert at_task_grouped.records[0].enabled
+    assert at_task_grouped.records[1].trigger_enabled
     assert at_task_grouped.start_boundary == datetime.fromisoformat("2023-05-11 00:00:00+00:00")
     assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-20 00:00:00+00:00")
     assert at_task_grouped.repetition_interval == "PT1M"
     assert at_task_grouped.repetition_duration == "PT12H13M"
     assert at_task_grouped.repetition_stop_duration_end
     assert at_task_grouped.execution_time_limit == "P3D"
-    assert at_task_grouped.which_week == "SECOND_WEEK"
+    assert at_task_grouped.which_week == [2]
     assert at_task_grouped.days_of_week == ["Wednesday"]
     assert at_task_grouped.months_of_year == ["June", "September"]
     assert_at_task_grouped_padding(at_task_grouped)
 
 
 def assert_at_task_grouped_weekly(at_task_grouped: GroupedRecord) -> None:
-    assert at_task_grouped.records[1].enabled
+    assert at_task_grouped.records[0].enabled
+    assert at_task_grouped.records[1].trigger_enabled
     assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-27 00:00:00+00:00")
     assert at_task_grouped.execution_time_limit == "P3D"
     assert at_task_grouped.repetition_duration == "PT1H"
@@ -195,9 +198,10 @@ def assert_at_task_grouped_weekly(at_task_grouped: GroupedRecord) -> None:
 
 
 def assert_at_task_grouped_monthly_date(at_task_grouped: GroupedRecord) -> None:
-    assert at_task_grouped.day_of_month == "15"
+    assert at_task_grouped.records[0].enabled
+    assert at_task_grouped.records[1].trigger_enabled
+    assert at_task_grouped.day_of_month == [15]
     assert at_task_grouped.months_of_year == ["March", "May", "June", "July", "August", "October"]
-    assert at_task_grouped.records[1].enabled
     assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-29 00:00:00+00:00")
     assert at_task_grouped.execution_time_limit == "P3D"
     assert at_task_grouped.repetition_duration == "PT4H44M"
