@@ -74,7 +74,7 @@ def assert_xml_task_properties(xml_task: TaskRecord) -> None:
     assert xml_task.network_profile_name is None
     assert xml_task.run_only_network_available is None
     assert xml_task.wake_to_run is None
-    assert xml_task.enabled is None
+    assert xml_task.enabled
     assert xml_task.hidden
     assert xml_task.delete_expired_task_after is None
     assert xml_task.idle_duration is None
@@ -151,12 +151,12 @@ def assert_at_task_grouped_exec(at_task_grouped: GroupedRecord) -> None:
 
 def assert_at_task_grouped_daily(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.days_between_triggers == 3
-    assert at_task_grouped.end_boundary == "2023-05-12"
+    assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-12 00:00:00+00:00")
     assert at_task_grouped.execution_time_limit == "P3D"
     assert at_task_grouped.repetition_duration == "PT13H15M"
     assert at_task_grouped.repetition_interval == "PT12M"
-    assert at_task_grouped.repetition_stop_duration_end == "True"
-    assert at_task_grouped.start_boundary == "2023-05-11"
+    assert at_task_grouped.repetition_stop_duration_end
+    assert at_task_grouped.start_boundary == datetime.fromisoformat("2023-05-11 00:00:00+00:00")
     assert_at_task_grouped_padding(at_task_grouped)
 
 
@@ -167,12 +167,12 @@ def assert_at_task_grouped_padding(at_task_grouped: GroupedRecord) -> None:
 
 
 def assert_at_task_grouped_monthlydow(at_task_grouped: GroupedRecord) -> None:
-    assert at_task_grouped.records[1].enabled == "True"
-    assert at_task_grouped.start_boundary == "2023-05-11"
-    assert at_task_grouped.end_boundary == "2023-05-20"
+    assert at_task_grouped.records[1].enabled
+    assert at_task_grouped.start_boundary == datetime.fromisoformat("2023-05-11 00:00:00+00:00")
+    assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-20 00:00:00+00:00")
     assert at_task_grouped.repetition_interval == "PT1M"
     assert at_task_grouped.repetition_duration == "PT12H13M"
-    assert at_task_grouped.repetition_stop_duration_end == "True"
+    assert at_task_grouped.repetition_stop_duration_end
     assert at_task_grouped.execution_time_limit == "P3D"
     assert at_task_grouped.which_week == "SECOND_WEEK"
     assert at_task_grouped.days_of_week == ["Wednesday"]
@@ -181,13 +181,13 @@ def assert_at_task_grouped_monthlydow(at_task_grouped: GroupedRecord) -> None:
 
 
 def assert_at_task_grouped_weekly(at_task_grouped: GroupedRecord) -> None:
-    assert at_task_grouped.records[1].enabled == "True"
-    assert at_task_grouped.end_boundary == "2023-05-27"
+    assert at_task_grouped.records[1].enabled
+    assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-27 00:00:00+00:00")
     assert at_task_grouped.execution_time_limit == "P3D"
     assert at_task_grouped.repetition_duration == "PT1H"
     assert at_task_grouped.repetition_interval == "PT10M"
-    assert at_task_grouped.repetition_stop_duration_end == "True"
-    assert at_task_grouped.start_boundary == "2023-05-23"
+    assert at_task_grouped.repetition_stop_duration_end
+    assert at_task_grouped.start_boundary == datetime.fromisoformat("2023-05-23 00:00:00+00:00")
     assert at_task_grouped.days_of_week == ["Monday", "Wednesday", "Friday"]
     assert at_task_grouped.unused == [0]
     assert at_task_grouped.weeks_between_triggers == 1
@@ -197,13 +197,13 @@ def assert_at_task_grouped_weekly(at_task_grouped: GroupedRecord) -> None:
 def assert_at_task_grouped_monthly_date(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.day_of_month == "15"
     assert at_task_grouped.months_of_year == ["March", "May", "June", "July", "August", "October"]
-    assert at_task_grouped.records[1].enabled == "True"
-    assert at_task_grouped.end_boundary == "2023-05-29"
+    assert at_task_grouped.records[1].enabled
+    assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-29 00:00:00+00:00")
     assert at_task_grouped.execution_time_limit == "P3D"
     assert at_task_grouped.repetition_duration == "PT4H44M"
     assert at_task_grouped.repetition_interval == "PT17M"
-    assert at_task_grouped.repetition_stop_duration_end == "True"
-    assert at_task_grouped.start_boundary == "2023-05-23"
+    assert at_task_grouped.repetition_stop_duration_end
+    assert at_task_grouped.start_boundary == datetime.fromisoformat("2023-05-23 00:00:00+00:00")
 
 
 @pytest.mark.parametrize(
