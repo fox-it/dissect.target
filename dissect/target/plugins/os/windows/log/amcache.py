@@ -24,10 +24,10 @@ COMMON_ELEMENTS = [
     ("path", "path"),
     ("path", "filename"),
     ("path", "create"),
-    ("string", "size"),
+    ("varint", "size"),
     ("string", "magic"),
     ("string", "size_of_image"),
-    ("string", "pe_checksum"),
+    ("varint", "pe_checksum"),
     ("datetime", "link_date"),
     ("string", "linker_version"),
     ("string", "bin_file_version"),
@@ -83,7 +83,7 @@ def create_record(
         create=target.fs.path(create),
         size_of_image=install_properties.get("sizeofimage"),
         file_description=install_properties.get("filedescription"),
-        size=install_properties.get("size"),
+        size=int(install_properties.get("size", "0x00"), 16),
         digest=(
             None,
             install_properties.get("id")[4:],
@@ -103,7 +103,7 @@ def create_record(
         product_name=install_properties.get("productname"),
         pe_subsystem=install_properties.get("pesubsystem"),
         longname=install_properties.get("longname"),
-        pe_checksum=install_properties.get("pechecksum"),
+        pe_checksum=int(install_properties.get("pechecksum", "0x00"), 16),
         _target=target,
     )
 

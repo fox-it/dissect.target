@@ -201,3 +201,5 @@ def test_amcache_install_entry(target_win: Target) -> None:
         assert str(entry.path) == r"C:\Users\JohnCena"
         assert str(entry.longname) == r"7z2201-x64.exe"
         assert entry.filesize == 1575742
+        assert entry.size == 0x180B3E
+        assert entry.pe_checksum == 0
