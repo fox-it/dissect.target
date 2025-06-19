@@ -29,8 +29,8 @@ PrefetchRecord = TargetRecordDescriptor(
 )
 
 
-GroupedPrefetchRecord = TargetRecordDescriptor(
-    "filesystem/ntfs/prefetch",
+CompactPrefetchRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/prefetch/compact",
     [
         ("datetime", "ts"),
         ("path", "filename"),
@@ -259,9 +259,9 @@ class PrefetchPlugin(Plugin):
         if len(list(self.prefetchdir.iterdir())) == 0:
             raise UnsupportedPluginError("No prefetch files found")
 
-    @export(record=[PrefetchRecord, GroupedPrefetchRecord])
-    @arg("--grouped", action="store_true", help="Group the prefetch record")
-    def prefetch(self, grouped: bool = False) -> Iterator[PrefetchRecord | GroupedPrefetchRecord]:
+    @export(record=[PrefetchRecord, CompactPrefetchRecord])
+    @arg("--compact", action="store_true", help="Compact the prefetch records")
+    def prefetch(self, compact: bool = False) -> Iterator[PrefetchRecord | CompactPrefetchRecord]:
         """Return the content of all prefetch files.
 
         Prefetch is a memory management feature in Windows. It contains information (for example run count and
@@ -282,7 +282,7 @@ class PrefetchPlugin(Plugin):
             linkedfile (path): The linked file entry.
             runcount (int): The run count.
 
-        with ``--grouped``:
+        with ``--compact``:
 
         Yields PrefetchRecords with fields:
 
@@ -312,8 +312,8 @@ class PrefetchPlugin(Plugin):
             filename = self.target.fs.path(scca.header.name.decode("utf-16-le", errors="ignore").split("\x00")[0])
             entry_name = self.target.fs.path(entry.name)
 
-            if grouped:
-                yield GroupedPrefetchRecord(
+            if compact:
+                yield CompactPrefetchRecord(
                     ts=scca.latest_timestamp,
                     filename=filename,
                     prefetch=entry_name,

@@ -29,7 +29,7 @@ else:
 
 log = logging.getLogger(__name__)
 
-CACHE_SIZE = 1024 * 1024
+CACHE_SIZE = 64 * 1024  # Tuned for ~0.7GB of memory usage on extFS
 
 
 class DissectMount(Operations):
