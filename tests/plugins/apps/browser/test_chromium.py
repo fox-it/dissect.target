@@ -49,7 +49,7 @@ def test_chromium_history(target_platform: Target, request: pytest.FixtureReques
         == "https://www.google.com/search?q=fox-it+github+dissect&oq=fox-it+github+dissect&gs_lcrp=EgZjaHJvbWUyBggA"
         "EEUYOTIHCAEQIRigAdIBCDU2OTNqMGo3qAIAsAIA&sourceid=chrome&ie=UTF-8"
     )
-    assert records[0].id == "1"
+    assert records[0].id == 1
     assert records[0].visit_count == 2
     assert records[0].ts == dt("2022-12-22T12:14:26.396332+00:00")
 
@@ -106,7 +106,7 @@ def test_chromium_extensions(target_platform: Target, request: pytest.FixtureReq
     assert records[0].ts_update == dt("2023-04-18T08:43:37.773874+00:00")
     assert records[0].name == "Web Store"
     assert records[0].version == "0.2"
-    assert records[0].id == "ahfgeienlihckogmohjhadlkjgocpleb"
+    assert records[0].extension_id == "ahfgeienlihckogmohjhadlkjgocpleb"
 
 
 def test_windows_chromium_passwords(target_chromium_win: Target) -> None:

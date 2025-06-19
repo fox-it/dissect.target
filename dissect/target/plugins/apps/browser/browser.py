@@ -27,7 +27,7 @@ GENERIC_EXTENSION_RECORD_FIELDS = [
     ("datetime", "ts_install"),
     ("datetime", "ts_update"),
     ("string", "browser"),
-    ("string", "id"),
+    ("string", "extension_id"),
     ("string", "name"),
     ("string", "short_name"),
     ("string", "default_title"),
@@ -58,7 +58,7 @@ GENERIC_COOKIE_FIELDS = [
 GENERIC_HISTORY_RECORD_FIELDS = [
     ("datetime", "ts"),
     ("string", "browser"),
-    ("string", "id"),
+    ("varint", "id"),
     ("uri", "url"),
     ("string", "title"),
     ("string", "description"),

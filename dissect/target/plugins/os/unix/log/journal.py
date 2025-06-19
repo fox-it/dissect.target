@@ -28,7 +28,8 @@ JournalRecord = TargetRecordDescriptor(
         # User Journal fields
         ("string", "message"),
         ("string", "message_id"),
-        ("varint", "priority"),
+        ("varint", "priority_int"),
+        ("string", "priority"),
         ("path", "code_file"),
         ("varint", "code_line"),
         ("string", "code_func"),
@@ -61,7 +62,7 @@ JournalRecord = TargetRecordDescriptor(
         ("string", "systemd_session"),
         ("string", "systemd_owner_uid"),
         ("string", "selinux_context"),
-        ("string", "boot_id"),
+        ("string", "kernel_boot_id"),
         ("string", "machine_id"),
         ("string", "systemd_invocation_id"),
         ("string", "transport"),
@@ -265,6 +266,17 @@ struct EntryArrayObject_Compact {
 
 c_journal = cstruct().load(journal_def)
 
+# Resource: https://wiki.archlinux.org/title/Systemd/Journal
+MAP_PRIORITY = [
+    "emerg",
+    "alert",
+    "crit",
+    "err",
+    "warning",
+    "notice",
+    "info",
+    "debug",
+]
 
 def get_optional(value: str, to_type: Callable) -> Any | None:
     """Return the value if True, otherwise return None."""
@@ -441,11 +453,13 @@ class JournalPlugin(Plugin):
                 continue
 
             for entry in journal:
+                priority = int_or_none(entry.get("priority"))
                 yield JournalRecord(
                     ts=entry.get("ts"),
                     message=entry.get("message"),
                     message_id=entry.get("message_id"),
-                    priority=int_or_none(entry.get("priority")),
+                    priority_int=priority,
+                    priority=MAP_PRIORITY[priority] if priority else None,
                     code_file=get_optional(entry.get("code_file"), path_function),
                     code_line=int_or_none(entry.get("code_line")),
                     code_func=entry.get("code_func"),
@@ -477,7 +491,7 @@ class JournalPlugin(Plugin):
                     systemd_session=entry.get("systemd_session"),
                     systemd_owner_uid=entry.get("systemd_owner_uid"),
                     selinux_context=entry.get("selinux_context"),
-                    boot_id=entry.get("boot_id"),
+                    kernel_boot_id=entry.get("boot_id"),
                     machine_id=entry.get("machine_id"),
                     systemd_invocation_id=entry.get("systemd_invocation_id"),
                     transport=entry.get("transport"),

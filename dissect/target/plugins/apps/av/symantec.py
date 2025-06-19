@@ -28,7 +28,7 @@ SEPLogRecord = TargetRecordDescriptor(
         ("string", "action_taken"),
         ("string", "virus_type"),
         ("varint", "scan_id"),
-        ("varint", "quarantine_id"),
+        ("string", "quarantine_id"),
         ("varint", "virus_id"),
         ("varint", "depth"),
         ("boolean", "still_infected"),

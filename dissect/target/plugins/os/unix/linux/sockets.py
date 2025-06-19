@@ -41,7 +41,7 @@ UnixSocketRecord = TargetRecordDescriptor(
     [
         ("string", "protocol"),
         ("uint32", "ref"),
-        ("string", "flags"),
+        ("string", "socket_flags"),
         ("string", "type"),
         ("string", "state"),
         ("uint32", "inode"),
@@ -120,7 +120,7 @@ class NetSocketPlugin(Plugin):
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.
-            flags (bytes): The flags associated with the socket.
+            socket_flags (bytes): The flags associated with the socket.
             type (string): The stream type of the socket.
             state (string): The state of the socket.
             inode (int): The inode associated to the socket.
@@ -210,7 +210,7 @@ class NetSocketPlugin(Plugin):
         return UnixSocketRecord(
             protocol=data.protocol_string,
             ref=data.ref,
-            flags=data.flags,
+            socket_flags=data.flags,
             type=data.stream_type_string,
             state=data.state_string,
             inode=data.inode,
