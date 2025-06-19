@@ -1167,7 +1167,7 @@ def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -
     argvalues=[
         (LinuxPlugin, ["linux", "unix"]),
         (FortiOSPlugin, ["fortios", "linux", "unix"]),
-        (DebianPlugin, ["linux", "linux", "unix"]),
+        (DebianPlugin, ["linux", "unix"]),
     ],
 )
 def test_os_tree(target_bare: Target, os_plugin: type[OSPlugin], results: list[str]) -> None:

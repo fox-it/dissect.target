@@ -1261,8 +1261,7 @@ class OSPlugin(Plugin):
     @internal
     def os_tree(self) -> list[str]:
         """Returns the :func:`os` value of this and all the OS plugin parents."""
-        instance, _ = self.target._functions["os"]
-        output: list[str] = []
+        result: list[str] = []
         for klass in self.__class__.mro():
             if not issubclass(klass, OSPlugin):
                 # In case the plugin extends multiple different classes.
@@ -1271,8 +1270,9 @@ class OSPlugin(Plugin):
             if klass is OSPlugin:
                 break
 
-            output.append(klass.os.__get__(instance))
-        return output
+            result.append(klass.os.__get__(self))
+        # dicts maintain insertion order, we use it here to get rid of duplicates
+        return list(dict.fromkeys(result))
 
     @export(property=True)
     def architecture(self) -> str | None:
