@@ -278,6 +278,7 @@ MAP_PRIORITY = [
     "debug",
 ]
 
+
 def get_optional(value: str, to_type: Callable) -> Any | None:
     """Return the value if True, otherwise return None."""
 
