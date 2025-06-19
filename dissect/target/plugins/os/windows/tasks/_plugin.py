@@ -115,7 +115,11 @@ class TasksPlugin(Plugin):
         if len(self.task_files) == 0:
             raise UnsupportedPluginError("No task files")
 
-    @export(record=DynamicDescriptor(["path", "datetime"]))
+    @export(
+        record=[
+            TaskRecord,
+        ]
+    )
     def tasks(self) -> Iterator[TaskRecord | GroupedRecord]:
         """Return all scheduled tasks on a Windows system.
 
@@ -151,10 +155,10 @@ class TasksPlugin(Plugin):
 
                 # Actions
                 for action in task_object.get_actions():
-                    grouped = GroupedRecord("filesystem/windows/task/grouped", [record, action])
+                    grouped = GroupedRecord(action._desc.name, [record, action])
                     yield grouped
 
                 # Triggers
                 for trigger in task_object.get_triggers():
-                    grouped = GroupedRecord("filesystem/windows/task/grouped", [record, trigger])
+                    grouped = GroupedRecord(trigger._desc.name, [record, trigger])
                     yield grouped

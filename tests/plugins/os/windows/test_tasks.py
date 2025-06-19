@@ -210,6 +210,13 @@ def assert_at_task_grouped_monthly_date(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.start_boundary == datetime.fromisoformat("2023-05-23 00:00:00+00:00")
 
 
+def assert_xml_task_trigger_properties(xml_task: GroupedRecord) -> None:
+    assert xml_task.records[0].enabled
+    assert xml_task.records[1].trigger_enabled
+    assert xml_task.days_between_triggers == 1
+    assert xml_task.start_boundary == datetime.fromisoformat("2023-05-12 00:00:00+00:00")
+
+
 @pytest.mark.parametrize(
     ("assert_func", "marker"),
     [
@@ -222,7 +229,7 @@ def test_single_record_properties(
     target_win: Target, setup_tasks_test: None, assert_func: Callable, marker: str
 ) -> None:
     records = list(target_win.tasks())
-    assert len(records) == 10
+    assert len(records) == 18
     pat = re.compile(rf"{marker}")
     records = filter(lambda x: re.findall(pat, str(x)), records)
     assert_func(next(iter(records)))
@@ -233,6 +240,7 @@ def test_single_record_properties(
     [
         (assert_xml_task_grouped_properties, "test_xml.xml.*ComHandler"),
         (assert_xml_task_grouped_properties, "MapsToastTask.*ComHandler"),
+        (assert_xml_task_trigger_properties, "MapsToastTask.*trigger_enabled"),
         (assert_at_task_grouped_exec, "NOTEPAD.EXE"),
         (assert_at_task_grouped_daily, "PT13H15M"),
         (assert_at_task_grouped_monthlydow, "June"),
@@ -244,7 +252,7 @@ def test_grouped_record_properties(
     target_win: Target, setup_invalid_tasks_test: pytest.fixture, assert_func: Callable, marker: str
 ) -> None:
     records = list(target_win.tasks())
-    assert len(records) == 10
+    assert len(records) == 18
     pat = re.compile(rf"{marker}")
     grouped_records = filter(lambda x: re.findall(pat, str(x)) and isinstance(x, GroupedRecord), records)
     assert_func(next(iter(grouped_records)))
@@ -255,5 +263,5 @@ def test_xml_task_invalid(
 ) -> None:
     caplog.clear()
     with caplog.at_level(logging.WARNING, target_win.log.name):
-        assert len(list(target_win.tasks())) == 10
+        assert len(list(target_win.tasks())) == 18
         assert "Invalid task file encountered:" in caplog.text
