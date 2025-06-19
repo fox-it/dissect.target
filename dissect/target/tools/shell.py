@@ -461,7 +461,7 @@ class TargetCmd(ExtendedCmd):
 
         def _exec_(argparts: list[str], stdout: TextIO) -> None:
             try:
-                output, value, _ = execute_function_on_target(self.target, func, argparts)
+                output, value = execute_function_on_target(self.target, func, argparts)
             except SystemExit:
                 return
 
