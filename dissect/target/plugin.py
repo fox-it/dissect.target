@@ -1260,7 +1260,7 @@ class OSPlugin(Plugin):
 
     @internal
     def os_tree(self) -> list[str]:
-        "Returns the :func:`os` functions for all the OSPlugin parents of the class."
+        """Returns the :func:`os` value of this and all the OS plugin parents."""
         instance, _ = self.target._functions["os"]
         output: list[str] = []
         for klass in self.__class__.mro():
