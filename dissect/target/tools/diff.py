@@ -24,6 +24,7 @@ from dissect.target.target import Target
 from dissect.target.tools.fsutils import print_extensive_file_stat_listing
 from dissect.target.tools.query import record_output
 from dissect.target.tools.shell import (
+    ANSI_COLORS,
     ExtendedCmd,
     TargetCli,
     _target_name,
@@ -402,15 +403,11 @@ class DifferentialCli(ExtendedCmd):
         src_name = _target_name(self.comparison.src_target)
         dst_name = _target_name(self.comparison.dst_target)
 
-        prompt_base = f"{src_name}/{dst_name}" if src_name != dst_name else src_name
-
-        if os.getenv("NO_COLOR"):
-            suffix = f"{prompt_base}:{self.cwd}$ "
-        else:
-            suffix = f"\x1b[1;32m{prompt_base}\x1b[0m:\x1b[1;34m{self.cwd}\x1b[0m$ "
+        base = f"{src_name}/{dst_name}" if src_name != dst_name else src_name
+        suffix = "{base}:{self.cwd}$" if os.getenv("NO_COLOR") else "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$"
 
         if len(self.targets) <= 2:
-            return f"(diff) {suffix}"
+            return f"(diff) {suffix} ".format(base=base, cwd=self.cwd, **ANSI_COLORS)  # type: ignore
 
         chain_prefix = "[ "
         for i in range(len(self.targets)):
@@ -418,7 +415,7 @@ class DifferentialCli(ExtendedCmd):
             chain_prefix += char
         chain_prefix += "] "
 
-        return f"(diff) {chain_prefix}{suffix}"
+        return f"(diff) {chain_prefix}{suffix} ".format(base=base, cwd=self.cwd, **ANSI_COLORS)  # type: ignore
 
     def _select_source_and_dest(self, src_index: int, dst_index: int) -> None:
         """Set local variables according to newly selected source and destination index, and re-instatiate

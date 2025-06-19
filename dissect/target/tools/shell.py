@@ -718,6 +718,12 @@ class TargetCli(TargetCmd):
             print(str(fs))
         return False
 
+    def do_mounts(self, line: str) -> bool:
+        """print target mounts"""
+        for mount, fs in self.target.fs.mounts.items():
+            print(f"{fs!s:<30}\t{mount}")
+        return False
+
     def do_info(self, line: str) -> bool:
         """print target information"""
         print_target_info(self.target)
@@ -1066,19 +1072,23 @@ class TargetCli(TargetCmd):
     @arg("-C", "--canonical", action="store_true")
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print a hexdump of a file"""
-        path = self.check_file(args.path)
-        if not path:
+        """print a hexdump of file(s)"""
+        paths = list(self.resolve_glob_path(args.path))
+        if not paths:
+            print(f"{args.path}: No such file or directory")
             return False
 
-        fh = path.open("rb")
-        if args.skip > 0:
-            fh.seek(args.skip + 1)
+        for path in paths:
+            if len(paths) > 1:
+                print(f"[{path}]", file=stdout)
+            fh = path.open("rb")
+            if args.skip > 0:
+                fh.seek(args.skip + 1)
 
-        if args.hex:
-            print(fh.read(args.length).hex(), file=stdout)
-        else:
-            print(hexdump(fh.read(args.length), output="string"), file=stdout)
+            if args.hex:
+                print(fh.read(args.length).hex(), file=stdout)
+            else:
+                print(hexdump(fh.read(args.length), output="string"), file=stdout)
 
         return False
 
