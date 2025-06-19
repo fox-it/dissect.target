@@ -42,7 +42,7 @@ def test_docs_get_func_description() -> None:
     func = IISLogsPlugin.logs
     func_desc = docs.get_func_description(func, with_docstrings=False)
 
-    assert func_desc == "iis.logs - Return contents of IIS (v7 and above) log files. (output: records)"
+    assert func_desc == "(webserver.)iis.logs - Return contents of IIS (v7 and above) log files. (output: records)"
 
     func_desc = docs.get_func_description(func, with_docstrings=True)
     lines_bag = get_nonempty_lines_set(func_desc)
