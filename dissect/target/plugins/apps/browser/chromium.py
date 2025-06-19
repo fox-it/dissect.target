@@ -453,7 +453,7 @@ class ChromiumMixin:
                             ts_install=ts_install,
                             ts_update=ts_update,
                             browser=browser_name,
-                            id=extension_id,
+                            extension_id=extension_id,
                             name=name,
                             short_name=short_name,
                             default_title=default_title,
@@ -643,7 +643,7 @@ class ChromiumMixin:
                         cipher = ChaCha20_Poly1305.new(key=key, nonce=data.iv)
 
                     else:
-                        raise ValueError("Unsupported ElevationService key flag {data.flag!r}")  # noqa: TRY301
+                        raise ValueError(f"Unsupported ElevationService key flag {data.flag!r}")  # noqa: TRY301
 
                     aes_key = cipher.decrypt_and_verify(data.ciphertext, data.mac_tag)
 
