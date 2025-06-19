@@ -1258,6 +1258,22 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
+    @internal
+    def os_tree(self) -> list[str]:
+        "Returns the :func:`os` functions for all the OSPlugin parents of the class."
+        instance, _ = self.target._functions["os"]
+        output: list[str] = []
+        for klass in self.__class__.mro():
+            if not issubclass(klass, OSPlugin):
+                # In case the plugin extends multiple different classes.
+                continue
+
+            if klass is OSPlugin:
+                break
+
+            output.append(klass.os.__get__(instance))
+        return output
+
     @export(property=True)
     def architecture(self) -> str | None:
         """Return a slug of the target's OS architecture.
