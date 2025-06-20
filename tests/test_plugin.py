@@ -1171,6 +1171,7 @@ def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -
     ],
 )
 def test_os_tree(target_bare: Target, os_plugin: type[OSPlugin], results: list[str]) -> None:
+    """Test if we correctly return the OS name tree."""
     target_bare._os_plugin = os_plugin
     target_bare.apply()
     assert target_bare.os_tree() == results
