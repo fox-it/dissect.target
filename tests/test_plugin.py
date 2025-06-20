@@ -42,6 +42,9 @@ from dissect.target.plugin import (
 from dissect.target.plugins.apps.other.env import EnvironmentFilePlugin
 from dissect.target.plugins.general.users import UsersPlugin
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
+from dissect.target.plugins.os.unix.linux.fortios._os import FortiOSPlugin
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
@@ -1157,6 +1160,21 @@ def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -
         assert (os_docstring == subclass_docstring) is replaced
         if not replaced:
             assert subclass_docstring == f"Test docstring {method_name}."
+
+
+@pytest.mark.parametrize(
+    argnames=("os_plugin", "results"),
+    argvalues=[
+        (LinuxPlugin, ["linux", "unix"]),
+        (FortiOSPlugin, ["fortios", "linux", "unix"]),
+        (DebianPlugin, ["linux", "unix"]),
+    ],
+)
+def test_os_tree(target_bare: Target, os_plugin: type[OSPlugin], results: list[str]) -> None:
+    """Test if we correctly return the OS name tree."""
+    target_bare._os_plugin = os_plugin
+    target_bare.apply()
+    assert target_bare.os_tree() == results
 
 
 class _TestInternalPlugin(InternalPlugin):
