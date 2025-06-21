@@ -61,7 +61,6 @@ class EverythingPlugin(Plugin):
             try:
                 with self.target.fs.path(path).open() as everything_fh:
                     everything_file = EverythingDBParser(everything_fh)
-
                     for item in everything_file:
                         yield EverythingRecord(
                             path=item.file_path,

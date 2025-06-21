@@ -378,6 +378,46 @@ class EverythingDBParser:
 
         yield from self.parse_files(folder_list)
 
+    def parse_folder(self, folder: EverythingIndexObj, name: str):
+        folder.file_path = name
+        # This is hardcoded for all folders
+        folder.attributes = 16
+
+        if c_everything_header.EntryAttributes.has_folder_size in self.header.entry_attributes_flags:
+            folder.size = c_everything_header.uint64_t(self.fh)
+        if c_everything_header.EntryAttributes.has_date_created in self.header.entry_attributes_flags:
+            folder.date_created = c_everything_header.uint64_t(self.fh)
+        if c_everything_header.EntryAttributes.has_date_modified in self.header.entry_attributes_flags:
+            folder.date_modified = c_everything_header.uint64_t(self.fh)
+        if c_everything_header.EntryAttributes.has_date_accessed in self.header.entry_attributes_flags:
+            folder.date_accessed = c_everything_header.uint64_t(self.fh)
+        if c_everything_header.EntryAttributes.has_attributes in self.header.entry_attributes_flags:
+            folder.attributes = c_everything_header.uint32_t(self.fh)
+
+        if isinstance(self.filesystem_list[folder.fs_index], EverythingREFS):
+            # Unknown
+            c_everything_header.uint64_t(self.fh)
+            c_everything_header.uint64_t(self.fh)
+        elif isinstance(self.filesystem_list[folder.fs_index], EverythingNTFS):
+            # Unknown
+            c_everything_header.uint64_t(self.fh)
+        elif isinstance(self.filesystem_list[folder.fs_index], EverythingEFU):
+            if folder.parent_index is None:
+                # The EFU format does not contain the root drive, so it just puts random data into
+                # the metadata.  This will cause errors if passed to flow.record, so we remove it here
+                folder.date_accessed = None
+                folder.date_modified = None
+                folder.date_created = None
+                folder.size = None
+
+        # Must be done here because EFU files can contain garbage values
+        if folder.date_accessed is not None:
+            folder.date_accessed = wintimestamp(folder.date_accessed)
+        if folder.date_modified is not None:
+            folder.date_modified = wintimestamp(folder.date_modified)
+        if folder.date_created is not None:
+            folder.date_created = wintimestamp(folder.date_created)
+
     def parse_folders(self, folder_list: list[EverythingIndexObj]) -> Iterator[EverythingF]:
         temp_buf = b""
         for folder in folder_list:
@@ -405,48 +445,17 @@ class EverythingDBParser:
                 temp_buf = temp_buf[: len(temp_buf) - trunc_from_prev]
             temp_buf += self.fh.read(new_byte_count)
 
-            folder.file_path = temp_buf.decode()
-
-            # This is hardcoded for all folders
-            folder.attributes = 16
-
             # The yield can't happen here, because we can only call resolve_path once we finish this loop
-            if self.header.entry_attributes_flags.has_folder_size in self.header.entry_attributes_flags:
-                folder.size = c_everything_header.uint64_t(self.fh)
-            if self.header.entry_attributes_flags.has_date_created in self.header.entry_attributes_flags:
-                folder.date_created = c_everything_header.uint64_t(self.fh)
-            if self.header.entry_attributes_flags.has_date_modified in self.header.entry_attributes_flags:
-                folder.date_modified = c_everything_header.uint64_t(self.fh)
-            if self.header.entry_attributes_flags.has_date_accessed in self.header.entry_attributes_flags:
-                folder.date_accessed = c_everything_header.uint64_t(self.fh)
-            if self.header.entry_attributes_flags.has_attributes in self.header.entry_attributes_flags:
-                folder.attributes = c_everything_header.uint32_t(self.fh)
-
-            if isinstance(self.filesystem_list[folder.fs_index], EverythingREFS):
-                # Unknown
-                c_everything_header.uint64_t(self.fh)
-                c_everything_header.uint64_t(self.fh)
-            elif isinstance(self.filesystem_list[folder.fs_index], EverythingNTFS):
-                # Unknown
-                c_everything_header.uint64_t(self.fh)
-            elif isinstance(self.filesystem_list[folder.fs_index], EverythingEFU):
-                if folder.parent_index is not None:
-                    continue
-                # The EFU format does not contain the root drive, so it just puts random data into
-                # the metadata.  This will cause errors if passed to flow.record, so we remove it here
-                folder.date_accessed = None
-                folder.date_modified = None
-                folder.date_created = None
-                folder.size = None
+            self.parse_folder(folder, temp_buf.decode())
 
         for folder in folder_list:
             yield EverythingF(
                 file_path=folder.resolve_path(folder_list),
                 size=folder.size,
                 attributes=folder.attributes,
-                date_created=wintimestamp(folder.date_created) if folder.date_created else None,
-                date_modified=wintimestamp(folder.date_modified) if folder.date_modified else None,
-                date_accessed=wintimestamp(folder.date_accessed) if folder.date_accessed else None,
+                date_created=folder.date_created,
+                date_modified=folder.date_modified,
+                date_accessed=folder.date_accessed,
                 file_type="directory",
             )
 
