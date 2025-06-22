@@ -95,7 +95,7 @@ TaskRecord = TargetRecordDescriptor(
 
 TriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger",
-    [
+    {
         ("string", "uri"),
         *BaseTriggerRecord.target_fields,
         *BootTriggerRecord.target_fields,
@@ -111,18 +111,18 @@ TriggerRecord = TargetRecordDescriptor(
         *TimeTriggerRecord.target_fields,
         *WeeklyTriggerRecord.target_fields,
         *WnfTriggerRecord.target_fields,
-    ],
+    },
 )
 
 ActionRecord = TargetRecordDescriptor(
     "filesystem/windows/task/action",
-    [
+    {
         ("string", "uri"),
         *ComHandlerRecord.target_fields,
         *ExecRecord.target_fields,
         *SendEmailRecord.target_fields,
         *ShowMessageRecord.target_fields,
-    ],
+    },
 )
 
 
