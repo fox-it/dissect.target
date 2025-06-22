@@ -7,6 +7,7 @@ from flow.record import GroupedRecord, RecordDescriptor
 
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.plugins.os.windows.tasks.records import (
+    BaseTriggerRecord,
     BootTriggerRecord,
     CalendarTriggerRecord,
     ComHandlerRecord,
@@ -22,7 +23,6 @@ from dissect.target.plugins.os.windows.tasks.records import (
     SessionStateChangeTriggerRecord,
     ShowMessageRecord,
     TimeTriggerRecord,
-    TriggerRecord,
     WeeklyTriggerRecord,
     WnfTriggerRecord,
 )
@@ -272,7 +272,7 @@ class XmlTask:
             random_delay = self.get_element("RandomDelay", trigger)
             trigger_data = self.get_element("Data", trigger)
 
-            base = TriggerRecord(
+            base = BaseTriggerRecord(
                 trigger_enabled=trigger_enabled,
                 start_boundary=start_boundary,
                 end_boundary=end_boundary,

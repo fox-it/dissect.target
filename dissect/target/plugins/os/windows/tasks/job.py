@@ -8,12 +8,12 @@ from flow.record import GroupedRecord
 
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.plugins.os.windows.tasks.records import (
+    BaseTriggerRecord,
     DailyTriggerRecord,
     ExecRecord,
     MonthlyDateTriggerRecord,
     MonthlyDowTriggerRecord,
     PaddingTriggerRecord,
-    TriggerRecord,
     WeeklyTriggerRecord,
 )
 
@@ -262,7 +262,7 @@ class AtTask:
             repetition_stop_duration_end = trigger.trigger_flags.kill_at_end == 1
             execution_time_limit = self.minutes_duration_to_iso(round(self.at_data.max_run_time / 60000))
 
-            base = TriggerRecord(
+            base = BaseTriggerRecord(
                 trigger_enabled=trigger_enabled,
                 start_boundary=start_boundary,
                 end_boundary=end_boundary,

@@ -228,7 +228,7 @@ def assert_xml_task_trigger_properties(xml_task: GroupedRecord) -> None:
 def test_single_record_properties(
     target_win: Target, setup_tasks_test: None, assert_func: Callable, marker: str
 ) -> None:
-    records = list(target_win.tasks())
+    records = list(target_win.tasks(compact=True))
     assert len(records) == 18
     pat = re.compile(rf"{marker}")
     records = filter(lambda x: re.findall(pat, str(x)), records)
@@ -251,7 +251,7 @@ def test_single_record_properties(
 def test_grouped_record_properties(
     target_win: Target, setup_invalid_tasks_test: pytest.fixture, assert_func: Callable, marker: str
 ) -> None:
-    records = list(target_win.tasks())
+    records = list(target_win.tasks(compact=True))
     assert len(records) == 18
     pat = re.compile(rf"{marker}")
     grouped_records = filter(lambda x: re.findall(pat, str(x)) and isinstance(x, GroupedRecord), records)
@@ -263,5 +263,5 @@ def test_xml_task_invalid(
 ) -> None:
     caplog.clear()
     with caplog.at_level(logging.WARNING, target_win.log.name):
-        assert len(list(target_win.tasks())) == 18
+        assert len(list(target_win.tasks(compact=True))) == 18
         assert "Invalid task file encountered:" in caplog.text

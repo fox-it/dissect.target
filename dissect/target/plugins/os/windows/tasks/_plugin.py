@@ -5,9 +5,29 @@ from typing import TYPE_CHECKING
 from flow.record import GroupedRecord
 
 from dissect.target.exceptions import InvalidTaskError, UnsupportedPluginError
-from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.os.windows.tasks.job import AtTask
+from dissect.target.plugins.os.windows.tasks.records import (
+    BaseTriggerRecord,
+    BootTriggerRecord,
+    CalendarTriggerRecord,
+    ComHandlerRecord,
+    DailyTriggerRecord,
+    EventTriggerRecord,
+    ExecRecord,
+    IdleTriggerRecord,
+    LogonTriggerRecord,
+    MonthlyDateTriggerRecord,
+    MonthlyDowTriggerRecord,
+    RegistrationTrigger,
+    SendEmailRecord,
+    SessionStateChangeTriggerRecord,
+    ShowMessageRecord,
+    TimeTriggerRecord,
+    WeeklyTriggerRecord,
+    WnfTriggerRecord,
+)
 from dissect.target.plugins.os.windows.tasks.xml import ScheduledTasks
 
 if TYPE_CHECKING:
@@ -73,6 +93,38 @@ TaskRecord = TargetRecordDescriptor(
     ],
 )
 
+TriggerRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/trigger",
+    [
+        ("string", "uri"),
+        *BaseTriggerRecord.target_fields,
+        *BootTriggerRecord.target_fields,
+        *CalendarTriggerRecord.target_fields,
+        *DailyTriggerRecord.target_fields,
+        *EventTriggerRecord.target_fields,
+        *IdleTriggerRecord.target_fields,
+        *LogonTriggerRecord.target_fields,
+        *MonthlyDateTriggerRecord.target_fields,
+        *MonthlyDowTriggerRecord.target_fields,
+        *RegistrationTrigger.target_fields,
+        *SessionStateChangeTriggerRecord.target_fields,
+        *TimeTriggerRecord.target_fields,
+        *WeeklyTriggerRecord.target_fields,
+        *WnfTriggerRecord.target_fields,
+    ],
+)
+
+ActionRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/action",
+    [
+        ("string", "uri"),
+        *ComHandlerRecord.target_fields,
+        *ExecRecord.target_fields,
+        *SendEmailRecord.target_fields,
+        *ShowMessageRecord.target_fields,
+    ],
+)
+
 
 class TasksPlugin(Plugin):
     """Plugin for retrieving scheduled tasks on a Windows system.
@@ -115,12 +167,9 @@ class TasksPlugin(Plugin):
         if len(self.task_files) == 0:
             raise UnsupportedPluginError("No task files")
 
-    @export(
-        record=[
-            TaskRecord,
-        ]
-    )
-    def tasks(self) -> Iterator[TaskRecord | GroupedRecord]:
+    @export(record=[TaskRecord, TriggerRecord, ActionRecord])
+    @arg("--compact", action="store_true", help="Compact the trigger & action records")
+    def tasks(self, compact: bool = False) -> Iterator[TaskRecord | TriggerRecord | ActionRecord | GroupedRecord]:
         """Return all scheduled tasks on a Windows system.
 
         On a Windows system, a scheduled task is a program or script that is executed on a specific time or at specific
@@ -150,15 +199,23 @@ class TasksPlugin(Plugin):
                 for attr in TaskRecord.fields:
                     record_kwargs[attr] = getattr(task_object, attr, None)
 
-                record = TaskRecord(**record_kwargs, _target=self.target)
-                yield record
+                task_record = TaskRecord(**record_kwargs, _target=self.target)
+                yield task_record
 
                 # Actions
                 for action in task_object.get_actions():
-                    grouped = GroupedRecord(action._desc.name, [record, action])
-                    yield grouped
+                    if compact:
+                        record = GroupedRecord("filesystem/windows/task/compact", [task_record, action])
+                    else:
+                        record = ActionRecord.init_from_record(action, raise_unknown=True)
+                        record.uri = task_record.uri
+                    yield record
 
                 # Triggers
                 for trigger in task_object.get_triggers():
-                    grouped = GroupedRecord(trigger._desc.name, [record, trigger])
-                    yield grouped
+                    if compact:
+                        record = GroupedRecord("filesystem/windows/task/compact", [task_record, trigger])
+                    else:
+                        record = TriggerRecord.init_from_record(trigger, raise_unknown=True)
+                        record.uri = task_record.uri
+                    yield record

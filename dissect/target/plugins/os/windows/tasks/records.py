@@ -67,8 +67,8 @@ TimeTriggerRecord = TargetRecordDescriptor(
     [],
 )
 
-TriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger",
+BaseTriggerRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/trigger/base",
     [
         ("boolean", "trigger_enabled"),
         ("datetime", "start_boundary"),
