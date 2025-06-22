@@ -168,8 +168,12 @@ class TasksPlugin(Plugin):
             raise UnsupportedPluginError("No task files")
 
     @export(record=[TaskRecord, TriggerRecord, ActionRecord])
-    @arg("--compact", action="store_true", help="Compact the trigger & action records")
-    def tasks(self, compact: bool = False) -> Iterator[TaskRecord | TriggerRecord | ActionRecord | GroupedRecord]:
+    @arg(
+        "--group",
+        action="store_true",
+        help="Group each trigger and action record together with its corresponding parent task record.",
+    )
+    def tasks(self, group: bool = False) -> Iterator[TaskRecord | TriggerRecord | ActionRecord | GroupedRecord]:
         """Return all scheduled tasks on a Windows system.
 
         On a Windows system, a scheduled task is a program or script that is executed on a specific time or at specific
@@ -204,8 +208,8 @@ class TasksPlugin(Plugin):
 
                 # Actions
                 for action in task_object.get_actions():
-                    if compact:
-                        record = GroupedRecord("filesystem/windows/task/compact", [task_record, action])
+                    if group:
+                        record = GroupedRecord("filesystem/windows/task/groupe", [task_record, action])
                     else:
                         record = ActionRecord.init_from_record(action, raise_unknown=True)
                         record.uri = task_record.uri
@@ -213,8 +217,8 @@ class TasksPlugin(Plugin):
 
                 # Triggers
                 for trigger in task_object.get_triggers():
-                    if compact:
-                        record = GroupedRecord("filesystem/windows/task/compact", [task_record, trigger])
+                    if group:
+                        record = GroupedRecord("filesystem/windows/task/groupe", [task_record, trigger])
                     else:
                         record = TriggerRecord.init_from_record(trigger, raise_unknown=True)
                         record.uri = task_record.uri
