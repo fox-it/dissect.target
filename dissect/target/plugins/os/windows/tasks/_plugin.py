@@ -68,7 +68,7 @@ TaskRecord = TargetRecordDescriptor(
         ("string", "restart_on_failure_interval"),
         ("string", "restart_on_failure_count"),
         ("string", "mutiple_instances_policy"),
-        ("boolean", "dissalow_start_on_batteries"),
+        ("boolean", "disallow_start_on_batteries"),
         ("boolean", "stop_going_on_batteries"),
         ("boolean", "allow_start_on_demand"),
         ("boolean", "start_when_available"),

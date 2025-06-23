@@ -118,7 +118,7 @@ class XmlTask:
         self.restart_on_failure_interval = self.get_element("Settings/RestartOnFailure/Interval")
         self.restart_on_failure_count = self.get_element("Settings/RestartOnFailure/Count")
         self.mutiple_instances_policy = self.get_element("Settings/MultipleInstancesPolicy")
-        self.dissalow_start_on_batteries = self.str_to_bool(self.get_element("Settings/DisallowStartIfOnBatteries"))
+        self.disallow_start_on_batteries = self.str_to_bool(self.get_element("Settings/DisallowStartIfOnBatteries"))
         self.stop_going_on_batteries = self.str_to_bool(self.get_element("Settings/StopIfGoingOnBatteries"))
         self.allow_hard_terminate = self.get_element("Settings/AllowHardTerminate")
         self.start_when_available = self.str_to_bool(self.get_element("Settings/StartWhenAvailable"))

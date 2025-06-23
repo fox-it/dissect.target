@@ -187,7 +187,7 @@ class AtTask:
         self.description = self.at_data.comment.rstrip("\x00")
         self.restart_on_failure_interval = self.minutes_duration_to_iso(self.at_data.retry_interval)
         self.restart_on_failure_count = self.at_data.retry_count
-        self.dissalow_start_on_batteries = bool(self.at_data.task_flags.disallow_battery)
+        self.disallow_start_on_batteries = bool(self.at_data.task_flags.disallow_battery)
         self.stop_going_on_batteries = bool(self.at_data.task_flags.stop_battery)
         self.run_only_network_available = bool(self.at_data.task_flags.internet_connected)
         self.wake_to_run = bool(self.at_data.task_flags.wake_to_run)
