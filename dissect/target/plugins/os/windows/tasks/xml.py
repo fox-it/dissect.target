@@ -98,11 +98,14 @@ def str_to_bool(string_to_convert: str) -> bool | None:
 
 
 class XmlTask:
-    """Initialize the XmlTask class for open XML-based task files.
+    """Parses and extracts information from an XML-based Task Scheduler file.
+
+    This class is used to extract metadata, triggers, and actions from a task
+    defined in an XML format (used in newer versions of Windows Task Scheduler).
 
     Args:
-        xml_file: the file to be parsed.
-        target: the target system.
+        task_element: The root XML element representing the task.
+        task_path: The path of the task in the target system.
     """
 
     def __init__(self, task_element: Element, task_path: TargetPath):
