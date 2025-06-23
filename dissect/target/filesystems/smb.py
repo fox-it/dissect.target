@@ -5,16 +5,6 @@ import stat
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import AlignedStream
-from impacket.nt_errors import STATUS_NOT_A_DIRECTORY
-from impacket.smb import ATTR_DIRECTORY, SharedFile
-from impacket.smb3structs import (
-    FILE_ATTRIBUTE_NORMAL,
-    FILE_NON_DIRECTORY_FILE,
-    FILE_OPEN,
-    FILE_READ_DATA,
-    FILE_SHARE_READ,
-)
-from impacket.smbconnection import SessionError, SMBConnection
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -28,6 +18,23 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+try:
+    from impacket.nt_errors import STATUS_NOT_A_DIRECTORY
+    from impacket.smb import ATTR_DIRECTORY, SharedFile
+    from impacket.smb3structs import (
+        FILE_ATTRIBUTE_NORMAL,
+        FILE_NON_DIRECTORY_FILE,
+        FILE_OPEN,
+        FILE_READ_DATA,
+        FILE_SHARE_READ,
+    )
+    from impacket.smbconnection import SessionError, SMBConnection
+
+    HAS_IMPACKET = True
+
+except ImportError:
+    HAS_IMPACKET = False
+
 log = logging.getLogger(__name__)
 
 
@@ -38,6 +45,12 @@ class SmbFilesystem(Filesystem):
 
     def __init__(self, conn: SMBConnection, share_name: str, *args, **kwargs):
         super().__init__(None, *args, **kwargs, alt_separator="\\", case_sensitive=False)
+
+        if not HAS_IMPACKET:
+            raise ImportError(
+                "Required dependency 'impacket' is missing, install with 'pip install dissect.target[smb]'"
+            )
+
         self.conn = conn
         self.share_name = share_name
 
