@@ -171,7 +171,7 @@ class TasksPlugin(Plugin):
     @arg(
         "--group",
         action="store_true",
-        help="Group each trigger and action record together with its corresponding parent task record.",
+        help="group each trigger and action record together with its corresponding parent task record",
     )
     def tasks(self, group: bool = False) -> Iterator[TaskRecord | TriggerRecord | ActionRecord | GroupedRecord]:
         """Return all scheduled tasks on a Windows system.
@@ -209,17 +209,23 @@ class TasksPlugin(Plugin):
                 # Actions
                 for action in task_object.get_actions():
                     if group:
-                        record = GroupedRecord("filesystem/windows/task/groupe", [task_record, action])
+                        record = GroupedRecord("filesystem/windows/task/grouped", [task_record, action])
                     else:
-                        record = ActionRecord(**action._asdict(), _target=self.target)
-                        record.uri = task_record.uri
+                        record = ActionRecord(
+                            **action._asdict(),
+                            uri=task_record.uri,
+                            _target=self.target
+                        )
                     yield record
 
                 # Triggers
                 for trigger in task_object.get_triggers():
                     if group:
-                        record = GroupedRecord("filesystem/windows/task/groupe", [task_record, trigger])
+                        record = GroupedRecord("filesystem/windows/task/grouped", [task_record, trigger])
                     else:
-                        record = TriggerRecord(**trigger._asdict(), _target=self.target)
-                        record.uri = task_record.uri
+                        record = TriggerRecord(
+                            **trigger._asdict(),
+                            uri=task_record.uri,
+                            _target=self.target
+                        )
                     yield record
