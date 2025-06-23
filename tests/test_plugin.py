@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from docutils.core import publish_string
 from docutils.utils import SystemMessage
+from flow.record import RecordDescriptor
 
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -1339,6 +1340,86 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
                 f"function {descriptor.func.__qualname__}: "
                 "default is implied as opposite boolean already."
             )
+
+
+seen_field_names: set[str] = set()
+seen_field_types: dict[str, tuple[str | None, RecordDescriptor]] = {}
+
+ELASTIC_FIELD_TYPES_MAP = {
+    # strings
+    "string": "wildcard",
+    "string[]": "wildcard",
+    "stringlist": "wildcard",
+    "wstring": "wildcard",
+    "path": "wildcard",
+    "uri": "wildcard",
+    "command": "wildcard",
+    # ints
+    "varint": "long",
+    "varint[]": "long",
+    "filesize": "long",
+    "uint32": "long",
+    "uint16": "long",
+    "float": "float",
+    # ip / cidr
+    "net.ipaddress": "ip",
+    "net.ipaddress[]": "ip",
+    "net.ipnetwork": "ip_range",
+    "net.ipnetwork[]": "ip_range",
+    "net.ipinterface": "ip_range",
+    "net.ipinterface[]": "ip_range",
+    # other
+    "datetime": "date",
+    "boolean": "boolean",
+    "bytes": "binary",
+    "digest": "keyword",
+    "dynamic": "wildcard",
+}
+
+@pytest.mark.parametrize(
+    "descriptor",
+    find_functions("*", Target(), compatibility=False, show_hidden=True)[0],
+    ids=lambda d: d.path,
+)
+@pytest.mark.xdist_group("sequential")
+def test_plugin_function_record_field_types_elastic(descriptor: FunctionDescriptor) -> None:
+    """Test if exported plugin functions yielding records do not conflict with their field names and types
+    for Elasticsearch adapters. Uses ``ELASTIC_FIELD_TYPES_MAP`` which is based on flow.record and ElasticSearch
+    field types. Maps various flow record types to a sensible Elasticsearch counterpart type.
+
+    Resources:
+        - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
+        - https://github.com/fox-it/flow.record/tree/main/flow/record/fieldtypes
+        - https://github.com/JSCU-NL/dissect-elastic
+    """
+
+    # Test if plugin function record fields make sense and do not conflict with other records.
+    if descriptor.output == "record" and hasattr(descriptor, "record"):
+
+        # Functions can yield a single record or a list of records.
+        records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+
+        for record in records:
+            if not isinstance(record, RecordDescriptor):
+                raise TypeError(f"{record!r} of function {descriptor!r} is not of type RecordDescriptor")
+
+            if not record.fields and not record.name == "empty":
+                raise AssertionError(f"{record!r} has no fields")
+
+            for name, field in record.fields.items():
+                # Make sure field names have the same type when translated. This check does not save multiple field name
+                # and typenames, this is a bare-minumum check only.
+                if name in seen_field_names:
+                    seen_typename, seen_record = seen_field_types[name]
+                    assert ELASTIC_FIELD_TYPES_MAP[seen_typename] == ELASTIC_FIELD_TYPES_MAP[field.typename], (
+                        f"<{record.name} ({field.typename!r}, '{name}')> is duplicate mismatch of <{seen_record.name} ({seen_typename!r}, '{name}')>"  # noqa: E501
+                    )
+                else:
+                    seen_field_names.add(name)
+                    seen_field_types[name] = (field.typename, record)
+
+                # NOTE: We could perform other checks here too, e.g. field names
+                # starting with "ts" should be of type "datetime"
 
 
 def assert_valid_rst(src: str) -> None:
