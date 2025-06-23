@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.helpers.fsutil import TargetPath
-    from dissect.target.helpers.record import RecordDescriptor
 
 atjob_def = """
 struct PRIORITY {
@@ -207,7 +206,7 @@ class AtTask:
             if getattr(self.at_data.task_prio, key):
                 self.priority = key
 
-    def get_actions(self) -> Iterator[RecordDescriptor]:
+    def get_actions(self) -> Iterator[GroupedRecord]:
         """Get the at job task actions.
 
         Yields:

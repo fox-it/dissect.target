@@ -211,11 +211,7 @@ class TasksPlugin(Plugin):
                     if group:
                         record = GroupedRecord("filesystem/windows/task/grouped", [task_record, action])
                     else:
-                        record = ActionRecord(
-                            **action._asdict(),
-                            uri=task_record.uri,
-                            _target=self.target
-                        )
+                        record = ActionRecord(**action._asdict(), uri=task_record.uri, _target=self.target)
                     yield record
 
                 # Triggers
@@ -223,9 +219,5 @@ class TasksPlugin(Plugin):
                     if group:
                         record = GroupedRecord("filesystem/windows/task/grouped", [task_record, trigger])
                     else:
-                        record = TriggerRecord(
-                            **trigger._asdict(),
-                            uri=task_record.uri,
-                            _target=self.target
-                        )
+                        record = TriggerRecord(**trigger._asdict(), uri=task_record.uri, _target=self.target)
                     yield record
