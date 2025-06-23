@@ -341,7 +341,7 @@ class XmlTask:
                     )
 
                 else:
-                    raise TypeError("Unknown calender type")
+                    raise ValueError("Unknown calendar type")
 
                 yield GroupedRecord(CalendarTriggerRecord.name, [base, record])
 
@@ -364,7 +364,7 @@ class XmlTask:
                 yield GroupedRecord(RegistrationTrigger.name, [base, record])
 
             else:
-                raise TypeError(f"Unknown trigger type: {trigger_type}")
+                raise ValueError(f"Unknown trigger type: {trigger_type}")
 
     def get_actions(self) -> Iterator[GroupedRecord]:
         """Get the actions from the XML task data.
