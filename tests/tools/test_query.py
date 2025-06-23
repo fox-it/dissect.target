@@ -27,6 +27,28 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
 
 
 @pytest.mark.parametrize(
+    "pattern",
+    [None, "*"],
+)
+def test_list_target(monkeypatch: pytest.MonkeyPatch, pattern: str | None) -> None:
+    """tests whether ``--list`` and ``--list *`` on a target target functions the same"""
+
+    with monkeypatch.context() as m:
+        _pattern: list[str] = [pattern] if pattern else []
+        m.setattr("sys.argv", ["target-query", "tests/_data/loaders/tar/test-archive.tar.gz", "--list", *_pattern])
+
+        plugin_matches, _ = mock_find_functions(patterns="foo,bar")
+
+        with (
+            patch("dissect.target.plugin._filter_compatible") as compatible,
+            patch("dissect.target.plugin._filter_tree_match", return_value=plugin_matches),
+        ):
+            target_query()
+
+            assert compatible.call_args[0][0] == plugin_matches
+
+
+@pytest.mark.parametrize(
     ("given_funcs", "expected_invalid_funcs"),
     [
         (
