@@ -83,7 +83,7 @@ class RunKeysPlugin(Plugin):
                     yield RunKeyRecord(
                         ts=r.ts,
                         name=entry.name,
-                        command=entry.value,
+                        command=entry.value or None,
                         key=key,
                         _target=self.target,
                         _key=r,
