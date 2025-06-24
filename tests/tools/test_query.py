@@ -31,7 +31,7 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
     [None, "*"],
 )
 def test_list_target(monkeypatch: pytest.MonkeyPatch, pattern: str | None) -> None:
-    """tests whether ``--list`` and ``--list *`` on a target target functions the same"""
+    """Tests whether ``--list`` and ``--list *`` on a target returns the same results."""
 
     with monkeypatch.context() as m:
         _pattern: list[str] = [pattern] if pattern else []
