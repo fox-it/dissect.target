@@ -51,8 +51,9 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
 
             with vm_config.open("rt") as fh:
                 for line in fh:
+                    line = line.strip()
                     if line.startswith("NAME="):
-                        return line.split("=", 1)[1].strip()
+                        return line.split("=", 1)[1].strip('"')
         except Exception as e:
             self.target.log.exception("Failed parsing NAME from vm_path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
