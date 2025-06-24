@@ -60,10 +60,15 @@ class WSLChildTargetPlugin(ChildTargetPlugin):
             raise UnsupportedPluginError("No WSL installs found")
 
     def _get_child_name(self, vm_path: TargetPath) -> str | None:
+        # Some WSL files are stored on disk by their GUID others by name. Search for the correct WSL and return name
         try:
-            vm_guid = vm_path.parent.name
-            vm_key = self.target.registry.key(f"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss\\{vm_guid}")
-            return vm_key.value("DistributionName").value
+            for lxss_key in self.target.registry.keys("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss"):
+                for distribution_key in lxss_key.subkeys():
+                    if not distribution_key.name.startswith("{"):
+                        continue
+                    base_path = self.target.resolve(distribution_key.value("BasePath").value)
+                    if base_path == vm_path.parent:
+                        return distribution_key.value("DistributionName").value
         except Exception as e:
             self.target.log.exception("Failed parsing registry key for vm name from path=%s", vm_path)
             self.target.log.debug("", exc_info=e)
