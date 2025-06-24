@@ -23,6 +23,7 @@ def test_child_colima(target_unix_users: Target, fs_unix: VirtualFilesystem) -> 
     children = list(target_unix_users.list_children())
 
     assert len(children) == 3
+    assert children[0].name == "colima"
     assert children[0].type == "colima"
     assert children[0].path == "/root/.colima/_lima/colima/diffdisk"
     assert children[1].path == "/root/.colima/_lima/colima-test/diffdisk"
