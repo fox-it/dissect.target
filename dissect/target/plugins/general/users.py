@@ -82,8 +82,47 @@ class UsersPlugin(InternalPlugin):
 
     def all_with_home(self) -> Iterator[UserDetails]:
         """Return :class:`UserDetails` objects for users that have existing directory set as home directory."""
-        for user in self.target.users():
-            if user.home:
-                user_details = self.get(user)
-                if user_details.home_path.exists():
-                    yield user_details
+
+        seen_home_directories: set[TargetPath] = set()
+        try:
+            for user in self.target.users():
+                if user.home:
+                    user_details = self.get(user)
+                    if user_details.home_path.exists():
+                        seen_home_directories.add(user_details.home_path)
+                        yield user_details
+        except Exception as e:
+            self.target.log.warning("Failed to retrieve user details, falling back to hardcoded locations.")
+            self.target.log.debug("", exc_info=e)
+
+        # Iterate over misc home directories
+        for misc_home_dir, user_criterion in self.target.misc_home_dirs:
+            # We skip the entry if no user can be found.
+            if misc_home_dir in seen_home_directories or not user_criterion:
+                continue
+
+            if (user := self.find(**{user_criterion[0]: user_criterion[1]})) is None:
+                continue
+
+            seen_home_directories.add(misc_home_dir)
+            yield UserDetails(user=UnixUserRecord(name=misc_home_dir), home_path=misc_home_dir)
+
+    def all_home_dirs(self) -> Iterator[TargetPath]:
+        """Return all home directories of users."""
+
+        seen_home_directories: set[TargetPath] = set()
+        try:
+            for user in self.target.users():
+                if user.home and (home_path := self.target.resolve(str(user.home))).exists():
+                    seen_home_directories.add(home_path)
+                    yield home_path
+        except Exception as e:
+            self.target.log.warning("Failed to retrieve user details, falling back to hardcoded locations.")
+            self.target.log.debug("", exc_info=e)
+
+        # Iterate over misc home directories
+        for misc_home_dir, _ in self.target.misc_home_dirs:
+            if misc_home_dir not in seen_home_directories:
+                seen_home_directories.add(misc_home_dir)
+                yield misc_home_dir
+

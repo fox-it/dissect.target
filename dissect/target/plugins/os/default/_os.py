@@ -51,6 +51,10 @@ class DefaultOSPlugin(OSPlugin):
         yield from ()
 
     @export(property=True)
+    def misc_home_dirs(self) -> Iterator[tuple[tuple[str, tuple[str, str] | None]]]:
+        yield from ()
+
+    @export(property=True)
     def os(self) -> str:
         return "default"
 
