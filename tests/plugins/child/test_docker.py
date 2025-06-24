@@ -13,6 +13,7 @@ def test_docker(target_linux_docker: Target) -> None:
     children = sorted(target_linux_docker.list_children(), key=lambda r: r.path)
 
     assert len(children) == 3
+    assert children[0].name == "epic_lichterman"
     assert children[0].type == "docker"
 
     assert [c.path for c in children] == [
