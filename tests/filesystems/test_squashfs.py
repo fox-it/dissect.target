@@ -13,7 +13,7 @@ def test_filesystem_squashfs(type: str) -> None:
     """Test if we detect and correctly iterate SquashFS filesystems."""
 
     if type == "lzma" and platform.system() == "Windows":
-        pytest.skip(reason="LZMA not available on Windows")
+        pytest.skip(reason="SquashFS LZMA misbehaves on Windows")
 
     sqfs_bin = absolute_path(f"_data/filesystems/squashfs/{type}.sqfs")
 
