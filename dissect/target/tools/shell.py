@@ -721,7 +721,7 @@ class TargetCli(TargetCmd):
     def do_mounts(self, line: str) -> bool:
         """print target mounts"""
         for mount, fs in self.target.fs.mounts.items():
-            print(f"{fs!s:<30}\t{mount}")
+            print(f"<Mount path={mount!r} fs={fs!r}>")
         return False
 
     def do_info(self, line: str) -> bool:
