@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from dissect.target.filesystem import Filesystem
@@ -31,6 +33,13 @@ class DarwinPlugin(BsdPlugin):
             if (fs.exists("/Library") and fs.exists("/Applications")) or fs.exists("/private/var/mobile"):
                 return fs
         return None
+
+    @export(property=True)
+    def misc_home_dirs(self) -> Iterator[tuple[tuple[str, tuple[str, str] | None]]]:
+        yield from super().misc_home_dirs()
+
+        if (user_path := self.target.resolve("Users")).exists():
+            yield from ((entry, None) for entry in user_path.iterdir() if entry.is_dir())
 
 
 def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> str | None:

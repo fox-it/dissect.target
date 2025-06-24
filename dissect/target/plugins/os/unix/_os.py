@@ -160,6 +160,14 @@ class UnixPlugin(OSPlugin):
                 )
 
     @export(property=True)
+    def misc_home_dirs(self) -> Iterator[tuple[tuple[str, tuple[str, str] | None]]]:
+        if (root_path := self.target.resolve("root")).exists():
+            yield (root_path, ("uid", 0))
+
+        if (home_path := self.target.resolve("home")).exists():
+            yield from ((entry, None) for entry in home_path.iterdir() if entry.is_dir())
+
+    @export(property=True)
     def architecture(self) -> str | None:
         return self._get_architecture(self.os)
 
