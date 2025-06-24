@@ -1160,6 +1160,8 @@ class OSPlugin(Plugin):
     methods with the same ``@classmethod`` or ``@export(...)`` annotation.
     """
 
+    _misc_home_dirs: tuple[tuple[str, str | None]] = ()
+
     def __init_subclass__(cls, **kwargs):
         # Note that cls is the subclass
         super().__init_subclass__(**kwargs)

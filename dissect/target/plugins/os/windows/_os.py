@@ -315,5 +315,24 @@ class WindowsPlugin(OSPlugin):
                 )
 
     @export(property=True)
+    def misc_home_dirs(self) -> Iterator[tuple[tuple[str, tuple[str, str] | None]]]:
+        yield from (
+            (resolved_path, user_criterion)
+            for path, user_criterion in [
+                ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19")),
+                ("%windir%/ServiceProfiles/NetworkService", ("sid", "S-1-5-20")),
+                ("%windir%/System32/config/systemprofile", ("sid", "S-1-5-18")),
+                ("%windir%/SysWOW64/config/systemprofile", ("sid", "S-1-5-18")),
+            ]
+            if (resolved_path := self.target.resolve(path)).exists()
+        )
+
+        # Homedirs for users when there is no user profile information available.
+        user_dirs = ("sysvol/Users", "sysvol/Documents and Settings")
+        for user_dir in user_dirs:
+            if (resolved := self.target.resolve(user_dir)).exists():
+                yield from ((entry, None) for entry in resolved.iterdir() if entry.is_dir())
+
+    @export(property=True)
     def os(self) -> str:
         return OperatingSystem.WINDOWS.value
