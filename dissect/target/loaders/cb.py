@@ -55,7 +55,7 @@ class CbLoader(Loader):
 
         if not HAS_CARBON_BLACK:
             raise ImportError(
-                "Required dependency 'carbon-black-cloud-sdk-python' is missing, install with 'pip install dissect.target[cb]"  # noqa: E501
+                "Required dependency 'carbon-black-cloud-sdk-python' is missing, install with 'pip install dissect.target[cb]'"  # noqa: E501
             )
 
         self.host, _, instance = self.parsed_path.netloc.partition("@")
