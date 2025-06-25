@@ -93,7 +93,7 @@ class SmbLoader(Loader):
 
         if not HAS_IMPACKET:
             raise ImportError(
-                "Required dependency 'impacket' is missing, install with 'pip install dissect.target[smb]"
+                "Required dependency 'impacket' is missing, install with 'pip install dissect.target[smb]'"
             )
 
         if parsed_path is None:

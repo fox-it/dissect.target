@@ -37,7 +37,7 @@ class CbFilesystem(Filesystem):
     def __init__(self, session: LiveResponseSession, prefix: str, *args, **kwargs):
         if not HAS_CARBON_BLACK:
             raise ImportError(
-                "Required dependency 'carbon-black-cloud-sdk-python' is missing, install with 'pip install dissect.target[cb]"  # noqa: E501
+                "Required dependency 'carbon-black-cloud-sdk-python' is missing, install with 'pip install dissect.target[cb]'"  # noqa: E501
             )
 
         self.session = session
