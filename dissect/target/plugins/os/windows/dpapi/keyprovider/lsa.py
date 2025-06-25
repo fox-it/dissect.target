@@ -6,9 +6,7 @@ from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import export
-from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import (
-    KeyProviderPlugin,
-)
+from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import KeyProviderPlugin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -36,15 +34,15 @@ class LSADefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
 
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
-        """Yield Windows LSA DefaultPassword strings.
+        """Yield Windows LSA DefaultPassword decrypted strings.
 
-        Currently extracts decrypted ``DefaultPassword`` values from LSA.
-        Does not yet parse ``HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\DefaultPassword``.
+        Extracts decrypted ``DefaultPassword`` values from the LSA.
 
         Resources:
             - https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
         """
 
+        # Search for DefaultPassword values in the LSA
         for secret in ["DefaultPassword", "DefaultPassword_OldVal"]:
             if default_pass := self.target.lsa._secrets.get(secret):
                 try:
