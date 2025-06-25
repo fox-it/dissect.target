@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, NamedTuple, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -83,13 +83,13 @@ class UsersPlugin(InternalPlugin):
     def all_with_home(self) -> Iterator[UserDetails]:
         """Return :class:`UserDetails` objects for users that have existing directory set as home directory."""
 
-        seen_home_directories: set[TargetPath] = set()
+        seen: set[TargetPath] = set()
         try:
             for user in self.target.users():
                 if user.home:
                     user_details = self.get(user)
                     if user_details.home_path.exists():
-                        seen_home_directories.add(user_details.home_path)
+                        seen.add(user_details.home_path)
                         yield user_details
         except Exception as e:
             self.target.log.warning("Failed to retrieve user details, falling back to hardcoded locations.")
@@ -98,31 +98,33 @@ class UsersPlugin(InternalPlugin):
         # Iterate over misc home directories
         for misc_home_dir, user_criterion in self.target.misc_home_dirs:
             # We skip the entry if no user can be found.
-            if misc_home_dir in seen_home_directories or not user_criterion:
+            # We cannot use set membership check here because of https://github.com/fox-it/dissect.target/issues/1203
+            if any(seen_path.samefile(misc_home_dir) for seen_path in seen) or not user_criterion:
                 continue
 
             if (user := self.find(**{user_criterion[0]: user_criterion[1]})) is None:
                 continue
 
-            seen_home_directories.add(misc_home_dir)
             yield UserDetails(user=UnixUserRecord(name=misc_home_dir), home_path=misc_home_dir)
+            seen.add(misc_home_dir)
 
+    @cached_property
     def all_home_dirs(self) -> Iterator[TargetPath]:
         """Return all home directories of users."""
 
-        seen_home_directories: set[TargetPath] = set()
+        seen: set[TargetPath] = set()
         try:
             for user in self.target.users():
                 if user.home and (home_path := self.target.resolve(str(user.home))).exists():
-                    seen_home_directories.add(home_path)
                     yield home_path
+                    seen.add(home_path)
         except Exception as e:
             self.target.log.warning("Failed to retrieve user details, falling back to hardcoded locations.")
             self.target.log.debug("", exc_info=e)
 
         # Iterate over misc home directories
         for misc_home_dir, _ in self.target.misc_home_dirs:
-            if misc_home_dir not in seen_home_directories:
-                seen_home_directories.add(misc_home_dir)
+            # We cannot use set membership check here because of https://github.com/fox-it/dissect.target/issues/1203
+            if not any(seen_path.samefile(misc_home_dir) for seen_path in seen):
                 yield misc_home_dir
-
+                seen.add(misc_home_dir)
