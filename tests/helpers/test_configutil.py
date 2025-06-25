@@ -106,6 +106,17 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
         ),
         (
             """
+            key value1
+              key2 value2a
+              key3 value3a
+            key value1
+              key2 value2b
+              key3 value3b
+            """,
+            {"key value1": [{"key2": "value2a", "key3": "value3a"}, {"key2": "value2b", "key3": "value3b"}]},
+        ),
+        (
+            """
             key value
               key2 value2
               key3 value3
