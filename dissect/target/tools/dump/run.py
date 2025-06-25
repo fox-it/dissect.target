@@ -60,7 +60,7 @@ def get_targets(targets: list[str]) -> Iterator[Target]:
 
 
 def execute_function(
-    target: Target, function: FunctionDescriptor, dry_run: bool, rest: list[str]
+    target: Target, function: FunctionDescriptor, dry_run: bool, arguments: list[str]
 ) -> Iterator[TargetRecordDescriptor]:
     """Execute function ``function`` on provided target ``target`` and return a generator
     with the records produced.
@@ -83,7 +83,7 @@ def execute_function(
         )
         return
     try:
-        output_type, target_attr = execute_function_on_target(target, function)
+        _, target_attr = execute_function_on_target(target, function)
     except UnsupportedPluginError as e:
         local_log.error("Unsupported plugin for %s: %s", function.name, e.root_cause_str())
         local_log.debug("%s", function, exc_info=e)
@@ -106,7 +106,7 @@ def execute_function(
     try:
         yield from result
     except Exception as e:
-        local_log.error("Error occorred while processing output of %s.%s: %s", function.qualname, function.name, e)
+        local_log.error("Error occurred while processing output of %s.%s: %s", function.qualname, function.name, e)
         local_log.debug("", exc_info=e)
         return
 
@@ -139,14 +139,14 @@ def produce_target_func_pairs(
 
 
 def execute_functions(
-    target_func_stream: Iterable[tuple[Target, FunctionDescriptor]], dry_run: bool, rest: list[str]
+    target_func_stream: Iterable[tuple[Target, FunctionDescriptor]], dry_run: bool, arguments: list[str]
 ) -> Iterator[RecordStreamElement]:
     """Execute a function on a target for target / function pairs in the stream.
 
     Returns a generator of ``RecordStreamElement`` objects.
     """
     for target, func in target_func_stream:
-        for record in execute_function(target, func, dry_run, rest):
+        for record in execute_function(target, func, dry_run, arguments):
             yield RecordStreamElement(target=target, func=func, record=record)
 
 
@@ -192,7 +192,7 @@ def persist_processing_state(
             yield element
 
 
-def configure_state(args: argparse.Namespace) -> DumpState:
+def configure_state(args: argparse.Namespace) -> DumpState | None:
     state = None if args.restart else load_state(output_dir=args.output)
 
     if state:
@@ -218,7 +218,7 @@ def configure_state(args: argparse.Namespace) -> DumpState:
                 compression=args.compression,
                 state_path=state.path,
             )
-            raise RuntimeError("Issue with the existing state")
+            return None
     else:
         state = create_state(
             output_dir=args.output,
@@ -237,13 +237,13 @@ def execute_pipeline(
     state: DumpState,
     targets: Iterator[Target],
     dry_run: bool,
-    rest: list[str],
+    arguments: list[str],
     limit: int | None = None,
 ) -> None:
     """Run the record generation, processing and sinking pipeline."""
 
     target_func_pairs_stream = produce_target_func_pairs(targets, state)
-    record_stream = execute_functions(target_func_pairs_stream, dry_run, rest)
+    record_stream = execute_functions(target_func_pairs_stream, dry_run, arguments)
 
     if limit:
         record_stream = itertools.islice(record_stream, limit)
@@ -320,11 +320,14 @@ def main() -> None:
 
     try:
         state = configure_state(args)
+        if state is None:
+            # Error was already shown above, stopping execution
+            return
         targets = open_targets(args)
         execute_pipeline(
             state=state,
             targets=targets,
-            rest=rest,
+            arguments=rest,
             dry_run=args.dry_run,
             limit=args.limit,
         )

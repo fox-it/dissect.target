@@ -219,7 +219,7 @@ def create_state(
     output_dir: Path,
     target_paths: list[str],
     functions: str,
-    excluded_functions: set[str],
+    excluded_functions: list[str],
     serialization: Serialization,
     compression: Compression = None,
 ) -> DumpState:

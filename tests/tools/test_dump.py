@@ -86,7 +86,7 @@ def test_execute_pipeline(
         run.execute_pipeline(
             state=_state,
             targets=mock_get_targets(["dummy"]),
-            rest=[],
+            arguments=[],
             dry_run=False,
             limit=0,
         )
@@ -182,7 +182,7 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
         run.execute_pipeline(
             state=_state,
             targets=mock_get_targets(["dummy"]),
-            rest=[],
+            arguments=[],
             dry_run=False,
             limit=limit,
         )
