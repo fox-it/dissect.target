@@ -88,7 +88,7 @@ def test_execute_pipeline(
             targets=mock_get_targets(["dummy"]),
             arguments=[],
             dry_run=False,
-            limit=0,
+            limit=None,
         )
 
         target_name = target_win_iis_amcache.name

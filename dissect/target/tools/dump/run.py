@@ -243,11 +243,7 @@ def execute_pipeline(
     """Run the record generation, processing and sinking pipeline."""
 
     target_func_pairs_stream = produce_target_func_pairs(targets, state)
-    record_stream = execute_functions(target_func_pairs_stream, dry_run, arguments)
-
-    if limit:
-        record_stream = itertools.islice(record_stream, limit)
-
+    record_stream = itertools.islice(execute_functions(target_func_pairs_stream, dry_run, arguments), limit)
     record_stream = sink_records(record_stream, state)
     record_stream = log_progress(record_stream)
     record_stream = persist_processing_state(record_stream, state)
