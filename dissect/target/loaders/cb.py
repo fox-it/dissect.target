@@ -54,7 +54,9 @@ class CbLoader(Loader):
         super().__init__(path, parsed_path=parsed_path, resolve=False)
 
         if not HAS_CARBON_BLACK:
-            raise ImportError("Please install 'carbon-black-cloud-sdk-python' to use the 'cb://' target.")
+            raise ImportError(
+                "Required dependency 'carbon-black-cloud-sdk-python' is missing, install with 'pip install dissect.target[cb]"  # noqa: E501
+            )
 
         self.host = self.parsed_path.path.strip("/")
         instance = self.parsed_path.hostname
