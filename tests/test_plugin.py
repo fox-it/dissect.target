@@ -1383,9 +1383,20 @@ ELASTIC_FIELD_TYPES_MAP = {
 )
 @pytest.mark.xdist_group("sequential")
 def test_plugin_function_record_field_types_elastic(descriptor: FunctionDescriptor) -> None:
-    """Test if exported plugin functions yielding records do not conflict with their field names and types
-    for Elasticsearch adapters. Uses ``ELASTIC_FIELD_TYPES_MAP`` which is based on flow.record and ElasticSearch
-    field types. Maps various flow record types to a sensible Elasticsearch counterpart type.
+    """Test if exported plugin functions yielding records do not have conflicting field names and types
+    for Elasticsearch adapters.
+
+    For example, take the following TargetRecordDescriptors for plugin X, Y and Z::
+
+        RecordX = TargetRecordDescriptor("record/x", [("varint", "my_field")])
+        RecordY = TargetRecordDescriptor("record/y", [("path",   "my_field")])
+        RecordZ = TargetRecordDescriptor("record/y", [("string", "my_field")])
+
+    The ``RecordX`` descriptor will fail in this test, since the field ``my_field`` cannot be of type ``varint``
+    while also being used as ``string`` (and ``path``). The ``RecordY`` and ``RecordZ`` descriptors do not conflict,
+    since the types ``path`` and ``string`` translate to the same ``wildcard`` type in the Elasticsearch adapter.
+
+    Uses ``ELASTIC_FIELD_TYPES_MAP`` which is based on flow.record and ElasticSearch field types.
 
     Resources:
         - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
