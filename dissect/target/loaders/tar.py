@@ -26,10 +26,14 @@ TAR_EXT_COMP = (
     ".tar.xz",
     ".tar.bz",
     ".tar.bz2",
+    ".tar.lzma",
+    ".tar.lz",
     ".tgz",
     ".txz",
     ".tbz",
     ".tbz2",
+    ".tlz",
+    ".tlzma",
 )
 TAR_EXT = (".tar",)
 
@@ -40,6 +44,16 @@ TAR_MAGIC_COMP = (
     b"\x42\x5a\x68",
     # xz
     b"\xfd\x37\x7a\x58\x5a\x00",
+    # lzma
+    b"\x5d\x00\x00\x01\x00",
+    b"\x5d\x00\x00\x10\x00",
+    b"\x5d\x00\x00\x08\x00",
+    b"\x5d\x00\x00\x10\x00",
+    b"\x5d\x00\x00\x20\x00",
+    b"\x5d\x00\x00\x40\x00",
+    b"\x5d\x00\x00\x80\x00",
+    b"\x5d\x00\x00\x00\x01",
+    b"\x5d\x00\x00\x00\x02",
 )
 TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 

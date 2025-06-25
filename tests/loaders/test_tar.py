@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import tarfile
 from typing import TYPE_CHECKING
 
@@ -132,30 +133,53 @@ def test_tar_anonymous_filesystems(target_default: Target) -> None:
     [
         # regular tar file
         (True, "file.tar", ""),
-        (True, "file", "00" * 257 + "7573746172202000"),
         # gzip tar file
         (True, "file.tar.gz", ""),
         (True, "file.tgz", ""),
-        (True, "file", "1f8b0800000000000000"),
         # bzip2 tar file
         (True, "file.tar.bz2", ""),
         (True, "file.tar.bz", ""),
         (True, "file.tbz", ""),
         (True, "file.tbz2", ""),
-        (True, "file", "425a6839314159265359"),
         # xz tar file
         (True, "file.tar.xz", ""),
         (True, "file.txz", ""),
-        (True, "file", "fd377a585a000004e6d6"),
         # some things it should not detect
         (False, "file", "00010203"),
         (False, "file.zip", "504b0304"),
     ],
 )
-def test_tar_detect(should_detect: bool, filename: str, buffer: str, tmp_path: pathlib.Path) -> None:
+def test_tar_detect_extension(should_detect: bool, filename: str, buffer: str, tmp_path: pathlib.Path) -> None:
     """Test if we detect the given buffer as a (compressed) tar file or not."""
     tmp_tar = tmp_path.joinpath(filename)
     tmp_tar.touch()
     with tmp_tar.open("wb") as fh:
         fh.write(bytes.fromhex(buffer))
     assert TarLoader.detect(tmp_tar) == should_detect
+
+
+@pytest.mark.parametrize(
+    "file",
+    [
+        "small.tar",
+        "small.tar.bz2",
+        "small.tar.gz",
+        "small.tar.lz",
+        "small.tar.xz",
+    ],
+)
+def test_tar_detect_buffer(file: str, tmp_path: pathlib.Path) -> None:
+    """Test if we detect the given files as a (compressed) tar file or not."""
+
+    if file == "small.tar.lz" and (platform.python_implementation() == "PyPy" or platform.system() == "Windows"):
+        pytest.skip(reason="LZMA is flaky on PyPy and/or Windows")
+
+    small_file = absolute_path(f"_data/loaders/tar/detect/{file}")
+    buf = small_file.read_bytes()
+
+    tmp_tar = tmp_path.joinpath(file.replace(".", "-"))
+    tmp_tar.touch()
+    with tmp_tar.open("wb") as fh:
+        fh.write(buf)
+
+    assert TarLoader.detect(tmp_tar)
