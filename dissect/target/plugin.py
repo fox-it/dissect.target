@@ -16,7 +16,7 @@ import traceback
 from dataclasses import dataclass, field
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, override
 
 try:
     from typing import TypeAlias  # novermin
@@ -27,7 +27,7 @@ except ImportError:
 from flow.record import Record, RecordDescriptor
 
 import dissect.target.plugins.os.default as default
-from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import EmptyRecord
@@ -432,21 +432,25 @@ class Plugin:
     def __init__(self, target: Target):
         self.target = target
 
+    def _has_function(self, name: str) -> bool:
+        """Returns whether this plugin has a function ``name``."""
+        return name in self.__functions__
+
     def __getattr__(self, name: str, /) -> Any:
         if not self.__namespace__:
             raise AttributeError(name)
 
-        funcs = self.__functions__
-        if isinstance(self, NamespacePlugin):
-            funcs = self.__subplugins__
+        # If the namespace doesn't expose the function ``name``, we might have encountered a implicit nested namespace.
+        # These are the plugins that build upon a namespace, but not through inheritance
+        # So we attempt to resolve it by looking for the namespace with the name
+        func_name = name if self._has_function(name) else f"{full_namespace(self.__class__)}.{name}"
 
-        if name not in funcs:
+        try:
+            _, func = self.target.get_function(func_name)
+        except PluginNotFoundError:
             raise AttributeError(name)
 
-        class_, func = self.target.get_function(name)
-
-        if isinstance(func, Plugin):
-            return class_
+        # If a plugin is called directly, target.get_function func will will be an instance of a plugin and can be called.
         return func
 
     def is_compatible(self) -> bool:
@@ -902,8 +906,7 @@ def find_functions(
         else:
             # If we don't have an exact function match, do a slower treematch
             if matches := list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden)):
-                matched_dict = dict.fromkeys(matches)
-                found.extend(matched_dict.keys())
+                found.extend(dict.fromkeys(matches))
             else:
                 invalid_functions.add(pattern)
 
@@ -1444,6 +1447,10 @@ class NamespacePlugin(Plugin):
             # Add subplugin to aggregator
             aggregator.__subplugins__.append(cls.__namespace__)
             cls.__update_aggregator_docs(aggregator)
+
+    @override
+    def _has_function(self, name: str) -> bool:
+        return super()._has_function(name) or name in self.__subplugins__
 
     def check_compatible(self) -> None:
         at_least_one = False

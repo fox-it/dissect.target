@@ -655,9 +655,38 @@ def test_nested_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> 
     assert isinstance(target_bare.ns.foo.foo1, Foo1)
     assert isinstance(target_bare.ns.foo.foo2, Foo2)
 
+    with pytest.raises(AttributeError):
+        target_bare.ns.bla
+
     result, _ = find_functions("ns.foo.*.fizz")
     assert len(result) == 2
     assert sorted(desc.name for desc in result) == ["foo1.fizz", "foo2.fizz"]
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> None:
+    class Foo(Plugin):
+        __namespace__ = "foo"
+
+    class FooBar(Plugin):
+        __namespace__ = "foo.bar"
+
+        @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz"]
+
+    for plugin in [Foo, FooBar]:
+        target_bare._register_plugin_functions(plugin(target_bare))
+
+    assert isinstance(target_bare.foo, Foo)
+    assert isinstance(target_bare.foo.bar, FooBar)
+    assert hasattr(target_bare.foo.bar, "bazz")
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bazz
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bar.foo
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
