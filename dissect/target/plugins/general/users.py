@@ -96,7 +96,7 @@ class UsersPlugin(InternalPlugin):
             self.target.log.debug("", exc_info=e)
 
         # Iterate over misc home directories
-        for misc_home_dir, user_criterion in self.target.misc_home_dirs:
+        for misc_home_dir, user_criterion in self.target.misc_home_dirs():
             # We skip the entry if no user can be found.
             # We cannot use set membership check here because of https://github.com/fox-it/dissect.target/issues/1203
             if any(seen_path.samefile(misc_home_dir) for seen_path in seen) or not user_criterion:
@@ -123,7 +123,7 @@ class UsersPlugin(InternalPlugin):
             self.target.log.debug("", exc_info=e)
 
         # Iterate over misc home directories
-        for misc_home_dir, _ in self.target.misc_home_dirs:
+        for misc_home_dir, _ in self.target.misc_home_dirs():
             # We cannot use set membership check here because of https://github.com/fox-it/dissect.target/issues/1203
             if not any(seen_path.samefile(misc_home_dir) for seen_path in seen):
                 yield misc_home_dir

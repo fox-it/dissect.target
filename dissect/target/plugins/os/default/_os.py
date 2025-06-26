@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers.record import EmptyRecord
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.plugin import OSPlugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -50,8 +50,12 @@ class DefaultOSPlugin(OSPlugin):
     def users(self) -> Iterator[Record]:
         yield from ()
 
-    @export(property=True)
-    def misc_home_dirs(self) -> Iterator[tuple[tuple[str, tuple[str, str] | None]]]:
+    @internal
+    def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        """Return a generator home directories and a user key.
+
+        Example output: ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
+        """
         yield from ()
 
     @export(property=True)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target.plugin import export
+from dissect.target.plugin import internal
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 
 if TYPE_CHECKING:
@@ -34,8 +34,8 @@ class DarwinPlugin(BsdPlugin):
                 return fs
         return None
 
-    @export(property=True)
-    def misc_home_dirs(self) -> Iterator[tuple[tuple[str, tuple[str, str] | None]]]:
+    @internal
+    def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
         yield from super().misc_home_dirs()
 
         if (user_path := self.target.resolve("Users")).exists():

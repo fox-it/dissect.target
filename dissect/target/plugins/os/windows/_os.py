@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
-from dissect.target.plugin import OperatingSystem, OSPlugin, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -314,8 +314,8 @@ class WindowsPlugin(OSPlugin):
                     _target=self.target,
                 )
 
-    @export(property=True)
-    def misc_home_dirs(self) -> Iterator[tuple[tuple[str, tuple[str, str] | None]]]:
+    @internal
+    def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
         yield from (
             (resolved_path, user_criterion)
             for path, user_criterion in [
