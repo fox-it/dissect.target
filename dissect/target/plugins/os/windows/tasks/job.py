@@ -203,8 +203,8 @@ class AtTask:
         self.data = self.at_data.user_data
 
         # check which prio bit is set
-        for key, value in self.at_data.task_prio._values.items():
-            if value:
+        for key in self.at_data.task_prio.fields:
+            if getattr(self.at_data.task_prio, key):
                 self.priority = key
 
     def get_actions(self) -> Iterator[TargetRecordDescriptor]:

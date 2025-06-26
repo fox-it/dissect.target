@@ -473,7 +473,7 @@ class Plugin:
             try:
                 yield from method()
             except Exception as e:
-                self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name)  # noqa: TRY400
+                self.target.log.error("Error while executing `%s.%s`: %s", self.__namespace__, method_name, e)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
 
     def get_paths(self) -> Iterator[Path]:
@@ -1258,6 +1258,22 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
+    @internal
+    def os_tree(self) -> list[str]:
+        """Returns the :func:`os` value of this and all the OS plugin parents."""
+        result: list[str] = []
+        for klass in self.__class__.mro():
+            if not issubclass(klass, OSPlugin):
+                # In case the plugin extends multiple different classes.
+                continue
+
+            if klass is OSPlugin:
+                break
+
+            result.append(klass.os.__get__(self))
+        # dicts maintain insertion order, we use it here to get rid of duplicates
+        return list(dict.fromkeys(result))
+
     @export(property=True)
     def architecture(self) -> str | None:
         """Return a slug of the target's OS architecture.
@@ -1397,7 +1413,7 @@ class NamespacePlugin(Plugin):
                 except UnsupportedPluginError:  # noqa: PERF203
                     continue
                 except Exception as e:
-                    self.target.log.error("Subplugin %s.%s raised an exception", ns, method_name)  # noqa: TRY400
+                    self.target.log.error("Subplugin %s.%s raised an exception: %s", ns, method_name, e)  # noqa: TRY400
                     self.target.log.debug("", exc_info=e)
 
         # Holds the subplugins that share this method
