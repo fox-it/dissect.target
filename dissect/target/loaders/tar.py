@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import tarfile as tf
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 from dissect.target import filesystem, target
@@ -25,10 +26,14 @@ TAR_EXT_COMP = (
     ".tar.xz",
     ".tar.bz",
     ".tar.bz2",
+    ".tar.lzma",
+    ".tar.lz",
     ".tgz",
     ".txz",
     ".tbz",
     ".tbz2",
+    ".tlz",
+    ".tlzma",
 )
 TAR_EXT = (".tar",)
 
@@ -39,6 +44,16 @@ TAR_MAGIC_COMP = (
     b"\x42\x5a\x68",
     # xz
     b"\xfd\x37\x7a\x58\x5a\x00",
+    # lzma
+    b"\x5d\x00\x00\x01\x00",
+    b"\x5d\x00\x00\x10\x00",
+    b"\x5d\x00\x00\x08\x00",
+    b"\x5d\x00\x00\x10\x00",
+    b"\x5d\x00\x00\x20\x00",
+    b"\x5d\x00\x00\x40\x00",
+    b"\x5d\x00\x00\x80\x00",
+    b"\x5d\x00\x00\x00\x01",
+    b"\x5d\x00\x00\x00\x02",
 )
 TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
@@ -196,11 +211,22 @@ def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
         return False
 
     with path.open("rb") as fh:
-        headers = [fh.read(6)]
-        fh.seek(257)
-        headers.append(fh.read(8))
+        # The minimum file size of an uncompressed tar is 512 bytes, but a compressed tar file could be smaller.
+        fh.seek(0)
+        buf = fh.read(tf.BLOCKSIZE)
+        headers = [buf[0:6]]
+        if len(buf) >= 265:
+            headers.append(buf[257 : 257 + 8])
+
         for header in headers:
             if header.startswith(magics):
+                # We could be dealing with a compressed file that is not actually a tar.
+                # To weed out a false positive we try to decompress and read ustar from
+                # the first 512 bytes (or less) of the file.
+                try:
+                    tf.open(mode="r:*", fileobj=BytesIO(buf))  # noqa: SIM115
+                except (tf.ReadError, tf.CompressionError, ValueError, EOFError):
+                    continue
                 return True
     return False
 
