@@ -263,7 +263,7 @@ def test_windows_user(target_win_users: Target) -> None:
 
     assert users[0].sid == "S-1-5-18"
     assert users[0].name == "systemprofile"
-    assert users[0].home == windows_path("%systemroot%\\system32\\config\\systemprofile")
+    assert users[0].home == windows_path("c:\\windows\\system32\\config\\systemprofile")
 
     assert users[1].sid == "S-1-5-21-3263113198-3007035898-945866154-1002"
     assert users[1].name == "John"
