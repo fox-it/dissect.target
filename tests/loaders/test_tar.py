@@ -175,11 +175,9 @@ def test_tar_detect_buffer(file: str, tmp_path: pathlib.Path) -> None:
         pytest.skip(reason="LZMA is flaky on PyPy and/or Windows")
 
     small_file = absolute_path(f"_data/loaders/tar/detect/{file}")
-    buf = small_file.read_bytes()
 
+    # We rename the file to prevent detection based on file suffix.
     tmp_tar = tmp_path.joinpath(file.replace(".", "-"))
-    tmp_tar.touch()
-    with tmp_tar.open("wb") as fh:
-        fh.write(buf)
+    tmp_tar.write_bytes(small_file.read_bytes())
 
     assert TarLoader.detect(tmp_tar)
