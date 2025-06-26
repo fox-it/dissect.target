@@ -16,7 +16,7 @@ import traceback
 from dataclasses import dataclass, field
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, override
 
 try:
     from typing import TypeAlias  # novermin
@@ -27,7 +27,7 @@ except ImportError:
 from flow.record import Record, RecordDescriptor
 
 import dissect.target.plugins.os.default as default
-from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import EmptyRecord
@@ -432,6 +432,27 @@ class Plugin:
     def __init__(self, target: Target):
         self.target = target
 
+    def _has_function(self, name: str) -> bool:
+        """Returns whether this plugin has a function ``name``."""
+        return name in self.__functions__
+
+    def __getattr__(self, name: str, /) -> Any:
+        if not self.__namespace__:
+            raise AttributeError(name)
+
+        # If the namespace doesn't expose the function ``name``, we might have encountered a implicit nested namespace.
+        # These are the plugins that build upon a namespace, but not through inheritance
+        # So we attempt to resolve it by looking for the namespace with the name
+        func_name = name if self._has_function(name) else f"{full_namespace(self.__class__)}.{name}"
+
+        try:
+            _, func = self.target.get_function(func_name)
+        except PluginNotFoundError:
+            raise AttributeError(name)
+
+        # If a plugin is called directly, target.get_function func will will be an instance of a plugin and can be called.
+        return func
+
     def is_compatible(self) -> bool:
         """Perform a compatibility check with the target."""
         try:
@@ -542,6 +563,8 @@ def register(plugincls: type[Plugin]) -> None:
 
     module_key = f"{module_path}.{plugincls.__qualname__}"
 
+    namespace = full_namespace(plugincls)
+
     if not issubclass(plugincls, ChildTargetPlugin):
         # First pass to resolve aliases
         for attr in _get_nonprivate_attributes(plugincls):
@@ -572,7 +595,7 @@ def register(plugincls: type[Plugin]) -> None:
 
                     descriptor = FunctionDescriptor(
                         name=name,
-                        namespace=plugincls.__namespace__,
+                        namespace=namespace,
                         path=path,
                         exported=exported,
                         internal=internal,
@@ -597,7 +620,7 @@ def register(plugincls: type[Plugin]) -> None:
         if plugincls.__register__:
             descriptor = FunctionDescriptor(
                 name=plugincls.__namespace__,
-                namespace=plugincls.__namespace__,
+                namespace=namespace,
                 path=module_path,
                 exported=len(exports) != 0,
                 internal=len(functions) != 0 and len(exports) == 0,
@@ -619,7 +642,7 @@ def register(plugincls: type[Plugin]) -> None:
         plugin_index[module_key] = PluginDescriptor(
             module=plugincls.__module__,
             qualname=plugincls.__qualname__,
-            namespace=plugincls.__namespace__,
+            namespace=namespace,
             path=module_path,
             findable=plugincls.__findable__,
             functions=functions,
@@ -833,6 +856,12 @@ def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
 
             paths.setdefault(descriptor.path, []).append(descriptor)
 
+            if descriptor.namespace:
+                # This adds the ``<namespace>.<function_name>`` to the generated paths.
+                # Then we can find the namespace (function) using its namespace
+                func_part = descriptor.name.split(".")[-1]
+                paths.setdefault(f"{descriptor.namespace}.{func_part}", []).append(descriptor)
+
     return paths
 
 
@@ -877,7 +906,7 @@ def find_functions(
         else:
             # If we don't have an exact function match, do a slower treematch
             if matches := list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden)):
-                found.extend(matches)
+                found.extend(dict.fromkeys(matches))
             else:
                 invalid_functions.add(pattern)
 
@@ -1301,11 +1330,28 @@ class ChildTargetPlugin(Plugin):
         raise NotImplementedError
 
 
+def full_namespace(plugin_cls: type[Plugin]) -> str | None:
+    """Returns the full namespace of ``plugin_cls`` using the mro()
+
+    When ``plugin_cls`` has multiple plugins as its base, the namespace will reflect that
+    """
+    if plugin_cls.__namespace__ is None:
+        return None
+
+    mro = plugin_cls.mro()
+    mro.reverse()
+    # Join all the namespaces together
+    return ".".join(klass.__namespace__ for klass in mro if issubclass(klass, Plugin) and klass.__namespace__)
+
+
 class NamespacePlugin(Plugin):
     """A namespace plugin provides services to access functionality from a group of subplugins.
 
     Support is currently limited to shared exported functions with output type ``record`` and ``yield``.
     """
+
+    __subplugins__: set[str] = None
+    __nsplugin__: type[Self] = None
 
     def __init_subclass__(cls, **kwargs):
         # Upon subclassing, decide whether this is a direct subclass of NamespacePlugin
@@ -1331,12 +1377,13 @@ class NamespacePlugin(Plugin):
             super().__init_subclass__(**kwargs)
 
             cls.__nsplugin__ = cls
-            if not hasattr(cls, "__subplugins__"):
+            if cls.__subplugins__ is None:
                 cls.__subplugins__ = set()
 
     def __init_subclass_subplugin__(cls, **kwargs) -> None:
         # Register the current plugin class as a subplugin with
         # the direct subclass of NamespacePlugin
+
         cls.__nsplugin__.__subplugins__.add(cls.__namespace__)
 
         # Generate a tuple of class names for which we do not want to add subplugin functions, which is the
@@ -1388,6 +1435,10 @@ class NamespacePlugin(Plugin):
             # Add subplugin to aggregator
             aggregator.__subplugins__.append(cls.__namespace__)
             cls.__update_aggregator_docs(aggregator)
+
+    @override
+    def _has_function(self, name: str) -> bool:
+        return super()._has_function(name) or name in self.__subplugins__
 
     def check_compatible(self) -> None:
         at_least_one = False
