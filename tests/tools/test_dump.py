@@ -203,7 +203,7 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
 
         state_blob = json.loads(state_path.read_text())
 
-        assert state_blob["compression"] == str(None)
+        assert state_blob["compression"] == "None"
         sink_blobs = state_blob["sinks"]
 
         iis_sink_blob = next(s for s in state_blob["sinks"] if s["func"] == "iis.logs")
