@@ -36,6 +36,12 @@ def test_users_plugin(target_win_users: Target, fs_win: VirtualFilesystem, tmp_p
     assert len(users_with_home) == 1  # only John has a home dir
 
 
+def test_misc_users(target_win_users: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
+    fs_win.map_dir("windows/SysWOW64/config/systemprofile", tmp_path)
+    users_with_home = list(target_win_users.user_details.all_with_home())
+    assert len(users_with_home) == 1  # Misc home dir is found
+
+
 def test_users_plugin_find_no_params(target_unix_users: Target) -> None:
     with pytest.raises(ValueError, match="Either sid or uid or username is expected"):
         target_unix_users.user_details.find()
