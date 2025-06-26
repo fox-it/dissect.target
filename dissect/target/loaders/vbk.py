@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.vbk import VbkFilesystem
 from dissect.target.loader import Loader, find_loader
@@ -18,7 +19,11 @@ RE_RAW_DISK = re.compile(r"(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a
 
 
 class VbkLoader(Loader):
-    """Load Veaam Backup (VBK) files."""
+    """Load Veaam Backup (VBK) files.
+
+    Resources:
+     - https://helpcenter.veeam.com/docs/backup/hyperv/backup_files.html?ver=120
+    """
 
     def __init__(self, path: Path, **kwargs):
         super().__init__(path, **kwargs)
@@ -36,8 +41,18 @@ class VbkLoader(Loader):
             raise LoaderError("Unexpected empty VBK filesystem")
 
         if not (candidates := [path for pattern in ("*.vmx", "*.vmcx") if (path := next(base.glob(pattern), None))]):
+            disks = []
+
             # Try to look for raw disks
-            if not (disks := [path for path in base.iterdir() if RE_RAW_DISK.match(path.name)]):
+            for path in base.iterdir():
+
+                if RE_RAW_DISK.match(path.name):
+                    disks.append(path)
+
+                # Example: Idea0-0/<HOSTNAME>.vhdx
+                disks.extend(path.glob("*.vhdx"))
+
+            if not disks:
                 # Dunno, just give up 🤷‍♂️ should've spent extra time staring at summary.xml
                 raise LoaderError("Unsupported VBK structure")
 
@@ -45,6 +60,13 @@ class VbkLoader(Loader):
 
         # Try to find a loader
         for candidate in candidates:
+
+            # Veeam stores Windows raw disk images with the .vhdx file extension, which confuses the VHDX loader because
+            # the disk images are not in the VHDX format but rather in a raw format.
+            # Therefore, the RawContainer is used to handle these files using a FibStream.
+            if candidate.name.endswith(".vhdx"):
+                target.disks.add(RawContainer(candidate.open()))
+                break
             if (loader := find_loader(candidate, fallbacks=[RawLoader])) is not None:
                 ldr = loader(candidate)
                 ldr.map(target)
