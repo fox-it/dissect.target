@@ -22,7 +22,7 @@ def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> No
     assert len(records) == 80
     assert record.ts == datetime(2024, 7, 13, 16, 49, 9, 0, tzinfo=timezone.utc)
     assert record.id_event == 80
-    assert record.status == 1
+    assert record.status_id == 1
     assert record.status_mapped == "Success"
     assert record.server_selection == 2
     assert record.server_selection_mapped == "ssWindowsUpdate"

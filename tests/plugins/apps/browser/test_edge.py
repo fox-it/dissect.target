@@ -68,7 +68,7 @@ def test_edge_history(target_platform: Target, request: pytest.FixtureRequest) -
     assert {"edge"} == {record.browser for record in records}
 
     assert records[-1].url == "https://github.com/fox-it/dissect"
-    assert records[-1].id == "45"
+    assert records[-1].id == 45
     assert records[-1].visit_count == 2
     assert records[-1].ts == dt("2023-02-24T11:54:44.875477+00:00")
 
@@ -105,7 +105,7 @@ def test_edge_extensions(target_platform: Target, request: pytest.FixtureRequest
     assert records[0].ts_update == dt("2023-04-18T08:39:57.968208+00:00")
     assert records[0].name == "Web Store"
     assert records[0].version == "0.2"
-    assert records[0].id == "ahfgeienlihckogmohjhadlkjgocpleb"
+    assert records[0].extension_id == "ahfgeienlihckogmohjhadlkjgocpleb"
 
 
 def test_windows_edge_passwords_plugin(target_edge_win: Target) -> None:

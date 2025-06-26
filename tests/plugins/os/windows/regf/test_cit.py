@@ -98,6 +98,7 @@ def test_cit_cit_plugin(target_win_tzinfo: Target, hive_hklm: VirtualHive) -> No
 
     program = next(r for r in results if r._desc.name == "windows/registry/cit/program")
     assert program.path == "\\DEVICE\\HARDDISKVOLUME2\\WINDOWS\\SYSTEM32\\CSRSS.EXE"
+    assert program.pe_checksum == 0x126ef
 
 
 def test_cit_puu_plugin(target_win: Target, hive_hklm: VirtualHive) -> None:

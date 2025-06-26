@@ -17,7 +17,7 @@ UsnjrnlRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("varint", "usn"),
-        ("string", "segment"),
+        ("string", "segment_id"),
         ("path", "path"),
         ("string", "reason"),
         ("uint32", "security_id"),
@@ -82,7 +82,7 @@ class UsnjrnlPlugin(Plugin):
                     segment = segment_reference(record.record.FileReferenceNumber)
                     yield UsnjrnlRecord(
                         ts=ts,
-                        segment=f"{segment}#{record.FileReferenceNumber.SequenceNumber}",
+                        segment_id=f"{segment}#{record.FileReferenceNumber.SequenceNumber}",
                         path=self.target.fs.path(path),
                         usn=record.Usn,
                         reason=str(record.Reason).replace("USN_REASON.", ""),

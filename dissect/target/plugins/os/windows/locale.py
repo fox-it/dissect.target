@@ -17,7 +17,7 @@ WindowsKeyboardRecord = TargetRecordDescriptor(
     "windows/keyboard",
     [
         ("string", "layout"),
-        ("string", "id"),
+        ("string", "language_id"),
     ],
 )
 
@@ -65,6 +65,6 @@ class WindowsLocalePlugin(LocalePlugin):
                     found_keyboards.append(language_id)
                     yield WindowsKeyboardRecord(
                         layout=self.LANG_DICT.get(language_id, language_id),
-                        id=language_id,
+                        language_id=language_id,
                         _target=self.target,
                     )
