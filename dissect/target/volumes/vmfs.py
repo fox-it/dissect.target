@@ -53,13 +53,13 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
     def _volumes(self) -> Iterator[Volume]:
         for i, volume in enumerate(self.lvm.volumes):
             yield Volume(
-                volume.open(),
-                i + 1,
-                None,
-                volume.size,
-                None,
-                volume.name,
-                volume.uuid,
+                fh=volume.open(),
+                number=i + 1,
+                offset=None,
+                size=volume.size,
+                vtype=None,
+                name=volume.name,
+                guid=volume.uuid,
                 raw=volume,
                 disk=self.disk,
                 vs=self,

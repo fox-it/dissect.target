@@ -64,7 +64,7 @@ full = [
     "dissect.squashfs>=1,<2",
     "dissect.sql>=3,<4",
     "dissect.thumbcache>=1,<2",
-    "dissect.vmfs>=3,<4",
+    "dissect.vmfs>=3.12.dev,<4",  # TODO: update on release
     "dissect.xfs>=3,<4",
     "ipython",
     "fusepy",
@@ -105,7 +105,7 @@ dev = [
     "dissect.squashfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.thumbcache[dev]>=1.0.dev,<2.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
-    "dissect.vmfs[dev]>=3.0.dev,<4.0.dev",
+    "dissect.vmfs[dev]>=3.12.dev,<4.0.dev",
     "dissect.volume[dev]>=3.0.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
     "pexpect",
