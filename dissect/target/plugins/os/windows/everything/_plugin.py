@@ -13,28 +13,29 @@ from dissect.target.plugins.os.windows.everything.everything_types import (
 EverythingRecord = TargetRecordDescriptor(
     "windows/everything/everything_record",
     [
-        ("string", "path"),
+        ("path", "path"),
         ("filesize", "size"),
         ("datetime", "date_created"),
         ("datetime", "date_modified"),
         ("datetime", "date_accessed"),
         ("uint32", "attributes"),
-        ("string", "record_type"),
+        ("string", "type"),
         ("string", "source"),
     ],
 )
 
 
 class EverythingPlugin(Plugin):
-    """Voidtools Everything database parser
-    Extracts files and metadata from the Everything database, which is stored in a proprietary format
+    """Voidtools Everything database parser.
+
+    Extracts files and metadata from the Everything database, which is stored in a proprietary format.
     """
 
     __namespace__ = "everything"
 
     PATH_GLOBS: ClassVar = [
-        "C:\\Program Files\\Everything\\Everything*.db",
-        "C:\\Program Files (x86)\\Everything\\Everything*.db",
+        "sysvol\\Program Files\\Everything\\Everything*.db",
+        "sysvol\\Program Files (x86)\\Everything\\Everything*.db",
     ]
     USER_PATH: ClassVar = "AppData\\Local\\Everything\\Everything*.db"
 
@@ -59,9 +60,9 @@ class EverythingPlugin(Plugin):
         """Yield file and directory names from everything.db file."""
         for path in self.configs:
             try:
-                with self.target.fs.path(path).open() as everything_fh:
-                    everything_file = EverythingDBParser(everything_fh)
-                    for item in everything_file:
+                with self.target.fs.path(path).open() as fh:
+                    db = EverythingDBParser(fh)
+                    for item in db:
                         yield EverythingRecord(
                             path=item.file_path,
                             size=item.size,
@@ -69,7 +70,7 @@ class EverythingPlugin(Plugin):
                             date_modified=item.date_modified,
                             date_accessed=item.date_accessed,
                             attributes=item.attributes,
-                            record_type=item.file_type,
+                            type=item.file_type,
                             source=path,
                             _target=self.target,
                         )
