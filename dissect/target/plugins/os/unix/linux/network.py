@@ -366,15 +366,21 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
         routes = self._parse_proc_net_route(interfaces)
 
-        # Find locally bound IPv4 addresses from /proc/net/tcp and correlate with routes
+        # Find locally bound IPv4 addresses from /proc/net/tcp and proc_net_fib_tree and correlate with routes
         tcp_local_ipv4 = self._parse_proc_net_tcp_local_ipv4()
-        for ipv4 in tcp_local_ipv4:
-            for route_name, route_ifaces in routes.items():
-                for route_iface in route_ifaces:
+        fib_tree_ipv4 = self._parse_proc_net_fib_tree()
+        for route_name, route_ifaces in routes.items():
+            iface = interfaces.setdefault(route_name, ProcConfigParser.ParserContext(name=route_name))
+            for route_iface in route_ifaces:
+                matched_iface = False
+                for ipv4 in chain(tcp_local_ipv4, fib_tree_ipv4):
                     if ipv4 in route_iface.network:
-                        iface = interfaces.setdefault(route_name, ProcConfigParser.ParserContext(name=route_name))
                         iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
+                        matched_iface = True
                         break
+                if not matched_iface:
+                    # If no local IP found, still add the route interface
+                    iface.ip_interfaces.add(route_iface)
 
         self._parse_proc_net_if_inet6(interfaces)
 
@@ -466,6 +472,9 @@ class ProcConfigParser(LinuxNetworkConfigParser):
                 self._target.log.warning("Failed to parse local address in /proc/net/tcp: %s", local_address)
                 continue
         return local_ips
+
+    def _parse_proc_net_fib_tree(self) -> set[IPv4Address]:
+        return set()
 
 
 MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]

@@ -221,13 +221,19 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
     interfaces = list(parser.interfaces())
 
     # Destructure interfaces by name for easy assertions
-    assert len(interfaces) == 2
-    wlp, lo = interfaces
+    assert len(interfaces) == 4
+    (
+        wlp,
+        docker,
+        vir,
+        lo,
+    ) = interfaces
 
     assert Counter(wlp.cidr) == Counter(
         [ip_interface("fe80::f66c:ff08:22f4:9090/64"), ip_interface("192.168.1.109/24")]
     )
     assert Counter(wlp.gateway) == Counter([ip_address("192.168.1.1")])
 
-    # lo assertions (from if_inet6)
     assert Counter(lo.cidr) == Counter([ip_interface("::1/128")])
+    assert Counter(docker.cidr) == Counter([ip_interface("172.17.0.0/16")])
+    assert Counter(vir.cidr) == Counter([ip_interface("192.168.122.0/24")])
