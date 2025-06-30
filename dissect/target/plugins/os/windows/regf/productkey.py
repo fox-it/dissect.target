@@ -1,4 +1,4 @@
-from typing import Iterator
+from collections.abc import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -30,12 +30,12 @@ class ProductKeyPlugin(Plugin):
     def productkey(self) -> Iterator[ProductKeyRecord]:
         """Return the currently activated product key.
 
-        The HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform registry 
+        The HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform registry
         key contains information about the product key that is used to activate Windows.
 
         References:
             - https://www.avg.com/en/signal/find-windows-10-product-key
-        """  # noqa: E501
+        """
         for reg in self.target.registry.keys(self.KEY):
             values = {value.name: value.value for value in reg.values()}
 
