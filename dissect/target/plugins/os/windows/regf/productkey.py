@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -30,7 +32,7 @@ class ProductKeyPlugin(Plugin):
     def productkey(self) -> Iterator[ProductKeyRecord]:
         """Return the currently activated product key.
 
-        The HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform registry
+        The ``HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SoftwareProtectionPlatform`` registry
         key contains information about the product key that is used to activate Windows.
 
         References:
