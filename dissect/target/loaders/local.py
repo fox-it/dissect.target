@@ -27,7 +27,7 @@ SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
 
 LINUX_DEV_DIR = Path("/dev")
 LINUX_DRIVE_REGEX = re.compile(r"(([shv]|xv)d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
-VOLATILE_LINUX_PATHS = [
+LINUX_VOLATILE_DIRS = [
     Path("/proc"),
     Path("/sys"),
 ]
@@ -86,11 +86,11 @@ class LocalLoader(Loader):
 
 
 def map_linux_drives(target: Target) -> None:
-    """Map Linux raw disks and /proc and /sys.
+    """Map Linux raw disks and ``/proc`` and ``/sys``.
 
-    Iterate through /dev and match raw device names (not partitions).
+    Iterate through ``/dev`` and match raw device names (not partitions).
 
-    /proc and /sys are mounted if they exists, allowing access to volatile files.
+    ``/proc`` and ``/sys`` are mounted if they exists, allowing access to volatile files.
     """
     for drive in LINUX_DEV_DIR.iterdir():
         if LINUX_DRIVE_REGEX.match(drive.name):
@@ -102,7 +102,7 @@ def map_linux_drives(target: Target) -> None:
     # Note that when running on a local target using a directory fs (through
     # force-directory-fs or fallback-to-directory-fs), these filesystems are
     # already present as they are usually mounted on the local system.
-    for volatile_path in VOLATILE_LINUX_PATHS:
+    for volatile_path in LINUX_VOLATILE_DIRS:
         if volatile_path.exists():
             volatile_fs = DirectoryFilesystem(volatile_path)
             target.filesystems.add(volatile_fs)
@@ -112,7 +112,7 @@ def map_linux_drives(target: Target) -> None:
 def map_solaris_drives(target: Target) -> None:
     """Map Solaris raw disks.
 
-    Iterate through /dev/dsk and match raw device names (not slices or partitions).
+    Iterate through ``/dev/dsk`` and match raw device names (not slices or partitions).
     """
     for drive in SOLARIS_DEV_DIR.iterdir():
         if not SOLARIS_DRIVE_REGEX.match(drive.name):
@@ -123,7 +123,7 @@ def map_solaris_drives(target: Target) -> None:
 def map_esxi_drives(target: Target) -> None:
     """Map ESXi raw disks.
 
-    Get all devices from /vmfs/devices/disks/* (not partitions).
+    Get all devices from ``/vmfs/devices/disks/*`` (not partitions).
     """
     for drive in ESXI_DEV_DIR.glob("vml.*"):
         if ":" in drive.name:

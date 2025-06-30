@@ -126,7 +126,7 @@ def test_map_linux_drives(tmp_path: Path) -> None:
             "dissect.target.loaders.local._add_disk_as_raw_container_to_target",
             autospec=True,
         ) as mock_add_raw_disks,
-        patch("dissect.target.loaders.local.VOLATILE_LINUX_PATHS", [tmp_path]),
+        patch("dissect.target.loaders.local.LINUX_VOLATILE_DIRS", [tmp_path]),
         patch.object(t.filesystems, "add", autospec=True) as mock_add_fs,
         patch.object(t.fs, "mount", autospec=True) as mock_mount,
     ):
