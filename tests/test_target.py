@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import urllib.parse
 from collections import defaultdict
 from typing import TYPE_CHECKING, ClassVar
@@ -546,6 +547,31 @@ def test_vs_offset_0(target_bare: Target) -> None:
         filesystem_open.assert_called_once_with(mock_volume)
         assert len(target_bare.volumes) == 1
         assert len(target_bare.filesystems) == 1
+
+
+def test_empty_volume_log(target_bare: Target, caplog: pytest.LogCaptureFixture) -> None:
+    """Test whether we correctly log an undetectable filesystem warning."""
+    mock_volume = MagicMock()
+    mock_volume.fs = None
+    mock_volume.read = Mock(side_effect=lambda size: b"\x00" * size)
+
+    target_bare.volumes.add(mock_volume)
+
+    with caplog.at_level(logging.DEBUG, target_bare.log.name):
+        target_bare.volumes.apply()
+
+    assert "Skipping empty volume" in caplog.text
+    assert "Can't identify filesystem" not in caplog.text
+
+    # Now test that we do log a warning if the volume is not empty
+    mock_volume.read = Mock(side_effect=lambda size: b"\x01" * size)
+
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, target_bare.log.name):
+        target_bare.volumes.apply()
+
+    assert "Skipping empty volume" not in caplog.text
+    assert "Can't identify filesystem" in caplog.text
 
 
 @pytest.mark.parametrize("nr_of_fs", [1, 2])
