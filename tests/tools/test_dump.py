@@ -10,6 +10,7 @@ import pytest
 from dissect.target.plugins.apps.webserver import iis
 from dissect.target.plugins.os.windows import amcache
 from dissect.target.tools.dump import run, state, utils
+from dissect.target.tools.dump.run import main as target_dump
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -222,3 +223,26 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
             else:
                 assert amcache_sink_blob["record_count"] == 118
                 assert not amcache_sink_blob["is_dirty"]
+
+
+def test_dump(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-dump",
+                "-f",
+                "walkfs",
+                "tests/_data/loaders/tar/test-archive.tar.gz",
+                "-o",
+                str(tmp_path),
+            ],
+        )
+
+        target_dump()
+
+        assert tmp_path.joinpath("target-dump.state.json").exists()
+
+        entry = tmp_path.joinpath("test-archive.tar.gz/walkfs/filesystem_entry.jsonl")
+        assert entry.exists()
+        assert "test-file.txt" in entry.read_text()
