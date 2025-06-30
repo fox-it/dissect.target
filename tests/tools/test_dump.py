@@ -241,6 +241,38 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
                 assert not amcache_sink_blob["is_dirty"]
 
 
+def test_execute_excluded_plugins(target_win_iis_amcache: Target, tmp_path: pathlib.Path) -> None:
+    def mock_get_targets(targets: list[str]) -> Iterator[Target]:
+        yield target_win_iis_amcache
+
+    with patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets):
+        output_dir = tmp_path.joinpath("output")
+
+        functions = "amcache.applications"
+        _state = create_state(
+            output_dir=output_dir,
+            target_paths=["dummy"],
+            functions=functions,
+            excluded_functions=[functions],
+            serialization=utils.Serialization.JSONLINES,
+            compression=utils.Compression.NONE,
+        )
+
+        run.execute_pipeline(
+            state=_state,
+            targets=mock_get_targets(["dummy"]),
+            arguments=[],
+            dry_run=False,
+            limit=None,
+        )
+
+        target_name = target_win_iis_amcache.name
+
+        assert output_dir.joinpath(target_name).exists()
+        assert not output_dir.joinpath(f"{target_name}/amcahce.applications").exists()
+
+
+# tool tests
 def test_dump(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
     with monkeypatch.context() as m:
         m.setattr(
@@ -262,3 +294,30 @@ def test_dump(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
         entry = tmp_path.joinpath("test-archive.tar.gz/walkfs/filesystem_entry.jsonl")
         assert entry.exists()
         assert "test-file.txt" in entry.read_text()
+
+
+def test_dump_excluded_plugins(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-dump",
+                "-f",
+                "mft,walkfs",
+                "-xf",
+                "mft",
+                "tests/_data/loaders/tar/test-archive.tar.gz",
+                "-o",
+                str(tmp_path),
+            ],
+        )
+
+        target_dump()
+
+        assert tmp_path.joinpath("target-dump.state.json").exists()
+
+        entry = tmp_path.joinpath("test-archive.tar.gz/walkfs/filesystem_entry.jsonl")
+        assert entry.exists()
+        assert "test-file.txt" in entry.read_text()
+
+        assert not tmp_path.joinpath("test-archive.tar.gz/mft").exists()
