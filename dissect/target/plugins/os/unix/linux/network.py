@@ -387,8 +387,8 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
     def _parse_proc_net_route(self, ctx: dict[str, ProcConfigParser.ParserContext]) -> dict[str, set[IPv4Interface]]:
         try:
-            with self._target.fs.open("/proc/net/route") as f:
-                lines = f.read().decode().splitlines()
+            with self._target.fs.path("/proc/net/route").open("r") as f:
+                lines = f.readlines()
         except FileNotFoundError:
             self._target.log.info("File /proc/net/route not found")
             return {}
@@ -421,8 +421,8 @@ class ProcConfigParser(LinuxNetworkConfigParser):
     def _parse_proc_net_if_inet6(self, ctx: dict[str, ProcConfigParser.ParserContext]) -> None:
         # Parse IPv6 from /proc/net/if_inet6
         try:
-            with self._target.fs.open("/proc/net/if_inet6") as f:
-                for line in f.read().decode().splitlines():
+            with self._target.fs.path("/proc/net/if_inet6").open("r") as f:
+                for line in f:
                     parts = line.split()
                     if len(parts) < 6:
                         self._target.log.warning("Skipping malformed line in /proc/net/if_inet6: %s", line)
@@ -441,8 +441,8 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
     def _parse_proc_net_tcp_local_ipv4(self) -> set[IPv4Address]:
         try:
-            with self._target.fs.open("/proc/net/tcp") as f:
-                lines = f.read().decode().splitlines()
+            with self._target.fs.path("/proc/net/tcp").open("r") as f:
+                lines = f.readlines()
         except FileNotFoundError:
             self._target.log.info("File /proc/net/tcp does not exist")
             return set()
