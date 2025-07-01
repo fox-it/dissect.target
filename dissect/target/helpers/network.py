@@ -163,7 +163,7 @@ class IANAProtocol(IntEnum):
     RESERVED_255 = 255
 
     @classmethod
-    def _missing_(cls, value: int) -> IntEnum:
+    def _missing_(cls, value: int) -> IANAProtocol:
         # Allows values other than defined members
         member = int.__new__(cls, value)
 

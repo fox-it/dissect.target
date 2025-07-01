@@ -110,7 +110,7 @@ class WindowsFirewallPlugin(Plugin):
         For a Windows operating system, the Firewall rules are stored in the
         ``HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules`` registry key.
 
-        Resources:
+        References:
             - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gpfas/2efe0b76-7b4a-41ff-9050-1023f8196d16
 
         Yields dynamic records with usually the following fields:
@@ -210,7 +210,7 @@ class WindowsFirewallPlugin(Plugin):
         Currently parses ``pfirewall*`` files in ``sysvol\\Windows\\System32\\LogFiles\\Firewall\\`` only.
         Does not yet parse dynamically set log locations e.g. ``netsh advfirewall set currentprofile logging filename``.
 
-        Resources:
+        References:
             - https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure-logging
 
         Yields Windows Firewall log records with the following fields:
