@@ -387,10 +387,6 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         for iface in interfaces.values():
             yield iface.to_record(self._target)
 
-    def _be_hex_to_int(self, be_hex: str) -> int:
-        """Convert big-endian hex string to integer."""
-        return int.from_bytes(bytes.fromhex(be_hex), "little")
-
     def _parse_proc_net_route(self, ctx: dict[str, ProcConfigParser.ParserContext]) -> dict[str, set[IPv4Interface]]:
         try:
             with self._target.fs.open("/proc/net/route") as f:
@@ -413,12 +409,12 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             iface_name, destination_hex, gateway_hex, *_, mask = fields[:8]
 
             # Only add CIDR if not default route
-            if (addr := self._be_hex_to_int(destination_hex)) != 0:
-                mask_bit_count = bin(self._be_hex_to_int(mask)).count("1")
+            if (addr := be_hex_to_int(destination_hex)) != 0:
+                mask_bit_count = bin(be_hex_to_int(mask)).count("1")
                 route_interfaces.setdefault(iface_name, set()).add(ip_interface((addr, mask_bit_count)))
 
             # Add gateway if not 0.0.0.0
-            if (gateway := self._be_hex_to_int(gateway_hex)) != 0:
+            if (gateway := be_hex_to_int(gateway_hex)) != 0:
                 iface = ctx.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
                 iface.gateways.add(ip_address(gateway))
 
@@ -467,7 +463,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
                 continue
             try:
                 ip_hex, _ = local_address.split(":", 1)
-                local_ips.add(ip_address(self._be_hex_to_int(ip_hex)))
+                local_ips.add(ip_address(be_hex_to_int(ip_hex)))
             except Exception:
                 self._target.log.warning("Failed to parse local address in /proc/net/tcp: %s", local_address)
                 continue
@@ -475,6 +471,11 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
     def _parse_proc_net_fib_tree(self) -> set[IPv4Address]:
         return set()
+
+
+def be_hex_to_int(be_hex: str) -> int:
+    """Convert big-endian hex string to integer."""
+    return int.from_bytes(bytes.fromhex(be_hex), "little")
 
 
 MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
