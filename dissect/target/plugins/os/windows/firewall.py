@@ -108,7 +108,7 @@ class WindowsFirewallPlugin(Plugin):
         """Return firewall rules saved in the Windows registry.
 
         For a Windows operating system, the Firewall rules are stored in the
-        HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules registry key.
+        ``HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules`` registry key.
 
         Resources:
             - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gpfas/2efe0b76-7b4a-41ff-9050-1023f8196d16

@@ -21,7 +21,7 @@ from dissect.target.helpers.network import IANAProtocol
     ],
 )
 def test_helpers_network_iana_protocol_translation(input_number: int, expected_output: str) -> None:
-    """test if we translate IANA protocol numbers correctly."""
+    """Test if we translate IANA protocol numbers correctly."""
 
     assert IANAProtocol(input_number).name == expected_output
     assert IANAProtocol(input_number).value == input_number
