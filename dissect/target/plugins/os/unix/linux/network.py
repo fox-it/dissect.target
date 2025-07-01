@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import ip_address, ip_interface
-from itertools import chain
+from itertools import chain, product
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from dissect.target.helpers import configutil
@@ -371,16 +371,14 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         fib_tree_ipv4 = self._parse_proc_net_fib_tree()
         for route_name, route_ifaces in routes.items():
             iface = interfaces.setdefault(route_name, ProcConfigParser.ParserContext(name=route_name))
-            for route_iface in route_ifaces:
-                matched_iface = False
-                for ipv4 in chain(tcp_local_ipv4, fib_tree_ipv4):
-                    if ipv4 in route_iface.network:
-                        iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
-                        matched_iface = True
-                        break
-                if not matched_iface:
-                    # If no local IP found, still add the route interface
-                    iface.ip_interfaces.add(route_iface)
+            matched_iface = False
+            for route_iface, ipv4 in product(route_ifaces, chain(tcp_local_ipv4, fib_tree_ipv4)):
+                if ipv4 in route_iface.network:
+                    iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
+                    matched_iface = True
+                    break
+            if not matched_iface:
+                iface.ip_interfaces.add(route_iface)  # If no local IP found, still add the route interface
 
         self._parse_proc_net_if_inet6(interfaces)
 
