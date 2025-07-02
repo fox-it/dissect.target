@@ -102,10 +102,10 @@ class UsersPlugin(InternalPlugin):
             if any(seen_path.samefile(misc_home_dir) for seen_path in seen) or not user_criterion:
                 continue
 
-            if (user := self.find(**{user_criterion[0]: user_criterion[1]})) is None:
+            if (user_details := self.find(**{user_criterion[0]: user_criterion[1]})) is None:
                 continue
 
-            yield UserDetails(user=UnixUserRecord(name=misc_home_dir), home_path=misc_home_dir)
+            yield UserDetails(user=user_details.user, home_path=misc_home_dir)
             seen.add(misc_home_dir)
 
     @cached_property
