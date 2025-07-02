@@ -161,10 +161,10 @@ class UnixPlugin(OSPlugin):
 
     @internal
     def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
-        if (root_path := self.target.resolve("root")).exists():
+        if (root_path := self.target.fs.path("root")).exists():
             yield (root_path, ("uid", 0))
 
-        if (home_path := self.target.resolve("home")).exists():
+        if (home_path := self.target.fs.path("home")).exists():
             yield from ((entry, None) for entry in home_path.iterdir() if entry.is_dir())
 
     @export(property=True)
