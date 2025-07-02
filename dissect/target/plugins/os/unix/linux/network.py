@@ -345,6 +345,11 @@ class ProcConfigParser(LinuxNetworkConfigParser):
     Locally bound Ipv6 addresses are parsed from /proc/net/if_inet6.
     """
 
+    # Regex to match lines like: |-- 127.0.0.1
+    trie_ip_line_re = re.compile(r"^\s*\|\-\-\s*(\d+\.\d+\.\d+\.\d+)\s*$")
+    # Regex to match the next line: /32 host LOCAL
+    trie_local_re = re.compile(r"^\s*/32 host LOCAL\s*$")
+
     @dataclass
     class ParserContext:
         name: str | None = None
@@ -368,7 +373,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
         # Find locally bound IPv4 addresses from /proc/net/tcp and proc_net_fib_tree and correlate with routes
         tcp_local_ipv4 = self._parse_proc_net_tcp_local_ipv4()
-        fib_tree_ipv4 = self._parse_proc_net_fib_tree()
+        fib_tree_ipv4 = self._parse_proc_fib_trie()
         for route_name, route_ifaces in routes.items():
             iface = interfaces.setdefault(route_name, ProcConfigParser.ParserContext(name=route_name))
             matched_iface = False
@@ -447,7 +452,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             self._target.log.info("File /proc/net/tcp does not exist")
             return set()
         except Exception as e:
-            self._target.log.warning("Error reading /proc/net/route")
+            self._target.log.warning("Error reading /proc/net/tcp")
             self._target.log.debug("", exc_info=e)
             return set()
 
@@ -467,8 +472,31 @@ class ProcConfigParser(LinuxNetworkConfigParser):
                 continue
         return local_ips
 
-    def _parse_proc_net_fib_tree(self) -> set[IPv4Address]:
-        return set()
+    def _parse_proc_fib_trie(self) -> set[IPv4Address]:
+        """
+        Parse a fib_trie-like text and return a set of IPv4Address objects
+        for addresses ending in '/32 host LOCAL'.
+        """
+
+        try:
+            with self._target.fs.path("/proc/net/fib_trie").open("r") as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/fib_trie does not exist")
+            return set()
+        except Exception as e:
+            self._target.log.warning("Error reading /proc/net/fib_trie")
+            self._target.log.debug("", exc_info=e)
+            return set()
+
+        result = set()
+        for i, line in enumerate(lines):
+            ip_match = self.trie_ip_line_re.match(line)
+            if ip_match and i + 1 < len(lines):
+                local_match = self.trie_local_re.match(lines[i + 1])
+                if local_match:
+                    result.add(ip_address(ip_match.group(1)))
+        return result
 
 
 def be_hex_to_int(be_hex: str) -> int:
