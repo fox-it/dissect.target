@@ -44,6 +44,8 @@ def test_misc_users(target_win_users: Target, fs_win: VirtualFilesystem, tmp_pat
     fs_win.map_dir("Windows/SysWOW64/config/systemprofile", tmp_path)
     users_with_home = list(target_win_users.user_details.all_with_home())
     assert len(users_with_home) == 1  # Misc home dir is found
+    assert users_with_home[0].user.sid == "S-1-5-18"
+    assert users_with_home[0].home_path == target_win_users.fs.path("c:/Windows/SysWOW64/config/systemprofile")
 
     home_dirs = list(target_win_users.user_details.all_home_dirs)
     assert len(home_dirs) == 1  # Misc home dir is found
