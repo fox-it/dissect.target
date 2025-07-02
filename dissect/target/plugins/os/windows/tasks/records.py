@@ -3,12 +3,12 @@ from __future__ import annotations
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 BootTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/boot_trigger",
+    "filesystem/windows/task/trigger/boot",
     [],
 )
 
 CalendarTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/calendar_trigger",
+    "filesystem/windows/task/trigger/calendar",
     [],
 )
 
@@ -30,7 +30,7 @@ ComHandlerRecord = TargetRecordDescriptor(
 )
 
 EventTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/event_trigger",
+    "filesystem/windows/task/trigger/event",
     [
         ("string", "subscription"),
         ("string", "period_of_occurence"),
@@ -51,19 +51,19 @@ ExecRecord = TargetRecordDescriptor(
 )
 
 IdleTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/idle_trigger",
+    "filesystem/windows/task/trigger/idle",
     [],
 )
 
 LogonTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/logon_trigger",
+    "filesystem/windows/task/trigger/logon",
     [
         ("string", "user_id"),
     ],
 )
 
 TimeTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/time_trigger",
+    "filesystem/windows/task/trigger/time",
     [],
 )
 
@@ -84,7 +84,7 @@ BaseTriggerRecord = TargetRecordDescriptor(
 )
 
 MonthlyDateTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/monthly_date",
+    "filesystem/windows/task/trigger/monthly",
     [
         ("uint16[]", "day_of_month"),
         ("string[]", "months_of_year"),
@@ -128,7 +128,7 @@ SendEmailRecord = TargetRecordDescriptor(
 )
 
 SessionStateChangeTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/session_state_change_trigger",
+    "filesystem/windows/task/trigger/session_state_change",
     [
         ("string", "user_id"),
         ("string", "state_change"),
