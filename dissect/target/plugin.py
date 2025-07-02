@@ -437,6 +437,8 @@ class Plugin:
         return name in self.__functions__
 
     def __getattr__(self, name: str, /) -> Any:
+        # If a plugin has no namespace, a plugin only registers its functions to the target
+        # The only method of getting those functions is using the function name directly on a target
         if not self.__namespace__:
             raise AttributeError(name)
 
