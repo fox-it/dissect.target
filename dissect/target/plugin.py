@@ -443,8 +443,8 @@ class Plugin:
             raise AttributeError(name)
 
         # If the namespace doesn't expose the function ``name``, we might have encountered a implicit nested namespace.
-        # These are the plugins that build upon a namespace, but not through inheritance
-        # So we attempt to resolve it by looking for the namespace with the name
+        # These are the plugins that build upon a namespace, but not through inheritance.
+        # So we attempt to resolve it by looking up the namespace by name.
         func_name = name if self._has_function(name) else f"{full_namespace(self.__class__)}.{name}"
 
         try:
