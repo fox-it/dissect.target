@@ -52,10 +52,6 @@ class DefaultOSPlugin(OSPlugin):
 
     @internal
     def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
-        """Return a generator home directories and a user key.
-
-        Example output: ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
-        """
         yield from ()
 
     @export(property=True)
