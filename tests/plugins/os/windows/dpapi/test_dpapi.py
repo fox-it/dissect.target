@@ -157,7 +157,6 @@ def test_dpapi_decrypt_blob_win_10(
 
     if user_type == "user":
         # test decrypting dpapi user blob
-        keychain.KEYCHAIN.clear()
         keychain.register_key(
             key_type=keychain.KeyType.PASSPHRASE,
             value="password",
