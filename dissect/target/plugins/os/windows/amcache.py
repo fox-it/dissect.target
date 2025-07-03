@@ -212,7 +212,7 @@ PcaGeneralAppcompatRecord = TargetRecordDescriptor(
         ("string", "copyright"),
         ("string", "version"),
         ("string", "program_id"),
-        ("string", "exit_code"),
+        ("string", "exit_message"),
         ("path", "source"),
     ],
 )
@@ -680,7 +680,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                     self.target.log.warning("Invalid line in %s, ignoring: %s", path.name, line)
                     continue
 
-                ts, type_, app_path, name, copyright, version, program_id, exit_code = parts
+                ts, type_, app_path, name, copyright, version, program_id, exit_message = parts
 
                 yield PcaGeneralAppcompatRecord(
                     ts=datetime.strptime(ts, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
@@ -690,7 +690,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                     copyright=copyright,
                     version=version,
                     program_id=program_id,
-                    exit_code=exit_code,
+                    exit_message=exit_message,
                     source=path,
                     _target=self.target,
                 )

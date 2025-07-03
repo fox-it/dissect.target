@@ -19,7 +19,7 @@ GENERIC_DOWNLOAD_RECORD_FIELDS = [
     ("path", "path"),
     ("uri", "url"),
     ("filesize", "size"),
-    ("varint", "state"),
+    ("string", "state"),
     ("path", "source"),
 ]
 

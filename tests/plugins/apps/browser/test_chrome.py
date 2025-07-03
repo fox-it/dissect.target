@@ -105,6 +105,7 @@ def test_chrome_downloads(target_platform: Target, request: pytest.FixtureReques
     assert records[0].ts_start == dt("2023-02-24T11:54:19.726147+00:00")
     assert records[0].ts_end == dt("2023-02-24T11:54:21.030043+00:00")
     assert records[0].url == "https://codeload.github.com/fox-it/dissect/zip/refs/heads/main"
+    assert records[0].state == "complete"
 
 
 @pytest.mark.parametrize(
