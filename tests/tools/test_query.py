@@ -6,9 +6,9 @@ import re
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
+from dissect.target.plugin import FunctionDescriptor
 import pytest
 
-from dissect.target.plugin import FunctionDescriptor
 from dissect.target.tools.query import main as target_query
 
 if TYPE_CHECKING:
@@ -27,25 +27,41 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
 
 
 @pytest.mark.parametrize(
-    "pattern",
-    [None, "*"],
+    ("target_fixture"),
+    [
+        "target_win_users",
+        "target_unix_users",
+        "target_linux_users",
+        "target_macos_users",
+    ],
 )
-def test_list_target(monkeypatch: pytest.MonkeyPatch, pattern: str | None) -> None:
+def test_list_target(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+    request: pytest.FixtureRequest,
+    target_fixture: str,
+) -> None:
     """Tests whether ``--list`` and ``--list *`` on a target returns the same results."""
 
-    with monkeypatch.context() as m:
-        _pattern: list[str] = [pattern] if pattern else []
-        m.setattr("sys.argv", ["target-query", "tests/_data/loaders/tar/test-archive.tar.gz", "--list", *_pattern])
+    args = ["target-query", "tests/_data/loaders/tar/test-archive.tar.gz", "--list"]
 
-        plugin_matches, _ = mock_find_functions(patterns="foo,bar")
+    target: Target = request.getfixturevalue(target_fixture)
 
-        with (
-            patch("dissect.target.plugin._filter_compatible") as compatible,
-            patch("dissect.target.plugin._filter_tree_match", return_value=plugin_matches),
-        ):
-            target_query()
+    def _run_query(args: list[str], target: Target) -> tuple[bytes, bytes]:
+        with monkeypatch.context() as m:
+            m.setattr("sys.argv", args)
 
-            assert compatible.call_args[0][0] == plugin_matches
+            # Patch the target that gets opened.
+            with patch("dissect.target.target.Target.open_all", return_value=[target]):
+                target_query()
+
+                return capsys.readouterr()
+
+    stdout_1, stderr_1 = _run_query(args, target)
+    stdout_2, stderr_2 = _run_query([*args, "*"], target)
+
+    assert stdout_1 == stdout_2
+    assert stderr_1 == stderr_2
 
 
 @pytest.mark.parametrize(
