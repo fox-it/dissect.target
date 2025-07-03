@@ -43,7 +43,7 @@ def test_list_target(
 ) -> None:
     """Tests whether ``--list`` and ``--list *`` on a target returns the same results."""
 
-    args = ["target-query", "tests/_data/loaders/tar/test-archive.tar.gz", "--list"]
+    args = ["target-query", "mock/path", "--list"]
 
     target: Target = request.getfixturevalue(target_fixture)
 
