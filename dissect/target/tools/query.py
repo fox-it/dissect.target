@@ -26,6 +26,7 @@ from dissect.target.plugin import (
 )
 from dissect.target.plugins.general.plugins import (
     _get_default_functions,
+    _get_os_functions,
     generate_functions_json,
     generate_functions_overview,
 )
@@ -76,10 +77,14 @@ def list_plugins(
     argv: list[str] | None = None,
 ) -> None:
     collected = set()
+    if targets or patterns:
+        collected.update(_get_os_functions())
+
     if targets:
         for target in Target.open_all(targets, include_children):
-            funcs, _ = find_functions(patterns, target, compatibility=True, show_hidden=True)
+            funcs, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
             collected.update(funcs)
+
     elif patterns:
         funcs, _ = find_functions(patterns, Target(), show_hidden=True)
         collected.update(funcs)
