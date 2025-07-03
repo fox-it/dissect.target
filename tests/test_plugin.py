@@ -1342,61 +1342,20 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
             )
 
 
-seen_field_names: set[str] = set()
-seen_field_types: dict[str, tuple[str | None, RecordDescriptor]] = {}
-
-ELASTIC_FIELD_TYPES_MAP = {
-    # strings
-    "string": "wildcard",
-    "string[]": "wildcard",
-    "stringlist": "wildcard",
-    "wstring": "wildcard",
-    "path": "wildcard",
-    "uri": "wildcard",
-    "command": "wildcard",
-    # ints
-    "varint": "long",
-    "varint[]": "long",
-    "filesize": "long",
-    "uint32": "long",
-    "uint16": "long",
-    "float": "float",
-    # ip / cidr
-    "net.ipaddress": "ip",
-    "net.ipaddress[]": "ip",
-    "net.ipnetwork": "ip_range",
-    "net.ipnetwork[]": "ip_range",
-    "net.ipinterface": "ip_range",
-    "net.ipinterface[]": "ip_range",
-    # other
-    "datetime": "date",
-    "boolean": "boolean",
-    "bytes": "binary",
-    "digest": "keyword",
-    "dynamic": "wildcard",
-}
-
-@pytest.mark.parametrize(
-    "descriptor",
-    find_functions("*", Target(), compatibility=False, show_hidden=True)[0],
-    ids=lambda d: d.path,
-)
-@pytest.mark.xdist_group("sequential")
-def test_plugin_function_record_field_types_elastic(descriptor: FunctionDescriptor) -> None:
-    """Test if exported plugin functions yielding records do not have conflicting field names and types
-    for Elasticsearch adapters.
+def test_plugin_record_field_consistency() -> None:
+    """Test if exported plugin functions yielding records do not have conflicting field names and types.
 
     For example, take the following TargetRecordDescriptors for plugin X, Y and Z::
 
         RecordX = TargetRecordDescriptor("record/x", [("varint", "my_field")])
-        RecordY = TargetRecordDescriptor("record/y", [("path",   "my_field")])
+        RecordY = TargetRecordDescriptor("record/y", [("path", "my_field")])
         RecordZ = TargetRecordDescriptor("record/y", [("string", "my_field")])
 
     The ``RecordX`` descriptor will fail in this test, since the field ``my_field`` cannot be of type ``varint``
     while also being used as ``string`` (and ``path``). The ``RecordY`` and ``RecordZ`` descriptors do not conflict,
-    since the types ``path`` and ``string`` translate to the same ``wildcard`` type in the Elasticsearch adapter.
+    since the types ``path`` and ``string`` translate to the same ``wildcard`` type.
 
-    Uses ``ELASTIC_FIELD_TYPES_MAP`` which is based on flow.record and ElasticSearch field types.
+    Uses ``FIELD_TYPES_MAP`` which is loosely based on flow.record and ElasticSearch field types.
 
     Resources:
         - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
@@ -1404,33 +1363,79 @@ def test_plugin_function_record_field_types_elastic(descriptor: FunctionDescript
         - https://github.com/JSCU-NL/dissect-elastic
     """
 
-    # Test if plugin function record fields make sense and do not conflict with other records.
-    if descriptor.output == "record" and hasattr(descriptor, "record"):
+    seen_field_names: set[str] = set()
+    seen_field_types: dict[str, tuple[str | None, RecordDescriptor]] = {}
+    inconsistencies: set[str] = set()
 
-        # Functions can yield a single record or a list of records.
-        records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+    FIELD_TYPES_MAP = {
+        # strings
+        "string": "string",
+        "string[]": "string",
+        "stringlist": "string",
+        "wstring": "string",
+        "path": "string",
+        "path[]": "string",
+        "uri": "string",
+        "command": "string",
+        "dynamic": "string",
+        # ints
+        "varint": "long",
+        "varint[]": "long",
+        "filesize": "long",
+        "uint32": "long",
+        "uint16": "long",
+        "float": "float",
+        # ip / cidr
+        "net.ipaddress": "ip",
+        "net.ipaddress[]": "ip",
+        "net.ipnetwork": "ip_range",
+        "net.ipnetwork[]": "ip_range",
+        "net.ipinterface": "ip_range",
+        "net.ipinterface[]": "ip_range",
+        # dates
+        "datetime": "datetime",
+        "datetime[]": "datetime",
+        # other
+        "boolean": "boolean",
+        "bytes": "binary",
+        "digest": "keyword",
+    }
 
-        for record in records:
-            if not isinstance(record, RecordDescriptor):
-                raise TypeError(f"{record!r} of function {descriptor!r} is not of type RecordDescriptor")
+    for descriptor in find_functions("*", Target(), compatibility=False, show_hidden=True)[0]:
+        # Test if plugin function record fields make sense and do not conflict with other records.
+        if descriptor.output == "record" and hasattr(descriptor, "record"):
+            # Functions can yield a single record or a list of records.
+            records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
 
-            if not record.fields and not record.name == "empty":
-                raise AssertionError(f"{record!r} has no fields")
+            for record in records:
+                assert isinstance(record, RecordDescriptor), (
+                    f"{record!r} of function {descriptor!r} is not of type RecordDescriptor"
+                )
+                if record.name != "empty":
+                    assert record.fields, f"{record!r} has no fields"
 
-            for name, field in record.fields.items():
-                # Make sure field names have the same type when translated. This check does not save multiple field name
-                # and typenames, this is a bare-minumum check only.
-                if name in seen_field_names:
-                    seen_typename, seen_record = seen_field_types[name]
-                    assert ELASTIC_FIELD_TYPES_MAP[seen_typename] == ELASTIC_FIELD_TYPES_MAP[field.typename], (
-                        f"<{record.name} ({field.typename!r}, '{name}')> is duplicate mismatch of <{seen_record.name} ({seen_typename!r}, '{name}')>"  # noqa: E501
+                for name, field in record.fields.items():
+                    # Make sure field names have the same type when translated. This check does not save multiple field
+                    # name and typenames, this is a bare-minumum check only.
+                    assert field.typename in FIELD_TYPES_MAP, (
+                        f"Field type {field.typename} is not mapped in FIELD_TYPES_MAP, please add it manually."
                     )
-                else:
-                    seen_field_names.add(name)
-                    seen_field_types[name] = (field.typename, record)
 
-                # NOTE: We could perform other checks here too, e.g. field names
-                # starting with "ts" should be of type "datetime"
+                    if name in seen_field_names:
+                        seen_typename, seen_record = seen_field_types[name]
+                        if FIELD_TYPES_MAP[seen_typename] != FIELD_TYPES_MAP[field.typename]:
+                            inconsistencies.add(
+                                f"<{record.name} ({field.typename!r}, '{name}')> is duplicate mismatch of <{seen_record.name} ({seen_typename!r}, '{name}')>"  # noqa: E501
+                            )
+
+                    else:
+                        seen_field_names.add(name)
+                        seen_field_types[name] = (field.typename, record)
+
+    if inconsistencies:
+        raise AssertionError(
+            f"Found {len(inconsistencies)} inconsistencies in RecordDescriptors:\n" + "\n".join(inconsistencies)
+        )
 
 
 def assert_valid_rst(src: str) -> None:
