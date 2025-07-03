@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
-class Compression(enum.Enum):
+class Compression(str, enum.Enum):
     """Supported compression types."""
 
     BZIP2 = "bzip2"
@@ -54,7 +54,7 @@ class Compression(enum.Enum):
     NONE = None
 
 
-class Serialization(enum.Enum):
+class Serialization(str, enum.Enum):
     """Supported serialization methods."""
 
     JSONLINES = "jsonlines"
