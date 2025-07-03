@@ -580,7 +580,7 @@ def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
     return TargetUnixFactory(tmp_path)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def guarded_keychain() -> Iterator[None]:
     """This fixture clears the keychain from any previously added values."""
     keychain.KEYCHAIN.clear()
