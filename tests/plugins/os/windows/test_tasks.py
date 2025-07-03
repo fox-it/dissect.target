@@ -68,7 +68,7 @@ def assert_xml_task_properties(xml_task: TaskRecord) -> None:
     assert xml_task.restart_on_failure_interval is None
     assert xml_task.restart_on_failure_count is None
     assert xml_task.mutiple_instances_policy == "Queue"
-    assert not xml_task.dissalow_start_on_batteries
+    assert not xml_task.disallow_start_on_batteries
     assert not xml_task.stop_going_on_batteries
     assert xml_task.start_when_available
     assert xml_task.network_profile_name is None
@@ -113,7 +113,7 @@ def assert_at_task_properties(at_task: TaskRecord) -> None:
     assert at_task.restart_on_failure_interval is None
     assert at_task.restart_on_failure_count == "0"
     assert at_task.mutiple_instances_policy is None
-    assert at_task.dissalow_start_on_batteries
+    assert at_task.disallow_start_on_batteries
     assert at_task.stop_going_on_batteries
     assert at_task.start_when_available is None
     assert at_task.network_profile_name is None

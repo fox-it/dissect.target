@@ -212,7 +212,7 @@ class XmlTask:
         Returns:
             str: The value of the XML element if found, otherwise None.
         """
-        xml_data = xml_data or self.task_element
+        xml_data = xml_data if xml_data is not None else self.task_element
         data = xml_data.find(xml_path)
 
         if data is None:
@@ -325,7 +325,7 @@ class XmlTask:
                         days_of_week=days_of_week,
                     )
 
-                elif trigger.find("ScheduleByMonth/"):
+                elif trigger.find("ScheduleByMonth/") is not None:
                     day_of_month = [int(day.text) for day in trigger.iter("Day")]
                     months_of_year = [month.tag for month in trigger.findall("*/Months/*")]
                     record = MonthlyDateTriggerRecord(
@@ -333,7 +333,7 @@ class XmlTask:
                         months_of_year=months_of_year,
                     )
 
-                elif trigger.find("ScheduleByMonthDayOfWeek/"):
+                elif trigger.find("ScheduleByMonthDayOfWeek/") is not None:
                     which_week = [int(week.text) for week in trigger.iter("Week")]
                     days_of_week = [day.tag for day in trigger.findall("*/DaysOfWeek/*")]
                     months_of_year = [month.tag for month in trigger.findall("*/Months/*")]
