@@ -79,6 +79,7 @@ def list_plugins(
     collected = set()
     if targets or patterns:
         collected.update(_get_os_functions())
+
     if targets:
         for target in Target.open_all(targets, include_children):
             funcs, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
