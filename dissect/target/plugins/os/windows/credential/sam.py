@@ -218,6 +218,7 @@ c_sam = cstruct().load(sam_def)
 SamRecord = TargetRecordDescriptor(
     "windows/credential/sam",
     [
+        ("datetime", "ts"),
         ("uint32", "rid"),
         ("string", "fullname"),
         ("string", "username"),
@@ -367,6 +368,7 @@ class SamPlugin(Plugin):
 
         .. code-block:: text
 
+            ts (datetime): The creation date.
             rid (uint32): The RID.
             fullname (string): Parsed fullname.
             username (string): Parsed username.
@@ -414,7 +416,10 @@ class SamPlugin(Plugin):
                 lm_hash = decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
                 nt_hash = decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
 
+                names_key = self.target.registry.key(f"{self.SAM_KEY}\\Users\\Names\\{u_username}")
+
                 yield SamRecord(
+                    ts=names_key.ts,
                     rid=f.rid,
                     fullname=u_fullname,
                     username=u_username,
