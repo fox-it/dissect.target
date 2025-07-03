@@ -6,9 +6,9 @@ import re
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
-from dissect.target.plugin import FunctionDescriptor
 import pytest
 
+from dissect.target.plugin import FunctionDescriptor
 from dissect.target.tools.query import main as target_query
 
 if TYPE_CHECKING:
