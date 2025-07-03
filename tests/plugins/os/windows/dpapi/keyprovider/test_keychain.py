@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 
 def test_dpapi_keyprovider_keychain(target_win: Target) -> None:
     """test if we yield provided keychain items correctly."""
-
-    keychain.KEYCHAIN.clear()
     keychain.register_key(
         key_type=keychain.KeyType.PASSPHRASE,
         value="password1",
