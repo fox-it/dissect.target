@@ -71,6 +71,16 @@ struct GoogleChromeCipher {
 """
 c_elevation = cstruct(endian="<").load(elevation_def)
 
+# Resources:
+# - https://github.com/chromium/chromium/blob/main/components/download/public/common/download_item.h
+DOWNLOAD_STATES = {
+    0: "in_progress",
+    1: "complete",
+    2: "cancelled",
+    3: "interrupted",
+    4: "interrupted",
+}
+
 
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
@@ -363,6 +373,11 @@ class ChromiumMixin:
                         url = download_chain[-1].url
                         url = try_idna(url)
 
+                    # https://github.com/chromium/chromium/blob/main/components/download/public/common/download_item.h
+                    state = None
+                    if state := row.get("state"):
+                        state = DOWNLOAD_STATES.get(state)
+
                     yield self.BrowserDownloadRecord(
                         ts_start=webkittimestamp(row.start_time),
                         ts_end=webkittimestamp(row.end_time) if row.end_time else None,
@@ -374,7 +389,7 @@ class ChromiumMixin:
                         url=url,
                         size=row.get("total_bytes"),
                         mime_type=row.get("mime_type"),
-                        state=row.get("state"),
+                        state=state,
                         source=db_file,
                         _target=self.target,
                         _user=user.user,

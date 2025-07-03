@@ -88,6 +88,7 @@ def test_edge_downloads(target_platform: Target, request: pytest.FixtureRequest)
     assert records[0].ts_start == dt("2023-02-24T11:52:36.631304+00:00")
     assert records[0].ts_end == dt("2023-02-24T11:52:37.068768+00:00")
     assert records[0].url == "https://codeload.github.com/fox-it/dissect/zip/refs/heads/main"
+    assert records[0].state == "complete"
 
 
 @pytest.mark.parametrize(
