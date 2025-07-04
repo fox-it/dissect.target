@@ -26,7 +26,7 @@ def test_clfs_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert len(stream_names) == 1
     assert next(iter(stream_names)) == expected_stream
 
-    stream_ids = {r.stream_id for r in records}
+    stream_ids = {r.stream_int_id for r in records}
     assert len(stream_ids) == 1
     assert next(iter(stream_ids)) == 0
 
@@ -35,7 +35,8 @@ def test_clfs_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert len(container_names) == 1
     assert next(iter(container_names)) == expected_container
 
-    container_ids = {r.container_id for r in records}
+    container_ids = {r.container_int_id for r in records}
+
     assert len(container_ids) == 1
     assert next(iter(container_ids)) == 0
 

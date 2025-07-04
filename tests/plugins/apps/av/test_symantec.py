@@ -54,7 +54,7 @@ def test_symantec_log(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert records[0].action_taken == "Pending Analysis"
     assert records[0].virus_type == "Test"
     assert records[0].scan_id == 1692364523
-    assert records[0].quarantine_id == 0
+    assert records[0].quarantine_id == "0"
     assert records[0].virus_id == 11101
     assert records[0].depth == 0
     assert bool(records[0].still_infected) is False

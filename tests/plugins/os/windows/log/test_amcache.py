@@ -110,7 +110,7 @@ def test_amcache_windows_11_general(target_win: Target, fs_win: VirtualFilesyste
         assert records[0].copyright == "freefilesync.org"
         assert records[0].version == "11.20"
         assert records[0].program_id == "000617915288ba535b4198ae58be4d9e2a4200000904"
-        assert records[0].exit_code == "Abnormal process exit with code 0x2"
+        assert records[0].exit_message == "Abnormal process exit with code 0x2"
 
 
 def mock_read_key_subkeys(self: AmcachePlugin, key: str) -> Iterator[Mock]:
@@ -201,3 +201,5 @@ def test_amcache_install_entry(target_win: Target) -> None:
         assert str(entry.path) == r"C:\Users\JohnCena"
         assert str(entry.longname) == r"7z2201-x64.exe"
         assert entry.filesize == 1575742
+        assert entry.size == 0x180B3E
+        assert entry.pe_checksum == 0
