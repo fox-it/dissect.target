@@ -377,7 +377,7 @@ class MockOSWarpPlugin(OSPlugin):
         ("test.[!y]*", 1),  # Found with tree search, all in test not starting with y (so x13 is ok)
         ("test.???.??", 1),  # Found with tree search, using question marks
         ("x13", 0),  # Not Found: Part of namespace but no match
-        ("Warp.*", 0),  # Not Found: Namespace != Module so 0
+        ("Warp.*", 1),  # Found: Using the namespace
         ("os.warp._os.f6", 0),  # OS plugins are excluded from tree search
         ("f6", 1),  # Found with direct match
         ("f22", 1),  # Unfindable has no effect on direct match
@@ -595,6 +595,98 @@ def test_namesplace_plugin_multiple_same_module(mock_plugins: PluginRegistry) ->
     result, _ = find_functions("*.baz")
     assert len(result) == 2
     assert sorted(desc.name for desc in result) == ["bar.baz", "foo.baz"]
+
+
+def test_namespace_attributes(target_win: Target) -> None:
+    target_win._register_plugin_functions(_TestSubPlugin1(target_win))
+    target_win._register_plugin_functions(_TestSubPlugin2(target_win))
+    target_win._register_plugin_functions(_TestSubPlugin3(target_win))
+    target_win._register_plugin_functions(_TestSubPlugin4(target_win))
+    target_win._register_plugin_functions(_TestSubPlugin5(target_win))
+    target_win._register_plugin_functions(_TestNSPlugin(target_win))
+
+    assert isinstance(target_win.NS.t2, _TestSubPlugin2)
+    assert isinstance(target_win.NS.t2.t3, _TestSubPlugin3)
+    assert isinstance(target_win.NS.t2.t3.t4, _TestSubPlugin4)
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_nested_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> None:
+    class NS(NamespacePlugin):
+        __namespace__ = "ns"
+
+        def check_compatible(self) -> None:
+            return None
+
+    class Bar(NS):
+        __namespace__ = "bar"
+
+        @export(output="yield")
+        def baz(self) -> Iterator[str]:
+            yield from ["bar"]
+
+    class FooSpace(NS, NamespacePlugin):
+        __namespace__ = "foo"
+
+    class Foo1(FooSpace):
+        __namespace__ = "foo1"
+
+        @export(output="yield")
+        def fizz(self) -> Iterator[str]:
+            yield from ["buzz1"]
+
+    class Foo2(FooSpace):
+        __namespace__ = "foo2"
+
+        @export(output="yield")
+        def fizz(self) -> Iterator[str]:
+            yield from ["buzz2"]
+
+    for plugin in [NS, Bar, FooSpace, Foo1, Foo2]:
+        target_bare._register_plugin_functions(plugin(target_bare))
+
+    assert isinstance(target_bare.ns, NS)
+    assert hasattr(target_bare.ns, "baz")
+    assert hasattr(target_bare.ns, "fizz")
+    assert isinstance(target_bare.ns.bar, Bar)
+    assert isinstance(target_bare.ns.foo, FooSpace)
+    assert hasattr(target_bare.ns.foo, "baz")
+    assert hasattr(target_bare.ns.foo, "fizz")
+    assert isinstance(target_bare.ns.foo.foo1, Foo1)
+    assert isinstance(target_bare.ns.foo.foo2, Foo2)
+
+    with pytest.raises(AttributeError):
+        target_bare.ns.bla
+
+    result, _ = find_functions("ns.foo.*.fizz")
+    assert len(result) == 2
+    assert sorted(desc.name for desc in result) == ["foo1.fizz", "foo2.fizz"]
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> None:
+    class Foo(Plugin):
+        __namespace__ = "foo"
+
+    class FooBar(Plugin):
+        __namespace__ = "foo.bar"
+
+        @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz"]
+
+    for plugin in [Foo, FooBar]:
+        target_bare._register_plugin_functions(plugin(target_bare))
+
+    assert isinstance(target_bare.foo, Foo)
+    assert isinstance(target_bare.foo.bar, FooBar)
+    assert hasattr(target_bare.foo.bar, "bazz")
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bazz
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bar.foo
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:

@@ -5,6 +5,8 @@ import itertools
 import textwrap
 from typing import TYPE_CHECKING, Any, Callable
 
+from dissect.target.plugin import full_namespace
+
 if TYPE_CHECKING:
     from dissect.target.plugin import Plugin
 
@@ -151,4 +153,7 @@ def _get_full_func_name(plugin_class: type[Plugin], func: Callable) -> str:
     if hasattr(plugin_class, "__namespace__") and plugin_class.__namespace__:
         func_name = f"{plugin_class.__namespace__}.{func_name}"
 
+    if hasattr(plugin_class, "__nsplugin__") and plugin_class.__nsplugin__:
+        ns_part = f"{full_namespace(plugin_class)}.{func.__name__}".replace(func_name, "")
+        func_name = f"({ns_part}){func_name}" if ns_part else func_name
     return func_name
