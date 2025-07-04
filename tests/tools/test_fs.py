@@ -8,6 +8,8 @@ import pytest
 
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.tools.fs import _extract_path, cp
+from dissect.target.tools.fs import main as target_fs
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,6 +25,26 @@ def vfs(files: list[str]) -> VirtualFilesystem:
             vfs.map_file_entry(file, VirtualFile(vfs, file, io.BytesIO(b"")))
     return vfs
 
+
+@pytest.mark.parametrize(
+    ("path", "expected_files"),
+    [("root/.bash_history", 1), ("this/path/doesntexist", 0), ("**/*_history", 4)
+     ],
+)
+def test_target_fs(
+        capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, path: str, expected_files: int
+) -> None:
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-fs", "tests/_data/tools/info/image.tar", "cp", path])
+
+        target_fs()
+        stdout, stderr = capsys.readouterr()
+
+        if expected_files > 0:
+            lines = [l for l in stdout.split("\n") if l != ""]
+            assert len(lines) == expected_files
+        else:
+            assert stdout == "[!] Path doesn't exist\n"
 
 @pytest.mark.parametrize("files", [["file"]])
 def test_extract_file(vfs: VirtualFilesystem, tmp_path: Path) -> None:
