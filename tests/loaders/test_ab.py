@@ -39,7 +39,7 @@ def test_ab_loader(target_bare: Target) -> None:
 
 
 def test_ab_unwrapper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    ab_path = Path(absolute_path("_data/loaders/ab/test.ab"))
+    ab_path = absolute_path("_data/loaders/ab/test.ab")
 
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["python", str(ab_path), "-p", "password", "-o", str(tmp_path)])

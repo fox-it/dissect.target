@@ -57,7 +57,6 @@ def test_credhist_partial(target_win_users: Target, fs_win: VirtualFilesystem) -
     )
     target_win_users.add_plugin(CredHistPlugin)
 
-    keychain.KEYCHAIN.clear()
     keychain.register_key(
         key_type=keychain.KeyType.PASSPHRASE,
         value="password3",

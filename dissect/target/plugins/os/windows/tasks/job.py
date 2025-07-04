@@ -8,12 +8,12 @@ from flow.record import GroupedRecord
 
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.plugins.os.windows.tasks.records import (
+    BaseTriggerRecord,
     DailyTriggerRecord,
     ExecRecord,
     MonthlyDateTriggerRecord,
     MonthlyDowTriggerRecord,
     PaddingTriggerRecord,
-    TriggerRecord,
     WeeklyTriggerRecord,
 )
 
@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.helpers.fsutil import TargetPath
-    from dissect.target.helpers.record import TargetRecordDescriptor
 
 atjob_def = """
 struct PRIORITY {
@@ -187,7 +186,7 @@ class AtTask:
         self.description = self.at_data.comment.rstrip("\x00")
         self.restart_on_failure_interval = self.minutes_duration_to_iso(self.at_data.retry_interval)
         self.restart_on_failure_count = self.at_data.retry_count
-        self.dissalow_start_on_batteries = bool(self.at_data.task_flags.disallow_battery)
+        self.disallow_start_on_batteries = bool(self.at_data.task_flags.disallow_battery)
         self.stop_going_on_batteries = bool(self.at_data.task_flags.stop_battery)
         self.run_only_network_available = bool(self.at_data.task_flags.internet_connected)
         self.wake_to_run = bool(self.at_data.task_flags.wake_to_run)
@@ -207,7 +206,7 @@ class AtTask:
             if getattr(self.at_data.task_prio, key):
                 self.priority = key
 
-    def get_actions(self) -> Iterator[TargetRecordDescriptor]:
+    def get_actions(self) -> Iterator[GroupedRecord]:
         """Get the at job task actions.
 
         Yields:
@@ -243,31 +242,27 @@ class AtTask:
         }
         for trigger in self.at_data.task_triggers:
             trigger_type = TRIGGER_TYPE_NAMES.get(trigger.trigger_type, None)
-            enabled = not trigger.trigger_flags.trigger_disabled
+            trigger_enabled = not trigger.trigger_flags.trigger_disabled
 
             s_year = trigger.begin_year
             s_month = trigger.begin_month
             s_day = trigger.begin_day
-            start_boundary = (
-                datetime.datetime(year=s_year, month=s_month, day=s_day, tzinfo=self.tzinfo).date().isoformat()
-            )
+            start_boundary = datetime.datetime(year=s_year, month=s_month, day=s_day, tzinfo=self.tzinfo)
 
             e_year = trigger.end_year
             e_month = trigger.end_month
             e_day = trigger.end_day
             end_boundary = None
             if trigger.trigger_flags.has_end_date:
-                end_boundary = (
-                    datetime.datetime(year=e_year, month=e_month, day=e_day, tzinfo=self.tzinfo).date().isoformat()
-                )
+                end_boundary = datetime.datetime(year=e_year, month=e_month, day=e_day, tzinfo=self.tzinfo)
 
             repetition_interval = self.minutes_duration_to_iso(trigger.minutes_interval)
             repetition_duration = self.minutes_duration_to_iso(trigger.minutes_duration)
             repetition_stop_duration_end = trigger.trigger_flags.kill_at_end == 1
             execution_time_limit = self.minutes_duration_to_iso(round(self.at_data.max_run_time / 60000))
 
-            base = TriggerRecord(
-                enabled=enabled,
+            base = BaseTriggerRecord(
+                trigger_enabled=trigger_enabled,
                 start_boundary=start_boundary,
                 end_boundary=end_boundary,
                 repetition_interval=repetition_interval,
@@ -336,7 +331,7 @@ class AtTask:
                 months_of_year = self.get_months_of_year(trigger.trigger_specific2)
 
                 record = MonthlyDateTriggerRecord(
-                    day_of_month=day_of_month,
+                    day_of_month=[day_of_month],
                     months_of_year=months_of_year,
                 )
 
@@ -344,18 +339,10 @@ class AtTask:
 
             if trigger_type == "MONTHLYDOW":
                 week = trigger.trigger_specific0
-                week_strings = [
-                    "FIRST_WEEK",
-                    "SECOND_WEEK",
-                    "THIRD_WEEK",
-                    "FOURTH_WEEK",
-                    "LAST_WEEK",
-                ]
-                week = week_strings[week - 1]
                 days = self.get_days_of_week(trigger.trigger_specific1)
                 months = self.get_months_of_year(trigger.trigger_specific2)
                 record = MonthlyDowTriggerRecord(
-                    which_week=week,
+                    which_week=[week],
                     days_of_week=days,
                     months_of_year=months,
                 )
