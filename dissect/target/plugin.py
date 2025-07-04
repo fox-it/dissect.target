@@ -1259,6 +1259,15 @@ class OSPlugin(Plugin):
         raise NotImplementedError
 
     @internal
+    def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        """Return a generator home directories and a user key.
+
+        Example output: ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
+        """
+
+        raise NotImplementedError
+
+    @internal
     def os_tree(self) -> list[str]:
         """Returns the :func:`os` value of this and all the OS plugin parents."""
         result: list[str] = []

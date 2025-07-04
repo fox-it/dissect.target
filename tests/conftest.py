@@ -288,6 +288,11 @@ def hive_hklm() -> VirtualHive:
     # set current control set to ControlSet001 and mock it
     change_controlset(hive, 1)
 
+    # set windir
+    current_version_key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
+    hive.map_key(current_version_key, VirtualKey(hive, current_version_key))
+    hive.map_value(current_version_key, "SystemRoot", VirtualValue(hive, "SystemRoot", "c:\\Windows"))
+
     return hive
 
 
