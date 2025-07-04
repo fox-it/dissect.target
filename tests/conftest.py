@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import pathlib
 import tempfile
 import textwrap
@@ -11,10 +12,11 @@ import pytest
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import _generate_long_paths
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
@@ -34,17 +36,51 @@ if TYPE_CHECKING:
 
     from dissect.target.plugin import OSPlugin
 
-# Test if the data/ directory is present and if not, as is the case in Python
-# source distributions of dissect.target, we give an error
-data_dir = absolute_path("_data")
-if not pathlib.Path(data_dir).is_dir():
-    raise pytest.PytestConfigWarning(
-        f"No test data directory {data_dir} found.\n"
-        "This can happen when you have downloaded the source distribution\n"
-        "of dissect.target from pypi.org. If so, retrieve the test data from\n"
-        "the dissect.target GitHub repository at:\n"
-        "https://github.com/fox-it/dissect.target"
-    )
+
+HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    if not HAS_BENCHMARK:
+        # If we don't have pytest-benchmark (or pytest-codspeed) installed, register the benchmark marker ourselves
+        # to avoid pytest warnings
+        config.addinivalue_line("markers", "benchmark: mark test for benchmarking (requires pytest-benchmark)")
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    # Test if the _data/ directory is present and if not, as is the case in Python
+    # source distributions of dissect.target, we give an error
+    data_dir = absolute_path("_data")
+    if not data_dir.is_dir():
+        session.shouldfail = (
+            "! !\n"
+            f"No test data directory {data_dir} found.\n"
+            "This can happen when you have downloaded the source distribution\n"
+            "of dissect.target from pypi.org. If so, retrieve the test data from\n"
+            "the dissect.target GitHub repository at:\n"
+            "https://github.com/fox-it/dissect.target"
+            "\n! !"
+        )
+    else:
+        # Test if the test data looks like LFS references and if so, we give an error
+        # This can happen when git-lfs is not installed or not configured correctly
+        for file in (path for path in data_dir.rglob("*") if path.is_file()):
+            with file.open("rb") as fh:
+                if fh.read(42) == b"version https://git-lfs.github.com/spec/v1":
+                    session.shouldfail = (
+                        "! !\n"
+                        "Test data files look like git-lfs references.\n"
+                        "This can happen when git-lfs is not installed or not configured correctly.\n"
+                        "Install git-lfs and run: \n"
+                        "git lfs install && git lfs pull"
+                        "\n! !"
+                    )
+            break
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    if not HAS_BENCHMARK and item.get_closest_marker("benchmark") is not None:
+        pytest.skip("pytest-benchmark is not installed")
 
 
 @pytest.fixture(autouse=True)
@@ -282,7 +318,7 @@ def target_bare(tmp_path: pathlib.Path) -> Iterator[Target]:
 
 @pytest.fixture
 def target_default(tmp_path: pathlib.Path) -> Target:
-    return make_os_target(tmp_path, DefaultPlugin)
+    return make_os_target(tmp_path, DefaultOSPlugin)
 
 
 @pytest.fixture
@@ -428,6 +464,13 @@ def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Target:
     east_tzi = bytes.fromhex("6801000000000000c4ffffff0000040006000100160000000000000000000900060001001600000000000000")
     east_tz_data.add_value("TZI", east_tzi)
 
+    utc_tz_data_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\UTC"
+    utc_tz_data = VirtualKey(hive_hklm, utc_tz_data_path)
+    utc_tz_data.add_value("Display", "(UTC) Coordinated Universal Time")
+    utc_tz_data.add_value("Dlt", "Coordinated Universal Time")
+    utc_tz_data.add_value("Std", "Coordinated Universal Time")
+    utc_tz_data.add_value("TZI", b"\x00" * 44)
+
     dynamic_dst = VirtualKey(hive_hklm, east_tz_data_path + "\\Dynamic DST")
     dynamic_dst.add_value("FirstEntry", 2019)
     dynamic_dst.add_value("LastEntry", 2019)
@@ -438,6 +481,7 @@ def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Target:
     hive_hklm.map_key(tz_info_path, tz_info)
     hive_hklm.map_key(eu_tz_data_path, eu_tz_data)
     hive_hklm.map_key(east_tz_data_path, east_tz_data)
+    hive_hklm.map_key(utc_tz_data_path, utc_tz_data)
 
     return target_win
 
@@ -534,3 +578,11 @@ def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
     """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
     to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
     return TargetUnixFactory(tmp_path)
+
+
+@pytest.fixture(autouse=True)
+def guarded_keychain() -> Iterator[None]:
+    """This fixture clears the keychain from any previously added values."""
+    keychain.KEYCHAIN.clear()
+    yield
+    keychain.KEYCHAIN.clear()

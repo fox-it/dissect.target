@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hmac
 import json
 import logging
@@ -494,8 +495,8 @@ class FirefoxPlugin(BrowserPlugin):
                         browser="firefox",
                         id=login.get("id"),
                         url=login.get("hostname"),
-                        encrypted_username=login.get("encryptedUsername"),
-                        encrypted_password=login.get("encryptedPassword"),
+                        encrypted_username=base64.b64decode(login.get("encryptedUsername", "")),
+                        encrypted_password=base64.b64decode(login.get("encryptedPassword", "")),
                         decrypted_username=decrypted_username,
                         decrypted_password=decrypted_password,
                         source=login_file,

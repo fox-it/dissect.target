@@ -21,7 +21,8 @@ from dissect.target.helpers import config
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import extract_path_info
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
-from dissect.target.plugins.os.default._os import DefaultPlugin
+from dissect.target.loaders.direct import DirectLoader
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 if TYPE_CHECKING:
     import urllib
@@ -372,6 +373,19 @@ class Target:
         if not at_least_one_loaded:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
 
+    @classmethod
+    def open_direct(cls, paths: list[str | Path]) -> Self:
+        """Create a minimal target with a virtual root filesystem with all ``paths`` mapped into it.
+
+        This is useful when running plugins on individual files.
+        """
+        return cls._load("direct", DirectLoader(paths))
+
+    @property
+    def is_direct(self) -> bool:
+        """Check if the target is a direct target."""
+        return isinstance(self._loader, DirectLoader)
+
     def _load_child_plugins(self) -> None:
         """Load special :class:`~dissect.target.plugin.ChildTargetPlugin` plugins.
 
@@ -399,7 +413,8 @@ class Target:
                 child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
-                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc.qualname, e)
+                self.log.info("Child plugin reported itself as incompatible: %s", plugin_desc.qualname)
+                self.log.debug("", exc_info=e)
             except Exception:
                 self.log.exception(
                     "An exception occurred while checking for child plugin compatibility: %s", plugin_desc.qualname
@@ -475,7 +490,7 @@ class Target:
         raise TargetError("Target has no path and/or loader")
 
     @classmethod
-    def _load(cls, path: str | Path, ldr: loader.Loader) -> Self:
+    def _load(cls, path: str | Path | None, ldr: loader.Loader) -> Self:
         """Internal function that attemps to load a path using a given loader.
 
         Args:
@@ -552,7 +567,7 @@ class Target:
             candidates.append((plugin_desc, os_plugin, fs))
 
         fs = None
-        os_plugin = DefaultPlugin
+        os_plugin = DefaultOSPlugin
 
         if candidates:
             plugin_desc, os_plugin, fs = candidates[0]
@@ -593,7 +608,7 @@ class Target:
         Args:
             plugin_cls: The plugin to add and register, this can either be a class or instance. When this is a class,
                         it will be instantiated.
-            check_compatible: A flag that determines if we check whether the plugin is compatible with the ``Target``.
+            check_compatible: Check whether the plugin is compatible with the ``Target``.
 
         Returns:
             The ``plugin_cls`` instance.
@@ -617,7 +632,7 @@ class Target:
         if not isinstance(p, plugin.Plugin):
             raise PluginError(f"Not a subclass of Plugin: {p}")
 
-        if check_compatible:
+        if check_compatible and not self.is_direct:
             try:
                 p.check_compatible()
             except PluginError:

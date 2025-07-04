@@ -94,8 +94,10 @@ def main() -> int:
         vfs.map_file_fh(f"volumes/{fname}", v)
 
     for i, fs in enumerate(t.filesystems):
-        fname = f"filesystems/{vnames[fs.volume] if fs.volume else f'fs_{i}'}"
-        vfs.mount(fname, fs)
+        volumes = fs.volume if isinstance(fs.volume, list) else [fs.volume]
+        for volume in volumes:
+            fname = f"filesystems/{vnames[volume] if volume else f'fs_{i}'}"
+            vfs.mount(fname, fs)
 
     # This is kinda silly because fusepy will convert this back into string arguments
     options = parse_options_string(args.options) if args.options else {}

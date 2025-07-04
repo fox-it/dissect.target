@@ -1,25 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-import pytest
 
 from dissect.target.helpers import keychain
 from tests._utils import absolute_path
 
-if TYPE_CHECKING:
-    from collections.abc import Iterator
 
-
-@pytest.fixture
-def guarded_keychain() -> Iterator[None]:
-    keychain.KEYCHAIN.clear()
-    yield
-    keychain.KEYCHAIN.clear()
-
-
-def test_keychain_register_keychain_file(guarded_keychain: None) -> None:
+def test_keychain_register_keychain_file() -> None:
     keychain_file = Path(absolute_path("_data/helpers/keychain/keychain.csv"))
 
     keychain.register_keychain_file(keychain_file)
@@ -29,7 +16,7 @@ def test_keychain_register_keychain_file(guarded_keychain: None) -> None:
     assert len(keychain.get_keys_for_provider("bitlocker")) == 2
 
 
-def test_keychain_register_wildcard_value(guarded_keychain: None) -> None:
+def test_keychain_register_wildcard_value() -> None:
     keychain.register_wildcard_value("test-value")
 
     # Number of keys registered is equal number of supported key types, minus one for an invalid raw key

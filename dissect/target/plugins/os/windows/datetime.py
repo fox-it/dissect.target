@@ -76,6 +76,9 @@ def parse_systemtime_transition(systemtime: c_tz._SYSTEMTIME, year: int) -> date
     Reference:
         - https://docs.microsoft.com/en-us/windows/win32/api/timezoneapi/ns-timezoneapi-time_zone_information
     """
+    if not (1 <= systemtime.wDay <= 5):
+        raise ValueError("systemtime.wDay should be between 1 and 5")
+
     month = SundayFirstCalendar.monthdayscalendar(year, systemtime.wMonth)
     occurrences = [week[systemtime.wDayOfWeek] for week in month if week[systemtime.wDayOfWeek]]
     target_occurrence = -1 if systemtime.wDay == 5 and len(occurrences) < 5 else systemtime.wDay - 1
@@ -155,6 +158,10 @@ class WindowsTimezone(tzinfo):
         assert dt.tzinfo is self
 
         tzi = self.dynamic_dst.get(dt.year, self.tzi)
+        # If the time zone does not support daylight saving time the wMonth member is zero
+        if tzi.daylight_date.wMonth == 0 or tzi.standard_date.wMonth == 0:
+            return False
+
         start, end = get_dst_range(tzi, dt.year)
 
         # DST is flipped in some regions

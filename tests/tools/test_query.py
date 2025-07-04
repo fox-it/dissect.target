@@ -27,6 +27,44 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
 
 
 @pytest.mark.parametrize(
+    ("target_fixture"),
+    [
+        "target_win_users",
+        "target_unix_users",
+        "target_linux_users",
+        "target_macos_users",
+    ],
+)
+def test_list_target(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+    request: pytest.FixtureRequest,
+    target_fixture: str,
+) -> None:
+    """Tests whether ``--list`` and ``--list *`` on a target returns the same results."""
+
+    args = ["target-query", "mock/path", "--list"]
+
+    target: Target = request.getfixturevalue(target_fixture)
+
+    def _run_query(args: list[str], target: Target) -> tuple[bytes, bytes]:
+        with monkeypatch.context() as m:
+            m.setattr("sys.argv", args)
+
+            # Patch the target that gets opened.
+            with patch("dissect.target.target.Target.open_all", return_value=[target]):
+                target_query()
+
+                return capsys.readouterr()
+
+    stdout_1, stderr_1 = _run_query(args, target)
+    stdout_2, stderr_2 = _run_query([*args, "*"], target)
+
+    assert stdout_1 == stdout_2
+    assert stderr_1 == stderr_2
+
+
+@pytest.mark.parametrize(
     ("given_funcs", "expected_invalid_funcs"),
     [
         (
@@ -298,6 +336,32 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
         "arguments": [],
         "alias": False,
         "path": "os.windows.credential.sam.sam",
+    }
+
+    # plugin with arguments
+    docker_plugin = get_plugin(output, "docker.logs")
+    assert docker_plugin == {
+        "name": "docker.logs",
+        "output": "record",
+        "description": "Returns log files (stdout/stderr) from Docker containers.",
+        "arguments": [
+            {
+                "name": "--raw-messages",
+                "type": "bool",
+                "help": "preserve ANSI escape sequences and trailing newlines from log messages",
+                "default": False,
+                "required": False,
+            },
+            {
+                "name": "--remove-backspaces",
+                "type": "bool",
+                "help": "alter messages by removing ASCII backspaces and the corresponding characters",
+                "default": False,
+                "required": False,
+            },
+        ],
+        "path": "apps.container.docker.logs",
+        "alias": False,
     }
 
 

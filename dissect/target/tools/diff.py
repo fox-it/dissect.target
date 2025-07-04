@@ -646,7 +646,7 @@ class DifferentialCli(ExtendedCmd):
         return False
 
     @arg("path", nargs="?")
-    @arg("--hex", action="store_true", default=False)
+    @arg("--hex", action="store_true")
     def cmd_diff(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """output the difference in file contents between two targets"""
         stdout = stdout.buffer
@@ -703,7 +703,7 @@ class DifferentialCli(ExtendedCmd):
         args.hex = True
         return self.cmd_diff(args, stdout)
 
-    @arg("index", type=str)
+    @arg("index")
     @arg("type", choices=["src", "dst"])
     def cmd_set(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """change either the source or destination target for differentiation
@@ -940,15 +940,12 @@ def main() -> int:
     query_mode.add_argument(
         "-p",
         "--parameters",
-        type=str,
-        required=False,
         default="",
         help="parameters for the plugin",
     )
     query_mode.add_argument(
         "-f",
         "--plugin",
-        type=str,
         required=True,
         help="function to execute",
     )
@@ -966,7 +963,6 @@ def main() -> int:
         "--only-changed",
         action="store_true",
         help="do not output unchanged records",
-        default=False,
     )
 
     configure_generic_arguments(parser)

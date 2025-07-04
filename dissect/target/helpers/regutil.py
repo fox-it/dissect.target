@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
 GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 
-KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.NamedKey]
+KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.KeyNode]
 """The possible key types that can be returned from the registry."""
 
 ValueType = Union[int, str, bytes, list[str], None]

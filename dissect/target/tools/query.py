@@ -26,6 +26,7 @@ from dissect.target.plugin import (
 )
 from dissect.target.plugins.general.plugins import (
     _get_default_functions,
+    _get_os_functions,
     generate_functions_json,
     generate_functions_overview,
 )
@@ -76,10 +77,14 @@ def list_plugins(
     argv: list[str] | None = None,
 ) -> None:
     collected = set()
+    if targets or patterns:
+        collected.update(_get_os_functions())
+
     if targets:
         for target in Target.open_all(targets, include_children):
-            funcs, _ = find_functions(patterns, target, compatibility=True, show_hidden=True)
+            funcs, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
             collected.update(funcs)
+
     elif patterns:
         funcs, _ = find_functions(patterns, Target(), show_hidden=True)
         collected.update(funcs)
@@ -140,6 +145,7 @@ def main() -> int:
         default=None,
         help="list (matching) available plugins and loaders",
     )
+    parser.add_argument("--direct", action="store_true", help="treat TARGETS as paths to pass to plugins directly")
 
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
@@ -272,7 +278,9 @@ def main() -> int:
     execution_report.set_event_callbacks(Target)
 
     try:
-        for target in Target.open_all(args.targets, args.children):
+        targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
+
+        for target in targets:
             if args.child:
                 try:
                     target = target.open_child(args.child)
