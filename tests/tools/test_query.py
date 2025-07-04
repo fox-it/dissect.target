@@ -10,6 +10,7 @@ import pytest
 
 from dissect.target.plugin import FunctionDescriptor
 from dissect.target.tools.query import main as target_query
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
@@ -361,6 +362,59 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
             },
         ],
         "path": "apps.container.docker.logs",
+        "alias": False,
+    }
+
+
+def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test if target-query --list "*" --json <target> returns functions we expect it to."""
+
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-l=*",
+                str(absolute_path("_data/loaders/containerimage/alpine.tar")),
+                "-j",
+            ],
+        )
+        target_query()
+        out, _ = capsys.readouterr()
+
+    output = json.loads(out)
+
+    # test the generic structure of the returned dictionary.
+    assert isinstance(output, dict), "Could not load JSON output of 'target-query --list --json'"
+    assert output["plugins"], "Expected a dictionary of plugins"
+    assert not output.get("loaders"), "Did not expect a dictionary of loaders"
+    assert not output["plugins"].get("failed"), "Some plugin(s) failed to initialize"
+
+    def get_plugin(plugins: list[dict], needle: str) -> dict | bool:
+        match = [p for p in plugins["plugins"]["loaded"] if p["name"] == needle]
+        return match[0] if match else False
+
+    # general plugin
+    users_plugin = get_plugin(output, "users")
+    assert isinstance(users_plugin, dict)
+
+    # We expect path to be "os.unix.linux._os.users"
+    # https://github.com/fox-it/dissect.target/issues/1178
+    users_plugin.pop("path")
+
+    assert users_plugin == {
+        "name": "users",
+        "description": "Yield unix user records from passwd files or syslog session logins.",
+        "output": "record",
+        "arguments": [
+            {
+                "name": "--sessions",
+                "help": "Parse syslog for recent user sessions",
+                "default": False,
+                "required": False,
+                "type": "bool",
+            }
+        ],
         "alias": False,
     }
 
