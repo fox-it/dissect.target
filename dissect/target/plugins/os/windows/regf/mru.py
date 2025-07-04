@@ -18,7 +18,7 @@ from dissect.target.plugins.os.windows.regf.shellbags import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator, Iterator
 
     from flow.record import Record
 
@@ -372,9 +372,8 @@ def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescr
 
         entry_index = mrulist_ex.index(int(value.name))
         if record != OpenSaveMRURecord:
-            split_idx = value.value.index(b"\x00\x00")
-            # Poor mans null terminated utf-16-le
-            path, bag = value.value[: split_idx + 1], value.value[split_idx + 3 :]
+            path = next(read_wstrings(value.value))
+            bag = value.value[len(path) + 2 :]
         else:
             bag = value.value
             path = None
@@ -456,3 +455,19 @@ def parse_office_mru_key(target: Target, key: RegistryKey, record: TargetRecordD
             _user=user,
             _key=key,
         )
+
+
+def read_wstrings(buf: bytes) -> Generator[bytes, None, None]:
+    idx = 0
+    remaining = buf
+    while (idx := remaining.find(b"\x00\x00", idx)) != -1:
+        if idx & 1:
+            idx += 1
+            continue
+
+        yield remaining[:idx]
+        remaining = remaining[idx + 2 :]
+        idx = 0
+
+    if remaining:
+        yield remaining
