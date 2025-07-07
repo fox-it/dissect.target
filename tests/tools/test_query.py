@@ -377,3 +377,19 @@ def test_record_stream_write_exception_handling(
             target_query()
 
     assert "Exception occurred while processing output of WalkFSPlugin.walkfs:" in caplog.text
+
+
+def test_arguments_passed_correctly(monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv", ["target-query", "-fprefetch,mft", "tests/_data/loaders/tar/test-archive.tar.gz", "--compact"]
+        )
+
+        with patch(
+            "dissect.target.tools.query.execute_function_on_target", side_effect=mock_execute_function
+        ) as mocked_execute:
+            target_query()
+
+        assert len(mocked_execute.mock_calls) == 2
+        for call in mocked_execute.mock_calls:
+            assert call.args[2] == ["--compact"]

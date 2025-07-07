@@ -67,7 +67,7 @@ def execute_function(target: Target, function: FunctionDescriptor) -> TargetReco
     local_log.debug("Function execution")
 
     try:
-        output_type, target_attr, _ = execute_function_on_target(target, function)
+        output_type, target_attr = execute_function_on_target(target, function)
     except UnsupportedPluginError:
         local_log.error("Function is not supported for target", exc_info=True)
         return

@@ -188,7 +188,7 @@ def execute_function_on_target(
     target: Target,
     func: FunctionDescriptor,
     arguments: list[str] | None = None,
-) -> tuple[str, Any, list[str]]:
+) -> tuple[str, Any]:
     """Execute function on provided target with provided arguments."""
 
     arguments = arguments or []
@@ -197,17 +197,15 @@ def execute_function_on_target(
     plugin_method, parser = plugin_function_with_argparser(func_obj)
 
     if parser:
-        known_args, rest = parser.parse_known_args(arguments)
+        known_args, _ = parser.parse_known_args(arguments)
         value = plugin_method(**vars(known_args))
     elif isinstance(func_obj, property):
-        rest = arguments
         value = func_obj.__get__(func_cls)
     else:
-        rest = arguments
         value = func_obj
 
     output_type = getattr(plugin_method, "__output__", "default") if plugin_method else "default"
-    return (output_type, value, rest)
+    return (output_type, value)
 
 
 def plugin_function_with_argparser(

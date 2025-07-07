@@ -311,7 +311,7 @@ def main() -> int:
                     continue
 
                 try:
-                    output_type, result, rest = execute_function_on_target(target, func_def, rest)
+                    output_type, result = execute_function_on_target(target, func_def, rest)
                 except UnsupportedPluginError as e:
                     target.log.error(  # noqa: TRY400
                         "Unsupported plugin for %s: %s",
