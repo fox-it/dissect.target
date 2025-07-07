@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -54,10 +55,10 @@ def test_list_target(
             m.setattr("sys.argv", args)
 
             # Patch the target that gets opened.
-            with patch("dissect.target.target.Target.open_all", return_value=[target]):
+            with patch("dissect.target.target.Target.open_all", return_value=[target]), contextlib.suppress(SystemExit):
                 target_query()
 
-                return capsys.readouterr()
+            return capsys.readouterr()
 
     stdout_1, stderr_1 = _run_query(args, target)
     stdout_2, stderr_2 = _run_query([*args, "*"], target)
