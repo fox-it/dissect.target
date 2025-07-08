@@ -1259,12 +1259,15 @@ class OSPlugin(Plugin):
         raise NotImplementedError
 
     @internal
-    def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
-        """Return a generator home directories and a user key.
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        """Yields miscellaneous user paths and user keys.
 
-        Example output: ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
+        Example:
+            ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
         """
 
+        # Consider moving this to the UserPlugin class, and create separate UserPlugin subclasses for each OS
+        # when the mechanism becomes more complex.
         raise NotImplementedError
 
     @internal

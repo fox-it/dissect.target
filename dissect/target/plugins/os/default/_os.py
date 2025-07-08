@@ -51,7 +51,7 @@ class DefaultOSPlugin(OSPlugin):
         yield from ()
 
     @internal
-    def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
         yield from ()
 
     @export(property=True)
