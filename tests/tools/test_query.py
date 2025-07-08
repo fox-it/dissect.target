@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -19,7 +20,9 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "--list"])
 
-        target_query()
+        with pytest.raises(SystemExit):
+            target_query()
+
         out, _ = capsys.readouterr()
 
         assert out.startswith("Available plugins:")
@@ -52,10 +55,10 @@ def test_list_target(
             m.setattr("sys.argv", args)
 
             # Patch the target that gets opened.
-            with patch("dissect.target.target.Target.open_all", return_value=[target]):
+            with patch("dissect.target.target.Target.open_all", return_value=[target]), contextlib.suppress(SystemExit):
                 target_query()
 
-                return capsys.readouterr()
+            return capsys.readouterr()
 
     stdout_1, stderr_1 = _run_query(args, target)
     stdout_2, stderr_2 = _run_query([*args, "*"], target)
@@ -234,11 +237,6 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
 
         with (
             patch(
-                "dissect.target.tools.query.find_functions",
-                autospec=True,
-                side_effect=mock_find_functions,
-            ),
-            patch(
                 "dissect.target.tools.utils.find_functions",
                 autospec=True,
                 side_effect=mock_find_functions,
@@ -286,7 +284,8 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
 
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "-l", "-j"])
-        target_query()
+        with pytest.raises(SystemExit):
+            target_query()
         out, _ = capsys.readouterr()
 
     try:

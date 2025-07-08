@@ -18,18 +18,28 @@ from dissect.target.helpers.docs import get_docstring
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     FunctionDescriptor,
+    OSPlugin,
     Plugin,
     find_functions,
     get_external_module_paths,
+    load,
     load_modules_from_paths,
 )
+from dissect.target.plugins.general.plugins import (
+    _get_default_functions,
+    _get_os_functions,
+    generate_functions_json,
+    generate_functions_overview,
+)
+from dissect.target.target import Target
 from dissect.target.tools.logging import configure_logging
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
     from datetime import datetime
 
-    from dissect.target.target import Target
+
+USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
@@ -77,6 +87,115 @@ def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None
     load_modules_from_paths(paths)
 
 
+def configure_plugin_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("-f", "--function", help="one or more comma separated functions to execute")
+    parser.add_argument("-xf", "--excluded-functions", help="functions to exclude from execution", default="")
+    parser.add_argument(
+        "-l",
+        "--list",
+        action="store",
+        nargs="?",
+        const="",
+        default=None,
+        help="list (matching) available plugins and loaders",
+    )
+    parser.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="do not execute the functions, but just print which functions would be executed",
+    )
+
+
+def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace, rest: list[str]) -> set:
+    """Processes the arguments concerting plugin functions (-f, --function) and exclusion list (-xf, --exclude-funciton)
+
+    It puts the excluded function paths inside args.excluded_functions as a side effect
+
+    Returns:
+        True if there are multiple output types detected, false otherwise.
+    """
+
+    # Show help for a function or in general
+    if "-h" in rest or "--help" in rest:
+        found_functions, _ = find_functions(args.function)
+        if not len(found_functions):
+            parser.error("function(s) not found, see -l for available plugins")
+
+        func = found_functions[0]
+        plugin_class = load(func)
+        if issubclass(plugin_class, OSPlugin):
+            obj = getattr(OSPlugin, func.method_name)
+        else:
+            obj = getattr(plugin_class, func.method_name)
+
+        if isinstance(obj, type) and issubclass(obj, Plugin):
+            parser = generate_argparse_for_plugin_class(obj, usage_tmpl=USAGE_FORMAT_TMPL)
+        elif isinstance(obj, (Callable, property)):
+            parser = generate_argparse_for_unbound_method(getattr(obj, "fget", obj), usage_tmpl=USAGE_FORMAT_TMPL)
+        else:
+            parser.error(f"can't find plugin with function `{func.method_name}`")
+        parser.print_help()
+        parser.exit(0)
+
+    # Show the list of available plugins for the given optional target and optional
+    # search pattern, only display plugins that can be applied to ANY targets
+    if args.list is not None:
+        list_plugins(args.targets, args.list, getattr(args, "children", False), getattr(args, "json", False), rest)
+        parser.exit(0)
+
+    if not args.function:
+        parser.error("argument -f/--function is required")
+
+    funcs, invalid_funcs = find_functions(args.function)
+    if any(invalid_funcs):
+        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
+
+    excluded_funcs, invalid_excluded_funcs = find_functions(args.excluded_functions)
+    if any(invalid_excluded_funcs):
+        parser.error(
+            f"argument -xf/--excluded-functions contains invalid plugin(s): {', '.join(invalid_excluded_funcs)}",
+        )
+
+    args.excluded_functions = list({excluded.path for excluded in excluded_funcs})
+
+    # Verify uniformity of output types, otherwise default to records.
+    # Note that this is a heuristic, the targets are not opened yet because of
+    # performance, so it might generate a false positive
+    # (os.* on Windows includes other OS plugins),
+    # however this is highly hypothetical, most plugins across OSes have
+    # the same output types and most output types are records anyway.
+    # Furthermore we really want the notification at the top, so this is the only
+    # way forward. In the very unlikely case you have a
+    # collection of non-record plugins that have record counterparts for
+    # other OSes just refine the wildcard to exclude other OSes.
+    # The only scenario that might cause this is with
+    # custom plugins with idiosyncratic output across OS-versions/branches.
+    return {func.output for func in funcs if func.path not in args.excluded_functions}
+
+
+def open_targets(args: argparse.Namespace) -> Iterator[Target]:
+    direct: bool = getattr(args, "direct", False)
+    children: bool = getattr(args, "children", False)
+    child: str | None = getattr(args, "child", None)
+    targets: Iterable[Target] = (
+        [Target.open_direct(args.targets)] if direct else Target.open_all(args.targets, children)
+    )
+
+    for target in targets:
+        if child:
+            try:
+                target: Target = target.open_child(child)
+            except Exception as e:
+                target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
+                target.log.debug("", exc_info=e)
+
+        if getattr(args, "dry_run", False):
+            print(f"Dry run on: {target}")
+
+        yield target
+
+
 def generate_argparse_for_bound_method(
     method: Callable,
     usage_tmpl: str | None = None,
@@ -120,6 +239,52 @@ def generate_argparse_for_unbound_method(
     parser.usage = usage_tmpl.format(prog=parser.prog, name=func_name, usage=usage[offset:])
 
     return parser
+
+
+def list_plugins(
+    targets: list[str] | None = None,
+    patterns: str = "",
+    include_children: bool = False,
+    as_json: bool = False,
+    argv: list[str] | None = None,
+) -> None:
+    collected = set()
+    if targets or patterns:
+        collected.update(_get_os_functions())
+
+    if targets:
+        for target in Target.open_all(targets, include_children):
+            funcs, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
+            collected.update(funcs)
+    elif patterns:
+        funcs, _ = find_functions(patterns, Target(), show_hidden=True)
+        collected.update(funcs)
+    else:
+        collected.update(_get_default_functions())
+
+    target = Target()
+    fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
+    fargs, rest = fparser.parse_known_args(argv or [])
+
+    # Display in a user friendly manner
+    if collected:
+        if as_json:
+            print('{"plugins": ', end="")
+            print(generate_functions_json(collected), end="")
+        else:
+            print(generate_functions_overview(collected, include_docs=fargs.print_docs))
+
+    # No real targets specified, show the available loaders
+    if not targets:
+        fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
+        fargs, rest = fparser.parse_known_args(rest)
+        del fargs.as_json
+        if as_json:
+            print(', "loaders": ', end="")
+        target.loaders(**vars(fargs), as_json=as_json)
+
+    if as_json:
+        print("}")
 
 
 def generate_argparse_for_plugin_class(
