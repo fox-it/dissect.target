@@ -347,8 +347,6 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
     # Regex to match lines like: |-- 127.0.0.1
     trie_ip_line_re = re.compile(r"^\s*\|\-\-\s*(\d+\.\d+\.\d+\.\d+)\s*$")
-    # Regex to match the next line: /32 host LOCAL
-    trie_local_re = re.compile(r"^\s*/32 host LOCAL\s*$")
 
     @dataclass
     class ParserContext:
@@ -490,12 +488,16 @@ class ProcConfigParser(LinuxNetworkConfigParser):
             return set()
 
         result = set()
-        for i, line in enumerate(lines):
-            ip_match = self.trie_ip_line_re.match(line)
-            if ip_match and i + 1 < len(lines):
-                local_match = self.trie_local_re.match(lines[i + 1])
-                if local_match:
-                    result.add(ip_address(ip_match.group(1)))
+        iterator = configutil.PeekableIterator(lines)
+        for line in iterator:
+            # Skip all the lines that do not contain '/32 host LOCAL' as the next line
+            next_line = iterator.peek()
+            if not next_line or "/32 host LOCAL" not in next_line:
+                continue
+
+            if ip_match := self.trie_ip_line_re.match(line):
+                result.add(ip_address(ip_match.group(1)))
+
         return result
 
 
