@@ -35,8 +35,8 @@ class DarwinPlugin(BsdPlugin):
         return None
 
     @internal
-    def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
-        yield from super().misc_home_dirs()
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        yield from super().misc_user_paths()
 
         if (user_path := self.target.fs.path("Users")).exists():
             yield from ((entry, None) for entry in user_path.iterdir() if entry.is_dir())

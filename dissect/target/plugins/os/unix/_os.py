@@ -160,7 +160,7 @@ class UnixPlugin(OSPlugin):
                 )
 
     @internal
-    def misc_home_dirs(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
         if (root_path := self.target.fs.path("root")).exists():
             yield (root_path, ("uid", 0))
 

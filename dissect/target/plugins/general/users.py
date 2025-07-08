@@ -92,11 +92,11 @@ class UsersPlugin(InternalPlugin):
                         seen.add(user_details.home_path)
                         yield user_details
         except Exception as e:
-            self.target.log.warning("Failed to retrieve user details, falling back to hardcoded locations.")
+            self.target.log.warning("Failed to retrieve user details, falling back to hardcoded locations")
             self.target.log.debug("", exc_info=e)
 
         # Iterate over misc home directories
-        for misc_home_dir, user_criterion in self.target.misc_home_dirs():
+        for misc_home_dir, user_criterion in self.target.misc_user_paths():
             # We skip the entry if no user can be found.
             # We cannot use set membership check here because of https://github.com/fox-it/dissect.target/issues/1203
             if any(seen_path.samefile(misc_home_dir) for seen_path in seen) or not user_criterion:
@@ -110,7 +110,7 @@ class UsersPlugin(InternalPlugin):
 
     @cached_property
     def all_home_dirs(self) -> Iterator[TargetPath]:
-        """Return all home directories of users."""
+        """Return all home directories of users, including miscellaneous user directories that may not be linked to discovered local users."""  # noqa: E501
 
         seen: set[TargetPath] = set()
         try:
@@ -119,11 +119,11 @@ class UsersPlugin(InternalPlugin):
                     yield home_path
                     seen.add(home_path)
         except Exception as e:
-            self.target.log.warning("Failed to retrieve user details, falling back to hardcoded locations.")
+            self.target.log.warning("Failed to retrieve user details, falling back to hardcoded locations")
             self.target.log.debug("", exc_info=e)
 
         # Iterate over misc home directories
-        for misc_home_dir, _ in self.target.misc_home_dirs():
+        for misc_home_dir, _ in self.target.misc_user_paths():
             # We cannot use set membership check here because of https://github.com/fox-it/dissect.target/issues/1203
             if not any(seen_path.samefile(misc_home_dir) for seen_path in seen):
                 yield misc_home_dir
