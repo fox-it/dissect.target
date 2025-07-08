@@ -1266,8 +1266,8 @@ class OSPlugin(Plugin):
             ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
         """
 
-        # Consider moving this to the UserPlugin class, and create separate UserPlugin subclasses for each OS
-        # when the mechanism becomes more complex.
+        # Consider moving this to the UsersPlugin class, and create separate UsersPlugin subclasses for each OS
+        # when the machinery concerning users and user_paths becomes more complex.
         raise NotImplementedError
 
     @internal
