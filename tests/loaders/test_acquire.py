@@ -10,7 +10,6 @@ from tests._utils import absolute_path
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
 
-    from dissect.target import Target
     from dissect.target.loader import Loader
 
 
@@ -21,7 +20,7 @@ if TYPE_CHECKING:
     ],
 )
 @pytest.mark.benchmark
-def test_benchmark(benchmark: BenchmarkFixture, target_default: Target, archive: str, loader: type[Loader]) -> None:
+def test_benchmark(benchmark: BenchmarkFixture, archive: str, loader: type[Loader]) -> None:
     file = absolute_path(archive)
 
-    benchmark(lambda: loader(file).map(target_default))
+    benchmark(lambda: loader(file).map(Target()))
