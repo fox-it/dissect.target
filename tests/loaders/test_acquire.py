@@ -1,15 +1,14 @@
 from pathlib import Path
 
 import pytest
-from dissect.target.loader import Loader
+from pytest_benchmark.fixture import BenchmarkFixture
 
 from dissect.target import Target
+from dissect.target.loader import Loader
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.loaders.zip import ZipLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from tests._utils import absolute_path
-
-from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def test_case_sensitive_drive_letter(target_bare: Target) -> None:
@@ -35,7 +34,7 @@ def test_case_sensitive_drive_letter(target_bare: Target) -> None:
 
 
 @pytest.mark.parametrize(
-    "archive, expected_drive_letter",
+    ("archive", "expected_drive_letter"),
     [
         ("_data/loaders/acquire/test-windows-sysvol-absolute.tar", "c:"),  # C: due to backwards compatibility
         ("_data/loaders/acquire/test-windows-sysvol-relative.tar", "c:"),  # C: due to backwards compatibility
@@ -55,6 +54,7 @@ def test_windows_sysvol_formats(target_default: Target, archive: str, expected_d
     # NOTE: for the sysvol archives, this also tests the backwards compatibility
     assert sorted(target_default.fs.mounts.keys()) == [expected_drive_letter]
     assert target_default.fs.get(f"{expected_drive_letter}/Windows/System32/foo.txt")
+
 
 def test_windows_sysvol_formats_zip(target_default: Target) -> None:
     path = Path(absolute_path("_data/loaders/acquire/test-windows-fs-c.zip"))
@@ -81,7 +81,7 @@ def test_anonymous_filesystems(target_default: Target) -> None:
 
 
 @pytest.mark.parametrize(
-    "archive,loader",
+    ("archive", "loader"),
     [
         ("_data/loaders/acquire/test-windows-fs-c-relative.tar", TarLoader),
         ("_data/loaders/acquire/test-windows-fs-c.zip", ZipLoader),

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import re
 import zipfile
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
-from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import loaderutil
 from dissect.target.loader import Loader
@@ -19,7 +17,6 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 PREFIXES = ["", "fs"]
-ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 
 
 class DirLoader(Loader):
@@ -48,7 +45,6 @@ def map_dirs(
     *,
     dirfs: type[DirectoryFilesystem] = DirectoryFilesystem,
     zipfs: type[ZipFilesystem] = ZipFilesystem,
-    tarfs: type[TarFilesystem] = TarFilesystem,
     **kwargs,
 ) -> None:
     """Map directories as filesystems into the given target.
@@ -59,7 +55,6 @@ def map_dirs(
         os_type: The operating system type, used to determine how the filesystem should be mounted.
         dirfs: The filesystem class to use for directory filesystems.
         zipfs: The filesystem class to use for ZIP filesystems.
-        tarfs: The filesystem class to use for TAR filesystems.
     """
     alt_separator = ""
     case_sensitive = True
@@ -77,8 +72,6 @@ def map_dirs(
 
         if isinstance(path, zipfile.Path):
             dfs = zipfs(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
-        elif hasattr(path, "_fs") and isinstance(path._fs, TarFilesystem):
-            dfs = tarfs(tarfile=path._fs.tar, base=str(path), alt_separator=alt_separator, case_sensitive=case_sensitive)
         else:
             dfs = dirfs(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
 
@@ -95,10 +88,7 @@ def map_dirs(
                 vfs = dfs[0]
 
             fs_to_add.append(vfs)
-            mount_letter = drive_letter.lower()
-            if mount_letter != "$fs$":
-                mount_letter += ":"
-            target.fs.mount(mount_letter, vfs)
+            target.fs.mount(drive_letter.lower() + ":", vfs)
         else:
             fs_to_add.extend(dfs)
 
@@ -123,7 +113,7 @@ def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
     map_dirs(target, dirs, os_type, **kwargs)
 
 
-def find_dirs(path: Path) -> tuple[str, list[tuple[str, Path] | Path]]:
+def find_dirs(path: Path) -> tuple[str, list[Path]]:
     """Try to find if ``path`` contains an operating system directory layout and return the OS type and detected
     directories.
 
@@ -134,31 +124,21 @@ def find_dirs(path: Path) -> tuple[str, list[tuple[str, Path] | Path]]:
         path: The path to check.
 
     Returns:
-        A tuple consisting of the found operating system layout and a list of all detected directories
-            (which contains either a Path, or a tuple of drive letter + Path).
+        A tuple consisting of the found operating system layout and a list of all detected directories.
     """
-    dirs : list[tuple[str, Path] | Path] = []
-    os_type : str | None = None
+    dirs = []
+    os_type = None
 
     if path.is_dir():
         for p in path.iterdir():
             # Look for directories like C or C:
             if p.is_dir() and (is_drive_letter_path(p) or p.name in ("sysvol", "$rootfs$")):
-                if p.name == "sysvol":
-                    dirs.append(("c", p))
-                else:
-                    dirs.append((p.name[0], p))
+                dirs.append(p)
 
                 if not os_type:
                     os_type = os_type_from_path(p)
 
-            if p.name == "$fs$":
-                dirs.append(("$fs$", p))
-                for anon_fs in p.iterdir():
-                    if ANON_FS_RE.match(anon_fs.name):
-                        dirs.append(anon_fs)
-
-        if len(dirs) == 0:
+        if not os_type:
             os_type = os_type_from_path(path)
             dirs = [path]
 

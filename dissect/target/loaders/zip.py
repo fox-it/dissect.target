@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import logging
 import zipfile as zf
 from typing import TYPE_CHECKING
 
-from dissect.target.loaders.dir import find_and_map_dirs
-
-from dissect.target import target
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.loader import Loader, SubLoader
+from dissect.target.loaders.dir import find_and_map_dirs
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from dissect.target import target
+
+
 ZIP_EXT = (".zip",)
+
 
 class ZipSubLoader(SubLoader[zf.Path]):
     """Zip implementation of a :class:`SubLoader`."""
@@ -31,9 +32,9 @@ class ZipSubLoader(SubLoader[zf.Path]):
         """Only to be called internally by :class:`ZipLoader`."""
         raise NotImplementedError
 
+
 class GenericZipSubLoader(ZipSubLoader):
-    """Generic zip sub loader.
-    """
+    """Generic zip sub loader."""
 
     @staticmethod
     def detect(zipfile: zf.Path) -> bool:
@@ -68,6 +69,3 @@ class ZipLoader(Loader):
                 self.subloader = candidate(self.zip)
                 self.subloader.map(target)
                 break
-
-
-

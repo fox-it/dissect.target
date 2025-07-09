@@ -35,16 +35,13 @@ class TarFilesystem(Filesystem):
 
     def __init__(
         self,
-        fh: BinaryIO | None = None,
+        fh: BinaryIO,
         base: str | None = None,
         *,
         tarinfo: tf.TarInfo | None = None,
         tarfile: tf.TarFile | None = None,
         **kwargs,
     ):
-        if not fh and not tarfile:
-            raise FileNotFoundError("TarFilesystem expects either fh or tarfile")
-
         super().__init__(fh, **kwargs)
 
         if tarfile:

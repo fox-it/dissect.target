@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-import tarfile as tf
-import zipfile as zf
+from typing import TYPE_CHECKING
 
 from dissect.target import filesystem
 from dissect.target.filesystems.tar import TarFilesystemDirectoryEntry, TarFilesystemEntry
@@ -11,7 +10,13 @@ from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.loaders.dir import find_and_map_dirs
 from dissect.target.loaders.tar import TarSubLoader
 from dissect.target.loaders.zip import ZipSubLoader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    import tarfile as tf
+    import zipfile as zf
+
+    from dissect.target.target import Target
+
 
 log = logging.getLogger(__name__)
 
@@ -27,8 +32,14 @@ class AcquireTarSubLoader(TarSubLoader):
     @staticmethod
     def detect(tarfile: tf.TarFile) -> bool:
         for member in tarfile.getmembers():
-            if member.name.startswith((f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/",
-                                       f"/{FILESYSTEMS_LEGACY_ROOT}/", f"{FILESYSTEMS_LEGACY_ROOT}/")):
+            if member.name.startswith(
+                (
+                    f"/{FILESYSTEMS_ROOT}/",
+                    f"{FILESYSTEMS_ROOT}/",
+                    f"/{FILESYSTEMS_LEGACY_ROOT}/",
+                    f"{FILESYSTEMS_LEGACY_ROOT}/",
+                )
+            ):
                 return True
         return False
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import tarfile as tf
 from typing import TYPE_CHECKING
 
@@ -68,8 +67,7 @@ class TarSubLoader(SubLoader[tf.TarFile]):
 
 
 class GenericTarSubLoader(TarSubLoader):
-    """Generic tar sub loader.
-    """
+    """Generic tar sub loader."""
 
     @staticmethod
     def detect(tarfile: tf.TarFile) -> bool:

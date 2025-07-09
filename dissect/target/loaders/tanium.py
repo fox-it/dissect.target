@@ -34,7 +34,7 @@ class TaniumLoader(DirLoader):
         file_path = path.joinpath("file")
         os_type, dirs = find_dirs(file_path)
         if file_path and os_type == OperatingSystem.WINDOWS:
-            for volume, path in dirs:
+            for path in dirs:
                 # Tanium doesn't have the correct filenames for several files, like $J
                 if path.joinpath("$Extend/$UsnJrnl_$J").exists():
                     return True
