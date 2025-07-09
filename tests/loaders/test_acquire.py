@@ -1,12 +1,12 @@
-from pathlib import Path
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.loaders.tar import TarLoader
 from dissect.target.loader import Loader
+from dissect.target.loaders.tar import TarLoader
 from dissect.target.loaders.zip import ZipLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
 
     from dissect.target.loader import Loader
+
 
 def test_case_sensitive_drive_letter(target_bare: Target) -> None:
     tar_file = absolute_path("_data/loaders/acquire/uppercase_driveletter.tar")
@@ -89,7 +90,7 @@ def test_anonymous_filesystems(target_default: Target) -> None:
 @pytest.mark.parametrize(
     ("archive", "loader"),
     [
-        ("_data/loaders/tar/test-windows-fs-c-relative.tar", TarLoader),
+        ("_data/loaders/acquire/test-windows-fs-c-relative.tar", TarLoader),
         ("_data/loaders/acquire/test-windows-fs-c.zip", ZipLoader),
     ],
 )
