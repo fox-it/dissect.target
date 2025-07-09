@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.loaders.tar import TarLoader
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
