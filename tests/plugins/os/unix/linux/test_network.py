@@ -102,22 +102,29 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     assert not wired_static.dhcp_ipv4
     assert not wired_static.dhcp_ipv6
     assert wired_static.last_connected is None
-    assert Counter(wired_static.vlan) == Counter([100, 101])
+    assert set(wired_static.vlan) == {100, 101}
     assert wired_static.configurator == "systemd-networkd"
 
     assert wired_static_complex.name == "enp1s0"
     assert wired_static_complex.type == "ether"
     assert wired_static_complex.enabled is None
-    assert Counter(wired_static_complex.cidr) == Counter([ip_interface("10.1.10.9/16"), ip_interface("10.1.9.10/24")])
-    assert Counter(wired_static_complex.gateway) == Counter(
-        [ip_address("10.1.6.3"), ip_address("10.1.10.2"), ip_address("10.1.9.3")]
-    )
-    assert Counter(wired_static_complex.dns) == Counter(
-        [ip_address("10.1.10.1"), ip_address("10.1.10.2"), ip_address("1111:2222::3333")]
-    )
-    assert Counter(wired_static_complex.mac) == Counter(
-        ["aa::bb::cc::dd::ee::ff", "ff::ee::dd::cc::bb::aa", "cc::ff::bb::aa::dd", "bb::aa::dd::cc::ff"]
-    )
+    assert set(wired_static_complex.cidr) == {ip_interface("10.1.10.9/16"), ip_interface("10.1.9.10/24")}
+    assert set(wired_static_complex.gateway) == {
+        ip_address("10.1.6.3"),
+        ip_address("10.1.10.2"),
+        ip_address("10.1.9.3"),
+    }
+    assert set(wired_static_complex.dns) == {
+        ip_address("10.1.10.1"),
+        ip_address("10.1.10.2"),
+        ip_address("1111:2222::3333"),
+    }
+    assert set(wired_static_complex.mac) == {
+        "aa::bb::cc::dd::ee::ff",
+        "ff::ee::dd::cc::bb::aa",
+        "cc::ff::bb::aa::dd",
+        "bb::aa::dd::cc::ff",
+    }
     assert wired_static_complex.source == "/etc/systemd/network/30-wired-static-complex.network"
     assert not wired_static_complex.dhcp_ipv4
     assert not wired_static_complex.dhcp_ipv6
@@ -173,16 +180,24 @@ def test_systemd_network_drop(target_linux: Target, fs_linux: VirtualFilesystem)
     assert wired_static_complex.name == "wlp2s0"
     assert wired_static_complex.type == "wifi"
     assert wired_static_complex.enabled is None
-    assert Counter(wired_static_complex.cidr) == Counter([ip_interface("10.1.10.11/16")])
-    assert Counter(wired_static_complex.gateway) == Counter(
-        [ip_address("10.1.6.3"), ip_address("10.1.10.2"), ip_address("10.1.9.3"), ip_address("10.1.10.4")]
-    )
-    assert Counter(wired_static_complex.dns) == Counter(
-        [ip_address("10.1.10.1"), ip_address("10.1.10.2"), ip_address("1111:2222::3333")]
-    )
-    assert Counter(wired_static_complex.mac) == Counter(
-        ["aa::bb::cc::dd::ee::ff", "ff::ee::dd::cc::bb::aa", "cc::ff::bb::aa::dd", "bb::aa::dd::cc::ff"]
-    )
+    assert set(wired_static_complex.cidr) == {ip_interface("10.1.10.11/16")}
+    assert set(wired_static_complex.gateway) == {
+        ip_address("10.1.6.3"),
+        ip_address("10.1.10.2"),
+        ip_address("10.1.9.3"),
+        ip_address("10.1.10.4"),
+    }
+    assert set(wired_static_complex.dns) == {
+        ip_address("10.1.10.1"),
+        ip_address("10.1.10.2"),
+        ip_address("1111:2222::3333"),
+    }
+    assert set(wired_static_complex.mac) == {
+        "aa::bb::cc::dd::ee::ff",
+        "ff::ee::dd::cc::bb::aa",
+        "cc::ff::bb::aa::dd",
+        "bb::aa::dd::cc::ff",
+    }
     assert wired_static_complex.source == "/etc/systemd/network/30-wired-static-complex.network"
     assert wired_static_complex.dhcp_ipv4
     assert not wired_static_complex.dhcp_ipv6
@@ -230,11 +245,9 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
         lo,
     ) = interfaces
 
-    assert Counter(wlp.cidr) == Counter(
-        [ip_interface("fe80::f66c:ff08:22f4:9090/64"), ip_interface("192.168.1.109/24")]
-    )
-    assert Counter(wlp.gateway) == Counter([ip_address("192.168.1.1")])
+    assert set(wlp.cidr) == {ip_interface("fe80::f66c:ff08:22f4:9090/64"), ip_interface("192.168.1.109/24")}
+    assert wlp.gateway == [ip_address("192.168.1.1")]
 
-    assert Counter(lo.cidr) == Counter([ip_interface("::1/128")])
-    assert Counter(docker.cidr) == Counter([ip_interface("172.17.0.1/16")])
-    assert Counter(vir.cidr) == Counter([ip_interface("192.168.122.1/24")])
+    assert lo.cidr == [ip_interface("::1/128")]
+    assert docker.cidr == [ip_interface("172.17.0.1/16")]
+    assert vir.cidr == [ip_interface("192.168.122.1/24")]
