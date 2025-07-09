@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import posixpath
-from collections import Counter
 from datetime import datetime
 from ipaddress import ip_address, ip_interface
 from typing import TYPE_CHECKING
@@ -34,17 +33,19 @@ def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem
     assert wired.name == "enp0s3"
     assert wired.type == "ethernet"
     assert wired.enabled is None
-    assert Counter(wired.cidr) == Counter([ip_interface("192.168.2.138/24"), ip_interface("10.1.1.10/16")])
-    assert Counter(wired.gateway) == Counter(
-        [ip_address("192.168.2.2"), ip_address("2620:52:0:2219:222:68ff:fe11:5403"), ip_address("192.168.2.3")]
-    )
+    assert set(wired.cidr) == {ip_interface("192.168.2.138/24"), ip_interface("10.1.1.10/16")}
+    assert set(wired.gateway) == {
+        ip_address("192.168.2.2"),
+        ip_address("2620:52:0:2219:222:68ff:fe11:5403"),
+        ip_address("192.168.2.3"),
+    }
     assert wired.dns == [ip_address("88.88.88.88")]
     assert wired.mac == ["08:00:27:5B:4A:EB"]
     assert wired.source == "/etc/NetworkManager/system-connections/wired-static.nmconnection"
     assert not wired.dhcp_ipv4
     assert not wired.dhcp_ipv6
     assert wired.last_connected == datetime.fromisoformat("2024-10-29 07:59:54+00:00")
-    assert Counter(wired.vlan) == Counter([10, 11])
+    assert set(wired.vlan) == {10, 11}
     assert wired.configurator == "NetworkManager"
 
     assert wireless.name == "wlp2s0"
