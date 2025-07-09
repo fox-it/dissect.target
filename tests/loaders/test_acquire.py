@@ -10,7 +10,7 @@ from tests._utils import absolute_path
 
 
 @pytest.mark.parametrize(
-    "archive,loader",
+    ("archive", "loader"),
     [
         ("_data/loaders/tar/test-windows-fs-c-relative.tar", TarLoader),
     ],
