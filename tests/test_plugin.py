@@ -656,7 +656,7 @@ def test_nested_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> 
     assert isinstance(target_bare.ns.foo.foo2, Foo2)
 
     with pytest.raises(AttributeError):
-        target_bare.ns.bla
+        _ = target_bare.ns.bla
 
     result, _ = find_functions("ns.foo.*.fizz")
     assert len(result) == 2
@@ -683,10 +683,10 @@ def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Ta
     assert hasattr(target_bare.foo.bar, "bazz")
 
     with pytest.raises(AttributeError):
-        target_bare.foo.bazz
+        target_bare.foo.bazz()
 
     with pytest.raises(AttributeError):
-        target_bare.foo.bar.foo
+        target_bare.foo.bar.foo()
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:

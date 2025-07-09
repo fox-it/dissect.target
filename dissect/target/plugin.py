@@ -16,7 +16,7 @@ import traceback
 from dataclasses import dataclass, field
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, override
+from typing import TYPE_CHECKING, Any, Callable
 
 try:
     from typing import TypeAlias  # novermin
@@ -452,7 +452,7 @@ class Plugin:
         except PluginNotFoundError:
             raise AttributeError(name)
 
-        # If a plugin is called directly, target.get_function func will will be an instance of a plugin and can be called.
+        # If a plugin is called directly, target.get_function returns an instance of the plugin that can be called.
         return func
 
     def is_compatible(self) -> bool:
@@ -1450,7 +1450,6 @@ class NamespacePlugin(Plugin):
             aggregator.__subplugins__.append(cls.__namespace__)
             cls.__update_aggregator_docs(aggregator)
 
-    @override
     def _has_function(self, name: str) -> bool:
         return super()._has_function(name) or name in self.__subplugins__
 
