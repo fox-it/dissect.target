@@ -658,15 +658,15 @@ def test_nested_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> 
     with pytest.raises(AttributeError):
         _ = target_bare.ns.bla
 
-    result, _ = find_functions("ns.foo.*.fizz")
-    assert len(result) == 2
-    assert sorted(desc.name for desc in result) == ["foo1.fizz", "foo2.fizz"]
-
 
 @patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
 def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> None:
     class Foo(Plugin):
         __namespace__ = "foo"
+
+        @export(output="yield")
+        def buzz(self) -> Iterator[str]:
+            yield from ["buzz"]
 
     class FooBar(Plugin):
         __namespace__ = "foo.bar"
@@ -675,11 +675,19 @@ def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Ta
         def bazz(self) -> Iterator[str]:
             yield from ["bazz"]
 
-    for plugin in [Foo, FooBar]:
+    class FooBaz(Plugin):
+        __namespace__ = "foo.baz"
+
+        @export(output="yield")
+        def bar(self) -> Iterator[str]:
+            yield from ["bar"]
+
+    for plugin in [Foo, FooBar, FooBaz]:
         target_bare._register_plugin_functions(plugin(target_bare))
 
     assert isinstance(target_bare.foo, Foo)
     assert isinstance(target_bare.foo.bar, FooBar)
+    assert isinstance(target_bare.foo.baz, FooBaz)
     assert hasattr(target_bare.foo.bar, "bazz")
 
     with pytest.raises(AttributeError):
@@ -687,6 +695,13 @@ def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Ta
 
     with pytest.raises(AttributeError):
         target_bare.foo.bar.foo()
+
+    # Test whether it can find a specific function using a glob
+    functions, _ = find_functions("foo.*.bar")
+    assert sorted(desc.name for desc in functions) == ["foo.baz.bar"]
+
+    functions, _ = find_functions("foo*")
+    assert sorted(desc.name for desc in functions) == ["foo.bar.bazz", "foo.baz.bar", "foo.buzz"]
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
