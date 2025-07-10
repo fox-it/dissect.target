@@ -74,7 +74,7 @@ def test_firefox_history(target_platform: Target, request: pytest.FixtureRequest
     assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].url == "https://www.mozilla.org/privacy/firefox/"
-    assert records[0].id == "1"
+    assert records[0].id == 1
     assert records[0].description == "47356411089529"
     assert records[0].visit_count == 1
     assert records[0].ts == dt("2021-12-01T10:42:05.742000+00:00")
@@ -134,7 +134,7 @@ def test_firefox_extensions(target_platform: Target, request: pytest.FixtureRequ
 
     assert {"firefox"} == {record.browser for record in records}
     assert len(records) == 2
-    assert records[0].id == "uBlock0@raymondhill.net"
+    assert records[0].extension_id == "uBlock0@raymondhill.net"
     assert records[0].ts_install == dt("2024-04-23 07:07:21.516000+00:00")
     assert records[0].ts_update == dt("2024-04-23 07:07:21.516000+00:00")
     assert (
@@ -216,7 +216,7 @@ def test_firefox_oculus_history(target_firefox_oculus: Target) -> None:
     assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].url == "https://webxr.today/"
-    assert records[0].id == "1"
+    assert records[0].id == 1
     assert records[0].description == "47356570952011"
     assert records[0].ts == dt("2021-11-04 13:29:30.780000+00:00")
 
@@ -270,7 +270,7 @@ def test_firefox_oculus_extensions(target_firefox_oculus: Target) -> None:
 
     assert {"firefox"} == {record.browser for record in records}
     assert len(records) == 5
-    assert records[0].id == "default-theme@mozilla.org"
+    assert records[0].extension_id == "default-theme@mozilla.org"
     assert records[0].ts_install == dt("2021-11-04 13:29:29.988000+00:00")
     assert records[0].ts_update == dt("1970-01-01 00:00:00+00:00")
     assert records[0].ext_path is None

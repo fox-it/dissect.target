@@ -38,6 +38,9 @@ def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None
     assert record.syslog_identifier == "gnome-shell"
     assert record.pid == 2096
     assert record.transport == "stdout"
+    assert record.kernel_boot_id == "5ffb8dae595f4679988508fd45d9c8c4"
+    assert record.priority_int == 6
+    assert record.priority == "info"
     assert record.source == "/var/log/journal/1337/user-1000.journal"
 
 
