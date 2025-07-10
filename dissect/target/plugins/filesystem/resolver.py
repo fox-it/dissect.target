@@ -18,6 +18,9 @@ FALLBACK_SEARCH_PATHS = [
     "sysvol/windows/system32",
     "sysvol/windows/syswow64",
     "sysvol/windows",
+    "sysvol/winnt/system32",
+    "sysvol/winnt/syswow64",
+    "sysvol/winnt",
 ]
 
 
