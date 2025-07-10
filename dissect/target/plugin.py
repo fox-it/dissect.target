@@ -445,7 +445,7 @@ class Plugin:
         # If the namespace doesn't expose the function ``name``, we might have encountered a implicit nested namespace.
         # These are the plugins that build upon a namespace, but not through inheritance.
         # So we attempt to resolve it by looking up the namespace by name.
-        func_name = name if self._has_function(name) else f"{full_namespace(self.__class__)}.{name}"
+        func_name = name if self._has_function(name) else f"{self.__class__.__namespace__}.{name}"
 
         try:
             _, func = self.target.get_function(func_name)
@@ -565,7 +565,7 @@ def register(plugincls: type[Plugin]) -> None:
 
     module_key = f"{module_path}.{plugincls.__qualname__}"
 
-    namespace = full_namespace(plugincls)
+    namespace = plugincls.__namespace__
 
     if not issubclass(plugincls, ChildTargetPlugin):
         # First pass to resolve aliases
@@ -579,7 +579,6 @@ def register(plugincls: type[Plugin]) -> None:
 
             if getattr(attr, "__generated__", False) and plugincls != plugincls.__nsplugin__:
                 continue
-
             exported = getattr(attr, "__exported__", False)
             internal = getattr(attr, "__internal__", False)
 
@@ -1342,20 +1341,6 @@ class ChildTargetPlugin(Plugin):
         possible child targets on this target.
         """
         raise NotImplementedError
-
-
-def full_namespace(plugin_cls: type[Plugin]) -> str | None:
-    """Returns the full namespace of ``plugin_cls`` using the mro()
-
-    When ``plugin_cls`` has multiple plugins as its base, the namespace will reflect that
-    """
-    if plugin_cls.__namespace__ is None:
-        return None
-
-    mro = plugin_cls.mro()
-    mro.reverse()
-    # Join all the namespaces together
-    return ".".join(klass.__namespace__ for klass in mro if issubclass(klass, Plugin) and klass.__namespace__)
 
 
 class NamespacePlugin(Plugin):
