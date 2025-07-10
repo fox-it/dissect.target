@@ -50,6 +50,7 @@ def main() -> int:
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to display info from")
     parser.add_argument("--children", action="store_true", help="include children")
+    parser.add_argument("--children-recursive", action="store_true", default=False, help="include children recursively")
     parser.add_argument("--from-file", nargs="?", type=Path, help="file containing targets to load")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-r", "--record", action="store_true", help="print output as record")
@@ -155,8 +156,10 @@ def get_volumes_info(target: Target) -> list[dict[str, str | int]]:
     return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
 
 
-def get_children_info(target: Target) -> list[dict[str, str]]:
-    return [{"type": c.type, "path": str(c.path)} for c in target.list_children()]
+def get_children_info(target: Target, recursive: bool = False) -> list[dict[str, str]]:
+    if recursive:
+        return [{"child_index": i, "type": c.type, "path": str(c.path)} for i, c in target.list_children_recursive()]
+    return [{"child_index": i, "type": c.type, "path": str(c.path)} for i, c in enumerate(target.list_children())]
 
 
 if __name__ == "__main__":

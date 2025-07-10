@@ -189,6 +189,8 @@ def open_targets(args: argparse.Namespace) -> Iterator[Target]:
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
                 target.log.debug("", exc_info=e)
+                # Do not continue processing, as target is now still pointing to the parent.
+                continue
 
         if getattr(args, "dry_run", False):
             print(f"Dry run on: {target}")
@@ -471,3 +473,17 @@ def find_and_filter_plugins(
 def escape_str(value: str) -> str:
     """Escape non-ASCII, unicode characters and bytes to a printable form."""
     return repr(value)[1:-1]
+
+
+def print_children(targets: list[str], recursive: bool = False) -> None:
+    """Pretty print children of targets (recursively)"""
+    for target in targets:
+        print(f"# Processing hostname={target.name}, path={target.path} (-recursive={recursive})")
+        for child_id, child in target.list_children_recursive() if recursive else enumerate(target.list_children()):
+            # Always cast child_id to str to match _recursive()
+            prefix = "-" * str(child_id).count(".")
+            print(f" {prefix}[#{child_id}]: type={child.type}, name={child.name}, path={child.path}")
+
+    # Check if any children were found, if not print msg
+    if "child_id" not in locals():
+        print("No children found on target(s)")
