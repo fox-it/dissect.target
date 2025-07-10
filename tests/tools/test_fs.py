@@ -27,7 +27,11 @@ def vfs(files: list[str]) -> VirtualFilesystem:
 
 @pytest.mark.parametrize(
     ("path", "expected_files"),
-    [("root/.bash_history", 1), ("this/path/doesntexist", 0), ("**/*_history", 4)],
+    [
+        ("root/.bash_history", 1), 
+        ("this/path/doesntexist", 0), 
+        ("**/*_history", 4),
+    ],
 )
 def test_target_fs(
     capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, path: str, expected_files: int
