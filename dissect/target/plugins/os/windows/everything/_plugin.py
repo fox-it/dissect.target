@@ -6,12 +6,12 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.windows.everything.everything_types import (
-    EverythingDBParser,
+from dissect.target.plugins.os.windows.everything.parser import (
+    EverythingDB,
 )
 
 EverythingRecord = TargetRecordDescriptor(
-    "windows/everything/everything_record",
+    "windows/everything/record",
     [
         ("path", "path"),
         ("filesize", "size"),
@@ -61,7 +61,7 @@ class EverythingPlugin(Plugin):
         for path in self.configs:
             try:
                 with self.target.fs.path(path).open() as fh:
-                    db = EverythingDBParser(fh)
+                    db = EverythingDB(fh)
                     for item in db:
                         yield EverythingRecord(
                             path=item.file_path,

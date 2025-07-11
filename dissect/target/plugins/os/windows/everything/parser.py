@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 BZIP_HEADER = b"BZh9"
 FILE_MAGIC = b"ESDb"
-REFS_MIN_VERSION = (1, 7, 17)
 COMPAT_1 = (1, 7, 9)
 
 log = logging.getLogger(__name__)
@@ -119,11 +118,11 @@ def filesystems_cstruct(version: tuple[int, int, int]) -> cstruct:
         {version_match("uint64_t next_usn;", version >= COMPAT_1)}
     }};
     """
-    everything_filesystem_cs = cstruct()
-    everything_filesystem_cs.add_custom_type("EverythingVarInt", EverythingVarInt)
-    everything_filesystem_cs.load(c_filesystems_def)
+    c_filesystems = cstruct()
+    c_filesystems.add_custom_type("EverythingVarInt", EverythingVarInt)
+    c_filesystems.load(c_filesystems_def)
 
-    return everything_filesystem_cs
+    return c_filesystems
 
 
 class EverythingFSType(IntEnum):
@@ -135,7 +134,7 @@ class EverythingFSType(IntEnum):
 
 
 @dataclasses.dataclass
-class EverythingF:
+class Record:
     file_path: str
     size: int
     date_created: datetime | None
@@ -170,9 +169,10 @@ class EverythingIndexObj:
         return folder_list[self.parent_index].resolve_fs(folder_list)
 
 
-class EverythingDBParser:
+class EverythingDB:
     def __init__(self, fh: BinaryIO):
         self.fh = fh
+        self.fh.seek(0)
 
         # Check if file is bzipped
         header = self.fh.read(4)
@@ -188,7 +188,7 @@ class EverythingDBParser:
 
         self.header = header
         self.version = (header.version_major, header.version_minor, header.version_patch)
-        self.filesystems_cstruct = filesystems_cstruct(self.version)
+        self.c_filesystems = filesystems_cstruct(self.version)
         self.__parse_filesystems()
 
         # This might be hidden/system files/folders, or maybe a list of folders to exclude?
@@ -221,7 +221,7 @@ class EverythingDBParser:
         self.filesystem_list = []
 
         for i in range(self.header.number_of_filesystems):
-            filesystem_header = self.filesystems_cstruct.filesystem_header(self.fh)
+            filesystem_header = self.c_filesystems.filesystem_header(self.fh)
             log.debug("Filesystem %d: type %s", i, filesystem_header)
 
             try:
@@ -231,21 +231,21 @@ class EverythingDBParser:
 
             if fs_type in [EverythingFSType.NTFS, EverythingFSType.REFS]:
                 if fs_type == EverythingFSType.NTFS:
-                    header = self.filesystems_cstruct.ntfs_header(self.fh)
+                    header = self.c_filesystems.ntfs_header(self.fh)
                 else:
-                    header = self.filesystems_cstruct.refs_header(self.fh)
+                    header = self.c_filesystems.refs_header(self.fh)
 
             elif fs_type == EverythingFSType.EFU:
-                header = self.filesystems_cstruct.efu_header(self.fh)
+                header = self.c_filesystems.efu_header(self.fh)
 
             elif fs_type == EverythingFSType.FOLDER:
-                header = self.filesystems_cstruct.folder_header(self.fh)
+                header = self.c_filesystems.folder_header(self.fh)
             else:
                 raise NotImplementedError(f"Have not implemented parsing {fs_type}")
             self.filesystem_list.append((fs_type, filesystem_header, header))
 
-    def __iter__(self) -> Iterator[EverythingF]:
-        self.fh.seek(self._start_seek, io.SEEK_SET)
+    def __iter__(self) -> Iterator[Record]:
+        self.fh.seek(self._start_seek)
         # This builds a list of folders in the filesystem.  This creates an index, where each object contains:
         #   index of parent object (meaning the folder above)
         #   index of filesystem
@@ -301,7 +301,7 @@ def write_varint(data: int) -> bytes:
     return struct.pack("<Bi", 0xFF, data)
 
 
-def parse_folder(db: EverythingDBParser, folder: EverythingIndexObj, name: str) -> None:
+def parse_folder(db: EverythingDB, folder: EverythingIndexObj, name: str) -> None:
     folder.file_path = name
     # This is hardcoded for all folders
     folder.attributes = 16
@@ -366,7 +366,7 @@ def read_truncated_name(fh: BinaryIO, current_buf: bytes = b"") -> bytes:
     return current_buf
 
 
-def parse_folders(db: EverythingDBParser, folder_list: list[EverythingIndexObj]) -> Iterator[EverythingF]:
+def parse_folders(db: EverythingDB, folder_list: list[EverythingIndexObj]) -> Iterator[Record]:
     temp_buf = b""
     for folder in folder_list:
         # There is a bug loading EFU files, (which causes Everything v1.4.0.704b to crash)
@@ -379,7 +379,7 @@ def parse_folders(db: EverythingDBParser, folder_list: list[EverythingIndexObj])
         parse_folder(db, folder, temp_buf.decode())
 
     for folder in folder_list:
-        yield EverythingF(
+        yield Record(
             file_path=folder.resolve_path(folder_list),
             size=folder.size,
             attributes=folder.attributes,
@@ -390,7 +390,7 @@ def parse_folders(db: EverythingDBParser, folder_list: list[EverythingIndexObj])
         )
 
 
-def parse_files(db: EverythingDBParser, folder_list: list[EverythingIndexObj]) -> Iterator[EverythingF]:
+def parse_files(db: EverythingDB, folder_list: list[EverythingIndexObj]) -> Iterator[Record]:
     temp_buf = b""
     for _ in range(db.header.number_of_files):
         parent_index = c_header.uint32_t(db.fh)
@@ -438,7 +438,7 @@ def parse_files(db: EverythingDBParser, folder_list: list[EverythingIndexObj]) -
         )
 
         try:
-            yield EverythingF(
+            yield Record(
                 file_path=f"{file_name}\\{temp_buf.decode()}",
                 size=file_size,
                 attributes=attributes,
