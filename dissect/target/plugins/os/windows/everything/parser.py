@@ -189,6 +189,7 @@ class EverythingDB:
         self.header = header
         self.version = (header.version_major, header.version_minor, header.version_patch)
         self.c_filesystems = filesystems_cstruct(self.version)
+        self.filesystems = []
         self.__parse_filesystems()
 
         # This might be hidden/system files/folders, or maybe a list of folders to exclude?
@@ -215,11 +216,9 @@ class EverythingDB:
         self._start_seek = self.fh.tell()
 
     def __repr__(self) -> str:
-        return f"{self.header} - Filesystems{self.filesystem_list}"
+        return f"{self.header} - Filesystems{self.filesystems}"
 
     def __parse_filesystems(self) -> None:
-        self.filesystem_list = []
-
         for i in range(self.header.number_of_filesystems):
             filesystem_header = self.c_filesystems.filesystem_header(self.fh)
             log.debug("Filesystem %d: type %s", i, filesystem_header)
@@ -242,7 +241,7 @@ class EverythingDB:
                 header = self.c_filesystems.folder_header(self.fh)
             else:
                 raise NotImplementedError(f"Have not implemented parsing {fs_type}")
-            self.filesystem_list.append((fs_type, filesystem_header, header))
+            self.filesystems.append((fs_type, filesystem_header, header))
 
     def __iter__(self) -> Iterator[Record]:
         self.fh.seek(self._start_seek)
@@ -317,14 +316,14 @@ def parse_folder(db: EverythingDB, folder: EverythingIndexObj, name: str) -> Non
     if c_header.EntryAttributes.has_attributes in db.header.entry_attributes:
         folder.attributes = c_header.uint32_t(db.fh)
 
-    if db.filesystem_list[folder.fs_index][0] == EverythingFSType.REFS:
+    if db.filesystems[folder.fs_index][0] == EverythingFSType.REFS:
         # Unknown
         c_header.uint64_t(db.fh)
         c_header.uint64_t(db.fh)
-    elif db.filesystem_list[folder.fs_index][0] == EverythingFSType.NTFS:
+    elif db.filesystems[folder.fs_index][0] == EverythingFSType.NTFS:
         # Unknown
         c_header.uint64_t(db.fh)
-    elif db.filesystem_list[folder.fs_index][0] == EverythingFSType.EFU:
+    elif db.filesystems[folder.fs_index][0] == EverythingFSType.EFU:
         if folder.parent_index is None:
             # The EFU format does not contain the root drive, so it just puts random data into
             # the metadata.  This will cause errors if passed to flow.record, so we remove it here
