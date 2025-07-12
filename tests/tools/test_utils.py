@@ -173,7 +173,6 @@ def test_namespace_plugin_args() -> None:
 
     mock_target.get_function.return_value = Fake, obj
 
-    _, result, rest = execute_function_on_target(mock_target, Mock(), ["--a", "asdf", "--b", "123"])
+    _, result = execute_function_on_target(mock_target, Mock(), ["--a", "asdf", "--b", "123"])
 
     assert result == "asdf"
-    assert rest == ["--b", "123"]
