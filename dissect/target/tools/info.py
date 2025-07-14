@@ -159,6 +159,7 @@ def get_volumes_info(target: Target) -> list[dict[str, str | int]]:
 def get_mounts_info(target: Target) -> list:
     return [{"fs": fs.__class__.__name__, "path": path} for path, fs in target.fs.mounts.items()]
 
+
 def get_children_info(target: Target) -> list[dict[str, str]]:
     return [{"type": c.type, "path": str(c.path)} for c in target.list_children()]
 
