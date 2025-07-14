@@ -13,11 +13,11 @@ from dissect.cstruct import utils
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.scrape import recover_string
 from dissect.target.plugins.scrape.qfind import QFindMatchRecord, QFindPlugin
-from dissect.target.target import Target
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_targets,
     process_generic_arguments,
 )
 
@@ -43,7 +43,6 @@ def main() -> int:
     )
 
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument(
         "-R", "--raw", action="store_true", help="show raw hex dumps instead of post-processed string output"
     )
@@ -69,7 +68,7 @@ def main() -> int:
         rs = record_output(args.strings, args.json)
 
     try:
-        for target in Target.open_all(args.targets, args.children):
+        for target in open_targets(args):
             hit: QFindMatchRecord
             for hit in target.qfind(
                 args.needles,

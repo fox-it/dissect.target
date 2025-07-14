@@ -50,7 +50,6 @@ from dissect.target.tools.utils import (
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_bound_method,
-    print_children,
     process_generic_arguments,
 )
 
@@ -1586,13 +1585,6 @@ def main() -> int:
         formatter_class=help_formatter,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="targets to load")
-    parser.add_argument(
-        "--child", action="store", help="load child of target by path of index, see --list-children(-recursive)"
-    )
-    parser.add_argument("--list-children", action="store_true", help="list children of targets")
-    parser.add_argument(
-        "--list-children-recursive", action="store_true", default=False, help="list children of targets recursively"
-    )
     parser.add_argument("-p", "--python", action="store_true", help="(I)Python shell")
     parser.add_argument("-r", "--registry", action="store_true", help="registry shell")
     parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
@@ -1604,16 +1596,6 @@ def main() -> int:
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:
         logging.getLogger("dissect").setLevel(level=logging.ERROR)
-
-    # Check if --child was used, in this case arg.targets should only contain one target.
-    if args.child and len(args.targets) > 1:
-        print("--child can only be used with one target, exiting.")
-        return 1
-
-    if args.list_children or args.list_children_recursive:
-        targets = list(Target.open_all(args.targets))
-        print_children(targets, args.list_children_recursive)
-        return 0
 
     # PyPy < 3.10.14 readline is stuck in Python 2.7
     if platform.python_implementation() == "PyPy":

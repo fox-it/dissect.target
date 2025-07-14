@@ -31,7 +31,6 @@ from dissect.target.tools.utils import (
     find_and_filter_plugins,
     open_targets,
     persist_execution_report,
-    print_children,
     process_generic_arguments,
     process_plugin_arguments,
 )
@@ -58,14 +57,6 @@ def record_output(strings: bool = False, json: bool = False) -> AbstractWriter:
     return RecordStreamWriter(fp)
 
 
-def list_children(targets: list[str]) -> None:
-    for name, target in [[name, target := Target.open(name)] for name in targets]:
-        print(f"Processing target: {name} (hostname={target.name})")
-        for index, child in enumerate(target.list_children()):
-            print(f"- [#{index}]: type={child.type}, path={child.path}")
-    return
-
-
 @catch_sigpipe
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
@@ -76,19 +67,6 @@ def main() -> int:
         add_help=False,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("--child", help="load a specific child path or index, see --list-children(-recursive)")
-    parser.add_argument(
-        "--list-children",
-        action=argparse.BooleanOptionalAction,
-        help="list all children by index and path output to be used in --child - does not process anything",
-    )
-    parser.add_argument(
-        "--list-children-recursive",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="list all children (recursively) by index and path - does not process anything",
-    )
-    parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument("--direct", action="store_true", help="treat TARGETS as paths to pass to plugins directly")
 
     configure_plugin_arguments(parser)
@@ -145,18 +123,11 @@ def main() -> int:
                 "The --rewrite-cache option will be ignored as --no-cache or --only-read-cache are specified",
             )
 
-    different_output_types = process_plugin_arguments(parser, args, rest)
-
     if not args.targets:
         parser.error("too few arguments - missing targets")
 
-    if len(args.targets) > 1 and args.child:
-        parser.error("When using --child, only a single target should be supplied")
-
-    # List found children on targets and exit
-    if args.list_children or args.list_children_recursive:
-        targets = [Target.open_direct(args.targets)] if args.direct else Target.open_all(args.targets, args.children)
-        return print_children(targets, recursive=args.list_children_recursive)
+    # Process plugin argments after host and child args are checked
+    different_output_types = process_plugin_arguments(parser, args, rest)
 
     if args.report_dir and not args.report_dir.is_dir():
         parser.error(f"--report-dir {args.report_dir} is not a valid directory")

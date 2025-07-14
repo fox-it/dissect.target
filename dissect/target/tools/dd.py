@@ -40,6 +40,9 @@ def main() -> int:
 
     try:
         t = Target.open(args.target)
+        if args.child:
+            t.log.warning("Switching to --child %s", args.child)
+            t = t.open_child(args.child)
     except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
