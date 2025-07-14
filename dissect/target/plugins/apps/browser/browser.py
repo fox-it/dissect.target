@@ -65,7 +65,7 @@ GENERIC_HISTORY_RECORD_FIELDS = [
     ("string", "rev_host"),
     ("varint", "visit_type"),
     ("varint", "visit_count"),
-    ("string", "hidden"),
+    ("boolean", "hidden"),
     ("string", "typed"),
     ("varint", "session"),
     ("varint", "from_visit"),

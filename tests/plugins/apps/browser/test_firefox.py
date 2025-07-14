@@ -78,6 +78,7 @@ def test_firefox_history(target_platform: Target, request: pytest.FixtureRequest
     assert records[0].description == "47356411089529"
     assert records[0].visit_count == 1
     assert records[0].ts == dt("2021-12-01T10:42:05.742000+00:00")
+    assert records[0].hidden
 
 
 @pytest.mark.parametrize(

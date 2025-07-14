@@ -52,6 +52,7 @@ def test_chromium_history(target_platform: Target, request: pytest.FixtureReques
     assert records[0].id == 1
     assert records[0].visit_count == 2
     assert records[0].ts == dt("2022-12-22T12:14:26.396332+00:00")
+    assert not records[0].hidden
 
 
 @pytest.mark.parametrize(
