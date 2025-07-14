@@ -573,6 +573,7 @@ def register(plugincls: type[Plugin]) -> None:
 
             if getattr(attr, "__generated__", False) and plugincls != plugincls.__nsplugin__:
                 continue
+
             exported = getattr(attr, "__exported__", False)
             internal = getattr(attr, "__internal__", False)
 
@@ -1337,9 +1338,6 @@ class NamespacePlugin(Plugin):
     Support is currently limited to shared exported functions with output type ``record`` and ``yield``.
     """
 
-    __subplugins__: set[str] = None
-    __nsplugin__: type[Self] = None
-
     def __init_subclass__(cls, **kwargs):
         # Upon subclassing, decide whether this is a direct subclass of NamespacePlugin
         # If this is not the case, autogenerate aggregate methods for methods record output.
@@ -1364,13 +1362,12 @@ class NamespacePlugin(Plugin):
             super().__init_subclass__(**kwargs)
 
             cls.__nsplugin__ = cls
-            if cls.__subplugins__ is None:
+            if not hasattr(cls, "__subplugins__"):
                 cls.__subplugins__ = set()
 
     def __init_subclass_subplugin__(cls, **kwargs) -> None:
         # Register the current plugin class as a subplugin with
         # the direct subclass of NamespacePlugin
-
         cls.__nsplugin__.__subplugins__.add(cls.__namespace__)
 
         # Generate a tuple of class names for which we do not want to add subplugin functions, which is the
