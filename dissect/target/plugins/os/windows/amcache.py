@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from enum import IntEnum
 from typing import TYPE_CHECKING
 
 from dissect.util.ts import wintimestamp
@@ -207,7 +208,7 @@ PcaGeneralAppcompatRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("path", "path"),
-        ("varint", "type"),
+        ("string", "type"),
         ("string", "name"),
         ("string", "copyright"),
         ("string", "version"),
@@ -216,6 +217,20 @@ PcaGeneralAppcompatRecord = TargetRecordDescriptor(
         ("path", "source"),
     ],
 )
+
+
+class PcaGeneralDbType(IntEnum):
+    """PcaGeneralDb type enum
+
+    Resource:
+        - https://www.sygnia.co/blog/new-windows-11-pca-artifact/
+    """
+
+    INSTALLER_FAILED = 0
+    DRIVER_BLOCKED = 1
+    ABNORMAL_PROCESS_EXIT = 2
+    PCA_RESOLVE_CALLED = 3
+    UNKNOWN = 4
 
 
 class AmcachePluginOldMixin:
@@ -685,7 +700,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 yield PcaGeneralAppcompatRecord(
                     ts=datetime.strptime(ts, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
                     path=self.target.resolve(app_path),
-                    type=int(type_),
+                    type=PcaGeneralDbType(int(type_)).name,
                     name=name,
                     copyright=copyright,
                     version=version,

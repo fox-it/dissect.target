@@ -89,7 +89,7 @@ DefenderMPLogEMSRecord = TargetRecordDescriptor(
         ("varint", "pid"),
         ("string", "sigseq"),
         ("varint", "send_memory_scan_report"),
-        ("varint", "source"),
+        ("varint", "source_int"),
     ],
 )
 
@@ -249,7 +249,7 @@ DEFENDER_MPLOG_PATTERNS = [
                 pid:\s(?P<pid>\d*),\s
                 sigseq:\s(?P<sigseq>\w*),\s
                 sendMemoryScanReport:\s(?P<send_memory_scan_report>\d*),\s
-                source:\s(?P<source>\d*)
+                source:\s(?P<source_int>\d*)
             """,
             re.VERBOSE,
         ),

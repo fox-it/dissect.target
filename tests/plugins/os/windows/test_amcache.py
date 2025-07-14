@@ -105,7 +105,7 @@ def test_amcache_windows_11_general(target_win: Target, fs_win: VirtualFilesyste
         assert len(records) == 176
         assert records[0].ts == datetime.datetime(2022, 5, 12, 19, 48, 9, 548000, tzinfo=datetime.timezone.utc)
         assert records[0].path == "C:\\Program Files\\freefilesync\\freefilesync.exe"
-        assert records[0].type == 2
+        assert records[0].type == "ABNORMAL_PROCESS_EXIT"
         assert records[0].name == "freefilesync"
         assert records[0].copyright == "freefilesync.org"
         assert records[0].version == "11.20"

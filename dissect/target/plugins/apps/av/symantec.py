@@ -27,7 +27,7 @@ SEPLogRecord = TargetRecordDescriptor(
         ("path", "source_file"),
         ("string", "action_taken"),
         ("string", "virus_type"),
-        ("varint", "scan_id"),
+        ("string", "scan_id"),
         ("string", "quarantine_id"),
         ("varint", "virus_id"),
         ("varint", "depth"),
@@ -312,7 +312,7 @@ class SymantecPlugin(Plugin):
             source_file (path): File that contains the virus.
             action_taken (string): Action taken by SEP.
             virus_type (string): Description of the type of virus.
-            scan_id (varint): ID of the scan associated with the event.
+            scan_id (string): ID of the scan associated with the event.
             event_data (string): String or bytes from a virus event.
             quarantine_id (varint): ID associated with the quarantined virus.
             still_infected (boolean): Whether the system is still infected.

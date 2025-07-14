@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 NetSocketRecord = TargetRecordDescriptor(
-    "linux/proc/sockets",
+    "linux/proc/sockets/net",
     [
         ("string", "protocol"),
         ("uint32", "rx_queue"),
@@ -37,7 +37,7 @@ NetSocketRecord = TargetRecordDescriptor(
 )
 
 UnixSocketRecord = TargetRecordDescriptor(
-    "linux/proc/sockets",
+    "linux/proc/sockets/unix",
     [
         ("string", "protocol"),
         ("uint32", "ref"),
@@ -50,17 +50,17 @@ UnixSocketRecord = TargetRecordDescriptor(
 )
 
 PacketSocketRecord = TargetRecordDescriptor(
-    "linux/proc/sockets",
+    "linux/proc/sockets/packet",
     [
         ("string", "protocol"),
         ("string", "protocol_type"),
-        ("string", "sk"),
+        ("uint32", "packet_socket_type"),
+        ("uint32", "sk"),
         ("uint32", "ref"),
-        ("uint32", "type"),
         ("uint32", "iface"),
         ("uint32", "r"),
         ("uint32", "rmem"),
-        ("uint32", "user"),
+        ("uint32", "uid"),
         ("string", "owner"),
         ("uint32", "inode"),
         ("uint32", "pid"),
@@ -93,14 +93,14 @@ class NetSocketPlugin(Plugin):
 
             hostname (string): The target hostname.
             domain (string): The target domain.
-            protocol (int): The captured protocol i.e. 0003 is ETH_P_ALL
-            protocol_type (str): The canonical name of the captured protocol.
-            sk (string): The socket number.
-            type (int): The integer type of the socket (packet).
+            protocol (str): packet.
+            protocol_type (str): The canonical name of the captured protocol i.e. ETH_P_ALL.
+            packet_socket_type (int): The integer type of the socket (packet).
+            sk (int): The socket number.
             iface (int): The interface index of the socket.
             r (int): The number of bytes that have been received by the socket and are waiting to be processed.
             rmem (int): The size of the receive buffer for the socket.
-            user (int): The user ID of the process that created the socket.
+            uid (int): The user ID of the process that created the socket.
             inode (int): The inode associated to the socket.
             pid (int): The pid associated with this socket.
             name (string): The process name associated to this socket.
@@ -222,13 +222,13 @@ class NetSocketPlugin(Plugin):
         return PacketSocketRecord(
             protocol=data.protocol_string,
             protocol_type=data.protocol_type,
+            packet_socket_type=data.type,
             sk=data.sk,
             ref=data.ref,
-            type=data.type,
             iface=data.iface,
             r=data.r,
             rmem=data.rmem,
-            user=data.user,
+            uid=data.user,
             inode=data.inode,
             pid=data.pid,
             name=data.name,

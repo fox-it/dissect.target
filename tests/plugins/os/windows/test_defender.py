@@ -355,7 +355,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[8].pid == 2820
     assert records[8].sigseq == "0x1"
     assert records[8].send_memory_scan_report == 1
-    assert records[8].source == 4
+    assert records[8].source_int == 4
 
     # Original Filename
     assert records[9].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"

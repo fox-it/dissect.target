@@ -123,6 +123,7 @@ def test_cit_puu_plugin(target_win: Target, hive_hklm: VirtualHive) -> None:
     assert len(results) == 1
     assert results[0].update_key == 1466689571
     assert results[0].build_number == 19042
+    assert results[0].version_num == 210
 
 
 def test_cit_dp_plugin(target_win: Target, hive_hklm: VirtualHive) -> None:
@@ -179,7 +180,7 @@ def test_cit_telemetry_plugin(target_win: Target, hive_hklm: VirtualHive) -> Non
     results = list(target_win.cit.telemetry())
 
     assert len(results) == 2
-    assert results[0].version == 1705
+    assert results[0].version_num == 1705
     assert results[0].path == "\\Device\\HarddiskVolume2\\Windows\\System32\\taskhost.exe"
     assert results[0].value == "DEVICECHANGE"
 

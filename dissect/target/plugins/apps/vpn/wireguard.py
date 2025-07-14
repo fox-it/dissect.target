@@ -25,7 +25,7 @@ WireGuardInterfaceRecord = TargetRecordDescriptor(
         ("varint", "listen_port"),
         ("string", "fw_mark"),
         ("net.ipaddress[]", "dns"),
-        ("varint", "table"),
+        ("string", "table"),
         ("varint", "mtu"),
         ("string", "preup"),
         ("string", "postup"),
