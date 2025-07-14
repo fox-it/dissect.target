@@ -45,8 +45,6 @@ def test_wsl(target_win_users: Target, hive_hku: VirtualHive, fs_win: VirtualFil
 
     children = list(target_win_users.list_children())
 
-    # import ipdb; ipdb.set_trace()
-
     assert len(children) == 1
 
     assert children[0].name == "my_wsl_name"

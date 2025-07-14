@@ -46,6 +46,21 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
     parser.add_argument("-L", "--loader", action="store", help="select a specific loader (i.e. vmx, raw)")
+    parser.add_argument(
+        "--child", action="store", help="load child of target by path of index, see --list-children(-recursive)"
+    )
+    parser.add_argument("--children", action="store_true", help="include children")
+    parser.add_argument(
+        "--list-children",
+        action=argparse.BooleanOptionalAction,
+        help="list all children by index and path output to be used in --child - does not process anything",
+    )
+    parser.add_argument(
+        "--list-children-recursive",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="list all children (recursively) by index and path - does not process anything",
+    )
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", action="store_true", help="print version")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
@@ -76,6 +91,17 @@ def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None
         args.targets = targets
     elif hasattr(args, "target"):
         args.target = targets[0]
+
+    if hasattr(args, "targets") and len(args.targets) > 1 and args.child:
+        print("When using --child, only a single target should be supplied")
+        sys.exit(1)
+
+    # List found children on targets and exit
+    if args.list_children or args.list_children_recursive:
+        # Using open_targets here breaks with target-fs due to target vs targets
+        list_target = Target.open_all(targets, args.children)
+        print_children(list_target, recursive=args.list_children_recursive)
+        sys.exit(0)
 
     if args.keychain_file:
         keychain.register_keychain_file(args.keychain_file)
@@ -185,6 +211,7 @@ def open_targets(args: argparse.Namespace) -> Iterator[Target]:
     for target in targets:
         if child:
             try:
+                target.log.warning("Switching to --child %s", child)
                 target: Target = target.open_child(child)
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
