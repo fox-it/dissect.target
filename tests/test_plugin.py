@@ -1379,11 +1379,11 @@ def test_plugin_record_field_consistency() -> None:
         "command": "string",
         "dynamic": "string",
         # ints
-        "varint": "long",
-        "varint[]": "long",
-        "filesize": "long",
-        "uint32": "long",
-        "uint16": "long",
+        "varint": "int",
+        "varint[]": "int",
+        "filesize": "int",
+        "uint32": "int",
+        "uint16": "int",
         "float": "float",
         # ip / cidr
         "net.ipaddress": "ip",
@@ -1433,7 +1433,7 @@ def test_plugin_record_field_consistency() -> None:
                         seen_field_types[name] = (field.typename, record)
 
     if inconsistencies:
-        raise AssertionError(
+        pytest.fail(
             f"Found {len(inconsistencies)} inconsistencies in RecordDescriptors:\n" + "\n".join(inconsistencies)
         )
 
