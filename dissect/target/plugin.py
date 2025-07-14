@@ -432,10 +432,6 @@ class Plugin:
     def __init__(self, target: Target):
         self.target = target
 
-    def _has_function(self, name: str) -> bool:
-        """Returns whether this plugin has a function ``name``."""
-        return name in self.__functions__
-
     def __getattr__(self, name: str, /) -> Any:
         # If a plugin has no namespace, a plugin only registers its functions to the target
         # The only method of getting those functions is using the function name directly on a target
@@ -445,7 +441,7 @@ class Plugin:
         # If the namespace doesn't expose the function ``name``, we might have encountered a implicit nested namespace.
         # These are the plugins that build upon a namespace, but not through inheritance.
         # So we attempt to resolve it by looking up the namespace by name.
-        func_name = name if self._has_function(name) else f"{self.__class__.__namespace__}.{name}"
+        func_name = name if (name in self.__functions__) else f"{self.__class__.__namespace__}.{name}"
 
         try:
             _, func = self.target.get_function(func_name)
@@ -1434,9 +1430,6 @@ class NamespacePlugin(Plugin):
             # Add subplugin to aggregator
             aggregator.__subplugins__.append(cls.__namespace__)
             cls.__update_aggregator_docs(aggregator)
-
-    def _has_function(self, name: str) -> bool:
-        return super()._has_function(name) or name in self.__subplugins__
 
     def check_compatible(self) -> None:
         at_least_one = False
