@@ -1370,31 +1370,24 @@ def test_plugin_record_field_consistency() -> None:
     FIELD_TYPES_MAP = {
         # strings
         "string": "string",
-        "string[]": "string",
         "stringlist": "string",
         "wstring": "string",
         "path": "string",
-        "path[]": "string",
         "uri": "string",
         "command": "string",
         "dynamic": "string",
         # ints
         "varint": "int",
-        "varint[]": "int",
         "filesize": "int",
         "uint32": "int",
         "uint16": "int",
         "float": "float",
         # ip / cidr
         "net.ipaddress": "ip",
-        "net.ipaddress[]": "ip",
         "net.ipnetwork": "ip_range",
-        "net.ipnetwork[]": "ip_range",
         "net.ipinterface": "ip_range",
-        "net.ipinterface[]": "ip_range",
         # dates
         "datetime": "datetime",
-        "datetime[]": "datetime",
         # other
         "boolean": "boolean",
         "bytes": "binary",
@@ -1417,20 +1410,24 @@ def test_plugin_record_field_consistency() -> None:
                 for name, field in record.fields.items():
                     # Make sure field names have the same type when translated. This check does not save multiple field
                     # name and typenames, this is a bare-minumum check only.
-                    assert field.typename in FIELD_TYPES_MAP, (
-                        f"Field type {field.typename} is not mapped in FIELD_TYPES_MAP, please add it manually."
+
+                    # We only care about the field type, not if it is a list of that type.
+                    field_typename = field.typename.replace("[]", "")
+
+                    assert field_typename in FIELD_TYPES_MAP, (
+                        f"Field type {field_typename} is not mapped in FIELD_TYPES_MAP, please add it manually."
                     )
 
                     if name in seen_field_names:
                         seen_typename, seen_record = seen_field_types[name]
-                        if FIELD_TYPES_MAP[seen_typename] != FIELD_TYPES_MAP[field.typename]:
+                        if FIELD_TYPES_MAP[seen_typename] != FIELD_TYPES_MAP[field_typename]:
                             inconsistencies.add(
                                 f"<{record.name} ({field.typename!r}, '{name}')> is duplicate mismatch of <{seen_record.name} ({seen_typename!r}, '{name}')>"  # noqa: E501
                             )
 
                     else:
                         seen_field_names.add(name)
-                        seen_field_types[name] = (field.typename, record)
+                        seen_field_types[name] = (field_typename, record)
 
     if inconsistencies:
         pytest.fail(
