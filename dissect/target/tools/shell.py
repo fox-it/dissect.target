@@ -1081,14 +1081,14 @@ class TargetCli(TargetCmd):
         for path in paths:
             if len(paths) > 1:
                 print(f"[{path}]", file=stdout)
-            fh = path.open("rb")
-            if args.skip > 0:
-                fh.seek(args.skip + 1)
+            with path.open("rb") as fh:
+                if args.skip > 0:
+                    fh.seek(args.skip + 1)
 
-            if args.hex:
-                print(fh.read(args.length).hex(), file=stdout)
-            else:
-                print(hexdump(fh.read(args.length), output="string"), file=stdout)
+                if args.hex:
+                    print(fh.read(args.length).hex(), file=stdout)
+                else:
+                    print(hexdump(fh.read(args.length), output="string"), file=stdout)
 
         return False
 
