@@ -377,7 +377,7 @@ class MockOSWarpPlugin(OSPlugin):
         ("test.[!y]*", 1),  # Found with tree search, all in test not starting with y (so x13 is ok)
         ("test.???.??", 1),  # Found with tree search, using question marks
         ("x13", 0),  # Not Found: Part of namespace but no match
-        ("Warp.*", 1),  # Found: Using the namespace
+        ("Warp.*", 0),  # Not Found: Namespace != Module so 0
         ("os.warp._os.f6", 0),  # OS plugins are excluded from tree search
         ("f6", 1),  # Found with direct match
         ("f22", 1),  # Unfindable has no effect on direct match
@@ -633,13 +633,6 @@ def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Ta
 
     with pytest.raises(AttributeError):
         target_bare.foo.bar.foo()
-
-    # Test whether it can find a specific function using a glob
-    functions, _ = find_functions("foo.*.bar")
-    assert sorted(desc.name for desc in functions) == ["foo.baz.bar"]
-
-    functions, _ = find_functions("foo*")
-    assert sorted(desc.name for desc in functions) == ["foo.bar.bazz", "foo.baz.bar", "foo.buzz"]
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:

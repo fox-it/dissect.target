@@ -561,8 +561,6 @@ def register(plugincls: type[Plugin]) -> None:
 
     module_key = f"{module_path}.{plugincls.__qualname__}"
 
-    namespace = plugincls.__namespace__
-
     if not issubclass(plugincls, ChildTargetPlugin):
         # First pass to resolve aliases
         for attr in _get_nonprivate_attributes(plugincls):
@@ -592,7 +590,7 @@ def register(plugincls: type[Plugin]) -> None:
 
                     descriptor = FunctionDescriptor(
                         name=name,
-                        namespace=namespace,
+                        namespace=plugincls.__namespace__,
                         path=path,
                         exported=exported,
                         internal=internal,
@@ -617,7 +615,7 @@ def register(plugincls: type[Plugin]) -> None:
         if plugincls.__register__:
             descriptor = FunctionDescriptor(
                 name=plugincls.__namespace__,
-                namespace=namespace,
+                namespace=plugincls.__namespace__,
                 path=module_path,
                 exported=len(exports) != 0,
                 internal=len(functions) != 0 and len(exports) == 0,
@@ -639,7 +637,7 @@ def register(plugincls: type[Plugin]) -> None:
         plugin_index[module_key] = PluginDescriptor(
             module=plugincls.__module__,
             qualname=plugincls.__qualname__,
-            namespace=namespace,
+            namespace=plugincls.__namespace__,
             path=module_path,
             findable=plugincls.__findable__,
             functions=functions,
@@ -853,12 +851,6 @@ def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
 
             paths.setdefault(descriptor.path, []).append(descriptor)
 
-            if descriptor.namespace:
-                # This adds the ``<namespace>.<function_name>`` to the generated paths.
-                # Then we can find the namespace (function) using its namespace
-                func_part = descriptor.name.split(".")[-1]
-                paths.setdefault(f"{descriptor.namespace}.{func_part}", []).append(descriptor)
-
     return paths
 
 
@@ -903,7 +895,7 @@ def find_functions(
         else:
             # If we don't have an exact function match, do a slower treematch
             if matches := list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden)):
-                found.extend(dict.fromkeys(matches))
+                found.extend(matches)
             else:
                 invalid_functions.add(pattern)
 
