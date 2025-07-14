@@ -109,7 +109,7 @@ class UsersPlugin(InternalPlugin):
             seen.add(misc_home_dir)
 
     @cached_property
-    def all_home_dirs(self) -> Iterator[TargetPath]:
+    def all_home_paths(self) -> Iterator[TargetPath]:
         """Return all home directories of users, including miscellaneous user directories that may not be linked to discovered local users."""  # noqa: E501
 
         seen: set[TargetPath] = set()

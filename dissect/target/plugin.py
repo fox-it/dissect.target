@@ -1263,7 +1263,7 @@ class OSPlugin(Plugin):
         """Yields miscellaneous user paths and user keys.
 
         Example:
-            ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
+            ("c:/Windows/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
         """
 
         # Consider moving this to the UsersPlugin class, and create separate UsersPlugin subclasses for each OS

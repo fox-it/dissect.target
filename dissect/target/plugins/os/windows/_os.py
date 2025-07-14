@@ -328,8 +328,7 @@ class WindowsPlugin(OSPlugin):
         )
 
         # Homedirs for users when there is no user profile information available.
-        user_dirs = ("sysvol/Users", "sysvol/Documents and Settings")
-        for user_dir in user_dirs:
+        for user_dir in ("sysvol/Users", "sysvol/Documents and Settings"):
             if (resolved := self.target.resolve(user_dir)).exists():
                 yield from ((entry, None) for entry in resolved.iterdir() if entry.is_dir())
 
