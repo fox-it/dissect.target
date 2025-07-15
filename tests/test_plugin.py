@@ -598,7 +598,7 @@ def test_namesplace_plugin_multiple_same_module(mock_plugins: PluginRegistry) ->
 
 
 @patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
-def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Target) -> None:
+def test_nested_namespace_getattr(mock_plugins: PluginRegistry, target_bare: Target) -> None:
     class Foo(Plugin):
         __namespace__ = "foo"
 
@@ -611,14 +611,22 @@ def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Ta
 
         @export(output="yield")
         def bazz(self) -> Iterator[str]:
-            yield from ["bazz"]
+            yield from ["bazz1"]
+
+        @export(output="yield")
+        def bar(self) -> Iterator[str]:
+            yield from ["bar1"]
 
     class FooBaz(Plugin):
         __namespace__ = "foo.baz"
 
         @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz2"]
+
+        @export(output="yield")
         def bar(self) -> Iterator[str]:
-            yield from ["bar"]
+            yield from ["bar2"]
 
     for plugin in [Foo, FooBar, FooBaz]:
         target_bare._register_plugin_functions(plugin(target_bare))
@@ -633,6 +641,13 @@ def test_nested_implicit_namespace(mock_plugins: PluginRegistry, target_bare: Ta
 
     with pytest.raises(AttributeError):
         target_bare.foo.bar.foo()
+
+    # Test whether we can access the plugin this way
+    assert next(target_bare.foo.bar.bazz()) == "bazz1"
+    assert next(target_bare.foo.bar.bar()) == "bar1"
+    assert next(target_bare.foo.baz.bazz()) == "bazz2"
+    assert next(target_bare.foo.baz.bar()) == "bar2"
+    assert next(target_bare.foo.buzz()) == "buzz"
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
