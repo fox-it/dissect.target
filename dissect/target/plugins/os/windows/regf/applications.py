@@ -20,13 +20,26 @@ WindowsApplicationRecord = TargetRecordDescriptor(
     COMMON_APPLICATION_FIELDS,
 )
 
+KEYS = (
+    "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKLM\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+)
+
 
 class WindowsApplicationsPlugin(Plugin):
     """Windows Applications plugin."""
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.keys = list(self.target.registry.keys("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"))
+        key_list = list(self.target.registry.keys(KEYS))
+        """
+        Removing all keys from Backup registry hives located in sysvol/windows/system32/config/RegBack
+        Parsing keys from RegBack leads to duplicate applications. A VirtualHive might not have a filepath attribute.
+        Checking if the attribute exists first. If not, it is assumed it's not from RegBack.
+        """
+        self.keys = [
+            key for key in key_list if not hasattr(key.hive, "filepath") or "RegBack" not in key.hive.filepath.parts
+        ]
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):
@@ -57,14 +70,32 @@ class WindowsApplicationsPlugin(Plugin):
             type         (string):   type of the application, either user or system
             path         (string):   path to the installed location or installer of the application
         """
+
+        def parse_datetime(date_string: str) -> datetime.datetime | None:
+            """
+            Parses a date string by trying a list of common formats.
+            Returns a datetime object or None if all formats fail.
+            """
+            date_formats = [
+                "%Y%m%d",  # e.g., 20231225
+                "%m/%d/%Y",  # e.g., 12/25/2023
+                "%d/%m/%Y",  # e.g., 25/12/2023
+            ]
+            for fmt in date_formats:
+                try:
+                    return datetime.datetime.strptime(date_string, fmt).replace(tzinfo=datetime.timezone.utc)
+                except (ValueError, TypeError):  # noqa: PERF203
+                    continue
+
+            return None
+
         for uninstall in self.keys:
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}
 
-                if install_date := values.get("InstallDate"):
-                    install_date = datetime.datetime.strptime(install_date, "%Y%m%d").replace(
-                        tzinfo=datetime.timezone.utc
-                    )
+                install_date = None
+                if install_date_string := values.get("InstallDate"):
+                    install_date = parse_datetime(str(install_date_string))
 
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,
