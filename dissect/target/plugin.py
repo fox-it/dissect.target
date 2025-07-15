@@ -438,13 +438,9 @@ class Plugin:
         if not self.__namespace__:
             raise AttributeError(name)
 
-        # If the namespace doesn't expose the function ``name``, we might have encountered a implicit nested namespace.
-        # These are the plugins that build upon a namespace, but not through inheritance.
-        # So we attempt to resolve it by looking up the namespace by name.
-        func_name = name if (name in self.__functions__) else f"{self.__class__.__namespace__}.{name}"
-
+        # Attempt to lookup the function using the namespace
         try:
-            _, func = self.target.get_function(func_name)
+            _, func = self.target.get_function(f"{self.__class__.__namespace__}.{name}")
         except PluginNotFoundError:
             raise AttributeError(name)
 
