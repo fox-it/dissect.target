@@ -433,18 +433,17 @@ class Plugin:
         self.target = target
 
     def __getattr__(self, name: str, /) -> Any:
-        # If a plugin has no namespace, a plugin only registers its functions to the target
-        # The only method of getting those functions is using the function name directly on a target
+        # "Magic" attribute access is only allowed on namespace plugins, to allow for indirect nesting of namespaces
+        # E.g. `__namespace__ = "foo.bar"`, we should try to resolve `bar` on a plugin instance of `foo`
         if not self.__namespace__:
             raise AttributeError(name)
 
-        # Attempt to lookup the function using the namespace
+        # Attempt to lookup the atribute using the namespace
         try:
             _, func = self.target.get_function(f"{self.__class__.__namespace__}.{name}")
         except PluginNotFoundError:
             raise AttributeError(name)
 
-        # If a plugin is called directly, target.get_function returns an instance of the plugin that can be called.
         return func
 
     def is_compatible(self) -> bool:

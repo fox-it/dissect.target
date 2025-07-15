@@ -1407,39 +1407,24 @@ def assert_valid_rst(src: str) -> None:
             pytest.fail(f"Invalid rst: {e}", pytrace=False)
 
 
-def select_namespace_plugins() -> list[FunctionDescriptor]:
-    """returns a list of all the function descriptors with unique namespaces"""
-    descriptions: dict[str, FunctionDescriptor] = {}
-    for func in find_functions("*", Target(), compatibility=False, show_hidden=True)[0]:
-        if func.namespace in ["network"]:
-            continue
-        if not func.namespace:
-            continue
-        if func.namespace in descriptions:
-            continue
-
-        descriptions.update({func.namespace: func})
-
-    return list(descriptions.values())
-
-
 @pytest.mark.parametrize(
     "descriptor",
-    select_namespace_plugins(),
-    ids=lambda x: x.namespace,
+    [descriptor for descriptor in plugins() if descriptor.namespace and "." in descriptor.namespace],
+    ids=lambda descriptor: descriptor.namespace,
 )
-def test_plugin_namespace_reachable(descriptor: FunctionDescriptor) -> None:
-    """Tests whether a namespaced plugin can be found using the parts of the namespace"""
-    parts: list[str] = descriptor.namespace.split(".")
-    for idx in range(len(parts)):
-        func = ".".join(parts[: idx + 1])
-        found_plugins = list(lookup(func, None))
-        assert len(found_plugins) > 0, (
-            f"Cannot reach {descriptor.namespace!r} due to {func!r} not existing. Please create a plugin with namespace"
-            f"{func!r} for it be programatically reachable."
-        )
-        # We have a collision if multiple functions get returned from found_plugins,
-        # with the exception of network and any other os_plugin specific implementations.
-        assert len(found_plugins) == 1, (
-            f"Multiple functions are registered using: {descriptor.namespace!r}: {found_plugins}"
-        )
+def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
+    """Test whether all parts of nested namespaces exist and that there are no conflicts with other functions."""
+
+    parts = descriptor.namespace.split(".")
+    for i in range(len(parts)):
+        part = ".".join(parts[: i + 1])
+        result = list(lookup(part))
+
+        if not result:
+            pytest.fail(f"Unreachable namespace {descriptor.namespace!r}, namespace {part!r} does not exist.")
+
+        if len(result) > 1:
+            conflicts = ", ".join(
+                f"{desc.name} ({desc.module}.{desc.qualname})" for desc in result if desc.namespace != part
+            )
+            pytest.fail(f"Namespace name {descriptor.namespace!r} has conflicts with function name: {conflicts}")
