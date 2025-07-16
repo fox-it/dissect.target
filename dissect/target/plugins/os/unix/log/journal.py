@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import lzma
-from enum import IntEnum
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable
 
 import zstandard
@@ -12,6 +11,7 @@ from dissect.util.compression import lz4
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.utils import IntEnumMissing
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
@@ -267,7 +267,7 @@ struct EntryArrayObject_Compact {
 c_journal = cstruct().load(journal_def)
 
 
-class JournalMessagePriority(IntEnum):
+class JournalMessagePriority(IntEnumMissing):
     """Journal message priority enum.
 
     Resources:

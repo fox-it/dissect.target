@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.plugins.os.unix.log.journal import JournalPlugin
+from dissect.target.plugins.os.unix.log.journal import JournalMessagePriority, JournalPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -75,3 +75,24 @@ def test_journal_plugin_unused_object(
 
     assert "ObjectType OBJECT_UNUSED encountered for next OBJECT_ENTRY_ARRAY offset at 0x3C1337" in caplog.text
     assert len(results) == 252
+
+
+@pytest.mark.parametrize(
+    ("input", "expected_name", "expected_value"),
+    [
+        (0, "EMERG", 0),
+        (1, "ALERT", 1),
+        (2, "CRIT", 2),
+        (3, "ERR", 3),
+        (4, "WARNING", 4),
+        (5, "NOTICE", 5),
+        (6, "INFO", 6),
+        (7, "DEBUG", 7),
+        (1337, "1337", 1337),
+    ],
+)
+def test_journal_plugin_priority_enum(input: int, expected_name: str, expected_value: int) -> None:
+    """Test if we can handle different priority values."""
+    priority = JournalMessagePriority(input)
+    assert priority.name == expected_name
+    assert priority.value == expected_value
