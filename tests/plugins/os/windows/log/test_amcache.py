@@ -98,7 +98,7 @@ def test_amcache_windows_11_general(target_win: Target, fs_win: VirtualFilesyste
 
     with patch(
         "dissect.target.plugins.os.windows.env.EnvironmentVariablePlugin._get_system_env_vars",
-        return_value={"%programfiles%": "C:\\Program Files"},
+        return_value={"%programfiles%": "C:\\Program Files", "%windir%": "c:\\Windows"},
     ):
         records = list(target_win.amcache.general())
 

@@ -94,7 +94,7 @@ def assert_xml_task_properties(xml_task: TaskRecord) -> None:
 def assert_at_task_properties(at_task: TaskRecord) -> None:
     assert at_task.uri is None
     assert at_task.security_descriptor is None
-    assert str(at_task.task_path) == "sysvol\\windows\\tasks\\AtTask.job"
+    assert str(at_task.task_path) == "c:\\Windows\\tasks\\AtTask.job"
     assert at_task.date is None
     assert at_task.last_run_date == datetime(2023, 5, 21, 10, 44, 25, 794000, tzinfo=timezone.utc)
     assert at_task.author == "user1"

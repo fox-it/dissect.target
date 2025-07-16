@@ -17,7 +17,7 @@ from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.loaders.local import LocalLoader
-from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -158,6 +158,14 @@ class UnixPlugin(OSPlugin):
                     source="/var/log/syslog",
                     _target=self.target,
                 )
+
+    @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        if (root_path := self.target.fs.path("/root")).exists():
+            yield (root_path, ("uid", 0))
+
+        if (home_path := self.target.fs.path("/home")).exists():
+            yield from ((entry, None) for entry in home_path.iterdir() if entry.is_dir())
 
     @export(property=True)
     def architecture(self) -> str | None:

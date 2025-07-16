@@ -943,7 +943,7 @@ WUA_CODE_MAP = {
 class WuaHistoryPlugin(Plugin):
     """Plugin to return all available historical Windows Update Agent operations stored in the DataStore.edb."""
 
-    DATASTORE_PATH = "sysvol/windows/softwaredistribution/datastore/datastore.edb"
+    DATASTORE_PATH = "%windir%/softwaredistribution/datastore/datastore.edb"
     DATASTORE_UPDATE_TABLE = "tbHistory"
 
     def __init__(self, target: Target):
@@ -952,7 +952,7 @@ class WuaHistoryPlugin(Plugin):
         self._datastore = None
         self._update_table = None
 
-        if (path := target.fs.path(self.DATASTORE_PATH)).exists():
+        if (path := target.resolve(self.DATASTORE_PATH)).exists():
             try:
                 self._datastore = EseDB(path.open())
                 self._update_table = self._datastore.table(self.DATASTORE_UPDATE_TABLE)

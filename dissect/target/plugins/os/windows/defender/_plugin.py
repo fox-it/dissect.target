@@ -96,7 +96,7 @@ DEFENDER_EVTX_FIELDS = [
     ("string", "Version"),
 ]
 
-DEFENDER_LOG_DIR = "sysvol/windows/system32/winevt/logs"
+DEFENDER_LOG_DIR = "%windir%/system32/winevt/logs"
 DEFENDER_LOG_FILENAME_GLOB = "Microsoft-Windows-Windows Defender*"
 EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
@@ -151,7 +151,7 @@ class MicrosoftDefenderPlugin(Plugin):
 
         if not any(
             [
-                self.target.fs.path(DEFENDER_LOG_DIR).exists(),
+                self.target.resolve(DEFENDER_LOG_DIR).exists(),
                 self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
                 (
                     self.target.has_function("registry")

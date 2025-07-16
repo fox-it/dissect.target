@@ -183,14 +183,14 @@ class GenericPlugin(Plugin):
         last_seen = 0
 
         try:
-            for f in self.target.fs.scandir("sysvol/windows/system32/winevt/logs"):
+            for f in self.target.resolve("%windir%/system32/winevt/logs").iterdir():
                 if f.stat().st_mtime > last_seen:
                     last_seen = f.stat().st_mtime
         except Exception as e:
             self.target.log.debug("Could not determine last activity", exc_info=e)
 
         try:
-            for f in self.target.fs.scandir("sysvol/windows/system32/config"):
+            for f in self.target.resolve("%windir%/system32/config").iterdir():
                 if f.stat().st_mtime > last_seen:
                     last_seen = f.stat().st_mtime
         except Exception as e:

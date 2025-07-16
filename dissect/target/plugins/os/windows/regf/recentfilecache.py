@@ -42,7 +42,7 @@ class RecentFileCachePlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self._recentfiles = self.target.fs.path("sysvol/windows/appcompat/programs/RecentFileCache.bcf")
+        self._recentfiles = self.target.resolve("%windir%/appcompat/programs/RecentFileCache.bcf")
 
     def check_compatible(self) -> None:
         if not self._recentfiles.exists():
