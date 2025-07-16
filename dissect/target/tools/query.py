@@ -123,11 +123,11 @@ def main() -> int:
                 "The --rewrite-cache option will be ignored as --no-cache or --only-read-cache are specified",
             )
 
-    if not args.targets:
-        parser.error("too few arguments - missing targets")
-
     # Process plugin argments after host and child args are checked
     different_output_types = process_plugin_arguments(parser, args, rest)
+
+    if not args.targets:
+        parser.error("too few arguments - missing targets")
 
     if args.report_dir and not args.report_dir.is_dir():
         parser.error(f"--report-dir {args.report_dir} is not a valid directory")
