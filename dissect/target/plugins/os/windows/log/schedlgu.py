@@ -113,7 +113,6 @@ class SchedLgUPlugin(Plugin):
         "sysvol/SchedLgU.txt",
         "%windir%/SchedLgU.txt",
         "%windir%/tasks/SchedLgU.txt",
-        "sysvol/winnt/tasks/SchedLgU.txt",
     )
 
     def __init__(self, target: Target):
