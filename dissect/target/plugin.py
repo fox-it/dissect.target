@@ -438,7 +438,7 @@ class Plugin:
         if not self.__namespace__:
             raise AttributeError(name)
 
-        # Attempt to lookup the atribute using the namespace
+        # Attempt to lookup the attribute using the namespace
         try:
             _, func = self.target.get_function(f"{self.__class__.__namespace__}.{name}")
         except PluginNotFoundError:
