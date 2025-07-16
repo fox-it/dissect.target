@@ -374,7 +374,6 @@ class ChromiumMixin:
                         url = try_idna(url)
 
                     # https://github.com/chromium/chromium/blob/main/components/download/public/common/download_item.h
-                    state = None
                     if state := row.get("state"):
                         state = DOWNLOAD_STATES.get(state)
 

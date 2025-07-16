@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 NetSocketRecord = TargetRecordDescriptor(
-    "linux/proc/sockets/net",
+    "linux/proc/socket/net",
     [
         ("string", "protocol"),
         ("uint32", "rx_queue"),
@@ -37,7 +37,7 @@ NetSocketRecord = TargetRecordDescriptor(
 )
 
 UnixSocketRecord = TargetRecordDescriptor(
-    "linux/proc/sockets/unix",
+    "linux/proc/socket/unix",
     [
         ("string", "protocol"),
         ("uint32", "ref"),
@@ -50,7 +50,7 @@ UnixSocketRecord = TargetRecordDescriptor(
 )
 
 PacketSocketRecord = TargetRecordDescriptor(
-    "linux/proc/sockets/packet",
+    "linux/proc/socket/packet",
     [
         ("string", "protocol"),
         ("string", "protocol_type"),

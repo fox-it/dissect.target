@@ -220,7 +220,7 @@ PcaGeneralAppcompatRecord = TargetRecordDescriptor(
 
 
 class PcaGeneralDbType(IntEnum):
-    """PcaGeneralDb type enum
+    """``PcaGeneralDb`` type enum.
 
     Resource:
         - https://www.sygnia.co/blog/new-windows-11-pca-artifact/

@@ -1016,7 +1016,8 @@ class WuaHistoryPlugin(Plugin):
             flags (int): Undocumented and unknown.
             id_event (int): Index number of the Windows Update Agent record in the tbHistory table.
             kb (string): Another unique ID of the update.
-            status_id (int): Integer signifying result of operation
+            status_id (int): Integer signifying result of operation.
+
             status_mapped (string): Mapping of the 'status' field.
             server_selection (int): The update service that was used for the Windows Update Agent operation.
             server_selection_mapped (string): Mapping of the 'server_selection' field.
