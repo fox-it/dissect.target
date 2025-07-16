@@ -25,7 +25,7 @@ TrustedDocumentsRecord = create_extended_descriptor([RegistryRecordDescriptorExt
         ("datetime", "ts_created"),
         ("datetime", "ts_enabled"),
         ("string", "application"),
-        ("path", "document_path"),
+        ("path", "document"),
         ("string", "state"),
         ("bytes", "raw"),
         ("path", "source"),
@@ -101,7 +101,7 @@ class TrustedDocumentsPlugin(Plugin):
         .. code-block:: text
 
             application (string): Application name of the Office product that produced the TrustRecords registry key.
-            document_path (path): Path to the document for which a TrustRecords entry is created.
+            document (path): Path to the document for which a TrustRecords entry is created.
             ts (datetime): The created time of the TrustRecord registry key.
             type (varint): Type of the value within the TrustRecords registry key.
             value (bytes): Value of the TrustRecords entry, which contains the information whether macros are enabled.
@@ -119,7 +119,7 @@ class TrustedDocumentsPlugin(Plugin):
                     ts_created=wintimestamp(entry.ts_created),
                     ts_enabled=convert_time(entry.ts_enabled),
                     application=application,
-                    document_path=self.target.resolve(value.name),
+                    document=self.target.resolve(value.name),
                     state=entry.flag.name,
                     raw=value.value,
                     _key=key,

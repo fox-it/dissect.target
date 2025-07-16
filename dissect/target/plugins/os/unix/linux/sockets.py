@@ -54,7 +54,7 @@ PacketSocketRecord = TargetRecordDescriptor(
     [
         ("string", "protocol"),
         ("string", "protocol_type"),
-        ("uint32", "packet_socket_type"),
+        ("uint32", "socket_type"),
         ("uint32", "sk"),
         ("uint32", "ref"),
         ("uint32", "iface"),
@@ -95,7 +95,7 @@ class NetSocketPlugin(Plugin):
             domain (string): The target domain.
             protocol (str): packet.
             protocol_type (str): The canonical name of the captured protocol i.e. ETH_P_ALL.
-            packet_socket_type (int): The integer type of the socket (packet).
+            socket_type (int): The integer type of the socket (packet).
             sk (int): The socket number.
             iface (int): The interface index of the socket.
             r (int): The number of bytes that have been received by the socket and are waiting to be processed.
@@ -222,7 +222,7 @@ class NetSocketPlugin(Plugin):
         return PacketSocketRecord(
             protocol=data.protocol_string,
             protocol_type=data.protocol_type,
-            packet_socket_type=data.type,
+            socket_type=data.type,
             sk=data.sk,
             ref=data.ref,
             iface=data.iface,

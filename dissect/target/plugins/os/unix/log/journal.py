@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import lzma
+from enum import IntEnum
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable
 
 import zstandard
@@ -28,7 +29,6 @@ JournalRecord = TargetRecordDescriptor(
         # User Journal fields
         ("string", "message"),
         ("string", "message_id"),
-        ("varint", "priority_int"),
         ("string", "priority"),
         ("path", "code_file"),
         ("varint", "code_line"),
@@ -266,17 +266,22 @@ struct EntryArrayObject_Compact {
 
 c_journal = cstruct().load(journal_def)
 
-# Resource: https://wiki.archlinux.org/title/Systemd/Journal
-MAP_PRIORITY = [
-    "emerg",
-    "alert",
-    "crit",
-    "err",
-    "warning",
-    "notice",
-    "info",
-    "debug",
-]
+
+class JournalMessagePriority(IntEnum):
+    """Journal message priority enum.
+
+    Resources:
+        - https://wiki.archlinux.org/title/Systemd/Journal
+    """
+
+    EMERG = 0
+    ALERT = 1
+    CRIT = 2
+    ERR = 3
+    WARNING = 4
+    NOTICE = 5
+    INFO = 6
+    DEBUG = 7
 
 
 def get_optional(value: str, to_type: Callable) -> Any | None:
@@ -459,8 +464,7 @@ class JournalPlugin(Plugin):
                     ts=entry.get("ts"),
                     message=entry.get("message"),
                     message_id=entry.get("message_id"),
-                    priority_int=priority,
-                    priority=MAP_PRIORITY[priority] if priority else None,
+                    priority=JournalMessagePriority(priority).name.lower() if priority else None,
                     code_file=get_optional(entry.get("code_file"), path_function),
                     code_line=int_or_none(entry.get("code_line")),
                     code_func=entry.get("code_func"),

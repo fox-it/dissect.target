@@ -26,6 +26,7 @@ def test_wireguard_plugin_global_log(target_unix_users: Target, fs_unix: Virtual
     assert record.listen_port == 12345
     assert record.source == "/etc/wireguard/wg0.conf"
     assert record.dns == []
+    assert record.table == "1337"
 
     # Peer
     record = records[1]
@@ -56,6 +57,7 @@ def test_wireguard_plugin_global_log(target_unix_users: Target, fs_unix: Virtual
     assert not record.listen_port
     assert record.source == "/etc/wireguard/wg0.conf"
     assert record.dns == ["10.13.37.1", "1.1.1.1"]
+    assert record.table == "off"
 
     # Peer
     record = records[5]

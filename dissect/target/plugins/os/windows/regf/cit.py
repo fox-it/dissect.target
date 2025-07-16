@@ -386,7 +386,7 @@ CITPostUpdateUseInfoRecord = create_extended_descriptor([UserRecordDescriptorExt
         ("varint", "user_active_duration_in_s"),
         ("varint", "user_or_display_active_duration_in_s"),
         ("varint", "desktop_active_duration_in_s"),
-        ("varint", "version_num"),
+        ("varint", "puu_version"),
         ("varint", "boot_id_min"),
         ("varint", "boot_id_max"),
         ("varint", "pmuu_key"),
@@ -434,7 +434,7 @@ CITTelemetryRecord = TargetRecordDescriptor(
     "windows/registry/cit/telemetry",
     [
         ("datetime", "regf_mtime"),
-        ("varint", "version_num"),
+        ("varint", "telemetry_version"),
         ("path", "path"),
         ("string", "value"),
     ],
@@ -816,7 +816,7 @@ class CITPlugin(Plugin):
                     user_active_duration_in_s=puu.UserActiveDurationInS,
                     user_or_display_active_duration_in_s=puu.UserOrDispActiveDurationInS,
                     desktop_active_duration_in_s=puu.DesktopActiveDurationInS,
-                    version_num=puu.Version,
+                    puu_version=puu.Version,
                     boot_id_min=puu.BootIdMin,
                     boot_id_max=puu.BootIdMax,
                     pmuu_key=puu.PMUUKey,
@@ -914,7 +914,7 @@ class CITPlugin(Plugin):
                 for value in version_key.values():
                     yield CITTelemetryRecord(
                         regf_mtime=version_key.ts,
-                        version_num=version_key.name,
+                        telemetry_version=version_key.name,
                         path=self.target.fs.path(value.name),
                         value=str(c_cit.TELEMETRY_ANSWERS(value.value)).split(".")[1],
                         _target=self.target,

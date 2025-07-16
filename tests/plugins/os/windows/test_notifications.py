@@ -45,7 +45,7 @@ def test_notifications_appdb(target_win_users: Target, fs_win: VirtualFilesystem
 
     appdb_record = records_by_type["windows/notification/appdb"][0]
     assert appdb_record.timestamp == datetime("2016-06-02T10:00:34.019495+00:00")
-    assert appdb_record.version_num == 3
+    assert appdb_record.chunk_version == 3
     assert appdb_record.next_notification_id == 517
 
     push_record = records_by_type_chunk["windows/notification/appdb/push"][8][0]
@@ -73,7 +73,7 @@ def test_notifications_appdb(target_win_users: Target, fs_win: VirtualFilesystem
         assert tile.arrival_time.year == 2016
         assert tile.expiry_time.year == 2016
         assert tile.id == tile_ids[tile_no]
-        assert tile.type_num == 3
+        assert tile.tile_type == 3
         assert tile.index == tile_no
         assert tile.name == ""
         assert tile.content.startswith("<?xml")

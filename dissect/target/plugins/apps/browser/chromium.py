@@ -78,7 +78,7 @@ DOWNLOAD_STATES = {
     1: "complete",
     2: "cancelled",
     3: "interrupted",
-    4: "interrupted",
+    4: "interrupted",  # Older versions of Chromium can have DownloadState value 4 as interrupted.
 }
 
 

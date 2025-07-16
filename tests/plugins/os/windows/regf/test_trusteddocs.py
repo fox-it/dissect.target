@@ -50,7 +50,7 @@ def test_trusteddocs_plugin(target_win_users: Target, hive_hku: VirtualHive) -> 
     assert results[0].raw == bytes.fromhex("5AAC70BDC995DA010028A153C5FFFFFFA9DEB30101000000")
     assert results[0].application == "Word"
     assert (
-        results[0].document_path == "%USERPROFILE%\\Downloads\\example1.docm"
+        results[0].document == "%USERPROFILE%\\Downloads\\example1.docm"
     )  # Resolve does not work here, should be 'C:\\Users\\John'
     assert results[0].ts_created == datetime(2024, 4, 23, 22, 1, 6, 9405, tzinfo=timezone.utc)
     assert results[0].ts_enabled == datetime(
@@ -61,7 +61,7 @@ def test_trusteddocs_plugin(target_win_users: Target, hive_hku: VirtualHive) -> 
     assert results[1].raw == bytes.fromhex("5AAC70BDC995DA010028A153C5FFFFFFABDEB301FFFFFF7F")
     assert results[1].application == "Word"
     assert (
-        results[1].document_path == "%USERPROFILE%\\Downloads\\example2.docm"
+        results[1].document == "%USERPROFILE%\\Downloads\\example2.docm"
     )  # Resolve does not work here, should be 'C:\\Users\\John'
     assert results[1].ts_created == datetime(2024, 4, 23, 22, 1, 6, 9405, tzinfo=timezone.utc)
     assert results[1].ts_enabled == datetime(

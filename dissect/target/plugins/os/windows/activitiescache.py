@@ -33,7 +33,7 @@ ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtensio
         ("string", "group"),
         ("uint32", "activity_type"),
         ("uint32", "activity_status"),
-        ("uint32", "priority_int"),
+        ("uint32", "activity_priority"),
         ("uint32", "match_id"),
         ("uint32", "etag"),
         ("string", "tag"),
@@ -107,7 +107,7 @@ class ActivitiesCachePlugin(Plugin):
             group (string): Group field.
             activity_type (int): ActivityType field.
             activity_status (int): ActivityStatus field.
-            priority_int (int): Priority field.
+            activity_priority (int): Priority field.
             match_id (int): MatchId field.
             etag (int): ETag field.
             tag (string): Tag field.
@@ -140,7 +140,7 @@ class ActivitiesCachePlugin(Plugin):
                         group=r["[Group]"],
                         activity_type=r["[ActivityType]"],
                         activity_status=r["[ActivityStatus]"],
-                        priority_int=r["[Priority]"],
+                        activity_priority=r["[Priority]"],
                         match_id=r["[MatchId]"],
                         etag=r["[ETag]"],
                         tag=r["[Tag]"],
