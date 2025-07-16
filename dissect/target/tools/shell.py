@@ -1467,9 +1467,16 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, commands: list[str] | None) -> None:
-    """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
+def open_shell(
+    targets: list[str | pathlib.Path], child: str, python: bool, registry: bool, commands: list[str] | None
+) -> None:
+    """Helper method for starting a regular, Python or registry shell for one (child) or multiple targets."""
     targets = list(Target.open_all(targets))
+
+    if child:
+        if len(targets) > 1:
+            raise ValueError("Only one <target> supported with --child")
+        targets = [targets[0].open_child(child)]
 
     if python:
         python_shell(targets, commands=commands)
@@ -1592,7 +1599,7 @@ def main() -> int:
             )
 
     try:
-        open_shell(args.targets, args.python, args.registry, args.commands)
+        open_shell(args.targets, args.child, args.python, args.registry, args.commands)
     except TargetError as e:
         log.exception("Error opening shell")
         log.debug("", exc_info=e)

@@ -42,10 +42,39 @@ if TYPE_CHECKING:
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
+class list_children_action(argparse.Action):
+    def __init__(
+        self, option_strings: list, dest: str = argparse.SUPPRESS, default: str = argparse.SUPPRESS, help: None = None
+    ):
+        super().__init__(option_strings=option_strings, dest=dest, default=default, nargs=0, help=help)
+
+    def __call__(
+        self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, values: list, option_string: None = None
+    ):
+        for action in parser._get_positional_actions():
+            action.required = False
+
+        namespace.list_children = True
+
+
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
     parser.add_argument("-L", "--loader", action="store", help="select a specific loader (i.e. vmx, raw)")
+    parser.add_argument(
+        "--child", action="store", help="load child of target by path of index, see --list-children(-recursive)"
+    )
+    parser.add_argument("--children", action="store_true", help="include children")
+    parser.add_argument(
+        "--list-children",
+        action=list_children_action,
+        help="list all children by index and path output to be used in --child - does not process anything",
+    )
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Makes --list-children behave recursively - does not process anything",
+    )
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", action="store_true", help="print version")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
@@ -76,6 +105,18 @@ def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None
         args.targets = targets
     elif hasattr(args, "target"):
         args.target = targets[0]
+
+    if hasattr(args, "targets") and len(args.targets) > 1 and args.child:
+        print("When using --child, only a single target should be supplied")
+        sys.exit(1)
+
+    # List found children on targets and exit
+    if hasattr(args, "list_children"):
+        # List found children on targets and exit
+        # Using open_targets here breaks with target-fs due to target vs targets
+        list_target = Target.open_all(targets, args.children)
+        print_children(list_target, recursive=args.recursive)
+        sys.exit(0)
 
     if args.keychain_file:
         keychain.register_keychain_file(args.keychain_file)
@@ -185,10 +226,13 @@ def open_targets(args: argparse.Namespace) -> Iterator[Target]:
     for target in targets:
         if child:
             try:
+                target.log.warning("Switching to --child %s", child)
                 target: Target = target.open_child(child)
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
                 target.log.debug("", exc_info=e)
+                # Do not continue processing, as target is now still pointing to the parent.
+                continue
 
         if getattr(args, "dry_run", False):
             print(f"Dry run on: {target}")
@@ -471,3 +515,17 @@ def find_and_filter_plugins(
 def escape_str(value: str) -> str:
     """Escape non-ASCII, unicode characters and bytes to a printable form."""
     return repr(value)[1:-1]
+
+
+def print_children(targets: list[str], recursive: bool = False) -> None:
+    """Pretty print children of targets (recursively)"""
+    for target in targets:
+        print(f"# Processing hostname={target.name}, path={target.path} (-recursive={recursive})")
+        for child_id, child in target.list_children_recursive() if recursive else enumerate(target.list_children()):
+            # Always cast child_id to str to match _recursive()
+            prefix = "-" * str(child_id).count(".")
+            print(f" {prefix}[#{child_id}]: type={child.type}, name={child.name}, path={child.path}")
+
+    # Check if any children were found, if not print msg
+    if "child_id" not in locals():
+        print("No children found on target(s)")

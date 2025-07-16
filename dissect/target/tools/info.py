@@ -6,16 +6,21 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.target import Target
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_targets,
     process_generic_arguments,
 )
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
+
 
 InfoRecord = TargetRecordDescriptor(
     "target/info",
@@ -49,7 +54,6 @@ def main() -> int:
         formatter_class=help_formatter,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to display info from")
-    parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument("--from-file", nargs="?", type=Path, help="file containing targets to load")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-r", "--record", action="store_true", help="print output as record")
@@ -74,19 +78,20 @@ def main() -> int:
     process_generic_arguments(args, rest)
 
     try:
-        for i, target in enumerate(Target.open_all(args.targets, include_children=args.children)):
+        for i, target in enumerate(open_targets(args)):
             try:
+                target_info = get_target_info(target, args)
                 if args.jsonlines:
-                    print(json.dumps(get_target_info(target), default=str))
+                    print(json.dumps(target_info, default=str))
                 elif args.json:
-                    print(json.dumps(get_target_info(target), indent=4, default=str))
+                    print(json.dumps(target_info, indent=4, default=str))
                 elif args.record:
                     rs = record_output(args.strings)
-                    rs.write(InfoRecord(**get_target_info(target), _target=target))
+                    rs.write(InfoRecord(**target_info, _target=target))
                 else:
                     if i > 0:
                         print("-" * 70)
-                    print_target_info(target)
+                    print_target_info(target, target_info)
             except Exception as e:  # noqa: PERF203
                 target.log.error("Exception in retrieving information for target: `%s`, use `-vv` for details", target)  # noqa: TRY400
                 target.log.debug("", exc_info=e)
@@ -98,11 +103,11 @@ def main() -> int:
     return 0
 
 
-def get_target_info(target: Target) -> dict[str, str | list[str]]:
+def get_target_info(target: Target, args: argparse.Namespace) -> dict[str, str | list[str]]:
     return {
         "disks": get_disks_info(target),
         "volumes": get_volumes_info(target),
-        "children": get_children_info(target),
+        "children": get_children_info(target, args.recursive),
         "hostname": target.hostname,
         "domain": get_optional_func(target, "domain"),
         "ips": target.ips,
@@ -122,10 +127,10 @@ def get_optional_func(target: Target, func: str) -> str | None:
     return None
 
 
-def print_target_info(target: Target) -> None:
+def print_target_info(target: Target, target_info: dict[str, str | list[str]]) -> None:
     print(target)
 
-    for name, value in get_target_info(target).items():
+    for name, value in target_info.items():
         if name in ["disks", "volumes", "children"]:
             if not any(value):
                 continue
@@ -155,8 +160,16 @@ def get_volumes_info(target: Target) -> list[dict[str, str | int]]:
     return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
 
 
-def get_children_info(target: Target) -> list[dict[str, str]]:
-    return [{"type": c.type, "path": str(c.path)} for c in target.list_children()]
+def get_children_info(target: Target, recursive: bool = False) -> list[dict[str, str]]:
+    if recursive:
+        return [
+            {"child_index": i, "name": c.name, "type": c.type, "path": str(c.path)}
+            for i, c in target.list_children_recursive()
+        ]
+    return [
+        {"child_index": i, "name": c.name, "type": c.type, "path": str(c.path)}
+        for i, c in enumerate(target.list_children())
+    ]
 
 
 if __name__ == "__main__":

@@ -6,10 +6,10 @@ import logging
 
 from dissect.target.exceptions import TargetError
 from dissect.target.plugins.scrape.qfind import QFindPlugin
-from dissect.target.target import Target
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_targets,
     process_generic_arguments,
 )
 
@@ -26,7 +26,6 @@ def main() -> int:
     )
 
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("--children", action="store_true", help="include children")
 
     for args, kwargs in getattr(QFindPlugin.qfind, "__args__", []):
         parser.add_argument(*args, **kwargs)
@@ -41,7 +40,7 @@ def main() -> int:
         return 1
 
     try:
-        for target in Target.open_all(args.targets, args.children):
+        for target in open_targets(args):
             target.qfind(
                 args.needles,
                 args.needle_file,
