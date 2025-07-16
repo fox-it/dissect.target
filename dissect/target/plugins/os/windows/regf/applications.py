@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import datetime
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.parsers import DateTimeParser, default_datetime_parser
 from dissect.target.helpers.record import (
     COMMON_APPLICATION_FIELDS,
     TargetRecordDescriptor,
@@ -29,8 +29,22 @@ KEYS = (
 class WindowsApplicationsPlugin(Plugin):
     """Windows Applications plugin."""
 
-    def __init__(self, target: Target):
+    def __init__(
+        self,
+        target: Target,
+        datetime_parser: DateTimeParser = default_datetime_parser,
+    ):
+        """Initialise the plugin.
+
+        Args:
+            target: The target to run this plugin on.
+            datetime_parser: A function to parse date strings. Defaults to
+                `default_datetime_parser`. This allows for dependency injection
+                of custom parsers.
+        """
         super().__init__(target)
+        self.datetime_parser = datetime_parser
+
         key_list = list(self.target.registry.keys(KEYS))
         """
         Removing all keys from Backup registry hives located in sysvol/windows/system32/config/RegBack
@@ -71,31 +85,13 @@ class WindowsApplicationsPlugin(Plugin):
             path         (string):   path to the installed location or installer of the application
         """
 
-        def parse_datetime(date_string: str) -> datetime.datetime | None:
-            """
-            Parses a date string by trying a list of common formats.
-            Returns a datetime object or None if all formats fail.
-            """
-            date_formats = [
-                "%Y%m%d",  # e.g., 20231225
-                "%m/%d/%Y",  # e.g., 12/25/2023
-                "%d/%m/%Y",  # e.g., 25/12/2023
-            ]
-            for fmt in date_formats:
-                try:
-                    return datetime.datetime.strptime(date_string, fmt).replace(tzinfo=datetime.timezone.utc)
-                except (ValueError, TypeError):  # noqa: PERF203
-                    continue
-
-            return None
-
         for uninstall in self.keys:
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}
 
                 install_date = None
                 if install_date_string := values.get("InstallDate"):
-                    install_date = parse_datetime(str(install_date_string))
+                    install_date = self.datetime_parser(str(install_date_string))
 
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,
