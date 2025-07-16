@@ -1259,6 +1259,18 @@ class OSPlugin(Plugin):
         raise NotImplementedError
 
     @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        """Yields miscellaneous user paths and user keys.
+
+        Example:
+            ("c:/Windows/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
+        """
+
+        # Consider moving this to the UsersPlugin class, and create separate UsersPlugin subclasses for each OS
+        # when the machinery concerning users and user_paths becomes more complex.
+        raise NotImplementedError
+
+    @internal
     def os_tree(self) -> list[str]:
         """Returns the :func:`os` value of this and all the OS plugin parents."""
         result: list[str] = []
