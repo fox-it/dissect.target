@@ -42,6 +42,21 @@ if TYPE_CHECKING:
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
+class list_children_action(argparse.Action):
+    def __init__(
+        self, option_strings: list, dest: str = argparse.SUPPRESS, default: str = argparse.SUPPRESS, help: None = None
+    ):
+        super().__init__(option_strings=option_strings, dest=dest, default=default, nargs=0, help=help)
+
+    def __call__(
+        self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, values: list, option_string: None = None
+    ):
+        for action in parser._get_positional_actions():
+            action.required = False
+
+        namespace.list_children = True
+
+
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
@@ -52,14 +67,13 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument(
         "--list-children",
-        action=argparse.BooleanOptionalAction,
+        action=list_children_action,
         help="list all children by index and path output to be used in --child - does not process anything",
     )
     parser.add_argument(
-        "--list-children-recursive",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="list all children (recursively) by index and path - does not process anything",
+        "--recursive",
+        action="store_true",
+        help="Makes --list-children behave recursively - does not process anything",
     )
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", action="store_true", help="print version")
@@ -97,10 +111,11 @@ def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None
         sys.exit(1)
 
     # List found children on targets and exit
-    if args.list_children or args.list_children_recursive:
+    if hasattr(args, "list_children"):
+        # List found children on targets and exit
         # Using open_targets here breaks with target-fs due to target vs targets
         list_target = Target.open_all(targets, args.children)
-        print_children(list_target, recursive=args.list_children_recursive)
+        print_children(list_target, recursive=args.recursive)
         sys.exit(0)
 
     if args.keychain_file:

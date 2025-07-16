@@ -81,17 +81,18 @@ def main() -> int:
     try:
         for i, target in enumerate(open_targets(args)):
             try:
+                target_info = get_target_info(target, args)
                 if args.jsonlines:
-                    print(json.dumps(get_target_info(target), default=str))
+                    print(json.dumps(target_info, default=str))
                 elif args.json:
-                    print(json.dumps(get_target_info(target), indent=4, default=str))
+                    print(json.dumps(target_info, indent=4, default=str))
                 elif args.record:
                     rs = record_output(args.strings)
-                    rs.write(InfoRecord(**get_target_info(target), _target=target))
+                    rs.write(InfoRecord(**target_info, _target=target))
                 else:
                     if i > 0:
                         print("-" * 70)
-                    print_target_info(target)
+                    print_target_info(target, target_info)
             except Exception as e:  # noqa: PERF203
                 target.log.error("Exception in retrieving information for target: `%s`, use `-vv` for details", target)  # noqa: TRY400
                 target.log.debug("", exc_info=e)
@@ -103,12 +104,12 @@ def main() -> int:
     return 0
 
 
-def get_target_info(target: Target) -> dict[str, str | list[str]]:
+def get_target_info(target: Target, args: argparse.Namespace) -> dict[str, str | list[str]]:
     return {
         "disks": get_disks_info(target),
         "volumes": get_volumes_info(target),
         "mounts": get_mounts_info(target),
-        "children": get_children_info(target),
+        "children": get_children_info(target, args.recursive),
         "hostname": target.hostname,
         "domain": get_optional_func(target, "domain"),
         "ips": target.ips,
@@ -128,10 +129,10 @@ def get_optional_func(target: Target, func: str) -> str | None:
     return None
 
 
-def print_target_info(target: Target) -> None:
+def print_target_info(target: Target, target_info: dict[str, str | list[str]]) -> None:
     print(target)
 
-    for name, value in get_target_info(target).items():
+    for name, value in target_info.items():
         if name in ["disks", "volumes", "mounts", "children"]:
             if not any(value):
                 continue
@@ -167,8 +168,14 @@ def get_mounts_info(target: Target) -> list[dict[str, str | None]]:
 
 def get_children_info(target: Target, recursive: bool = False) -> list[dict[str, str]]:
     if recursive:
-        return [{"child_index": i, "type": c.type, "path": str(c.path)} for i, c in target.list_children_recursive()]
-    return [{"child_index": i, "type": c.type, "path": str(c.path)} for i, c in enumerate(target.list_children())]
+        return [
+            {"child_index": i, "name": c.name, "type": c.type, "path": str(c.path)}
+            for i, c in target.list_children_recursive()
+        ]
+    return [
+        {"child_index": i, "name": c.name, "type": c.type, "path": str(c.path)}
+        for i, c in enumerate(target.list_children())
+    ]
 
 
 if __name__ == "__main__":
