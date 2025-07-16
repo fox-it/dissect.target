@@ -357,12 +357,12 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         self.amcache = regutil.HiveCollection()
         self.amcache_applaunch = False
 
-        fpath = self.target.fs.path("sysvol/windows/appcompat/programs/amcache.hve")
+        fpath = self.target.resolve("%windir%/appcompat/programs/amcache.hve")
         if fpath.exists():
             self.amcache.add(regutil.RegfHive(fpath))
 
     def check_compatible(self) -> None:
-        if not self.amcache and not next(self.target.fs.path("sysvol/windows/appcompat/pca").glob("Pca*.txt"), None):
+        if not self.amcache and not next(self.target.resolve("%windir%/appcompat/pca").glob("Pca*.txt"), None):
             raise UnsupportedPluginError("Could not load amcache.hve or find AppLaunchDic")
 
     def read_key_subkeys(self, key: str) -> Iterator[regutil.RegistryKey]:
@@ -642,7 +642,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
         """
 
-        if (path := self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt")).exists():
+        if (path := self.target.resolve("%windir%/appcompat/pca/PcaAppLaunchDic.txt")).exists():
             for line in path.open("rt"):
                 if not (line := line.strip()):
                     continue
@@ -670,7 +670,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
             - https://www.sygnia.co/blog/new-windows-11-pca-artifact/
         """
 
-        for path in self.target.fs.path("sysvol/windows/appcompat/pca").glob("PcaGeneralDb*.txt"):
+        for path in self.target.resolve("%windir%/appcompat/pca").glob("PcaGeneralDb*.txt"):
             for line in path.open("rt", encoding="utf-16-le"):
                 if not (line := line.strip()):
                     continue

@@ -51,7 +51,7 @@ class DPAPIPlugin(InternalPlugin):
         # Search for SYSTEM master keys
         master_keys[self.SYSTEM_SID] = {}
 
-        system_master_key_path = self.target.fs.path(f"sysvol/Windows/System32/Microsoft/Protect/{self.SYSTEM_SID}")
+        system_master_key_path = self.target.resolve(f"%windir%/System32/Microsoft/Protect/{self.SYSTEM_SID}")
         system_user_master_key_path = system_master_key_path.joinpath("User")
 
         for dir in [system_master_key_path, system_user_master_key_path]:
