@@ -42,13 +42,13 @@ class ClfsPlugin(Plugin):
     the memory implementation for dissect is working.
     """
 
-    BLF_PATH = "sysvol/windows/system32/config/"  # Unsure at time of writing if this is the only location
+    BLF_PATH = "%windir%/system32/config/"  # Unsure at time of writing if this is the only location
 
     def __init__(self, target: Target):
         super().__init__(target)
         self._blfs = []
 
-        blfdir = self.target.fs.path(self.BLF_PATH)
+        blfdir = self.target.resolve(self.BLF_PATH)
 
         if blfdir.exists() and blfdir.is_dir():
             blf_files = blfdir.glob("*.blf")

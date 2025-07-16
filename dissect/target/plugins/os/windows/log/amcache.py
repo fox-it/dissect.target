@@ -113,7 +113,7 @@ class AmcacheInstallPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.logs = self.target.fs.path("sysvol/windows/appcompat/programs/install")
+        self.logs = self.target.resolve("%windir%/appcompat/programs/install")
 
     def check_compatible(self) -> None:
         if not self.logs.exists():
