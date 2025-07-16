@@ -493,18 +493,21 @@ class Target:
         self._load_child_plugins()
         for i, child in enumerate(self.list_children()):
             child_id = f"{prefix}.{i}".lstrip(".")
+
+            # Yield the child_id and ChildTargetRecord before attempting to open the child
+            yield child_id, child
+
             try:
                 # Attempt to open the target for next iteration of recrusive
                 target = self.open_child(child.path)
+
+                # Recursivly continue to yield these valures
+                yield from target.list_children_recursive(prefix=child_id)
+
             except TargetError:
                 self.log.exception("Failed to open child target %s", child.path)
                 continue
 
-            # Yield the child_id and ChildTargetRecord
-            yield child_id, child
-
-            # Recursivly continue to yield these valures
-            yield from target.list_children_recursive(prefix=child_id)
 
     def reload(self) -> Target:
         """Reload the current target.
