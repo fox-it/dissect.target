@@ -44,8 +44,8 @@ def test_uac_loader_compressed_zip(target_bare: Target) -> None:
 
 def test_uac_loader_zip(target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
-    mkdirs(root / '[root]', ["etc", "var"])
-    (root / '[root]' / 'etc' / 'passwd').write_bytes(b"root:x:0:0:root:/root:/bin/bash\n")
+    mkdirs(root / "[root]", ["etc", "var"])
+    (root / "[root]" / "etc" / "passwd").write_bytes(b"root:x:0:0:root:/root:/bin/bash\n")
     loader = UACLoader(root)
     loader.map(target_bare)
     target_bare.apply()
@@ -54,6 +54,7 @@ def test_uac_loader_zip(target_bare: Target, tmp_path: Path) -> None:
     assert test_file.exists()
     assert test_file.is_file()
     assert test_file.open().readline() == b"root:x:0:0:root:/root:/bin/bash\n"
+
 
 @pytest.mark.parametrize(
     ("archive", "loader"),
