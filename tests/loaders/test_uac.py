@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from pytest_benchmark.fixture import BenchmarkFixture
 
-from dissect.target.loader import Loader
 from dissect.target.loaders.tar import TarLoader
-from dissect.target.loaders.uac import UacZipSubLoader, UacTarSubloader, UACLoader
+from dissect.target.loaders.uac import UACLoader, UacTarSubloader, UacZipSubLoader
 from dissect.target.loaders.zip import ZipLoader
+from dissect.target.target import Target
 from tests._utils import absolute_path, mkdirs
 
 if TYPE_CHECKING:
-    from dissect.target.target import Target
+    from pathlib import Path
+
+    from pytest_benchmark.fixture import BenchmarkFixture
+
+    from dissect.target.loader import Loader
 
 
 def test_uac_loader_compressed_tar(target_bare: Target) -> None:
