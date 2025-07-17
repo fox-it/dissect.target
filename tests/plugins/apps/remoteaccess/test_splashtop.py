@@ -18,7 +18,7 @@ SPLASHTOP_LOG_PATH = "Program Files (x86)/Splashtop/Splashtop Remote/Server/log/
 
 
 @pytest.fixture
-def target_splashtop(target_win_users, fs_win) -> Iterator[SplashtopPlugin]:
+def target_splashtop(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[SplashtopPlugin]:
     fs_win.map_file(
         SPLASHTOP_LOG_PATH,
         absolute_path("_data/plugins/apps/remoteaccess/splashtop/SPLog.txt"),
@@ -34,11 +34,11 @@ def target_splashtop(target_win_users, fs_win) -> Iterator[SplashtopPlugin]:
     with patch.object(entry, "stat") as mock_stat:
         mock_stat.return_value = stat_result
         target_win_users.add_plugin(SplashtopPlugin)
-        yield target_win_users.splashtop
+        yield target_win_users
 
 
-def test_splashtop_plugin_log(target_splashtop: SplashtopPlugin) -> None:
-    records = list(target_splashtop.logs())
+def test_splashtop_plugin_log(target_splashtop: Target) -> None:
+    records = list(target_splashtop.splashtop.logs())
     assert len(records) == 384
 
     assert records[-1].ts == datetime(2025, 7, 14, 15, 15, 38, 194000, tzinfo=timezone.utc)
@@ -46,8 +46,8 @@ def test_splashtop_plugin_log(target_splashtop: SplashtopPlugin) -> None:
     assert records[-1].source == f"sysvol/{SPLASHTOP_LOG_PATH}"
 
 
-def test_splashtop_plugin_filetransfer(target_splashtop: SplashtopPlugin) -> None:
-    records = list(target_splashtop.filetransfer())
+def test_splashtop_plugin_filetransfer(target_splashtop: Target) -> None:
+    records = list(target_splashtop.splashtop.filetransfer())
     assert len(records) == 1
 
     assert records[0].ts == datetime(2025, 7, 14, 15, 17, 30, 766000, tzinfo=timezone.utc)

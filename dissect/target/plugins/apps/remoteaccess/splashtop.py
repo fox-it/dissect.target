@@ -91,7 +91,7 @@ class SplashtopPlugin(RemoteAccessPlugin):
                             _target=self.target,
                         )
                     except ValueError as e:
-                        self.target.log.warning("Could not parse log line in file %s: '%r'", log_file, line)
+                        self.target.log.warning("Could not parse log line in file %s: %r", log_file, line)
                         self.target.log.debug("", exc_info=e)
             except Exception as e:
                 self.target.log.warning("Could not parse log file %s", log_file)
@@ -122,6 +122,6 @@ class SplashtopPlugin(RemoteAccessPlugin):
                     )
             except Exception as e:
                 self.target.log.warning(
-                    "Could not parse file transfer from message in file %s: '%r'", log_record.source, log_record.message
+                    "Could not parse file transfer from message in file %s: %r", log_record.source, log_record.message
                 )
                 self.target.log.debug("", exc_info=e)
