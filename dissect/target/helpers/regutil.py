@@ -5,7 +5,6 @@ from __future__ import annotations
 import fnmatch
 import re
 from collections import defaultdict
-from enum import IntEnum
 from functools import cached_property
 from io import BytesIO
 from typing import TYPE_CHECKING, BinaryIO, NewType, TextIO, Union
@@ -17,6 +16,7 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
+from dissect.target.helpers.utils import IntEnumMissing
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -33,7 +33,7 @@ ValueType = Union[int, str, bytes, list[str], None]
 """The possible value types that can be returned from the registry."""
 
 
-class RegistryValueType(IntEnum):
+class RegistryValueType(IntEnumMissing):
     """Registry value types as defined in ``winnt.h``.
 
     Resources:
@@ -53,14 +53,6 @@ class RegistryValueType(IntEnum):
     FULL_RESOURCE_DESCRIPTOR = c_regf.REG_FULL_RESOURCE_DESCRIPTOR
     RESOURCE_REQUIREMENTS_LIST = c_regf.REG_RESOURCE_REQUIREMENTS_LIST
     QWORD = c_regf.REG_QWORD
-
-    @classmethod
-    def _missing_(cls, value: int) -> IntEnum:
-        # Allow values other than defined members
-        member = int.__new__(cls, value)
-        member._name_ = None
-        member._value_ = value
-        return member
 
 
 class RegistryHive:

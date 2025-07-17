@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dissect.cstruct import cstruct
+from dissect.util.ts import wintimestamp
+
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
@@ -18,13 +21,40 @@ if TYPE_CHECKING:
 TrustedDocumentsRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/trusteddocuments",
     [
-        ("datetime", "ts"),
+        ("datetime", "ts_modified"),
+        ("datetime", "ts_created"),
+        ("datetime", "ts_enabled"),
         ("string", "application"),
-        ("varint", "type"),
-        ("path", "document_path"),
-        ("bytes", "value"),
+        ("path", "document"),
+        ("string", "state"),
+        ("bytes", "raw"),
+        ("path", "source"),
     ],
 )
+
+trustrecord_def = """
+typedef QWORD FILETIME;
+
+enum TRFLAG {
+    EDITING_ENABLED     = 0x00000001
+    MACROS_ENABLED      = 0x7fffffff
+};
+
+struct TrustRecordEntry {
+    FILETIME            ts_created;
+    QWORD               timezone_offset;
+    DWORD               ts_enabled;
+    TRFLAG              flag;
+};
+"""
+
+c_trustrecord = cstruct().load(trustrecord_def)
+
+
+def convert_time(time: int) -> float:
+    """Return minute precision timestamp from DWORD time integer."""
+    multiplier = 16505867190471736999  # E5109EC205D7BEA7
+    return ((time << (64 + 29)) / multiplier) / 10_000_000
 
 
 class TrustedDocumentsPlugin(Plugin):
@@ -71,19 +101,27 @@ class TrustedDocumentsPlugin(Plugin):
         .. code-block:: text
 
             application (string): Application name of the Office product that produced the TrustRecords registry key.
-            document_path (path): Path to the document for which a TrustRecords entry is created.
+            document (path): Path to the document for which a TrustRecords entry is created.
             ts (datetime): The created time of the TrustRecord registry key.
             type (varint): Type of the value within the TrustRecords registry key.
             value (bytes): Value of the TrustRecords entry, which contains the information whether macros are enabled.
+
+        Resources:
+            - https://az4n6.blogspot.com/2016/02/more-on-trust-records-macros-and.html
+            - https://github.com/DissectMalware/OfficeForensicTools/blob/master/trusted_documents.py
+            - https://github.com/nmantani/PS-TrustedDocuments
         """
         for user, application, key in self._iterate_keys():
             for value in key.values():
+                entry = c_trustrecord.TrustRecordEntry(value.value)
                 yield TrustedDocumentsRecord(
-                    ts=key.ts,
-                    type=value.type,
+                    ts_modified=key.ts,
+                    ts_created=wintimestamp(entry.ts_created),
+                    ts_enabled=convert_time(entry.ts_enabled),
                     application=application,
-                    document_path=self.target.resolve(value.name),
-                    value=value.value,
+                    document=self.target.resolve(value.name),
+                    state=entry.flag.name,
+                    raw=value.value,
                     _key=key,
                     _user=user,
                     _target=self.target,
