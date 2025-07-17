@@ -157,16 +157,19 @@ class PodmanPlugin(ContainerPlugin):
         """Yield any Podman containers on the target system.
 
         Uses the ``$PODMAN/storage/db.sql`` SQLite3 database and ``$PODMAN/storage/overlay-containers`` folder.
-        Does not (yet) support legacy BoltDB Podman databases.
-
-        TODO: Also parse ``$PODMAN/storage/overlay-containers/*`` for Podman v3 / BoltDB versions.
+        Does not support legacy (v3 and older) BoltDB Podman databases.
         """
         for dir, _ in self.installs:
-            if (db_path := dir.joinpath("storage/db.sql")).exists():
+            # Attempt to parse Podman v4 and newer SQLite databases.
+            if (db_path := dir.joinpath("storage/db.sql")).is_file():
                 yield from self._find_containers_sqlite(db_path)
 
+            # Fallback to globbing $PODMAN/storage/overlay-containers/* if the db does not exist (pre version 4).
+            elif dir.joinpath("storage/overlay-containers").is_dir():
+                yield from self._find_containers_fs(dir)
+
     def _find_containers_sqlite(self, db_path: Path) -> Iterator[PodmanContainerRecord]:
-        """Find Podman containers from existing ``db.sql``.
+        """Find Podman containers from existing ``db.sql`` files (version 4 and newer).
 
         Gets info from the ``ContainerConfig`` and ``ContainerState`` tables.
         """
@@ -230,6 +233,53 @@ class PodmanPlugin(ContainerPlugin):
                 if container.get("rootfsImageID")
                 else None,
                 source=db_path,
+                _target=self.target,
+            )
+
+    def _find_containers_fs(self, dir: Path) -> Iterator[PodmanContainerRecord]:
+        """Find Podman containers based on the ``$PODMAN/storage/overlay-containers/containers.json`` file."""
+
+        containers = {}
+        if (containers_file := dir.joinpath("storage/overlay-containers/containers.json")).is_file():
+            containers = json.loads(containers_file.read_text())
+
+        for container_dir in dir.joinpath("storage/overlay-containers").iterdir():
+            if (
+                not container_dir.is_dir()
+                or not (config_path := container_dir.joinpath("userdata/config.json")).is_file()
+            ):
+                continue
+
+            try:
+                config = json.loads(config_path.read_text())
+            except json.JSONDecodeError as e:
+                self.target.log.warning("Unable to read Podman container config file %r: %r", config_path, e)
+                self.target.log.debug("", exc_info=e)
+                continue
+
+            # See if this container is also registered in containers.json
+            other_config = {}
+            for c in containers:
+                if c.get("id") == container_dir.name:
+                    other_config = c
+                    other_config["metadata"] = json.loads(other_config["metadata"])
+                    break
+
+            # Some fields are not available in these JSON files (we should parse BoltDB for that):
+            # running state, pid, started ts, finished ts, ports, volumes.
+
+            yield PodmanContainerRecord(
+                container_id=container_dir.name,
+                image=other_config.get("metadata", {}).get("image-name"),
+                image_id=other_config.get("image"),
+                command=" ".join(config.get("process", {}).get("args", [])),
+                created=other_config.get("created"),
+                names=other_config.get("names"),
+                environment=config.get("process", {}).get("env", []),
+                mount_path=dir.joinpath(f"storage/overlay/{other_config.get('layer')}") if other_config else None,
+                config_path=config_path,
+                image_path=dir.joinpath("storage/overlay-images", other_config.get("image")) if other_config else None,
+                source=config_path,
                 _target=self.target,
             )
 
