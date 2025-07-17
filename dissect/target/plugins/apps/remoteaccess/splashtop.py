@@ -40,7 +40,8 @@ class SplashtopPlugin(RemoteAccessPlugin):
     )
 
     LOG_PATHS = (
-        "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt",  # General agent log including connections and filetransfers
+        # General agent log including connections and filetransfers
+        "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt",
         # File transfer log which is currently acquired but not parsed
         # All content is also included in the SPLog so no need to parse
         # acquired the file just in case something is missing in the SPLog
@@ -108,7 +109,7 @@ class SplashtopPlugin(RemoteAccessPlugin):
         for log_record in self.logs():
             try:
                 # Example log entry:
-                # SM_03280[FTCnnel] OnUploadFileCPRequest 1, 1 =>{"fileID":"353841253","fileName":"NOTE.txt","fileSize":"34","remotesessionFTC":1,"request":"uploadFile"}
+                # SM_03280[FTCnnel] OnUploadFileCPRequest 1, 1 =>{"fileID":"353841253","fileName":"NOTE.txt","fileSize":"34","remotesessionFTC":1,"request":"uploadFile"}  # noqa: E501
 
                 if any(method in log_record.message for method in methods):
                     json_data = json.loads(log_record.message.split("=>")[1])

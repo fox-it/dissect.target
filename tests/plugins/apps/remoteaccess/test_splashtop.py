@@ -18,7 +18,7 @@ SPLASHTOP_LOG_PATH = "Program Files (x86)/Splashtop/Splashtop Remote/Server/log/
 
 
 @pytest.fixture
-def target_splashtop(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[SplashtopPlugin]:
+def target_splashtop(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
     fs_win.map_file(
         SPLASHTOP_LOG_PATH,
         absolute_path("_data/plugins/apps/remoteaccess/splashtop/SPLog.txt"),
@@ -53,7 +53,7 @@ def test_splashtop_plugin_filetransfer(target_splashtop: Target) -> None:
     assert records[0].ts == datetime(2025, 7, 14, 15, 17, 30, 766000, tzinfo=timezone.utc)
     assert (
         records[0].message
-        == 'SM_03280[FTCnnel] OnUploadFileCPRequest 1, 1 =>{"fileID":"353841253","fileName":"NOTE.txt","fileSize":"34","remotesessionFTC":1,"request":"uploadFile"}'
+        == 'SM_03280[FTCnnel] OnUploadFileCPRequest 1, 1 =>{"fileID":"353841253","fileName":"NOTE.txt","fileSize":"34","remotesessionFTC":1,"request":"uploadFile"}'  # noqa: E501
     )
     assert records[0].source == f"sysvol/{SPLASHTOP_LOG_PATH}"
     assert records[0].filename == "NOTE.txt"
