@@ -135,7 +135,7 @@ class WindowsLicensePlugin(Plugin):
 
 
 def decode_cd_key(input: bytes | bytearray) -> str:
-    """Decode the given bytes to a windows cd key using a pseudo base24 implementation."""
+    """Decode the given bytes to a Windows CD key using a pseudo base24 implementation."""
     chars = "BCDFGHJKMPQRTVWXY2346789"
     output = ""
 
