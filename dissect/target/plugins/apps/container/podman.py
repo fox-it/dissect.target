@@ -252,7 +252,7 @@ class PodmanPlugin(ContainerPlugin):
             for log_file in install.glob("storage/overlay-containers/*/userdata/ctr.log*"):
                 buf = ""
 
-                for line in log_file.open("rt").readlines():
+                for line in log_file.open("rt"):
                     if not (match := RE_CTR_LOG.match(line)):
                         self.target.log.warning("Unable to match Podman log line %r in file %r", line, log_file)
                         continue
