@@ -30,6 +30,7 @@ InfoRecord = TargetRecordDescriptor(
         ("string", "timezone"),
         ("string[]", "disks"),
         ("string[]", "volumes"),
+        ("string[]", "mounts"),
         ("string[]", "children"),
     ],
 )
