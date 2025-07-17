@@ -109,6 +109,7 @@ def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
             <dissect.target.helpers.loaderutil.add_virtual_ntfs_filesystem>`.
     """
     os_type, dirs = find_dirs(path)
+
     map_dirs(target, dirs, os_type, **kwargs)
 
 
