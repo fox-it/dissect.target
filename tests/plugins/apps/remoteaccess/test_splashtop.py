@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest

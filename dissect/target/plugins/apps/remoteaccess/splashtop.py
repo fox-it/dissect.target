@@ -93,17 +93,19 @@ class SplashtopPlugin(RemoteAccessPlugin):
                         )
                     except ValueError as e:
                         self.target.log.warning("Could not parse log line in file %s: %r", log_file, line)
-                        self.target.log.debug("", exc_info=e)
+                        self.target.log.debug("", exc_info=e)  # noqa: PERF203
             except Exception as e:
                 self.target.log.warning("Could not parse log file %s", log_file)
-                self.target.log.debug("", exc_info=e)
+                self.target.log.debug("", exc_info=e)  # noqa: PERF203
 
     @export(record=RemoteAccessFileTransferRecord)
     def filetransfer(self) -> Iterator[RemoteAccessFileTransferRecord]:
         """Parse Splashtop filetransfers.
 
-        Splashtop is a remote desktop application and can be used by adversaries to get (persistent) access to a machine.
-        File transfers as logged in the generic logfile (``SPLog.txt``) show what files are downloaded to a system.
+        Splashtop is a remote desktop application and can be used by adversaries
+        to get (persistent) access to a machine.
+        File transfers as logged in the generic logfile (``SPLog.txt``)
+        show what files are downloaded to a system.
         """
         methods = ("OnUploadRequest", "OnUploadFileCPRequest", "OnDownloadRequest")
         for log_record in self.logs():
@@ -125,4 +127,4 @@ class SplashtopPlugin(RemoteAccessPlugin):
                 self.target.log.warning(
                     "Could not parse file transfer from message in file %s: %r", log_record.source, log_record.message
                 )
-                self.target.log.debug("", exc_info=e)
+                self.target.log.debug("", exc_info=e)  # noqa: PERF203
