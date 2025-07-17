@@ -146,7 +146,7 @@ class PodmanPlugin(ContainerPlugin):
             if (db_path := dir.joinpath("storage/db.sql")).exists():
                 yield from self._find_containers_sqlite(db_path)
 
-    def _find_containers_sqlite(self, db_path: Path) -> Iterator:
+    def _find_containers_sqlite(self, db_path: Path) -> Iterator[PodmanContainerRecord]:
         """Find Podman containers from existing ``db.sql``.
 
         Gets info from the ``ContainerConfig`` and ``ContainerState`` tables.
@@ -224,6 +224,7 @@ class PodmanPlugin(ContainerPlugin):
         Resources:
             - https://docs.podman.io/en/latest/markdown/podman-create.1.html#log-driver-driver
         """
+        raise NotImplementedError
 
 
 def convert_ports(ports: dict[str, list | dict]) -> Iterator[str]:

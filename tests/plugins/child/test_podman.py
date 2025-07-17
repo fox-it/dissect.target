@@ -1,8 +1,14 @@
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.apps.container.podman import PodmanPlugin
 from dissect.target.plugins.child.podman import PodmanChildTargetPlugin
 from tests.plugins.apps.container.test_podman import target_unix_podman  # noqa: F401
+
+if TYPE_CHECKING:
+    from dissect.target import Target
+    from dissect.target.filesystem import VirtualFilesystem
 
 
 def test_plugins_child_podman(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:  # noqa: F811

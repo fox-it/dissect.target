@@ -16,7 +16,6 @@ class OverlayLoader(Loader):
     @staticmethod
     def detect(path: TargetPath) -> bool:
         # path should be a folder
-
         if not path.is_dir():
             return False
 
@@ -25,8 +24,8 @@ class OverlayLoader(Loader):
             if not path.joinpath(file).exists():
                 return False
 
-        # parents should be
-        return not "containers/storage/overlay/" not in path.as_posix()
+        # and should have the following parent folders
+        return "containers/storage/overlay/" in path.as_posix()
 
     def map(self, target: Target) -> None:
         target.filesystems.add(OverlayFilesystem(self.absolute_path))

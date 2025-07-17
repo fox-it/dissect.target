@@ -1,5 +1,11 @@
-from dissect.target import Target
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.loaders.overlay2 import Overlay2Loader
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 
 def test_overlay2_loader_docker(target_linux_docker: Target) -> None:

@@ -8,6 +8,7 @@ from dissect.target.filesystem import LayerFilesystem, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -109,7 +110,7 @@ class Overlay2Filesystem(LayerFilesystem):
             else:
                 layer_fs = DirectoryFilesystem(layer)
 
-            log.info("Adding layer %s to destination %s", layer, dest)
+            log.debug("Adding layer %s to destination %s", layer, dest)
             self.append_layer().mount("/" if layer.is_file() else dest, layer_fs)
 
     def __repr__(self) -> str:
@@ -141,7 +142,7 @@ class OverlayFilesystem(LayerFilesystem):
                 continue
 
             layer_fs = DirectoryFilesystem(layer)
-            log.info("Adding layer %s to destination %s", layer, dest)
+            log.debug("Adding layer %s to destination %s", layer, dest)
             self.append_layer().mount("/" if layer.is_file() else dest, layer_fs)
 
     def __repr__(self) -> str:
@@ -153,4 +154,4 @@ def oci_layers(path: Path) -> Iterator[tuple[str, Path]]:
     yield ("/", path.joinpath("diff"))
     for symlink in path.joinpath("lower").read_text().split(":"):
         if symlink:
-            yield ("/", path.parent.joinpath(symlink).resolve())  # noqa: PERF401
+            yield ("/", path.parent.joinpath(symlink).resolve())
