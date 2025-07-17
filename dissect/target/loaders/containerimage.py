@@ -78,7 +78,7 @@ class ContainerImageTarSubLoader(TarSubLoader):
                     self.tarfs.path("/blobs").joinpath(index["manifests"][0]["digest"].replace(":", "/")).read_text()
                 )
                 self.layers = [
-                    self.tarfs.path(f"/blobs/{layer['digest'].replace(':', '/')}")
+                    self.tarfs.path("/blobs").joinpath(layer["digest"].replace(":", "/"))
                     for layer in self.config.get("layers", [])
                 ]
             except Exception as e:
