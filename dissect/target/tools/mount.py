@@ -9,9 +9,11 @@ from dissect.target import filesystem
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.target import Target
-from dissect.target.tools.utils import (catch_sigpipe,
-                                        configure_generic_arguments,
-                                        process_generic_arguments)
+from dissect.target.tools.utils import (
+    catch_sigpipe,
+    configure_generic_arguments,
+    process_generic_arguments,
+)
 
 # Setting logging level to info for startup information.
 logging.basicConfig(level=logging.INFO)

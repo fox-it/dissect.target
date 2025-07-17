@@ -6,8 +6,10 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 from dissect.target import filesystem, target
-from dissect.target.filesystems.tar import (TarFilesystemDirectoryEntry,
-                                            TarFilesystemEntry)
+from dissect.target.filesystems.tar import (
+    TarFilesystemDirectoryEntry,
+    TarFilesystemEntry,
+)
 from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.loader import Loader, SubLoader
