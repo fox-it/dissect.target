@@ -134,13 +134,13 @@ class TasksPlugin(Plugin):
     """
 
     PATHS = (
-        "sysvol/windows/system32/tasks",
-        "sysvol/windows/system32/tasks_migrated",
-        "sysvol/windows/syswow64/tasks",
-        "sysvol/windows/tasks",  # at.exe job file location
+        "%windir%/system32/tasks",
+        "%windir%/system32/tasks_migrated",
+        "%windir%/syswow64/tasks",
+        "%windir%/tasks",  # at.exe job file location
     )
     GLOB_PATHS = (
-        "sysvol/windows/system32/GroupPolicy/DataStore/*/Machine/Preferences/ScheduledTasks/*",
+        "%windir%/system32/GroupPolicy/DataStore/*/Machine/Preferences/ScheduledTasks/*",
         "sysvol/ProgramData/Microsoft/*/Preferences/ScheduledTasks/*",
     )
 
@@ -150,12 +150,12 @@ class TasksPlugin(Plugin):
 
         for path in self.GLOB_PATHS:
             start_path, pattern = path.split("*", 1)
-            for entry in self.target.fs.path(start_path).rglob("*" + pattern):
+            for entry in self.target.resolve(start_path).rglob("*" + pattern):
                 if entry.is_file() and entry.suffix == ".xml":
                     self.task_files.append(entry)
 
         for file_path in self.PATHS:
-            fpath = self.target.fs.path(file_path)
+            fpath = self.target.resolve(file_path)
             if not fpath.exists():
                 continue
 

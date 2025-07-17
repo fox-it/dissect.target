@@ -385,7 +385,7 @@ class SRUPlugin(Plugin):
         super().__init__(target)
         self._sru = None
 
-        srupath = target.fs.path("sysvol/Windows/System32/sru/SRUDB.dat")
+        srupath = target.resolve("%windir%/System32/sru/SRUDB.dat")
         if srupath.exists():
             try:
                 self._sru = sru.SRU(srupath.open())

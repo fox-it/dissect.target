@@ -598,6 +598,59 @@ def test_namesplace_plugin_multiple_same_module(mock_plugins: PluginRegistry) ->
     assert sorted(desc.name for desc in result) == ["bar.baz", "foo.baz"]
 
 
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_nested_namespace_getattr(mock_plugins: PluginRegistry, target_bare: Target) -> None:
+    class Foo(Plugin):
+        __namespace__ = "foo"
+
+        @export(output="yield")
+        def buzz(self) -> Iterator[str]:
+            yield from ["buzz"]
+
+    class FooBar(Plugin):
+        __namespace__ = "foo.bar"
+
+        @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz1"]
+
+        @export(output="yield")
+        def bar(self) -> Iterator[str]:
+            yield from ["bar1"]
+
+    class FooBaz(Plugin):
+        __namespace__ = "foo.baz"
+
+        @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz2"]
+
+        @export(output="yield")
+        def bar(self) -> Iterator[str]:
+            yield from ["bar2"]
+
+    for plugin in [Foo, FooBar, FooBaz]:
+        target_bare._register_plugin_functions(plugin(target_bare))
+
+    assert isinstance(target_bare.foo, Foo)
+    assert isinstance(target_bare.foo.bar, FooBar)
+    assert isinstance(target_bare.foo.baz, FooBaz)
+    assert hasattr(target_bare.foo.bar, "bazz")
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bazz()
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bar.foo()
+
+    # Test whether we can access the plugin this way
+    assert next(target_bare.foo.bar.bazz()) == "bazz1"
+    assert next(target_bare.foo.bar.bar()) == "bar1"
+    assert next(target_bare.foo.baz.bazz()) == "bazz2"
+    assert next(target_bare.foo.baz.bar()) == "bar2"
+    assert next(target_bare.foo.buzz()) == "buzz"
+
+
 def test_find_plugin_function_default(target_default: Target) -> None:
     found, _ = find_functions("services", target_default)
 
@@ -1446,3 +1499,26 @@ def assert_valid_rst(src: str) -> None:
         # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
         if "Unknown interpreted text role" not in str(e):
             pytest.fail(f"Invalid rst: {e}", pytrace=False)
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    [descriptor for descriptor in plugins() if descriptor.namespace and "." in descriptor.namespace],
+    ids=lambda descriptor: descriptor.namespace,
+)
+def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
+    """Test whether all parts of nested namespaces exist and that there are no conflicts with other functions."""
+
+    parts = descriptor.namespace.split(".")
+    for i in range(len(parts)):
+        part = ".".join(parts[: i + 1])
+        result = list(lookup(part))
+
+        if not result:
+            pytest.fail(f"Unreachable namespace {descriptor.namespace!r}, namespace {part!r} does not exist.")
+
+        if len(result) > 1:
+            conflicts = ", ".join(
+                f"{desc.name} ({desc.module}.{desc.qualname})" for desc in result if desc.namespace != part
+            )
+            pytest.fail(f"Namespace name {descriptor.namespace!r} has conflicts with function name: {conflicts}")
