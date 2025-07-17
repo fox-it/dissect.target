@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target import filesystem
-from dissect.target.filesystems.tar import (TarFilesystemDirectoryEntry,
-                                            TarFilesystemEntry)
+from dissect.target.filesystems.tar import TarFilesystemDirectoryEntry, TarFilesystemEntry
 from dissect.target.helpers import fsutil
-from dissect.target.loaders.dir import (DirLoader, find_and_map_dirs,
-                                        find_dirs, map_dirs)
+from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs, map_dirs
 from dissect.target.loaders.tar import TarSubLoader
 from dissect.target.loaders.zip import ZipSubLoader
 
 if TYPE_CHECKING:
     import tarfile as tf
     import zipfile as zf
+    from pathlib import Path
 
     from dissect.target import Target
 
@@ -52,16 +50,10 @@ class UACLoader(DirLoader):
 
 
 class UacTarSubloader(TarSubLoader):
-
     @staticmethod
     def detect(tarfile: tf.TarFile) -> bool:
         for member in tarfile.getmembers():
-            if member.name.startswith(
-                    (
-                            f"/{FILESYSTEMS_ROOT}/",
-                            f"{FILESYSTEMS_ROOT}/"
-                    )
-            ):
+            if member.name.startswith((f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")):
                 return True
         return False
 
