@@ -253,7 +253,7 @@ class PrefetchPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.prefetchdir = self.target.fs.path("sysvol/windows/prefetch")
+        self.prefetchdir = self.target.resolve("%windir%/prefetch")
 
     def check_compatible(self) -> None:
         if len(list(self.prefetchdir.iterdir())) == 0:
