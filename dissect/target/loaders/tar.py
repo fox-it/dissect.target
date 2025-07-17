@@ -6,10 +6,8 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 from dissect.target import filesystem, target
-from dissect.target.filesystems.tar import (
-    TarFilesystemDirectoryEntry,
-    TarFilesystemEntry,
-)
+from dissect.target.filesystems.tar import (TarFilesystemDirectoryEntry,
+                                            TarFilesystemEntry)
 from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.loader import Loader, SubLoader
@@ -134,6 +132,7 @@ class TarLoader(Loader):
     __subloaders__ = (
         import_lazy("dissect.target.loaders.containerimage").ContainerImageTarSubLoader,
         import_lazy("dissect.target.loaders.acquire").AcquireTarSubLoader,
+        import_lazy("dissect.target.loaders.uac").UacTarSubloader,
         GenericTarSubLoader,  # should be last
     )
 
