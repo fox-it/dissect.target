@@ -25,7 +25,7 @@ class Overlay2Loader(Loader):
                 return False
 
         # and should have the following parent folders
-        return not "image/overlay2/layerdb/mounts/" not in path.as_posix()
+        return "image/overlay2/layerdb/mounts/" in path.as_posix()
 
     def map(self, target: Target) -> None:
         target.filesystems.add(Overlay2Filesystem(self.absolute_path))

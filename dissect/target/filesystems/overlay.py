@@ -119,7 +119,7 @@ class Overlay2Filesystem(LayerFilesystem):
 class OverlayFilesystem(LayerFilesystem):
     """Podman overlay filesystem implementation.
 
-    Currently does not support mounting of (anonymous) volumes, names volumes and bind mounts.
+    Currently does not support mounting of (anonymous) volumes, named volumes and bind mounts.
     Also does not map mount point files, hosts, hostname and resolv.conf files.
 
     Resources:
@@ -148,11 +148,9 @@ class OverlayFilesystem(LayerFilesystem):
         return f"<{self.__class__.__name__} {self.base_path}>"
 
 
-def oci_layers(path: Path) -> list[tuple[str, Path]]:
-    """Return the layers of an OCI container provided the ``mount_path``."""
-    layers = [("/", path.joinpath("diff"))]
+def oci_layers(path: Path) -> Iterator[tuple[str, Path]]:
+    """Yield the layers of an OCI container provided the ``mount_path``."""
+    yield ("/", path.joinpath("diff"))
     for symlink in path.joinpath("lower").read_text().split(":"):
         if symlink:
-            layers.append(("/", path.parent.joinpath(symlink).resolve()))  # noqa: PERF401
-
-    return layers
+            yield ("/", path.parent.joinpath(symlink).resolve())  # noqa: PERF401

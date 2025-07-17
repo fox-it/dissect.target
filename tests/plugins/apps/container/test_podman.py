@@ -70,7 +70,7 @@ def test_podman_images(target_unix_podman: Target, fs_unix: VirtualFilesystem) -
 
 
 def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we can detect Podman containers on a target based on a SQLite3 database."""
+    """Test if we can detect Podman containers on a target based on a SQLite3 database."""
 
     target_unix_podman.add_plugin(PodmanPlugin)
     records = list(target_unix_podman.container.containers())

@@ -6,7 +6,7 @@ from tests.plugins.apps.container.test_podman import target_unix_podman  # noqa:
 
 
 def test_plugins_child_podman(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:  # noqa: F811
-    """test if we can find, parse and correctly yield child Podman targets."""
+    """Test if we can find, parse and correctly yield child Podman targets."""
 
     target_unix_podman.add_plugin(PodmanPlugin)
     target_unix_podman.add_plugin(PodmanChildTargetPlugin)
