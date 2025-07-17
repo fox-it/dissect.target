@@ -404,7 +404,7 @@ class DifferentialCli(ExtendedCmd):
         dst_name = _target_name(self.comparison.dst_target)
 
         base = f"{src_name}/{dst_name}" if src_name != dst_name else src_name
-        suffix = "{base}:{self.cwd}$" if os.getenv("NO_COLOR") else "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$"
+        suffix = "{base}:{cwd}$" if os.getenv("NO_COLOR") else "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$"
         suffix = suffix.format(base=base, cwd=self.cwd, **ANSI_COLORS)  # type: ignore
 
         if len(self.targets) <= 2:
