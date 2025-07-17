@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from unittest.mock import patch
@@ -11,6 +10,8 @@ from dissect.target.plugins.apps.remoteaccess.splashtop import SplashtopPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 

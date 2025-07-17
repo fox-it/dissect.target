@@ -80,7 +80,7 @@ class SplashtopPlugin(RemoteAccessPlugin):
                         # The line is of format "<#>%b%d %H:%M:%S.%f ..." check if the start matches an expected line
                         if (line[0], line[2]) != ("<", ">"):
                             self.target.log.error("LINE %s", line)
-                            raise ValueError("Line does not match expected format")  # noqa: TRY301
+                            raise ValueError("Line does not match expected format")
 
                         # The prefix contains two spaces splitting off the timestamp, grab only the message part
                         message = line.split(" ", maxsplit=2)[-1]
@@ -91,12 +91,12 @@ class SplashtopPlugin(RemoteAccessPlugin):
                             source=log_file,
                             _target=self.target,
                         )
-                    except ValueError as e:
+                    except ValueError as e:  # noqa: PERF203
                         self.target.log.warning("Could not parse log line in file %s: %r", log_file, line)
-                        self.target.log.debug("", exc_info=e)  # noqa: PERF203
-            except Exception as e:
+                        self.target.log.debug("", exc_info=e)
+            except Exception as e:  # noqa: PERF203
                 self.target.log.warning("Could not parse log file %s", log_file)
-                self.target.log.debug("", exc_info=e)  # noqa: PERF203
+                self.target.log.debug("", exc_info=e)
 
     @export(record=RemoteAccessFileTransferRecord)
     def filetransfer(self) -> Iterator[RemoteAccessFileTransferRecord]:
@@ -123,8 +123,8 @@ class SplashtopPlugin(RemoteAccessPlugin):
                         filename=json_data["fileName"],
                         _target=self.target,
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 self.target.log.warning(
                     "Could not parse file transfer from message in file %s: %r", log_record.source, log_record.message
                 )
-                self.target.log.debug("", exc_info=e)  # noqa: PERF203
+                self.target.log.debug("", exc_info=e)
