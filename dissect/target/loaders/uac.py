@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 FILESYSTEMS_ROOT = "[root]"
-UAC_CHECK_FILES = ["uac.log"]
+UAC_CHECK_FILE = "uac.log"
 
 
 def find_fs_directories(path: Path) -> tuple[str, list[Path]]:
@@ -42,7 +42,7 @@ class UACLoader(DirLoader):
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return path.joinpath(FILESYSTEMS_ROOT).exists() and all(path.joinpath(x).exists() for x in UAC_CHECK_FILES)
+        return path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath(UAC_CHECK_FILE).exists()
 
     def map(self, target: Target) -> None:
         os_type, dirs = find_fs_directories(self.root)
@@ -83,7 +83,7 @@ class UacZipSubLoader(ZipSubLoader):
 
     @staticmethod
     def detect(zipfile: zf.Path) -> bool:
-        return zipfile.joinpath(FILESYSTEMS_ROOT).exists()
+        return zipfile.joinpath(FILESYSTEMS_ROOT).exists() and zipfile.joinpath(UAC_CHECK_FILE).exists()
 
     def map(self, target: Target) -> None:
         path = self.zip
