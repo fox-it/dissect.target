@@ -77,7 +77,10 @@ class ContainerImageTarSubLoader(TarSubLoader):
                 self.config = json.loads(
                     self.tarfs.path("/blobs").joinpath(index["manifests"][0]["digest"].replace(":", "/")).read_text()
                 )
-                self.layers = [self.tarfs.path(f"/blobs/{layer['digest'].replace(':', '/')}") for layer in self.config.get("layers", [])]
+                self.layers = [
+                    self.tarfs.path(f"/blobs/{layer['digest'].replace(':', '/')}")
+                    for layer in self.config.get("layers", [])
+                ]
             except Exception as e:
                 raise ValueError(f"Unable to load OCI container: {e}") from e
 

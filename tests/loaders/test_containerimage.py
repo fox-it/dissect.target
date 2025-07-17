@@ -21,7 +21,9 @@ def test_container_image_filesystem_docker(target_bare: Target) -> None:
     target_bare.apply()
 
     assert loader.subloader.name == "alpine:latest"
-    assert loader.subloader.layers == ["blobs/sha256/a0904247e36a7726c03c71ee48f3e64462021c88dafeb13f37fdaf613b27f11c"]
+    assert list(map(str, loader.subloader.layers)) == [
+        "blobs/sha256/a0904247e36a7726c03c71ee48f3e64462021c88dafeb13f37fdaf613b27f11c"
+    ]
     assert loader.subloader.config["created"] == "2025-01-08T12:07:30Z"
 
     assert len(target_bare.filesystems) == 1
@@ -60,7 +62,9 @@ def test_container_image_filesystem_oci_podman(target_bare: Target) -> None:
     target_bare.apply()
 
     assert loader.subloader.name == "docker.io/library/alpine:latest"
-    assert loader.subloader.layers == ["08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350.tar"]
+    assert list(map(str, loader.subloader.layers)) == [
+        "08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350.tar"
+    ]
     assert loader.subloader.manifest == {
         "Config": "aded1e1a5b3705116fa0a92ba074a5e0b0031647d9c315983ccba2ee5428ec8b.json",
         "RepoTags": ["docker.io/library/alpine:latest"],
