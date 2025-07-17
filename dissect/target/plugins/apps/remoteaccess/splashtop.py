@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
 
 RE_TS = re.compile(r"(\w{3}\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})")
-RE_LOG_LINE = re.compile(r"<[0-9]>\w{3}\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3}\s(.*)")
 
 
 class SplashtopPlugin(RemoteAccessPlugin):
