@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterator
 from unittest.mock import patch
+
+import pytest
 
 from dissect.target.plugins.apps.remoteaccess.splashtop import SplashtopPlugin
 from tests._utils import absolute_path
@@ -12,52 +14,43 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-class StatMock:
-    def __init__(self, fs_win):
-        fs_win.map_file(
-            "Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt",
-            absolute_path("_data/plugins/apps/remoteaccess/splashtop/SPLog.txt"),
-        )
+@pytest.fixture
+def target_splashtop(target_win_users, fs_win) -> Iterator[SplashtopPlugin]:
+    fs_win.map_file(
+        "Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt",
+        absolute_path("_data/plugins/apps/remoteaccess/splashtop/SPLog.txt"),
+    )
 
-        # The Splashtop plugin uses a year rollover helper which uses the modification time of a file to determine
-        # the starting year
-        # A new source checkout would result in different modification timestamps, so mock it to be in 2025
-        self.entry = fs_win.get("Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt")
-        self.stat_result = self.entry.stat()
-        self.stat_result.st_mtime = 1735732800
+    # The Splashtop plugin uses a year rollover helper which uses the modification time of a file to determine
+    # the starting year
+    # A new source checkout would result in different modification timestamps, so mock it to be in 2025
+    entry = fs_win.get("Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt")
+    stat_result = entry.stat()
+    stat_result.st_mtime = 1735732800
 
-    def __enter__(self):
-        self.mock_stat = patch.object(self.entry, "stat").__enter__()
-        self.mock_stat.return_value = self.stat_result
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        self.mock_stat.__exit__(*args, **kwargs)
-
-
-def test_splashtop_plugin_log(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    with StatMock(fs_win):
+    with patch.object(entry, "stat") as mock_stat:
+        mock_stat.return_value = stat_result
         target_win_users.add_plugin(SplashtopPlugin)
-
-        records = list(target_win_users.splashtop.logs())
-        assert len(records) == 384
-
-        assert records[-1].ts == datetime(2025, 7, 14, 15, 15, 38, 194000, tzinfo=timezone.utc)
-        assert records[-1].message == "SM_03280[Network] [LAN-S][Server] client connected from 10.199.5.134 (2), 288"
-        assert records[-1].source == "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt"
+        yield target_win_users.splashtop
 
 
-def test_splashtop_plugin_filetransfer(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    with StatMock(fs_win):
-        target_win_users.add_plugin(SplashtopPlugin)
+def test_splashtop_plugin_log(target_splashtop: SplashtopPlugin) -> None:
+    records = list(target_splashtop.logs())
+    assert len(records) == 384
 
-        records = list(target_win_users.splashtop.filetransfer())
-        assert len(records) == 1
+    assert records[-1].ts == datetime(2025, 7, 14, 15, 15, 38, 194000, tzinfo=timezone.utc)
+    assert records[-1].message == "SM_03280[Network] [LAN-S][Server] client connected from 10.199.5.134 (2), 288"
+    assert records[-1].source == "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt"
 
-        assert records[0].ts == datetime(2025, 7, 14, 15, 17, 30, 766000, tzinfo=timezone.utc)
-        assert (
-            records[0].message
-            == 'SM_03280[FTCnnel] OnUploadFileCPRequest 1, 1 =>{"fileID":"353841253","fileName":"NOTE.txt","fileSize":"34","remotesessionFTC":1,"request":"uploadFile"}'
-        )
-        assert records[0].source == "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt"
-        assert records[0].filename == "NOTE.txt"
+
+def test_splashtop_plugin_filetransfer(target_splashtop: SplashtopPlugin) -> None:
+    records = list(target_splashtop.filetransfer())
+    assert len(records) == 1
+
+    assert records[0].ts == datetime(2025, 7, 14, 15, 17, 30, 766000, tzinfo=timezone.utc)
+    assert (
+        records[0].message
+        == 'SM_03280[FTCnnel] OnUploadFileCPRequest 1, 1 =>{"fileID":"353841253","fileName":"NOTE.txt","fileSize":"34","remotesessionFTC":1,"request":"uploadFile"}'
+    )
+    assert records[0].source == "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt"
+    assert records[0].filename == "NOTE.txt"

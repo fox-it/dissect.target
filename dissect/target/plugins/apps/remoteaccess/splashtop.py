@@ -5,8 +5,7 @@ import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.helpers.fsutil import TargetPath
-    from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
 
@@ -32,12 +30,14 @@ class SplashtopPlugin(RemoteAccessPlugin):
 
     __namespace__ = "splashtop"
 
-    RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/splashtop/log", GENERIC_LOG_RECORD_FIELDS
+    RemoteAccessLogRecord = TargetRecordDescriptor(
+        "remoteaccess/splashtop/log",
+        GENERIC_LOG_RECORD_FIELDS,
     )
 
-    RemoteAccessFileTransferRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/splashtop/filetransfer", GENERIC_FILE_TRANSFER_RECORD_FIELDS
+    RemoteAccessFileTransferRecord = TargetRecordDescriptor(
+        "remoteaccess/splashtop/filetransfer",
+        GENERIC_FILE_TRANSFER_RECORD_FIELDS,
     )
 
     LOG_PATHS = (
@@ -73,23 +73,22 @@ class SplashtopPlugin(RemoteAccessPlugin):
 
         for log_file in self.log_files:
             for ts, line in year_rollover_helper(log_file, RE_TS, "%b%d %H:%M:%S.%f", target_tz):
-                if line := line.strip():
-                    try:
-                        if not (match := RE_LOG_LINE.match(line)):
-                            self.target.log.error("LINE %s", line)
-                            raise ValueError("Line does not match expected format")  # noqa: TRY301
+                try:
+                    if not (match := RE_LOG_LINE.match(line)):
+                        self.target.log.error("LINE %s", line)
+                        raise ValueError("Line does not match expected format")  # noqa: TRY301
 
-                        message = match.group(1)
+                    message = match.group(1)
 
-                        yield self.RemoteAccessLogRecord(
-                            ts=ts,
-                            message=message,
-                            source=log_file,
-                            _target=self.target,
-                        )
-                    except ValueError as e:
-                        self.target.log.warning("Could not parse log line in file %s: '%r'", log_file, line)
-                        self.target.log.debug("", exc_info=e)
+                    yield self.RemoteAccessLogRecord(
+                        ts=ts,
+                        message=message,
+                        source=log_file,
+                        _target=self.target,
+                    )
+                except ValueError as e:
+                    self.target.log.warning("Could not parse log line in file %s: '%r'", log_file, line)
+                    self.target.log.debug("", exc_info=e)
 
     @export(record=RemoteAccessFileTransferRecord)
     def filetransfer(self) -> Iterator[RemoteAccessFileTransferRecord]:
