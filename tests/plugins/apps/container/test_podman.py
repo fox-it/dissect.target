@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import textwrap
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -117,3 +118,79 @@ def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesyste
     assert records[-1].command == "nginx -g daemon off;"
     assert records[-1].volumes == ["/tmp/host-folder/host-file.txt:/data/container-file.txt"]
     assert records[-1].ports == ["0.0.0.0:8080->80/tcp"]
+
+
+def test_podman_logs(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we can parse non-default Podman json-file log driver entries."""
+
+    fs_unix.map_file(
+        "/home/user/.local/share/containers/storage/overlay-containers/350f9f5489aebd1d33aa9ed17450270f5a5502d8548df8085d88eccccf2182f1/userdata/ctr.log",
+        absolute_path("_data/plugins/apps/container/podman/ctr.log"),
+    )
+
+    target_unix_podman.add_plugin(PodmanPlugin)
+    records = list(target_unix_podman.container.logs())
+
+    assert len(records) == 51
+
+    assert records[0].ts == datetime(2025, 7, 17, 13, 59, 55, 516060, tzinfo=timezone.utc)
+    assert records[0].container == "350f9f5489aebd1d33aa9ed17450270f5a5502d8548df8085d88eccccf2182f1"
+    assert records[0].stream == "stdout"
+    assert records[0].message == "\x1b[?2004h\x1b]0;root@350f9f5489ae: /\x07root@350f9f5489ae:/# id"
+    assert (
+        records[0].source
+        == "/home/user/.local/share/containers/storage/overlay-containers/350f9f5489aebd1d33aa9ed17450270f5a5502d8548df8085d88eccccf2182f1/userdata/ctr.log"  # noqa: E501
+    )
+
+    assert "\n".join([r.message for r in records]) == textwrap.dedent("""\
+    \x1b[?2004h\x1b]0;root@350f9f5489ae: /\x07root@350f9f5489ae:/# id
+    uid=0(root) gid=0(root) groups=0(root)
+    \x1b[?2004l\x1b[?2004h\x1b]0;root@350f9f5489ae: /\x07root@350f9f5489ae:/# whoami
+    root
+    \x1b[?2004l\x1b[?2004h\x1b]0;root@350f9f5489ae: /\x07root@350f9f5489ae:/# ls -lah .
+    total 56K
+    dr-xr-xr-x   1 root   root    4.0K Jul 17 13:59 \x1b[0m\x1b[01;34m.\x1b[0m
+    dr-xr-xr-x   1 root   root    4.0K Jul 17 13:59 \x1b[01;34m..\x1b[0m
+    lrwxrwxrwx   1 root   root       7 Apr 22  2024 \x1b[01;36mbin\x1b[0m -> \x1b[01;34musr/bin\x1b[0m
+    drwxr-xr-x   2 root   root    4.0K Apr 22  2024 \x1b[01;34mboot\x1b[0m
+    drwxr-xr-x   5 root   root     360 Jul 17 13:59 \x1b[01;34mdev\x1b[0m
+    drwxr-xr-x   1 root   root    4.0K Jul 17 13:59 \x1b[01;34metc\x1b[0m
+    drwxr-xr-x   3 root   root    4.0K Jul 14 14:14 \x1b[01;34mhome\x1b[0m
+    lrwxrwxrwx   1 root   root       7 Apr 22  2024 \x1b[01;36mlib\x1b[0m -> \x1b[01;34musr/lib\x1b[0m
+    lrwxrwxrwx   1 root   root       9 Apr 22  2024 \x1b[01;36mlib64\x1b[0m -> \x1b[01;34musr/lib64\x1b[0m
+    drwxr-xr-x   2 root   root    4.0K Jul 14 14:08 \x1b[01;34mmedia\x1b[0m
+    drwxr-xr-x   2 root   root    4.0K Jul 14 14:08 \x1b[01;34mmnt\x1b[0m
+    drwxr-xr-x   2 root   root    4.0K Jul 14 14:08 \x1b[01;34mopt\x1b[0m
+    dr-xr-xr-x 278 nobody nogroup    0 Jul 17 13:59 \x1b[01;34mproc\x1b[0m
+    drwx------   2 root   root    4.0K Jul 14 14:14 \x1b[01;34mroot\x1b[0m
+    drwxr-xr-x   1 root   root    4.0K Jul 17 13:59 \x1b[01;34mrun\x1b[0m
+    lrwxrwxrwx   1 root   root       8 Apr 22  2024 \x1b[01;36msbin\x1b[0m -> \x1b[01;34musr/sbin\x1b[0m
+    drwxr-xr-x   2 root   root    4.0K Jul 14 14:08 \x1b[01;34msrv\x1b[0m
+    dr-xr-xr-x  13 nobody nogroup    0 Jul 17 13:59 \x1b[01;34msys\x1b[0m
+    drwxrwxrwt   2 root   root    4.0K Jul 14 14:14 \x1b[30;42mtmp\x1b[0m
+    drwxr-xr-x  12 root   root    4.0K Jul 14 14:08 \x1b[01;34musr\x1b[0m
+    drwxr-xr-x  11 root   root    4.0K Jul 14 14:14 \x1b[01;34mvar\x1b[0m
+    \x1b[?2004l\x1b[?2004h\x1b]0;root@350f9f5489ae: /\x07root@350f9f5489ae:/# cat /etc/passwd
+    root:x:0:0:root:/root:/bin/bash
+    daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+    bin:x:2:2:bin:/bin:/usr/sbin/nologin
+    sys:x:3:3:sys:/dev:/usr/sbin/nologin
+    sync:x:4:65534:sync:/bin:/bin/sync
+    games:x:5:60:games:/usr/games:/usr/sbin/nologin
+    man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+    lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+    mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+    news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+    uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+    proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+    www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+    backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+    list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+    irc:x:39:39:ircd:/run/ircd:/usr/sbin/nologin
+    _apt:x:42:65534::/nonexistent:/usr/sbin/nologin
+    nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+    ubuntu:x:1000:1000:Ubuntu:/home/ubuntu:/bin/bash
+    \x1b[?2004l\x1b[?2004h\x1b]0;root@350f9f5489ae: /\x07root@350f9f5489ae:/# echo "hidden\x08 \x08\x08 \x08\x08 \x08\x08 \x08\x08 \x08\x08 \x08hello!"
+    \x1b[?2004l
+    \x1b[?2004l
+    exit""")  # noqa: E501

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -58,6 +59,22 @@ class ContainerState(Enum):
     EXITED = 6
     REMOVING = 7
     STOPPING = 8
+
+
+RE_CTR_LOG = re.compile(
+    r"""
+        ^
+        (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}\:\d{2}\:\d{2}\.\d{9}\+\d{2}\:\d{2})
+        \s
+        (?P<stream>(stderr|stdout))
+        \s
+        (?P<type>\S)
+        \s
+        (?P<message>.*)
+        $
+    """,
+    re.VERBOSE,
+)
 
 
 class PodmanPlugin(ContainerPlugin):
@@ -141,6 +158,8 @@ class PodmanPlugin(ContainerPlugin):
 
         Uses the ``$PODMAN/storage/db.sql`` SQLite3 database and ``$PODMAN/storage/overlay-containers`` folder.
         Does not (yet) support legacy BoltDB Podman databases.
+
+        TODO: Also parse ``$PODMAN/storage/overlay-containers/*`` for Podman v3 / BoltDB versions.
         """
         for dir, _ in self.installs:
             if (db_path := dir.joinpath("storage/db.sql")).exists():
@@ -221,10 +240,40 @@ class PodmanPlugin(ContainerPlugin):
         Podman is configured by default to log towards ``syslog`` or ``journald``.
         This function parses non-default ``k8s-file`` and ``json-file`` log driver settings.
 
+        Note that ``json-file`` is an alias of ``k8s-file`` and does not actually produce JSON output.
+
+        Currently does not parse custom configuration in ``containers.conf`` for ``log_opt path`` values.
+
         Resources:
             - https://docs.podman.io/en/latest/markdown/podman-create.1.html#log-driver-driver
         """
-        raise NotImplementedError
+
+        for install, _ in self.installs:
+            for log_file in install.glob("storage/overlay-containers/*/userdata/ctr.log*"):
+                buf = ""
+
+                for line in log_file.open("rt").readlines():
+                    if not (match := RE_CTR_LOG.match(line)):
+                        self.target.log.warning("Unable to match Podman log line %r in file %r", line, log_file)
+                        continue
+
+                    fields = match.groupdict()
+                    type = fields.pop("type")
+
+                    # Each character has it's own log line and can be concatenated up until we encounter an empty 'F'.
+                    if type == "P":
+                        buf += fields["message"]
+                        continue
+                    elif type == "F" and fields["message"] == "":
+                        fields["message"] = buf
+                        buf = ""
+
+                    yield PodmanLogRecord(
+                        container=log_file.parent.parent.name,
+                        **fields,
+                        source=log_file,
+                        _target=self.target,
+                    )
 
 
 def convert_ports(ports: dict[str, list | dict]) -> Iterator[str]:
