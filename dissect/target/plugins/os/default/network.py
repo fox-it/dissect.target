@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
+
 InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]
 
 

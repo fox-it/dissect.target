@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import posixpath
+import textwrap
 from collections import Counter
 from datetime import datetime
+from io import BytesIO
 from ipaddress import ip_address, ip_interface
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from dissect.target.plugins.os.default.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
+    DhclientLeaseParser,
     LinuxNetworkConfigParser,
     LinuxNetworkPlugin,
     NetworkManagerConfigParser,
+    NetworkManagerLeaseParser,
     SystemdNetworkConfigParser,
 )
 
@@ -208,3 +212,76 @@ def test_linux_network_plugin_interfaces(target_linux: Target) -> None:
         assert len(interfaces) == 1
         MockLinuxConfigParser1.return_value.interfaces.assert_called_once()
         MockLinuxConfigParser2.return_value.interfaces.assert_called_once()
+
+
+def test_linux_network_dhclient_leases_file(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    lease_dhcp_dhclient = r"""
+    default-duid "\000\001\000\001\037\305\371\341\001\002\003\004\005\006"
+    lease {
+        interface "eth0";
+        fixed-address 1.2.3.4;
+        option dhcp-lease-time 13337;
+        option routers 0.0.0.0;
+        option host-name "hostname";
+        renew 1 2023/12/31 13:37:00;
+        rebind 2 2023/01/01 01:00:00;
+        expire 3 2024/01/01 13:37:00;
+    }
+    lease {
+        interface "eth0";
+        fixed-address 2001:db8::2:1;
+        option dhcp-lease-time 13338;
+        option routers 1.1.1.1;
+        option host-name "hostname";
+        renew 4 2024/12/31 14:37:00;
+        rebind 5 2024/01/01 02:00:00;
+        expire 6 2025/01/01 15:37:00;
+    }
+    """
+
+    fs_linux.map_file_fh("/var/lib/dhcp/dhclient.leases", BytesIO(textwrap.dedent(lease_dhcp_dhclient).encode()))
+    fs_linux.map_file_fh(
+        "/var/lib/dhclient/dhclient.eth0.leases", BytesIO(textwrap.dedent(lease_dhcp_dhclient).encode())
+    )
+
+    dhclient = DhclientLeaseParser(target_linux)
+
+    leases = list(dhclient.interfaces())
+
+    assert len(leases) == 4
+    assert leases[0].name == "eth0"
+    assert leases[0].type == "dhcp"
+    assert leases[0].cidr == [ip_interface("1.2.3.4/32")]
+    assert leases[0].gateway == [ip_address("0.0.0.0")]
+    assert leases[0].dhcp_ipv4
+    assert not leases[0].dhcp_ipv6
+    assert leases[0].configurator == "dhclient"
+
+    assert leases[3].name == "eth0"
+    assert leases[3].type == "dhcp"
+    assert leases[3].cidr == [ip_interface("2001:db8::2:1/128")]
+    assert leases[3].gateway == [ip_address("1.1.1.1")]
+    assert not leases[3].dhcp_ipv4
+    assert leases[3].dhcp_ipv6
+    assert leases[0].configurator == "dhclient"
+
+
+def test_linux_network_networkmanager_leases_file(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    lease_networkmanager = """
+    # This is private data. Do not parse.
+    ADDRESS=1.3.3.7
+    """
+
+    fs_linux.map_file_fh(
+        "/var/lib/NetworkManager/internal-d6b936ad-d73f-4898-a826-edbb61d6155a-eth0.lease",
+        BytesIO(textwrap.dedent(lease_networkmanager).encode()),
+    )
+
+    networkmanager = NetworkManagerLeaseParser(target_linux)
+    leases = list(networkmanager.interfaces())
+
+    assert len(leases) == 1
+    assert leases[0].name == "eth0"
+    assert leases[0].type == "dhcp"
+    assert leases[0].configurator == "NetworkManager"
+    assert leases[0].cidr == [ip_interface("1.3.3.7/32")]
