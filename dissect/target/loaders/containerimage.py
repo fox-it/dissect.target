@@ -61,7 +61,7 @@ class ContainerImageTarSubLoader(TarSubLoader):
             try:
                 self.manifest = json.loads(self.tarfs.path("/manifest.json").read_text())[0]
                 self.name = self.manifest.get("RepoTags", [None])[0]
-                self.layers = self.manifest.get("Layers", [])
+                self.layers = [self.tarfs.path(p) for p in self.manifest.get("Layers", [])]
             except Exception as e:
                 raise ValueError(f"Unable to read manifest.json inside docker image filesystem: {e}") from e
 
@@ -77,7 +77,7 @@ class ContainerImageTarSubLoader(TarSubLoader):
                 self.config = json.loads(
                     self.tarfs.path("/blobs").joinpath(index["manifests"][0]["digest"].replace(":", "/")).read_text()
                 )
-                self.layers = [f"/blobs/{layer['digest'].replace(':', '/')}" for layer in self.config.get("layers", [])]
+                self.layers = [self.tarfs.path(f"/blobs/{layer['digest'].replace(':', '/')}") for layer in self.config.get("layers", [])]
             except Exception as e:
                 raise ValueError(f"Unable to load OCI container: {e}") from e
 
@@ -89,7 +89,7 @@ class ContainerImageTarSubLoader(TarSubLoader):
     def map(self, target: Target) -> None:
         fs = LayerFilesystem()
 
-        for layer in [self.tarfs.path(p) for p in self.layers]:
+        for layer in self.layers:
             if not layer.exists():
                 log.warning("Layer %s does not exist in container image", layer)
                 continue
