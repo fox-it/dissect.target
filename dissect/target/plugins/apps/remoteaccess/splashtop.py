@@ -80,7 +80,7 @@ class SplashtopPlugin(RemoteAccessPlugin):
                         # The line is of format "<#>%b%d %H:%M:%S.%f ..." check if the start matches an expected line
                         if (line[0], line[2]) != ("<", ">"):
                             self.target.log.error("LINE %s", line)
-                            raise ValueError("Line does not match expected format")
+                            raise ValueError("Line does not match expected format")  # noqa: TRY301
 
                         # The prefix contains two spaces splitting off the timestamp, grab only the message part
                         message = line.split(" ", maxsplit=2)[-1]
