@@ -14,17 +14,20 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
+SPLASHTOP_LOG_PATH = "Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt"
+
+
 @pytest.fixture
 def target_splashtop(target_win_users, fs_win) -> Iterator[SplashtopPlugin]:
     fs_win.map_file(
-        "Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt",
+        SPLASHTOP_LOG_PATH,
         absolute_path("_data/plugins/apps/remoteaccess/splashtop/SPLog.txt"),
     )
 
     # The Splashtop plugin uses a year rollover helper which uses the modification time of a file to determine
     # the starting year
     # A new source checkout would result in different modification timestamps, so mock it to be in 2025
-    entry = fs_win.get("Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt")
+    entry = fs_win.get(SPLASHTOP_LOG_PATH)
     stat_result = entry.stat()
     stat_result.st_mtime = 1735732800
 
@@ -40,7 +43,7 @@ def test_splashtop_plugin_log(target_splashtop: SplashtopPlugin) -> None:
 
     assert records[-1].ts == datetime(2025, 7, 14, 15, 15, 38, 194000, tzinfo=timezone.utc)
     assert records[-1].message == "SM_03280[Network] [LAN-S][Server] client connected from 10.199.5.134 (2), 288"
-    assert records[-1].source == "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt"
+    assert records[-1].source == f"sysvol/{SPLASHTOP_LOG_PATH}"
 
 
 def test_splashtop_plugin_filetransfer(target_splashtop: SplashtopPlugin) -> None:
@@ -52,5 +55,5 @@ def test_splashtop_plugin_filetransfer(target_splashtop: SplashtopPlugin) -> Non
         records[0].message
         == 'SM_03280[FTCnnel] OnUploadFileCPRequest 1, 1 =>{"fileID":"353841253","fileName":"NOTE.txt","fileSize":"34","remotesessionFTC":1,"request":"uploadFile"}'
     )
-    assert records[0].source == "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt"
+    assert records[0].source == f"sysvol/{SPLASHTOP_LOG_PATH}"
     assert records[0].filename == "NOTE.txt"

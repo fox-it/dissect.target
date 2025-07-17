@@ -42,7 +42,10 @@ class SplashtopPlugin(RemoteAccessPlugin):
 
     LOG_PATHS = (
         "sysvol/Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt",  # General agent log including connections and filetransfers
-        # "sysvol/ProgramData/Splashtop/Temp/log/FTCLog.txt", # File transfer log which is included in the SPLog
+        # File transfer log which is currently acquired but not parsed
+        # All content is also included in the SPLog so no need to parse
+        # acquired the file just in case something is missing in the SPLog
+        # "sysvol/ProgramData/Splashtop/Temp/log/FTCLog.txt",
     )
 
     def __init__(self, target: Target):
@@ -51,8 +54,7 @@ class SplashtopPlugin(RemoteAccessPlugin):
         self.log_files: set[TargetPath] = set()
 
         for log_path in self.LOG_PATHS:
-            log_file = self.target.fs.path(log_path)
-            if log_file:
+            if (log_file := self.target.fs.path(log_path)).exists():
                 self.log_files.add(log_file)
 
     def check_compatible(self) -> None:
@@ -72,23 +74,29 @@ class SplashtopPlugin(RemoteAccessPlugin):
         target_tz = self.target.datetime.tzinfo
 
         for log_file in self.log_files:
-            for ts, line in year_rollover_helper(log_file, RE_TS, "%b%d %H:%M:%S.%f", target_tz):
-                try:
-                    if not (match := RE_LOG_LINE.match(line)):
-                        self.target.log.error("LINE %s", line)
-                        raise ValueError("Line does not match expected format")  # noqa: TRY301
+            try:
+                for ts, line in year_rollover_helper(log_file, RE_TS, "%b%d %H:%M:%S.%f", target_tz):
+                    try:
+                        # The line is of format "<#>%b%d %H:%M:%S.%f ..." check if the start matches an expected line
+                        if (line[0], line[2]) != ("<", ">"):
+                            self.target.log.error("LINE %s", line)
+                            raise ValueError("Line does not match expected format")  # noqa: TRY301
 
-                    message = match.group(1)
+                        # The prefix contains two spaces splitting off the timestamp, grab only the message part
+                        message = line.split(" ", maxsplit=2)[-1]
 
-                    yield self.RemoteAccessLogRecord(
-                        ts=ts,
-                        message=message,
-                        source=log_file,
-                        _target=self.target,
-                    )
-                except ValueError as e:
-                    self.target.log.warning("Could not parse log line in file %s: '%r'", log_file, line)
-                    self.target.log.debug("", exc_info=e)
+                        yield self.RemoteAccessLogRecord(
+                            ts=ts,
+                            message=message,
+                            source=log_file,
+                            _target=self.target,
+                        )
+                    except ValueError as e:
+                        self.target.log.warning("Could not parse log line in file %s: '%r'", log_file, line)
+                        self.target.log.debug("", exc_info=e)
+            except Exception as e:
+                self.target.log.warning("Could not parse log file %s", log_file)
+                self.target.log.debug("", exc_info=e)
 
     @export(record=RemoteAccessFileTransferRecord)
     def filetransfer(self) -> Iterator[RemoteAccessFileTransferRecord]:
@@ -113,7 +121,7 @@ class SplashtopPlugin(RemoteAccessPlugin):
                         filename=json_data["fileName"],
                         _target=self.target,
                     )
-            except ValueError as e:
+            except Exception as e:
                 self.target.log.warning(
                     "Could not parse file transfer from message in file %s: '%r'", log_record.source, log_record.message
                 )
