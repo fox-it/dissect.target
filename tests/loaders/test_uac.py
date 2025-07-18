@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 def test_uac_loader_compressed_tar(target_bare: Target) -> None:
     archive_path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz")
     loader = TarLoader(archive_path)
+    assert UacTarSubloader.detect(loader.tar)
     loader.map(target_bare)
     target_bare.apply()
     assert isinstance(loader.subloader, UacTarSubloader)
@@ -34,6 +35,8 @@ def test_uac_loader_compressed_tar(target_bare: Target) -> None:
 def test_uac_loader_compressed_zip(target_bare: Target) -> None:
     archive_path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143106.zip")
     loader = ZipLoader(archive_path)
+    assert UacZipSubLoader.detect(loader.zip)
+
     loader.map(target_bare)
     target_bare.apply()
     assert isinstance(loader.subloader, UacZipSubLoader)
@@ -47,7 +50,9 @@ def test_uac_loader_compressed_zip(target_bare: Target) -> None:
 def test_uac_loader_dir(target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root / "[root]", ["etc", "var"])
+    (root / "uac.log").write_bytes(b"")
     (root / "[root]" / "etc" / "passwd").write_bytes(b"root:x:0:0:root:/root:/bin/bash\n")
+    assert UACLoader.detect(root)
     loader = UACLoader(root)
     loader.map(target_bare)
     target_bare.apply()
