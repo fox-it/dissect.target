@@ -10,6 +10,8 @@ def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
 
     target_win.add_plugin(cim.CimPlugin)
 
-    assert len(list(target_win.cim())) == 220
-    assert len(list(target_win.cim.command_line_event_consumer())) == 203
-    assert len(list(target_win.cim.active_script_event_consumer())) == 3
+    assert len(list(target_win.cim())) == 3
+    assert len(list(target_win.cim.command_line_event_consumer())) == 1
+    assert len(list(target_win.cim.active_script_event_consumer())) == 2
+    # Ensure associated filter query was correctly found for all
+    assert len(list(record for record in target_win.cim() if record.filter_query)) == 3
