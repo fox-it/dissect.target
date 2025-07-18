@@ -33,14 +33,13 @@ class UACLoader(DirLoader):
 
     def __init__(self, path: Path, **kwargs):
         super().__init__(path)
-        self.root = path.absolute()
 
     @staticmethod
     def detect(path: Path) -> bool:
         return path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath(UAC_CHECK_FILE).exists()
 
     def map(self, target: Target) -> None:
-        os_type, dirs = find_dirs(self.root.joinpath(FILESYSTEMS_ROOT))
+        os_type, dirs = find_dirs(self.absolute_path.joinpath(FILESYSTEMS_ROOT))
         map_dirs(target, dirs, os_type)
 
 
