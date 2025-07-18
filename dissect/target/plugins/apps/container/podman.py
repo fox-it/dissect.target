@@ -168,16 +168,16 @@ class PodmanPlugin(ContainerPlugin):
             elif dir.joinpath("storage/overlay-containers").is_dir():
                 yield from self._find_containers_fs(dir)
 
-    def _find_containers_sqlite(self, db_path: Path) -> Iterator[PodmanContainerRecord]:
+    def _find_containers_sqlite(self, path: Path) -> Iterator[PodmanContainerRecord]:
         """Find Podman containers from existing ``db.sql`` files (version 4 and newer).
 
         Gets info from the ``ContainerConfig`` and ``ContainerState`` tables.
         """
 
         try:
-            db = SQLite3(db_path.open("rb"))
+            db = SQLite3(path.open("rb"))
         except (ValueError, SQLError) as e:
-            self.target.log.warning("Unable to read Podman database %s: %s", db_path, e)
+            self.target.log.warning("Unable to read Podman database %s: %s", path, e)
             self.target.log.debug("", exc_info=e)
             return
 
@@ -201,7 +201,7 @@ class PodmanPlugin(ContainerPlugin):
             # $PODMAN/storage/overlay-containers/<ID>/userdata/config.json -> `.root.path` contains the root folder,
             # this does not seem to be stored in the database at all so we have to resort to loading the `config.json`.
             try:
-                config_path = db_path.parent.joinpath("overlay-containers", container_id, "userdata", "config.json")
+                config_path = path.parent.joinpath("overlay-containers", container_id, "userdata", "config.json")
                 config = json.loads(config_path.read_text())
                 mount_path = config.get("root", {}).get("path")
                 if not mount_path:
@@ -229,21 +229,21 @@ class PodmanPlugin(ContainerPlugin):
                 environment=container.get("spec", {}).get("process", {}).get("env", []),
                 mount_path=mount_path,
                 config_path=config_path,
-                image_path=db_path.parent.joinpath("overlay-images", container.get("rootfsImageID"))
+                image_path=path.parent.joinpath("overlay-images", container.get("rootfsImageID"))
                 if container.get("rootfsImageID")
                 else None,
-                source=db_path,
+                source=path,
                 _target=self.target,
             )
 
-    def _find_containers_fs(self, dir: Path) -> Iterator[PodmanContainerRecord]:
+    def _find_containers_fs(self, path: Path) -> Iterator[PodmanContainerRecord]:
         """Find Podman containers based on the ``$PODMAN/storage/overlay-containers/containers.json`` file."""
 
         containers = {}
-        if (containers_file := dir.joinpath("storage/overlay-containers/containers.json")).is_file():
+        if (containers_file := path.joinpath("storage/overlay-containers/containers.json")).is_file():
             containers = json.loads(containers_file.read_text())
 
-        for container_dir in dir.joinpath("storage/overlay-containers").iterdir():
+        for container_dir in path.joinpath("storage/overlay-containers").iterdir():
             if (
                 not container_dir.is_dir()
                 or not (config_path := container_dir.joinpath("userdata/config.json")).is_file()
@@ -276,9 +276,9 @@ class PodmanPlugin(ContainerPlugin):
                 created=other_config.get("created"),
                 names=other_config.get("names"),
                 environment=config.get("process", {}).get("env", []),
-                mount_path=dir.joinpath(f"storage/overlay/{other_config.get('layer')}") if other_config else None,
+                mount_path=path.joinpath(f"storage/overlay/{other_config.get('layer')}") if other_config else None,
                 config_path=config_path,
-                image_path=dir.joinpath("storage/overlay-images", other_config.get("image")) if other_config else None,
+                image_path=path.joinpath("storage/overlay-images", other_config.get("image")) if other_config else None,
                 source=config_path,
                 _target=self.target,
             )
