@@ -25,6 +25,7 @@ ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtensio
         ("datetime", "last_modified_on_client"),
         ("datetime", "original_last_modified_on_client"),
         ("datetime", "expiration_time"),
+        ("string", "activity_id"),
         ("string", "app_id"),
         ("string", "enterprise_id"),
         ("string", "app_activity_id"),
@@ -32,7 +33,7 @@ ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtensio
         ("string", "group"),
         ("uint32", "activity_type"),
         ("uint32", "activity_status"),
-        ("uint32", "priority"),
+        ("uint32", "activity_priority"),
         ("uint32", "match_id"),
         ("uint32", "etag"),
         ("string", "tag"),
@@ -40,10 +41,10 @@ ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtensio
         ("datetime", "created_in_cloud"),
         ("string", "platform_device_id"),
         ("string", "package_id_hash"),
-        ("bytes", "id"),
         ("string", "payload"),
         ("string", "original_payload"),
         ("string", "clipboard_payload"),
+        ("path", "source"),
     ],
 )
 
@@ -98,6 +99,7 @@ class ActivitiesCachePlugin(Plugin):
             last_modified_on_client (datetime): LastModifiedOnClient field.
             original_last_modified_on_client (datetime): OriginalLastModifiedOnClient field.
             expiration_time (datetime): ExpirationTime field.
+            activity_id (string): Id field in hex.
             app_id (string): AppId field, JSON string containing multiple types of app name definitions.
             enterprise_id (string): EnterpriseId field.
             app_activity_id (string): AppActivityId field.
@@ -105,7 +107,7 @@ class ActivitiesCachePlugin(Plugin):
             group (string): Group field.
             activity_type (int): ActivityType field.
             activity_status (int): ActivityStatus field.
-            priority (int): Priority field.
+            activity_priority (int): Priority field.
             match_id (int): MatchId field.
             etag (int): ETag field.
             tag (string): Tag field.
@@ -113,7 +115,6 @@ class ActivitiesCachePlugin(Plugin):
             created_in_cloud (datetime): CreatedInCloud field.
             platform_device_id (string): PlatformDeviceId field.
             package_id_hash (string): PackageIdHash field.
-            id (bytes): Id field.
             payload (string): Payload field. JSON string containing payload data, varies per type.
             original_payload (string): OriginalPayload field.
             clipboard_payload (string): ClipboardPayload field.
@@ -131,14 +132,15 @@ class ActivitiesCachePlugin(Plugin):
                         last_modified_on_client=mkts(r["[LastModifiedOnClient]"]),
                         original_last_modified_on_client=mkts(r["[OriginalLastModifiedOnClient]"]),
                         expiration_time=mkts(r["[ExpirationTime]"]),
+                        activity_id=r["[Id]"].hex(),
                         app_id=r["[AppId]"],
-                        enterprise_id=r["[EnterpriseId]"],
+                        enterprise_id=r["[EnterpriseId]"] or None,
                         app_activity_id=r["[AppActivityId]"],
-                        group_app_activity_id=r["[GroupAppActivityId]"],
+                        group_app_activity_id=r["[GroupAppActivityId]"] or None,
                         group=r["[Group]"],
                         activity_type=r["[ActivityType]"],
                         activity_status=r["[ActivityStatus]"],
-                        priority=r["[Priority]"],
+                        activity_priority=r["[Priority]"],
                         match_id=r["[MatchId]"],
                         etag=r["[ETag]"],
                         tag=r["[Tag]"],
@@ -146,10 +148,10 @@ class ActivitiesCachePlugin(Plugin):
                         created_in_cloud=r["[CreatedInCloud]"],
                         platform_device_id=r["[PlatformDeviceId]"],
                         package_id_hash=r["[PackageIdHash]"],
-                        id=r["[Id]"],
                         payload=r["[Payload]"],
                         original_payload=r["[OriginalPayload]"],
                         clipboard_payload=r["[ClipboardPayload]"],
+                        source=cache_file,
                         _target=self.target,
                         _user=user,
                     )

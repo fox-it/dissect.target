@@ -4,7 +4,7 @@ import logging
 import re
 import urllib.parse
 from datetime import datetime, timezone, tzinfo
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import TYPE_CHECKING, BinaryIO, TypeVar
 
 from dissect.util.ts import from_unix
@@ -51,6 +51,17 @@ def to_list(value: T | list[T] | None) -> list[T]:
 
 class StrEnum(str, Enum):
     """Sortable and serializible string-based enum."""
+
+
+class IntEnumMissing(IntEnum):
+    """Integer-based enum that allows for values other than defined members."""
+
+    @classmethod
+    def _missing_(cls, value: int) -> IntEnum:
+        member = int.__new__(cls, value)
+        member._name_ = str(value)
+        member._value_ = value
+        return member
 
 
 def parse_path_uri(path: Path) -> tuple[str | None, str | None, str | None]:

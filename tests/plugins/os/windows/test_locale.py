@@ -57,6 +57,6 @@ def test_locale_plugin_windows(target_win_users: Target, hive_hku: VirtualHive, 
     keyboard = list(target_win_users.keyboard())
     assert len(keyboard) == 2
     assert keyboard[0].layout == "nl"
-    assert keyboard[0].id == "00000413"
+    assert keyboard[0].language_id == "00000413"
     assert keyboard[1].layout == "us"
-    assert keyboard[1].id == "00000409"
+    assert keyboard[1].language_id == "00000409"

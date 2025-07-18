@@ -73,7 +73,7 @@ class WindowsEventlogsMixin:
         return [path for path in self.get_paths() if re_filename.match(str(path))]
 
     def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> list[Path]:
-        if (path := self.target.fs.path(logs_dir)).exists():
+        if (path := self.target.resolve(logs_dir)).exists():
             file_paths = list(path.glob(filename_glob))
 
             self.target.log.debug("Log files found in '%s': %d", self.LOGS_DIR_PATH, len(file_paths))
@@ -105,14 +105,14 @@ class WindowsEventlogsMixin:
         return file_paths
 
     def check_compatible(self) -> None:
-        if not self.target.fs.path(self.LOGS_DIR_PATH).exists():
+        if not self.target.resolve(self.LOGS_DIR_PATH).exists():
             raise UnsupportedPluginError(f'Event log directory "{self.LOGS_DIR_PATH}" not found')
 
 
 class EvtPlugin(WindowsEventlogsMixin, Plugin):
     """Windows ``.evt`` event log plugin."""
 
-    LOGS_DIR_PATH = "sysvol/windows/system32/config"
+    LOGS_DIR_PATH = "%windir%/system32/config"
 
     NEEDLE = b"LfLe"
     CHUNK_SIZE = 0x10000

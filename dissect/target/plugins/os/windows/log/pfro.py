@@ -28,7 +28,7 @@ class PfroPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.logfile = self.target.fs.path("sysvol/windows/PFRO.log")
+        self.logfile = self.target.resolve("%windir%/PFRO.log")
 
     def check_compatible(self) -> None:
         if not self.logfile.exists():
@@ -36,7 +36,7 @@ class PfroPlugin(Plugin):
 
     @export(record=PfroRecord)
     def pfro(self) -> Iterator[PfroRecord]:
-        """Return the content of sysvol/Windows/PFRO.log
+        """Return the content of %windir%/PFRO.log
 
         A Pending File Rename Operation log file (PFRO.log) holds information about the process of deleting or renaming
         files that are locked or being used and that will be renamed on reboot. This is related to the filerenameop

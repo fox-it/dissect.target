@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
-from dissect.target.plugin import OperatingSystem, OSPlugin, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -313,6 +313,24 @@ class WindowsPlugin(OSPlugin):
                     home=self.target.resolve(home),
                     _target=self.target,
                 )
+
+    @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        yield from (
+            (resolved_path, user_criterion)
+            for path, user_criterion in [
+                ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19")),
+                ("%windir%/ServiceProfiles/NetworkService", ("sid", "S-1-5-20")),
+                ("%windir%/System32/config/systemprofile", ("sid", "S-1-5-18")),
+                ("%windir%/SysWOW64/config/systemprofile", ("sid", "S-1-5-18")),
+            ]
+            if (resolved_path := self.target.resolve(path)).exists()
+        )
+
+        # Homedirs for users when there is no user profile information available.
+        for user_dir in ("sysvol/Users", "sysvol/Documents and Settings"):
+            if (resolved := self.target.resolve(user_dir)).exists():
+                yield from ((entry, None) for entry in resolved.iterdir() if entry.is_dir())
 
     @export(property=True)
     def os(self) -> str:
