@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import ast
-import json
-import urllib.parse
+from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
-from dataclasses import dataclass, asdict
 
 from dissect.cim import cim
 from dissect.util.sid import read_sid
@@ -30,8 +27,8 @@ COMMON_ELEMENTS = [
 
 CommandLineEventConsumerRecord = TargetRecordDescriptor(
     "filesystem/windows/cim/consumerbinding/commandlineeventconsumer",
-    COMMON_ELEMENTS
-    + [
+    [
+        *COMMON_ELEMENTS,
         ("string", "command_line_template"),
         ("string", "executable_path"),
         ("string", "working_directory"),
@@ -41,8 +38,8 @@ CommandLineEventConsumerRecord = TargetRecordDescriptor(
 # https://learn.microsoft.com/en-us/windows/win32/wmisdk/activescripteventconsumer
 ActiveScriptEventConsumerRecord = TargetRecordDescriptor(
     "filesystem/windows/cim/consumerbinding/activescripteventconsumer",
-    COMMON_ELEMENTS
-    + [
+    [
+        *COMMON_ELEMENTS,
         ("string", "script_text"),
         ("string", "script_file_name"),
         ("string", "scripting_engine"),
@@ -105,16 +102,14 @@ class CimPlugin(Plugin):
         """
         yield consumer binded to __filtertoconsumerbinding of subscription namespace
         """
-        subscription_ns = self._repo.root.namespace("subscription")
-        filters = {}
         try:
-            for binding in subscription_ns.class_("__filtertoconsumerbinding").instances:
+            for binding in self._subscription_ns.class_("__filtertoconsumerbinding").instances:
                 filter_name = self.get_filter_name(binding)
                 yield (
-                    subscription_ns.query(binding.properties["Consumer"].value),
+                    self._subscription_ns.query(binding.properties["Consumer"].value),
                     filter_name,
                 )
-        except Exception as e:  # noqa
+        except Exception as e:
             self.target.log.warning("Error during consumerbindings execution", exc_info=e)
             self.target.log.debug("", exc_info=e)
 
@@ -134,7 +129,7 @@ class CimPlugin(Plugin):
             - https://learn.microsoft.com/en-us/windows/win32/wmisdk/commandlineeventconsumer
         """
         for consumer, filter_name in self.yield_consumerbinings():
-            if query := consumer.properties.get("CommandLineTemplate"):
+            if consumer.properties.get("CommandLineTemplate"):
                 yield CommandLineEventConsumerRecord(
                     command_line_template=self.get_property_value_safe(consumer, "CommandLineTemplate", ""),
                     executable_path=self.get_property_value_safe(consumer, "ExecutablePath", ""),
@@ -160,7 +155,7 @@ class CimPlugin(Plugin):
             - https://learn.microsoft.com/en-us/windows/win32/wmisdk/activescripteventconsumer
         """
         for consumer, filter_name in self.yield_consumerbinings():
-            if query := consumer.properties.get("ScriptText"):
+            if consumer.properties.get("ScriptText"):
                 yield ActiveScriptEventConsumerRecord(
                     script_text=self.get_property_value_safe(consumer, "ScriptText", ""),
                     script_file_name=self.get_property_value_safe(consumer, "ScriptFileName", ""),
@@ -173,7 +168,7 @@ class CimPlugin(Plugin):
                 )
 
     @staticmethod
-    def get_property_value_safe(consumer, prop_name: str, default_value: str | None = None) -> str | None:
+    def get_property_value_safe(consumer: cim.Instance, prop_name: str, default_value: str | None = None) -> str | None:
         """
         Extract value of a consumer properties. Fallback to default_value if properties is missing
         """
@@ -185,7 +180,7 @@ class CimPlugin(Plugin):
         except ValueError:
             return default_value
 
-    def get_creator_sid(self, class_instance) -> str | None:
+    def get_creator_sid(self, class_instance: cim.Instance) -> str | None:
         """
         Extract and parse CreatorSID member
         """
@@ -212,13 +207,14 @@ class CimPlugin(Plugin):
         return filters
 
     @staticmethod
-    def get_filter_name(binding: cim.ClassInstance) -> str:
+    def get_filter_name(binding: cim.Instance) -> str:
         """
         return unquoted filter name from a __filtertoconsumerbinding class instance
         """
         filter_name = binding.properties["Filter"].value
         # filter name is not always consistent
-        # e.g : __EventFilter.Name="Windows Update Event MOF" or \\.\root\subscription:__EventFilter.Name="Windows Update Event MOF"
+        # e.g : __EventFilter.Name="Windows Update Event MOF" or
+        # \\.\root\subscription:__EventFilter.Name="Windows Update Event MOF"
         if "=" in filter_name:
             # Required to manage filters name with escaped "
             filter_name = filter_name.split("=", maxsplit=1)[1]
