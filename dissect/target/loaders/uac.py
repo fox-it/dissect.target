@@ -45,7 +45,6 @@ class UacTarSubloader(TarSubLoader):
     References:
         - https://github.com/tclahr/uac
         - https://tclahr.github.io/uac-docs/
-        - https://tclahr.github.io/uac-docs/output_formats/
     """
 
     FS_ROOT_TUPLE = (f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")
@@ -66,7 +65,6 @@ class UacZipSubLoader(ZipSubLoader):
     References:
         - https://github.com/tclahr/uac
         - https://tclahr.github.io/uac-docs/
-        - https://tclahr.github.io/uac-docs/output_formats/
     """
 
     @staticmethod
