@@ -74,7 +74,5 @@ class UacZipSubLoader(ZipSubLoader):
         return zipfile.joinpath(FILESYSTEMS_ROOT).exists() and zipfile.joinpath(UAC_CHECK_FILE).exists()
 
     def map(self, target: Target) -> None:
-        path = self.zip
-        if path.joinpath(FILESYSTEMS_ROOT).exists():
-            path = path.joinpath(FILESYSTEMS_ROOT)
+        path = self.zip.joinpath(FILESYSTEMS_ROOT)
         find_and_map_dirs(target, path)
