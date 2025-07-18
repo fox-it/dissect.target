@@ -29,8 +29,8 @@ def find_fs_directories(path: Path) -> tuple[str, list[Path]]:
 
 
 class UACLoader(DirLoader):
-    """UAC forensic image files (uncompressed or as .tar.gz or .zip)
-    .
+    """UAC forensic image files (uncompressed or as .tar.gz or .zip).
+
     References:
         - https://github.com/tclahr/uac
         - https://tclahr.github.io/uac-docs/
