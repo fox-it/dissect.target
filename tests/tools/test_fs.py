@@ -28,8 +28,8 @@ def vfs(files: list[str]) -> VirtualFilesystem:
 @pytest.mark.parametrize(
     ("path", "expected_files"),
     [
-        ("root/.bash_history", 1), 
-        ("this/path/doesntexist", 0), 
+        ("root/.bash_history", 1),
+        ("this/path/doesntexist", 0),
         ("**/*_history", 4),
     ],
 )
