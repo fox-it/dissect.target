@@ -3,9 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from dissect.target import filesystem
-from dissect.target.filesystems.tar import TarFilesystemDirectoryEntry, TarFilesystemEntry
-from dissect.target.helpers import fsutil
+from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs, map_dirs
 from dissect.target.loaders.tar import TarSubLoader
 from dissect.target.loaders.zip import ZipSubLoader
@@ -53,22 +51,7 @@ class UacTarSubloader(TarSubLoader):
         return any(member.name.startswith(cls.FS_ROOT_TUPLE) for member in tarfile.getmembers())
 
     def map(self, target: Target) -> None:
-        vol = filesystem.VirtualFilesystem(case_sensitive=False)
-        vol.tar = self.tar
-        for member in self.tar.getmembers():
-            if member.name == ".":
-                continue
-
-            if member.name.startswith(self.FS_ROOT_TUPLE):
-                # Current acquire
-                parts = member.name.replace(f"{FILESYSTEMS_ROOT}/", "").split("/")
-                if parts[0] == "":
-                    parts.pop(0)
-
-                mname = "/".join(parts)
-                entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
-                entry = entry_cls(vol, fsutil.normpath(mname), member)
-                vol.map_file_entry(entry.path, entry)
+        vol = TarFilesystem(tarfile=self.tar, base=FILESYSTEMS_ROOT, fh=self.tar.fileobj)
         target.filesystems.add(vol)
 
 
