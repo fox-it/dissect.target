@@ -141,7 +141,7 @@ def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) ->
     assert records[0].Computer == "DESKTOP-L7A1DDP"
     assert records[0].Correlation_ActivityID is None
     assert records[0].SubjectUserSid == "S-1-5-18"
-    assert records[0].source == "sysvol\\windows\\system32\\winevt\\logs\\Security.evtx"
+    assert records[0].source == "c:\\Windows\\system32\\winevt\\logs\\Security.evtx"
 
     assert records[69].ts == datetime(2025, 3, 4, 10, 28, 2, 905350, tzinfo=timezone.utc)
     assert records[69].PrivilegeList is None

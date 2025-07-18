@@ -157,16 +157,31 @@ class AndroidBackup:
         offset = 0
         iv_len = blob[offset]
         offset += 1
-        iv = blob[offset : offset + iv_len]
 
+        iv = blob[offset : offset + iv_len]
         offset += iv_len
+
+        if offset >= len(blob):
+            raise ValueError("Invalid password: bogus IV length")
+
         mk_len = blob[offset]
         offset += 1
-        mk = blob[offset : offset + mk_len]
 
+        if offset >= len(blob):
+            raise ValueError("Invalid password: bogus master key length")
+
+        mk = blob[offset : offset + mk_len]
         offset += mk_len
+
+        if offset >= len(blob):
+            raise ValueError("Invalid password: bogus IV length")
+
         checksum_len = blob[offset]
         offset += 1
+
+        if offset >= len(blob):
+            raise ValueError("Invalid password: bogus checksum length")
+
         checksum = blob[offset : offset + checksum_len]
 
         ck_mk = _encode_bytes(mk) if self.version >= 2 else mk
