@@ -56,7 +56,6 @@ class UacTarSubloader(TarSubLoader):
         return False
 
     def map(self, target: Target) -> None:
-        # volumes = TarFilesystemDirectoryEntry()
         vol = filesystem.VirtualFilesystem(case_sensitive=False)
         vol.tar = self.tar
         for member in self.tar.getmembers():
