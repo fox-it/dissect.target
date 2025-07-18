@@ -23,11 +23,6 @@ FILESYSTEMS_ROOT = "[root]"
 UAC_CHECK_FILE = "uac.log"
 
 
-def find_fs_directories(path: Path) -> tuple[str, list[Path]]:
-    fs_root = path.joinpath(FILESYSTEMS_ROOT)
-    return find_dirs(fs_root)
-
-
 class UACLoader(DirLoader):
     """UAC forensic image files (uncompressed or as .tar.gz or .zip).
 
@@ -45,15 +40,19 @@ class UACLoader(DirLoader):
         return path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath(UAC_CHECK_FILE).exists()
 
     def map(self, target: Target) -> None:
-        os_type, dirs = find_fs_directories(self.root)
+        os_type, dirs = find_dirs(self.root.joinpath(FILESYSTEMS_ROOT))
         map_dirs(target, dirs, os_type)
 
 
 class UacTarSubloader(TarSubLoader):
-    @staticmethod
-    def detect(tarfile: tf.TarFile) -> bool:
+    """Loader for tar-based UAC collections."""
+
+    FS_ROOT_TUPLE = (f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")
+
+    @classmethod
+    def detect(cls, tarfile: tf.TarFile) -> bool:
         for member in tarfile.getmembers():
-            if member.name.startswith((f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")):
+            if member.name.startswith(cls.FS_ROOT_TUPLE):
                 return True
         return False
 
@@ -65,7 +64,7 @@ class UacTarSubloader(TarSubLoader):
             if member.name == ".":
                 continue
 
-            if member.name.startswith((f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")):
+            if member.name.startswith(self.FS_ROOT_TUPLE):
                 # Current acquire
                 parts = member.name.replace(f"{FILESYSTEMS_ROOT}/", "").split("/")
                 if parts[0] == "":
@@ -79,7 +78,7 @@ class UacTarSubloader(TarSubLoader):
 
 
 class UacZipSubLoader(ZipSubLoader):
-    """Loader for zip-based Acquire collections."""
+    """Loader for zip-based UAC collections."""
 
     @staticmethod
     def detect(zipfile: zf.Path) -> bool:
