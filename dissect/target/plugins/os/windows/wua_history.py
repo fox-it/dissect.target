@@ -22,7 +22,7 @@ WuaHistoryRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("varint", "id_event"),
-        ("varint", "status"),
+        ("varint", "status_id"),
         ("varint", "server_selection"),
         ("string", "mapped_result"),
         ("string", "unmapped_result"),
@@ -56,7 +56,7 @@ WuaHistoryRecord = TargetRecordDescriptor(
 
 TBHISTORY_COLUMN_MAP = {
     "IdEvent": "id_event",
-    "Status": "status",
+    "Status": "status_id",
     "ServerSelection": "server_selection",
     "MappedResult": "mapped_result",
     "UnmappedResult": "unmapped_result",
@@ -943,7 +943,7 @@ WUA_CODE_MAP = {
 class WuaHistoryPlugin(Plugin):
     """Plugin to return all available historical Windows Update Agent operations stored in the DataStore.edb."""
 
-    DATASTORE_PATH = "sysvol/windows/softwaredistribution/datastore/datastore.edb"
+    DATASTORE_PATH = "%windir%/softwaredistribution/datastore/datastore.edb"
     DATASTORE_UPDATE_TABLE = "tbHistory"
 
     def __init__(self, target: Target):
@@ -952,7 +952,7 @@ class WuaHistoryPlugin(Plugin):
         self._datastore = None
         self._update_table = None
 
-        if (path := target.fs.path(self.DATASTORE_PATH)).exists():
+        if (path := target.resolve(self.DATASTORE_PATH)).exists():
             try:
                 self._datastore = EseDB(path.open())
                 self._update_table = self._datastore.table(self.DATASTORE_UPDATE_TABLE)
@@ -1016,7 +1016,8 @@ class WuaHistoryPlugin(Plugin):
             flags (int): Undocumented and unknown.
             id_event (int): Index number of the Windows Update Agent record in the tbHistory table.
             kb (string): Another unique ID of the update.
-            status (int): Integer signifying result of operation
+            status_id (int): Integer signifying result of operation.
+
             status_mapped (string): Mapping of the 'status' field.
             server_selection (int): The update service that was used for the Windows Update Agent operation.
             server_selection_mapped (string): Mapping of the 'server_selection' field.
@@ -1065,7 +1066,7 @@ class WuaHistoryPlugin(Plugin):
             format_data[mapped_column_name] = value
             if kb := re.search(r"(KB.[0-9]*)", value):
                 format_data["kb"] = kb.group()
-        elif mapped_column_name == "status":
+        elif mapped_column_name == "status_id":
             format_data[mapped_column_name] = value
             format_data["status_mapped"] = STATUS_MAP.get(value, "Unknown")
         elif mapped_column_name == "server_selection":

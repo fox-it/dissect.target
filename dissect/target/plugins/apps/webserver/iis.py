@@ -64,10 +64,10 @@ class IISLogsPlugin(WebserverPlugin):
         - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807%28v=vs.90%29
     """
 
-    APPLICATION_HOST_CONFIG = "sysvol/windows/system32/inetsrv/config/applicationHost.config"
+    APPLICATION_HOST_CONFIG = "%windir%/system32/inetsrv/config/applicationHost.config"
 
     DEFAULT_LOG_PATHS = (
-        "sysvol\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
+        "%windir%\\System32\\LogFiles\\W3SVC*\\*.log",
         "sysvol\\Windows.old\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
         "sysvol\\inetpub\\logs\\LogFiles\\*.log",
         "sysvol\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log",
@@ -78,7 +78,7 @@ class IISLogsPlugin(WebserverPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.config = self.target.fs.path(self.APPLICATION_HOST_CONFIG)
+        self.config = self.target.resolve(self.APPLICATION_HOST_CONFIG)
 
     def check_compatible(self) -> None:
         if not self.log_dirs:
@@ -108,6 +108,7 @@ class IISLogsPlugin(WebserverPlugin):
         for log_path in self.DEFAULT_LOG_PATHS:
             try:
                 # later on we use */*.log to collect the files, so we need to move up 2 levels
+                log_path = self.target.expand_env(log_path)
                 log_dir = self.target.fs.path(log_path).parents[1]
             except IndexError:
                 self.target.log.info("Incompatible path found: %s", log_path)

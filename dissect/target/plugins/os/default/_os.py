@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers.record import EmptyRecord
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.plugin import OSPlugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -48,6 +48,10 @@ class DefaultOSPlugin(OSPlugin):
 
     @export(record=EmptyRecord)
     def users(self) -> Iterator[Record]:
+        yield from ()
+
+    @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
         yield from ()
 
     @export(property=True)
