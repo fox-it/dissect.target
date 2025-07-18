@@ -50,10 +50,7 @@ class UacTarSubloader(TarSubLoader):
 
     @classmethod
     def detect(cls, tarfile: tf.TarFile) -> bool:
-        for member in tarfile.getmembers():
-            if member.name.startswith(cls.FS_ROOT_TUPLE):
-                return True
-        return False
+        return any(member.name.startswith(cls.FS_ROOT_TUPLE) for member in tarfile.getmembers())
 
     def map(self, target: Target) -> None:
         vol = filesystem.VirtualFilesystem(case_sensitive=False)
