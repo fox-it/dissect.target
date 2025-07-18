@@ -35,8 +35,8 @@ def test_uac_loader_compressed_zip(target_bare: Target) -> None:
     archive_path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143106.zip")
     loader = ZipLoader(archive_path)
     loader.map(target_bare)
+    target_bare.apply()
     assert isinstance(loader.subloader, UacZipSubLoader)
-
     assert len(target_bare.filesystems) == 1
     test_file = target_bare.fs.path("etc/passwd")
     assert test_file.exists()
@@ -44,7 +44,7 @@ def test_uac_loader_compressed_zip(target_bare: Target) -> None:
     assert test_file.open().readline() == b"root:x:0:0:root:/root:/bin/bash\n"
 
 
-def test_uac_loader_zip(target_bare: Target, tmp_path: Path) -> None:
+def test_uac_loader_dir(target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root / "[root]", ["etc", "var"])
     (root / "[root]" / "etc" / "passwd").write_bytes(b"root:x:0:0:root:/root:/bin/bash\n")
