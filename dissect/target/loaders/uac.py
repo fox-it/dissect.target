@@ -29,9 +29,6 @@ class UACLoader(DirLoader):
         - https://tclahr.github.io/uac-docs/
     """
 
-    def __init__(self, path: Path, **kwargs):
-        super().__init__(path)
-
     @staticmethod
     def detect(path: Path) -> bool:
         return path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath(UAC_CHECK_FILE).exists()
