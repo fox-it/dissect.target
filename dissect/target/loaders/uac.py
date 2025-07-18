@@ -22,7 +22,7 @@ UAC_CHECK_FILE = "uac.log"
 
 
 class UACLoader(DirLoader):
-    """UAC forensic image files (uncompressed).
+    """Loader for extracted UAC collections
 
     References:
         - https://github.com/tclahr/uac
