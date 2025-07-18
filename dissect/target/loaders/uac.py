@@ -42,7 +42,14 @@ class UACLoader(DirLoader):
 
 
 class UacTarSubloader(TarSubLoader):
-    """Loader for tar-based UAC collections."""
+    """
+    Loader for tar-based UAC collections.
+
+    References:
+        - https://github.com/tclahr/uac
+        - https://tclahr.github.io/uac-docs/
+        - https://tclahr.github.io/uac-docs/output_formats/
+    """
 
     FS_ROOT_TUPLE = (f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")
 
@@ -56,7 +63,14 @@ class UacTarSubloader(TarSubLoader):
 
 
 class UacZipSubLoader(ZipSubLoader):
-    """Loader for zip-based UAC collections."""
+    """
+    Loader for zip-based UAC collections.
+
+    References:
+        - https://github.com/tclahr/uac
+        - https://tclahr.github.io/uac-docs/
+        - https://tclahr.github.io/uac-docs/output_formats/
+    """
 
     @staticmethod
     def detect(zipfile: zf.Path) -> bool:
