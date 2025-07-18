@@ -4,8 +4,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.tar import TarLoader
-from dissect.target.loaders.uac import UACLoader, UacTarSubloader, UacZipSubLoader
+from dissect.target.loaders.uac import UacLoader, UacTarSubloader, UacZipSubLoader
 from dissect.target.loaders.zip import ZipLoader
 from dissect.target.target import Target
 from tests._utils import absolute_path, mkdirs
@@ -19,13 +20,17 @@ if TYPE_CHECKING:
 
 
 def test_uac_loader_compressed_tar(target_bare: Target) -> None:
-    archive_path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz")
-    loader = TarLoader(archive_path)
-    assert UacTarSubloader.detect(loader.tar)
+    """Test if we map a compressed UAC tar image correctly."""
+    path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz")
+
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
     loader.map(target_bare)
-    target_bare.apply()
     assert isinstance(loader.subloader, UacTarSubloader)
     assert len(target_bare.filesystems) == 1
+
+    target_bare.apply()
     test_file = target_bare.fs.path("/etc/passwd")
     assert test_file.exists()
     assert test_file.is_file()
@@ -33,14 +38,17 @@ def test_uac_loader_compressed_tar(target_bare: Target) -> None:
 
 
 def test_uac_loader_compressed_zip(target_bare: Target) -> None:
-    archive_path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143106.zip")
-    loader = ZipLoader(archive_path)
-    assert UacZipSubLoader.detect(loader.zip)
+    """Test if we map a compressed UAC zip image correctly."""
+    path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143106.zip")
+
+    loader = loader_open(path)
+    assert isinstance(loader, ZipLoader)
 
     loader.map(target_bare)
-    target_bare.apply()
     assert isinstance(loader.subloader, UacZipSubLoader)
     assert len(target_bare.filesystems) == 1
+
+    target_bare.apply()
     test_file = target_bare.fs.path("etc/passwd")
     assert test_file.exists()
     assert test_file.is_file()
@@ -48,15 +56,19 @@ def test_uac_loader_compressed_zip(target_bare: Target) -> None:
 
 
 def test_uac_loader_dir(target_bare: Target, tmp_path: Path) -> None:
+    """Test if we map an extracted UAC directory correctly."""
     root = tmp_path
     mkdirs(root / "[root]", ["etc", "var"])
     (root / "uac.log").write_bytes(b"")
     (root / "[root]" / "etc" / "passwd").write_bytes(b"root:x:0:0:root:/root:/bin/bash\n")
-    assert UACLoader.detect(root)
-    loader = UACLoader(root)
+
+    loader = loader_open(root)
+    assert isinstance(loader, UacLoader)
+
     loader.map(target_bare)
-    target_bare.apply()
     assert len(target_bare.filesystems) == 1
+
+    target_bare.apply()
     test_file = target_bare.fs.path("etc/passwd")
     assert test_file.exists()
     assert test_file.is_file()

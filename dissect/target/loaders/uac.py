@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     import zipfile as zf
     from pathlib import Path
 
-    from dissect.target import Target
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -21,8 +21,8 @@ FILESYSTEMS_ROOT = "[root]"
 UAC_CHECK_FILE = "uac.log"
 
 
-class UACLoader(DirLoader):
-    """Loader for extracted UAC collections
+class UacLoader(DirLoader):
+    """Loader for extracted UAC collections.
 
     References:
         - https://github.com/tclahr/uac
@@ -39,8 +39,7 @@ class UACLoader(DirLoader):
 
 
 class UacTarSubloader(TarSubLoader):
-    """
-    Loader for tar-based UAC collections.
+    """Loader for tar-based UAC collections.
 
     References:
         - https://github.com/tclahr/uac
@@ -59,8 +58,7 @@ class UacTarSubloader(TarSubLoader):
 
 
 class UacZipSubLoader(ZipSubLoader):
-    """
-    Loader for zip-based UAC collections.
+    """Loader for zip-based UAC collections.
 
     References:
         - https://github.com/tclahr/uac

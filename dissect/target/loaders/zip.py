@@ -10,7 +10,7 @@ from dissect.target.loaders.dir import find_and_map_dirs
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dissect.target import target
+    from dissect.target.target import target
 
 
 ZIP_EXT = (".zip",)
