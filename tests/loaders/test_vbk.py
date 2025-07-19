@@ -39,7 +39,7 @@ def test_vbk_loader(VbkFilesystem: Mock, target_default: Target) -> None:
 
 @patch("dissect.target.loaders.vbk.VbkFilesystem")
 def test_vbk_loader_vhdx(VbkFilesystem: Mock, target_default: Target) -> None:
-    """Test the VBK loader when a VHDX file is found."""
+    """Test the VBK loader on a raw disk image with the VHDX file extension."""
     vfs = VirtualFilesystem()
     VbkFilesystem.return_value = vfs
 
@@ -58,8 +58,7 @@ def test_vbk_loader_vhdx(VbkFilesystem: Mock, target_default: Target) -> None:
     target_default.apply()
 
     # The `vbk_candidate.raw` file is a raw container with just enough data to fit
-    # a partition table parse. If the raw container in the vbk file
-    # is opened correctly, these checks should all pass.
+    # a partition table parse.
     assert len(target_default.disks) == 1
     assert len(target_default.volumes) == 4
     assert target_default.volumes[0].name == "Basic data partition"
