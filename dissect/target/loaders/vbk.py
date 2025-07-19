@@ -45,7 +45,6 @@ class VbkLoader(Loader):
 
             # Try to look for raw disks
             for path in base.iterdir():
-
                 if RE_RAW_DISK.match(path.name):
                     disks.append(path)
 
@@ -60,7 +59,6 @@ class VbkLoader(Loader):
 
         # Try to find a loader
         for candidate in candidates:
-
             # Veeam stores Windows raw disk images with the .vhdx file extension, which confuses the VHDX loader because
             # the disk images are not in the VHDX format but rather in a raw format.
             # Therefore, the RawContainer is used to handle these files using a FibStream.
