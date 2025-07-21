@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 def test_container_image_filesystem_docker(target_bare: Target) -> None:
     """Test if we map a Docker image correctly."""
     path = absolute_path("_data/loaders/containerimage/alpine-docker.tar")
-    
+
     loader = loader_open(path)
     assert isinstance(loader, TarLoader)
 
@@ -55,13 +55,13 @@ def test_container_image_filesystem_docker(target_bare: Target) -> None:
 
 def test_container_image_filesystem_oci_podman(target_bare: Target) -> None:
     """Test if we map a Podman OCI image correctly."""
+    path = absolute_path("_data/loaders/containerimage/alpine-oci.tar")
 
-    path = Path(absolute_path("_data/loaders/containerimage/alpine-oci.tar"))
-    assert TarLoader.detect(path)
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
 
-    loader = TarLoader(path)
     loader.map(target_bare)
-    target_bare.apply()
+    assert isinstance(loader.subloader, ContainerImageTarSubLoader)
 
     assert loader.subloader.name == "docker.io/library/alpine:latest"
     assert list(map(str, loader.subloader.layers)) == [
@@ -100,6 +100,8 @@ def test_container_image_filesystem_oci_podman(target_bare: Target) -> None:
             "diff_ids": ["sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350"],
         },
     }
+
+    target_bare.apply()
 
     assert sorted(map(str, target_bare.fs.path("/").iterdir())) == [
         "/$fs$",
