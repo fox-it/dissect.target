@@ -50,7 +50,7 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> None:
     """Benchmark walkfs performance on a small tar archive with ~500 files."""
 
-    loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine.tar")))
+    loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine-docker.tar")))
     loader.map(target_bare)
     target_bare.apply()
 
