@@ -81,7 +81,7 @@ def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive
     assert records[1].lport == ["5678"]
     assert records[1].ra4 == "ExampleKeyword"
     assert records[1].ra6 == "AnotherExampleKeyword"
-    assert records[1].app == "%SystemRoot%\\system32\\svchost.exe"
+    assert records[1].app == "c:\\Windows\\system32\\svchost.exe"
     assert records[1].svc == "ExampleSvc"
     assert records[1].name == "@Example.dll,-12345"
     assert records[1].desc == "@Example.dll,-6789"
@@ -95,7 +95,7 @@ def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive
     assert records[2].version == "V2.0"
     assert records[2].action == "BLOCK"
     assert records[2].dir == "OUT"
-    assert records[2].app == "%SystemRoot%\\System32\\svchost.exe"
+    assert records[2].app == "c:\\Windows\\System32\\svchost.exe"
     assert records[2].svc == "=DisplayEnhancementService"
     assert records[2].name == "Block outbound traffic from BFE"
     assert (
@@ -109,7 +109,7 @@ def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive
     assert records[3].dir == "OUT"
     assert records[3].protocol == "TCP"
     assert records[3].rport == ["3268", "389", "563", "993", "995", "80", "443"]
-    assert records[3].app == "%SystemRoot%\\system32\\SearchProtocolHost.exe"
+    assert records[3].app == "c:\\Windows\\system32\\SearchProtocolHost.exe"
     assert records[3].name == "Allow outbound traffic from SearchProtocolHost on specific ports"
     assert (
         records[3].source

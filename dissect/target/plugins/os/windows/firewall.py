@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import islice
 from typing import TYPE_CHECKING, Any, Callable, Final
 
@@ -133,7 +133,7 @@ class WindowsFirewallPlugin(Plugin):
             name (string): The Name of the rule.
             desc (string): The Desc of the rule.
             embed_ctxt (string): The EmbedCtxt of the rule.
-        """
+        """  # noqa: E501
 
         FIELD_MAP: Final[dict[str, str]] = {
             "app": "path",
@@ -239,39 +239,38 @@ class WindowsFirewallPlugin(Plugin):
         """
 
         for path in self.log_paths:
-            try:
-                fh = path.open("rt")
-                header = list(islice(fh, 4))
-                config = LogConfig(header)
-
-            except Exception as e:
-                self.target.log.warning("Unable to read Windows Firewall log file config in %s: %s", path, e)
-                self.target.log.debug("", exc_info=e)
-                continue
-
-            if config.version != 1.5:
-                self.target.log.warning(
-                    "Unsupported Windows Firewall log file version %r in log file %s", header[0], path
-                )
-                continue
-
-            for line in fh:
-                if not (line := line.strip()):
+            with path.open("rt") as fh:
+                try:
+                    header = list(islice(fh, 4))
+                    config = LogConfig(header)
+                except Exception as e:
+                    self.target.log.warning("Unable to read Windows Firewall log file config in %s: %s", path, e)
+                    self.target.log.debug("", exc_info=e)
                     continue
 
-                entry = FieldMap(config.fields, line.split(" ", len(config.fields)))
-                entry.ts = datetime.strptime(f"{entry.date} {entry.time}", "%Y-%m-%d %H:%M:%S").replace(
-                    tzinfo=self.target.datetime.tzinfo if config.time_format == "local" else None
-                )
+                if config.version != 1.5:
+                    self.target.log.warning(
+                        "Unsupported Windows Firewall log file version %r in log file %s", header[0], path
+                    )
+                    continue
 
-                del entry.date
-                del entry.time
+                for line in fh:
+                    if not (line := line.strip()):
+                        continue
 
-                yield WindowsFirewallLogRecord(
-                    **dict(entry),
-                    source=path,
-                    _target=self.target,
-                )
+                    entry = FieldMap(config.fields, line.split(" ", len(config.fields)))
+                    entry.ts = datetime.strptime(f"{entry.date} {entry.time}", "%Y-%m-%d %H:%M:%S").replace(
+                        tzinfo=self.target.datetime.tzinfo if config.time_format == "local" else timezone.utc
+                    )
+
+                    del entry.date
+                    del entry.time
+
+                    yield WindowsFirewallLogRecord(
+                        **dict(entry),
+                        source=path,
+                        _target=self.target,
+                    )
 
 
 @dataclass
@@ -316,9 +315,8 @@ class FieldMap:
     def __post_init__(self):
         assert len(self.fields) == len(self.values)
 
-        for i, f in enumerate(self.fields):
-            value = self.values[i]
-            setattr(self, f.replace("-", "_"), None if value == "-" else value)
+        for field_name, value in zip(self.fields, self.values):
+            setattr(self, field_name.replace("-", "_"), None if value == "-" else value)
 
     def __iter__(self) -> Iterator[tuple[str, str]]:
         for k, v in self.__dict__.items():
