@@ -27,7 +27,7 @@ except ImportError:
 from flow.record import Record, RecordDescriptor
 
 import dissect.target.plugins.os.default as default
-from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import EmptyRecord
@@ -431,6 +431,20 @@ class Plugin:
 
     def __init__(self, target: Target):
         self.target = target
+
+    def __getattr__(self, name: str, /) -> Any:
+        # "Magic" attribute access is only allowed on namespace plugins, to allow for indirect nesting of namespaces
+        # E.g. `__namespace__ = "foo.bar"`, we should try to resolve `bar` on a plugin instance of `foo`
+        if not self.__namespace__:
+            raise AttributeError(name)
+
+        # Attempt to lookup the attribute using the namespace
+        try:
+            _, func = self.target.get_function(f"{self.__class__.__namespace__}.{name}")
+        except PluginNotFoundError:
+            raise AttributeError(name)
+
+        return func
 
     def is_compatible(self) -> bool:
         """Perform a compatibility check with the target."""
@@ -1256,6 +1270,18 @@ class OSPlugin(Plugin):
         Returns:
             A slug of the OS name, e.g. 'windows' or 'linux'.
         """
+        raise NotImplementedError
+
+    @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        """Yields miscellaneous user paths and user keys.
+
+        Example:
+            ("c:/Windows/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
+        """
+
+        # Consider moving this to the UsersPlugin class, and create separate UsersPlugin subclasses for each OS
+        # when the machinery concerning users and user_paths becomes more complex.
         raise NotImplementedError
 
     @internal

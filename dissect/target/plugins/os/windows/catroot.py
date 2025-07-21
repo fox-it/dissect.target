@@ -78,8 +78,8 @@ class CatrootPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.catroot_dir = self.target.fs.path("sysvol/windows/system32/catroot")
-        self.catroot2_dir = self.target.fs.path("sysvol/windows/system32/catroot2")
+        self.catroot_dir = self.target.resolve("%windir%/system32/catroot")
+        self.catroot2_dir = self.target.resolve("%windir%/system32/catroot2")
 
     def check_compatible(self) -> None:
         if not HAS_ASN1:

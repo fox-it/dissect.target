@@ -5,9 +5,29 @@ from typing import TYPE_CHECKING
 from flow.record import GroupedRecord
 
 from dissect.target.exceptions import InvalidTaskError, UnsupportedPluginError
-from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.os.windows.tasks.job import AtTask
+from dissect.target.plugins.os.windows.tasks.records import (
+    BaseTriggerRecord,
+    BootTriggerRecord,
+    CalendarTriggerRecord,
+    ComHandlerRecord,
+    DailyTriggerRecord,
+    EventTriggerRecord,
+    ExecRecord,
+    IdleTriggerRecord,
+    LogonTriggerRecord,
+    MonthlyDateTriggerRecord,
+    MonthlyDowTriggerRecord,
+    RegistrationTrigger,
+    SendEmailRecord,
+    SessionStateChangeTriggerRecord,
+    ShowMessageRecord,
+    TimeTriggerRecord,
+    WeeklyTriggerRecord,
+    WnfTriggerRecord,
+)
 from dissect.target.plugins.os.windows.tasks.xml import ScheduledTasks
 
 if TYPE_CHECKING:
@@ -35,7 +55,7 @@ TaskRecord = TargetRecordDescriptor(
         ("string", "comment"),
         ("string", "run_as"),
         ("string", "cpassword"),
-        ("string", "enabled"),
+        ("boolean", "enabled"),
         ("string", "action"),
         ("string", "principal_id"),
         ("string", "user_id"),
@@ -48,30 +68,61 @@ TaskRecord = TargetRecordDescriptor(
         ("string", "restart_on_failure_interval"),
         ("string", "restart_on_failure_count"),
         ("string", "mutiple_instances_policy"),
-        ("string", "dissalow_start_on_batteries"),
-        ("string", "stop_going_on_batteries"),
-        ("string", "allow_start_on_demand"),
-        ("string", "start_when_available"),
+        ("boolean", "disallow_start_on_batteries"),
+        ("boolean", "stop_going_on_batteries"),
+        ("boolean", "allow_start_on_demand"),
+        ("boolean", "start_when_available"),
         ("string", "network_profile_name"),
-        ("string", "run_only_network_available"),
-        ("string", "wake_to_run"),
-        ("string", "enabled"),
-        ("string", "hidden"),
+        ("boolean", "run_only_network_available"),
+        ("boolean", "wake_to_run"),
+        ("boolean", "hidden"),
         ("string", "delete_expired_task_after"),
         ("string", "idle_duration"),
         ("string", "idle_wait_timeout"),
-        ("string", "idle_stop_on_idle_end"),
-        ("string", "idle_restart_on_idle"),
+        ("boolean", "idle_stop_on_idle_end"),
+        ("boolean", "idle_restart_on_idle"),
         ("string", "network_settings_name"),
         ("string", "network_settings_id"),
         ("string", "execution_time_limit"),
         ("string", "priority"),
-        ("string", "run_only_idle"),
-        ("string", "unified_scheduling_engine"),
-        ("string", "disallow_start_on_remote_app_session"),
+        ("boolean", "run_only_idle"),
+        ("boolean", "unified_scheduling_engine"),
+        ("boolean", "disallow_start_on_remote_app_session"),
         ("string", "data"),
         ("string", "raw_data"),
     ],
+)
+
+TriggerRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/trigger",
+    {
+        ("string", "uri"),
+        *BaseTriggerRecord.target_fields,
+        *BootTriggerRecord.target_fields,
+        *CalendarTriggerRecord.target_fields,
+        *DailyTriggerRecord.target_fields,
+        *EventTriggerRecord.target_fields,
+        *IdleTriggerRecord.target_fields,
+        *LogonTriggerRecord.target_fields,
+        *MonthlyDateTriggerRecord.target_fields,
+        *MonthlyDowTriggerRecord.target_fields,
+        *RegistrationTrigger.target_fields,
+        *SessionStateChangeTriggerRecord.target_fields,
+        *TimeTriggerRecord.target_fields,
+        *WeeklyTriggerRecord.target_fields,
+        *WnfTriggerRecord.target_fields,
+    },
+)
+
+ActionRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/action",
+    {
+        ("string", "uri"),
+        *ComHandlerRecord.target_fields,
+        *ExecRecord.target_fields,
+        *SendEmailRecord.target_fields,
+        *ShowMessageRecord.target_fields,
+    },
 )
 
 
@@ -83,13 +134,13 @@ class TasksPlugin(Plugin):
     """
 
     PATHS = (
-        "sysvol/windows/system32/tasks",
-        "sysvol/windows/system32/tasks_migrated",
-        "sysvol/windows/syswow64/tasks",
-        "sysvol/windows/tasks",  # at.exe job file location
+        "%windir%/system32/tasks",
+        "%windir%/system32/tasks_migrated",
+        "%windir%/syswow64/tasks",
+        "%windir%/tasks",  # at.exe job file location
     )
     GLOB_PATHS = (
-        "sysvol/windows/system32/GroupPolicy/DataStore/*/Machine/Preferences/ScheduledTasks/*",
+        "%windir%/system32/GroupPolicy/DataStore/*/Machine/Preferences/ScheduledTasks/*",
         "sysvol/ProgramData/Microsoft/*/Preferences/ScheduledTasks/*",
     )
 
@@ -99,12 +150,12 @@ class TasksPlugin(Plugin):
 
         for path in self.GLOB_PATHS:
             start_path, pattern = path.split("*", 1)
-            for entry in self.target.fs.path(start_path).rglob("*" + pattern):
+            for entry in self.target.resolve(start_path).rglob("*" + pattern):
                 if entry.is_file() and entry.suffix == ".xml":
                     self.task_files.append(entry)
 
         for file_path in self.PATHS:
-            fpath = self.target.fs.path(file_path)
+            fpath = self.target.resolve(file_path)
             if not fpath.exists():
                 continue
 
@@ -116,8 +167,13 @@ class TasksPlugin(Plugin):
         if len(self.task_files) == 0:
             raise UnsupportedPluginError("No task files")
 
-    @export(record=DynamicDescriptor(["path", "datetime"]))
-    def tasks(self) -> Iterator[TaskRecord | GroupedRecord]:
+    @export(record=[TaskRecord, TriggerRecord, ActionRecord])
+    @arg(
+        "--group",
+        action="store_true",
+        help="group each trigger and action record together with its corresponding parent task record",
+    )
+    def tasks(self, group: bool = False) -> Iterator[TaskRecord | TriggerRecord | ActionRecord | GroupedRecord]:
         """Return all scheduled tasks on a Windows system.
 
         On a Windows system, a scheduled task is a program or script that is executed on a specific time or at specific
@@ -147,15 +203,21 @@ class TasksPlugin(Plugin):
                 for attr in TaskRecord.fields:
                     record_kwargs[attr] = getattr(task_object, attr, None)
 
-                record = TaskRecord(**record_kwargs, _target=self.target)
-                yield record
+                task_record = TaskRecord(**record_kwargs, _target=self.target)
+                yield task_record
 
                 # Actions
                 for action in task_object.get_actions():
-                    grouped = GroupedRecord("filesystem/windows/task/grouped", [record, action])
-                    yield grouped
+                    if group:
+                        record = GroupedRecord("filesystem/windows/task/grouped", [task_record, action])
+                    else:
+                        record = ActionRecord(**action._asdict(), uri=task_record.uri, _target=self.target)
+                    yield record
 
                 # Triggers
                 for trigger in task_object.get_triggers():
-                    grouped = GroupedRecord("filesystem/windows/task/grouped", [record, trigger])
-                    yield grouped
+                    if group:
+                        record = GroupedRecord("filesystem/windows/task/grouped", [task_record, trigger])
+                    else:
+                        record = TriggerRecord(**trigger._asdict(), uri=task_record.uri, _target=self.target)
+                    yield record

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dissect.target.loader import open as loader_open
+from dissect.target.loaders.containerimage import ContainerImageTarSubLoader
 from dissect.target.loaders.tar import TarLoader
 from tests._utils import absolute_path
 
@@ -12,13 +13,13 @@ if TYPE_CHECKING:
 
 def test_container_image_filesystem(target_bare: Target) -> None:
     """Test if we map a container image correctly."""
+    path = absolute_path("_data/loaders/containerimage/alpine.tar")
 
-    # Uses TarLoader and TarSubLoader functionality.
-    path = Path(absolute_path("_data/loaders/containerimage/alpine.tar"))
-    assert TarLoader.detect(path)
-    loader = TarLoader(path)
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
     loader.map(target_bare)
-    target_bare.apply()
+    assert isinstance(loader.subloader, ContainerImageTarSubLoader)
 
     assert loader.subloader.name == "alpine:latest"
     assert loader.subloader.manifest["Layers"] == [
@@ -29,6 +30,7 @@ def test_container_image_filesystem(target_bare: Target) -> None:
     assert len(target_bare.filesystems) == 1
     assert len(target_bare.filesystems[0].layers) == 3
 
+    target_bare.apply()
     assert sorted(map(str, target_bare.fs.path("/").iterdir())) == [
         "/$fs$",
         "/bin",

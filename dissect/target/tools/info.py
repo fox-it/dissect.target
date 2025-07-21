@@ -30,6 +30,7 @@ InfoRecord = TargetRecordDescriptor(
         ("string", "timezone"),
         ("string[]", "disks"),
         ("string[]", "volumes"),
+        ("string[]", "mounts"),
         ("string[]", "children"),
     ],
 )
@@ -102,6 +103,7 @@ def get_target_info(target: Target) -> dict[str, str | list[str]]:
     return {
         "disks": get_disks_info(target),
         "volumes": get_volumes_info(target),
+        "mounts": get_mounts_info(target),
         "children": get_children_info(target),
         "hostname": target.hostname,
         "domain": get_optional_func(target, "domain"),
@@ -126,7 +128,7 @@ def print_target_info(target: Target) -> None:
     print(target)
 
     for name, value in get_target_info(target).items():
-        if name in ["disks", "volumes", "children"]:
+        if name in ["disks", "volumes", "mounts", "children"]:
             if not any(value):
                 continue
             print(f"\n{name.capitalize()}")
@@ -153,6 +155,10 @@ def get_disks_info(target: Target) -> list[dict[str, str | int]]:
 
 def get_volumes_info(target: Target) -> list[dict[str, str | int]]:
     return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
+
+
+def get_mounts_info(target: Target) -> list:
+    return [{"fs": fs.__class__.__name__, "path": path} for path, fs in target.fs.mounts.items()]
 
 
 def get_children_info(target: Target) -> list[dict[str, str]]:
