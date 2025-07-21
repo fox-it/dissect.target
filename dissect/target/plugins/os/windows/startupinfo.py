@@ -56,7 +56,7 @@ class StartupInfoPlugin(Plugin):
         super().__init__(target)
         self._files = []
 
-        path = target.fs.path("sysvol/windows/system32/wdi/logfiles/startupinfo")
+        path = target.resolve("%windir%/system32/wdi/logfiles/startupinfo")
         if path.exists():
             self._files = list(path.iterdir())
 
