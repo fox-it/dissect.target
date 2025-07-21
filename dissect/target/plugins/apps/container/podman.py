@@ -153,7 +153,7 @@ class PodmanPlugin(ContainerPlugin):
                 )
 
     @export(record=PodmanContainerRecord)
-    def containers(self, save: str | None = None, compress: bool | None = None) -> Iterator[PodmanContainerRecord]:
+    def containers(self) -> Iterator[PodmanContainerRecord]:
         """Yield any Podman containers on the target system.
 
         Uses the ``$PODMAN/storage/db.sql`` SQLite3 database and ``$PODMAN/storage/overlay-containers`` folder.
@@ -181,16 +181,13 @@ class PodmanPlugin(ContainerPlugin):
             self.target.log.debug("", exc_info=e)
             return
 
-        tables = [t.name for t in db.tables()]
         containers = {}
 
-        for table in ["ContainerConfig", "ContainerState"]:
-            if table not in tables:
-                continue
-
-            for row in db.table(table):
-                containers.setdefault(row.ID, {})
-                containers[row.ID].update(json.loads(row.JSON))
+        for table_name in ["ContainerConfig", "ContainerState"]:
+            if table := db.table(table_name):
+                for row in table:
+                    containers.setdefault(row.ID, {})
+                    containers[row.ID].update(json.loads(row.JSON))
 
         for container_id, container in containers.items():
             volumes = []
