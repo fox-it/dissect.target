@@ -374,7 +374,8 @@ def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pyt
                 "-j",
             ],
         )
-        target_query()
+        with pytest.raises(SystemExit, check=lambda r: r.code == 0):
+            target_query()
         out, _ = capsys.readouterr()
 
     output = json.loads(out)
