@@ -47,7 +47,6 @@ from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
 from dissect.target.plugins.os.unix.linux.fortios._os import FortiOSPlugin
 from dissect.target.target import Target
-from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
