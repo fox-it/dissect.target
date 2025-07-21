@@ -120,7 +120,7 @@ def test_registration(tmp_path: Path) -> None:
                 super().__init__(fh, 20, *args, **kwargs)
 
             def __repr__(self) -> str:
-                return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
+                return f"<{self.__class__.__name__} size={self.size} vs={self.vs.__type__ if self.vs else None}>"
 
             @staticmethod
             def _detect_fh(fh: BinaryIO, original: list[BinaryIO] | BinaryIO) -> bool:
