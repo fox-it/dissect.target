@@ -347,7 +347,7 @@ def test_glob_ext(key_collection: KeyCollection, pattern: str, key_paths: list[s
         (c_regf.REG_FULL_RESOURCE_DESCRIPTOR, "FULL_RESOURCE_DESCRIPTOR", 9),
         (c_regf.REG_RESOURCE_REQUIREMENTS_LIST, "RESOURCE_REQUIREMENTS_LIST", 10),
         (c_regf.REG_QWORD, "QWORD", 11),
-        (1337, None, 1337),
+        (1337, "1337", 1337),
     ],
 )
 def test_registry_value_type_enum(input: int, expected_name: str | None, expected_value: int) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from enum import IntEnum
 from typing import TYPE_CHECKING
 
 from dissect.util.ts import wintimestamp
@@ -207,15 +208,29 @@ PcaGeneralAppcompatRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("path", "path"),
-        ("varint", "type"),
+        ("string", "type"),
         ("string", "name"),
         ("string", "copyright"),
         ("string", "version"),
         ("string", "program_id"),
-        ("string", "exit_code"),
+        ("string", "exit_message"),
         ("path", "source"),
     ],
 )
+
+
+class PcaGeneralDbType(IntEnum):
+    """``PcaGeneralDb`` type enum.
+
+    Resource:
+        - https://www.sygnia.co/blog/new-windows-11-pca-artifact/
+    """
+
+    INSTALLER_FAILED = 0
+    DRIVER_BLOCKED = 1
+    ABNORMAL_PROCESS_EXIT = 2
+    PCA_RESOLVE_CALLED = 3
+    UNKNOWN = 4
 
 
 class AmcachePluginOldMixin:
@@ -680,17 +695,17 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                     self.target.log.warning("Invalid line in %s, ignoring: %s", path.name, line)
                     continue
 
-                ts, type_, app_path, name, copyright, version, program_id, exit_code = parts
+                ts, type_, app_path, name, copyright, version, program_id, exit_message = parts
 
                 yield PcaGeneralAppcompatRecord(
                     ts=datetime.strptime(ts, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
                     path=self.target.resolve(app_path),
-                    type=int(type_),
+                    type=PcaGeneralDbType(int(type_)).name,
                     name=name,
                     copyright=copyright,
                     version=version,
                     program_id=program_id,
-                    exit_code=exit_code,
+                    exit_message=exit_message,
                     source=path,
                     _target=self.target,
                 )
