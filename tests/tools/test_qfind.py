@@ -23,7 +23,7 @@ buf = (
     + (b"\x00" * 1024 * 52)
 )
 
-buf_unique = (b"ABCD" + b"\x00" * ((1024 * 8) - 4)) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4))
+buf_unique = (b"\x00" * 512) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4)) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4))
 
 
 @pytest.mark.parametrize(
