@@ -39,7 +39,7 @@ class Container(io.IOBase):
     __type__: str = None
     """A short string identifying the type of container."""
 
-    def __init__(self, fh: BinaryIO | Path, size: int, vs: VolumeSystem = None):
+    def __init__(self, fh: BinaryIO | Path, size: int, vs: VolumeSystem | None = None):
         self.fh = fh
         self.size = size
 
@@ -50,7 +50,7 @@ class Container(io.IOBase):
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
+        return f"<{self.__class__.__name__} size={self.size} vs={self.vs.__type__ if self.vs else None}>"
 
     @classmethod
     def detect(cls, item: list | BinaryIO | Path) -> bool:
