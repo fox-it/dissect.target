@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.loader import Loader
+from dissect.target.loader import open as loader_open
+from dissect.target.loaders.acquire import AcquireTarSubLoader, AcquireZipSubLoader
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.loaders.zip import ZipLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
@@ -19,18 +19,19 @@ if TYPE_CHECKING:
 
 
 def test_case_sensitive_drive_letter(target_bare: Target) -> None:
-    tar_file = absolute_path("_data/loaders/acquire/uppercase_driveletter.tar")
+    path = absolute_path("_data/loaders/acquire/uppercase_driveletter.tar")
 
-    loader = TarLoader(tar_file)
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
     loader.map(target_bare)
-
     # mounts = / and c:
     assert sorted(target_bare.fs.mounts.keys()) == ["c:", "fs"]
     assert "C:" not in target_bare.fs.mounts
 
     # Initialize our own WindowsPlugin to override the detection
     target_bare._os_plugin = WindowsPlugin.create(target_bare, target_bare.fs.mounts["c:"])
-    target_bare._init_os()
+    target_bare.apply()
 
     # sysvol is now added
     assert sorted(target_bare.fs.mounts.keys()) == ["c:", "fs", "sysvol"]
@@ -51,11 +52,14 @@ def test_case_sensitive_drive_letter(target_bare: Target) -> None:
     ],
 )
 def test_windows_sysvol_formats(target_default: Target, archive: str, expected_drive_letter: str) -> None:
-    path = Path(absolute_path(archive))
-    assert TarLoader.detect(path)
+    path = absolute_path(archive)
+
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
 
     loader = TarLoader(path)
     loader.map(target_default)
+    assert isinstance(loader.subloader, AcquireTarSubLoader)
 
     assert WindowsPlugin.detect(target_default)
     # NOTE: for the sysvol archives, this also tests the backwards compatibility
@@ -64,11 +68,13 @@ def test_windows_sysvol_formats(target_default: Target, archive: str, expected_d
 
 
 def test_windows_sysvol_formats_zip(target_default: Target) -> None:
-    path = Path(absolute_path("_data/loaders/acquire/test-windows-fs-c.zip"))
-    assert ZipLoader.detect(path)
+    path = absolute_path("_data/loaders/acquire/test-windows-fs-c.zip")
 
-    loader = ZipLoader(path)
+    loader = loader_open(path)
+    assert isinstance(loader, ZipLoader)
+
     loader.map(target_default)
+    assert isinstance(loader.subloader, AcquireZipSubLoader)
 
     assert WindowsPlugin.detect(target_default)
     # NOTE: for the sysvol archives, this also tests the backwards compatibility
@@ -77,11 +83,13 @@ def test_windows_sysvol_formats_zip(target_default: Target) -> None:
 
 
 def test_anonymous_filesystems(target_default: Target) -> None:
-    tar_file = Path(absolute_path("_data/loaders/acquire/test-anon-filesystems.tar"))
-    assert TarLoader.detect(tar_file)
+    path = absolute_path("_data/loaders/acquire/test-anon-filesystems.tar")
 
-    loader = TarLoader(tar_file)
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
     loader.map(target_default)
+    assert isinstance(loader.subloader, AcquireTarSubLoader)
 
     assert target_default.fs.get("$fs$/fs0/foo").open().read() == b"hello world\n"
     assert target_default.fs.get("$fs$/fs1/bar").open().read() == b"hello world\n"
