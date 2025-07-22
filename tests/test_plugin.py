@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from flow.record import Record
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def test_save_plugin_import_failure() -> None:
@@ -423,6 +424,12 @@ def test_find_functions_compatible_check(target_linux: Target) -> None:
         functions = [f.path for f in found]
         assert "apps.browser.chrome.cookies" in functions
         assert "apps.browser.chrome.history" in functions
+
+
+@pytest.mark.benchmark
+def test_benchmark_functions_compatible_check(target_unix_users: Target, benchmark: BenchmarkFixture) -> None:
+    """Benchmark ``_filter_compatible`` performance."""
+    benchmark(lambda: find_functions("*", target_unix_users, compatibility=True))
 
 
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
