@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import datetime
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.parsers import DateTimeParser, default_datetime_parser
 from dissect.target.helpers.record import (
     COMMON_APPLICATION_FIELDS,
     TargetRecordDescriptor,
@@ -20,13 +20,41 @@ WindowsApplicationRecord = TargetRecordDescriptor(
     COMMON_APPLICATION_FIELDS,
 )
 
+KEYS = (
+    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+)
+
 
 class WindowsApplicationsPlugin(Plugin):
     """Windows Applications plugin."""
 
-    def __init__(self, target: Target):
+    def __init__(
+        self,
+        target: Target,
+        datetime_parser: DateTimeParser = default_datetime_parser,
+    ):
+        """Initialise the plugin.
+
+        Args:
+            target: The target to run this plugin on.
+            datetime_parser: A function to parse date strings. Defaults to
+                `default_datetime_parser`. This allows for dependency injection
+                of custom parsers.
+        """
         super().__init__(target)
-        self.keys = list(self.target.registry.keys("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"))
+        self.datetime_parser = datetime_parser
+
+        key_list = list(self.target.registry.keys(KEYS))
+        """
+        Removing all keys from Backup registry hives located in sysvol/windows/system32/config/RegBack
+        Parsing keys from RegBack leads to duplicate applications. A VirtualHive might not have a filepath attribute.
+        Checking if the attribute exists first. If not, it is assumed it's not from RegBack.
+        """
+        self.keys = [
+            key for key in key_list if not hasattr(key.hive, "filepath") or "RegBack" not in key.hive.filepath.parts
+        ]
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):
@@ -57,14 +85,14 @@ class WindowsApplicationsPlugin(Plugin):
             type         (string):   type of the application, either user or system
             path         (string):   path to the installed location or installer of the application
         """
+
         for uninstall in self.keys:
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}
 
-                if install_date := values.get("InstallDate"):
-                    install_date = datetime.datetime.strptime(install_date, "%Y%m%d").replace(
-                        tzinfo=datetime.timezone.utc
-                    )
+                install_date = None
+                if install_date_string := values.get("InstallDate"):
+                    install_date = self.datetime_parser(str(install_date_string))
 
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,
