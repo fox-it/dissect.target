@@ -95,3 +95,79 @@ def test_unix_applications_desktop_files(target_unix_users: Target, fs_unix: Vir
         "user",
         "user",
     ]
+
+
+def test_unix_autostart_applications_desktop_files(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if .desktop files are picked up by the autostart_desktop_applications plugin."""
+
+    system_autostart_filenames = [
+        "firefox_firefox.desktop",
+        "code_code.desktop",
+        "gimp.desktop",
+        "vmware-workstation.desktop",
+        "python.desktop",
+    ]
+
+    user_autostart_filenames = [
+        "vlc.desktop",
+        "terminal.desktop",
+    ]
+
+    for filename in system_autostart_filenames:
+        fs_unix.map_file(
+            f"/etc/xdg/autostart/{filename}",
+            absolute_path(f"_data/plugins/os/unix/applications/{filename}"),
+        )
+
+    for filename in user_autostart_filenames:
+        fs_unix.map_file(
+            f"/home/user/.config/autostart/{filename}",
+            absolute_path(f"_data/plugins/os/unix/applications/{filename}"),
+        )
+
+    target_unix_users.add_plugin(UnixPlugin)
+    target_unix_users.add_plugin(UnixApplicationsPlugin)
+
+    results = sorted(target_unix_users.autostart_desktop_applications(), key=lambda r: r.name)
+
+    assert len(results) == 7
+
+    assert results[0].ts_installed is None
+    assert results[0].name == "Firefox Web Browser"
+    assert results[0].version == "1.0"
+    assert results[0].author is None
+    assert results[0].type == "user"
+    assert (
+        results[0].path
+        == "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/firefox_firefox.desktop /snap/bin/firefox %u"
+    )
+
+    assert [r.name for r in results] == [
+        "Firefox Web Browser",
+        "GNU Image Manipulation Program",
+        "Python (v3.12)",
+        "Terminal",
+        "VLC media player",
+        "VMware Workstation",
+        "Visual Studio Code",
+    ]
+
+    assert [r.path for r in results] == [
+        "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/firefox_firefox.desktop /snap/bin/firefox %u",
+        "gimp-2.10 %U",
+        "/usr/bin/python3.12",
+        "gnome-terminal",
+        "/usr/bin/vlc --started-from-file %U",
+        "/usr/bin/vmware %U",
+        "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/code_code.desktop /snap/bin/code --force-user-env %F",  # noqa: E501
+    ]
+
+    assert [r.type for r in results] == [
+        "user",
+        "user",
+        "user",
+        "system",
+        "user",
+        "user",
+        "user",
+    ]
