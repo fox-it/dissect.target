@@ -41,7 +41,7 @@ class DPAPIPlugin(InternalPlugin):
             raise UnsupportedPluginError("Windows registry and LSA plugins are required for DPAPI decryption")
 
     def keychain(self) -> set:
-        return set(self.target._dpapi_keyprovider.keys())
+        return set(self.target.dpapi.keyprovider.keys())
 
     @cached_property
     def master_keys(self) -> dict[str, dict[str, MasterKeyFile]]:

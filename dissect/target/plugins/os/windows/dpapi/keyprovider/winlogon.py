@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class WinlogonDefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
     """Windows Winlogon DefaultPassword key provider plugin."""
 
-    __namespace__ = "_dpapi_keyprovider_winlogon_defaultpassword"
+    __namespace__ = "dpapi.keyprovider.winlogon_defaultpassword"
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):
