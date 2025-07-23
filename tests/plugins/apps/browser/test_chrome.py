@@ -20,6 +20,8 @@ from tests.plugins.os.windows.credential.test_lsa import (
 from tests.plugins.os.windows.test__os import map_version_value
 
 if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
+
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
@@ -483,3 +485,20 @@ def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win:
     assert cookies[1].host == "rijksoverheid.nl"
     assert cookies[1].name == "AnotherExampleCookieName"
     assert cookies[1].value == "420"
+
+
+@pytest.mark.benchmark
+def test_benchmark_chrome_userdirs(
+    target_win_users: Target, fs_win: VirtualFilesystem, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark :class:`ChromiumMixin` ``_build_userdirs`` performance."""
+
+    for i in range(3):
+        fs_win.map_dir(
+            f"Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Profile {i}",
+            absolute_path("_data/plugins/apps/browser/chrome/generic"),
+        )
+
+    benchmark(
+        lambda: target_win_users.add_plugin(ChromePlugin, check_compatible=True) and list(target_win_users.chrome())
+    )
