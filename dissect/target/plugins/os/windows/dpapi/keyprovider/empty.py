@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class EmptyKeyProviderPlugin(KeyProviderPlugin):
     """Empty key provider plugin."""
 
-    __namespace__ = "_dpapi_keyprovider_empty"
+    __namespace__ = "dpapi.keyprovider.empty"
 
     def check_compatible(self) -> None:
         return
