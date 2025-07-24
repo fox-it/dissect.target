@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
+from unittest.mock import Mock
 
 import pytest
 from flow.record.fieldtypes import windows_path
@@ -267,6 +268,30 @@ def test_windows_user(target_win_users: Target) -> None:
 
     assert users[1].sid == "S-1-5-21-3263113198-3007035898-945866154-1002"
     assert users[1].name == "John"
+    assert users[1].home == windows_path("C:\\Users\\John")
+
+
+def test_windows_user_from_sam(target_win_users: Target) -> None:
+    fake_sam_user = Mock()
+    fake_sam_user.rid = 1002
+    fake_sam_user.username = "Jane"  # Should override "John" from home folder
+
+    target_win_users.machine_sid = Mock(return_value="S-1-5-21-3263113198-3007035898-945866154")
+    target_win_users.sam = Mock(return_value=[fake_sam_user])
+
+    users = list(target_win_users.users())
+
+    # There should be two users, SYSTEM and the user from SAM
+    assert len(users) == 2
+
+    # SYSTEM user
+    assert users[0].sid == "S-1-5-18"
+    assert users[0].name == "systemprofile"
+    assert users[0].home == windows_path("c:\\Windows\\system32\\config\\systemprofile")
+
+    # User from SAM, username from SAM should have priority
+    assert users[1].sid == "S-1-5-21-3263113198-3007035898-945866154-1002"
+    assert users[1].name == "Jane"
     assert users[1].home == windows_path("C:\\Users\\John")
 
 

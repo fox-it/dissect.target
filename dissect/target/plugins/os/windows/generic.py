@@ -564,6 +564,10 @@ class GenericPlugin(Plugin):
         """Return the machine SID of the system with the timestamp."""
         try:
             key = self.target.registry.key("HKLM\\SAM\\SAM\\Domains\\Account")
+
+            # The machine SID is stored in the last 12 bytes of the V value as little-endian
+            # The machine SID differs from a 'normal' binary SID as only holds 3 values and lacks a prefix / Revision
+            # NOTE: Consider moving this to dissect.util.sid if we encounter this more often
             sid = struct.unpack_from("<III", key.value("V").value, -12)
             return (f"S-1-5-21-{sid[0]}-{sid[1]}-{sid[2]}", key.timestamp)
         except (RegistryError, struct.error):
@@ -583,7 +587,7 @@ class GenericPlugin(Plugin):
         """Return the machine- and optional domain SID of the system."""
 
         if sid := self._machine_sid():
-            yield sid
+            yield ComputerSidRecord(ts=sid[1], sidtype="Machine", sid=sid[0], _target=self.target)
 
         try:
             key = self.target.registry.key("HKLM\\SECURITY\\Policy\\PolMachineAccountS")
