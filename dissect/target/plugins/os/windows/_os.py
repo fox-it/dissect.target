@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export, internal
-from dissect.target.plugins.os.windows.credential.sam import SamRecord
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -15,6 +14,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.plugins.os.windows.credential.sam import SamRecord
     from dissect.target.target import Target
 
 ARCH_MAP = {
@@ -309,10 +309,15 @@ class WindowsPlugin(OSPlugin):
         sam_users = self._sam_by_sid()
 
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+        sids = set()
         for k in self.target.registry.keys(key):
             for subkey in k.subkeys():
                 sid = subkey.name
 
+                if sid in sids:
+                    continue
+
+                sids.add(sid)
                 home = None
                 name = None
                 try:
