@@ -50,7 +50,7 @@ class Container(io.IOBase):
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} size={self.size} vs={self.vs.__type__ if self.vs else None}>"
+        return f"<Container type={self.__type__} size={self.size} vs={self.vs.__type__ if self.vs else None}>"
 
     @classmethod
     def detect(cls, item: list | BinaryIO | Path) -> bool:

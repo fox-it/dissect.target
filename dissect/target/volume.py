@@ -77,7 +77,7 @@ class VolumeSystem:
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} serial={self.serial}>"
+        return f"<VolumeSystem type={self.__type__} serial={self.serial}>"
 
     @classmethod
     def detect(cls, fh: BinaryIO) -> bool:
