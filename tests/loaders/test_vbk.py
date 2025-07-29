@@ -6,15 +6,16 @@ import pytest
 
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.loaders.hyperv import HyperVLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbk import VbkLoader
+from dissect.target.loaders.vmx import VmxLoader
 from dissect.target.target import Target
-from tests._utils import absolute_path
 
 
 @patch("dissect.target.loaders.vbk.VbkFilesystem")
-def test_vbk_loader(VbkFilesystem: Mock, target_default: Target) -> None:
-    """Test the VBK loader."""
+def test_vbk_loader_raw(VbkFilesystem: Mock, target_default: Target) -> None:
+    """Test the VBK loader on a raw disk backup layout."""
     vfs = VirtualFilesystem()
     VbkFilesystem.return_value = vfs
 
@@ -33,43 +34,79 @@ def test_vbk_loader(VbkFilesystem: Mock, target_default: Target) -> None:
     loader.map(target_default)
     assert isinstance(loader.loader, RawLoader)
     assert len(target_default.disks) == 1
+
     target_default.disks[0].seek(0)
     assert target_default.disks[0].read().decode() == "🍖👑"
 
 
 @patch("dissect.target.loaders.vbk.VbkFilesystem")
-def test_vbk_loader_vhdx(VbkFilesystem: Mock, target_default: Target) -> None:
-    """Test the VBK loader on a raw disk image with the VHDX file extension."""
+def test_vbk_loader_vmx(VbkFilesystem: Mock, target_default: Target) -> None:
+    """Test the VBK loader on a VMware backup layout."""
     vfs = VirtualFilesystem()
     VbkFilesystem.return_value = vfs
 
     loader = VbkLoader(Mock())
 
-    vfs.makedirs("guid")
-    vfs.makedirs("guid/scsi0-0")
-
     vfs.map_file_fh("guid/summary.xml", BytesIO(b""))
-
-    # Map raw candidate
-    candidate = Path(absolute_path("_data/loaders/vbk/vbk_candidate.raw"))
-    vfs.map_file("guid/scsi0-0/candidate.vhdx", candidate)
+    vfs.map_file_fh("guid/candidate.vmx", BytesIO(b'scsi0:0.fileName = "candidate.vmdk"'))
+    vfs.map_file_fh(
+        "guid/candidate.vmdk",
+        BytesIO(b'# Disk DescriptorFile\nparentCID=ffffffff\nRW 16777216 VMFS "candidate-flat.vmdk"'),
+    )
+    vfs.map_file_fh("guid/candidate-flat.vmdk", BytesIO("🍖👑".encode()))
 
     loader.map(target_default)
-    target_default.apply()
-
-    # The `vbk_candidate.raw` file is a raw container with just enough data to fit
-    # a partition table parse.
+    assert isinstance(loader.loader, VmxLoader)
     assert len(target_default.disks) == 1
-    assert len(target_default.volumes) == 4
-    assert target_default.volumes[0].name == "Basic data partition"
-    assert target_default.volumes[0].size == 471858688
-    assert target_default.volumes[0].fs is None
-    assert target_default.volumes[1].name == "EFI system partition"
-    assert target_default.volumes[1].size == 103808512
-    assert target_default.volumes[1].fs is None
-    assert target_default.volumes[2].name == "Microsoft reserved partition"
-    assert target_default.volumes[2].size == 16776704
-    assert target_default.volumes[2].fs is None
-    assert target_default.volumes[3].name == "Basic data partition"
-    assert target_default.volumes[3].size == 136844410368
-    assert target_default.volumes[3].fs is None
+
+    target_default.disks[0].seek(0)
+    assert target_default.disks[0].read(-1).decode() == "🍖👑"
+
+
+@patch("dissect.target.loaders.hyperv.hyperv.HyperVFile")
+@patch("dissect.target.loaders.vbk.VbkFilesystem")
+def test_vbk_loader_vmcx(VbkFilesystem: Mock, HyperVFile: Mock, target_default: Target) -> None:
+    """Test the VBK loader on a Hyper-V backup layout."""
+    vfs = VirtualFilesystem()
+    VbkFilesystem.return_value = vfs
+
+    HyperVFile.return_value = HyperVFile
+    HyperVFile.as_dict.return_value = {
+        "configuration": {
+            "manifest": {
+                "vdev0": {
+                    "device": "83f8638b-8dca-4152-9eda-2ca8b33039b4",
+                    "instance": "83f8638b-8dca-4152-9eda-2ca8b33039b4",
+                },
+                "vdev1": {
+                    "device": "d422512d-2bf2-4752-809d-7b82b5fcb1b4",
+                    "instance": "d422512d-2bf2-4752-809d-7b82b5fcb1b4",
+                },
+            },
+            "_83f8638b-8dca-4152-9eda-2ca8b33039b4_": {
+                "controller0": {"drive0": {"type": "VHD", "pathname": "C:\\Fake\\Path\\ide.vhdx"}},
+            },
+            "_d422512d-2bf2-4752-809d-7b82b5fcb1b4_": {
+                "controller0": {"drive0": {"type": "VHD", "pathname": "C:\\Fake\\Path\\scsi.vhdx"}},
+            },
+        }
+    }
+
+    loader = VbkLoader(Mock())
+
+    vfs.map_file_fh("guid/summary.xml", BytesIO(b""))
+    vfs.map_file_fh("guid/Config/candidate.vmcx", BytesIO(b""))
+    vfs.map_file_fh("guid/Ide0-0/ide.vhdx", BytesIO("🐌".encode()))
+    vfs.map_file_fh("guid/Scsi0-0/scsi.vhdx", BytesIO("🏃🏃".encode()))
+
+    loader.map(target_default)
+    assert isinstance(loader.loader, HyperVLoader)
+    assert len(target_default.disks) == 2
+
+    disks = sorted(target_default.disks, key=lambda d: d.size)
+
+    disks[0].seek(0)
+    assert disks[0].read(-1).decode() == "🐌"
+
+    disks[1].seek(0)
+    assert disks[1].read(-1).decode() == "🏃🏃"

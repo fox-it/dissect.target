@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import re
+from itertools import chain
 from typing import TYPE_CHECKING
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.vbk import VbkFilesystem
 from dissect.target.loader import Loader, find_loader
 from dissect.target.loaders.raw import RawLoader
@@ -22,7 +24,7 @@ class VbkLoader(Loader):
     """Load Veaam Backup (VBK) files.
 
     Resources:
-     - https://helpcenter.veeam.com/docs/backup/hyperv/backup_files.html?ver=120
+        - https://helpcenter.veeam.com/docs/backup/hyperv/backup_files.html?ver=120
     """
 
     def __init__(self, path: Path, **kwargs):
@@ -40,38 +42,34 @@ class VbkLoader(Loader):
         if (base := next(root.glob("*"), None)) is None:
             raise LoaderError("Unexpected empty VBK filesystem")
 
-        if not (candidates := [path for pattern in ("*.vmx", "*.vmcx") if (path := next(base.glob(pattern), None))]):
-            disks = []
-
+        if not (
+            candidates := [path for pattern in ("*.vmx", "Config/*.vmcx") if (path := next(base.glob(pattern), None))]
+        ):
             # Try to look for raw disks
-            for path in base.iterdir():
-                if RE_RAW_DISK.match(path.name):
-                    disks.append(path)
-
-                # Example: Idea0-0/<HOSTNAME>.vhdx
-                disks.extend(path.glob("*.vhdx"))
-
-            if not disks:
+            if not (disks := [path for path in base.iterdir() if RE_RAW_DISK.match(path.name)]):
                 # Dunno, just give up 🤷‍♂️ should've spent extra time staring at summary.xml
-                raise LoaderError("Unsupported VBK structure")
+                raise LoaderError("Unsupported VBK structure, use `-L raw` to manually inspect the VBK")
 
             candidates.append(root.joinpath("+".join(map(str, disks))))
 
         # Try to find a loader
         for candidate in candidates:
-            # Veeam stores Windows raw disk images with the .vhdx file extension, which confuses the VHDX loader because
-            # the disk images are not in the VHDX format but rather in a raw format.
-            # Therefore, the RawContainer is used to handle these files using a FibStream.
-            if candidate.name.endswith(".vhdx"):
-                target.disks.add(RawContainer(candidate.open()))
-                break
+            if candidate.suffix.lower() == ".vmcx":
+                # For VMCX files we need to massage the file layout a bit
+                vfs = VirtualFilesystem()
+                vfs.map_file_entry(candidate.name, candidate)
+
+                for entry in chain(base.glob("Ide*/*"), base.glob("Scsi*/*")):
+                    vfs.map_file_entry(entry.name, entry)
+
+                candidate = vfs.path(candidate.name)
+
             if (loader := find_loader(candidate, fallbacks=[RawLoader])) is not None:
                 ldr = loader(candidate)
                 ldr.map(target)
 
                 # Store a reference to the loader if we successfully mapped
                 self.loader = ldr
-
                 break
         else:
-            raise LoaderError("Unsupported VBK structure")
+            raise LoaderError("Unsupported VBK structure, use `-L raw` to manually inspect the VBK")
