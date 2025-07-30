@@ -75,6 +75,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert mimikatz_record.last_write_time.date() == detection_date
     assert mimikatz_record.last_accessed_time.date() == detection_date
 
+    assert mimikatz_record.quarantine_id == "a762038000000000fb1112639186e0d6"
+    assert mimikatz_record.scan_id == "cdbe4600e43a964b8dc2416b0ef7a207"
+    assert mimikatz_record.threat_id == 2147705511
+
 
 def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     # Map the quarantine folder from our test data
@@ -351,7 +355,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[8].pid == 2820
     assert records[8].sigseq == "0x1"
     assert records[8].send_memory_scan_report == 1
-    assert records[8].source == 4
+    assert records[8].source_id == 4
 
     # Original Filename
     assert records[9].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"

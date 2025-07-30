@@ -35,7 +35,7 @@ class VbkFilesystem(Filesystem):
     def _detect(fh: BinaryIO) -> bool:
         try:
             vbk.VBK(fh)
-        except vbk.VBKError:
+        except (vbk.VBKError, EOFError):
             return False
         else:
             return True

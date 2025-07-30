@@ -157,10 +157,10 @@ class UalPlugin(Plugin):
 
     __namespace__ = "ual"
 
-    LOG_DB_GLOB = "sysvol/Windows/System32/LogFiles/Sum/*.mdb"
+    LOG_DB_GLOB = "%windir%/System32/LogFiles/Sum/*.mdb"
 
     IDENTITY_DB_FILENAME = "SystemIdentity.mdb"
-    IDENTITY_DB_PATH = f"sysvol/Windows/System32/LogFiles/Sum/{IDENTITY_DB_FILENAME}"
+    IDENTITY_DB_PATH = f"%windir%/System32/LogFiles/Sum/{IDENTITY_DB_FILENAME}"
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -176,14 +176,16 @@ class UalPlugin(Plugin):
             raise UnsupportedPluginError("No MDB files found")
 
     def find_mdb_files(self) -> list[Path]:
+        base, _, glob = self.LOG_DB_GLOB.partition("*")
+
         return [
             path
-            for path in self.target.fs.path("/").glob(self.LOG_DB_GLOB)
+            for path in self.target.resolve(base).glob(f"*{glob}")
             if path.exists() and path.name != self.IDENTITY_DB_FILENAME
         ]
 
     def populate_role_guid_map(self) -> None:
-        identity_db = self.target.fs.path(self.IDENTITY_DB_PATH)
+        identity_db = self.target.resolve(self.IDENTITY_DB_PATH)
         if not identity_db.exists():
             return
 

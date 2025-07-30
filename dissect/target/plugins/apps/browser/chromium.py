@@ -71,6 +71,16 @@ struct GoogleChromeCipher {
 """
 c_elevation = cstruct(endian="<").load(elevation_def)
 
+# Resources:
+# - https://github.com/chromium/chromium/blob/main/components/download/public/common/download_item.h
+DOWNLOAD_STATES = {
+    0: "in_progress",
+    1: "complete",
+    2: "cancelled",
+    3: "interrupted",
+    4: "interrupted",  # Older versions of Chromium can have DownloadState value 4 as interrupted.
+}
+
 
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
@@ -363,6 +373,10 @@ class ChromiumMixin:
                         url = download_chain[-1].url
                         url = try_idna(url)
 
+                    # https://github.com/chromium/chromium/blob/main/components/download/public/common/download_item.h
+                    if state := row.get("state"):
+                        state = DOWNLOAD_STATES.get(state)
+
                     yield self.BrowserDownloadRecord(
                         ts_start=webkittimestamp(row.start_time),
                         ts_end=webkittimestamp(row.end_time) if row.end_time else None,
@@ -374,7 +388,7 @@ class ChromiumMixin:
                         url=url,
                         size=row.get("total_bytes"),
                         mime_type=row.get("mime_type"),
-                        state=row.get("state"),
+                        state=state,
                         source=db_file,
                         _target=self.target,
                         _user=user.user,
@@ -453,7 +467,7 @@ class ChromiumMixin:
                             ts_install=ts_install,
                             ts_update=ts_update,
                             browser=browser_name,
-                            id=extension_id,
+                            extension_id=extension_id,
                             name=name,
                             short_name=short_name,
                             default_title=default_title,
@@ -643,7 +657,7 @@ class ChromiumMixin:
                         cipher = ChaCha20_Poly1305.new(key=key, nonce=data.iv)
 
                     else:
-                        raise ValueError("Unsupported ElevationService key flag {data.flag!r}")  # noqa: TRY301
+                        raise ValueError(f"Unsupported ElevationService key flag {data.flag!r}")  # noqa: TRY301
 
                     aes_key = cipher.decrypt_and_verify(data.ciphertext, data.mac_tag)
 

@@ -403,7 +403,7 @@ class FirefoxPlugin(BrowserPlugin):
                         ts_install=from_unix_ms(extension.get("installDate", 0)),
                         ts_update=from_unix_ms(extension.get("updateDate", 0)),
                         browser="firefox",
-                        id=extension.get("id"),
+                        extension_id=extension.get("id"),
                         name=(extension.get("defaultLocale", {}) or {}).get("name"),
                         short_name=None,
                         default_title=None,

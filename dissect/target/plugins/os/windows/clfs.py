@@ -18,16 +18,16 @@ ClfsRecord = TargetRecordDescriptor(
     "filesystem/windows/clfs",
     [
         ("string", "stream_name"),
-        ("uint32", "stream_id"),
         ("string", "type"),
         ("string", "file_attributes"),
         ("uint32", "offset"),
         ("string", "container_name"),
-        ("uint32", "container_id"),
         ("uint32", "container_size"),
         ("uint32", "record_offset"),
         ("bytes", "record_data"),
         ("bytes", "block_data"),
+        ("uint32", "clfs_stream_id"),
+        ("uint32", "clfs_container_id"),
     ],
 )
 
@@ -42,13 +42,13 @@ class ClfsPlugin(Plugin):
     the memory implementation for dissect is working.
     """
 
-    BLF_PATH = "sysvol/windows/system32/config/"  # Unsure at time of writing if this is the only location
+    BLF_PATH = "%windir%/system32/config/"  # Unsure at time of writing if this is the only location
 
     def __init__(self, target: Target):
         super().__init__(target)
         self._blfs = []
 
-        blfdir = self.target.fs.path(self.BLF_PATH)
+        blfdir = self.target.resolve(self.BLF_PATH)
 
         if blfdir.exists() and blfdir.is_dir():
             blf_files = blfdir.glob("*.blf")
@@ -107,15 +107,15 @@ class ClfsPlugin(Plugin):
                         for record_offset, record_data, block_data in trans.records():
                             yield ClfsRecord(
                                 stream_name=stream.name,
-                                stream_id=stream.id,
                                 type=stream.type,
                                 file_attributes=stream.file_attributes,
                                 offset=stream.offset,
                                 container_name=container_file.name,
-                                container_id=stream.lsn_base.Offset.ContainerId,
                                 container_size=blf_container.size,
                                 record_offset=record_offset,
                                 record_data=record_data,
                                 block_data=block_data,
+                                clfs_stream_id=stream.id,
+                                clfs_container_id=stream.lsn_base.Offset.ContainerId,
                                 _target=self.target,
                             )

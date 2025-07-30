@@ -36,7 +36,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
     # Rustdesk logs when installed as a service/server
     SERVER_GLOBS = (
         # Windows >= Windows 7
-        "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log",
+        "%windir%/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log",
         "sysvol/ProgramData/RustDesk/*/*/*.log",
         # Linux
         "var/log/rustdesk-server/*.log",
@@ -61,7 +61,8 @@ class RustdeskPlugin(RemoteAccessPlugin):
 
         # Service globs
         for log_glob in self.SERVER_GLOBS:
-            for log_file in self.target.fs.path().glob(log_glob):
+            base, _, glob = log_glob.partition("*")
+            for log_file in self.target.resolve(base).glob(f"*{glob}"):
                 self.log_files.add((log_file, None))
 
         # User globs

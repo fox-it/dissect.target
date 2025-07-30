@@ -116,6 +116,16 @@ def test_sam_plugin_rev1(target_win_users: Target, hive_hklm: VirtualHive) -> No
     )
     users_key.add_subkey("000003E8", e8_key)
 
+    names_key = VirtualKey(hive_hklm, "Names")
+    names_key_users = ["Administrator", "Guest", "John"]
+
+    for name in names_key_users:
+        name_key = VirtualKey(hive_hklm, name)
+        name_key._timestamp = dt("2023-01-05 15:56:51.654921+00:00")
+
+        names_key.add_subkey(name, name_key)
+
+    users_key.add_subkey("Names", names_key)
     sam_key.add_subkey("Users", users_key)
     hive_hklm.map_key(SAM_KEY_PATH, sam_key)
 
@@ -133,6 +143,7 @@ def test_sam_plugin_rev1(target_win_users: Target, hive_hklm: VirtualHive) -> No
     results = list(target_win_users.sam())
 
     assert len(results) == 3
+    assert results[2].ts == dt("2023-01-05 15:56:51.654921+00:00")
     assert results[2].rid == 1000
     assert results[2].fullname == ""
     assert results[2].username == "John"
@@ -308,6 +319,16 @@ def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> No
     )
     users_key.add_subkey("000003E8", e8_key)
 
+    names_key = VirtualKey(hive_hklm, "Names")
+    names_key_users = ["Administrator", "Guest", "WDAGUtilityAccount", "DefaultAccount", "John"]
+
+    for name in names_key_users:
+        name_key = VirtualKey(hive_hklm, name)
+        name_key._timestamp = dt("2023-01-05 15:56:51.654921+00:00")
+
+        names_key.add_subkey(name, name_key)
+
+    users_key.add_subkey("Names", names_key)
     sam_key.add_subkey("Users", users_key)
     hive_hklm.map_key(SAM_KEY_PATH, sam_key)
 
@@ -326,6 +347,7 @@ def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> No
 
     assert len(results) == 5
 
+    assert results[3].ts == dt("2023-01-05 15:56:51.654921+00:00")
     assert results[3].rid == 504
     assert results[3].fullname == ""
     assert results[3].username == "WDAGUtilityAccount"
@@ -344,6 +366,7 @@ def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> No
     assert results[3].lm == ""
     assert results[3].nt == "2f4bbedb0aa738ae7ce3d9846692d3e4"
 
+    assert results[4].ts == dt("2023-01-05 15:56:51.654921+00:00")
     assert results[4].rid == 1000
     assert results[4].fullname == ""
     assert results[4].username == "John"

@@ -25,7 +25,8 @@ def test_wireguard_plugin_global_log(target_unix_users: Target, fs_unix: Virtual
     assert record.private_key == "UHJpdmF0ZUtleQ=="
     assert record.listen_port == 12345
     assert record.source == "/etc/wireguard/wg0.conf"
-    assert record.dns is None
+    assert record.dns == []
+    assert record.table == "1337"
 
     # Peer
     record = records[1]
@@ -39,4 +40,28 @@ def test_wireguard_plugin_global_log(target_unix_users: Target, fs_unix: Virtual
     assert record.name is None
     assert [str(addr) for addr in record.allowed_ips] == ["10.13.37.3/32", "::/0"]
     assert record.public_key == "UHVibGljS2V5Mg=="
+    assert record.source == "/etc/wireguard/wg0.conf"
+
+    # Peer
+    record = records[3]
+    assert record.name is None
+    assert record.allowed_ips == ["10.13.37.4"]
+    assert record.public_key == "UHVibGljS2V5Mg=="
+    assert record.source == "/etc/wireguard/wg0.conf"
+
+    # Interface
+    record = records[4]
+    assert record.name == "wg0"
+    assert record.address == "10.13.37.5"
+    assert record.private_key == "UHJpdmF0ZUtleTI=="
+    assert not record.listen_port
+    assert record.source == "/etc/wireguard/wg0.conf"
+    assert record.dns == ["10.13.37.1", "1.1.1.1"]
+    assert record.table == "off"
+
+    # Peer
+    record = records[5]
+    assert record.name is None
+    assert record.allowed_ips == ["0.0.0.0/0"]
+    assert record.public_key == "TWFkZVlvdUxvb2s="
     assert record.source == "/etc/wireguard/wg0.conf"

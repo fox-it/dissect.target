@@ -29,9 +29,9 @@ def test_cache_namespace(target_bare: Target) -> None:
     )
 
 
-def test_cache_filename(target_bare: Target) -> None:
-    plugin1 = AmcachePlugin(target_bare)
-    plugin2 = UalPlugin(target_bare)
+def test_cache_filename(target_win: Target) -> None:
+    plugin1 = AmcachePlugin(target_win)
+    plugin2 = UalPlugin(target_win)
 
     cache1 = Cache(AmcachePlugin.applications)
     cache2 = Cache(UalPlugin.client_access)
@@ -41,20 +41,20 @@ def test_cache_filename(target_bare: Target) -> None:
     assert cache1.fname == cache3.fname == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.applications"
     assert cache2.fname == cache4.fname == "dissect.target.plugins.os.windows.ual.UalPlugin.client_access"
 
-    target_bare._config.CACHE_DIR = "/tmp"
+    target_win._config.CACHE_DIR = "/tmp"
     assert (
-        cache1.cache_path(target_bare, ()).name
+        cache1.cache_path(target_win, ()).name
         == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.applications.KCk=.zstd"
     )
     assert (
-        cache2.cache_path(target_bare, ()).name
+        cache2.cache_path(target_win, ()).name
         == "dissect.target.plugins.os.windows.ual.UalPlugin.client_access.KCk=.zstd"
     )
     assert (
-        cache3.cache_path(target_bare, ()).name
+        cache3.cache_path(target_win, ()).name
         == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.applications.KCk=.zstd"
     )
     assert (
-        cache4.cache_path(target_bare, ()).name
+        cache4.cache_path(target_win, ()).name
         == "dissect.target.plugins.os.windows.ual.UalPlugin.client_access.KCk=.zstd"
     )
