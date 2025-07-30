@@ -5,6 +5,7 @@ from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import KeyP
 
 class DefaultPasswordKeyProvider(KeyProviderPlugin):
     """DefaultPassword key provider plugin for DPAPI."""
+
     __namespace__ = "dpapi.keyprovider.defaultpassword"
 
     def check_compatible(self) -> None:
