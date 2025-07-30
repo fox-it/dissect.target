@@ -4,16 +4,18 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.plugin import export
-from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import KeyProviderPlugin
+from dissect.target.plugins.os.windows.dpapi.keyprovider.defaultpassword.defaultpassword import (
+    DefaultPasswordKeyProvider,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-class WinlogonDefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
+class WinlogonDefaultPasswordKeyProviderPlugin(DefaultPasswordKeyProvider):
     """Windows Winlogon DefaultPassword key provider plugin."""
 
-    __namespace__ = "dpapi.keyprovider.winlogon_defaultpassword"
+    __namespace__ = "dpapi.keyprovider.defaultpassword.winlogon"
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):

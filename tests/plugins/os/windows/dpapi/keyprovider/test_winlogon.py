@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING
 
 from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
-from dissect.target.plugins.os.windows.dpapi.keyprovider.winlogon import WinlogonDefaultPasswordKeyProviderPlugin
+from dissect.target.plugins.os.windows.dpapi.keyprovider.defaultpassword.winlogon import (
+    WinlogonDefaultPasswordKeyProviderPlugin,
+)
 
 if TYPE_CHECKING:
     from dissect.target.helpers.regutil import VirtualHive
@@ -22,6 +24,6 @@ def test_dpapi_keyprovider_winlogon(target_win: Target, hive_hklm: VirtualHive) 
     target_win.add_plugin(DPAPIPlugin, check_compatible=False)
     target_win.add_plugin(WinlogonDefaultPasswordKeyProviderPlugin)
 
-    key = next(target_win.dpapi.keyprovider.winlogon_defaultpassword())
+    key = next(target_win.dpapi.keyprovider.defaultpassword.winlogon())
 
-    assert key == ("dpapi.keyprovider.winlogon_defaultpassword", "password")
+    assert key == ("dpapi.keyprovider.defaultpassword.winlogon", "password")
