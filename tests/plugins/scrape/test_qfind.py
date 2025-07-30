@@ -149,7 +149,7 @@ def test_qfind_unique(target_bare: Target, capsys: pytest.CaptureFixture) -> Non
 
     target_bare.add_plugin(QFindPlugin)
 
-    buf = (b"ABCD" + b"\x00" * ((1024 * 8) - 4)) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4))
+    buf = (b"\x00" * 512) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4)) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4))
     mock_disk = RawContainer(io.BytesIO(buf))
     target_bare.disks.add(mock_disk)
 
