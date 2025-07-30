@@ -63,22 +63,40 @@ def target_firefox_oculus(target_android: Target, fs_android: VirtualFilesystem)
 
 
 @pytest.mark.parametrize(
-    "target_platform",
-    ["target_firefox_win", "target_firefox_unix"],
+    ("target_platform", "expected_source"),
+    [
+        (
+            "target_firefox_win",
+            "C:\\Users\\John\\AppData\\local\\Mozilla\\Firefox\\Profiles\\g1rbw8y7.default-release\\places.sqlite",
+        ),
+        (
+            "target_firefox_unix",
+            "/root/.mozilla/firefox/g1rbw8y7.default-release/places.sqlite",
+        ),
+    ],
 )
-def test_firefox_history(target_platform: Target, request: pytest.FixtureRequest) -> None:
+def test_firefox_history(target_platform: Target, expected_source: str, request: pytest.FixtureRequest) -> None:
     target_platform = request.getfixturevalue(target_platform)
     records = list(target_platform.firefox.history())
 
     assert len(records) == 24
     assert {"firefox"} == {record.browser for record in records}
 
-    assert records[0].url == "https://www.mozilla.org/privacy/firefox/"
-    assert records[0].id == 1
-    assert records[0].description == "47356411089529"
-    assert records[0].visit_count == 1
     assert records[0].ts == dt("2021-12-01T10:42:05.742000+00:00")
+    assert records[0].browser == "firefox"
+    assert records[0].id == 1
+    assert records[0].url == "https://www.mozilla.org/privacy/firefox/"
+    assert not records[0].title
+    assert not records[0].description
+    assert records[0].host == "www.mozilla.org"
+    assert records[0].visit_type == 1
+    assert records[0].visit_count == 1
     assert records[0].hidden
+    assert not records[0].typed
+    assert records[0].session == 0
+    assert not records[0].from_visit
+    assert not records[0].from_url
+    assert records[0].source == expected_source
 
 
 @pytest.mark.parametrize(
@@ -218,7 +236,7 @@ def test_firefox_oculus_history(target_firefox_oculus: Target) -> None:
 
     assert records[0].url == "https://webxr.today/"
     assert records[0].id == 1
-    assert records[0].description == "47356570952011"
+    assert not records[0].description
     assert records[0].ts == dt("2021-11-04 13:29:30.780000+00:00")
 
 
