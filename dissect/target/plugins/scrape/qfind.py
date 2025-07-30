@@ -27,7 +27,7 @@ QFindMatchRecord = TargetRecordDescriptor(
         ("string", "needle"),
         ("string", "codec"),
         ("bytes", "match"),
-        ("bytes", "content"),
+        ("bytes", "buffer"),
     ],
 )
 
@@ -46,7 +46,7 @@ class QFindPlugin(Plugin):
     @arg("-i", "--ignore-case", action="store_true", help="case insensitive search")
     @arg("-u", "--unique", action="store_true", help="only yield unique string hits (does not apply to raw output)")
     @arg("-W", "--window", type=int, default=256, help="maximum window size in bytes for context around each hit")
-    @arg("--strip-null-bytes", action="store_true", help="strip null bytes from matched content")
+    @arg("--strip-null-bytes", action="store_true", help="strip null bytes from matched buffer")
     @export(record=QFindMatchRecord)
     def qfind(
         self,
@@ -167,6 +167,6 @@ class QFindPlugin(Plugin):
                 needle=original_needle,
                 codec=codec,
                 match=match,
-                content=buf.strip(b"\x00") if strip_null_bytes else buf,
+                buffer=buf.strip(b"\x00") if strip_null_bytes else buf,
                 _target=self.target,
             )

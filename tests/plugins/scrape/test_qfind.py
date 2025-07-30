@@ -141,7 +141,7 @@ def test_qfind_regex(mock_target: Target) -> None:
     assert results[0].needle == r"[a-d]{4}"
     assert results[0].codec == "utf-8"
     assert results[0].match == b"ABCD"
-    assert results[0].content == (b"\x00" * 256) + b"ABCD" + (b"\x00" * 252)
+    assert results[0].buffer == (b"\x00" * 256) + b"ABCD" + (b"\x00" * 252)
 
 
 def test_qfind_unique(target_bare: Target, capsys: pytest.CaptureFixture) -> None:

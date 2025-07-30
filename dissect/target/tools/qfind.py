@@ -103,15 +103,15 @@ def main() -> int:
                         if not NO_COLOR
                         else None
                     )
-                    utils.hexdump(hit.content, palette, offset=before_offset)
+                    utils.hexdump(hit.buffer, palette, offset=before_offset)
 
                 else:
                     codec = "utf-8" if hit.codec == "hex" else hit.codec
                     before_part = recover_string(
-                        hit.content[: hit.offset - before_offset], codec, reverse=True, ascii=not args.allow_non_ascii
+                        hit.buffer[: hit.offset - before_offset], codec, reverse=True, ascii=not args.allow_non_ascii
                     )
                     after_part = recover_string(
-                        hit.content[hit.offset - before_offset :], codec, ascii=not args.allow_non_ascii
+                        hit.buffer[hit.offset - before_offset :], codec, ascii=not args.allow_non_ascii
                     )
                     hit = (
                         before_part,
