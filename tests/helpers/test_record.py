@@ -114,6 +114,10 @@ def test_trd_call_with_default_fields() -> None:
     assert record.domain == "some.domain"
     assert record._source == "/some/path"
 
+def test_trd_unix_shell_type() -> None:
+    shell_fields = [field for field in UnixUserRecord.get_field_tuples() if field[1] == "shell"]
+    assert shell_fields, "UnixUserRecord should have a 'shell' field"
+    assert all(field[0] == "path" for field in shell_fields), "All 'shell' fields in UnixUserRecord should have type 'path'"
 
 def test_trd_call_no_target() -> None:
     record = TestRecord(
