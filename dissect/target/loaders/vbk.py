@@ -4,7 +4,6 @@ import re
 from itertools import chain
 from typing import TYPE_CHECKING
 
-from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.vbk import VbkFilesystem

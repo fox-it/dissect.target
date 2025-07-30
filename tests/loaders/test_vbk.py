@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from io import BytesIO
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
@@ -10,11 +12,13 @@ from dissect.target.loaders.hyperv import HyperVLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbk import VbkLoader
 from dissect.target.loaders.vmx import VmxLoader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @patch("dissect.target.loaders.vbk.VbkFilesystem")
-def test_vbk_loader_raw(VbkFilesystem: Mock, target_default: Target) -> None:
+def test_vbk_loader_mock_raw(VbkFilesystem: Mock, target_default: Target) -> None:
     """Test the VBK loader on a raw disk backup layout."""
     vfs = VirtualFilesystem()
     VbkFilesystem.return_value = vfs
@@ -40,7 +44,7 @@ def test_vbk_loader_raw(VbkFilesystem: Mock, target_default: Target) -> None:
 
 
 @patch("dissect.target.loaders.vbk.VbkFilesystem")
-def test_vbk_loader_vmx(VbkFilesystem: Mock, target_default: Target) -> None:
+def test_vbk_loader_mock_vmx(VbkFilesystem: Mock, target_default: Target) -> None:
     """Test the VBK loader on a VMware backup layout."""
     vfs = VirtualFilesystem()
     VbkFilesystem.return_value = vfs
@@ -65,7 +69,7 @@ def test_vbk_loader_vmx(VbkFilesystem: Mock, target_default: Target) -> None:
 
 @patch("dissect.target.loaders.hyperv.hyperv.HyperVFile")
 @patch("dissect.target.loaders.vbk.VbkFilesystem")
-def test_vbk_loader_vmcx(VbkFilesystem: Mock, HyperVFile: Mock, target_default: Target) -> None:
+def test_vbk_loader_mock_vmcx(VbkFilesystem: Mock, HyperVFile: Mock, target_default: Target) -> None:
     """Test the VBK loader on a Hyper-V backup layout."""
     vfs = VirtualFilesystem()
     VbkFilesystem.return_value = vfs
