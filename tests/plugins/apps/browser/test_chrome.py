@@ -85,7 +85,7 @@ def test_chrome_history(target_platform: Target, request: pytest.FixtureRequest)
         records[0].url == "https://www.google.com/search?q=github+fox-it+dissect&oq=github+fox-it+dissect"
         "&aqs=chrome..69i57.12832j0j4&sourceid=chrome&ie=UTF-8"
     )
-    assert records[0].id == "1"
+    assert records[0].id == 1
     assert records[0].visit_count == 2
     assert records[0].ts == dt("2023-02-24T11:54:07.157810+00:00")
 
@@ -105,6 +105,7 @@ def test_chrome_downloads(target_platform: Target, request: pytest.FixtureReques
     assert records[0].ts_start == dt("2023-02-24T11:54:19.726147+00:00")
     assert records[0].ts_end == dt("2023-02-24T11:54:21.030043+00:00")
     assert records[0].url == "https://codeload.github.com/fox-it/dissect/zip/refs/heads/main"
+    assert records[0].state == "complete"
 
 
 @pytest.mark.parametrize(
@@ -122,7 +123,7 @@ def test_chrome_extensions(target_platform: Target, request: pytest.FixtureReque
     assert records[0].ts_update == dt("2022-11-24T15:20:43.682152+00:00")
     assert records[0].name == "Web Store"
     assert records[0].version == "0.2"
-    assert records[0].id == "ahfgeienlihckogmohjhadlkjgocpleb"
+    assert records[0].extension_id == "ahfgeienlihckogmohjhadlkjgocpleb"
 
 
 def test_windows_chrome_passwords_plugin(target_chrome_win: Target) -> None:
@@ -429,7 +430,7 @@ def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win:
 
     .. code-block::
 
-        (chrome.exe|msedge.exe) --enable-features=UseElevator
+        (chrome.exe|msedge.exe) --enable-field-trial-config --enable-features=UseElevator,AppBoundEncryptionKeyV3
 
     """
 

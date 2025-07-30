@@ -196,8 +196,8 @@ class MicrosoftDefenderPlugin(Plugin):
             # These fields are present for all (currently known) quarantine entry types
             fields = {
                 "ts": entry.timestamp,
-                "quarantine_id": entry.quarantine_id,
-                "scan_id": entry.scan_id,
+                "quarantine_id": entry.quarantine_id.hex(),
+                "scan_id": entry.scan_id.hex(),
                 "threat_id": entry.threat_id,
                 "detection_name": entry.detection_name,
             }
