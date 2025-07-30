@@ -128,7 +128,7 @@ class AnsiColors(StrEnum):
 
 
 # ANSI color escape sequences for readline prompt
-ANSI_COLORS = readline_escape(AnsiColors.as_dict())
+ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
 
 
 class ExtendedCmd(cmd.Cmd):
@@ -721,7 +721,7 @@ class TargetCli(TargetCmd):
     def do_mounts(self, line: str) -> bool:
         """print target mounts"""
         for mount, fs in self.target.fs.mounts.items():
-            print(f"<Mount path={mount!r} fs={fs!r}>")
+            print(f"<Mount fs={fs.__type__!r} path={mount!r}>")
         return False
 
     def do_info(self, line: str) -> bool:

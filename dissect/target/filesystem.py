@@ -66,7 +66,7 @@ class Filesystem:
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}>"
+        return f"<Filesystem type={self.__type__}>"
 
     def path(self, *args) -> fsutil.TargetPath:
         """Instantiate a new path-like object on this filesystem."""
