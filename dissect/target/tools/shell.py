@@ -128,7 +128,7 @@ class AnsiColors(StrEnum):
 
 
 # ANSI color escape sequences for readline prompt
-ANSI_COLORS = readline_escape(AnsiColors.as_dict())
+ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
 
 
 class ExtendedCmd(cmd.Cmd):
