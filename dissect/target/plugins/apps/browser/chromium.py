@@ -205,11 +205,11 @@ class ChromiumMixin:
                 url (uri): History URL.
                 title (string): Page title.
                 description (string): Page description.
-                rev_host (string): Reverse hostname.
+                host (string): Hostname.
                 visit_type (varint): Visit type.
                 visit_count (varint): Amount of visits.
                 hidden (string): Hidden value.
-                typed (string): Typed value.
+                typed (boolean): Typed value.
                 session (varint): Session value.
                 from_visit (varint): Record ID of the "from" visit.
                 from_url (uri): URL of the "from" visit.
@@ -237,7 +237,7 @@ class ChromiumMixin:
                         url=try_idna(url.url),
                         title=url.title,
                         description=None,
-                        rev_host=None,
+                        host=None,
                         visit_type=None,
                         visit_count=url.visit_count,
                         hidden=url.hidden,
