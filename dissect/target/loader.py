@@ -252,6 +252,8 @@ register("velociraptor", "VelociraptorLoader")
 register("uac", "UacLoader")
 register("smb", "SmbLoader")
 register("cb", "CbLoader")
+register("ssh", "SshLoader")
+register("nc", "NetcatListenerLoader")
 register("cyber", "CyberLoader")
 register("proxmox", "ProxmoxLoader")
 register("multiraw", "MultiRawLoader")  # Should be last
