@@ -118,6 +118,8 @@ class SearchIndexPlugin(Plugin):
         to correlate the field ``System_FileOwner`` with a ``UserRecordDescriptor``. The field ``System_FileAttributes`` should be
         investigated further.
 
+        No test data available for indexed Outlook emails, this plugin might not be able to handle indexed email messages.
+
         Resources:
             - https://learn.microsoft.com/en-us/windows/win32/search/-search-3x-wds-overview
             - https://github.com/libyal/esedb-kb/blob/main/documentation/Windows%20Search.asciidoc
