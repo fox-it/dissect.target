@@ -6,7 +6,9 @@ from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import export
-from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import KeyProviderPlugin
+from dissect.target.plugins.os.windows.dpapi.keyprovider.defaultpassword.defaultpassword import (
+    DefaultPasswordKeyProvider,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -23,10 +25,10 @@ struct DefaultPassword {
 c_defaultpassword = cstruct().load(defaultpassword_def)
 
 
-class LSADefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
+class LSADefaultPasswordKeyProviderPlugin(DefaultPasswordKeyProvider):
     """Windows LSA DefaultPassword key provider plugin."""
 
-    __namespace__ = "_dpapi_keyprovider_lsa_defaultpassword"
+    __namespace__ = "dpapi.keyprovider.defaultpassword.lsa"
 
     def check_compatible(self) -> None:
         if not self.target.has_function("lsa"):
