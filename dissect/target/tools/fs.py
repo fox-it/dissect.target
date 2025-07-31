@@ -143,8 +143,8 @@ def main() -> int:
     parser_cp.set_defaults(handler=cp)
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(args)
 
     if args.subcommand is None:
         parser.error("No subcommand specified")
