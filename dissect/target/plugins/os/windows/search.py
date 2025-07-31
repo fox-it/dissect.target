@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import re
+from typing import TYPE_CHECKING, Any, Union
 
 from dissect.esedb import EseDB
 from dissect.sql import SQLite3
@@ -10,6 +11,9 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import hashutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.apps.browser.browser import BrowserHistoryRecord
+from dissect.target.plugins.apps.browser.edge import EdgePlugin
+from dissect.target.plugins.apps.browser.iexplore import InternetExplorerPlugin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -28,23 +32,36 @@ SearchIndexRecord = TargetRecordDescriptor(
         ("path", "path"),
         ("string", "type"),
         ("filesize", "size"),
-        ("bytes", "data"),
+        ("string", "data"),
         ("path", "source"),
     ],
 )
 
+SearchIndexActivityRecord = TargetRecordDescriptor(
+    "windows/search_index/activity",
+    [
+        ("datetime", "ts_start"),
+        ("datetime", "ts_end"),
+        ("varint", "duration"),
+        ("string", "application_name"),
+        ("string", "application_id"),
+        ("string", "activity_id"),
+        ("path", "source"),
+    ],
+)
+
+RE_URL = re.compile(r"(?P<browser>.+)\:\/\/\{(?P<sid>.+)\}\/(?P<url>.+)$")
+
+BROWSER_RECORD_MAP = {
+    "iehistory": InternetExplorerPlugin.BrowserHistoryRecord,
+    "winrt": EdgePlugin.BrowserHistoryRecord,
+}
+
+SearchIndexRecords = Union[SearchIndexRecord, SearchIndexActivityRecord, BrowserHistoryRecord]
+
 
 class SearchIndexPlugin(Plugin):
-    """Windows Search Index plugin.
-
-    Parses ``Windows.edb`` EseDB and ``Windows.db`` SQlite3 databases. Currently does not parse
-    ``GatherLogs/SystemIndex/SystemIndex.*.(Crwl|gthr)`` files or ``Windows-gather.db`` and ``Windows-usn.db`` files.
-
-    Resources:
-        - https://github.com/strozfriedberg/sidr
-        - https://github.com/libyal/esedb-kb/blob/main/documentation/Windows%20Search.asciidoc
-        - https://www.aon.com/en/insights/cyber-labs/windows-search-index-the-forensic-artifact-youve-been-searching-for
-    """
+    """Windows Search Index plugin."""
 
     SYSTEM_PATHS = (
         # Windows 11 22H2 (SQLite3)
@@ -85,11 +102,30 @@ class SearchIndexPlugin(Plugin):
         if not self.databases:
             raise UnsupportedPluginError("No Windows Search Index database files found on target")
 
-    @export(record=SearchIndexRecord)
-    def search(self) -> Iterator[SearchIndexRecord]:
-        """Yield Windows Index Search records."""
+    @export(record=[SearchIndexRecords])
+    def search(self) -> Iterator[SearchIndexRecords]:
+        """Yield Windows Index Search records.
 
-        # TODO: Split record types in IE/Edge browsing activity, user activity and file activity
+        Windows Search is a standard component of Windows 7 and Windows Vista, and is enabled by default. The standard (non-Windows Server)
+        configuration of Windows Search indexes the following paths: ``C:\\Users\\*`` and ``C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\*``,
+        with some exceptions for certain file extensions (see the linked resources for more information).
+
+        Parses ``Windows.edb`` EseDB and ``Windows.db`` SQlite3 databases. Currently does not parse
+        ``GatherLogs/SystemIndex/SystemIndex.*.(Crwl|gthr)`` files or ``Windows-gather.db`` and ``Windows-usn.db`` files.
+
+        The difference between the fields ``System_Date*`` and ``System_Document_Date*`` should be researched further.
+        It is unclear what the field ``InvertedOnlyMD5`` is a checksum of (record or file content?). It might be possible
+        to correlate the field ``System_FileOwner`` with a ``UserRecordDescriptor``. The field ``System_FileAttributes`` should be
+        investigated further.
+
+        Resources:
+            - https://learn.microsoft.com/en-us/windows/win32/search/-search-3x-wds-overview
+            - https://github.com/libyal/esedb-kb/blob/main/documentation/Windows%20Search.asciidoc
+            - https://www.aon.com/en/insights/cyber-labs/windows-search-index-the-forensic-artifact-youve-been-searching-for
+            - https://github.com/strozfriedberg/sidr
+            - https://devblogs.microsoft.com/windows-search-platform/configuration-and-settings/
+            - https://learn.microsoft.com/en-us/windows/win32/search/-search-3x-wds-included-in-index
+        """  # noqa: E501
 
         for db_path, user_details in self.databases:
             if db_path.suffix == ".edb":
@@ -98,102 +134,117 @@ class SearchIndexPlugin(Plugin):
             elif db_path.suffix == ".db":
                 yield from self.parse_sqlite(db_path, user_details)
 
-    def parse_esedb(self, db_path: Path, user_details: UserDetails) -> Iterator[SearchIndexRecord]:
+            else:
+                self.target.log.warning("Unknown Windows Search Index database file %r", db_path)
+
+    def parse_esedb(self, db_path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the EseDB ``SystemIndex_PropertyStore`` table."""
 
         with db_path.open("rb") as fh:
             db = EseDB(fh)
             table = db.table("SystemIndex_PropertyStore")
 
-            # Translates e.g. "System_DateModified" to "15F-System_DateModified"
-            COLS = {col.split("-", maxsplit=1)[-1]: col for col in table.column_names}
+            # Translates e.g. ``System_DateModified`` to ``15F-System_DateModified``
+            COLUMNS = {col.split("-", maxsplit=1)[-1]: col for col in table.column_names}
 
             for record in table.records():
+                values = {
+                    clean_col: record.get(full_col) for clean_col, full_col in COLUMNS.items() if record.get(full_col)
+                }
+                yield from self.build_record(values, user_details, db_path)
 
-                # BUG: System_Search_AutoSummary is LongText but actually stores bytes?
-                data = record.get(COLS["System_Search_AutoSummary"])
-                data = data.encode() if isinstance(data, str) else data
-
-                # TODO: What is the difference between System_Date* and System_Document_Date*?
-                # TODO: Check if InvertedOnlyMD5 field matches filesystem file content
-
-                yield SearchIndexRecord(
-                    ts=None,
-                    ts_mtime=wintimestamp(int.from_bytes(b_mtime, "little"))
-                    if (b_mtime := record.get(COLS["System_DateModified"]))
-                    else None,
-                    ts_btime=wintimestamp(int.from_bytes(b_btime, "little"))
-                    if (b_btime := record.get(COLS["System_DateCreated"]))
-                    else None,
-                    ts_atime=wintimestamp(int.from_bytes(b_atime, "little"))
-                    if (b_atime := record.get(COLS["System_DateAccessed"]))
-                    else None,
-                    path=record.get(COLS["System_ItemPathDisplay"]),
-                    type=record.get(COLS["System_MIMEType"]),  # or System_ItemTypeText
-                    size=int.from_bytes(b_size, "little") if (b_size := record.get(COLS["System_Size"])) else None,
-                    data=data,
-                    source=db_path,
-                    _target=self.target,
-                )
-
-    def parse_sqlite(self, db_path: Path, user_details: UserDetails) -> Iterator[SearchIndexRecord]:
+    def parse_sqlite(self, db_path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the SQLite3 ``SystemIndex_1_PropertyStore`` table."""
-
-        def build_record(values: dict[str, Any], db_path: Path, target: Target) -> Iterator[SearchIndexRecord]:
-
-            # TODO: Add System_FileOwner
-            # TODO: Add System_Search_AutoSummary
-            # TODO: Parse System_FileAttributes (https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants)
-
-            yield SearchIndexRecord(
-                ts=wintimestamp(int.from_bytes(b_gtime, "little"))
-                if (b_gtime := current_values.get("System_Search_GatherTime"))
-                else None,
-                ts_mtime=wintimestamp(int.from_bytes(b_mtime, "little"))
-                if (b_mtime := current_values.get("System_DateModified"))
-                else None,
-                ts_btime=wintimestamp(int.from_bytes(b_btime, "little"))
-                if (b_btime := current_values.get("System_DateCreated"))
-                else None,
-                ts_atime=wintimestamp(int.from_bytes(b_atime, "little"))
-                if (b_atime := current_values.get("System_DateAccessed"))
-                else None,
-                path=current_values.get("System_ItemPathDisplay"),
-                type=current_values.get("System_MIMEType"),  # or System_ContentType or System_ItemTypeText
-                size=int.from_bytes(b_size, "little")
-                if (b_size := current_values.get("System_Size"))
-                else None,
-                data=bytes(current_values.get("System_Search_AutoSummary", ""),encoding="utf-8") or None,
-                source=db_path,
-                _target=target,
-            )
 
         with db_path.open("rb") as fh:
             db = SQLite3(fh)
 
-            # Contains WorkId, ColumnId and Value
+            # Contains ``WorkId``, ``ColumnId`` and ``Value``
             table = db.table("SystemIndex_1_PropertyStore")
 
-            # ColumnId is translated using the ``SystemIndex_1_PropertyStore_Metadata`` table
-            COLS = {
+            # ``ColumnId`` is translated using the ``SystemIndex_1_PropertyStore_Metadata`` table
+            COLUMNS = {
                 row.get("Id"): row.get("UniqueKey", "").split("-", maxsplit=1)[-1]
                 for row in db.table("SystemIndex_1_PropertyStore_Metadata").rows()
             }
 
             current_work_id = None
-            current_values = {}
+            values = {}
 
             for row in table.rows():
                 if current_work_id is None:
                     current_work_id = row.get("WorkId")
 
                 if row.get("WorkId") != current_work_id:
-                    yield from build_record(current_values, db_path, self.target)
+                    yield from self.build_record(values, user_details, db_path)
                     current_work_id = row.get("WorkId")
-                    current_values = {}
+                    values = {}
 
                 column_id = row.get("ColumnId")
-                column_name = COLS[column_id]
-                current_values[column_name] = row.get("Value")
+                column_name = COLUMNS[column_id]
+                if value := row.get("Value"):
+                    values[column_name] = value
 
-            yield from build_record(current_values, db_path, self.target)
+            yield from self.build_record(values, user_details, db_path)
+
+    def build_record(
+        self, values: dict[str, Any], user_details: UserDetails | None, db_path: Path
+    ) -> Iterator[SearchIndexRecords]:
+        """Build a ``SearchIndexRecord``, ``SearchIndexActivityRecord`` or ``HistoryRecord``."""
+
+        if values.get("System_ItemType") == "ActivityHistoryItem":
+            yield SearchIndexActivityRecord(
+                ts_start=wintimestamp(int.from_bytes(values.get("System_ActivityHistory_StartTime", b""), "little")),
+                ts_end=wintimestamp(int.from_bytes(values.get("System_ActivityHistory_EndTime", b""), "little")),
+                duration=int.from_bytes(values.get("System_ActivityHistory_ActiveDuration", b""), "little"),
+                application_name=values.get("System_Activity_AppDisplayName"),
+                application_id=values.get("System_ActivityHistory_AppId"),
+                activity_id=values.get("System_ActivityHistory_AppActivityId"),
+                source=db_path,
+                _target=self.target,
+            )
+
+        elif values.get("System_Search_Store") in ("iehistory", "winrt"):
+            system_itemurl = values.get("System_ItemUrl")
+
+            if not system_itemurl or not (match := RE_URL.match(system_itemurl)):
+                self.target.log.warning(
+                    "Unable to parse System_ItemUrl: %r (%r) in %s", system_itemurl, values, db_path
+                )
+                return
+
+            browser, sid, url = match.groupdict().values()
+
+            if not (CurrentBrowserHistoryRecord := BROWSER_RECORD_MAP.get(browser)):
+                self.target.log.warning(
+                    "Unable to determine browser history type for %r (%r) in %s", browser, system_itemurl, db_path
+                )
+                return
+
+            yield CurrentBrowserHistoryRecord(
+                ts=wintimestamp(int.from_bytes(values.get("System_Link_DateVisited", b""), "little")),
+                browser=browser,
+                url=values.get("System_Link_TargetUrl") or url,
+                title=values.get("System_Title"),
+                host=None,  # TODO: derive from url
+                source=db_path,
+                _user=None,  # TODO: derive from sid
+                _target=self.target,
+            )
+
+        # System_Search_Store = "file"
+        else:
+            yield SearchIndexRecord(
+                ts=wintimestamp(int.from_bytes(values.get("System_Search_GatherTime", b""), "little")),
+                ts_mtime=wintimestamp(int.from_bytes(values.get("System_DateModified", b""), "little")),
+                ts_btime=wintimestamp(int.from_bytes(values.get("System_DateCreated", b""), "little")),
+                ts_atime=wintimestamp(int.from_bytes(values.get("System_DateAccessed", b""), "little")),
+                path=values.get("System_ItemPathDisplay"),
+                type=values.get("System_MIMEType")
+                or values.get("System_ContentType")
+                or values.get("System_ItemTypeText"),
+                size=int.from_bytes(b_size, "little") if (b_size := values.get("System_Size")) else None,
+                data=values.get("System_Search_AutoSummary"),
+                source=db_path,
+                _target=self.target,
+            )
