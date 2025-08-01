@@ -15,6 +15,7 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
@@ -652,10 +653,6 @@ def test_open_uri() -> None:
         assert target._loader.parsed_path.query == "query=1&other=2"
 
 
-class CustomPath(Path):
-    """A custom Path class for testing."""
-
-
 @pytest.mark.parametrize(
     ("path", "expected"),
     [
@@ -676,8 +673,8 @@ class CustomPath(Path):
         (Path("./test.txt"), Path("./test.txt")),
         (Path("local"), Path("local")),
         (Path("local?query=1&other=2"), Path("local")),
-        (CustomPath("custom.txt"), CustomPath("custom.txt")),
-        (CustomPath("/path/to/custom.txt"), CustomPath("/path/to/custom.txt")),
+        (TargetPath(VirtualFilesystem(), "custom.txt"), TargetPath(VirtualFilesystem(), "custom.txt")),
+        (TargetPath(VirtualFilesystem(), "/path/to/custom.txt"), TargetPath(VirtualFilesystem(), "/path/to/custom.txt")),
     ],
 )
 def test_expected_path(path: str | Path, expected: Path) -> None:
