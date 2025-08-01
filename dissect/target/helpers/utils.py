@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-import urllib.parse
 from datetime import datetime, timezone, tzinfo
 from enum import Enum, IntEnum
 from typing import TYPE_CHECKING, BinaryIO, TypeVar
@@ -62,14 +61,6 @@ class IntEnumMissing(IntEnum):
         member._name_ = str(value)
         member._value_ = value
         return member
-
-
-def parse_path_uri(path: Path) -> tuple[str | None, str | None, str | None]:
-    if path is None:
-        return None, None, None
-    parsed_path = urllib.parse.urlparse(str(path))
-    parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True)
-    return parsed_path.scheme, parsed_path.path, parsed_query
 
 
 def parse_options_string(options: str) -> dict[str, str | bool]:

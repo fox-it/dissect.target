@@ -45,7 +45,7 @@ def create_header_bytes(magic: int, position: int = 0, length: int = 0x100) -> B
 @pytest.fixture
 def mocked_shimcache() -> ShimCache:
     with patch.object(ShimCache, "identify"):
-        return ShimCache(fh=BytesIO(b""), ntversion="", noheader=False)
+        return ShimCache(fh=BytesIO(), ntversion="", noheader=False)
 
 
 @pytest.fixture(params=[True, False])

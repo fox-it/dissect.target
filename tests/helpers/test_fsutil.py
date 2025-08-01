@@ -257,8 +257,8 @@ def path_fs() -> VirtualFilesystem:
     vfs.symlink("nonexistent", "/some/dir/link.txt")
     vfs.symlink("/some/dir/nested", "/some/dirlink")
     vfs.map_file_fh("/some/file.txt", io.BytesIO(b"content"))
-    vfs.map_file_fh("/some/dir/file.txt", io.BytesIO(b""))
-    vfs.map_file_fh("/some/dir/nested/file.txt", io.BytesIO(b""))
+    vfs.map_file_fh("/some/dir/file.txt", io.BytesIO())
+    vfs.map_file_fh("/some/dir/nested/file.txt", io.BytesIO())
 
     return vfs
 
@@ -772,7 +772,7 @@ def test_reverse_readlines() -> None:
         ("🦊" * 8000) + ("a" * 200)
     ]
 
-    vfs.map_file_fh("empty", io.BytesIO(b""))
+    vfs.map_file_fh("empty", io.BytesIO())
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
 
     broken_content = (b"foobar\r\n" * 2) + (b"\xc2broken\r\n") + (b"barfoo\r\n" * 2)

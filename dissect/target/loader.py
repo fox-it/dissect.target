@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
+import urllib.parse
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.loaderutil import extract_path_info
 
 if TYPE_CHECKING:
-    import urllib.parse
     from collections.abc import Iterator
     from pathlib import Path
 
@@ -64,7 +64,9 @@ class Loader:
         parsed_path: A URI parsed path to use.
     """
 
-    def __init__(self, path: Path, parsed_path: urllib.parse.ParseResult | None = None, resolve: bool = True, **kwargs):
+    def __init__(
+        self, path: Path, *, parsed_path: urllib.parse.ParseResult | None = None, resolve: bool = True, **kwargs
+    ):
         self.path = path
         self.absolute_path = None
         if resolve:
@@ -75,6 +77,7 @@ class Loader:
                 self.absolute_path = path
             self.base_path = self.absolute_path.parent
         self.parsed_path = parsed_path
+        self.parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True) if parsed_path else {}
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self.path)!r})"
@@ -92,7 +95,7 @@ class Loader:
         raise NotImplementedError
 
     @staticmethod
-    def find_all(path: Path, parsed_path: urllib.parse.ParseResult | None = None) -> Iterator[Path]:
+    def find_all(path: Path, parsed_path: urllib.parse.ParseResult | None = None) -> Iterator[str | Path]:
         """Finds all targets to load from ``path``.
 
         This can be used to open multiple targets from a target path that doesn't necessarily map to files on a disk.
@@ -106,7 +109,10 @@ class Loader:
         Returns:
             All the target paths found from the source path.
         """
-        yield path
+        if parsed_path is not None:
+            yield urllib.parse.urlunparse(parsed_path)
+        else:
+            yield path
 
     def map(self, target: Target) -> None:
         """Maps the loaded path into a ``Target``.
@@ -120,21 +126,26 @@ class Loader:
 T = TypeVar("T")
 
 
-class SubLoader(Generic[T]):
+class SubLoader(Loader, Generic[T]):
     """A base class for loading arbitary data and coupling it to a :class:`Target <dissect.target.target.Target>`.
 
     Should not be called like a regular :class:`Loader`. For examples see :class:`TarLoader`
     and :class:`TarSubLoader` implementations.
     """
 
-    def __init__(self, value: T):
-        pass
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}>"
+    def __init__(
+        self,
+        path: Path,
+        value: T,
+        *,
+        parsed_path: urllib.parse.ParseResult | None = None,
+        resolve: bool = True,
+        **kwargs,
+    ):
+        super().__init__(path, parsed_path=parsed_path, resolve=resolve, **kwargs)
 
     @staticmethod
-    def detect(value: T) -> bool:
+    def detect(path: Path, value: T) -> bool:
         raise NotImplementedError
 
     def map(self, target: Target) -> None:
@@ -218,17 +229,15 @@ def open(item: str | Path, *args, **kwargs) -> Loader | None:
 
 
 register("local", "LocalLoader")
-register("remote", "RemoteLoader")
-register("mqtt", "MqttLoader")
 register("asdf", "AsdfLoader")
-register("tar", "TarLoader")
-register("zip", "ZipLoader")
 register("vmx", "VmxLoader")
 register("vmwarevm", "VmwarevmLoader")
 register("hyperv", "HyperVLoader")
 register("pvs", "PvsLoader")
 register("pvm", "PvmLoader")
 register("utm", "UtmLoader")
+register("libvirt", "LibvirtLoader")
+register("proxmox", "ProxmoxLoader")
 register("ovf", "OvfLoader")
 register("ova", "OvaLoader")
 register("vbox", "VBoxLoader")
@@ -237,21 +246,26 @@ register("vbk", "VbkLoader")
 register("xva", "XvaLoader")
 register("vma", "VmaLoader")
 register("kape", "KapeLoader")
+register("velociraptor", "VelociraptorLoader")
 register("tanium", "TaniumLoader")
 register("itunes", "ITunesLoader")
 register("ab", "AndroidBackupLoader")
 register("cellebrite", "CellebriteLoader")
 register("target", "TargetLoader")
-register("log", "LogLoader")
 # Disabling ResLoader because of DIS-536
 # register("res", "ResLoader")
 register("overlay2", "Overlay2Loader")
 register("overlay", "OverlayLoader")
 register("phobos", "PhobosLoader")
-register("velociraptor", "VelociraptorLoader")
 register("uac", "UacLoader")
+# tar and zip loaders should be low priority to give other loaders a chance first
+register("tar", "TarLoader")
+register("zip", "ZipLoader")
+# These are URI based loaders, so just put them low down the list since they don't do any detection anyway
 register("smb", "SmbLoader")
 register("cb", "CbLoader")
 register("cyber", "CyberLoader")
-register("proxmox", "ProxmoxLoader")
+register("log", "LogLoader")
+register("remote", "RemoteLoader")
+register("mqtt", "MqttLoader")
 register("multiraw", "MultiRawLoader")  # Should be last
