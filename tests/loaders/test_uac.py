@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -19,57 +20,88 @@ if TYPE_CHECKING:
     from dissect.target.loader import Loader
 
 
-def test_uac_loader_compressed_tar(target_bare: Target) -> None:
+@pytest.fixture
+def mock_uac_dir(tmp_path: Path) -> Path:
+    root = tmp_path
+    mkdirs(root / "[root]", ["etc", "var"])
+    (root / "uac.log").write_bytes(b"")
+    (root / "[root]" / "etc" / "passwd").write_bytes(b"root:x:0:0:root:/root:/bin/bash\n")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    ("path", "loader"),
+    [
+        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz", TarLoader),
+        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143106.zip", ZipLoader),
+        ("mock_uac_dir", UacLoader),
+    ],
+)
+def test_target_open(path: str, loader: type[Loader], mock_uac_dir: Path) -> None:
+    """Test that we correctly use the UAC loaders when opening a ``Target``."""
+    path = mock_uac_dir if path == "mock_uac_dir" else absolute_path(path)
+
+    with patch("dissect.target.target.Target.apply"):
+        for target in (Target.open(path), next(Target.open_all(path), None)):
+            assert target is not None
+            assert isinstance(target._loader, loader)
+            if isinstance(target._loader, TarLoader):
+                assert isinstance(target._loader.subloader, UacTarSubloader)
+            elif isinstance(target._loader, ZipLoader):
+                assert isinstance(target._loader.subloader, UacZipSubLoader)
+            assert target.path == path
+
+
+def test_compressed_tar() -> None:
     """Test if we map a compressed UAC tar image correctly."""
     path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz")
 
     loader = loader_open(path)
     assert isinstance(loader, TarLoader)
 
-    loader.map(target_bare)
+    t = Target()
+    loader.map(t)
     assert isinstance(loader.subloader, UacTarSubloader)
-    assert len(target_bare.filesystems) == 1
+    assert len(t.filesystems) == 1
 
-    target_bare.apply()
-    test_file = target_bare.fs.path("/etc/passwd")
+    t.apply()
+    test_file = t.fs.path("/etc/passwd")
     assert test_file.exists()
     assert test_file.is_file()
     assert test_file.open().readline() == b"root:x:0:0:root:/root:/bin/bash\n"
 
 
-def test_uac_loader_compressed_zip(target_bare: Target) -> None:
+def test_compressed_zip() -> None:
     """Test if we map a compressed UAC zip image correctly."""
     path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143106.zip")
 
     loader = loader_open(path)
     assert isinstance(loader, ZipLoader)
 
-    loader.map(target_bare)
+    t = Target()
+    loader.map(t)
     assert isinstance(loader.subloader, UacZipSubLoader)
-    assert len(target_bare.filesystems) == 1
+    assert len(t.filesystems) == 1
 
-    target_bare.apply()
-    test_file = target_bare.fs.path("etc/passwd")
+    t.apply()
+    test_file = t.fs.path("etc/passwd")
     assert test_file.exists()
     assert test_file.is_file()
     assert test_file.open().readline() == b"root:x:0:0:root:/root:/bin/bash\n"
 
 
-def test_uac_loader_dir(target_bare: Target, tmp_path: Path) -> None:
+def test_dir(mock_uac_dir: Path) -> None:
     """Test if we map an extracted UAC directory correctly."""
-    root = tmp_path
-    mkdirs(root / "[root]", ["etc", "var"])
-    (root / "uac.log").write_bytes(b"")
-    (root / "[root]" / "etc" / "passwd").write_bytes(b"root:x:0:0:root:/root:/bin/bash\n")
 
-    loader = loader_open(root)
+    loader = loader_open(mock_uac_dir)
     assert isinstance(loader, UacLoader)
 
-    loader.map(target_bare)
-    assert len(target_bare.filesystems) == 1
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 1
 
-    target_bare.apply()
-    test_file = target_bare.fs.path("etc/passwd")
+    t.apply()
+    test_file = t.fs.path("etc/passwd")
     assert test_file.exists()
     assert test_file.is_file()
     assert test_file.open().readline() == b"root:x:0:0:root:/root:/bin/bash\n"

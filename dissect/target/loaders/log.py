@@ -31,7 +31,7 @@ class LogLoader(Loader):
     }
 
     def __init__(self, path: Path, parsed_path: urllib.parse.ParseResult | None = None):
-        super().__init__(path, parsed_path)
+        super().__init__(path, parsed_path=parsed_path)
         warnings.warn(
             "The LogLoader is deprecated in favor of direct files (`--direct`)"
             " and will be removed in dissect.target 3.24",

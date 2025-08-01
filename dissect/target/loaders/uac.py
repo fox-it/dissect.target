@@ -48,9 +48,9 @@ class UacTarSubloader(TarSubLoader):
 
     FS_ROOT_TUPLE = (f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")
 
-    @classmethod
-    def detect(cls, tarfile: tf.TarFile) -> bool:
-        return any(member.name.startswith(cls.FS_ROOT_TUPLE) for member in tarfile.getmembers())
+    @staticmethod
+    def detect(path: Path, tarfile: tf.TarFile) -> bool:
+        return any(member.name.startswith(UacTarSubloader.FS_ROOT_TUPLE) for member in tarfile.getmembers())
 
     def map(self, target: Target) -> None:
         vol = TarFilesystem(tarfile=self.tar, base=FILESYSTEMS_ROOT, fh=self.tar.fileobj)
@@ -66,7 +66,7 @@ class UacZipSubLoader(ZipSubLoader):
     """
 
     @staticmethod
-    def detect(zipfile: zf.Path) -> bool:
+    def detect(path: Path, zipfile: zf.Path) -> bool:
         return zipfile.joinpath(FILESYSTEMS_ROOT).exists() and zipfile.joinpath(UAC_CHECK_FILE).exists()
 
     def map(self, target: Target) -> None:

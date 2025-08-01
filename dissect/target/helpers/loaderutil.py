@@ -87,8 +87,7 @@ def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult 
         path: String or ``Path`` describing the path of a target.
 
     Returns:
-        - a ``Path`` or ``None``
-        - ``ParseResult`` or ``None``
+        A tuple containing the adjusted path and a ``ParseResult`` if applicable.
     """
 
     if path is None:
@@ -101,3 +100,19 @@ def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult 
     if parsed_path.scheme == "" or re.match("^[A-Za-z]$", parsed_path.scheme):
         return Path(path), None
     return Path(parsed_path.netloc + parsed_path.path).expanduser(), parsed_path
+
+
+def parse_path_uri(path: str | Path) -> tuple[urllib.parse.ParseResult | None, str | None, str | None]:
+    """Parse a path URI into three components.
+
+    Args:
+        path: String or ``Path`` describing the path of a target.
+
+    Returns:
+        A tuple containing the parsed path, a normalized identifying path, and the query parameters (if any).
+    """
+    if path is None:
+        return None, None, None
+    parsed_path = urllib.parse.urlparse(str(path))
+    parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True)
+    return parsed_path, (parsed_path.netloc or "").split("@", 1)[-1] + (parsed_path.path or ""), parsed_query

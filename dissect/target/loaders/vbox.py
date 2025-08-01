@@ -27,5 +27,4 @@ class VBoxLoader(Loader):
 
     def map(self, target: Target) -> None:
         for disk in self.vbox.disks():
-            parent = self.base_path.joinpath(disk).open("rb")
-            target.disks.add(container.open(parent))
+            target.disks.add(container.open(self.base_path.joinpath(disk)))
