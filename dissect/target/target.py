@@ -18,14 +18,14 @@ from dissect.target.exceptions import (
     VolumeSystemError,
 )
 from dissect.target.helpers import config
-from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.loaderutil import extract_path_info
-from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
+from dissect.target.helpers.fsutil import TargetPath, basename
+from dissect.target.helpers.loaderutil import extract_path_info, parse_path_uri
+from dissect.target.helpers.utils import StrEnum, slugify
 from dissect.target.loaders.direct import DirectLoader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 if TYPE_CHECKING:
-    import urllib
+    import urllib.parse
     from collections.abc import Iterator
 
     from typing_extensions import Self
@@ -72,13 +72,24 @@ class Target:
     """
 
     def __init__(self, path: str | Path | None = None):
-        # WIP, part of the introduction of URI-style paths.
-        # Since pathlib.Path does not support URIs, bigger refactoring
-        # is needed in order to fully utilise URI's scheme / path / query
-        # for Target configuration.
-        self.path_scheme, self.path, self.path_query = parse_path_uri(path)
-        if self.path is not None:
-            self.path = Path(self.path)
+        self.path = None
+
+        self.parsed_path, normalized_path, self.path_query = parse_path_uri(path)
+        self.path_scheme = self.parsed_path.scheme if self.parsed_path else None
+
+        if normalized_path is not None:
+            if not isinstance(path, Path):
+                self.path = Path(normalized_path)
+            else:
+                # Maintain the original path class
+                if hasattr(path, "with_segments"):
+                    self.path = path.with_segments(normalized_path)
+                else:
+                    # Backwards compatibility with < 3.12
+                    if path.is_absolute():
+                        self.path = path.joinpath("/").joinpath(normalized_path)
+                    else:
+                        self.path = path.with_name(basename(normalized_path))
 
         self.props: dict[Any, Any] = {}
         self.log = getlogger(self)
@@ -276,12 +287,10 @@ class Target:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
         """
 
-        path, parsed_path = extract_path_info(path)
-
-        loader_cls = loader.find_loader(path, parsed_path=parsed_path)
-        if loader_cls:
+        adjusted_path, parsed_path = extract_path_info(path)
+        if loader_cls := loader.find_loader(adjusted_path, parsed_path=parsed_path):
             try:
-                loader_instance = loader_cls(path, parsed_path=parsed_path)
+                loader_instance = loader_cls(adjusted_path, parsed_path=parsed_path)
             except Exception as e:
                 raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {path}: {e}") from e
             return cls._load(path, loader_instance)
@@ -300,7 +309,7 @@ class Target:
         return cls._load(path, loader.RawLoader(path))
 
     @classmethod
-    def open_all(cls, paths: list[str | Path], include_children: bool = False) -> Iterator[Self]:
+    def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False) -> Iterator[Self]:
         """Yield targets from a list of paths.
 
         If the path is a directory, iterate files one directory deep.
@@ -312,63 +321,71 @@ class Target:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
-        def _find(find_path: Path, parsed_path: urllib.parse.ParseResult | None) -> Iterator[Path]:
-            yield find_path
-            if parsed_path is not None:
+        def _open_all(path: str | Path, adjusted_path: Path, parsed_path: urllib.parse.ParseResult) -> Iterator[Target]:
+            loader_cls = loader.find_loader(adjusted_path, parsed_path=parsed_path, fallbacks=fallback_loaders)
+            if not loader_cls:
                 return
 
-            if find_path.is_dir():
-                yield from find_path.iterdir()
+            getlogger(path).debug("Attempting to use loader: %s", loader_cls)
+            for sub_path in loader_cls.find_all(adjusted_path, parsed_path=parsed_path):
+                adjusted_sub_path, sub_parsed_path = extract_path_info(sub_path)
+                try:
+                    ldr = loader_cls(adjusted_sub_path, parsed_path=sub_parsed_path or parsed_path)
+                except Exception as e:
+                    message = "Failed to initiate loader: %s"
+                    if isinstance(e, TargetPathNotFoundError):
+                        message = "%s"
+
+                    getlogger(sub_path).error(message, e)
+                    getlogger(sub_path).debug("", exc_info=e)
+                    continue
+
+                try:
+                    # Attempt to load the target using this loader
+                    target = cls._load(sub_path, ldr)
+                except Exception as e:
+                    getlogger(sub_path).error("Failed to load target with loader %s", ldr, exc_info=e)
+                    continue
+                else:
+                    yield target
+
+                if include_children:
+                    try:
+                        yield from target.open_children()
+                    except Exception as e:
+                        getlogger(sub_path).error("Failed to load child target from %s", target, exc_info=e)
 
         at_least_one_loaded = False
         fallback_loaders = [loader.DirLoader, loader.RawLoader]
 
+        if isinstance(paths, (str, Path)):
+            paths = [paths]
+
         # Treat every path as a unique target spec
         for path in paths:
             loaded = False
-            path, parsed_path = extract_path_info(path)
+            adjusted_path, parsed_path = extract_path_info(path)
 
-            # Search for targets one directory deep
-            for entry in _find(path, parsed_path):
-                loader_cls = loader.find_loader(entry, parsed_path=parsed_path, fallbacks=fallback_loaders)
-                if not loader_cls:
-                    continue
+            for target in _open_all(path, adjusted_path, parsed_path):
+                loaded = True
+                at_least_one_loaded = True
+                yield target
 
-                getlogger(entry).debug("Attempting to use loader: %s", loader_cls)
-                for sub_entry in loader_cls.find_all(entry, parsed_path=parsed_path):
-                    sub_entry, sub_parsed_path = extract_path_info(sub_entry)
-                    try:
-                        ldr = loader_cls(sub_entry, parsed_path=sub_parsed_path)
-                    except Exception as e:
-                        message = "Failed to initiate loader: %s"
-                        if isinstance(e, TargetPathNotFoundError):
-                            message = "%s"
-
-                        getlogger(sub_entry).error(message, e)
-                        getlogger(sub_entry).debug("", exc_info=e)
-                        continue
-
-                    try:
-                        # Attempt to load the target using this loader
-                        target = cls._load(sub_entry, ldr)
-                    except Exception as e:
-                        getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
-                        continue
-                    else:
-                        loaded = True
-                        at_least_one_loaded = True
-                        yield target
-
-                    if include_children:
-                        try:
-                            yield from target.open_children()
-                        except Exception as e:
-                            getlogger(sub_entry).error("Failed to load child target from %s", target, exc_info=e)
-
-                # Found a compatible loader for the top level path, no need to search a level deeper
+            if loaded:
+                # If we found a loader for the top level path, no need to search a level deeper
                 # Going deeper could cause unwanted behaviour
-                if loaded and entry is path:
-                    break
+                continue
+
+            # If we did not find a loader for the top level path, we will search one directory deep
+            # This obviously only works for directories, but also if the path is not URI-like
+            if parsed_path is not None or not adjusted_path.is_dir():
+                continue
+
+            for lower_path in adjusted_path.iterdir():
+                adjusted_lower_path, parsed_lower_path = extract_path_info(lower_path)
+                for target in _open_all(lower_path, adjusted_lower_path, parsed_lower_path):
+                    at_least_one_loaded = True
+                    yield target
 
         if not at_least_one_loaded:
             raise TargetError(f"Failed to find any loader for targets: {paths}")

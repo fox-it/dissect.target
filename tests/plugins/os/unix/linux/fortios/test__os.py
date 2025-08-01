@@ -55,8 +55,8 @@ def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     end
     """  # noqa: E501
 
-    fs_unix.map_file_fh("/.flatkc", BytesIO(b""))
-    fs_unix.map_file_fh("/rootfs.gz", BytesIO(b""))
+    fs_unix.map_file_fh("/.flatkc", BytesIO())
+    fs_unix.map_file_fh("/rootfs.gz", BytesIO())
     fs_unix.map_file_fh("/data/config/sys_global.conf.gz", BytesIO(gzip.compress(global_config.encode())))
     fs_unix.map_file_fh("/data/config/global_system_interface.gz", BytesIO(gzip.compress(iface_config.encode())))
     fs_unix.map_file_fh("/data/config/sys_vd_root+root.conf.gz", BytesIO(gzip.compress(root_config.encode())))

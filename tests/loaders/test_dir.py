@@ -2,17 +2,29 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.dir import DirLoader, find_dirs
 from dissect.target.plugin import OperatingSystem
+from dissect.target.target import Target
 from tests._utils import mkdirs
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dissect.target.target import Target
+
+def test_target_open(tmp_path: Path) -> None:
+    """Test that we correctly use ``DirLoader`` when opening a ``Target``."""
+    root = tmp_path
+    mkdirs(root, ["windows/system32"])
+
+    for target in (Target.open(root), next(Target.open_all(root), None)):
+        assert target is not None
+        assert isinstance(target._loader, DirLoader)
+        assert target.path == root
 
 
-def test_dir_loader_windows(target_bare: Target, tmp_path: Path) -> None:
+def test_windows(tmp_path: Path) -> None:
+    """Test the ``DirLoader`` for Windows directories."""
     root = tmp_path
     mkdirs(root, ["windows/system32"])
 
@@ -20,15 +32,16 @@ def test_dir_loader_windows(target_bare: Target, tmp_path: Path) -> None:
     assert os_type == OperatingSystem.WINDOWS
     assert len(dirs) == 1
 
-    assert DirLoader.detect(root)
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
 
-    loader = DirLoader(root)
-    loader.map(target_bare)
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 1
 
-    assert len(target_bare.filesystems) == 1
 
-
-def test_dir_loader_winnt(target_bare: Target, tmp_path: Path) -> None:
+def test_winnt(tmp_path: Path) -> None:
+    """Test the ``DirLoader`` for WinNT directories."""
     root = tmp_path
     mkdirs(tmp_path, ["winnt"])
 
@@ -36,47 +49,16 @@ def test_dir_loader_winnt(target_bare: Target, tmp_path: Path) -> None:
     assert os_type == OperatingSystem.WINDOWS
     assert len(dirs) == 1
 
-    assert DirLoader.detect(root)
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
 
-    loader = DirLoader(root)
-    loader.map(target_bare)
-
-    assert len(target_bare.filesystems) == 1
-
-
-def test_dir_loader_linux(target_bare: Target, tmp_path: Path) -> None:
-    root = tmp_path
-    mkdirs(root, ["etc", "var"])
-
-    os_type, dirs = find_dirs(root)
-    assert os_type == OperatingSystem.LINUX
-    assert len(dirs) == 1
-
-    assert DirLoader.detect(root)
-
-    loader = DirLoader(root)
-    loader.map(target_bare)
-
-    assert len(target_bare.filesystems) == 1
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 1
 
 
-def test_dir_loader_macos(target_bare: Target, tmp_path: Path) -> None:
-    root = tmp_path
-    mkdirs(root, ["Library"])
-
-    os_type, dirs = find_dirs(root)
-    assert os_type == OperatingSystem.OSX
-    assert len(dirs) == 1
-
-    assert DirLoader.detect(root)
-
-    loader = DirLoader(root)
-    loader.map(target_bare)
-
-    assert len(target_bare.filesystems) == 1
-
-
-def test_dir_loader_windows_drive_letters(target_bare: Target, tmp_path: Path) -> None:
+def test_windows_drive_letters(tmp_path: Path) -> None:
+    """Test the ``DirLoader`` with Windows drive letters."""
     root = tmp_path
     mkdirs(root, ["C/windows/system32", "D/test", "E/test"])
 
@@ -84,10 +66,44 @@ def test_dir_loader_windows_drive_letters(target_bare: Target, tmp_path: Path) -
     assert os_type == OperatingSystem.WINDOWS
     assert len(dirs) == 3
 
-    assert DirLoader.detect(root)
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
 
-    loader = DirLoader(root)
-    loader.map(target_bare)
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 3
+    assert len(t.fs.mounts) == 3
 
-    assert len(target_bare.filesystems) == 3
-    assert len(target_bare.fs.mounts) == 3
+
+def test_linux(tmp_path: Path) -> None:
+    """Test the ``DirLoader`` for Linux directories."""
+    root = tmp_path
+    mkdirs(root, ["etc", "var"])
+
+    os_type, dirs = find_dirs(root)
+    assert os_type == OperatingSystem.LINUX
+    assert len(dirs) == 1
+
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
+
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 1
+
+
+def test_macos(tmp_path: Path) -> None:
+    """Test the ``DirLoader`` for macOS directories."""
+    root = tmp_path
+    mkdirs(root, ["Library"])
+
+    os_type, dirs = find_dirs(root)
+    assert os_type == OperatingSystem.OSX
+    assert len(dirs) == 1
+
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
+
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 1
