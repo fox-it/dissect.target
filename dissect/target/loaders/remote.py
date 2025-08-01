@@ -4,7 +4,7 @@ import logging
 import socket
 import ssl
 import time
-import urllib.parse
+import warnings
 from io import DEFAULT_BUFFER_SIZE
 from struct import pack, unpack
 from typing import TYPE_CHECKING
@@ -17,6 +17,7 @@ from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
 if TYPE_CHECKING:
+    import urllib.parse
     from pathlib import Path
 
     from dissect.target.target import Target
@@ -74,7 +75,9 @@ class RemoteStreamConnection:
         self._is_connected = False
         self._socket = None
         self._ssl_sock = None
-        self._context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            self._context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
         self._context.verify_mode = ssl.CERT_REQUIRED
         self._context.load_default_certs()
         self._max_reconnects = self.MAX_RECONNECTS
@@ -220,11 +223,10 @@ class RemoteLoader(Loader):
     """Load a remote target that runs a compatible Dissect agent."""
 
     def __init__(self, path: Path, parsed_path: urllib.parse.ParseResult | None = None):
-        super().__init__(path, parsed_path, resolve=False)
+        super().__init__(path, parsed_path=parsed_path, resolve=False)
         if parsed_path is None:
             raise LoaderError("No URI connection details has been passed.")
-        options = dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True))
-        self.stream = RemoteStreamConnection(parsed_path.hostname, parsed_path.port, options=options)
+        self.stream = RemoteStreamConnection(parsed_path.hostname, parsed_path.port, options=self.parsed_query)
 
     @staticmethod
     def detect(path: Path) -> bool:

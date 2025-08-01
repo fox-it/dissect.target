@@ -1,24 +1,32 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.containerimage import ContainerImageTarSubLoader
 from dissect.target.loaders.tar import TarLoader
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
-if TYPE_CHECKING:
-    from dissect.target.target import Target
+
+def test_target_open() -> None:
+    """Test that we correctly use ``ContainerImageTarSubLoader`` when opening a ``Target``."""
+    path = absolute_path("_data/loaders/containerimage/alpine-docker.tar")
+
+    for target in (Target.open(path), next(Target.open_all(path), None)):
+        assert target is not None
+        assert isinstance(target._loader, TarLoader)
+        assert isinstance(target._loader.subloader, ContainerImageTarSubLoader)
+        assert target.path == path
 
 
-def test_container_image_filesystem_docker(target_bare: Target) -> None:
+def test_docker() -> None:
     """Test if we map a Docker image correctly."""
     path = absolute_path("_data/loaders/containerimage/alpine-docker.tar")
 
     loader = loader_open(path)
     assert isinstance(loader, TarLoader)
 
-    loader.map(target_bare)
+    t = Target()
+    loader.map(t)
     assert isinstance(loader.subloader, ContainerImageTarSubLoader)
 
     assert loader.subloader.name == "alpine:latest"
@@ -27,11 +35,11 @@ def test_container_image_filesystem_docker(target_bare: Target) -> None:
     ]
     assert loader.subloader.config["created"] == "2025-01-08T12:07:30Z"
 
-    assert len(target_bare.filesystems) == 1
-    assert len(target_bare.filesystems[0].layers) == 3
+    assert len(t.filesystems) == 1
+    assert len(t.filesystems[0].layers) == 3
 
-    target_bare.apply()
-    assert sorted(map(str, target_bare.fs.path("/").iterdir())) == [
+    t.apply()
+    assert sorted(map(str, t.fs.path("/").iterdir())) == [
         "/$fs$",
         "/bin",
         "/dev",
@@ -53,14 +61,15 @@ def test_container_image_filesystem_docker(target_bare: Target) -> None:
     ]
 
 
-def test_container_image_filesystem_oci_podman(target_bare: Target) -> None:
+def test_oci_podman() -> None:
     """Test if we map a Podman OCI image correctly."""
     path = absolute_path("_data/loaders/containerimage/alpine-oci.tar")
 
     loader = loader_open(path)
     assert isinstance(loader, TarLoader)
 
-    loader.map(target_bare)
+    t = Target()
+    loader.map(t)
     assert isinstance(loader.subloader, ContainerImageTarSubLoader)
 
     assert loader.subloader.name == "docker.io/library/alpine:latest"
@@ -101,9 +110,9 @@ def test_container_image_filesystem_oci_podman(target_bare: Target) -> None:
         },
     }
 
-    target_bare.apply()
+    t.apply()
 
-    assert sorted(map(str, target_bare.fs.path("/").iterdir())) == [
+    assert sorted(map(str, t.fs.path("/").iterdir())) == [
         "/$fs$",
         "/bin",
         "/dev",

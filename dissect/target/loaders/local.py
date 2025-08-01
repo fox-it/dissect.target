@@ -13,7 +13,7 @@ from dissect.target import filesystem, volume
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.dir import DirectoryFilesystem
-from dissect.target.helpers.utils import parse_path_uri
+from dissect.target.helpers.loaderutil import parse_path_uri
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:

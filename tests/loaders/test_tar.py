@@ -1,75 +1,112 @@
 from __future__ import annotations
 
+import logging
 import platform
 import tarfile
 from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.loaders.tar import TarLoader
+from dissect.target.loader import open as loader_open
+from dissect.target.loaders.tar import GenericTarSubLoader, TarLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 from tests.filesystems.test_tar import _mkdir
 
 if TYPE_CHECKING:
-    import pathlib
-
-    from dissect.target.target import Target
+    from pathlib import Path
 
 
-def test_tar_loader_compressed_tar_file(target_win: Target) -> None:
-    archive_path = absolute_path("_data/loaders/tar/test-archive.tar.gz")
+def test_target_open() -> None:
+    """Test that we correctly use ``TarLoader`` when opening a ``Target``."""
+    path = absolute_path("_data/loaders/tar/test-archive.tar")
 
-    loader = TarLoader(archive_path)
-    loader.map(target_win)
+    for target in (Target.open(path), next(Target.open_all(path), None)):
+        assert target is not None
+        assert isinstance(target._loader, TarLoader)
+        assert target.path == path
 
-    assert len(target_win.filesystems) == 2
 
-    test_file = target_win.fs.path("test-data/test-file.txt")
+def test_compressed_tar_file(caplog: pytest.LogCaptureFixture) -> None:
+    """Test if we can handle a compressed tar file."""
+    path = absolute_path("_data/loaders/tar/test-archive.tar.gz")
+
+    with caplog.at_level(logging.WARNING):
+        loader = loader_open(path)
+        assert isinstance(loader, TarLoader)
+        assert "is compressed" in caplog.text
+
+    t = Target()
+    loader.map(t)
+    assert isinstance(loader.subloader, GenericTarSubLoader)
+
+    assert len(t.filesystems) == 1
+
+    test_file = t.fs.path("test-data/test-file.txt")
 
     assert test_file.exists()
     assert test_file.open().read() == b"test-value\n"
 
 
-def test_tar_loader_compressed_tar_file_with_empty_dir(target_unix: Target) -> None:
-    archive_path = absolute_path("_data/loaders/tar/test-archive-empty-folder.tgz")
-    loader = TarLoader(archive_path)
-    loader.map(target_unix)
+def test_compressed_tar_file_with_empty_dir() -> None:
+    """Test if we can handle a tar file with an empty directory."""
+    path = absolute_path("_data/loaders/tar/test-archive-empty-folder.tgz")
 
-    assert len(target_unix.filesystems) == 2
-    test_file = target_unix.fs.path("test/test_file_with_content")
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
+    t = Target()
+    loader.map(t)
+    assert isinstance(loader.subloader, GenericTarSubLoader)
+
+    assert len(t.filesystems) == 1
+
+    test_file = t.fs.path("test/test_file_with_content")
     assert test_file.exists()
     assert test_file.is_file()
     assert test_file.open().read() == b"This is a test!\n"
-    empty_folder = target_unix.fs.path("test/empty_dir")
+
+    empty_folder = t.fs.path("test/empty_dir")
     assert empty_folder.exists()
     assert empty_folder.is_dir()
 
 
-def test_tar_loader_windows_case_sensitivity(target_default: Target, tmp_path: pathlib.Path) -> None:
+def test_case_sensitivity_windows(tmp_path: Path) -> None:
     """Test if we correctly map a tar with Windows folder structure as a case-insensitive filesystem."""
-
-    tar_path = tmp_path.joinpath("target.tar.gz")
-    with tarfile.open(tar_path, "w:gz") as tf:
+    path = tmp_path.joinpath("target.tar.gz")
+    with tarfile.open(path, "w:gz") as tf:
         _mkdir(tf, "Windows")
         _mkdir(tf, "Windows/System32")
 
-    loader = TarLoader(tar_path)
-    loader.map(target_default)
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
+    t = Target()
+    loader.map(t)
+    assert isinstance(loader.subloader, GenericTarSubLoader)
 
     # Make sure the case sensitiveness is changed to False and make sure we detect the target as Windows.
-    assert not target_default.filesystems[0].case_sensitive
-    assert WindowsPlugin.detect(target_default)
+    assert not t.filesystems[0].case_sensitive
+    assert WindowsPlugin.detect(t)
 
-    # We also test the inverse, make sure a random Linux target is not marked as case-insensitive.
-    tar_path = tmp_path.joinpath("second_target.tar.gz")
-    with tarfile.open(tar_path, "w:gz") as tf:
+
+def test_case_sensitivity_linux(tmp_path: Path) -> None:
+    """Test if we correctly map a tar with Linux folder structure as a case-sensitive filesystem."""
+    path = tmp_path.joinpath("target.tar.gz")
+    with tarfile.open(path, "w:gz") as tf:
         _mkdir(tf, "etc")
         _mkdir(tf, "var")
         _mkdir(tf, "opt")
-    loader = TarLoader(tar_path)
-    loader.map(target_default)
-    assert target_default.filesystems[1].case_sensitive
+
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
+    t = Target()
+    loader.map(t)
+    assert isinstance(loader.subloader, GenericTarSubLoader)
+
+    assert t.filesystems[0].case_sensitive
 
 
 @pytest.mark.parametrize(
@@ -93,7 +130,7 @@ def test_tar_loader_windows_case_sensitivity(target_default: Target, tmp_path: p
         (False, "file.zip", "504b0304"),
     ],
 )
-def test_tar_detect_extension(should_detect: bool, filename: str, buffer: str, tmp_path: pathlib.Path) -> None:
+def test_detect_extension(should_detect: bool, filename: str, buffer: str, tmp_path: Path) -> None:
     """Test if we detect the given buffer as a (compressed) tar file or not."""
     tmp_tar = tmp_path.joinpath(filename)
     tmp_tar.touch()
@@ -112,7 +149,7 @@ def test_tar_detect_extension(should_detect: bool, filename: str, buffer: str, t
         "small.tar.xz",
     ],
 )
-def test_tar_detect_buffer(file: str, tmp_path: pathlib.Path) -> None:
+def test_detect_buffer(file: str, tmp_path: Path) -> None:
     """Test if we detect the given files as a (compressed) tar file or not."""
 
     if file == "small.tar.lz" and (platform.python_implementation() == "PyPy" or platform.system() == "Windows"):

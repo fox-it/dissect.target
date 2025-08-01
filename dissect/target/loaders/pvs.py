@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from dissect.hypervisor import pvs
 
-from dissect.target.containers.hdd import HddContainer
+from dissect.target import container
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
@@ -28,6 +28,6 @@ class PvsLoader(Loader):
         for disk in self.pvs.disks():
             path = self.base_path.joinpath(disk)
             try:
-                target.disks.add(HddContainer(path))
+                target.disks.add(container.open(path))
             except Exception:
                 target.log.exception("Failed to load HDD: %s", disk)

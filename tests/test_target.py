@@ -4,6 +4,7 @@ import io
 import logging
 import urllib.parse
 from collections import defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
@@ -22,7 +23,6 @@ from dissect.target.target import DiskCollection, Event, Target, TargetLogAdapte
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from logging import Logger
-    from pathlib import Path
 
 
 class ErrorCounter(TargetLogAdapter):
@@ -614,3 +614,76 @@ def test_children_on_invalid_target(caplog: pytest.LogCaptureFixture, tmp_path: 
             pass
 
     assert "Failed to load child target from None" not in caplog.text
+
+
+def test_open_uri() -> None:
+    """Test that we can open a URI with a custom scheme."""
+
+    class MockLoader(loader.Loader):
+        def __init__(self, path: Path, parsed_path: urllib.parse.ParseResult | None = None):
+            super().__init__(path, parsed_path=parsed_path, resolve=False)
+
+        def map(self, target: Target) -> None:
+            target.filesystems.add(VirtualFilesystem())
+
+    with patch.dict(loader.LOADERS_BY_SCHEME, {"mock": MockLoader}):
+        # First test Target.open
+        target = Target.open("mock://user:password@example.com:1337/path/to/resource?query=1&other=2")
+
+        assert target.path == Path("example.com:1337/path/to/resource")
+        assert target.path_query == {"query": ["1"], "other": ["2"]}
+        assert isinstance(target._loader, MockLoader)
+        assert target._loader.parsed_path
+        assert target._loader.parsed_path.scheme == "mock"
+        assert target._loader.parsed_path.netloc == "user:password@example.com:1337"
+        assert target._loader.parsed_path.path == "/path/to/resource"
+        assert target._loader.parsed_path.query == "query=1&other=2"
+
+        # Target.open_all should also work
+        target = next(Target.open_all(["mock://user:password@example.com:1337/path/to/resource?query=1&other=2"]))
+
+        assert target.path == Path("example.com:1337/path/to/resource")
+        assert target.path_query == {"query": ["1"], "other": ["2"]}
+        assert isinstance(target._loader, MockLoader)
+        assert target._loader.parsed_path
+        assert target._loader.parsed_path.scheme == "mock"
+        assert target._loader.parsed_path.netloc == "user:password@example.com:1337"
+        assert target._loader.parsed_path.path == "/path/to/resource"
+        assert target._loader.parsed_path.query == "query=1&other=2"
+
+
+class CustomPath(Path):
+    """A custom Path class for testing."""
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("", Path()),
+        ("test.txt", Path("test.txt")),
+        ("/test.txt", Path("/test.txt")),
+        ("./test.txt", Path("./test.txt")),
+        ("local", Path("local")),
+        ("local?query=1&other=2", Path("local")),
+        ("/path/to/test.txt", Path("/path/to/test.txt")),
+        ("/path/to/test.txt?query=1&other=2", Path("/path/to/test.txt")),
+        ("uri://example.com/path/to/test.txt", Path("example.com/path/to/test.txt")),
+        ("uri://wing@safecomputer.com:1337/path/to/test.txt", Path("safecomputer.com:1337/path/to/test.txt")),
+        ("uri://user:password@example.com:6969/path/to/test.txt", Path("example.com:6969/path/to/test.txt")),
+        ("uri://example.com/path/to/test.txt?query=1&other=2", Path("example.com/path/to/test.txt")),
+        (Path("test.txt"), Path("test.txt")),
+        (Path("/test.txt"), Path("/test.txt")),
+        (Path("./test.txt"), Path("./test.txt")),
+        (Path("local"), Path("local")),
+        (Path("local?query=1&other=2"), Path("local")),
+        (CustomPath("custom.txt"), CustomPath("custom.txt")),
+        (CustomPath("/path/to/custom.txt"), CustomPath("/path/to/custom.txt")),
+    ],
+)
+def test_expected_path(path: str | Path, expected: Path) -> None:
+    """Test that ``target.path`` has the expected value for a given path."""
+    target = Target(path)
+
+    assert target.path == expected
+    if isinstance(path, Path):
+        assert type(target.path) is type(expected)

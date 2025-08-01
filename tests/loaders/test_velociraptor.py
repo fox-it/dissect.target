@@ -6,16 +6,18 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.velociraptor import VelociraptorLoader
+from dissect.target.target import Target
 from tests._utils import absolute_path, mkdirs
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dissect.target.target import Target
 
-
-def create_root(sub_dir: str, tmp_path: Path) -> Path:
+@pytest.fixture(params=["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"])
+def mock_velociraptor_dir(request: pytest.FixtureRequest, tmp_path: Path) -> Path:
+    sub_dir = request.param
     paths = [
         f"uploads/{sub_dir}/%5C%5C.%5CC%3A/",
         f"uploads/{sub_dir}/%5C%5C.%5CC%3A/$Extend",
@@ -52,63 +54,65 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
     return root
 
 
-@pytest.mark.parametrize(
-    "sub_dir",
-    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
-)
-def test_windows_ntfs(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
-    root = create_root(sub_dir, tmp_path)
+def test_loader_open(mock_velociraptor_dir: Path) -> None:
+    """Test that we correctly use ``VelociraptorLoader`` when opening a ``Target``."""
+    path = mock_velociraptor_dir
 
-    assert VelociraptorLoader.detect(root) is True
+    for target in (Target.open(path), next(Target.open_all(path), None)):
+        assert target is not None
+        assert isinstance(target._loader, VelociraptorLoader)
+        assert target.path == path
 
-    loader = VelociraptorLoader(root)
-    loader.map(target_bare)
-    target_bare.apply()
 
-    assert "sysvol" in target_bare.fs.mounts
-    assert "c:" in target_bare.fs.mounts
+def test_windows_ntfs(mock_velociraptor_dir: Path) -> None:
+    """Test that ``VelociraptorLoader`` correctly loads a Windows directory structure."""
+    loader = loader_open(mock_velociraptor_dir)
+    assert isinstance(loader, VelociraptorLoader)
+
+    t = Target()
+    loader.map(t)
+    t.apply()
+
+    assert "sysvol" in t.fs.mounts
+    assert "c:" in t.fs.mounts
 
     usnjrnl_records = 0
-    for fs in target_bare.filesystems:
+    for fs in t.filesystems:
         if isinstance(fs, NtfsFilesystem):
             usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
     assert usnjrnl_records == 2
-    assert len(target_bare.filesystems) == 4
+    assert len(t.filesystems) == 4
 
-    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
-    assert target_bare.fs.path("sysvol/other.txt").read_text() == "my first file"
-    assert target_bare.fs.path("sysvol/.TEST").exists()
-    assert target_bare.fs.path("sysvol/Microsoft-Windows-Windows Defender%254WHC.evtx").exists()
+    assert t.fs.path("sysvol/C-DRIVE.txt").exists()
+    assert t.fs.path("sysvol/other.txt").read_text() == "my first file"
+    assert t.fs.path("sysvol/.TEST").exists()
+    assert t.fs.path("sysvol/Microsoft-Windows-Windows Defender%254WHC.evtx").exists()
 
 
-@pytest.mark.parametrize(
-    "sub_dir",
-    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
-)
-def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
-    create_root(sub_dir, tmp_path)
+def test_windows_ntfs_zip(mock_velociraptor_dir: Path) -> None:
+    """Test that ``VelociraptorLoader`` correctly loads a Windows ZIP structure."""
+    shutil.make_archive(mock_velociraptor_dir.joinpath("test_ntfs"), "zip", mock_velociraptor_dir)
 
-    shutil.make_archive(tmp_path.joinpath("test_ntfs"), "zip", tmp_path)
+    path = mock_velociraptor_dir.joinpath("test_ntfs.zip")
+    loader = loader_open(path)
+    assert isinstance(loader, VelociraptorLoader)
 
-    zip_path = tmp_path.joinpath("test_ntfs.zip")
-    assert VelociraptorLoader.detect(zip_path) is True
+    t = Target()
+    loader.map(t)
+    t.apply()
 
-    loader = VelociraptorLoader(zip_path)
-    loader.map(target_bare)
-    target_bare.apply()
-
-    assert "sysvol" in target_bare.fs.mounts
-    assert "c:" in target_bare.fs.mounts
+    assert "sysvol" in t.fs.mounts
+    assert "c:" in t.fs.mounts
 
     usnjrnl_records = 0
-    for fs in target_bare.filesystems:
+    for fs in t.filesystems:
         if isinstance(fs, NtfsFilesystem):
             usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
     assert usnjrnl_records == 2
-    assert len(target_bare.filesystems) == 4
-    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
-    assert target_bare.fs.path("sysvol/.TEST").exists()
-    assert target_bare.fs.path("sysvol/Microsoft-Windows-Windows Defender%4WHC.evtx").exists()
+    assert len(t.filesystems) == 4
+    assert t.fs.path("sysvol/C-DRIVE.txt").exists()
+    assert t.fs.path("sysvol/.TEST").exists()
+    assert t.fs.path("sysvol/Microsoft-Windows-Windows Defender%4WHC.evtx").exists()
 
 
 @pytest.mark.parametrize(
@@ -122,20 +126,22 @@ def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> 
         (["uploads/auto/Library", "uploads/auto/Applications", "uploads/auto/%2ETEST"]),
     ],
 )
-def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
+def test_unix(paths: list[str], tmp_path: Path) -> None:
+    """Test that ``VelociraptorLoader`` correctly loads a Unix directory structure."""
     root = tmp_path
     mkdirs(root, paths)
 
     (root / "uploads.json").write_bytes(b"{}")
 
-    assert VelociraptorLoader.detect(root) is True
+    loader = loader_open(root)
+    assert isinstance(loader, VelociraptorLoader)
 
-    loader = VelociraptorLoader(root)
-    loader.map(target_bare)
-    target_bare.apply()
+    t = Target()
+    loader.map(t)
+    t.apply()
 
-    assert len(target_bare.filesystems) == 1
-    assert target_bare.fs.path("/.TEST").exists()
+    assert len(t.filesystems) == 1
+    assert t.fs.path("/.TEST").exists()
 
 
 @pytest.mark.parametrize(
@@ -149,7 +155,8 @@ def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
         (["uploads/auto/Library", "uploads/auto/Applications", "uploads/auto/%2ETEST"]),
     ],
 )
-def test_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
+def test_unix_zip(paths: list[str], tmp_path: Path) -> None:
+    """Test that ``VelociraptorLoader`` correctly loads a Unix ZIP structure."""
     root = tmp_path
     mkdirs(root, paths)
 
@@ -157,12 +164,13 @@ def test_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None
 
     shutil.make_archive(tmp_path.joinpath("test_unix"), "zip", tmp_path)
 
-    zip_path = tmp_path.joinpath("test_unix.zip")
-    assert VelociraptorLoader.detect(zip_path) is True
+    path = tmp_path.joinpath("test_unix.zip")
+    loader = loader_open(path)
+    assert isinstance(loader, VelociraptorLoader)
 
-    loader = VelociraptorLoader(zip_path)
-    loader.map(target_bare)
-    target_bare.apply()
+    t = Target()
+    loader.map(t)
+    t.apply()
 
-    assert len(target_bare.filesystems) == 1
-    assert target_bare.fs.path("/.TEST").exists()
+    assert len(t.filesystems) == 1
+    assert t.fs.path("/.TEST").exists()

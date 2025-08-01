@@ -1,32 +1,44 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers import keychain
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.ab import AndroidBackupLoader
 from dissect.target.loaders.ab import main as ab_main
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import pytest
 
-    from dissect.target.target import Target
 
-
-def test_ab_loader(target_bare: Target) -> None:
-    ab_path = Path(absolute_path("_data/loaders/ab/test.ab"))
+def test_target_open() -> None:
+    """Test that we correctly use ``AndroidBackupLoader`` when opening a ``Target``."""
+    path = absolute_path("_data/loaders/ab/test.ab")
     keychain.register_wildcard_value("password")
 
-    assert AndroidBackupLoader.detect(ab_path)
+    for target in (Target.open(path), next(Target.open_all(path), None)):
+        assert target is not None
+        assert isinstance(target._loader, AndroidBackupLoader)
 
-    loader = AndroidBackupLoader(ab_path)
-    loader.map(target_bare)
 
-    assert len(target_bare.filesystems) == 1
+def test_loader() -> None:
+    """Test the Android Backup loader."""
+    path = absolute_path("_data/loaders/ab/test.ab")
+    keychain.register_wildcard_value("password")
 
-    assert list(map(str, target_bare.fs.path("/").rglob("*"))) == [
+    loader = loader_open(path)
+    assert isinstance(loader, AndroidBackupLoader)
+
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 1
+
+    assert list(map(str, t.fs.path("/").rglob("*"))) == [
         "/data",
         "/data/data",
         "/data/data/org.fedorahosted.freeotp",
@@ -34,20 +46,21 @@ def test_ab_loader(target_bare: Target) -> None:
         "/data/data/org.fedorahosted.freeotp/shared_preferences/tokenBackup.xml",
     ]
 
-    buf = target_bare.fs.path("/data/data/org.fedorahosted.freeotp/shared_preferences/tokenBackup.xml").read_bytes()
+    buf = t.fs.path("/data/data/org.fedorahosted.freeotp/shared_preferences/tokenBackup.xml").read_bytes()
     assert hashlib.sha1(buf).hexdigest() == "7177d340414d5ca2a835603c347e64e3d2625e47"
 
 
-def test_ab_unwrapper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    ab_path = absolute_path("_data/loaders/ab/test.ab")
+def test_unwrapper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test the Android Backup unwrapper script."""
+    path = absolute_path("_data/loaders/ab/test.ab")
 
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["python", str(ab_path), "-p", "password", "-o", str(tmp_path)])
+        m.setattr("sys.argv", ["python", str(path), "-p", "password", "-o", str(tmp_path)])
         ab_main()
 
         assert [entry.name for entry in tmp_path.iterdir()] == ["test.plain.ab"]
 
-        m.setattr("sys.argv", ["python", str(ab_path), "-p", "password", "-o", str(tmp_path), "-t"])
+        m.setattr("sys.argv", ["python", str(path), "-p", "password", "-o", str(tmp_path), "-t"])
         ab_main()
 
         assert sorted([entry.name for entry in tmp_path.iterdir()]) == ["test.plain.ab", "test.tar"]
