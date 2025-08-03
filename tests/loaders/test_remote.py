@@ -14,7 +14,11 @@ from dissect.target.target import Target
 def test_target_open() -> None:
     """Test that we correctly use ``RemoteLoader`` when opening a ``Target``."""
     path = "remote://127.0.0.1:1337"
-    with patch("dissect.target.loaders.remote.RemoteLoader.map"), patch("dissect.target.target.Target.apply"):
+    with (
+        patch.object(ssl, "SSLContext", autospec=True),
+        patch("dissect.target.loaders.remote.RemoteLoader.map"),
+        patch("dissect.target.target.Target.apply"),
+    ):
         for target in (Target.open(path), next(Target.open_all(path), None)):
             assert target is not None
             assert isinstance(target._loader, RemoteLoader)
@@ -23,8 +27,9 @@ def test_target_open() -> None:
 
 def test_loader() -> None:
     """Test that ``RemoteLoader`` is correctly selected."""
-    loader = loader_open("remote://127.0.0.1:1337")
-    assert isinstance(loader, RemoteLoader)
+    with patch.object(ssl, "SSLContext", autospec=True):
+        loader = loader_open("remote://127.0.0.1:1337")
+        assert isinstance(loader, RemoteLoader)
 
 
 def test_stream() -> None:
@@ -74,7 +79,7 @@ def test_stream() -> None:
         assert rsc.is_connected() is True
 
 
-def test_remote_loader_stream_embedded() -> None:
+def test_stream_embedded() -> None:
     with (
         patch.object(ssl, "SSLContext", autospec=False) as mock_ssl_context,
         patch.object(socket, "socket", autospec=True),

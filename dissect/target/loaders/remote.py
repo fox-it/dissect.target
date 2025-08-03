@@ -107,7 +107,12 @@ class RemoteStreamConnection:
             self._reconnect_wait = options.get("reconnectwait", max(0, self._reconnect_wait))
             self._socket_timeout = options.get("sockettimeout", max(0, self._socket_timeout))
 
-        if flag_cert_chain_loaded is False and self.CONFIG_KEY is not None and self.CONFIG_CRT is not None:
+        if (
+            flag_cert_chain_loaded is False
+            and self.CONFIG_KEY is not None
+            and self.CONFIG_CRT is not None
+            and hasattr(self._context, "load_cert_chain_str")
+        ):
             self._context.load_cert_chain_str(certfile=self.CONFIG_CRT, keyfile=self.CONFIG_KEY)
 
         if flag_verify_locations_loaded is False and self.CONFIG_CRT is not None:
