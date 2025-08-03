@@ -674,7 +674,10 @@ def test_open_uri() -> None:
         (Path("local"), Path("local")),
         (Path("local?query=1&other=2"), Path("local")),
         (TargetPath(VirtualFilesystem(), "custom.txt"), TargetPath(VirtualFilesystem(), "custom.txt")),
-        (TargetPath(VirtualFilesystem(), "/path/to/custom.txt"), TargetPath(VirtualFilesystem(), "/path/to/custom.txt")),
+        (
+            TargetPath(VirtualFilesystem(), "/path/to/custom.txt"),
+            TargetPath(VirtualFilesystem(), "/path/to/custom.txt"),
+        ),
     ],
 )
 def test_expected_path(path: str | Path, expected: Path) -> None:
