@@ -50,7 +50,7 @@ def _create_zip(prefix: str = "", zip_dir: bool = True) -> io.BytesIO:
             _mkdir(zf, "/".join(cur))
 
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_1", (1980, 0, 0, 0, 0, 0)), "file 1 contents")
-    zf.writestr(zipfile.ZipInfo(f"{prefix}file_2", (2107, 0, 0, 0, 0, 0)), "file 2 contents")
+    zf.writestr(zipfile.ZipInfo(f"{prefix}file_2", (2107, 1, 1, 0, 0, 0)), "file 2 contents")
 
     if zip_dir:
         _mkdir(zf, f"{prefix}dir/")
@@ -118,7 +118,7 @@ def test_filesystems_zip(obj: str, base: str, request: pytest.FixtureRequest) ->
     assert fs.get("./file_1").open().read() == b"file 1 contents"
     assert fs.get("./file_2").open().read() == b"file 2 contents"
     assert fs.get("./file_1").lstat().st_mtime_ns == 315532800000000000
-    assert fs.get("./file_2").lstat().st_mtime_ns == 4354819199000000000
+    assert fs.get("./file_2").lstat().st_mtime_ns == 4323283200000000000
     assert fs.get("./symlink_file").open().read() == b"file 1 contents"
     assert len(list(fs.glob("./dir/*"))) == 100
     assert len(list(fs.glob("./symlink_dir/*"))) == 100
