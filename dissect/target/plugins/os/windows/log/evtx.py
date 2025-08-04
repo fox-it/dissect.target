@@ -82,9 +82,12 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
                 continue
 
             self.target.log.info("Processing event log file %s", entry)
+            try:
+                for event in evtx.Evtx(entry_data):
+                    yield self._build_record(event, entry)
+            except EOFError:
+                self.target.log.warning("Event log file could not be parsed: %s", entry)
 
-            for event in evtx.Evtx(entry_data):
-                yield self._build_record(event, entry)
 
     @export(record=DynamicDescriptor(["datetime"]))
     def scraped_evtx(self) -> Iterator[DynamicDescriptor]:
