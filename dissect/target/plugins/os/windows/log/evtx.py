@@ -88,7 +88,6 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
             except EOFError:
                 self.target.log.warning("Event log file could not be parsed: %s", entry)
 
-
     @export(record=DynamicDescriptor(["datetime"]))
     def scraped_evtx(self) -> Iterator[DynamicDescriptor]:
         """Return EVTX log file records scraped from target disks."""
