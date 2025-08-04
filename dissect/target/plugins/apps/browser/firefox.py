@@ -174,11 +174,11 @@ class FirefoxPlugin(BrowserPlugin):
             url (uri): History URL.
             title (string): Page title.
             description (string): Page description.
-            rev_host (string): Reverse hostname.
+            host (string): Hostname.
             visit_type (varint): Visit type.
             visit_count (varint): Amount of visits.
             hidden (string): Hidden value.
-            typed (string): Typed value.
+            typed (boolean): Typed value.
             session (varint): Session value.
             from_visit (varint): Record ID of the "from" visit.
             from_url (uri): URL of the "from" visit.
@@ -208,7 +208,9 @@ class FirefoxPlugin(BrowserPlugin):
                         url=try_idna(place.url),
                         title=place.title,
                         description=place.description,
-                        rev_host=try_idna(place.rev_shot),
+                        host="".join(list(reversed(try_idna(place.rev_host).decode()))).lstrip(".")
+                        if place.rev_host
+                        else None,
                         visit_type=row.visit_type,
                         visit_count=place.visit_count,
                         hidden=place.hidden,
@@ -403,7 +405,7 @@ class FirefoxPlugin(BrowserPlugin):
                         ts_install=from_unix_ms(extension.get("installDate", 0)),
                         ts_update=from_unix_ms(extension.get("updateDate", 0)),
                         browser="firefox",
-                        id=extension.get("id"),
+                        extension_id=extension.get("id"),
                         name=(extension.get("defaultLocale", {}) or {}).get("name"),
                         short_name=None,
                         default_title=None,

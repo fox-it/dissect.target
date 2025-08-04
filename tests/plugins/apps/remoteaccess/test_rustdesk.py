@@ -26,7 +26,7 @@ def test_rustdesk_plugin_log(target_win_users: Target, fs_win: VirtualFilesystem
     assert records[0].message == "DEBUG src\\server\\connection.rs:983 #1362 Connection opened from REDACTED IP:6074."
     assert (
         records[0].source
-        == "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/TestRustdesk.log"
+        == "c:\\Windows\\ServiceProfiles\\LocalService\\AppData\\Roaming\\RustDesk\\log\\server\\TestRustdesk.log"
     )
     assert records[0].username is None
     assert records[0].user_id is None
