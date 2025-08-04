@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
+re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>]")
 
 
 EVTX_GLOB = "*.evtx"
