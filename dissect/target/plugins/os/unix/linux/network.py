@@ -357,27 +357,31 @@ class DhclientLeaseParser(LinuxNetworkConfigParser):
 
         # TODO: Add support for renew, rebind, expire events.
         for file in self._config_files(["/var/lib/dhclient/", "/var/lib/dhcp/"], "*.leases"):
-            leases = configutil.parse(file, hint="leases")
+            try:
+                leases = configutil.parse(file, hint="leases")
+                for label, data in leases.parsed_data.items():
+                    if "lease" in label:
+                        if (fixed_address := data.get("fixed-address")) is not None:
+                            fixed_address = ip_interface(fixed_address)
 
-            for label, data in leases.parsed_data.items():
-                if "lease" in label:
-                    if (fixed_address := data.get("fixed-address")) is not None:
-                        fixed_address = ip_interface(fixed_address)
+                        if (router := data.get("option", {}).get("routers")) is not None:
+                            router = ip_address(router)
 
-                    if (router := data.get("option", {}).get("routers")) is not None:
-                        router = ip_address(router)
-
-                    yield UnixInterfaceRecord(
-                        name=data.get("interface").strip('"'),
-                        type="dhcp",
-                        cidr={fixed_address},
-                        gateway={router},
-                        source=file,
-                        dhcp_ipv4=isinstance(fixed_address, IPv4Interface),
-                        dhcp_ipv6=isinstance(fixed_address, IPv6Interface),
-                        configurator="dhclient",
-                        _target=self._target,
-                    )
+                        yield UnixInterfaceRecord(
+                            name=data.get("interface").strip('"'),
+                            type="dhcp",
+                            cidr={fixed_address},
+                            gateway={router},
+                            source=file,
+                            dhcp_ipv4=isinstance(fixed_address, IPv4Interface),
+                            dhcp_ipv6=isinstance(fixed_address, IPv6Interface),
+                            configurator="dhclient",
+                            _target=self._target,
+                        )
+            except Exception as e:  # noqa: PERF203
+                self._target.log.warning("Error parsing dhclient leases file %s", file)
+                self._target.log.debug("", exc_info=e)
+                continue
 
 
 class NetworkManagerLeaseParser(LinuxNetworkConfigParser):
@@ -386,23 +390,27 @@ class NetworkManagerLeaseParser(LinuxNetworkConfigParser):
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
         """Parse network interfaces from NetworkManager DHCP ``.lease`` files."""
         for file in self._config_files(["/var/lib/NetworkManager/"], "*.lease"):
-            lease = configutil.parse(file, hint="env")
+            try:
+                lease = configutil.parse(file, hint="env")
 
-            interface = file.stem.split("-")[-1]  # Extract interface name from file stem
+                interface = file.stem.split("-")[-1]  # Extract interface name from file stem
+                if ip_address := lease.get("ADDRESS"):
+                    ip_address = ip_interface(ip_address)
 
-            if ip_address := lease.get("ADDRESS"):
-                ip_address = ip_interface(ip_address)
-
-            yield UnixInterfaceRecord(
-                name=interface,
-                type="dhcp",
-                cidr={ip_address},
-                source=file,
-                configurator="NetworkManager",
-                dhcp_ipv4=isinstance(ip_address, IPv4Interface),
-                dhcp_ipv6=isinstance(ip_address, IPv6Interface),
-                _target=self._target,
-            )
+                yield UnixInterfaceRecord(
+                    name=interface,
+                    type="dhcp",
+                    cidr={ip_address},
+                    source=file,
+                    configurator="NetworkManager",
+                    dhcp_ipv4=isinstance(ip_address, IPv4Interface),
+                    dhcp_ipv6=isinstance(ip_address, IPv6Interface),
+                    _target=self._target,
+                )
+            except Exception as e:  # noqa: PERF203
+                self._target.log.warning("Error parsing NetworkManager lease file %s", file)
+                self._target.log.debug("", exc_info=e)
+                continue
 
 
 MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser]

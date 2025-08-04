@@ -218,7 +218,7 @@ def test_linux_network_dhclient_leases_file(target_linux: Target, fs_linux: Virt
     lease_dhcp_dhclient = r"""
     default-duid "\000\001\000\001\037\305\371\341\001\002\003\004\005\006"
     lease {
-        interface "eth0";
+        interface "eth0";  # some comment
         fixed-address 1.2.3.4;
         option dhcp-lease-time 13337;
         option routers 0.0.0.0;
@@ -236,6 +236,7 @@ def test_linux_network_dhclient_leases_file(target_linux: Target, fs_linux: Virt
         renew 4 2024/12/31 14:37:00;
         rebind 5 2024/01/01 02:00:00;
         expire 6 2025/01/01 15:37:00;
+        # some more comments
     }
     """
 

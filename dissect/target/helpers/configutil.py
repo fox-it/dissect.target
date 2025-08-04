@@ -838,7 +838,7 @@ class Leases(Default):
             >>> Leases = textwrap.dedent(
                     '''
                     lease {
-                        interface "eth0";
+                        interface "eth0"; # A comment that gets ignored
                         fixed-address 1.2.3.4;
                         option dhcp-lease-time 13337;
                         option routers 0.0.0.0;
@@ -846,6 +846,7 @@ class Leases(Default):
                         renew 1 2023/12/31 13:37:00;
                         rebind 2 2023/01/01 01:00:00;
                         expire 3 2024/01/01 13:37:00;
+                        # Another comment that gets ignored
                     }
                     '''
                 )

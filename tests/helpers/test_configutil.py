@@ -382,7 +382,7 @@ def test_env_parser(input: str | Path, expected_output: dict) -> None:
     ("string_data", "expected_output"),
     [
         (
-            'default-duid "\\000\\001\\000\\001\\037\\305\\371\\341\\001\\002\\003\\004\\005\\006"\nlease {\ninterface "eth0";\nfixed-address "1.2.3.4";\noption subnet-mask 255.255.255.0;\nrenew 2 2023/10/04 13:37:04;\n}',  # noqa: E501
+            'default-duid "\\000\\001\\000\\001\\037\\305\\371\\341\\001\\002\\003\\004\\005\\006"\nlease {\ninterface "eth0"; # some comment\nfixed-address "1.2.3.4";\noption subnet-mask 255.255.255.0;\nrenew 2 2023/10/04 13:37:04;\n# some other comment}',  # noqa: E501
             {
                 "default-duid": '"\\000\\001\\000\\001\\037\\305\\371\\341\\001\\002\\003\\004\\005\\006"',
                 "lease-0": {
