@@ -85,11 +85,6 @@ class ZipFilesystemEntry(VirtualDirectory):
         super().__init__(fs, path)
         self.entry = entry
 
-        if self.entry.date_time[0] < 1980 or self.entry.date_time[:3] == (1980, 0, 0):
-            self.entry.date_time = (1980, 1, 1, 0, 0, 0)
-        elif self.entry.date_time[0] > 2107:
-            self.entry.date_time = (2107, 12, 31, 23, 59, 59)
-
     def open(self) -> BinaryIO:
         if self.is_dir():
             raise IsADirectoryError(self.path)
@@ -165,6 +160,11 @@ class ZipFilesystemEntry(VirtualDirectory):
             mode = stat.S_IFDIR | mode
         elif not self.entry.is_dir() and not stat.S_ISREG(mode):
             mode = stat.S_IFREG | mode
+
+        if self.entry.date_time[0] < 1980 or self.entry.date_time[:3] == (1980, 0, 0):
+            self.entry.date_time = (1980, 1, 1, 0, 0, 0)
+        elif self.entry.date_time[0] > 2107:
+            self.entry.date_time = (2107, 12, 31, 23, 59, 59)
 
         return fsutil.stat_result(
             [
