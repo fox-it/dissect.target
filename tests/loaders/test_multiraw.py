@@ -16,14 +16,16 @@ if TYPE_CHECKING:
 
 def test_target_open(tmp_path: Path) -> None:
     """Test that we correctly use ``MultiRawLoader`` when opening a ``Target``."""
-    (tmp_path / "file1.bin").touch()
-    (tmp_path / "file2.bin").touch()
+    file1 = tmp_path / "file1.bin"
+    file2 = tmp_path / "file2.bin"
+    file1.touch()
+    file2.touch()
 
     fs = VirtualFilesystem()
     fs.map_file_fh("/dir/file1.bin", io.BytesIO())
     fs.map_file_fh("/dir/file2.bin", io.BytesIO())
 
-    for path in (f"{tmp_path}/file1.bin+{tmp_path}/file2.bin", fs.path("/dir/file1.bin+/dir/file2.bin")):
+    for path in (f"{file1}+{file2}", fs.path("/dir/file1.bin+/dir/file2.bin")):
         with patch("dissect.target.loaders.multiraw.container.open"), patch("dissect.target.target.Target.apply"):
             for target in (Target.open(path), next(Target.open_all(path), None)):
                 assert target is not None

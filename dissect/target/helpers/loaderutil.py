@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import re
+import os
+import string
 import urllib.parse
-from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -93,11 +93,11 @@ def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult 
     if path is None:
         return None, None
 
-    if isinstance(path, PathLike):
+    if isinstance(path, os.PathLike):
         return path, None
 
     parsed_path = urllib.parse.urlparse(path)
-    if parsed_path.scheme == "" or re.match("^[A-Za-z]$", parsed_path.scheme):
+    if parsed_path.scheme == "" or (len(parsed_path.scheme) == 1 and parsed_path.scheme in string.ascii_letters):
         return Path(path), None
     return Path(parsed_path.netloc + parsed_path.path).expanduser(), parsed_path
 
@@ -113,6 +113,25 @@ def parse_path_uri(path: str | Path) -> tuple[urllib.parse.ParseResult | None, s
     """
     if path is None:
         return None, None, None
+
+    path = str(path)
     parsed_path = urllib.parse.urlparse(str(path))
+
+    if len(parsed_path.scheme) == 1 and parsed_path.scheme in string.ascii_letters:
+        # If the scheme is a single letter, it's likely a Windows path
+        # Put the drive letter back
+        parsed_path = urllib.parse.ParseResult(
+            scheme="",
+            netloc=parsed_path.netloc,
+            path=path[:2] + parsed_path.path,  # Take it from the original path to preserve casing
+            params=parsed_path.params,
+            query=parsed_path.query,
+            fragment=parsed_path.fragment,
+        )
+
+    # Treat everything after the @ in a URI as part of the path
+    # I.e. "uri://user:password@host:port/path" becomes "host:port/path"
+    normalized_path = (parsed_path.netloc or "").split("@", 1)[-1] + (parsed_path.path or "")
+
     parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True)
-    return parsed_path, (parsed_path.netloc or "").split("@", 1)[-1] + (parsed_path.path or ""), parsed_query
+    return parsed_path, normalized_path, parsed_query
