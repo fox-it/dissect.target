@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING
 
 from dissect.target import filesystem, volume
 from dissect.target.containers.vhdx import VhdxContainer
-from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs
+from dissect.target.loader import Loader
+from dissect.target.loaders.dir import find_and_map_dirs, find_dirs
 from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
@@ -49,7 +50,7 @@ def is_valid_kape_vhdx(path: Path) -> bool:
     return False
 
 
-class KapeLoader(DirLoader):
+class KapeLoader(Loader):
     """Load KAPE forensic image format files.
 
     References:

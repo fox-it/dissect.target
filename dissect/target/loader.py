@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import logging
+import os
 import urllib.parse
+from pathlib import Path
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from dissect.target.helpers.lazy import import_lazy
-from dissect.target.helpers.loaderutil import extract_path_info
+from dissect.target.helpers.loaderutil import parse_path_uri
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -77,7 +78,9 @@ class Loader:
                 self.absolute_path = path
             self.base_path = self.absolute_path.parent
         self.parsed_path = parsed_path
-        self.parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True) if parsed_path else {}
+        self.parsed_query = (
+            dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True)) if parsed_path else {}
+        )
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self.path)!r})"
@@ -109,10 +112,7 @@ class Loader:
         Returns:
             All the target paths found from the source path.
         """
-        if parsed_path is not None:
-            yield urllib.parse.urlunparse(parsed_path)
-        else:
-            yield path
+        yield path
 
     def map(self, target: Target) -> None:
         """Maps the loaded path into a ``Target``.
@@ -171,33 +171,33 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
 
 
 def find_loader(
-    item: Path, parsed_path: urllib.parse.ParseResult | None = None, fallbacks: list[type[Loader]] | None = None
+    path: str | Path,
+    *,
+    fallbacks: list[type[Loader]] | None = None,
 ) -> type[Loader] | None:
-    """Finds a :class:`Loader` class for the specific ``item``.
+    """Finds a :class:`Loader` class for a given path.
 
-    This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
+    This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``path``.
     Once it detects a suitable :class:`Loader` it immediately returns said :class:`Loader` class.
-    It does this for all items inside the ``LOADER`` variable.
 
     The :class:`DirLoader <dissect.target.loaders.dir.DirLoader>` is used as the last entry
     due to how the detection methods function.
 
     Args:
-        item: The target path to load.
+        path: The target path to load.
         fallbacks: Fallback loaders to try.
 
     Returns:
-        A :class:`Loader` class for the specific target if one exists.
+        A :class:`Loader` class for the specific target if one is found.
     """
+    path = Path(path) if not isinstance(path, os.PathLike) else path
+
     if fallbacks is None:
         fallbacks = [DirLoader]
 
-    if parsed_path and (loader := LOADERS_BY_SCHEME.get(parsed_path.scheme)):
-        return loader
-
     for loader in LOADERS + fallbacks:
         try:
-            if loader.detect(item):
+            if loader.detect(path):
                 return loader
         except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", loader)
@@ -206,24 +206,43 @@ def find_loader(
     return None
 
 
-def open(item: str | Path, *args, **kwargs) -> Loader | None:
-    """Opens a :class:`Loader` for a specific ``item``.
+def find_loader_by_scheme(scheme: str) -> type[Loader] | None:
+    """Finds a :class:`Loader` class by its scheme.
 
-    This instantiates a :class:`Loader` for a specific ``item``.
+    Args:
+        scheme: The scheme to find the loader for.
+
+    Returns:
+        A :class:`Loader` class for the specific scheme if one is found.
+    """
+    return LOADERS_BY_SCHEME.get(scheme)
+
+
+def open(path: str | Path, *, fallbacks: list[type[Loader]] | None = None, **kwargs) -> Loader | None:
+    """Opens a :class:`Loader` for a given path.
+
+    This instantiates a :class:`Loader` for a specific ``path``.
     The :class:`DirLoader <dissect.target.loaders.dir.DirLoader>` is used as the last entry
     due to how the detection methods function.
 
     Args:
-        item: The target path to load.
+        path: The target path to load.
 
     Returns:
-        A :class:`Loader` class for the specific target if one exists.
+        A :class:`Loader` instance for the specific target if one is found.
     """
-    item, parsed_path = extract_path_info(item)
+    adjusted_path, parsed_path = parse_path_uri(path)
 
-    if loader := find_loader(item, parsed_path=parsed_path):
+    if parsed_path is not None and (loader := find_loader_by_scheme(parsed_path.scheme)):
+        # If we find a loader by scheme, use the adjusted path
         kwargs["parsed_path"] = parsed_path
-        return loader(item, *args, **kwargs)
+        return loader(adjusted_path, **kwargs)
+
+    # Use the original unadjusted path
+    path = Path(path) if not isinstance(path, os.PathLike) else path
+    if loader := find_loader(path, fallbacks=fallbacks):
+        kwargs["parsed_path"] = parsed_path
+        return loader(path, **kwargs)
 
     return None
 
