@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from typing import TYPE_CHECKING, Callable
 from unittest import mock
 
 import pytest
@@ -11,8 +12,18 @@ from dissect.target.loaders.hyperv import HyperVLoader
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def test_target_open() -> None:
+
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``HyperVLoader`` when opening a ``Target``."""
     for path in [
         absolute_path("_data/loaders/hyperv/B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"),
@@ -21,10 +32,9 @@ def test_target_open() -> None:
         absolute_path("_data/loaders/hyperv/993F7B33-6057-4D1E-A1FE-A1A1D77BE974.vmcx"),
     ]:
         with mock.patch("dissect.target.target.Target.apply"):
-            for target in (Target.open(path), next(Target.open_all(path), None)):
-                assert target is not None
-                assert isinstance(target._loader, HyperVLoader)
-                assert target.path == path
+            target = opener(path)
+            assert isinstance(target._loader, HyperVLoader)
+            assert target.path == path
 
 
 @pytest.mark.parametrize(

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import tarfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import patch
+
+import pytest
 
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.ova import OvaLoader
@@ -12,7 +14,14 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_target_open(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test that we correctly use ``OvaLoader`` when opening a ``Target``."""
     path = tmp_path / "test.ova"
 
@@ -21,17 +30,16 @@ def test_target_open(tmp_path: Path) -> None:
         tf.addfile(tarfile.TarInfo("disk.vmdk"), b"")
 
     with (
-        patch("dissect.target.loaders.ovf.ovf.OVF") as mock_ovf,
-        patch("dissect.target.loaders.ovf.container.open"),
+        patch("dissect.hypervisor.descriptor.ovf.OVF") as mock_ovf,
+        patch("dissect.target.container.open"),
         patch("dissect.target.target.Target.apply"),
     ):
         mock_ovf.return_value = mock_ovf
         mock_ovf.disks.return_value = ["disk.vmdk"]
 
-        for target in (Target.open(path), next(Target.open_all(path), None)):
-            assert target is not None
-            assert isinstance(target._loader, OvaLoader)
-            assert target.path == path
+        target = opener(path)
+        assert isinstance(target._loader, OvaLoader)
+        assert target.path == path
 
 
 def test_loader(tmp_path: Path) -> None:
@@ -43,8 +51,8 @@ def test_loader(tmp_path: Path) -> None:
         tf.addfile(tarfile.TarInfo("disk.vmdk"), b"")
 
     with (
-        patch("dissect.target.loaders.ovf.ovf.OVF") as mock_ovf,
-        patch("dissect.target.loaders.ovf.container.open") as mock_container_open,
+        patch("dissect.hypervisor.descriptor.ovf.OVF") as mock_ovf,
+        patch("dissect.target.container.open") as mock_container_open,
     ):
         mock_ovf.return_value = mock_ovf
         mock_ovf.disks.return_value = ["disk.vmdk"]

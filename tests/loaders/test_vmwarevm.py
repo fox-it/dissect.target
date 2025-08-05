@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import patch
 
 import pytest
@@ -21,20 +21,26 @@ def mock_vmwarevm_dir(tmp_path: Path) -> Iterator[Path]:
     (path / "Test.vmx").touch()
     (path / "mock.vmdk").touch()
 
-    with patch("dissect.target.loaders.vmx.vmx.VMX") as mock_vmx:
+    with patch("dissect.hypervisor.descriptor.vmx.VMX") as mock_vmx:
         mock_vmx.parse.return_value = mock_vmx
         mock_vmx.disks.return_value = ["mock.vmdk"]
 
         yield path
 
 
-def test_target_open(mock_vmwarevm_dir: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: Path) -> None:
     """Test that we correctly use ``VmwarevmLoader`` when opening a ``Target``."""
-    with patch("dissect.target.loaders.vmx.container.open"), patch("dissect.target.target.Target.apply"):
-        for target in (Target.open(mock_vmwarevm_dir), next(Target.open_all(mock_vmwarevm_dir), None)):
-            assert target is not None
-            assert isinstance(target._loader, VmwarevmLoader)
-            assert target.path == mock_vmwarevm_dir
+    with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
+        target = opener(mock_vmwarevm_dir)
+        assert isinstance(target._loader, VmwarevmLoader)
+        assert target.path == mock_vmwarevm_dir
 
 
 def test_loader(mock_vmwarevm_dir: Path) -> None:
@@ -42,7 +48,7 @@ def test_loader(mock_vmwarevm_dir: Path) -> None:
     loader = loader_open(mock_vmwarevm_dir)
     assert isinstance(loader, VmwarevmLoader)
 
-    with patch("dissect.target.loaders.vmx.container.open") as mock_container_open:
+    with patch("dissect.target.container.open") as mock_container_open:
         t = Target()
         loader.map(t)
 

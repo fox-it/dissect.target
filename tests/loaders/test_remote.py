@@ -4,14 +4,24 @@ import socket
 import ssl
 from pathlib import Path
 from struct import unpack
+from typing import Callable
 from unittest.mock import call, patch
+
+import pytest
 
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.remote import RemoteLoader, RemoteStream, RemoteStreamConnection
 from dissect.target.target import Target
 
 
-def test_target_open() -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``RemoteLoader`` when opening a ``Target``."""
     path = "remote://127.0.0.1:1337"
     with (
@@ -19,10 +29,9 @@ def test_target_open() -> None:
         patch("dissect.target.loaders.remote.RemoteLoader.map"),
         patch("dissect.target.target.Target.apply"),
     ):
-        for target in (Target.open(path), next(Target.open_all(path), None)):
-            assert target is not None
-            assert isinstance(target._loader, RemoteLoader)
-            assert target.path == Path("127.0.0.1:1337")
+        target = opener(path)
+        assert isinstance(target._loader, RemoteLoader)
+        assert target.path == Path("127.0.0.1:1337")
 
 
 def test_loader() -> None:

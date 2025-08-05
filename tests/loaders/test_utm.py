@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import textwrap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import patch
 
 import pytest
@@ -49,20 +49,26 @@ def mock_utm_dir(tmp_path: Path) -> Path:
     return root / "Test.utm"
 
 
-def test_target_open(mock_utm_dir: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_utm_dir: Path) -> None:
     """Test that we correctly use ``UtmLoader`` when opening a ``Target``."""
-    with patch("dissect.target.loaders.utm.container.open"), patch("dissect.target.target.Target.apply"):
-        for target in (Target.open(mock_utm_dir), next(Target.open_all(mock_utm_dir), None)):
-            assert target is not None
-            assert isinstance(target._loader, UtmLoader)
-            assert target.path == mock_utm_dir
+    with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
+        target = opener(mock_utm_dir)
+        assert isinstance(target._loader, UtmLoader)
+        assert target.path == mock_utm_dir
 
 
 def test_loader(mock_utm_dir: Path) -> None:
     loader = loader_open(mock_utm_dir)
     assert isinstance(loader, UtmLoader)
 
-    with patch("dissect.target.loaders.utm.container.open") as mock_container_open:
+    with patch("dissect.target.container.open") as mock_container_open:
         t = Target()
         loader.map(t)
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 def _mock_vmx_and_container_open(disks: list[str]) -> Iterator[MagicMock]:
     with (
         patch("dissect.hypervisor.descriptor.vmx.VMX") as mock_vmx,
-        patch("dissect.target.loaders.vmx.container.open") as mock_container_open,
+        patch("dissect.target.container.open") as mock_container_open,
     ):
         mock_vmx.parse.return_value = mock_vmx
         mock_vmx.disks.return_value = disks
@@ -35,6 +35,23 @@ def mock_vmwarevm_dir(tmp_path: Path) -> Path:
     vmx_path.touch()
 
     return vm_path
+
+
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: Path) -> None:
+    """Test that we correctly use ``VmwarevmLoader`` when opening a ``Target``."""
+    path = mock_vmwarevm_dir / "Test.vmx"
+
+    with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
+        target = opener(path)
+        assert isinstance(target._loader, VmxLoader)
+        assert target.path == path
 
 
 def test_loader(mock_vmwarevm_dir: Path) -> None:

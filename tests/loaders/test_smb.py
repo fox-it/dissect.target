@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -40,16 +40,22 @@ def mock_connection(mock_impacket: MagicMock) -> MagicMock:
     return mock_connection
 
 
-def test_target_open(mock_impacket: MagicMock, mock_connection: MagicMock) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_connection: MagicMock) -> None:
     """Test that we correctly use ``SmbLoader`` when opening a ``Target``."""
     from dissect.target.loaders.smb import SmbLoader
 
     path = "smb://user@host"
     with patch("dissect.target.target.Target.apply"):
-        for target in (Target.open(path), next(Target.open_all(path), None)):
-            assert target is not None
-            assert isinstance(target._loader, SmbLoader)
-            assert target.path == Path("host")
+        target = opener(path)
+        assert isinstance(target._loader, SmbLoader)
+        assert target.path == Path("host")
 
 
 def test_loader(mock_impacket: MagicMock, mock_connection: MagicMock) -> None:
