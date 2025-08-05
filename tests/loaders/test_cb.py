@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -52,17 +52,23 @@ def mock_session(mock_device: MagicMock) -> MagicMock:
     return mock_session
 
 
-def test_target_open(mock_session: MagicMock) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_session: MagicMock) -> None:
     """Test that we correctly use ``CbLoader`` when opening a ``Target``."""
     from dissect.target.loaders.cb import CbLoader
 
     path = "cb://instance/workstation"
 
     with patch("dissect.target.target.Target.apply"):
-        for target in (Target.open(path), next(Target.open_all(path), None)):
-            assert target is not None
-            assert isinstance(target._loader, CbLoader)
-            assert target.path == Path("instance/workstation")
+        target = opener(path)
+        assert isinstance(target._loader, CbLoader)
+        assert target.path == Path("instance/workstation")
 
 
 def test_loader(mock_session: MagicMock, mock_cbc_sdk: MagicMock) -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import patch
 
 import pytest
@@ -30,6 +30,13 @@ def mock_uac_dir(tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+@pytest.mark.parametrize(
     ("path", "loader"),
     [
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz", TarLoader),
@@ -37,19 +44,21 @@ def mock_uac_dir(tmp_path: Path) -> Path:
         ("mock_uac_dir", UacLoader),
     ],
 )
-def test_target_open(path: str, loader: type[Loader], mock_uac_dir: Path) -> None:
+def test_target_open(
+    opener: Callable[[str | Path], Target], path: str, loader: type[Loader], mock_uac_dir: Path
+) -> None:
     """Test that we correctly use the UAC loaders when opening a ``Target``."""
     path = mock_uac_dir if path == "mock_uac_dir" else absolute_path(path)
 
     with patch("dissect.target.target.Target.apply"):
-        for target in (Target.open(path), next(Target.open_all(path), None)):
-            assert target is not None
-            assert isinstance(target._loader, loader)
-            if isinstance(target._loader, TarLoader):
-                assert isinstance(target._loader.subloader, UacTarSubloader)
-            elif isinstance(target._loader, ZipLoader):
-                assert isinstance(target._loader.subloader, UacZipSubLoader)
-            assert target.path == path
+        target = opener(path)
+
+        assert isinstance(target._loader, loader)
+        if isinstance(target._loader, TarLoader):
+            assert isinstance(target._loader.subloader, UacTarSubloader)
+        elif isinstance(target._loader, ZipLoader):
+            assert isinstance(target._loader.subloader, UacZipSubLoader)
+        assert target.path == path
 
 
 def test_compressed_tar() -> None:

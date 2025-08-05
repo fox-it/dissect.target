@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.hypervisor.descriptor.vbox import VBox
+from dissect.hypervisor import vbox
 
 from dissect.target import container
 from dissect.target.loader import Loader
@@ -19,7 +19,7 @@ class VBoxLoader(Loader):
     def __init__(self, path: Path, **kwargs):
         super().__init__(path, **kwargs)
         with path.open("r") as fh:
-            self.vbox = VBox(fh)
+            self.vbox = vbox.VBox(fh)
 
     @staticmethod
     def detect(path: Path) -> bool:

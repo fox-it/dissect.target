@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import call, patch
+
+import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import open as loader_open
@@ -13,18 +15,25 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_target_open() -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``LibvirtLoader`` when opening a ``Target``."""
     vfs = VirtualFilesystem()
     vfs.map_file("/test.xml", absolute_path("_data/loaders/libvirt/qemu.xml"))
     vfs.map_file_fh("/var/lib/libvirt/images/linux2022.qcow2", None)
     vfs.map_file_fh("/second-disk.qcow2", None)
 
-    with patch("dissect.target.loaders.libvirt.container.open"), patch("dissect.target.target.Target.apply"):
-        for target in (Target.open(vfs.path("/test.xml")), next(Target.open_all(vfs.path("/test.xml")), None)):
-            assert target is not None
-            assert isinstance(target._loader, LibvirtLoader)
-            assert target.path == vfs.path("/test.xml")
+    path = vfs.path("/test.xml")
+    with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
+        target = opener(path)
+        assert isinstance(target._loader, LibvirtLoader)
+        assert target.path == path
 
 
 def test_loader(tmp_path: Path) -> None:
@@ -51,7 +60,7 @@ def test_loader(tmp_path: Path) -> None:
     loader = loader_open(vfs.path("/test.xml"))
     assert isinstance(loader, LibvirtLoader)
 
-    with patch("dissect.target.loaders.libvirt.container.open") as mock_container_open:
+    with patch("dissect.target.container.open") as mock_container_open:
         t = Target()
         loader.map(t)
 

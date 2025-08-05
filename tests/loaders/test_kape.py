@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import patch
 
 import pytest
@@ -34,13 +34,19 @@ def mock_kape_dir(tmp_path: Path) -> Path:
     return root
 
 
-def test_target_open(mock_kape_dir: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_kape_dir: Path) -> None:
     """Test that we correctly use ``KapeLoader`` when opening a ``Target``."""
     for path in [mock_kape_dir, absolute_path("_data/loaders/kape/test.vhdx")]:
-        for target in (Target.open(path), next(Target.open_all(path), None)):
-            assert target is not None
-            assert isinstance(target._loader, KapeLoader)
-            assert target.path == path
+        target = opener(path)
+        assert isinstance(target._loader, KapeLoader)
+        assert target.path == path
 
 
 @patch("dissect.target.filesystems.dir.DirectoryFilesystem.ntfs", None, create=True)

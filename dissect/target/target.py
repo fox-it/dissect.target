@@ -94,7 +94,7 @@ class Target:
         self._name = None
         self._plugins: list[plugin.Plugin] = []
         self._functions: dict[str, FunctionTuple] = {}
-        self._loader = None
+        self._loader: loader.Loader = None
         self._os = None
         self._os_plugin: type[plugin.OSPlugin] = None
         self._child_plugins: dict[str, plugin.ChildTargetPlugin] = {}

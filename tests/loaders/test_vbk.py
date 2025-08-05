@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import Mock, patch
 
 import pytest
@@ -15,17 +16,26 @@ from dissect.target.loaders.vmx import VmxLoader
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def test_target_open() -> None:
+
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``VbkLoader`` when opening a ``Target``."""
     path = absolute_path(
         "_data/loaders/vbk/Backup Job 1/VBK-Test-VM.e56465c7-3a5a-4599-bc25-3555b9b8cD2025-07-20T160920_3702.vbk"
     )
 
-    for target in (Target.open(path), next(Target.open_all(path), None)):
-        assert target is not None
-        assert isinstance(target._loader, VbkLoader)
-        assert target.path == path
+    target = opener(path)
+    assert isinstance(target._loader, VbkLoader)
+    assert target.path == path
 
 
 @pytest.mark.parametrize(

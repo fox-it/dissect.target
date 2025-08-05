@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 from unittest.mock import call, create_autospec, mock_open, patch
 
 import pytest
@@ -18,17 +19,23 @@ from dissect.target.loaders.local import (
 from dissect.target.target import Target, TargetLogAdapter
 
 
-def test_target_open() -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``LocalLoader`` when opening a ``Target``."""
     for path in ["local", "local?some=query"]:
         with patch("dissect.target.target.Target.apply"):
-            for target in (Target.open(path), next(Target.open_all(path), None)):
-                assert target is not None
-                assert isinstance(target._loader, LocalLoader)
-                assert target.path == Path("local")
+            target = opener(path)
+            assert isinstance(target._loader, LocalLoader)
+            assert target.path == Path("local")
 
-                if "?" in path:
-                    assert target.path_query == {"some": "query"}
+            if "?" in path:
+                assert target.path_query == {"some": "query"}
 
 
 def test_skip_emulated_drive() -> None:

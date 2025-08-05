@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import shutil
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 
@@ -54,14 +54,20 @@ def mock_velociraptor_dir(request: pytest.FixtureRequest, tmp_path: Path) -> Pat
     return root
 
 
-def test_loader_open(mock_velociraptor_dir: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_velociraptor_dir: Path) -> None:
     """Test that we correctly use ``VelociraptorLoader`` when opening a ``Target``."""
     path = mock_velociraptor_dir
 
-    for target in (Target.open(path), next(Target.open_all(path), None)):
-        assert target is not None
-        assert isinstance(target._loader, VelociraptorLoader)
-        assert target.path == path
+    target = opener(path)
+    assert isinstance(target._loader, VelociraptorLoader)
+    assert target.path == path
 
 
 def test_windows_ntfs(mock_velociraptor_dir: Path) -> None:

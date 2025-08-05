@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import patch
 
 import pytest
@@ -20,25 +20,31 @@ def mock_pvm_dir(tmp_path: Path) -> Iterator[Path]:
     mkdirs(tmp_path, ["Test.pvm"])
     (tmp_path / "Test.pvm" / "config.pvs").touch()
 
-    with patch("dissect.target.loaders.pvs.pvs.PVS") as mock_pvs:
+    with patch("dissect.hypervisor.descriptor.pvs.PVS") as mock_pvs:
         mock_pvs.return_value = mock_pvs
         mock_pvs.disks.return_value = ["mock.hdd"]
 
         yield tmp_path / "Test.pvm"
 
 
-def test_target_open(mock_pvm_dir: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_pvm_dir: Path) -> None:
     """Test that we correctly use ``PvmLoader`` when opening a ``Target``."""
-    with patch("dissect.target.loaders.pvs.container.open"), patch("dissect.target.target.Target.apply"):
-        for target in (Target.open(mock_pvm_dir), next(Target.open_all(mock_pvm_dir), None)):
-            assert target is not None
-            assert isinstance(target._loader, PvmLoader)
-            assert target.path == mock_pvm_dir
+    with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
+        target = opener(mock_pvm_dir)
+        assert isinstance(target._loader, PvmLoader)
+        assert target.path == mock_pvm_dir
 
 
 def test_loader(mock_pvm_dir: Path) -> None:
     """Test that ``PvmLoader`` correctly loads a PVM file and its disks."""
-    with patch("dissect.target.loaders.pvs.container.open") as mock_container_open:
+    with patch("dissect.target.container.open") as mock_container_open:
         loader = loader_open(mock_pvm_dir)
         assert isinstance(loader, PvmLoader)
 

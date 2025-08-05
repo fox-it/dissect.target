@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import io
 import logging
+import platform
 import urllib.parse
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Callable, ClassVar
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
 import pytest
@@ -617,7 +618,14 @@ def test_children_on_invalid_target(caplog: pytest.LogCaptureFixture, tmp_path: 
     assert "Failed to load child target from None" not in caplog.text
 
 
-def test_open_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_open_uri(opener: Callable[[str | Path], Target]) -> None:
     """Test that we can open a URI with a custom scheme."""
 
     class MockLoader(loader.Loader):
@@ -628,38 +636,46 @@ def test_open_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
             target.filesystems.add(VirtualFilesystem())
 
     with patch.dict(loader.LOADERS_BY_SCHEME, {"mock": MockLoader}):
-        # Test both Target.open and Target.open_all
         path = "mock://user:password@example.com:1337/path/to/resource?query=1&other=2"
-        for target in (Target.open(path), next(Target.open_all([path]))):
-            assert target.path == Path("example.com:1337/path/to/resource")
-            assert target.path_query == {"query": "1", "other": "2"}
-            assert isinstance(target._loader, MockLoader)
-            assert target._loader.parsed_path
-            assert target._loader.parsed_path.scheme == "mock"
-            assert target._loader.parsed_path.netloc == "user:password@example.com:1337"
-            assert target._loader.parsed_path.path == "/path/to/resource"
-            assert target._loader.parsed_path.query == "query=1&other=2"
+        target = opener(path)
 
-    # Test it with a Path object
+        assert target.path == Path("example.com:1337/path/to/resource")
+        assert target.path_query == {"query": "1", "other": "2"}
+        assert isinstance(target._loader, MockLoader)
+        assert target._loader.parsed_path
+        assert target._loader.parsed_path.scheme == "mock"
+        assert target._loader.parsed_path.netloc == "user:password@example.com:1337"
+        assert target._loader.parsed_path.path == "/path/to/resource"
+        assert target._loader.parsed_path.query == "query=1&other=2"
+
+
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test")
+def test_open_uri_path(opener: Callable[[str | Path], Target], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / "mock:").mkdir()
     (tmp_path / "mock:" / "file").write_bytes(b"I'm a hard drive!")
 
     monkeypatch.chdir(tmp_path)
 
-    # Test both Target.open and Target.open_all
     # If we pass in a Path object, we should not parse it as a URI
-    for target in (Target.open(Path("mock://file")), next(Target.open_all([Path("mock://file")]))):
-        assert target.path == Path("mock:/file")
-        assert isinstance(target._loader, RawLoader)
-        assert target._loader.path == Path("mock:/file")
-        assert target._loader.parsed_path is None
+    target = opener(Path("mock:/file"))
+    assert target.path == Path("mock:/file")
+    assert isinstance(target._loader, RawLoader)
+    assert target._loader.path == Path("mock:/file")
+    assert target._loader.parsed_path is None
 
     # If we pass it in as a string and we have no loader for it, it should still be treated as a local path
-    for target in (Target.open("mock://file"), next(Target.open_all(["mock://file"]))):
-        assert target.path == Path("mock:/file")
-        assert isinstance(target._loader, RawLoader)
-        assert target._loader.path == Path("mock:/file")
-        assert target._loader.parsed_path is None
+    target = opener("mock:/file")
+    assert target.path == Path("mock:/file")
+    assert isinstance(target._loader, RawLoader)
+    assert target._loader.path == Path("mock:/file")
+    assert target._loader.parsed_path is None
 
 
 @pytest.mark.parametrize(
