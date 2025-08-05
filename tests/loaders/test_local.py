@@ -28,7 +28,7 @@ def test_target_open() -> None:
                 assert target.path == Path("local")
 
                 if "?" in path:
-                    assert target.path_query == {"some": ["query"]}
+                    assert target.path_query == {"some": "query"}
 
 
 def test_skip_emulated_drive() -> None:

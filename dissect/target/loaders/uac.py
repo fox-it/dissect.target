@@ -4,7 +4,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystems.tar import TarFilesystem
-from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs, map_dirs
+from dissect.target.loader import Loader
+from dissect.target.loaders.dir import find_and_map_dirs, find_dirs, map_dirs
 from dissect.target.loaders.tar import TarSubLoader
 from dissect.target.loaders.zip import ZipSubLoader
 
@@ -21,7 +22,7 @@ FILESYSTEMS_ROOT = "[root]"
 UAC_CHECK_FILE = "uac.log"
 
 
-class UacLoader(DirLoader):
+class UacLoader(Loader):
     """Loader for extracted UAC collections.
 
     References:
