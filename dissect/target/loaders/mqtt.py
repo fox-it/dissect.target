@@ -546,7 +546,7 @@ class MqttLoader(Loader):
             raise LoaderError("No URI connection details have been passed.")
 
         if cls.broker is None:
-            options = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True)
+            options = dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True))
             if options.get("password"):
                 options["password"] = getpass()
             cls.broker = Broker(**options)

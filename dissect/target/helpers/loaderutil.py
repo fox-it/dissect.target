@@ -80,16 +80,17 @@ def _try_open(fs: Filesystem, path: str) -> BinaryIO | None:
     return None
 
 
-def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult | None]:
-    """Extracts a ``ParseResult`` from a path if it has a scheme and adjusts the path if necessary.
+def parse_path_uri(path: str | Path) -> tuple[Path | None, urllib.parse.ParseResult | None]:
+    """Parse a path URI into its path component and a parsed path, if applicable.
+
+    If the path is a string, it will be parsed as a URI. If it is a Path object, it will be returned as is.
 
     Args:
         path: String or ``Path`` describing the path of a target.
 
     Returns:
-        A tuple containing the adjusted path and a ``ParseResult`` if applicable.
+        A tuple containing a normalized path and the parsed path.
     """
-
     if path is None:
         return None, None
 
@@ -97,41 +98,7 @@ def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult 
         return path, None
 
     parsed_path = urllib.parse.urlparse(path)
-    if parsed_path.scheme == "" or (len(parsed_path.scheme) == 1 and parsed_path.scheme in string.ascii_letters):
+    if not parsed_path.scheme or (len(parsed_path.scheme) == 1 and parsed_path.scheme in string.ascii_letters):
         return Path(path), None
+
     return Path(parsed_path.netloc + parsed_path.path).expanduser(), parsed_path
-
-
-def parse_path_uri(path: str | Path) -> tuple[urllib.parse.ParseResult | None, str | None, str | None]:
-    """Parse a path URI into three components.
-
-    Args:
-        path: String or ``Path`` describing the path of a target.
-
-    Returns:
-        A tuple containing the parsed path, a normalized identifying path, and the query parameters (if any).
-    """
-    if path is None:
-        return None, None, None
-
-    path = str(path)
-    parsed_path = urllib.parse.urlparse(str(path))
-
-    if len(parsed_path.scheme) == 1 and parsed_path.scheme in string.ascii_letters:
-        # If the scheme is a single letter, it's likely a Windows path
-        # Put the drive letter back
-        parsed_path = urllib.parse.ParseResult(
-            scheme="",
-            netloc=parsed_path.netloc,
-            path=path[:2] + parsed_path.path,  # Take it from the original path to preserve casing
-            params=parsed_path.params,
-            query=parsed_path.query,
-            fragment=parsed_path.fragment,
-        )
-
-    # Treat everything after the @ in a URI as part of the path
-    # I.e. "uri://user:password@host:port/path" becomes "host:port/path"
-    normalized_path = (parsed_path.netloc or "").split("@", 1)[-1] + (parsed_path.path or "")
-
-    parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True)
-    return parsed_path, normalized_path, parsed_query
