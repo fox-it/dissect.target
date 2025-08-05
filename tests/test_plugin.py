@@ -1533,7 +1533,7 @@ def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
 
 @pytest.mark.parametrize(
     "descriptor",
-    [descriptor for descriptor in plugins() if issubclass(descriptor.cls, NamespacePlugin)],
+    [descriptor for descriptor in plugins() if NamespacePlugin in descriptor.cls.__bases__],
     ids=lambda descriptor: descriptor.qualname,
 )
 def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
