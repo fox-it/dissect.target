@@ -8,12 +8,16 @@ import pytest
 
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.hyperv import HyperVLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbk import VbkLoader
 from dissect.target.loaders.vmx import VmxLoader
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dissect.target.target import Target
 
 
@@ -114,3 +118,31 @@ def test_vbk_loader_mock_vmcx(VbkFilesystem: Mock, HyperVFile: Mock, target_defa
 
     disks[1].seek(0)
     assert disks[1].read(-1).decode() == "🏃🏃"
+
+
+@pytest.mark.parametrize(
+    ("path", "disk_sizes"),
+    [
+        (
+            "Backup Job 1/VBK-Test-VM.e56465c7-3a5a-4599-bc25-3555b9b8cD2025-07-20T160920_3702.vbk",
+            [20 * 1024 * 1024 * 1024],
+        ),
+        (
+            "Backup Job 2_1/VBK-Test-VM-SCSI.8637b8b5-28a2-41e1-90c6-f8a0D2025-07-29T171659_FB82.vbk",
+            [40 * 1024 * 1024 * 1024],
+        ),
+    ],
+)
+def test_vbk_loader(path: Path, disk_sizes: list[int], target_default: Target) -> None:
+    """Test the VBK loader on real files."""
+
+    path = absolute_path("_data/loaders/vbk").joinpath(path)
+
+    loader = loader_open(path)
+    assert isinstance(loader, VbkLoader)
+
+    loader.map(target_default)
+
+    assert len(target_default.disks) == len(disk_sizes)
+    for disk, size in zip(sorted(target_default.disks, key=lambda disk: disk.size), sorted(disk_sizes)):
+        assert disk.size == size
