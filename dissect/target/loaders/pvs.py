@@ -18,7 +18,8 @@ class PvsLoader(Loader):
 
     def __init__(self, path: Path, **kwargs):
         super().__init__(path, **kwargs)
-        self.pvs = pvs.PVS(path.open("rt"))
+        with path.open("r") as fh:
+            self.pvs = pvs.PVS(fh)
 
     @staticmethod
     def detect(path: Path) -> bool:

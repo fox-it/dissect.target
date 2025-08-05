@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 
@@ -13,18 +13,27 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pytest_benchmark.fixture import BenchmarkFixture
 
     from dissect.target.loader import Loader
 
 
-def test_target_open() -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``AcquireTarSubLoader`` when opening a ``Target``."""
     path = absolute_path("_data/loaders/acquire/test-windows-sysvol-absolute.tar")
 
-    for target in (Target.open(path), next(Target.open_all(path), None)):
-        assert target is not None
-        assert isinstance(target._loader, TarLoader)
+    target = opener(path)
+    assert isinstance(target._loader, TarLoader)
+    assert target.path == path
 
 
 def test_case_sensitive_drive_letter() -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 
@@ -32,14 +32,20 @@ def mock_tanium_dir(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_target_open(mock_tanium_dir: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_tanium_dir: Path) -> None:
     """Test that we correctly use ``TaniumLoader`` when opening a ``Target``."""
     path = mock_tanium_dir
 
-    for target in (Target.open(path), next(Target.open_all(path), None)):
-        assert target is not None
-        assert isinstance(target._loader, TaniumLoader)
-        assert target.path == path
+    target = opener(path)
+    assert isinstance(target._loader, TaniumLoader)
+    assert target.path == path
 
 
 def test_loader(mock_tanium_dir: Path) -> None:

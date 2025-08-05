@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
+
+import pytest
 
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.dir import DirLoader, find_dirs
@@ -12,15 +14,21 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_target_open(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test that we correctly use ``DirLoader`` when opening a ``Target``."""
     root = tmp_path
     mkdirs(root, ["windows/system32"])
 
-    for target in (Target.open(root), next(Target.open_all(root), None)):
-        assert target is not None
-        assert isinstance(target._loader, DirLoader)
-        assert target.path == root
+    target = opener(root)
+    assert isinstance(target._loader, DirLoader)
+    assert target.path == root
 
 
 def test_windows(tmp_path: Path) -> None:
