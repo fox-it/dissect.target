@@ -561,7 +561,11 @@ class ProcProcess:
         # we asume a standard of 100 clockticks per second. the actual value can be obtained from `getconf CLK_TCK`
         starttime = self._stat_file.get("starttime", 0) / 100
 
-        return from_unix(self._boottime + starttime)
+        # Check if there is a boottime. If not, we cannot determine the starttime.
+        if boottime := self._boottime:
+            return from_unix(boottime + starttime)
+
+        return None
 
     @property
     def runtime(self) -> timedelta:
