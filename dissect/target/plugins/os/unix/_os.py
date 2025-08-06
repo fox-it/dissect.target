@@ -83,7 +83,7 @@ class UnixPlugin(OSPlugin):
     def users(self, sessions: bool = False) -> Iterator[UnixUserRecord]:
         """Yield unix user records from passwd files or syslog session logins.
 
-        Resources:
+        References:
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
 
@@ -422,7 +422,7 @@ class UnixPlugin(OSPlugin):
     def _get_architecture(self, os: str = "unix", path: Path | str = "/bin/ls") -> str | None:
         """Determine architecture by reading an ELF header of a binary on the target.
 
-        Resources:
+        References:
             - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
         """
 
