@@ -6,7 +6,7 @@ from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, alias, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -63,8 +63,8 @@ struct DigitalProductId4 {
 
 c_pid = cstruct().load(pid_def)
 
-LicenseRecord = TargetRecordDescriptor(
-    "windows/license",
+WindowsProductKeyRecord = TargetRecordDescriptor(
+    "windows/product_key",
     [
         ("datetime", "ts"),
         ("string", "name"),
@@ -75,8 +75,8 @@ LicenseRecord = TargetRecordDescriptor(
 )
 
 
-class WindowsLicensePlugin(Plugin):
-    """Windows license plugin."""
+class WindowsProductKeyPlugin(Plugin):
+    """Windows product key plugin."""
 
     KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
 
@@ -85,13 +85,14 @@ class WindowsLicensePlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry") or not any(self.target.registry.values(self.KEY, self.VALUES)):
-            raise UnsupportedPluginError("WindowsLicense plugin requires registry plugin")
+            raise UnsupportedPluginError("WindowsProductKeyPlugin plugin requires RegistryPlugin")
 
-    @export(record=LicenseRecord)
-    def license(self) -> Iterator[LicenseRecord]:
-        """Yield Windows license key(s) of the target.
+    @alias("license")
+    @export(record=WindowsProductKeyRecord)
+    def productkey(self) -> Iterator[WindowsProductKeyRecord]:
+        """Yield Windows product key(s) of the target.
 
-        Resources:
+        References:
             - Reversing ``pidgen.dll`` and ````pidgenx.dll``.
             - https://www.licenturion.com/xp/fully-licensed-wpa.txt
             - https://github.com/Endermanch/XPKeygen
@@ -124,7 +125,7 @@ class WindowsLicensePlugin(Plugin):
                     else s.szEditionId.strip("\00")
                 )
 
-                yield LicenseRecord(
+                yield WindowsProductKeyRecord(
                     ts=key.ts,
                     name=f"{edition_type} {edition_id}".strip(),
                     type=getattr(s, "szKeyType", "").strip("\00"),
