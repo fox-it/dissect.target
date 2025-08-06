@@ -108,7 +108,7 @@ class SearchIndexPlugin(Plugin):
 
         Windows Search is a standard component of Windows 7 and Windows Vista, and is enabled by default. The standard (non-Windows Server)
         configuration of Windows Search indexes the following paths: ``C:\\Users\\*`` and ``C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\*``,
-        with some exceptions for certain file extensions (see the linked resources for more information).
+        with some exceptions for certain file extensions (see the linked references for more information).
 
         Parses ``Windows.edb`` EseDB and ``Windows.db`` SQlite3 databases. Currently does not parse
         ``GatherLogs/SystemIndex/SystemIndex.*.(Crwl|gthr)`` files or ``Windows-gather.db`` and ``Windows-usn.db`` files.
@@ -120,7 +120,7 @@ class SearchIndexPlugin(Plugin):
 
         No test data available for indexed Outlook emails, this plugin might not be able to handle indexed email messages.
 
-        Resources:
+        References:
             - https://learn.microsoft.com/en-us/windows/win32/search/-search-3x-wds-overview
             - https://github.com/libyal/esedb-kb/blob/main/documentation/Windows%20Search.asciidoc
             - https://www.aon.com/en/insights/cyber-labs/windows-search-index-the-forensic-artifact-youve-been-searching-for
