@@ -570,7 +570,10 @@ class ProcProcess:
     @property
     def runtime(self) -> timedelta:
         """Returns the runtime of a process until the moment of acquisition."""
-        return self.now - self.starttime
+        if starttime := self.starttime:
+            return self.now - starttime
+
+        return None
 
     @property
     def now(self) -> datetime:

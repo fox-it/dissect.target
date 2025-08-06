@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from unittest.mock import patch, PropertyMock
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugins.os.unix.linux.proc import ProcPlugin, ProcProcess
@@ -50,6 +51,24 @@ def test_processes(target_linux_users: Target, fs_linux_proc: VirtualFilesystem)
         for env in process.environ():
             assert env.variable == "VAR"
             assert env.contents == "1"
+
+
+def test_processes_without_boottime(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
+    target_linux_users.add_plugin(ProcPlugin)
+
+    with patch.object(ProcProcess, '_boottime', new_callable=PropertyMock) as mock_boottime:
+        mock_boottime.return_value = None
+
+        for process in target_linux_users.proc.processes():
+            assert process.pid in (1, 2, 3, 1337)
+            assert process.state in ("Sleeping", "Waking", "Running", "Wakekill")
+            assert process.name in ("systemd", "kthread", "acquire", "sshd")
+            assert process.starttime is None
+            assert process.runtime is None
+
+            for env in process.environ():
+                assert env.variable == "VAR"
+                assert env.contents == "1"
 
 
 def test_proc_plugin_incompatible(target_linux_users: Target, fs_linux: VirtualFilesystem) -> None:
