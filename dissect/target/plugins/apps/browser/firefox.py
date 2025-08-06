@@ -444,7 +444,7 @@ class FirefoxPlugin(BrowserPlugin):
         ``PASSPHRASE`` passwords in the keychain with providers ``browser``, ``firefox``, ``user`` and no provider
         can be used to decrypt secrets for this plugin.
 
-        Resources:
+        References:
             - https://github.com/lclevy/firepwd
         """
         for user, _, profile_dir in self._iter_profiles():
@@ -801,7 +801,7 @@ def decrypt(
     Returns:
         A tuple of decoded username and password strings.
 
-    Resources:
+    References:
         - https://github.com/lclevy/firepwd
     """
     if not HAS_CRYPTO:

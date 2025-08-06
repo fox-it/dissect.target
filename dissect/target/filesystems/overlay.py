@@ -123,7 +123,7 @@ class OverlayFilesystem(LayerFilesystem):
     Currently does not support mounting of (anonymous) volumes, named volumes and bind mounts.
     Also does not map mount point files, hosts, hostname and resolv.conf files.
 
-    Resources:
+    References:
         - https://github.com/containers/podman
         - https://docs.podman.io/en/latest/
     """

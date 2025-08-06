@@ -10,7 +10,7 @@ class ProtobufVarint(BaseType):
 
     Supports protobuf's msb varint implementation.
 
-    Resources:
+    References:
         - https://protobuf.dev/programming-guides/encoding/
         - https://github.com/protocolbuffers/protobuf/blob/main/python/google/protobuf/internal/decoder.py
     """
