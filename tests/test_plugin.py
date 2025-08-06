@@ -1529,3 +1529,28 @@ def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
                 f"{desc.name} ({desc.module}.{desc.qualname})" for desc in result if desc.namespace != part
             )
             pytest.fail(f"Namespace name {descriptor.namespace!r} has conflicts with function name: {conflicts}")
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    # Match plugin classes which are a *direct* base of NamespacePlugin only using :meth:`Plugin.__bases__`,
+    # instead of using ``issubclass`` which would also yield indirectly inherited Plugin classes.
+    [descriptor for descriptor in plugins() if NamespacePlugin in descriptor.cls.__bases__],
+    ids=lambda descriptor: descriptor.qualname,
+)
+def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
+    """This test checks if :class:`NamespacePlugin` usage is correct.
+
+    :class:`NamespacePlugin` is reserved for "grouping" other plugins of the same category. See for
+    example :class:`BrowserPlugin` or :class:`WebserverPlugin`.
+
+    If you want to expose plugin functions under a shared name, e.g. ``foo.bar`` and ``foo.baz``,
+    you should use :class:`Plugin` with ``Plugin.__namespace__ = "foo"`` instead.
+
+    Resources:
+        - https://github.com/fox-it/dissect.target/issues/1180
+    """
+
+    assert descriptor.cls.__subclasses__(), (
+        f"NamespacePlugin {descriptor.module}.{descriptor.qualname} has no subclasses, are you sure you're using NamespacePlugin correctly?"  # noqa: E501
+    )
