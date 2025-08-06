@@ -1533,6 +1533,8 @@ def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
 
 @pytest.mark.parametrize(
     "descriptor",
+    # Match plugin classes which are a *direct* base of NamespacePlugin only using :meth:`Plugin.__bases__`,
+    # instead of using ``issubclass`` which would also yield indirectly inherited Plugin classes.
     [descriptor for descriptor in plugins() if NamespacePlugin in descriptor.cls.__bases__],
     ids=lambda descriptor: descriptor.qualname,
 )
