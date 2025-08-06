@@ -1329,6 +1329,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # The method docstring should compile to rst without warnings
     assert_valid_rst(method_doc_str)
 
+    # The method docstring should follow our conventions
+    assert_compliant_rst(method_doc_str)
+
     # Plugin class should have a docstring
     class_doc_str = descriptor.cls.__doc__
     assert isinstance(class_doc_str, str), f"No docstring for class {descriptor.cls.__name__}"
@@ -1336,6 +1339,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
+
+    # The class docstring should follow our conventions
+    assert_compliant_rst(class_doc_str)
 
     # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
     for arg in descriptor.args:
@@ -1506,6 +1512,22 @@ def assert_valid_rst(src: str) -> None:
         # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
         if "Unknown interpreted text role" not in str(e):
             pytest.fail(f"Invalid rst: {e}", pytrace=False)
+
+
+def assert_compliant_rst(src: str) -> None:
+    """Makes sure that the given rst docstring follows the project's conventions."""
+
+    # Explicit message stating we want References instead of Resources to prevent confusion
+    if "Resources:\n" in src:
+        pytest.fail(f"Invalid rst: docstring contains 'Resources' instead of 'References': {src!r}", pytrace=False)
+
+    # Generic message stating lists should start with References (assumes lists always have at least one 'http')
+    if "- http" in src and "References:\n" not in src:
+        pytest.fail(f"Invalid rst: docstring contains list but does not mention 'References': {src!r}", pytrace=False)
+
+    # Make sure we use stripes instead of bullets (assumes lists always have at least one 'http')
+    if "* http" in src:
+        pytest.fail(f"Invalid rst: docstring contains bullet instead of dash in list: {src!r}", pytrace=False)
 
 
 @pytest.mark.parametrize(
