@@ -269,7 +269,7 @@ class WindowsFirewallPlugin(Plugin):
                     entry.pop("time")
 
                     yield WindowsFirewallLogRecord(
-                        **dict(entry),
+                        **entry,
                         source=path,
                         _target=self.target,
                     )
