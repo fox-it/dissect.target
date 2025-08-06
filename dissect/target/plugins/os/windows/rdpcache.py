@@ -335,7 +335,7 @@ def extract_bmc(fh: BinaryIO) -> Iterator[BitmapTile]:
 class RdpCachePlugin(Plugin):
     """Plugin to extract the RDP Bitmap Cache from a Windows target.
 
-    Resources:
+    References:
         - https://www.cert.ssi.gouv.fr/actualite/CERTFR-2016-ACT-017/
     """
 
