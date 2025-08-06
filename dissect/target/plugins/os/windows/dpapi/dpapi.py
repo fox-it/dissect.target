@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class DPAPIPlugin(InternalPlugin):
     """Windows Data Protection API (DPAPI) plugin.
 
-    Resources:
+    References:
         - Reversing ``Crypt32.dll``
         - https://learn.microsoft.com/en-us/windows/win32/api/dpapi/
         - https://github.com/fortra/impacket/blob/master/examples/dpapi.py

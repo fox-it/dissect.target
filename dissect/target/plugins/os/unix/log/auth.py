@@ -329,7 +329,7 @@ class AuthPlugin(Plugin):
             Debian format: Jan 12 13:37:00 hostname daemon[pid]: pam_unix(daemon:session): message
             Ubuntu  24.04: 2024-01-12T13:37:00.000000+02:00 hostname daemon[pid]: pam_unix(daemon:session): message
 
-        Resources:
+        References:
             - https://help.ubuntu.com/community/LinuxLogFiles
         """
         target_tz = self.target.datetime.tzinfo

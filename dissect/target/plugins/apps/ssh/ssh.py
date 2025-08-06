@@ -117,7 +117,7 @@ def calculate_fingerprints(public_key_decoded: bytes, ssh_keygen_format: bool = 
     parameter is set to ``True``. When set to ``False`` (default) hexdigests are calculated
     instead for ``sha1``and ``sha256``.
 
-    Resources:
+    References:
         - https://en.wikipedia.org/wiki/Public_key_fingerprint
         - https://man7.org/linux/man-pages/man1/ssh-keygen.1.html
         - ``ssh-keygen -l -E <alg> -f key.pub``

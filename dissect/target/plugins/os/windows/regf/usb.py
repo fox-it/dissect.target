@@ -63,7 +63,7 @@ class UsbPlugin(Plugin):
         - https://dfir.pubpub.org/pub/h78di10n/release/2
         - https://www.senturean.com/posts/19_08_03_usb_storage_forensics_1/#1-system-events
 
-    Resources:
+    References:
         - https://hatsoffsecurity.com/2014/06/05/usb-forensics-pt-1-serial-number/
         - http://www.swiftforensics.com/2013/11/windows-8-new-registry-artifacts-part-1.html
         - https://www.sans.org/blog/the-truth-about-usb-device-serial-numbers/
