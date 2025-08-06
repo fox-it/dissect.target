@@ -594,7 +594,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 def parse_unix_dhcp_leases(target: Target) -> set[str]:
     """Parse NetworkManager and dhclient DHCP ``.lease`` files.
 
-    Resources:
+    References:
         - https://linux.die.net/man/5/dhclient.conf
 
     Args:

@@ -1295,7 +1295,7 @@ def test_plugin_alias(target_bare: Target) -> None:
 def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     """This test checks plugin style guide conformity for all exported plugins.
 
-    Resources:
+    References:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
     # Ignore DefaultOSPlugin and NamespacePlugin instances
@@ -1417,7 +1417,7 @@ def test_plugin_record_field_consistency() -> None:
 
     Uses ``FIELD_TYPES_MAP`` which is loosely based on flow.record and ElasticSearch field types.
 
-    Resources:
+    References:
         - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
         - https://github.com/fox-it/flow.record/tree/main/flow/record/fieldtypes
         - https://github.com/JSCU-NL/dissect-elastic

@@ -36,7 +36,7 @@ ValueType = Union[int, str, bytes, list[str], None]
 class RegistryValueType(IntEnumMissing):
     """Registry value types as defined in ``winnt.h``.
 
-    Resources:
+    References:
         - https://learn.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
         - https://github.com/fox-it/dissect.regf/blob/main/dissect/regf/c_regf.py
     """
