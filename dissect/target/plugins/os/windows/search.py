@@ -110,7 +110,7 @@ class SearchIndexPlugin(Plugin):
         configuration of Windows Search indexes the following paths: ``C:\\Users\\*`` and ``C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\*``,
         with some exceptions for certain file extensions (see the linked references for more information).
 
-        Parses ``Windows.edb`` EseDB and ``Windows.db`` SQlite3 databases. Currently does not parse
+        Parses ``Windows.edb`` EseDB and ``Windows.db`` SQLite3 databases. Currently does not parse
         ``GatherLogs/SystemIndex/SystemIndex.*.(Crwl|gthr)`` files or ``Windows-gather.db`` and ``Windows-usn.db`` files.
 
         The difference between the fields ``System_Date*`` and ``System_Document_Date*`` should be researched further.
@@ -139,36 +139,36 @@ class SearchIndexPlugin(Plugin):
             else:
                 self.target.log.warning("Unknown Windows Search Index database file %r", db_path)
 
-    def parse_esedb(self, db_path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
+    def parse_esedb(self, path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the EseDB ``SystemIndex_PropertyStore`` table."""
 
-        with db_path.open("rb") as fh:
+        with path.open("rb") as fh:
             db = EseDB(fh)
             table = db.table("SystemIndex_PropertyStore")
 
-            # Translates e.g. ``System_DateModified`` to ``15F-System_DateModified``
-            COLUMNS = {col.split("-", maxsplit=1)[-1]: col for col in table.column_names}
+            # Translates e.g. ``System_DateModified`` to ``15F-System_DateModified`` as these column name prefixes might
+            # be dynamic based on the system version.
+            columns = {col: col.split("-", maxsplit=1)[-1] for col in table.column_names}
 
             for record in table.records():
-                values = {
-                    clean_col: record.get(full_col) for clean_col, full_col in COLUMNS.items() if record.get(full_col)
-                }
-                yield from self.build_record(values, user_details, db_path)
+                values = {clean_k or k: v for k, v in record.as_dict().items() if (clean_k := columns.get(k))}
+                yield from self.build_record(values, user_details, path)
 
-    def parse_sqlite(self, db_path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
+    def parse_sqlite(self, path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the SQLite3 ``SystemIndex_1_PropertyStore`` table."""
 
-        with db_path.open("rb") as fh:
+        with path.open("rb") as fh:
             db = SQLite3(fh)
 
-            # Contains ``WorkId``, ``ColumnId`` and ``Value``
-            table = db.table("SystemIndex_1_PropertyStore")
-
-            # ``ColumnId`` is translated using the ``SystemIndex_1_PropertyStore_Metadata`` table
-            COLUMNS = {
+            # ``ColumnId`` is translated using the ``SystemIndex_1_PropertyStore_Metadata`` table.
+            columns = {
                 row.get("Id"): row.get("UniqueKey", "").split("-", maxsplit=1)[-1]
                 for row in db.table("SystemIndex_1_PropertyStore_Metadata").rows()
             }
+
+            if not (table := db.table("SystemIndex_1_PropertyStore")):
+                self.target.log.warning("Database %s does not have a table called 'SystemIndex_1_PropertyStore'", path)
+                return
 
             current_work_id = None
             values = {}
@@ -178,16 +178,16 @@ class SearchIndexPlugin(Plugin):
                     current_work_id = row.get("WorkId")
 
                 if row.get("WorkId") != current_work_id:
-                    yield from self.build_record(values, user_details, db_path)
+                    yield from self.build_record(values, user_details, path)
                     current_work_id = row.get("WorkId")
                     values = {}
 
                 column_id = row.get("ColumnId")
-                column_name = COLUMNS[column_id]
+                column_name = columns[column_id]
                 if value := row.get("Value"):
                     values[column_name] = value
 
-            yield from self.build_record(values, user_details, db_path)
+            yield from self.build_record(values, user_details, path)
 
     def build_record(
         self, values: dict[str, Any], user_details: UserDetails | None, db_path: Path
@@ -223,6 +223,13 @@ class SearchIndexPlugin(Plugin):
                 )
                 return
 
+            user = None
+            if sid and (sid_user_details := self.target.user_details.find(sid)):
+                user = sid_user_details.user
+
+            if not user and user_details:
+                user = user_details.user
+
             yield CurrentBrowserHistoryRecord(
                 ts=wintimestamp(int.from_bytes(values.get("System_Link_DateVisited", b""), "little")),
                 browser=browser,
@@ -230,7 +237,7 @@ class SearchIndexPlugin(Plugin):
                 title=values.get("System_Title"),
                 host=None,  # TODO: derive from url
                 source=db_path,
-                _user=None,  # TODO: derive from sid
+                _user=user,
                 _target=self.target,
             )
 

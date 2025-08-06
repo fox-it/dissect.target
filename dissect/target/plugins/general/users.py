@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.helpers.fsutil import TargetPath
-    from dissect.target.target import Target
 
 UserRecord = Union[UnixUserRecord, WindowsUserRecord, MacOSUserRecord, IOSUserRecord]
 
@@ -32,14 +31,11 @@ class UsersPlugin(InternalPlugin):
 
     __namespace__ = "user_details"
 
-    def __init__(self, target: Target):
-        super().__init__(target)
-        self.find = lru_cache(32)(self.find)
-
     def check_compatible(self) -> None:
         if not hasattr(self.target, "users"):
             raise UnsupportedPluginError("Unsupported Plugin")
 
+    @lru_cache(maxsize=32)  # noqa: B019
     def find(
         self,
         sid: str | None = None,
