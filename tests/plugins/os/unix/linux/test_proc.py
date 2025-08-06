@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import PropertyMock, patch
 
 import pytest
-from unittest.mock import patch, PropertyMock
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugins.os.unix.linux.proc import ProcPlugin, ProcProcess
@@ -56,7 +56,7 @@ def test_processes(target_linux_users: Target, fs_linux_proc: VirtualFilesystem)
 def test_processes_without_boottime(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
 
-    with patch.object(ProcProcess, '_boottime', new_callable=PropertyMock) as mock_boottime:
+    with patch.object(ProcProcess, "_boottime", new_callable=PropertyMock) as mock_boottime:
         mock_boottime.return_value = None
 
         for process in target_linux_users.proc.processes():
