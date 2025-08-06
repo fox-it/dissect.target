@@ -503,7 +503,7 @@ class Env(ConfigurationParser):
     strings. Does not support dynamic env files, e.g. ``foo=`bar```. Also does not support multi-line key/value
     assignments (yet).
 
-    Resources:
+    References:
         - https://docs.docker.com/compose/environment-variables/variable-interpolation/#env-file-syntax
         - https://github.com/theskumar/python-dotenv/blob/main/src/dotenv/parser.py
     """

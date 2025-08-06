@@ -27,7 +27,7 @@ class WinlogonDefaultPasswordKeyProviderPlugin(DefaultPasswordKeyProvider):
 
         Extracts plaintext ``DefaultPassword`` values from the ``Winlogon`` registry.
 
-        Resources:
+        References:
             - https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
         """
 
