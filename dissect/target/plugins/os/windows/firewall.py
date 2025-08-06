@@ -258,13 +258,15 @@ class WindowsFirewallPlugin(Plugin):
                     if not (line := line.strip()):
                         continue
 
-                    entry = FieldMap(config.fields, line.split(" ", len(config.fields)))
-                    entry.ts = datetime.strptime(f"{entry.date} {entry.time}", "%Y-%m-%d %H:%M:%S").replace(
+                    entry = {
+                        k.replace("-", "_"): v if v != "-" else None for k, v in zip(config.fields, line.split(" "))
+                    }
+
+                    entry["ts"] = datetime.strptime(f"{entry['date']} {entry['time']}", "%Y-%m-%d %H:%M:%S").replace(
                         tzinfo=self.target.datetime.tzinfo if config.time_format == "local" else timezone.utc
                     )
-
-                    del entry.date
-                    del entry.time
+                    entry.pop("date")
+                    entry.pop("time")
 
                     yield WindowsFirewallLogRecord(
                         **dict(entry),
@@ -305,23 +307,3 @@ class LogConfig:
         _, _, fields = self.raw[3].strip().partition("#Fields: ")
         self.version = float(self.version)
         self.fields = fields.split(" ")
-
-
-@dataclass
-class FieldMap:
-    fields: list[str] = field(repr=False)
-    values: list[str] = field(repr=False)
-
-    def __post_init__(self):
-        assert len(self.fields) == len(self.values)
-
-        for field_name, value in zip(self.fields, self.values):
-            setattr(self, field_name.replace("-", "_"), None if value == "-" else value)
-
-    def __iter__(self) -> Iterator[tuple[str, str]]:
-        for k, v in self.__dict__.items():
-            if k not in ("fields", "values"):
-                yield (k, v)
-
-    def __repr__(self) -> str:
-        return f"<FieldMap {' '.join([f'{k}={v!r}' for k, v in dict(self).items()])}>"
