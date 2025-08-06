@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from flow.record import Record
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def test_save_plugin_import_failure() -> None:
@@ -423,6 +424,12 @@ def test_find_functions_compatible_check(target_linux: Target) -> None:
         functions = [f.path for f in found]
         assert "apps.browser.chrome.cookies" in functions
         assert "apps.browser.chrome.history" in functions
+
+
+@pytest.mark.benchmark
+def test_benchmark_functions_compatible_check(target_unix_users: Target, benchmark: BenchmarkFixture) -> None:
+    """Benchmark ``_filter_compatible`` performance."""
+    benchmark(lambda: find_functions("*", target_unix_users, compatibility=True))
 
 
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -1288,7 +1295,7 @@ def test_plugin_alias(target_bare: Target) -> None:
 def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     """This test checks plugin style guide conformity for all exported plugins.
 
-    Resources:
+    References:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
     # Ignore DefaultOSPlugin and NamespacePlugin instances
@@ -1322,6 +1329,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # The method docstring should compile to rst without warnings
     assert_valid_rst(method_doc_str)
 
+    # The method docstring should follow our conventions
+    assert_compliant_rst(method_doc_str)
+
     # Plugin class should have a docstring
     class_doc_str = descriptor.cls.__doc__
     assert isinstance(class_doc_str, str), f"No docstring for class {descriptor.cls.__name__}"
@@ -1329,6 +1339,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
+
+    # The class docstring should follow our conventions
+    assert_compliant_rst(class_doc_str)
 
     # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
     for arg in descriptor.args:
@@ -1410,7 +1423,7 @@ def test_plugin_record_field_consistency() -> None:
 
     Uses ``FIELD_TYPES_MAP`` which is loosely based on flow.record and ElasticSearch field types.
 
-    Resources:
+    References:
         - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
         - https://github.com/fox-it/flow.record/tree/main/flow/record/fieldtypes
         - https://github.com/JSCU-NL/dissect-elastic
@@ -1501,6 +1514,22 @@ def assert_valid_rst(src: str) -> None:
             pytest.fail(f"Invalid rst: {e}", pytrace=False)
 
 
+def assert_compliant_rst(src: str) -> None:
+    """Makes sure that the given rst docstring follows the project's conventions."""
+
+    # Explicit message stating we want References instead of Resources to prevent confusion
+    if "Resources:\n" in src:
+        pytest.fail(f"Invalid rst: docstring contains 'Resources' instead of 'References': {src!r}", pytrace=False)
+
+    # Generic message stating lists should start with References (assumes lists always have at least one 'http')
+    if "- http" in src and "References:\n" not in src:
+        pytest.fail(f"Invalid rst: docstring contains list but does not mention 'References': {src!r}", pytrace=False)
+
+    # Make sure we use stripes instead of bullets (assumes lists always have at least one 'http')
+    if "* http" in src:
+        pytest.fail(f"Invalid rst: docstring contains bullet instead of dash in list: {src!r}", pytrace=False)
+
+
 @pytest.mark.parametrize(
     "descriptor",
     [descriptor for descriptor in plugins() if descriptor.namespace and "." in descriptor.namespace],
@@ -1522,3 +1551,28 @@ def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
                 f"{desc.name} ({desc.module}.{desc.qualname})" for desc in result if desc.namespace != part
             )
             pytest.fail(f"Namespace name {descriptor.namespace!r} has conflicts with function name: {conflicts}")
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    # Match plugin classes which are a *direct* base of NamespacePlugin only using :meth:`Plugin.__bases__`,
+    # instead of using ``issubclass`` which would also yield indirectly inherited Plugin classes.
+    [descriptor for descriptor in plugins() if NamespacePlugin in descriptor.cls.__bases__],
+    ids=lambda descriptor: descriptor.qualname,
+)
+def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
+    """This test checks if :class:`NamespacePlugin` usage is correct.
+
+    :class:`NamespacePlugin` is reserved for "grouping" other plugins of the same category. See for
+    example :class:`BrowserPlugin` or :class:`WebserverPlugin`.
+
+    If you want to expose plugin functions under a shared name, e.g. ``foo.bar`` and ``foo.baz``,
+    you should use :class:`Plugin` with ``Plugin.__namespace__ = "foo"`` instead.
+
+    Resources:
+        - https://github.com/fox-it/dissect.target/issues/1180
+    """
+
+    assert descriptor.cls.__subclasses__(), (
+        f"NamespacePlugin {descriptor.module}.{descriptor.qualname} has no subclasses, are you sure you're using NamespacePlugin correctly?"  # noqa: E501
+    )
