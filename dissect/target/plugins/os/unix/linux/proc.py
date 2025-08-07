@@ -490,7 +490,7 @@ class ProcProcess:
             yield Environ(variable, contents)
 
     @property
-    def _boottime(self) -> int:
+    def _boottime(self) -> int | None:
         """Returns the boot time of the system.
 
         Used internally to determine process start- and runtimes.
@@ -555,7 +555,7 @@ class ProcProcess:
         return ProcessStateEnum[self._stat_file.get("state", "N")].value
 
     @property
-    def starttime(self) -> datetime:
+    def starttime(self) -> datetime | None:
         """Returns the start time of the process."""
         # Starttime is saved in clockticks per second from the boot time.
         # we asume a standard of 100 clockticks per second. the actual value can be obtained from `getconf CLK_TCK`
@@ -568,7 +568,7 @@ class ProcProcess:
         return None
 
     @property
-    def runtime(self) -> timedelta:
+    def runtime(self) -> timedelta | None:
         """Returns the runtime of a process until the moment of acquisition."""
         if starttime := self.starttime:
             return self.now - starttime
