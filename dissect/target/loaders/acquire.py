@@ -14,6 +14,7 @@ from dissect.target.loaders.zip import ZipSubLoader
 if TYPE_CHECKING:
     import tarfile as tf
     import zipfile as zf
+    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -30,7 +31,7 @@ class AcquireTarSubLoader(TarSubLoader):
     """Loader for tar-based Acquire collections."""
 
     @staticmethod
-    def detect(tarfile: tf.TarFile) -> bool:
+    def detect(path: Path, tarfile: tf.TarFile) -> bool:
         for member in tarfile.getmembers():
             if member.name.startswith(
                 (
@@ -107,7 +108,7 @@ class AcquireZipSubLoader(ZipSubLoader):
     """Loader for zip-based Acquire collections."""
 
     @staticmethod
-    def detect(zipfile: zf.Path) -> bool:
+    def detect(path: Path, zipfile: zf.Path) -> bool:
         return zipfile.joinpath(FILESYSTEMS_ROOT).exists() or zipfile.joinpath(FILESYSTEMS_LEGACY_ROOT).exists()
 
     def map(self, target: Target) -> None:

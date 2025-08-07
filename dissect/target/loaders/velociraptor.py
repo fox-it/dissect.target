@@ -9,7 +9,8 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers.fsutil import basename, dirname, join
-from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
+from dissect.target.loader import Loader
+from dissect.target.loaders.dir import find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.apps.edr.velociraptor import VELOCIRAPTOR_RESULTS
 
@@ -78,7 +79,7 @@ def extract_drive_letter(name: str) -> str | None:
     return None
 
 
-class VelociraptorLoader(DirLoader):
+class VelociraptorLoader(Loader):
     """Load Rapid7 Velociraptor forensic image files.
 
     As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
