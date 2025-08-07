@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 def test_trusteddocs_plugin(target_win_users: Target, hive_hku: VirtualHive) -> None:
     """Test if we detect and parse TrustedDocs entries.
 
-    Resources:
+    References:
         - https://github.com/Psmths/windows-forensic-artifacts/blob/main/file-activity/trustrecords-registry-key.md
     """
     trusteddocs_key_name = "Software\\Microsoft\\Office\\16.0\\Word\\Security\\Trusted Documents"
