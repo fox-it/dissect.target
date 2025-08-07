@@ -79,7 +79,11 @@ class TargetRecordDescriptorExtension(RecordDescriptorExtensionBase):
 
         target = record_kwargs.get("_target")
         if target:
-            hostname = target.hostname
+            try:
+                hostname = target.hostname
+            except PluginError:
+                pass
+
             try:
                 domain = target.domain
             except PluginError:
