@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.plugins.os.windows.credential.sam import SamRecord
     from dissect.target.target import Target
 
 ARCH_MAP = {
@@ -283,29 +284,50 @@ class WindowsPlugin(OSPlugin):
         except RegistryError:
             pass
 
+    def _sam_by_sid(self) -> dict[str, SamRecord]:
+        if not (machine_sid := self.target.machine_sid()):
+            return {}
+
+        sam_users: dict[str, SamRecord] = {}
+        try:
+            for sam_record in self.target.sam():
+                # Compose SID from domain_sid and RID
+                sid = f"{machine_sid}-{sam_record.rid}"
+                sam_users[sid] = sam_record
+        except Exception as e:
+            self.target.log.warning("Could not read SAM records")
+            self.target.log.debug("", exc_info=e)
+
+        return sam_users
+
     @export(record=WindowsUserRecord)
     def users(self) -> Iterator[WindowsUserRecord]:
         # Be aware that this function can never do anything which needs user
         # registry hives. Initializing those hives will need this function,
         # which will then cause a recursion.
+
+        sam_users = self._sam_by_sid()
+
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
         sids = set()
         for k in self.target.registry.keys(key):
             for subkey in k.subkeys():
                 sid = subkey.name
+
                 if sid in sids:
                     continue
 
                 sids.add(sid)
-                name = None
                 home = None
+                name = None
                 try:
                     profile_image_path = subkey.value("ProfileImagePath")
                 except RegistryValueNotFoundError:
                     pass
                 else:
                     home = profile_image_path.value
-                    name = home.split("\\")[-1]
+                    # Use SAM username if available
+                    name = sam_users[sid].username if sid in sam_users else home.split("\\")[-1]
 
                 yield WindowsUserRecord(
                     sid=subkey.name,
