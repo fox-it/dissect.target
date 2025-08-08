@@ -20,6 +20,7 @@ ServiceRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "name"),
         ("wstring", "displayname"),
+        ("wstring", "description"),
         ("path", "servicedll"),
         ("path", "imagepath"),
         ("string", "imagepath_args"),
@@ -86,6 +87,7 @@ class ServicesPlugin(Plugin):
             ts (datatime): The last modified timestamp of the registry key.
             name (string): The service name.
             displayname (string): The service display name.
+            description (string): The service description field.
             servicedll (path): The service dll.
             imagepath (path): The service image path.
             objectname (string): The object under which the service runs (for example LocalSystem)
@@ -117,6 +119,12 @@ class ServicesPlugin(Plugin):
                 display_name = None
                 try:
                     display_name = key.value("DisplayName").value
+                except RegistryValueNotFoundError:
+                    pass
+
+                description = None
+                try:
+                    description = key.value("Description").value
                 except RegistryValueNotFoundError:
                     pass
 
@@ -164,6 +172,7 @@ class ServicesPlugin(Plugin):
                     ts=ts,
                     name=name,
                     displayname=display_name,
+                    description=description,
                     servicedll=servicedll,
                     imagepath=image_path,
                     imagepath_args=image_path_args,
