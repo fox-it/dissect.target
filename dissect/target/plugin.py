@@ -1010,9 +1010,10 @@ def _filter_compatible(
             if plugincls(target).is_compatible():
                 compatible.add(descriptor.qualname)
                 yield descriptor
+            else:
+                incompatible.add(descriptor.qualname)
         except Exception:
             incompatible.add(descriptor.qualname)
-            continue
 
 
 def generate() -> dict[str, Any]:

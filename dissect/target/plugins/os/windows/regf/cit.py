@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-# Resources:
+# References:
 # - generaltel.dll
 # - win32k.sys (Windows 7)
 # - win32kbase.sys (Windows 10)
