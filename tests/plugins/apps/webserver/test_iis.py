@@ -111,18 +111,21 @@ def test_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesys
 
     assert len(results) == 10
 
-    record = results[0]
-    assert record.ts == datetime(2021, 10, 1, 7, 19, 8, tzinfo=tz)
-    assert record.remote_ip == "127.0.0.1"
-    assert record.remote_user is None
-    assert record.method == "GET"
-    assert record.uri == "/"
-    assert record.protocol is None
-    assert record.status_code == 304
-    assert record.bytes_sent == 143
-    assert record.referer is None
-    assert record.useragent is None
-    assert record.source == "sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"
+    record_1 = results[0]
+    assert record_1.ts == datetime(2021, 10, 1, 7, 19, 8, tzinfo=tz)
+    assert record_1.remote_ip == "127.0.0.1"
+    assert record_1.remote_user is None
+    assert record_1.method == "GET"
+    assert record_1.uri == "/"
+    assert record_1.protocol is None
+    assert record_1.status_code == 304
+    assert record_1.bytes_sent == 143
+    assert record_1.referer is None
+    assert record_1.useragent is None
+    assert record_1.source == "sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"
+
+    record_2 = results[5]
+    assert record_2.query == "query=value&otherquery=othervalue"
 
 
 def test_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -154,39 +157,42 @@ def test_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) ->
     )
     assert w3c_record_1.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
 
-    # W3C format type 2: contains HTTP version
-    w3c_record_2 = results[6]
-    assert w3c_record_2.ts == datetime(2021, 10, 1, 17, 34, 48, tzinfo=timezone.utc)
-    assert w3c_record_2.remote_ip == "::1"
-    assert w3c_record_2.remote_user is None
-    assert w3c_record_2.method == "GET"
-    assert w3c_record_2.uri == "/"
-    assert w3c_record_2.protocol == "HTTP/1.1"
-    assert w3c_record_2.status_code == 304
-    assert w3c_record_2.bytes_sent == 143
-    assert w3c_record_2.referer is None
-    assert (
-        w3c_record_2.useragent
-        == "Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/93.0.4577.82+Safari/537.36+Edg/93.0.961.52"  # noqa: E501
-    )
-    assert w3c_record_2.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
+    w3c_record_2 = results[4]
+    assert w3c_record_2.query == "param=value"
 
-    # W3C format type 3
-    w3c_record_3 = results[11]
-    assert w3c_record_3.ts == datetime(2021, 10, 1, 18, 2, 47, tzinfo=timezone.utc)
+    # W3C format type 2: contains HTTP version
+    w3c_record_3 = results[6]
+    assert w3c_record_3.ts == datetime(2021, 10, 1, 17, 34, 48, tzinfo=timezone.utc)
     assert w3c_record_3.remote_ip == "::1"
     assert w3c_record_3.remote_user is None
     assert w3c_record_3.method == "GET"
-    assert w3c_record_3.uri == "/another/path+path2"
+    assert w3c_record_3.uri == "/"
     assert w3c_record_3.protocol == "HTTP/1.1"
-    assert w3c_record_3.status_code == 404
-    assert w3c_record_3.bytes_sent == 5125
+    assert w3c_record_3.status_code == 304
+    assert w3c_record_3.bytes_sent == 143
     assert w3c_record_3.referer is None
     assert (
         w3c_record_3.useragent
         == "Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/93.0.4577.82+Safari/537.36+Edg/93.0.961.52"  # noqa: E501
     )
     assert w3c_record_3.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
+
+    # W3C format type 3
+    w3c_record_4 = results[11]
+    assert w3c_record_4.ts == datetime(2021, 10, 1, 18, 2, 47, tzinfo=timezone.utc)
+    assert w3c_record_4.remote_ip == "::1"
+    assert w3c_record_4.remote_user is None
+    assert w3c_record_4.method == "GET"
+    assert w3c_record_4.uri == "/another/path+path2"
+    assert w3c_record_4.protocol == "HTTP/1.1"
+    assert w3c_record_4.status_code == 404
+    assert w3c_record_4.bytes_sent == 5125
+    assert w3c_record_4.referer is None
+    assert (
+        w3c_record_4.useragent
+        == "Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/93.0.4577.82+Safari/537.36+Edg/93.0.961.52"  # noqa: E501
+    )
+    assert w3c_record_4.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
 
 
 @pytest.mark.parametrize(
