@@ -282,6 +282,7 @@ class NginxPlugin(WebserverPlugin):
                     _target=self.target,
                 )
 
+    @export(record=WebserverHostRecord)
     def hosts(self) -> Iterator[WebserverHostRecord]:
         """Return found server directives in the NGINX configuration.
 
