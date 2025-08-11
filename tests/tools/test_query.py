@@ -370,7 +370,7 @@ def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pyt
             [
                 "target-query",
                 "-l=*",
-                str(absolute_path("_data/loaders/containerimage/alpine.tar")),
+                str(absolute_path("_data/loaders/containerimage/alpine-docker.tar")),
                 "-j",
             ],
         )
@@ -394,11 +394,8 @@ def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pyt
     users_plugin = get_plugin(output, "users")
     assert isinstance(users_plugin, dict)
 
-    # We expect path to be "os.unix.linux._os.users"
-    # https://github.com/fox-it/dissect.target/issues/1178
-    users_plugin.pop("path")
-
     assert users_plugin == {
+        "path": "os.unix.linux._os.users",
         "name": "users",
         "description": "Yield unix user records from passwd files or syslog session logins.",
         "output": "record",

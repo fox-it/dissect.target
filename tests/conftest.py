@@ -17,7 +17,7 @@ from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
-from dissect.target.plugin import _generate_long_paths
+from dissect.target.plugin import _generate_long_paths, _os_match
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
@@ -88,6 +88,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 @pytest.fixture(autouse=True)
 def clear_caches() -> None:
     _generate_long_paths.cache_clear()
+    _os_match.cache_clear()
 
 
 @pytest.fixture(autouse=True)
