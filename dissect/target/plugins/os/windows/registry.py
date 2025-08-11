@@ -316,17 +316,20 @@ class RegistryPlugin(Plugin):
                 pass
 
     @internal
-    def values(self, keys: str | Iterable[str], value: str) -> Iterator[RegistryValue]:
+    def values(self, keys: str | Iterable[str], value: str | Iterable[str]) -> Iterator[RegistryValue]:
         """Yields all values that match the given queries.
 
         Automatically resolves CurrentVersion keys. Also flattens ValueCollections.
         """
 
+        values = [value] if isinstance(value, str) else value
+
         for key in self.keys(keys):
-            try:
-                yield key.value(value)
-            except RegistryValueNotFoundError:  # noqa: PERF203
-                pass
+            for value in values:
+                try:
+                    yield key.value(value)
+                except RegistryValueNotFoundError:  # noqa: PERF203
+                    pass
 
     def _iter_controlset_keypaths(self, keys: Iterable[str]) -> Iterator[str]:
         """Yield the key transformed for the different control sets."""

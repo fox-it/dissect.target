@@ -43,7 +43,7 @@ DockerLogRecord = TargetRecordDescriptor(
     COMMON_LOG_FIELDS,
 )
 
-# Resources:
+# References:
 # - https://github.com/moby/moby/pull/37092
 # - https://github.com/cpuguy83/docker/blob/master/daemon/logger/local/doc.go
 # - https://github.com/moby/moby/blob/master/api/types/plugins/logdriver/entry.proto
@@ -230,7 +230,7 @@ class DockerPlugin(ContainerPlugin):
         Eventually ``local`` will likely replace ``json-file`` as the
         default log driver.
 
-        Resources:
+        References:
             - https://docs.docker.com/config/containers/logging/configure/
             - https://docs.docker.com/config/containers/logging/json-file/
             - https://docs.docker.com/config/containers/logging/local/
@@ -422,7 +422,7 @@ def strip_log(input: str | bytes, exc_backspace: bool = False) -> str:
 
     Also translates ASCII codes such as backspaces to readable format.
 
-    Resources:
+    References:
         - https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#general-ascii-codes
     """
 

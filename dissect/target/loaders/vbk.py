@@ -22,7 +22,7 @@ RE_RAW_DISK = re.compile(r"(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a
 class VbkLoader(Loader):
     """Load Veaam Backup (VBK) files.
 
-    Resources:
+    References:
         - https://helpcenter.veeam.com/docs/backup/hyperv/backup_files.html?ver=120
     """
 

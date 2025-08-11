@@ -52,7 +52,7 @@ CHROMIUM_DOWNLOAD_RECORD_FIELDS = [
     ("string", "mime_type"),
 ]
 
-# Resources:
+# References:
 # - Reversing ``PostProcessData`` in ``elevation_service.exe``
 # - https://chromium.googlesource.com/chromium/src/+/master/chrome/elevation_service/elevator.cc
 elevation_def = """
@@ -71,7 +71,7 @@ struct GoogleChromeCipher {
 """
 c_elevation = cstruct(endian="<").load(elevation_def)
 
-# Resources:
+# References:
 # - https://github.com/chromium/chromium/blob/main/components/download/public/common/download_item.h
 DOWNLOAD_STATES = {
     0: "in_progress",
@@ -501,7 +501,7 @@ class ChromiumMixin:
 
         You can supply a SHA1 hash or plaintext password using the keychain (``-Kv`` or ``-K``).
 
-        Resources:
+        References:
             - https://chromium.googlesource.com/chromium/src/+/master/docs/linux/password_storage.md
             - https://chromium.googlesource.com/chromium/src/+/master/components/os_crypt/sync/os_crypt_linux.cc#40
         """
@@ -569,7 +569,7 @@ class ChromiumMixin:
 
         Used by :meth:`ChromiumMixin.passwords` and :meth:`ChromiumMixin.cookies` for Windows targets.
 
-        Resources:
+        References:
             - https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html
             - https://github.com/chromium/chromium/tree/main/chrome/browser/os_crypt
             - https://github.com/chromium/chromium/tree/main/chrome/elevation_service
@@ -760,7 +760,7 @@ def decrypt_v10_linux(
     Returns:
         Decrypted password string.
 
-    Resources:
+    References:
         - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_linux.cc
     """
 
@@ -879,7 +879,7 @@ def decrypt_dpapi(target: Target, user: UserDetails, keys: ChromiumKeys, encrypt
 
     They can be decrypted directly by utilizing the DPAPI plugin.
 
-    Resources:
+    References:
         - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
     """
 
