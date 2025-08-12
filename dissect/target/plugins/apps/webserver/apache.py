@@ -286,7 +286,7 @@ class ApachePlugin(WebserverPlugin):
 
         Apache / Httpd directives are case-insensitive which is why we convert lines to lowercase for pattern matching.
 
-        Resources:
+        References:
             - https://httpd.apache.org/docs/2.4/en/configuring.html#syntax
         """
         seen = set() if seen is None else seen
@@ -476,7 +476,7 @@ class ApachePlugin(WebserverPlugin):
     def hosts(self) -> Iterator[WebserverHostRecord]:
         """Return found ``VirtualHost`` directives in the Apache configuration.
 
-        Resources:
+        References:
             - https://httpd.apache.org/docs/2.4/mod/core.html#virtualhost
         """
 

@@ -111,14 +111,13 @@ class SchedLgUPlugin(Plugin):
 
     PATHS = (
         "sysvol/SchedLgU.txt",
-        "sysvol/windows/SchedLgU.txt",
-        "sysvol/windows/tasks/SchedLgU.txt",
-        "sysvol/winnt/tasks/SchedLgU.txt",
+        "%windir%/SchedLgU.txt",
+        "%windir%/tasks/SchedLgU.txt",
     )
 
     def __init__(self, target: Target):
         self.target = target
-        self.paths = [self.target.fs.path(path) for path in self.PATHS if self.target.fs.path(path).exists()]
+        self.paths = [resolved_path for path in self.PATHS if (resolved_path := self.target.resolve(path)).exists()]
 
     def check_compatible(self) -> None:
         if len(self.paths) == 0:

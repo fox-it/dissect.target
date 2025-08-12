@@ -71,7 +71,7 @@ class GnomeTrashPlugin(Plugin):
         Also parses media trash locations such as ``/media/$USER/$Label/.Trash-*``, ``/mnt/$Label/.Trash-*`` and other
         locations as defined in ``/etc/fstab``.
 
-        Resources:
+        References:
             - https://specifications.freedesktop.org/trash-spec/latest/
             - https://github.com/GNOME/glib/blob/main/gio/glocalfile.c
             - https://specifications.freedesktop.org/basedir-spec/latest/
@@ -132,7 +132,7 @@ class GnomeTrashPlugin(Plugin):
 
             # We also iterate expunged folders, they can contain files that could not be
             # deleted when the user pressed the "empty trash" button in the file manager.
-            # Resources:
+            # References:
             #   - https://gitlab.gnome.org/GNOME/glib/-/issues/1665
             #   - https://bugs.launchpad.net/ubuntu/+source/nautilus/+bug/422012
             for item in (trash / "expunged").rglob("*/*"):

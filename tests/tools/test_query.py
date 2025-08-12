@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -19,11 +20,51 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "--list"])
 
-        target_query()
+        with pytest.raises(SystemExit):
+            target_query()
+
         out, _ = capsys.readouterr()
 
         assert out.startswith("Available plugins:")
         assert "Failed to load:\n    None\n\nAvailable loaders:\n" in out
+
+
+@pytest.mark.parametrize(
+    ("target_fixture"),
+    [
+        "target_win_users",
+        "target_unix_users",
+        "target_linux_users",
+        "target_macos_users",
+    ],
+)
+def test_list_target(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+    request: pytest.FixtureRequest,
+    target_fixture: str,
+) -> None:
+    """Tests whether ``--list`` and ``--list *`` on a target returns the same results."""
+
+    args = ["target-query", "mock/path", "--list"]
+
+    target: Target = request.getfixturevalue(target_fixture)
+
+    def _run_query(args: list[str], target: Target) -> tuple[bytes, bytes]:
+        with monkeypatch.context() as m:
+            m.setattr("sys.argv", args)
+
+            # Patch the target that gets opened.
+            with patch("dissect.target.target.Target.open_all", return_value=[target]), contextlib.suppress(SystemExit):
+                target_query()
+
+            return capsys.readouterr()
+
+    stdout_1, stderr_1 = _run_query(args, target)
+    stdout_2, stderr_2 = _run_query([*args, "*"], target)
+
+    assert stdout_1 == stdout_2
+    assert stderr_1 == stderr_2
 
 
 @pytest.mark.parametrize(
@@ -196,11 +237,6 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
 
         with (
             patch(
-                "dissect.target.tools.query.find_functions",
-                autospec=True,
-                side_effect=mock_find_functions,
-            ),
-            patch(
                 "dissect.target.tools.utils.find_functions",
                 autospec=True,
                 side_effect=mock_find_functions,
@@ -248,7 +284,8 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
 
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "-l", "-j"])
-        target_query()
+        with pytest.raises(SystemExit):
+            target_query()
         out, _ = capsys.readouterr()
 
     try:
@@ -339,3 +376,19 @@ def test_record_stream_write_exception_handling(
             target_query()
 
     assert "Exception occurred while processing output of WalkFSPlugin.walkfs:" in caplog.text
+
+
+def test_arguments_passed_correctly(monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv", ["target-query", "-fprefetch,mft", "tests/_data/loaders/tar/test-archive.tar.gz", "--compact"]
+        )
+
+        with patch(
+            "dissect.target.tools.query.execute_function_on_target", side_effect=mock_execute_function
+        ) as mocked_execute:
+            target_query()
+
+        assert len(mocked_execute.mock_calls) == 2
+        for call in mocked_execute.mock_calls:
+            assert call.args[2] == ["--compact"]

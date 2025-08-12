@@ -16,7 +16,7 @@ def test_cellebrite_loader(target_bare: Target) -> None:
     The content of the ``EXTRACTION_FFS.zip`` file has been replaced with a minimal linux folder structure
     for performance reasons.
 
-    Resources:
+    References:
         - https://corp.digitalcorpora.org/corpora/iOS17/
     """
     path = Path(absolute_path("_data/loaders/cellebrite/EvidenceCollection.ufdx"))

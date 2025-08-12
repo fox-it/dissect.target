@@ -32,7 +32,7 @@ LSASecretRecord = TargetRecordDescriptor(
 class LSAPlugin(Plugin):
     """Windows Local Security Authority (LSA) plugin.
 
-    Resources:
+    References:
         - https://learn.microsoft.com/en-us/windows/win32/secauthn/lsa-authentication
         - https://moyix.blogspot.com/2008/02/decrypting-lsa-secrets.html (Windows XP)
         - https://github.com/fortra/impacket/blob/master/impacket/examples/secretsdump.py

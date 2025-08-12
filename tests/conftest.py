@@ -288,6 +288,11 @@ def hive_hklm() -> VirtualHive:
     # set current control set to ControlSet001 and mock it
     change_controlset(hive, 1)
 
+    # set windir
+    current_version_key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
+    hive.map_key(current_version_key, VirtualKey(hive, current_version_key))
+    hive.map_value(current_version_key, "SystemRoot", VirtualValue(hive, "SystemRoot", "c:\\Windows"))
+
     return hive
 
 
@@ -580,7 +585,7 @@ def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
     return TargetUnixFactory(tmp_path)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def guarded_keychain() -> Iterator[None]:
     """This fixture clears the keychain from any previously added values."""
     keychain.KEYCHAIN.clear()

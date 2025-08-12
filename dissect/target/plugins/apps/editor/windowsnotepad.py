@@ -304,7 +304,7 @@ class WindowsNotepadPlugin(EditorPlugin):
         Windows Notepad application for Windows 11 is now able to restore both saved and unsaved tabs when you re-open
         the application.
 
-        Resources:
+        References:
             - https://github.com/fox-it/dissect.target/pull/540
             - https://github.com/JustArion/Notepad-Tabs
             - https://github.com/ogmini/Notepad-Tabstate-Buffer

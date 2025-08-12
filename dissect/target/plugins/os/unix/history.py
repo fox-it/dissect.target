@@ -98,7 +98,7 @@ class CommandHistoryPlugin(Plugin):
             #1648598339
             echo "this is a test"
 
-        Resources:
+        References:
             - http://git.savannah.gnu.org/cgit/bash.git/tree/bashhist.c
         """
         next_cmd_ts = None
@@ -142,7 +142,7 @@ class CommandHistoryPlugin(Plugin):
             : 1673860722:0;sudo apt install sl
             : :;
 
-        Resources:
+        References:
             - https://sourceforge.net/p/zsh/code/ci/master/tree/Src/hist.c
         """
         i = 0
@@ -191,7 +191,7 @@ class CommandHistoryPlugin(Plugin):
         Note that the last ``- cmd: echo "test: test"`` is not valid YAML,
         which is why we cannot safely use the Python yaml module.
 
-        Resources:
+        References:
             - https://github.com/fish-shell/fish-shell/blob/master/src/history.cpp
         """
 

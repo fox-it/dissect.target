@@ -31,11 +31,7 @@ SyscacheRecord = TargetRecordDescriptor(
 
 
 class SyscachePlugin(Plugin):
-    """Plugin to parse Syscache.hve.
-
-    Reference:
-    - https://dfir.ru/2018/12/02/the-cit-database-and-the-syscache-hive/
-    """
+    """Plugin to parse Syscache.hve."""
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -51,7 +47,11 @@ class SyscachePlugin(Plugin):
 
     @export(record=SyscacheRecord)
     def syscache(self) -> Iterator[SyscacheRecord]:
-        """Parse the objects in the ObjectTable from the Syscache.hve file."""
+        """Parse the objects in the ObjectTable from the Syscache.hve file.
+
+        References:
+            - https://dfir.ru/2018/12/02/the-cit-database-and-the-syscache-hive/
+        """
 
         # Try to get the system volume
         mft = None

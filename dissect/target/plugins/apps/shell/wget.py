@@ -53,7 +53,7 @@ class WgetPlugin(Plugin):
         directory by default. The ``.wget-hsts`` file records HTTP Strict Transport Security (HSTS) information for the
         websites visited by the user via ``wget``.
 
-        Resources:
+        References:
             - https://www.gnu.org/software/wget
             - https://gitlab.com/gnuwget/wget/-/blob/master/src/hsts.c
             - https://en.wikipedia.org/wiki/HTTP_Strict_Transport_Security

@@ -245,7 +245,7 @@ class NginxPlugin(WebserverPlugin):
     def error(self) -> Iterator[WebserverErrorLogRecord]:
         """Return contents of NGINX error log files in unified ``WebserverErrorLogRecord`` format.
 
-        Resources:
+        References:
             - https://nginx.org/en/docs/ngx_core_module.html#error_log
             - https://github.com/nginx/nginx/blob/master/src/core/ngx_log.c
         """
@@ -285,7 +285,7 @@ class NginxPlugin(WebserverPlugin):
     def hosts(self) -> Iterator[WebserverHostRecord]:
         """Return found server directives in the NGINX configuration.
 
-        Resources:
+        References:
             - https://nginx.org/en/docs/http/ngx_http_core_module.html#server
         """
 
@@ -333,7 +333,7 @@ def parse_json_line(line: str) -> dict[str, str] | None:
     Unfortunately NGINX has no official default naming convention for JSON access logs,
     users can configure the JSON ``log_format`` as they see fit.
 
-    Resources:
+    References:
         - https://nginx.org/en/docs/http/ngx_http_log_module.html
         - https://github.com/elastic/examples/blob/master/Common%20Data%20Formats/nginx_json_logs/README.md
     """

@@ -21,7 +21,7 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
 
     Tested with configuration files from major versions 5, 6 and 7.
 
-    Resources:
+    References:
         - https://docs.oracle.com/en/virtualization/virtualbox/6.1/admin/TechnicalBackground.html
     """
 

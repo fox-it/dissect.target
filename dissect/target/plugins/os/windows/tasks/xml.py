@@ -3,20 +3,28 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
-from flow.record import GroupedRecord, RecordDescriptor
+from flow.record import GroupedRecord
 
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.plugins.os.windows.tasks.records import (
+    BaseTriggerRecord,
     BootTriggerRecord,
+    CalendarTriggerRecord,
     ComHandlerRecord,
+    DailyTriggerRecord,
     EventTriggerRecord,
     ExecRecord,
+    IdleTriggerRecord,
     LogonTriggerRecord,
+    MonthlyDateTriggerRecord,
+    MonthlyDowTriggerRecord,
+    RegistrationTrigger,
     SendEmailRecord,
     SessionStateChangeTriggerRecord,
     ShowMessageRecord,
     TimeTriggerRecord,
-    TriggerRecord,
+    WeeklyTriggerRecord,
+    WnfTriggerRecord,
 )
 
 if TYPE_CHECKING:
@@ -64,12 +72,40 @@ class ScheduledTasks:
         return tasks
 
 
-class XmlTask:
-    """Initialize the XmlTask class for open XML-based task files.
+def str_to_bool(string_to_convert: str) -> bool | None:
+    """Convert a string to a boolean value.
+
+    The conversion is case-insensitive and only accepts 'true' or 'false'
+    (with optional surrounding whitespace). Raises a ValueError for any
+    other input.
 
     Args:
-        xml_file: the file to be parsed.
-        target: the target system.
+        string_to_convert: The input string to convert. Should be 'true' or 'false', case-insensitively.
+
+    Returns:
+        None for an empty string, True if the input string is 'true' (case-insensitive), False if 'false'.
+    """
+    if not string_to_convert:
+        return None
+
+    string_to_convert_lower = string_to_convert.strip().lower()
+    if string_to_convert_lower == "true":
+        return True
+    if string_to_convert_lower == "false":
+        return False
+
+    raise ValueError(f"Invalid boolean string: '{string_to_convert}' (expected 'true' or 'false')")
+
+
+class XmlTask:
+    """Parses and extracts information from an XML-based Task Scheduler file.
+
+    This class is used to extract metadata, triggers, and actions from a task
+    defined in an XML format (used in newer versions of Windows Task Scheduler).
+
+    Args:
+        task_element: The root XML element representing the task.
+        task_path: The path of the task in the target system.
     """
 
     def __init__(self, task_element: Element, task_path: TargetPath):
@@ -84,7 +120,6 @@ class XmlTask:
         self.comment = self.get_element("Properties", attribute="comment")
         self.run_as = self.get_element("Properties", attribute="runAs")
         self.cpassword = self.get_element("Properties", attribute="cpassword")
-        self.enabled = self.get_element("Properties", attribute="enabled")
         self.action = self.get_element("Properties", attribute="action")
 
         self.uri = self.get_element("RegistrationInfo/URI")
@@ -107,31 +142,41 @@ class XmlTask:
         self.required_privileges = self.get_element("Principals/Principal/RequiredPrivileges")
 
         # Settings
-        self.allow_start_on_demand = self.get_element("Settings/AllowStartOnDemand")
+        self.allow_start_on_demand = str_to_bool(self.get_element("Settings/AllowStartOnDemand"))
         self.restart_on_failure_interval = self.get_element("Settings/RestartOnFailure/Interval")
         self.restart_on_failure_count = self.get_element("Settings/RestartOnFailure/Count")
         self.mutiple_instances_policy = self.get_element("Settings/MultipleInstancesPolicy")
-        self.dissalow_start_on_batteries = self.get_element("Settings/DisallowStartIfOnBatteries")
-        self.stop_going_on_batteries = self.get_element("Settings/StopIfGoingOnBatteries")
+        self.disallow_start_on_batteries = str_to_bool(self.get_element("Settings/DisallowStartIfOnBatteries"))
+        self.stop_going_on_batteries = str_to_bool(self.get_element("Settings/StopIfGoingOnBatteries"))
         self.allow_hard_terminate = self.get_element("Settings/AllowHardTerminate")
-        self.start_when_available = self.get_element("Settings/StartWhenAvailable")
+        self.start_when_available = str_to_bool(self.get_element("Settings/StartWhenAvailable"))
         self.network_profile_name = self.get_element("Settings/NetworkProfileName")
-        self.run_only_network_available = self.get_element("Settings/RunOnlyIfNetworkAvailable")
-        self.wake_to_run = self.get_element("Settings/WakeToRun")
-        self.enabled = self.get_element("Settings/Enabled")
-        self.hidden = self.get_element("Settings/Hidden")
+        self.run_only_network_available = str_to_bool(self.get_element("Settings/RunOnlyIfNetworkAvailable"))
+        self.wake_to_run = str_to_bool(self.get_element("Settings/WakeToRun"))
+
+        self.hidden = str_to_bool(self.get_element("Settings/Hidden"))
         self.delete_expired_task_after = self.get_element("Settings/DeleteExpiredTaskAfter")
         self.idle_duration = self.get_element("Settings/IdleSettings/Duration")
         self.idle_wait_timeout = self.get_element("Settings/IdleSettings/WaitTimeout")
-        self.idle_stop_on_idle_end = self.get_element("Settings/IdleSettings/StopOnIdleEnd")
-        self.idle_restart_on_idle = self.get_element("Settings/IdleSettings/RestartOnIdle")
+        self.idle_stop_on_idle_end = str_to_bool(self.get_element("Settings/IdleSettings/StopOnIdleEnd"))
+        self.idle_restart_on_idle = str_to_bool(self.get_element("Settings/IdleSettings/RestartOnIdle"))
         self.network_settings_name = self.get_element("Settings/NetworkSettings/Name")
         self.network_settings_id = self.get_element("Settings/NetworkSettings/Id")
         self.execution_time_limit = self.get_element("Settings/ExecutionTimeLimit")
         self.priority = self.get_element("Settings/Priority")
-        self.run_only_idle = self.get_element("Settings/RunOnlyIfIdle")
-        self.unified_scheduling_engine = self.get_element("Settings/UseUnifiedSchedulingEngine")
-        self.disallow_start_on_remote_app_session = self.get_element("Settings/DisallowStartOnRemoteAppSession")
+        self.run_only_idle = str_to_bool(self.get_element("Settings/RunOnlyIfIdle"))
+        self.unified_scheduling_engine = str_to_bool(self.get_element("Settings/UseUnifiedSchedulingEngine"))
+        self.disallow_start_on_remote_app_session = str_to_bool(
+            self.get_element("Settings/DisallowStartOnRemoteAppSession")
+        )
+
+        # Enabled
+        self.enabled = str_to_bool(self.get_element("Settings/Enabled"))
+        if self.enabled is None:
+            self.enabled = str_to_bool(self.get_element("Properties", attribute="enabled"))
+
+        if self.enabled is None:
+            self.enabled = True
 
         # Data
         self.data = self.get_raw("Data")
@@ -167,7 +212,7 @@ class XmlTask:
         Returns:
             str: The value of the XML element if found, otherwise None.
         """
-        xml_data = xml_data or self.task_element
+        xml_data = xml_data if xml_data is not None else self.task_element
         data = xml_data.find(xml_path)
 
         if data is None:
@@ -199,50 +244,48 @@ class XmlTask:
         """
         for trigger in self.task_element.findall("Triggers/*"):
             trigger_type = trigger.tag
-            enabled = self.get_element("Enabled", trigger)
+            trigger_enabled = str_to_bool(self.get_element("Enabled", trigger))
             start_boundary = self.get_element("StartBoundary", trigger)
             end_boundary = self.get_element("EndBoundary", trigger)
             repetition_interval = self.get_element("Repetition/Interval", trigger)
             repetition_duration = self.get_element("Repetition/Duration", trigger)
-            repetition_stop_duration_end = self.get_element("Repetition/StopAtDurationEnd", trigger)
+            repetition_stop_duration_end = str_to_bool(self.get_element("Repetition/StopAtDurationEnd", trigger))
             execution_time_limit = self.get_element("ExecutionTimeLimit", trigger)
+            delay = self.get_element("Delay", trigger)
+            random_delay = self.get_element("RandomDelay", trigger)
+            trigger_data = self.get_element("Data", trigger)
 
-            base = TriggerRecord(
-                enabled=enabled,
+            base = BaseTriggerRecord(
+                trigger_enabled=trigger_enabled,
                 start_boundary=start_boundary,
                 end_boundary=end_boundary,
                 repetition_interval=repetition_interval,
                 repetition_duration=repetition_duration,
                 repetition_stop_duration_end=repetition_stop_duration_end,
                 execution_time_limit=execution_time_limit,
+                delay=delay,
+                random_delay=random_delay,
+                trigger_data=trigger_data,
             )
 
             if trigger_type == "LogonTrigger":
                 user_id = self.get_element("UserId", trigger)
-                delay = self.get_element("Delay", trigger)
                 record = LogonTriggerRecord(
                     user_id=user_id,
-                    delay=delay,
                 )
-                yield GroupedRecord("filesystem/windows/task/logon_trigger", [base, record])
+                yield GroupedRecord(LogonTriggerRecord.name, [base, record])
 
-            if trigger_type == "BootTrigger":
-                delay = self.get_element("Delay", trigger)
-                record = BootTriggerRecord(delay=delay)
-                yield GroupedRecord("filesystem/windows/task/boot_trigger", [base, record])
+            elif trigger_type == "BootTrigger":
+                yield GroupedRecord(BootTriggerRecord.name, [base])
 
-            if trigger_type == "IdleTrigger":
-                pass  # No extra fields
+            elif trigger_type == "IdleTrigger":
+                yield GroupedRecord(IdleTriggerRecord.name, [base])
 
-            if trigger_type == "TimeTrigger":
-                random_delay = self.get_element("RandomDelay", trigger)
+            elif trigger_type == "TimeTrigger":
+                yield GroupedRecord(TimeTriggerRecord.name, [base])
 
-                record = TimeTriggerRecord(random_delay=random_delay)
-                yield GroupedRecord("filesystem/windows/task/time_trigger", [base, record])
-
-            if trigger_type == "EventTrigger":
+            elif trigger_type == "EventTrigger":
                 subscription = self.get_element("Subscription", trigger)
-                delay = self.get_element("Delay", trigger)
                 period_of_occurence = self.get_element("PeriodOfOccurrence", trigger)
                 number_of_occurences = self.get_element("NumberOfOccurences", trigger)
                 matching_elements = self.get_element("MatchingElement", trigger)
@@ -250,32 +293,83 @@ class XmlTask:
 
                 record = EventTriggerRecord(
                     subscription=subscription,
-                    delay=delay,
                     period_of_occurence=period_of_occurence,
                     number_of_occurences=number_of_occurences,
                     matching_elements=matching_elements,
                     value_queries=value_queries,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/event_trigger", [base, record])
+                yield GroupedRecord(EventTriggerRecord.name, [base, record])
 
-            if trigger_type == "SessionStateChangeTrigger":
+            elif trigger_type == "SessionStateChangeTrigger":
                 user_id = self.get_element("UserId", trigger)
-                delay = self.get_element("Delay", trigger)
                 state_change = self.get_element("StateChange", trigger)
 
                 record = SessionStateChangeTriggerRecord(
                     user_id=user_id,
-                    delay=delay,
                     state_change=state_change,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/sessionstate_trigger", [base, record])
+                yield GroupedRecord(SessionStateChangeTriggerRecord.name, [base, record])
 
-            if trigger_type == "CalendarTrigger":
-                pass
+            elif trigger_type == "CalendarTrigger":
+                if days_between_triggers := self.get_element("ScheduleByDay/DaysInterval", trigger):
+                    record = DailyTriggerRecord(
+                        days_between_triggers=int(days_between_triggers),
+                    )
 
-    def get_actions(self) -> Iterator[RecordDescriptor]:
+                elif weeks_between_triggers := self.get_element("ScheduleByWeek/WeeksInterval", trigger):
+                    days_of_week = [day.tag for day in trigger.find("ScheduleByWeek/DaysOfWeek/").iter("*")]
+                    record = WeeklyTriggerRecord(
+                        weeks_between_triggers=int(weeks_between_triggers),
+                        days_of_week=days_of_week,
+                    )
+
+                elif trigger.find("ScheduleByMonth/") is not None:
+                    day_of_month = [int(day.text) for day in trigger.iter("Day")]
+                    months_of_year = [month.tag for month in trigger.findall("*/Months/*")]
+                    record = MonthlyDateTriggerRecord(
+                        day_of_month=day_of_month,
+                        months_of_year=months_of_year,
+                    )
+
+                elif trigger.find("ScheduleByMonthDayOfWeek/") is not None:
+                    which_week = [int(week.text) for week in trigger.iter("Week")]
+                    days_of_week = [day.tag for day in trigger.findall("*/DaysOfWeek/*")]
+                    months_of_year = [month.tag for month in trigger.findall("*/Months/*")]
+                    record = MonthlyDowTriggerRecord(
+                        which_week=which_week,
+                        days_of_week=days_of_week,
+                        months_of_year=months_of_year,
+                    )
+
+                else:
+                    raise ValueError("Unknown calendar type")
+
+                yield GroupedRecord(CalendarTriggerRecord.name, [base, record])
+
+            elif trigger_type == "WnfStateChangeTrigger":
+                state_name = self.get_element("StateName", trigger)
+
+                record = WnfTriggerRecord(
+                    state_name=state_name,
+                )
+
+                yield GroupedRecord(WnfTriggerRecord.name, [base, record])
+
+            elif trigger_type == "RegistrationTrigger":
+                date = self.get_element("Date", trigger)
+
+                record = RegistrationTrigger(
+                    date=date,
+                )
+
+                yield GroupedRecord(RegistrationTrigger.name, [base, record])
+
+            else:
+                raise ValueError(f"Unknown trigger type: {trigger_type}")
+
+    def get_actions(self) -> Iterator[GroupedRecord]:
         """Get the actions from the XML task data.
 
         Yields:
@@ -300,7 +394,7 @@ class XmlTask:
                 yield ComHandlerRecord(
                     action_type=action_type,
                     class_id=com_class_id,
-                    data=com_data,
+                    com_data=com_data,
                 )
 
             if action_type == "SendEmail":

@@ -30,7 +30,7 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
     """Plugin for fetching and parsing Windows Eventlog Files (``*.evtx``)."""
 
     RECORD_NAME = "filesystem/windows/evtx"
-    LOGS_DIR_PATH = "sysvol/windows/system32/winevt/logs"
+    LOGS_DIR_PATH = "%windir%/system32/winevt/logs"
 
     NEEDLE = b"ElfChnk\x00"
     CHUNK_SIZE = 0x10000
