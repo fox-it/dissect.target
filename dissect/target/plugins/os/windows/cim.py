@@ -33,7 +33,7 @@ class CimPlugin(Plugin):
         super().__init__(target)
         self._repo = None
 
-        repodir = self.target.fs.path("sysvol/windows/system32/wbem/repository")
+        repodir = self.target.resolve("%windir%/system32/wbem/repository")
         if repodir.exists():
             index = repodir.joinpath("index.btr")
             objects = repodir.joinpath("objects.data")

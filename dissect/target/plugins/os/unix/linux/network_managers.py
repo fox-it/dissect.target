@@ -15,11 +15,9 @@ from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterable
 
     from dissect.target.helpers.fsutil import TargetPath
-    from dissect.target.plugins.os.unix.log.journal import JournalRecord
-    from dissect.target.plugins.os.unix.log.messages import MessagesRecord
     from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -304,7 +302,7 @@ class Parser:
             Value(s) corrensponding to that network configuration option.
         """
         if not config:
-            log.error("Cannot get option %s: No config to parse", option)
+            log.debug("Cannot get option %s: No config to parse", option)
             return None
 
         if section:
@@ -534,14 +532,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
     if not messages:
         target.log.warning("Could not search for DHCP leases using %s: No log entries found", log_func)
 
-    def records_enumerate(iterable: Iterable) -> Iterator[tuple[int, JournalRecord | MessagesRecord]]:
-        count = 0
-        for rec in iterable:
-            if rec._desc.name == "linux/log/journal":
-                count += 1
-            yield count, rec
-
-    for count, record in records_enumerate(messages):
+    for count, record in enumerate(messages):
         line = record.message
 
         if not line:
@@ -590,11 +581,11 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             ips.add(ip)
             continue
 
-        # The journal parser is relatively slow, so we stop when we have read 10000 journal entries,
+        # The journal and syslog parsers can be relatively slow, so we stop when we have read 10000 entries,
         # or if we have found at least one ip address. When `iter_all` is `True` we continue searching.
         if not iter_all and (ips or count > 10_000):
             if not ips:
-                target.log.warning("No DHCP IP addresses found in first 10000 journal entries")
+                target.log.warning("No DHCP IP addresses found in first 10000 journal or syslog entries")
             break
 
     return ips
@@ -603,7 +594,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 def parse_unix_dhcp_leases(target: Target) -> set[str]:
     """Parse NetworkManager and dhclient DHCP ``.lease`` files.
 
-    Resources:
+    References:
         - https://linux.die.net/man/5/dhclient.conf
 
     Args:

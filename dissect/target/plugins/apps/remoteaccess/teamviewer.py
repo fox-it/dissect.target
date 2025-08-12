@@ -52,7 +52,7 @@ RE_START = re.compile(
 class TeamViewerPlugin(RemoteAccessPlugin):
     """TeamViewer client plugin.
 
-    Resources:
+    References:
         - https://teamviewer.com/en/global/support/knowledge-base/teamviewer-classic/contact-support/find-your-log-files
         - https://www.systoolsgroup.com/forensics/teamviewer/
         - https://benleeyr.wordpress.com/2020/05/19/teamviewer-forensics-tested-on-v15/

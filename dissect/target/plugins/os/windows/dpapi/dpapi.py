@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class DPAPIPlugin(InternalPlugin):
     """Windows Data Protection API (DPAPI) plugin.
 
-    Resources:
+    References:
         - Reversing ``Crypt32.dll``
         - https://learn.microsoft.com/en-us/windows/win32/api/dpapi/
         - https://github.com/fortra/impacket/blob/master/examples/dpapi.py
@@ -41,7 +41,7 @@ class DPAPIPlugin(InternalPlugin):
             raise UnsupportedPluginError("Windows registry and LSA plugins are required for DPAPI decryption")
 
     def keychain(self) -> set:
-        return set(self.target._dpapi_keyprovider.keys())
+        return set(self.target.dpapi.keyprovider.keys())
 
     @cached_property
     def master_keys(self) -> dict[str, dict[str, MasterKeyFile]]:
@@ -51,7 +51,7 @@ class DPAPIPlugin(InternalPlugin):
         # Search for SYSTEM master keys
         master_keys[self.SYSTEM_SID] = {}
 
-        system_master_key_path = self.target.fs.path(f"sysvol/Windows/System32/Microsoft/Protect/{self.SYSTEM_SID}")
+        system_master_key_path = self.target.resolve(f"%windir%/System32/Microsoft/Protect/{self.SYSTEM_SID}")
         system_user_master_key_path = system_master_key_path.joinpath("User")
 
         for dir in [system_master_key_path, system_user_master_key_path]:

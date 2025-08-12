@@ -420,7 +420,7 @@ class Target:
                     "An exception occurred while checking for child plugin compatibility: %s", plugin_desc.qualname
                 )
 
-    def open_child(self, child: str | Path) -> Target | None:
+    def open_child(self, child: str | Path) -> Target:
         """Open a child target.
 
         Args:

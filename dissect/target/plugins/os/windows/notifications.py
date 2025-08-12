@@ -107,7 +107,7 @@ AppDBRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/notification/appdb",
     [
         ("datetime", "timestamp"),
-        ("varint", "version"),
+        ("varint", "chunk_version"),
         ("varint", "next_notification_id"),
     ],
 )
@@ -139,7 +139,7 @@ AppDBTileRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         ("datetime", "expiry_time"),
         ("varint", "id"),
         ("varint", "chunk_num"),
-        ("varint", "type"),
+        ("varint", "tile_type"),
         ("varint", "index"),
         ("string", "name"),
         ("string", "content"),
@@ -153,7 +153,7 @@ AppDBToastRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         ("datetime", "expiry_time"),
         ("varint", "id"),
         ("varint", "chunk_num"),
-        ("varint", "type"),
+        ("varint", "toast_type"),
         ("varint", "index"),
         ("string", "name1"),
         ("string", "name2"),
@@ -171,7 +171,7 @@ WpnDatabaseNotificationRecord = create_extended_descriptor([UserRecordDescriptor
         ("varint", "handler_id"),
         ("string", "activity_id"),
         ("string", "type"),
-        ("bytes", "payload"),
+        ("bytes", "payload_data"),
         ("string", "payload_type"),
         ("string", "tag"),
         ("string", "group"),
@@ -250,7 +250,7 @@ class NotificationsPlugin(Plugin):
 
         return AppDBRecord(
             timestamp=chunk_timestamp,
-            version=chunk.Header.Version,
+            chunk_version=chunk.Header.Version,
             next_notification_id=chunk.Header.NextNotificationId,
         )
 
@@ -339,7 +339,7 @@ class NotificationsPlugin(Plugin):
                     expiry_time=tile_expiry_time,
                     id=tile.UniqueId,
                     chunk_num=chunk_num,
-                    type=tile.Type,
+                    tile_type=tile.Type,
                     index=tile.Index,
                     name=name,
                     content=tile_xml,
@@ -381,7 +381,7 @@ class NotificationsPlugin(Plugin):
                     expiry_time=toast_expiry_time,
                     id=toast.UniqueId,
                     chunk_num=chunk_num,
-                    type=toast.Type,
+                    toast_type=toast.Type,
                     index=toast.Index,
                     name1=name1,
                     name2=name2,
@@ -476,7 +476,7 @@ class NotificationsPlugin(Plugin):
                         handler_id=row["[HandlerId]"],
                         activity_id=UUID(bytes=row["[ActivityId]"]),
                         type=row["[Type]"],
-                        payload=row["[Payload]"],
+                        payload_data=row["[Payload]"],
                         payload_type=row["[PayloadType]"],
                         tag=row["[Tag]"],
                         group=row["[Group]"],

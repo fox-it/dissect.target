@@ -95,10 +95,12 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
     return json.dumps({"loaded": loaded, "failed": failed})
 
 
+def _get_os_functions() -> list[plugin.FunctionDescriptor]:
+    return [f for f in plugin.functions(index="__os__") if f.exported and f.module == DefaultOSPlugin.__module__]
+
+
 def _get_default_functions() -> list[plugin.FunctionDescriptor]:
-    return [f for f in plugin.functions() if f.exported] + [
-        f for f in plugin.functions(index="__os__") if f.exported and f.module == DefaultOSPlugin.__module__
-    ]
+    return [f for f in plugin.functions() if f.exported] + _get_os_functions()
 
 
 def _categorize_functions(functions: list[plugin.FunctionDescriptor] | None = None) -> dict:
