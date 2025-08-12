@@ -9,6 +9,7 @@ from flow.record.fieldtypes import windows_path
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
+from dissect.target.plugins.os.windows.generic import ComputerSidRecord
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
@@ -272,11 +273,23 @@ def test_windows_user(target_win_users: Target) -> None:
 
 
 def test_windows_user_from_sam(target_win_users: Target) -> None:
+    """Verify the home folder name is independent of the SAM username.
+
+    The final component of the home folder path (e.g., 'C:\\Users\\Username')
+    is not always identical to the account's username after a rename. This
+    test ensures our code correctly handles this distinction.
+
+    See for reference:
+    https://learn.microsoft.com/en-us/previous-versions/troubleshoot/windows-client/renaming-user-account-not-change-profile-path
+    """
+
     fake_sam_user = Mock()
     fake_sam_user.rid = 1002
     fake_sam_user.username = "Jane"  # Should override "John" from home folder
 
-    target_win_users.machine_sid = Mock(return_value="S-1-5-21-3263113198-3007035898-945866154")
+    target_win_users.machine_sid = Mock(
+        return_value=iter([ComputerSidRecord(sid="S-1-5-21-3263113198-3007035898-945866154")])
+    )
     target_win_users.sam = Mock(return_value=[fake_sam_user])
 
     users = list(target_win_users.users())
