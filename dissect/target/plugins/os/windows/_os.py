@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import operator
 import struct
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
@@ -284,6 +285,7 @@ class WindowsPlugin(OSPlugin):
         except RegistryError:
             pass
 
+    @cached_property
     def _sam_by_sid(self) -> dict[str, SamRecord]:
         if not (machine_sid := next(self.target.machine_sid(), None)):
             return {}
@@ -292,8 +294,7 @@ class WindowsPlugin(OSPlugin):
         try:
             for sam_record in self.target.sam():
                 # Compose SID from domain_sid and RID
-                sid = f"{machine_sid.sid}-{sam_record.rid}"
-                sam_users[sid] = sam_record
+                sam_users[f"{machine_sid.sid}-{sam_record.rid}"] = sam_record
         except Exception as e:
             self.target.log.warning("Could not read SAM records")
             self.target.log.debug("", exc_info=e)
@@ -305,8 +306,6 @@ class WindowsPlugin(OSPlugin):
         # Be aware that this function can never do anything which needs user
         # registry hives. Initializing those hives will need this function,
         # which will then cause a recursion.
-
-        sam_users = self._sam_by_sid()
 
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
         sids = set()
@@ -327,7 +326,7 @@ class WindowsPlugin(OSPlugin):
                 else:
                     home = profile_image_path.value
                     # Use SAM username if available
-                    name = sam_users[sid].username if sid in sam_users else home.split("\\")[-1]
+                    name = self._sam_by_sid[sid].username if sid in self._sam_by_sid else home.split("\\")[-1]
 
                 yield WindowsUserRecord(
                     sid=subkey.name,
