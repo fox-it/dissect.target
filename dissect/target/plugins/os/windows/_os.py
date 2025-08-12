@@ -285,14 +285,14 @@ class WindowsPlugin(OSPlugin):
             pass
 
     def _sam_by_sid(self) -> dict[str, SamRecord]:
-        if not (machine_sid := self.target.machine_sid()):
+        if not (machine_sid := next(self.target.machine_sid(), None)):
             return {}
 
         sam_users: dict[str, SamRecord] = {}
         try:
             for sam_record in self.target.sam():
                 # Compose SID from domain_sid and RID
-                sid = f"{machine_sid}-{sam_record.rid}"
+                sid = f"{machine_sid.sid}-{sam_record.rid}"
                 sam_users[sid] = sam_record
         except Exception as e:
             self.target.log.warning("Could not read SAM records")
