@@ -106,7 +106,7 @@ def main() -> int:
         parser.print_help()
         return 0
 
-    process_generic_arguments(args, rest)
+    process_generic_arguments(parser, args, rest)
 
     if args.no_cache:
         cache.IGNORE_CACHE = True
@@ -123,7 +123,7 @@ def main() -> int:
                 "The --rewrite-cache option will be ignored as --no-cache or --only-read-cache are specified",
             )
 
-    # Process plugin argments after host and child args are checked
+    # Process plugin arguments after host and child args are checked
     different_output_types = process_plugin_arguments(parser, args, rest)
 
     if not args.targets:
@@ -146,6 +146,9 @@ def main() -> int:
             record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []
+
+            if args.dry_run:
+                print("Dry run on:", target)
 
             first_seen_output_type = default_output_type
 

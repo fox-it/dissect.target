@@ -13,6 +13,7 @@ from dissect.target.target import Target
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_target,
     process_generic_arguments,
 )
 
@@ -36,13 +37,10 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    process_generic_arguments(parser, args, rest)
 
     try:
-        t = Target.open(args.target)
-        if args.child:
-            t.log.warning("Switching to --child %s", args.child)
-            t = t.open_child(args.child)
+        t = open_target(args)
     except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)

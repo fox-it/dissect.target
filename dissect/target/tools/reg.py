@@ -42,7 +42,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    process_generic_arguments(parser, args, rest)
 
     try:
         for target in open_targets(args):

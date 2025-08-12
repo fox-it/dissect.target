@@ -42,39 +42,40 @@ if TYPE_CHECKING:
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
-class list_children_action(argparse.Action):
-    def __init__(
-        self, option_strings: list, dest: str = argparse.SUPPRESS, default: str = argparse.SUPPRESS, help: None = None
-    ):
-        super().__init__(option_strings=option_strings, dest=dest, default=default, nargs=0, help=help)
+class _OverrideRequiredAction(argparse.Action):
+    """A special argparse action that sets all required arguments to not required.
 
-    def __call__(
-        self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, values: list, option_string: None = None
-    ):
+    This is useful for implementing flags such as ``--list-children``, that should not be "blocked" by the ommission of
+    an otherwise required argument.
+    """
+
+    def __init__(self, option_strings: list, dest: str, **kwargs):
+        super().__init__(
+            option_strings=option_strings,
+            dest=dest,
+            nargs=0,
+            const=True,
+            default=False,
+            **kwargs,
+        )
+
+    def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, *args, **kwargs):
         for action in parser._get_positional_actions():
             action.required = False
 
-        namespace.list_children = True
+        setattr(namespace, self.dest, self.const)
 
 
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
-    parser.add_argument("-L", "--loader", action="store", help="select a specific loader (i.e. vmx, raw)")
-    parser.add_argument(
-        "--child", action="store", help="load child of target by path of index, see --list-children(-recursive)"
-    )
+    parser.add_argument("-L", "--loader", help="select a specific loader (i.e. vmx, raw)")
+    parser.add_argument("--child", help="load child of target by path of index (see --list-children)")
     parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument(
-        "--list-children",
-        action=list_children_action,
-        help="list all children by index and path output to be used in --child - does not process anything",
+        "--list-children", action=_OverrideRequiredAction, help="list all children indices and paths, then exit"
     )
-    parser.add_argument(
-        "--recursive",
-        action="store_true",
-        help="Makes --list-children behave recursively - does not process anything",
-    )
+    parser.add_argument("--recursive", action="store_true", help="make --list-children behave recursively")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", action="store_true", help="print version")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
@@ -87,7 +88,7 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None:
+def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace, rest: list[str]) -> None:
     configure_logging(args.verbose, args.quiet, as_plain_text=True)
 
     if args.version:
@@ -95,7 +96,7 @@ def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None
             print("dissect.target version " + version("dissect.target"))
         except PackageNotFoundError:
             print("unable to determine version")
-        sys.exit(0)
+        parser.exit(0)
 
     targets = args.targets if hasattr(args, "targets") else [args.target] if hasattr(args, "target") else []
     if targets and args.loader:
@@ -106,17 +107,13 @@ def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None
     elif hasattr(args, "target"):
         args.target = targets[0]
 
-    if hasattr(args, "targets") and len(args.targets) > 1 and args.child:
-        print("When using --child, only a single target should be supplied")
-        sys.exit(1)
+    if args.child and len(getattr(args, "targets", [])) > 1:
+        parser.error("--child can only be used on a single target, not multiple")
 
-    # List found children on targets and exit
-    if hasattr(args, "list_children"):
+    if args.list_children:
         # List found children on targets and exit
-        # Using open_targets here breaks with target-fs due to target vs targets
-        list_target = Target.open_all(targets, args.children)
-        print_children(list_target, recursive=args.recursive)
-        sys.exit(0)
+        list_children(args)
+        parser.exit(0)
 
     if args.keychain_file:
         keychain.register_keychain_file(args.keychain_file)
@@ -215,10 +212,31 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
     return {func.output for func in funcs if func.path not in args.excluded_functions}
 
 
+def open_target(args: argparse.Namespace) -> Target:
+    direct: bool = getattr(args, "direct", False)
+    child: str | None = getattr(args, "child", None)
+
+    target = Target.open_direct(args.target) if direct else Target.open(args.target)
+
+    if child:
+        try:
+            target.log.warning("Switching to --child %s", child)
+            target = target.open_child(child)
+        except Exception as e:
+            target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
+            target.log.debug("", exc_info=e)
+
+            # Do not continue processing, we requested a child but got none
+            raise
+
+    return target
+
+
 def open_targets(args: argparse.Namespace) -> Iterator[Target]:
     direct: bool = getattr(args, "direct", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
+
     targets: Iterable[Target] = (
         [Target.open_direct(args.targets)] if direct else Target.open_all(args.targets, children)
     )
@@ -227,15 +245,13 @@ def open_targets(args: argparse.Namespace) -> Iterator[Target]:
         if child:
             try:
                 target.log.warning("Switching to --child %s", child)
-                target: Target = target.open_child(child)
+                target = target.open_child(child)
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
                 target.log.debug("", exc_info=e)
-                # Do not continue processing, as target is now still pointing to the parent.
-                continue
 
-        if getattr(args, "dry_run", False):
-            print(f"Dry run on: {target}")
+                # Do not continue processing, we requested a child but got none
+                continue
 
         yield target
 
@@ -329,6 +345,19 @@ def list_plugins(
 
     if as_json:
         print("}")
+
+
+def list_children(args: argparse.Namespace) -> None:
+    """Pretty print children of targets (recursively)."""
+    found_one = False
+    for target in open_targets(args) if hasattr(args, "targets") else [open_target(args)]:
+        for child_id, child in target.list_children(recursive=args.recursive):
+            found_one = True
+            prefix = "-" * str(child_id).count(".")
+            print(f" {prefix}[{child_id}]: type={child.type!r} name={child.name!r} path={str(child.path)!r}")
+
+    if not found_one:
+        print("No children found on target(s)")
 
 
 def generate_argparse_for_plugin_class(
@@ -515,17 +544,3 @@ def find_and_filter_plugins(
 def escape_str(value: str) -> str:
     """Escape non-ASCII, unicode characters and bytes to a printable form."""
     return repr(value)[1:-1]
-
-
-def print_children(targets: list[str], recursive: bool = False) -> None:
-    """Pretty print children of targets (recursively)"""
-    for target in targets:
-        print(f"# Processing hostname={target.name}, path={target.path} (-recursive={recursive})")
-        for child_id, child in target.list_children_recursive() if recursive else enumerate(target.list_children()):
-            # Always cast child_id to str to match _recursive()
-            prefix = "-" * str(child_id).count(".")
-            print(f" {prefix}[#{child_id}]: type={child.type}, name={child.name}, path={child.path}")
-
-    # Check if any children were found, if not print msg
-    if "child_id" not in locals():
-        print("No children found on target(s)")

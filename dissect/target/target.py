@@ -420,41 +420,39 @@ class Target:
                     "An exception occurred while checking for child plugin compatibility: %s", plugin_desc.qualname
                 )
 
-    def open_child(self, child: str | Path) -> Target:
+    def open_child(self, child: int | str | Path) -> Target:
         """Open a child target.
 
+        Allows opening a nested child target by path, index or child pattern.
+        Paths will simply attempt to open the path as a child target.
+        Indexes are zero-based, so the first child is 0, the second is 1, etc.
+        If the child is a pattern, such as ``4.2``, it will open the 2nd child of the 4th child target of this target.
+
         Args:
-            child: The location of a target within the current ``Target``.
+            child: The location of a target within the current ``Target``, or a child pattern.
 
         Returns:
             An opened ``Target`` object of the child target.
         """
         # Open child identified by its single digit index (from list_children), int or str
-        if isinstance(child, int) or (isinstance(child, str) and child.isdecimal()):
-            child_num = int(child)
-            for child_record in self.list_children():
-                if child_num == 0:
-                    return Target.open(self.fs.path(child_record.path))
-                child_num -= 1
-            raise IndexError("Child target index out of range")
-
-        # Open sub-child (Grandchild?) uing a sub-child pattern Str such as "4.2":
-        # - open the 4th child of the current target and set this as new target.
-        # - open the 2nd child of this new target and return child.
-        if isinstance(child, str) and "." in child and all(child_id.isdecimal() for child_id in child.split(".")):
-            child_target = None
-            for child_id in [int(child_id) for child_id in child.split(".")]:
-                # Check if child_target is a Target (meaning we already looped atleast once)
-                if isinstance(child_target, Target):
-                    # Call .open_child from the child_target variable, not self.
-                    child_target = child_target.open_child(child_id)
+        # OR
+        # Open sub-child (grandchild?) uing a sub-child pattern string such as "4.2":
+        # - open the 4th child of the current target
+        # - open the 2nd child of this new target
+        if isinstance(child, int) or (isinstance(child, str) and all(part.isdecimal() for part in child.split("."))):
+            current_target = self
+            for child_idx in map(int, str(child).split(".")):
+                for child_record in current_target.list_children():
+                    if child_idx == 0:
+                        current_target = Target.open(current_target.fs.path(child_record.path))
+                        break
+                    child_idx -= 1
                 else:
-                    # Call .open_child from self, not from child_target (not initiated yet).
-                    child_target = self.open_child(child_id)
-                log.info("New target %s", child_target)
-            return child_target
+                    raise IndexError("Child target index out of range")
 
-        # Open child by its Path
+            return current_target
+
+        # Open child by path
         return Target.open(self.fs.path(child))
 
     def open_children(self, recursive: bool = False) -> Iterator[Target]:
@@ -480,34 +478,24 @@ class Target:
             if recursive:
                 yield from target.open_children(recursive=recursive)
 
-    def list_children(self) -> Iterator[ChildTargetRecord]:
-        """Lists all child targets that compatible :class:`~dissect.target.plugin.ChildTargetPlugin` classes
-        can discover.
-        """
+    def list_children(self, recursive: bool = False) -> Iterator[tuple[str, ChildTargetRecord]]:
+        """Lists all discovered child targets."""
         self._load_child_plugins()
-        for child_plugin in self._child_plugins.values():
-            yield from child_plugin.list_children()
 
-    def list_children_recursive(self, prefix: str = "") -> Iterator[tuple[str, tuple[ChildTargetRecord, list]]]:
-        """Lists all child targets - recursively - as a tuple with child_id to be used in --child"""
-        self._load_child_plugins()
-        for i, child in enumerate(self.list_children()):
-            child_id = f"{prefix}.{i}".lstrip(".")
+        idx = 0
+        for child_plugin in sorted(self._child_plugins.values()):
+            for child in child_plugin.list_children():
+                yield str(idx), child
 
-            # Yield the child_id and ChildTargetRecord before attempting to open the child
-            yield child_id, child
+                if recursive:
+                    try:
+                        target = self.open_child(child.path)
+                        for sub_idx, sub_child in target.list_children(recursive=recursive):
+                            yield f"{idx}.{sub_idx}", sub_child
+                    except TargetError:
+                        self.log.warning("Failed to open child target %s", child.path)
 
-            try:
-                # Attempt to open the target for next iteration of recrusive
-                target = self.open_child(child.path)
-
-                # Recursivly continue to yield these valures
-                yield from target.list_children_recursive(prefix=child_id)
-
-            except TargetError:
-                self.log.exception("Failed to open child target %s", child.path)
-                continue
-
+                idx += 1
 
     def reload(self) -> Target:
         """Reload the current target.

@@ -35,7 +35,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    process_generic_arguments(parser, args, rest)
 
     if not HAS_YARA:
         log.error("yara-python is not installed: pip install yara-python")

@@ -966,7 +966,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    process_generic_arguments(parser, args, rest)
 
     if len(args.targets) < 2:
         parser.error("at least two targets are required for target-diff")

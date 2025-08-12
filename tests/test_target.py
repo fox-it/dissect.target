@@ -10,9 +10,10 @@ import pytest
 
 from dissect.target import loader
 from dissect.target.containers.raw import RawContainer
-from dissect.target.exceptions import FilesystemError
+from dissect.target.exceptions import FilesystemError, TargetError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
@@ -588,3 +589,79 @@ def test_children_on_invalid_target(caplog: pytest.LogCaptureFixture, tmp_path: 
             pass
 
     assert "Failed to load child target from None" not in caplog.text
+
+
+def test_list_children() -> None:
+    """Test that ``list_children`` returns child records."""
+
+    class MockChildTargetPlugin:
+        def list_children(self) -> Iterator[ChildTargetRecord]:
+            yield ChildTargetRecord(type="mock", name="child0", path="/mock/child0")
+            yield ChildTargetRecord(type="mock", name="child1", path="/mock/child1")
+
+    target = Target()
+    target._child_plugins = {"mock": MockChildTargetPlugin()}
+
+    children = list(target.list_children())
+    assert len(children) == 2
+
+    child_id, child_record = children[0]
+    assert child_id == "0"
+    assert child_record.type == "mock"
+    assert child_record.name == "child0"
+    assert child_record.path == "/mock/child0"
+
+    child_id, child_record = children[1]
+    assert child_id == "1"
+    assert child_record.type == "mock"
+    assert child_record.name == "child1"
+    assert child_record.path == "/mock/child1"
+
+
+def test_list_children_recursive() -> None:
+    """Test that ``list_children(recursive=True)`` returns child records recursively."""
+
+    class MockChildTargetPlugin:
+        def list_children(self) -> Iterator[ChildTargetRecord]:
+            yield ChildTargetRecord(type="mock", name="child0", path="/mock/child0")
+            yield ChildTargetRecord(type="mock", name="child1", path="/mock/child1")
+
+    class EmptyChildTargetPlugin:
+        def list_children(self) -> Iterator[ChildTargetRecord]:
+            return iter([])
+
+    target = Target()
+    target._child_plugins = {"mock": MockChildTargetPlugin()}
+
+    child_0_target = Target()
+    child_0_target._child_plugins = {"mock": EmptyChildTargetPlugin()}
+    child_1_target = Target()
+    child_1_target._child_plugins = {"mock": MockChildTargetPlugin()}
+
+    child_1_0_target = Target()
+    child_1_0_target._child_plugins = {"mock": MockChildTargetPlugin()}
+    child_1_1_target = Target()
+    child_1_1_target._child_plugins = {"mock": EmptyChildTargetPlugin()}
+
+    child_target_1_0_0 = Target()
+    child_target_1_0_0._child_plugins = {"mock": EmptyChildTargetPlugin()}
+    child_target_1_0_1 = Target()
+    child_target_1_0_1._child_plugins = {"mock": MockChildTargetPlugin()}
+
+    target.open_child = lambda path: child_0_target if path == "/mock/child0" else child_1_target
+    child_1_target.open_child = lambda path: child_1_0_target if path == "/mock/child0" else child_1_1_target
+    child_1_0_target.open_child = lambda path: child_target_1_0_0 if path == "/mock/child0" else child_target_1_0_1
+    child_target_1_0_1.open_child = Mock(side_effect=TargetError("Mock error"))
+
+    children = list(target.list_children(recursive=True))
+
+    assert [child_id for child_id, _ in children] == [
+        "0",
+        "1",
+        "1.0",
+        "1.0.0",
+        "1.0.1",
+        "1.0.1.0",
+        "1.0.1.1",
+        "1.1",
+    ]

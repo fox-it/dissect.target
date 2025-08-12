@@ -76,12 +76,12 @@ def main() -> int:
             targets = targets[:-1]
         args.targets = targets
 
-    process_generic_arguments(args, rest)
+    process_generic_arguments(parser, args, rest)
 
     try:
         for i, target in enumerate(open_targets(args)):
             try:
-                target_info = get_target_info(target, args)
+                target_info = get_target_info(target, args.recursive)
                 if args.jsonlines:
                     print(json.dumps(target_info, default=str))
                 elif args.json:
@@ -104,12 +104,12 @@ def main() -> int:
     return 0
 
 
-def get_target_info(target: Target, args: argparse.Namespace) -> dict[str, str | list[str]]:
+def get_target_info(target: Target, recursive: bool = False) -> dict[str, str | list[str]]:
     return {
         "disks": get_disks_info(target),
         "volumes": get_volumes_info(target),
         "mounts": get_mounts_info(target),
-        "children": get_children_info(target, args.recursive),
+        "children": get_children_info(target, recursive),
         "hostname": target.hostname,
         "domain": get_optional_func(target, "domain"),
         "ips": target.ips,
@@ -167,14 +167,9 @@ def get_mounts_info(target: Target) -> list[dict[str, str | None]]:
 
 
 def get_children_info(target: Target, recursive: bool = False) -> list[dict[str, str]]:
-    if recursive:
-        return [
-            {"child_index": i, "name": c.name, "type": c.type, "path": str(c.path)}
-            for i, c in target.list_children_recursive()
-        ]
     return [
-        {"child_index": i, "name": c.name, "type": c.type, "path": str(c.path)}
-        for i, c in enumerate(target.list_children())
+        {"id": child_id, "type": child.type, "name": child.name, "path": str(child.path)}
+        for child_id, child in target.list_children(recursive=recursive)
     ]
 
 

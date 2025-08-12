@@ -104,7 +104,7 @@ def test_process_generic_arguments() -> None:
         ) as mocked_get_external_module_paths,
         patch("dissect.target.tools.utils.load_modules_from_paths") as mocked_load_modules_from_paths,
     ):
-        process_generic_arguments(args, rest)
+        process_generic_arguments(parser, args, rest)
 
         mocked_configure_logging.assert_called_once_with(0, False, as_plain_text=True)
         mocked_version.assert_called_once_with("dissect.target")
@@ -119,7 +119,7 @@ def test_process_generic_arguments() -> None:
 
         del args.targets
         args.target = "target1"
-        process_generic_arguments(args, rest)
+        process_generic_arguments(parser, args, rest)
 
         assert args.target == "loader_name://target1"
 

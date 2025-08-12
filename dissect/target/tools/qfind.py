@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from typing import Callable
 
     from dissect.target.container import Container
+    from dissect.target.target import Target
     from dissect.target.volume import Volume
 
 log = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    process_generic_arguments(parser, args, rest)
 
     if not args.targets:
         log.error("No targets provided")
