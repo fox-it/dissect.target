@@ -15,8 +15,8 @@ def test_child_colima(target_unix_users: Target, fs_unix: VirtualFilesystem) -> 
     fs_unix.map_file_fh("/root/.colima/_lima/colima/diffdisk", BytesIO())
     fs_unix.map_file_fh("/root/.colima/test/colima.yaml", BytesIO())
     fs_unix.map_file_fh("/root/.colima/_lima/colima-test/diffdisk", BytesIO())
-    fs_unix.map_file_fh("/home/user/.colima/default/colima.yaml", BytesIO())
-    fs_unix.map_file_fh("/home/user/.colima/_lima/colima/diffdisk", BytesIO())
+    fs_unix.map_file_fh("/home/user/.config/colima/default/colima.yaml", BytesIO())
+    fs_unix.map_file_fh("/home/user/.config/colima/_lima/colima/diffdisk", BytesIO())
 
     target_unix_users.add_plugin(ColimaChildTargetPlugin)
 
@@ -37,4 +37,4 @@ def test_child_colima(target_unix_users: Target, fs_unix: VirtualFilesystem) -> 
 
     child_id, child_record = children[2]
     assert child_id == "2"
-    assert child_record.path == "/home/user/.colima/_lima/colima/diffdisk"
+    assert child_record.path == "/home/user/.config/colima/_lima/colima/diffdisk"

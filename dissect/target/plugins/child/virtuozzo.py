@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
     """Child target plugin that yields from Virtuozzo container's root.
 
-    Virtuozzo conatiners are by default registered in the folder ``vz/root/$VEID``,
+    Virtuozzo containers are by default registered in the folder ``vz/root/$VEID``,
     where VEID will be substituted with the actual container UUID.
 
     .. code-block::
