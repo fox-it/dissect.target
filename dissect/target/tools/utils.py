@@ -355,7 +355,7 @@ def list_children(args: argparse.Namespace) -> None:
             found_one = True
             prefix = "-" * child_id.count(".")
             print(
-                f" {prefix}{' ' if prefix else ''}[{child_id}]: type={child.type!r} name={child.name!r} path={str(child.path)!r}"
+                f" {prefix}{' ' if prefix else ''}[{child_id}]: type={child.type!r} name={child.name!r} path={str(child.path)!r}"  # noqa: E501
             )
 
     if not found_one:
