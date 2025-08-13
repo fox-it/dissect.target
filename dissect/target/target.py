@@ -483,8 +483,8 @@ class Target:
         self._load_child_plugins()
 
         idx = 0
-        for child_plugin in sorted(self._child_plugins.values()):
-            for child in child_plugin.list_children():
+        for child_plugin_type in sorted(self._child_plugins):
+            for child in self._child_plugins[child_plugin_type].list_children():
                 yield str(idx), child
 
                 if recursive:
