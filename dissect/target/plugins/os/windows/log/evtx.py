@@ -104,6 +104,17 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
             pass
 
     def _build_record(self, evtx_record: dict, source: Path | None) -> Record:
+        # Check for time change events and warn user
+        event_id = evtx_record.get("EventID")
+        provider_name = evtx_record.get("Provider_Name")
+        
+        if self._is_time_change_event(event_id, provider_name):
+            self.target.log.warning(
+                "Time change event detected: EventID %s from %s. "
+                "Target may have undergone a time change which could affect timeline analysis.",
+                event_id, provider_name
+            )
+
         # predictable order of fields in the list is important, since we'll
         # be constructing a record descriptor from it.
         evtx_record_fields = sorted(evtx_record.items())
@@ -169,6 +180,38 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
 
     def _create_event_descriptor(self, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
+
+    def _is_time_change_event(self, event_id: int | None, provider_name: str | None) -> bool:
+        """Check if the event represents a time change event.
+        
+        Args:
+            event_id: The Event ID of the event
+            provider_name: The Provider Name of the event
+            
+        Returns:
+            True if this is a time change event, False otherwise
+        """
+        if event_id is None:
+            return False
+            
+        # Convert event_id to int and provider_name to string for comparison
+        try:
+            event_id = int(event_id)
+        except (ValueError, TypeError):
+            return False
+            
+        if provider_name is not None:
+            provider_name = str(provider_name)
+            
+        # Event ID 1 from Microsoft-Windows-Kernel-General indicates system time change
+        if event_id == 1 and provider_name == "Microsoft-Windows-Kernel-General":
+            return True
+            
+        # Event ID 4616 from Microsoft-Windows-Security-Auditing indicates time change in security log
+        if event_id == 4616 and provider_name == "Microsoft-Windows-Security-Auditing":
+            return True
+            
+        return False
 
 
 def format_value(value: Any) -> Any:
