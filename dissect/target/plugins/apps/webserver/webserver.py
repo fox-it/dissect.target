@@ -66,3 +66,6 @@ class WebserverPlugin(NamespacePlugin):
         """Returns log file records from installed webservers."""
         yield from self.access()
         yield from self.error()
+
+    def _iter_log_paths(self) -> Iterator[str]:
+        yield from self._log_paths()
