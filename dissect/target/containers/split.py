@@ -84,4 +84,5 @@ class SplitContainer(Container):
         return self._roffset
 
     def close(self) -> None:
-        pass
+        for fh in self._fhs:
+            fh.close()
