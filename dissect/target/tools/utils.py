@@ -353,8 +353,10 @@ def list_children(args: argparse.Namespace) -> None:
     for target in open_targets(args) if hasattr(args, "targets") else [open_target(args)]:
         for child_id, child in target.list_children(recursive=args.recursive):
             found_one = True
-            prefix = "-" * str(child_id).count(".")
-            print(f" {prefix}[{child_id}]: type={child.type!r} name={child.name!r} path={str(child.path)!r}")
+            prefix = "-" * child_id.count(".")
+            print(
+                f" {prefix}{' ' if prefix else ''}[{child_id}]: type={child.type!r} name={child.name!r} path={str(child.path)!r}"
+            )
 
     if not found_one:
         print("No children found on target(s)")
