@@ -30,7 +30,6 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
         - https://docs.virtuozzo.com/virtuozzo_hybrid_server_7_command_line_reference/managing-system/configuration-files.html
         - https://wiki.openvz.org/Man/ctid.conf.5
         - https://docs.virtuozzo.com/pdf/virtuozzo_hybrid_server_7_command_line_reference.pdf
-
     """
 
     __type__ = "virtuozzo"
@@ -42,28 +41,22 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
         if not self.target.fs.path(self.PATH).exists():
             raise UnsupportedPluginError("No Virtuozzo path found")
 
-    def _get_child_name(self, vm_path: str) -> str | None:
-        try:
-            vm_config = self.target.fs.path(self.CONFIG_PATH).joinpath(f"{vm_path.name}.conf")
-
-            if not vm_config.exists():
-                return None
-
-            with vm_config.open("rt") as fh:
-                for line in fh:
-                    line = line.strip()
-                    if line.startswith("NAME="):
-                        return line.split("=", 1)[1].strip('"')
-        except Exception as e:
-            self.target.log.exception("Failed parsing NAME from vm_path=%s", vm_path)
-            self.target.log.debug("", exc_info=e)
-        return None
-
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for container in self.target.fs.path(self.PATH).iterdir():
+            name = None
+            try:
+                if (vm_config := self.target.fs.path(self.CONFIG_PATH).joinpath(f"{container.name}.conf")).exists():
+                    with vm_config.open("rt") as fh:
+                        for line in fh:
+                            if (line := line.strip()).startswith("NAME="):
+                                name = line.split("=", 1)[1].strip('"')
+            except Exception as e:
+                self.target.log.exception("Failed to parse NAME from Virtuozzo config: %s", container)
+                self.target.log.debug("", exc_info=e)
+
             yield ChildTargetRecord(
-                name=self._get_child_name(container),
                 type=self.__type__,
+                name=name,
                 path=container,
                 _target=self.target,
             )

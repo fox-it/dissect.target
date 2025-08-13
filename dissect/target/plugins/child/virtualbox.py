@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from defusedxml import ElementTree as ET
+from defusedxml import ElementTree
 from dissect.hypervisor.descriptor.vbox import VBox
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -63,7 +63,7 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
                         continue
 
                     try:
-                        config = ET.fromstring(path.read_text())
+                        config = ElementTree.fromstring(path.read_text())
                     except Exception as e:
                         self.target.log.warning("Unable to parse %s: %s", path, e)
                         self.target.log.debug("", exc_info=e)
@@ -93,21 +93,20 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
         if not self.vboxes:
             raise UnsupportedPluginError("No VirtualBox children found on target")
 
-    def _get_child_name(self, vm_path: str) -> str | None:
-        try:
-            path = self.target.fs.path(vm_path)
-            config = ET.fromstring(path.open().read())
-            return config.find(f".//{VBox.VBOX_XML_NAMESPACE}Machine").attrib["name"]
-        except Exception as e:
-            self.target.log.exception("Failed parsing name from vm_path=%s", vm_path)
-            self.target.log.debug("", exc_info=e)
-        return None
-
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for vbox in self.vboxes:
+            try:
+                config = ElementTree.fromstring(vbox.read_bytes())
+                name = config.find(f".//{VBox.VBOX_XML_NAMESPACE}Machine").attrib["name"]
+            except Exception as e:
+                self.target.log.error("Failed to parse name from VirtualBox XML: %s", vbox)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
+
+                name = None
+
             yield ChildTargetRecord(
-                name=self._get_child_name(vbox),
                 type=self.__type__,
+                name=name,
                 path=vbox,
                 _target=self.target,
             )

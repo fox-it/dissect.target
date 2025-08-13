@@ -13,13 +13,13 @@ if TYPE_CHECKING:
     from dissect.target import Target
 
 
-def find_containers(paths: list[Path]) -> Iterator[Path]:
+def find_containers(paths: list[Path]) -> Iterator[str, Path]:
     for path in paths:
         for config_path in path.iterdir():
             if (config_file := config_path.joinpath("colima.yaml")).exists():
                 name = f"-{config_file.parts[-2]}" if config_file.parts[-2] != "default" else ""
                 if (disk_path := path.joinpath("_lima", f"colima{name}", "diffdisk")).exists():
-                    yield disk_path
+                    yield disk_path.parent.name, disk_path
 
 
 class ColimaChildTargetPlugin(ChildTargetPlugin):
@@ -37,10 +37,10 @@ class ColimaChildTargetPlugin(ChildTargetPlugin):
         super().__init__(target)
         self.paths = []
         for user in self.target.user_details.all_with_home():
-            # check .colima folder in home_path
+            # check .colima folder in ~/
             if (path := user.home_path.joinpath(".colima")).exists():
                 self.paths.append(path)
-            # check .colima folder in home_patha/.config/
+            # check .colima folder in ~/.config/
             if (path := user.home_path.joinpath(".config", "colima")).exists():
                 self.paths.append(path)
 
@@ -48,20 +48,11 @@ class ColimaChildTargetPlugin(ChildTargetPlugin):
         if not self.paths:
             raise UnsupportedPluginError("No Colima configurations found")
 
-    def _get_child_name(self, vm_path: str) -> str | None:
-        try:
-            if (vm := self.target.fs.path(vm_path)).exists():
-                return vm.parent.name
-        except Exception as e:
-            self.target.log.exception("Failed parsing container name from vm_path=%s", vm_path)
-            self.target.log.debug("", exc_info=e)
-        return None
-
     def list_children(self) -> Iterator[ChildTargetRecord]:
-        for container in find_containers(self.paths):
+        for name, container in find_containers(self.paths):
             yield ChildTargetRecord(
-                name=self._get_child_name(container),
                 type=self.__type__,
+                name=name,
                 path=container,
                 _target=self.target,
             )

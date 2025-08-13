@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -9,6 +8,7 @@ from dissect.target.plugin import ChildTargetPlugin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
@@ -32,6 +32,26 @@ def find_vm_inventory(target: Target) -> Iterator[TargetPath]:
                 yield inv_file
 
 
+def parse_vm_inventory(path: Path) -> dict[str, dict[str, str]]:
+    config = {}
+
+    with path.open("rt") as fh:
+        for line in fh:
+            if not (line := line.strip()) or line.startswith("."):
+                continue
+
+            full_key, value = line.split("=", 1)
+            vm, key = full_key.strip().split(".", 1)
+
+            # Only process vmlist entries, not index entries
+            if "vmlist" not in vm:
+                continue
+
+            config.setdefault(vm, {})[key] = value.strip().strip('"')
+
+    return config
+
+
 class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
     """Child target plugin that yields from VMware Workstation VM inventory."""
 
@@ -45,36 +65,14 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
         if not self.inventories:
             raise UnsupportedPluginError("No VMWare inventories found")
 
-    def inventory_to_dict(self, inventory: TargetPath) -> dict | None:
-        config = defaultdict(dict)
-        try:
-            with inventory.open("rt") as fh:
-                for line in map(str.strip, fh):
-                    if not line or line.startswith("."):
-                        continue
-                    full_key, value = map(str.strip, line.split("=", 1))
-                    vm, key = full_key.split(".", 1)
-
-                    # Only process vmlist entries, not index entries
-                    if "vmlist" not in vm:
-                        continue
-
-                    config[vm][key] = value.strip('"')
-                return config
-        except Exception as e:
-            self.target.log.exception("Failed parsing inventory file from inventory=%s", inventory)
-            self.target.log.debug("", exc_info=e)
-        return None
-
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for inv in self.inventories:
-            inventory = self.inventory_to_dict(inv)
+            inventory = parse_vm_inventory(inv)
 
-            for vm in inventory:
-                vm_config = inventory[vm]
+            for config in inventory.values():
                 yield ChildTargetRecord(
-                    name=vm_config.get("DisplayName"),
                     type=self.__type__,
-                    path=vm_config.get("config"),
+                    name=config.get("DisplayName"),
+                    path=config.get("config"),
                     _target=self.target,
                 )

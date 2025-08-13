@@ -30,7 +30,7 @@ def test_wsl(target_win: Target, fs_win: VirtualFilesystem) -> None:
 
     target_win.add_plugin(HyperVChildTargetPlugin)
 
-    children = list(target_win.list_children())
+    children = [child for _, child in target_win.list_children()]
 
     assert len(children) == 5
     assert children[0].name == "Default Generation 1"
@@ -43,13 +43,11 @@ def test_wsl(target_win: Target, fs_win: VirtualFilesystem) -> None:
         str(children[1].path) == "C:\\Hyper-V\\EasyToFind\\Virtual Machines\\993F7B33-6057-4D1E-A1FE-A1A1D77BE974.vmcx"
     )
 
-    # Missing test file cannot test .name
+    # TODO add test file for name
     assert (
         str(children[2].path)
         == "C:\\VM\\Other Generation 1\\Virtual Machines\\A5B56431-CA94-482A-B70A-F1F2B12373BE.vmcx"
     )
-
-    # Missing test file cannot test .name
     assert (
         str(children[3].path)
         == "C:\\VM\\Other Generation 2\\Virtual Machines\\4C57771A-3230-4B92-B029-D63F96518E70.vmcx"

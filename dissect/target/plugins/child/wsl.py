@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def find_wsl_installs(target: Target) -> Iterator[Path]:
+def find_wsl_installs(target: Target) -> Iterator[str, Path]:
     """Find all WSL disk files.
 
     Disk files for working (custom) Linux distributions can be located anywhere on the system.
@@ -31,9 +31,15 @@ def find_wsl_installs(target: Target) -> Iterator[Path]:
             for distribution_key in lxss_key.subkeys():
                 if not distribution_key.name.startswith("{"):
                     continue
+
+                name = distribution_key.value("DistributionName").value
                 base_path = target.resolve(distribution_key.value("BasePath").value)
                 # WSL needs diskname to be ext4.vhdx, but they can be renamed when WSL is not active
-                yield from base_path.glob("*.vhdx")
+                if not (disk_path := next(base_path.glob("*.vhdx"), None)):
+                    target.log.warning("No WSL disk file found in %s, check WSL install %r manually!", base_path, name)
+                    continue
+
+                yield name, disk_path
     except PluginError:
         pass
 
@@ -59,26 +65,11 @@ class WSLChildTargetPlugin(ChildTargetPlugin):
         if not len(self.installs):
             raise UnsupportedPluginError("No WSL installs found")
 
-    def _get_child_name(self, vm_path: TargetPath) -> str | None:
-        # Some WSL files are stored on disk by their GUID others by name. Search for the correct WSL and return name
-        try:
-            for lxss_key in self.target.registry.keys("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss"):
-                for distribution_key in lxss_key.subkeys():
-                    if not distribution_key.name.startswith("{"):
-                        continue
-                    base_path = self.target.resolve(distribution_key.value("BasePath").value)
-                    if base_path == vm_path.parent:
-                        return distribution_key.value("DistributionName").value
-        except Exception as e:
-            self.target.log.exception("Failed parsing registry key for vm name from path=%s", vm_path)
-            self.target.log.debug("", exc_info=e)
-        return None
-
     def list_children(self) -> Iterator[ChildTargetRecord]:
-        for install_path in self.installs:
+        for name, disk_path in self.installs:
             yield ChildTargetRecord(
-                name=self._get_child_name(install_path),
                 type=self.__type__,
-                path=install_path,
+                name=name,
+                path=disk_path,
                 _target=self.target,
             )

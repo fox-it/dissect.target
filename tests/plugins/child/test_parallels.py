@@ -23,24 +23,24 @@ def test_parallels_child_detection(target_macos_users: Target, fs_macos: Virtual
     )
 
     target_macos_users.add_plugin(ParallelsChildTargetPlugin)
-    children = list(target_macos_users.list_children())
+    children = [child for _, child in target_macos_users.list_children()]
 
     assert len(children) == 4
 
-    assert children[0].name == "My VM"
     assert children[0].type == "parallels"
+    assert children[0].name == "My VM"
     assert children[0].path == "/Users/Shared/Parallels/Windows 7.pvm"
 
-    assert children[1].name == "My VM"
     assert children[1].type == "parallels"
+    assert children[1].name == "My VM"
     assert children[1].path == "/Users/dissect/Parallels/Windows 11.pvm"
 
-    assert children[2].name == "My VM"
     assert children[2].type == "parallels"
+    assert children[2].name == "My VM"
     assert children[2].path == "/Users/dissect/Documents/Parallels/Windows 10.pvm"
 
-    assert children[3].name == "My VM"
     assert children[3].type == "parallels"
+    assert children[3].name == "My VM"
     assert (
         children[3].path
         == "/Users/dissect/Library/Group Containers/svn.com.parallels.desktop.appstore/Shared/Parallels/My VM.pvm"

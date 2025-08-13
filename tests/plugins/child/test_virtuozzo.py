@@ -18,12 +18,12 @@ def test_virtuozzo(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
     target_unix.add_plugin(VirtuozzoChildTargetPlugin)
 
-    children = list(target_unix.list_children())
+    children = [child for _, child in target_unix.list_children()]
 
     assert len(children) == 2
 
-    assert children[0].name == "a"
     assert children[0].type == "virtuozzo"
+    assert children[0].name == "a"
     assert str(children[0].path) == "/vz/root/a"
 
     assert children[1].type == "virtuozzo"

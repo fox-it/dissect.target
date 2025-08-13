@@ -23,8 +23,8 @@ class DockerChildTargetPlugin(ChildTargetPlugin):
         for container in self.target.docker.containers():
             if container.mount_path:
                 yield ChildTargetRecord(
-                    name=container.names,
                     type=self.__type__,
+                    name=container.name,
                     path=container.mount_path,
                     _target=self.target,
                 )

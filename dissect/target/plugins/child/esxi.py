@@ -21,21 +21,19 @@ class ESXiChildTargetPlugin(ChildTargetPlugin):
         if self.target.os != "esxi":
             raise UnsupportedPluginError("Not an ESXi operating system")
 
-    def _get_child_name(self, vm_path: str) -> str | None:
-        try:
-            with self.target.fs.path(vm_path).open("rt") as fh:
-                strings = fh.read()
-                return vmx._parse_dictionary(strings).get("displayname")
-        except Exception as e:
-            self.target.log.exception("Failed parsing displayname from vm_path=%s", vm_path)
-            self.target.log.debug("", exc_info=e)
-        return None
-
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for vm in self.target.vm_inventory():
+            try:
+                name = vmx.VMX.parse(self.target.fs.path(vm.path).read_text()).attr.get("displayname")
+            except Exception as e:
+                self.target.log.exception("Failed parsing displayname from VMX: %s", vm.path)
+                self.target.log.debug("", exc_info=e)
+
+                name = None
+
             yield ChildTargetRecord(
-                name=self._get_child_name(vm.path),
                 type=self.__type__,
+                name=name,
                 path=vm.path,
                 _target=self.target,
             )
