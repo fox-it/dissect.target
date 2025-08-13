@@ -132,6 +132,9 @@ class NginxPlugin(WebserverPlugin):
             elif (config_file := self.target.fs.path(config_file)).exists():
                 self.parse_config(config_file)
 
+    def _log_paths(self) -> set:
+        return self.access_paths | self.error_paths
+
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
         """Parse the given NGINX ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
 

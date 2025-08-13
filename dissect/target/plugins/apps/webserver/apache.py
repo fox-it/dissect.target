@@ -280,6 +280,9 @@ class ApachePlugin(WebserverPlugin):
                 if path not in seen:
                     self._process_conf_file(path, seen)
 
+    def _log_paths(self) -> set:
+        return self.access_paths | self.error_paths
+
     def _process_conf_file(self, path: Path, seen: set[Path] | None = None) -> None:
         """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
         and ``OptionalInclude`` directives. Populates ``self.access_paths`` and ``self.error_paths``.
