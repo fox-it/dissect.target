@@ -100,7 +100,6 @@ def configure_plugin_arguments(parser: argparse.ArgumentParser) -> None:
         help="list (matching) available plugins and loaders",
     )
     parser.add_argument(
-        "-n",
         "--dry-run",
         action="store_true",
         help="do not execute the functions, but just print which functions would be executed",
