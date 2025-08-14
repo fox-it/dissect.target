@@ -279,8 +279,8 @@ def test_windows_user_from_sam(target_win_users: Target) -> None:
     is not always identical to the account's username after a rename. This
     test ensures our code correctly handles this distinction.
 
-    See for reference:
-    https://learn.microsoft.com/en-us/previous-versions/troubleshoot/windows-client/renaming-user-account-not-change-profile-path
+    References:
+        - https://learn.microsoft.com/en-us/previous-versions/troubleshoot/windows-client/renaming-user-account-not-change-profile-path
     """
 
     fake_sam_user = Mock()
