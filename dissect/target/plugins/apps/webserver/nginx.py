@@ -242,6 +242,7 @@ class NginxPlugin(WebserverPlugin):
                     _target=self.target,
                 )
 
+    @export(record=WebserverErrorLogRecord)
     def error(self) -> Iterator[WebserverErrorLogRecord]:
         """Return contents of NGINX error log files in unified ``WebserverErrorLogRecord`` format.
 
@@ -282,6 +283,7 @@ class NginxPlugin(WebserverPlugin):
                     _target=self.target,
                 )
 
+    @export(record=WebserverHostRecord)
     def hosts(self) -> Iterator[WebserverHostRecord]:
         """Return found server directives in the NGINX configuration.
 
