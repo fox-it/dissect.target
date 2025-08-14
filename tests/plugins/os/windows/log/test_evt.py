@@ -110,3 +110,128 @@ def test_evt_direct_mode() -> None:
     records = list(target.evt())
 
     assert len(records) == 5
+
+
+def test_evt_time_change_warning_logged():  
+    """Test that time change events trigger warning logs in EVT plugin."""
+    from unittest.mock import Mock
+    
+    # Create a mock EVT record that represents a time change event
+    mock_record = Mock()
+    mock_record.EventID = 1
+    mock_record.SourceName = "Microsoft-Windows-Kernel-General"
+    mock_record.TimeGenerated = "2023-01-01T00:00:00Z"
+    mock_record.TimeWritten = "2023-01-01T00:00:00Z"
+    mock_record.EventCode = 1
+    mock_record.EventFacility = 0
+    mock_record.EventCustomerFlag = 0
+    mock_record.EventSeverity = 0
+    mock_record.EventType = 0
+    mock_record.EventCategory = 0
+    mock_record.Computername = "TestComputer"
+    mock_record.Strings = []
+    mock_record.Data = b""
+    
+    target = Target()
+    
+    # Mock the target's log warning method
+    original_warning = target.log.warning
+    warning_calls = []
+    def mock_warning(*args, **kwargs):
+        warning_calls.append((args, kwargs))
+        return original_warning(*args, **kwargs)
+    
+    target.log.warning = mock_warning
+    plugin = evt.EvtPlugin(target)
+    
+    # Process the record - this should trigger a warning
+    result = plugin._build_record(mock_record)
+    
+    # Verify warning was called
+    assert len(warning_calls) == 1
+    args = warning_calls[0][0]
+    assert "Time change event detected" in args[0]
+    assert "1" in str(args[1])
+    assert "Microsoft-Windows-Kernel-General" in str(args[2])
+
+
+def test_evt_time_change_warning_security_event():
+    """Test that security audit time change events trigger warning logs in EVT plugin."""
+    from unittest.mock import Mock
+    
+    # Create a mock EVT record that represents a security time change event
+    mock_record = Mock()
+    mock_record.EventID = 4616
+    mock_record.SourceName = "Microsoft-Windows-Security-Auditing"
+    mock_record.TimeGenerated = "2023-01-01T00:00:00Z"
+    mock_record.TimeWritten = "2023-01-01T00:00:00Z"
+    mock_record.EventCode = 4616
+    mock_record.EventFacility = 0
+    mock_record.EventCustomerFlag = 0
+    mock_record.EventSeverity = 0
+    mock_record.EventType = 0
+    mock_record.EventCategory = 0
+    mock_record.Computername = "TestComputer"
+    mock_record.Strings = []
+    mock_record.Data = b""
+    
+    target = Target()
+    
+    # Mock the target's log warning method
+    original_warning = target.log.warning
+    warning_calls = []
+    def mock_warning(*args, **kwargs):
+        warning_calls.append((args, kwargs))
+        return original_warning(*args, **kwargs)
+    
+    target.log.warning = mock_warning
+    plugin = evt.EvtPlugin(target)
+    
+    # Process the record - this should trigger a warning
+    result = plugin._build_record(mock_record)
+    
+    # Verify warning was called
+    assert len(warning_calls) == 1
+    args = warning_calls[0][0]
+    assert "Time change event detected" in args[0]
+    assert "4616" in str(args[1])
+    assert "Microsoft-Windows-Security-Auditing" in str(args[2])
+
+
+def test_evt_no_time_change_warning_for_normal_events():
+    """Test that normal events do not trigger time change warnings in EVT plugin."""
+    from unittest.mock import Mock
+    
+    # Create a mock EVT record that represents a normal event
+    mock_record = Mock()
+    mock_record.EventID = 1000  # Different event ID
+    mock_record.SourceName = "SomeOtherProvider"
+    mock_record.TimeGenerated = "2023-01-01T00:00:00Z"
+    mock_record.TimeWritten = "2023-01-01T00:00:00Z"
+    mock_record.EventCode = 1000
+    mock_record.EventFacility = 0
+    mock_record.EventCustomerFlag = 0
+    mock_record.EventSeverity = 0
+    mock_record.EventType = 0
+    mock_record.EventCategory = 0
+    mock_record.Computername = "TestComputer"
+    mock_record.Strings = []
+    mock_record.Data = b""
+    
+    target = Target()
+    
+    # Mock the target's log warning method
+    original_warning = target.log.warning
+    warning_calls = []
+    def mock_warning(*args, **kwargs):
+        warning_calls.append((args, kwargs))
+        return original_warning(*args, **kwargs)
+    
+    target.log.warning = mock_warning
+    plugin = evt.EvtPlugin(target)
+    
+    # Process the record - this should NOT trigger a warning
+    result = plugin._build_record(mock_record)
+    
+    # Verify warning was NOT called
+    assert len(warning_calls) == 0

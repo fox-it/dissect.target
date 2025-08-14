@@ -158,7 +158,10 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
         event_id = getattr(record, "EventID", None)
         source_name = getattr(record, "SourceName", None)
         
-        if self._is_time_change_event(event_id, source_name):
+        # Event ID 1 from Microsoft-Windows-Kernel-General indicates system time change
+        # Event ID 4616 from Microsoft-Windows-Security-Auditing indicates time change in security log
+        if ((event_id == 1 and source_name == "Microsoft-Windows-Kernel-General") or
+            (event_id == 4616 and source_name == "Microsoft-Windows-Security-Auditing")):
             self.target.log.warning(
                 "Time change event detected: EventID %s from %s. "
                 "Target may have undergone a time change which could affect timeline analysis.",
@@ -203,34 +206,4 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
         for record in evt.parse_chunk(chunk):
             yield self._build_record(record)
 
-    def _is_time_change_event(self, event_id: int | None, source_name: str | None) -> bool:
-        """Check if the event represents a time change event.
-        
-        Args:
-            event_id: The Event ID of the event
-            source_name: The Source Name of the event (SourceName field in EVT)
-            
-        Returns:
-            True if this is a time change event, False otherwise
-        """
-        if event_id is None:
-            return False
-            
-        # Convert event_id to int and source_name to string for comparison
-        try:
-            event_id = int(event_id)
-        except (ValueError, TypeError):
-            return False
-            
-        if source_name is not None:
-            source_name = str(source_name)
-            
-        # Event ID 1 from Microsoft-Windows-Kernel-General indicates system time change
-        if event_id == 1 and source_name == "Microsoft-Windows-Kernel-General":
-            return True
-            
-        # Event ID 4616 from Microsoft-Windows-Security-Auditing indicates time change in security log
-        if event_id == 4616 and source_name == "Microsoft-Windows-Security-Auditing":
-            return True
-            
-        return False
+
