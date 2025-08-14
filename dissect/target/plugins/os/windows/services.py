@@ -19,8 +19,8 @@ ServiceRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("string", "name"),
-        ("wstring", "displayname"),
-        ("wstring", "description"),
+        ("string", "displayname"),
+        ("string", "description"),
         ("path", "servicedll"),
         ("path", "imagepath"),
         ("string", "imagepath_args"),
