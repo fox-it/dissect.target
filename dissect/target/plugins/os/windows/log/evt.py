@@ -157,15 +157,17 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
         # Check for time change events and warn user
         event_id = getattr(record, "EventID", None)
         source_name = getattr(record, "SourceName", None)
-        
+
         # Event ID 1 from Microsoft-Windows-Kernel-General indicates system time change
         # Event ID 4616 from Microsoft-Windows-Security-Auditing indicates time change in security log
-        if ((event_id == 1 and source_name == "Microsoft-Windows-Kernel-General") or
-            (event_id == 4616 and source_name == "Microsoft-Windows-Security-Auditing")):
+        if (event_id == 1 and source_name == "Microsoft-Windows-Kernel-General") or (
+            event_id == 4616 and source_name == "Microsoft-Windows-Security-Auditing"
+        ):
             self.target.log.warning(
                 "Time change event detected: EventID %s from %s. "
                 "Target may have undergone a time change which could affect timeline analysis.",
-                event_id, source_name
+                event_id,
+                source_name,
             )
         
         return EvtRecordDescriptor(
@@ -205,5 +207,4 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
     def _parse_chunk(self, needle: bytes, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
             yield self._build_record(record)
-
 

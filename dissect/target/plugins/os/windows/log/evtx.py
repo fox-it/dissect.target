@@ -107,15 +107,17 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
         # Check for time change events and warn user
         event_id = evtx_record.get("EventID")
         provider_name = evtx_record.get("Provider_Name")
-        
+
         # Event ID 1 from Microsoft-Windows-Kernel-General indicates system time change
         # Event ID 4616 from Microsoft-Windows-Security-Auditing indicates time change in security log
-        if ((event_id == 1 and provider_name == "Microsoft-Windows-Kernel-General") or
-            (event_id == 4616 and provider_name == "Microsoft-Windows-Security-Auditing")):
+        if (event_id == 1 and provider_name == "Microsoft-Windows-Kernel-General") or (
+            event_id == 4616 and provider_name == "Microsoft-Windows-Security-Auditing"
+        ):
             self.target.log.warning(
                 "Time change event detected: EventID %s from %s. "
                 "Target may have undergone a time change which could affect timeline analysis.",
-                event_id, provider_name
+                event_id,
+                provider_name,
             )
 
         # predictable order of fields in the list is important, since we'll
@@ -183,8 +185,6 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
 
     def _create_event_descriptor(self, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
-
-
 
 
 def format_value(value: Any) -> Any:

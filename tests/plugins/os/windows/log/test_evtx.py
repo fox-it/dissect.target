@@ -174,7 +174,7 @@ def test_evtx_direct_mode() -> None:
     assert len(records) == 5
 
 
-def test_evtx_time_change_warning_logged():
+def test_evtx_time_change_warning_logged(caplog: pytest.LogCaptureFixture) -> None:
     """Test that time change events trigger warning logs in EVTX plugin."""
     
     # Create a mock EVTX record that represents a time change event
@@ -185,29 +185,19 @@ def test_evtx_time_change_warning_logged():
     }
     
     target = Target()
-    
-    # Mock the target's log warning method
-    original_warning = target.log.warning
-    warning_calls = []
-    def mock_warning(*args, **kwargs):
-        warning_calls.append((args, kwargs))
-        return original_warning(*args, **kwargs)
-    
-    target.log.warning = mock_warning
     plugin = evtx.EvtxPlugin(target)
     
     # Process the record - this should trigger a warning
-    result = plugin._build_record(mock_record, None)
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record, None)
     
-    # Verify warning was called
-    assert len(warning_calls) == 1
-    args = warning_calls[0][0]
-    assert "Time change event detected" in args[0]
-    assert "4616" in str(args[1])
-    assert "Microsoft-Windows-Security-Auditing" in str(args[2])
+    # Verify warning was logged
+    assert "Time change event detected" in caplog.text
+    assert "EventID 4616" in caplog.text
+    assert "Microsoft-Windows-Security-Auditing" in caplog.text
 
 
-def test_evtx_time_change_warning_kernel_event():
+def test_evtx_time_change_warning_kernel_event(caplog: pytest.LogCaptureFixture) -> None:
     """Test that kernel time change events trigger warning logs in EVTX plugin."""
     
     # Create a mock EVTX record that represents a kernel time change event
@@ -218,29 +208,19 @@ def test_evtx_time_change_warning_kernel_event():
     }
     
     target = Target()
-    
-    # Mock the target's log warning method
-    original_warning = target.log.warning
-    warning_calls = []
-    def mock_warning(*args, **kwargs):
-        warning_calls.append((args, kwargs))
-        return original_warning(*args, **kwargs)
-    
-    target.log.warning = mock_warning
     plugin = evtx.EvtxPlugin(target)
     
     # Process the record - this should trigger a warning
-    result = plugin._build_record(mock_record, None)
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record, None)
     
-    # Verify warning was called
-    assert len(warning_calls) == 1
-    args = warning_calls[0][0]
-    assert "Time change event detected" in args[0]
-    assert "1" in str(args[1])
-    assert "Microsoft-Windows-Kernel-General" in str(args[2])
+    # Verify warning was logged
+    assert "Time change event detected" in caplog.text
+    assert "EventID 1" in caplog.text
+    assert "Microsoft-Windows-Kernel-General" in caplog.text
 
 
-def test_evtx_no_time_change_warning_for_normal_events():
+def test_evtx_no_time_change_warning_for_normal_events(caplog: pytest.LogCaptureFixture) -> None:
     """Test that normal events do not trigger time change warnings in EVTX plugin."""
     
     # Create a mock EVTX record that represents a normal event
@@ -251,22 +231,14 @@ def test_evtx_no_time_change_warning_for_normal_events():
     }
     
     target = Target()
-    
-    # Mock the target's log warning method
-    original_warning = target.log.warning
-    warning_calls = []
-    def mock_warning(*args, **kwargs):
-        warning_calls.append((args, kwargs))
-        return original_warning(*args, **kwargs)
-    
-    target.log.warning = mock_warning
     plugin = evtx.EvtxPlugin(target)
     
     # Process the record - this should NOT trigger a warning
-    result = plugin._build_record(mock_record, None)
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record, None)
     
-    # Verify warning was NOT called
-    assert len(warning_calls) == 0
+    # Verify warning was NOT logged
+    assert "Time change event detected" not in caplog.text
 
 
 def test_evtx_with_security_log_produces_warning():
