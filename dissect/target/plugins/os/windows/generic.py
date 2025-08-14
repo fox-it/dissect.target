@@ -579,7 +579,7 @@ class GenericPlugin(Plugin):
                 _target=self.target,
             )
         except (RegistryError, struct.error):
-            self.target.log.exception("Cannot read machine SID from registry.")
+            self.target.log.exception("Cannot read machine SID from registry")
             return None
 
     @export(record=ComputerSidRecord)
@@ -600,7 +600,7 @@ class GenericPlugin(Plugin):
                 _target=self.target,
             )
         except (RegistryError, struct.error):
-            self.target.log.exception("Cannot read domain SIDs from registry.")
+            self.target.log.exception("Cannot read domain SID from registry")
             return None
 
     @export(record=ComputerSidRecord)
