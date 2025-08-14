@@ -473,6 +473,7 @@ class ApachePlugin(WebserverPlugin):
                 self.target.log.warning("An error occured parsing Apache log file %s: %s", path, str(e))
                 self.target.log.debug("", exc_info=e)
 
+    @export(record=WebserverHostRecord)
     def hosts(self) -> Iterator[WebserverHostRecord]:
         """Return found ``VirtualHost`` directives in the Apache configuration.
 
