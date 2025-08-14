@@ -43,7 +43,6 @@ def test_wsl(target_win: Target, fs_win: VirtualFilesystem) -> None:
         str(children[1].path) == "C:\\Hyper-V\\EasyToFind\\Virtual Machines\\993F7B33-6057-4D1E-A1FE-A1A1D77BE974.vmcx"
     )
 
-    # TODO add test file for name
     assert (
         str(children[2].path)
         == "C:\\VM\\Other Generation 1\\Virtual Machines\\A5B56431-CA94-482A-B70A-F1F2B12373BE.vmcx"
