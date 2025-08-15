@@ -20,15 +20,15 @@ def test_child_virtualbox_linux(target_unix_users: Target, fs_unix: VirtualFiles
     )
 
     # vbox to be found by traversing MachineRegistry values
-    fs_unix.map_file_fh("/example/vms/example-vm/example-vm.vbox", BytesIO(b""))
-    fs_unix.map_file_fh("/example/vms/second-vm/second-vm.vbox", BytesIO(b""))
-    fs_unix.map_file_fh("/example/vms/third-vm/third-vm.vbox", BytesIO(b""))
+    fs_unix.map_file_fh("/example/vms/example-vm/example-vm.vbox", BytesIO())
+    fs_unix.map_file_fh("/example/vms/second-vm/second-vm.vbox", BytesIO())
+    fs_unix.map_file_fh("/example/vms/third-vm/third-vm.vbox", BytesIO())
 
     # vbox to be found by traversing SystemProperties defaultMachineFolder value
-    fs_unix.map_file_fh("/some/other/folder/VirtualBox VMs/fourth-vm/fourth-vm.vbox", BytesIO(b""))
+    fs_unix.map_file_fh("/some/other/folder/VirtualBox VMs/fourth-vm/fourth-vm.vbox", BytesIO())
 
     # vbox to be found by traversing `$HOME/VirtualBox VMs` folders
-    fs_unix.map_file_fh("/home/user/VirtualBox VMs/fifth-vm/fifth-vm.vbox", BytesIO(b""))
+    fs_unix.map_file_fh("/home/user/VirtualBox VMs/fifth-vm/fifth-vm.vbox", BytesIO())
 
     # test deduplication by mapping the same VirtualBox.xml file for the root user
     fs_unix.map_file(
