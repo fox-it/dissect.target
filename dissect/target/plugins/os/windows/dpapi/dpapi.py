@@ -130,7 +130,7 @@ class DPAPIPlugin(InternalPlugin):
                                 "Decrypted SID %s master key with hash '%s' from provider %s", sid, mk_pass, provider
                             )
                             break
-                    except ValueError:
+                    except (ValueError, TypeError):
                         pass
 
                 if not mkf.decrypted:
