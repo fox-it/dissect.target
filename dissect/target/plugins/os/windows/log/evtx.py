@@ -104,6 +104,22 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
             pass
 
     def _build_record(self, evtx_record: dict, source: Path | None) -> Record:
+        # Check for time change events and warn user
+        event_id = evtx_record.get("EventID")
+        provider_name = evtx_record.get("Provider_Name")
+
+        # Event ID 1 from Microsoft-Windows-Kernel-General indicates system time change
+        # Event ID 4616 from Microsoft-Windows-Security-Auditing indicates time change in security log
+        if (event_id == 1 and provider_name == "Microsoft-Windows-Kernel-General") or (
+            event_id == 4616 and provider_name == "Microsoft-Windows-Security-Auditing"
+        ):
+            self.target.log.warning(
+                "Time change event detected: EventID %s from %s. "
+                "Target may have undergone a time change which could affect timeline analysis.",
+                event_id,
+                provider_name,
+            )
+
         # predictable order of fields in the list is important, since we'll
         # be constructing a record descriptor from it.
         evtx_record_fields = sorted(evtx_record.items())

@@ -172,3 +172,118 @@ def test_evtx_direct_mode() -> None:
     records = list(target.evtx())
 
     assert len(records) == 5
+
+
+def test_evtx_time_change_warning_logged(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that time change events trigger warning logs in EVTX plugin."""
+    
+    # Create a mock EVTX record that represents a time change event
+    mock_record = {
+        "EventID": 4616,
+        "Provider_Name": "Microsoft-Windows-Security-Auditing",
+        "TimeCreated_SystemTime": "2023-01-01T00:00:00Z"
+    }
+    
+    target = Target()
+    plugin = evtx.EvtxPlugin(target)
+    
+    # Process the record - this should trigger a warning
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record, None)
+    
+    # Verify warning was logged
+    assert "Time change event detected" in caplog.text
+    assert "EventID 4616" in caplog.text
+    assert "Microsoft-Windows-Security-Auditing" in caplog.text
+
+
+def test_evtx_time_change_warning_kernel_event(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that kernel time change events trigger warning logs in EVTX plugin."""
+    
+    # Create a mock EVTX record that represents a kernel time change event
+    mock_record = {
+        "EventID": 1,
+        "Provider_Name": "Microsoft-Windows-Kernel-General",
+        "TimeCreated_SystemTime": "2023-01-01T00:00:00Z"
+    }
+    
+    target = Target()
+    plugin = evtx.EvtxPlugin(target)
+    
+    # Process the record - this should trigger a warning
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record, None)
+    
+    # Verify warning was logged
+    assert "Time change event detected" in caplog.text
+    assert "EventID 1" in caplog.text
+    assert "Microsoft-Windows-Kernel-General" in caplog.text
+
+
+def test_evtx_no_time_change_warning_for_normal_events(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that normal events do not trigger time change warnings in EVTX plugin."""
+    
+    # Create a mock EVTX record that represents a normal event
+    mock_record = {
+        "EventID": 1000,  # Different event ID
+        "Provider_Name": "SomeOtherProvider",
+        "TimeCreated_SystemTime": "2023-01-01T00:00:00Z"
+    }
+    
+    target = Target()
+    plugin = evtx.EvtxPlugin(target)
+    
+    # Process the record - this should NOT trigger a warning
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record, None)
+    
+    # Verify warning was NOT logged
+    assert "Time change event detected" not in caplog.text
+
+
+def test_evtx_with_security_log_produces_warning():
+    """Integration test to verify warning is produced when processing Security.evtx."""
+    
+    import logging
+    from io import StringIO
+    
+    # Set up a string stream to capture log output
+    log_capture_string = StringIO()
+    ch = logging.StreamHandler(log_capture_string)
+    ch.setLevel(logging.WARNING)
+    
+    # Add the handler to the dissect.target logger
+    logger = logging.getLogger("dissect.target")
+    original_level = logger.level
+    logger.setLevel(logging.WARNING)
+    logger.addHandler(ch)
+    
+    try:
+        evtx_file = absolute_path("_data/plugins/os/windows/log/evtx/Security.evtx")
+        target = Target.open_direct([evtx_file])
+        plugin = evtx.EvtxPlugin(target)
+        
+        # Process some records to find the time change event
+        count = 0
+        found_time_change_event = False
+        for record in plugin.evtx():
+            count += 1
+            if hasattr(record, 'EventID') and record.EventID == 4616:
+                # Found the time change event
+                found_time_change_event = True
+                break
+            if count > 300:  # Safety limit
+                break
+        
+        # Check if we found the time change event
+        assert found_time_change_event, "Expected to find Event ID 4616 in Security.evtx"
+        
+        # Check the captured log output
+        log_contents = log_capture_string.getvalue()
+        assert "time change" in log_contents.lower(), f"Expected time change warning in logs, got: {log_contents}"
+        
+    finally:
+        # Clean up logging
+        logger.removeHandler(ch)
+        logger.setLevel(original_level)
+        ch.close()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 import pytest
 
@@ -110,3 +111,97 @@ def test_evt_direct_mode() -> None:
     records = list(target.evt())
 
     assert len(records) == 5
+
+
+def test_evt_time_change_warning_logged(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that time change events trigger warning logs in EVT plugin."""
+    
+    # Create a mock EVT record that represents a time change event
+    mock_record = Mock()
+    mock_record.EventID = 1
+    mock_record.SourceName = "Microsoft-Windows-Kernel-General"
+    mock_record.TimeGenerated = "2023-01-01T00:00:00Z"
+    mock_record.TimeWritten = "2023-01-01T00:00:00Z"
+    mock_record.EventCode = 1
+    mock_record.EventFacility = 0
+    mock_record.EventCustomerFlag = 0
+    mock_record.EventSeverity = 0
+    mock_record.EventType = 0
+    mock_record.EventCategory = 0
+    mock_record.Computername = "TestComputer"
+    mock_record.Strings = []
+    mock_record.Data = b""
+    
+    target = Target()
+    plugin = evt.EvtPlugin(target)
+    
+    # Process the record - this should trigger a warning
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record)
+    
+    # Verify warning was logged
+    assert "Time change event detected" in caplog.text
+    assert "EventID 1" in caplog.text
+    assert "Microsoft-Windows-Kernel-General" in caplog.text
+
+
+def test_evt_time_change_warning_security_event(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that security audit time change events trigger warning logs in EVT plugin."""
+    
+    # Create a mock EVT record that represents a security time change event
+    mock_record = Mock()
+    mock_record.EventID = 4616
+    mock_record.SourceName = "Microsoft-Windows-Security-Auditing"
+    mock_record.TimeGenerated = "2023-01-01T00:00:00Z"
+    mock_record.TimeWritten = "2023-01-01T00:00:00Z"
+    mock_record.EventCode = 4616
+    mock_record.EventFacility = 0
+    mock_record.EventCustomerFlag = 0
+    mock_record.EventSeverity = 0
+    mock_record.EventType = 0
+    mock_record.EventCategory = 0
+    mock_record.Computername = "TestComputer"
+    mock_record.Strings = []
+    mock_record.Data = b""
+    
+    target = Target()
+    plugin = evt.EvtPlugin(target)
+    
+    # Process the record - this should trigger a warning
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record)
+    
+    # Verify warning was logged
+    assert "Time change event detected" in caplog.text
+    assert "EventID 4616" in caplog.text
+    assert "Microsoft-Windows-Security-Auditing" in caplog.text
+
+
+def test_evt_no_time_change_warning_for_normal_events(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that normal events do not trigger time change warnings in EVT plugin."""
+    
+    # Create a mock EVT record that represents a normal event
+    mock_record = Mock()
+    mock_record.EventID = 1000  # Different event ID
+    mock_record.SourceName = "SomeOtherProvider"
+    mock_record.TimeGenerated = "2023-01-01T00:00:00Z"
+    mock_record.TimeWritten = "2023-01-01T00:00:00Z"
+    mock_record.EventCode = 1000
+    mock_record.EventFacility = 0
+    mock_record.EventCustomerFlag = 0
+    mock_record.EventSeverity = 0
+    mock_record.EventType = 0
+    mock_record.EventCategory = 0
+    mock_record.Computername = "TestComputer"
+    mock_record.Strings = []
+    mock_record.Data = b""
+    
+    target = Target()
+    plugin = evt.EvtPlugin(target)
+    
+    # Process the record - this should NOT trigger a warning
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record)
+    
+    # Verify warning was NOT logged
+    assert "Time change event detected" not in caplog.text
