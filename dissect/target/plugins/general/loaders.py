@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import json as jsonlib
 
 from dissect.target.helpers.docs import INDENT_STEP, get_docstring
 from dissect.target.loader import LOADERS_BY_SCHEME
@@ -14,12 +14,8 @@ class LoaderListPlugin(Plugin):
         pass
 
     @export(output="none")
-    # NOTE: We would prefer to re-use arguments across plugins from argparse in query.py, but that is not possible yet.
-    # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
-    # https://github.com/fox-it/dissect.target/pull/841
-    # https://github.com/fox-it/dissect.target/issues/889
-    @arg("--as-json", dest="as_json", action="store_true", help="output in JSON format")
-    def loaders(self, as_json: bool = False) -> None:
+    @arg("-j", "--json", action="store_true", help="output in JSON format")
+    def loaders(self, json: bool = False) -> None:
         """List the available loaders."""
 
         loaders_info = {}
@@ -32,8 +28,8 @@ class LoaderListPlugin(Plugin):
 
         loaders = sorted(loaders_info.items())
 
-        if as_json:
-            print(json.dumps([{"name": name, "description": desc} for name, desc in loaders]), end="")
+        if json:
+            print(jsonlib.dumps([{"name": name, "description": desc} for name, desc in loaders]), end="")
 
         else:
             print("Available loaders:")
