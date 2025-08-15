@@ -87,11 +87,11 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
                     try:
                         yield self._build_record(event, entry)
                     except Exception as e:  # noqa: PERF203
-                        self.target.log.warning("Unable to parse event log file %s: %s", entry, e)
+                        self.target.log.warning("Unable to parse event log event %s: %s", event, e)
                         self.target.log.debug("", exc_info=e)
-            except EOFError:
-                # Skip empty or corrupt EVTX files
-                continue
+            except EOFError as e:
+                self.target.log.warning("Unable to parse event log file %s: %s", entry, e)
+                self.target.log.debug("", exc_info=e)
 
     @export(record=DynamicDescriptor(["datetime"]))
     def scraped_evtx(self) -> Iterator[DynamicDescriptor]:
