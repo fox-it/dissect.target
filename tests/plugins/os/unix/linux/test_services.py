@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 from dissect.target.plugins.os.unix.linux.services import ServicesPlugin
@@ -66,3 +67,43 @@ def test_services(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None
 
     assert results[3].name == "example"
     assert str(results[3].source) == "/etc/init.d/example"
+
+
+def test_services_systemd_drop_folder(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we correctly parse systemd ``.service`` and drop folder ``.conf`` files. Data based on Ubuntu 22.04 LTS default files."""  # noqa: E501
+
+    fs_unix.map_file(
+        "/lib/systemd/system/systemd-localed.service",
+        str(absolute_path("_data/plugins/os/unix/linux/services/systemd-localed.service")),
+    )
+    fs_unix.map_file(
+        "/lib/systemd/system/systemd-localed.service.d/locale-gen.conf",
+        str(absolute_path("_data/plugins/os/unix/linux/services/locale-gen.conf")),
+    )
+    fs_unix.map_file_fh(
+        "/lib/systemd/system/systemd-localed.service.d/test.conf",
+        BytesIO(b"[Unit]\nDescription=Another Description\n"),
+    )
+
+    target_unix.add_plugin(ServicesPlugin)
+    results = list(target_unix.services())
+
+    # Make sure we convert duplicate values to a list
+    assert results[0].Unit_Description == ["Locale Service", "Another Description"]
+
+    # Make sure we convert multiple entries to a list
+    assert results[0].Unit_Documentation == [
+        "man:systemd-localed.service(8)",
+        "man:locale.conf(5)",
+        "man:vconsole.conf(5)",
+        "man:org.freedesktop.locale1(5)",
+    ]
+
+    # Make sure we map empty values to None
+    assert results[0].Service_CapabilityBoundingSet is None
+
+    # Make sure we merge .service entries and drop file entries into a single list
+    assert results[0].Service_ReadWritePaths == ["/etc", "/usr/lib/locale", "/usr/lib/locale/"]
+
+    # We do not have visibility in the parsed drop files since that is handled internally by the drop file configparser
+    assert results[0].source == "/lib/systemd/system/systemd-localed.service"
