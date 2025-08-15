@@ -18,14 +18,12 @@ class QCow2Container(Container):
         self,
         fh: BinaryIO | Path,
         data_file: BinaryIO | None = None,
-        backing_file: BinaryIO | int | None = None,
+        backing_file: BinaryIO | None = None,
         *args,
         **kwargs,
     ):
-        f = fh
-        if not hasattr(fh, "read"):
-            f = fh.open("rb")
-        self.qcow2 = qcow2.QCow2(f, data_file, backing_file)
+        self.qcow2 = qcow2.QCow2(fh, data_file, backing_file)
+        self.stream = self.qcow2.open()
 
         super().__init__(fh, self.qcow2.size, *args, **kwargs)
 
@@ -38,13 +36,13 @@ class QCow2Container(Container):
         return path.suffix.lower() == ".qcow2"
 
     def read(self, length: int) -> bytes:
-        return self.qcow2.read(length)
+        return self.stream.read(length)
 
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
-        return self.qcow2.seek(offset, whence)
+        return self.stream.seek(offset, whence)
 
     def tell(self) -> int:
-        return self.qcow2.tell()
+        return self.stream.tell()
 
     def close(self) -> None:
-        pass
+        self.stream.close()
