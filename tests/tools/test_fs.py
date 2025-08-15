@@ -34,13 +34,13 @@ def vfs(files: list[str]) -> VirtualFilesystem:
     ],
 )
 def test_target_fs(
-    capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, path: str, expected_files: int
+    path: str, expected_files: int, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-fs", "tests/_data/tools/info/image.tar", "cp", path])
+        m.setattr("sys.argv", ["target-fs", "tests/_data/tools/info/image.tar", "cp", path, "-o", str(tmp_path)])
 
         target_fs()
-        stdout, stderr = capsys.readouterr()
+        stdout, _ = capsys.readouterr()
 
         if expected_files > 0:
             lines = [line for line in stdout.split("\n") if line != ""]
