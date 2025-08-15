@@ -175,6 +175,7 @@ def test_evtx_direct_mode() -> None:
 
 
 def test_evtx_build_record_illegal_characters(target_win: Target) -> None:
+    """Test that we correctly replace illegal characters in record field names."""
     evtx_record = {
         "Provider_Name": "Microsoft-Windows-Kernel-Boot",
         "Provider_Guid": "{FF44CA15-7A4D-AA4B-BBA5-0998955E531E}",
