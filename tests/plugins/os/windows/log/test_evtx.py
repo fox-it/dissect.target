@@ -172,3 +172,20 @@ def test_evtx_direct_mode() -> None:
     records = list(target.evtx())
 
     assert len(records) == 5
+
+
+def test_evtx_build_record_illegal_characters(target_win: Target) -> None:
+    """Test that we correctly replace illegal characters in record field names."""
+    evtx_record = {
+        "Provider_Name": "Microsoft-Windows-Kernel-Boot",
+        "Provider_Guid": "{FF44CA15-7A4D-AA4B-BBA5-0998955E531E}",
+        "EventID": 85,
+        "pSubStatus->PrimaryBlob():.<#/Status": 1,
+    }
+
+    record = evtx.EvtxPlugin(target_win)._build_record(
+        evtx_record,
+        target_win.fs.path("C:/WINDOWS/system32/winevt/logs/Microsoft-Windows-Kernel-Boot%4Operational.evtx"),
+    )
+
+    assert record.pSubStatus__PrimaryBlob_______Status == "1"

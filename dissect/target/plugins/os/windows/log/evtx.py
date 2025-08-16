@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
+re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
 
 
 EVTX_GLOB = "*.evtx"
@@ -82,9 +82,16 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
                 continue
 
             self.target.log.info("Processing event log file %s", entry)
-
-            for event in evtx.Evtx(entry_data):
-                yield self._build_record(event, entry)
+            try:
+                for event in evtx.Evtx(entry_data):
+                    try:
+                        yield self._build_record(event, entry)
+                    except Exception as e:  # noqa: PERF203
+                        self.target.log.warning("Unable to parse event log event %s: %s", event, e)
+                        self.target.log.debug("", exc_info=e)
+            except EOFError as e:
+                self.target.log.warning("Unable to parse event log file %s: %s", entry, e)
+                self.target.log.debug("", exc_info=e)
 
     @export(record=DynamicDescriptor(["datetime"]))
     def scraped_evtx(self) -> Iterator[DynamicDescriptor]:
