@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import NamespacePlugin, export, internal
+from dissect.target.plugin import NamespacePlugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
