@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import NamespacePlugin, export
+from dissect.target.plugin import NamespacePlugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -66,6 +66,3 @@ class WebserverPlugin(NamespacePlugin):
         """Returns log file records from installed webservers."""
         yield from self.access()
         yield from self.error()
-
-    def _iter_log_paths(self) -> Iterator[str]:
-        yield from self._log_paths()
