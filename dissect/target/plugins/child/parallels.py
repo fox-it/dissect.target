@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from defusedxml import ElementTree
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -67,8 +69,18 @@ class ParallelsChildTargetPlugin(ChildTargetPlugin):
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for pvm in self.pvms:
+            try:
+                config = ElementTree.fromstring(pvm.joinpath("config.pvs").read_bytes())
+                name = config.find(".//VmName").text
+            except Exception as e:
+                self.target.log.error("Failed parsing VmName from config.pvs: %s", pvm)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
+
+                name = None
+
             yield ChildTargetRecord(
                 type=self.__type__,
+                name=name,
                 path=pvm,
                 _target=self.target,
             )
