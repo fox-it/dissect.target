@@ -37,7 +37,6 @@ class RustdeskPlugin(RemoteAccessPlugin):
     SERVER_GLOBS = (
         # Windows >= Windows 7
         "%windir%/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log",
-        "sysvol/ProgramData/RustDesk/*/*/*.log",
         # Linux
         "var/log/rustdesk-server/*.log",
     )
