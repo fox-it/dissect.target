@@ -95,8 +95,8 @@ class CaddyPlugin(WebserverPlugin):
 
         return log_paths
 
-    def _log_paths(self) -> list[Path]:
-        return self.log_paths
+    def _get_paths(self) -> Iterator[Path]:
+        yield from self.log_paths
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
