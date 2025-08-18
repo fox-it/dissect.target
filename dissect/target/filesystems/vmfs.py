@@ -106,8 +106,7 @@ class VmfsFilesystemEntry(FilesystemEntry):
     def is_file(self, follow_symlinks: bool = True) -> bool:
         """Return whether this entry is a file."""
         try:
-            entry = self._resolve(follow_symlinks=follow_symlinks).entry
-            return entry.is_file() or (entry.is_system() and not entry.is_dir())
+            return self._resolve(follow_symlinks=follow_symlinks).entry.is_file()
         except FilesystemError:
             return False
 
@@ -135,7 +134,7 @@ class VmfsFilesystemEntry(FilesystemEntry):
             self.entry.mode,
             self.entry.address,
             id(self.fs),
-            meta.numLinks,
+            meta.linkCount,
             meta.uid,
             meta.gid,
             self.entry.size,
