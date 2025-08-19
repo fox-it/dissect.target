@@ -35,8 +35,8 @@ def main() -> int:
     parser.add_argument("-b", "--bytes", type=int, default=-1, help="amount of bytes to read")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(args)
 
     try:
         t = Target.open(args.target)

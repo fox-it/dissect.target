@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, BinaryIO
 
 import dissect.vmfs as vmfs
 from dissect.vmfs.c_vmfs import c_vmfs
+from dissect.vmfs.descriptor import FileDescriptor
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -31,11 +32,11 @@ class VmfsFilesystem(Filesystem):
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         """Detect a VMFS filesystem on a given file-like object."""
-        fh.seek(c_vmfs.VMFS_FS3_BASE)
+        fh.seek(c_vmfs.FS3_FS_HEADER_OFFSET)
         sector = fh.read(512)
         return int.from_bytes(sector[:4], "little") in (
-            c_vmfs.VMFS_FS3_MAGIC,
-            c_vmfs.VMFSL_FS3_MAGIC,
+            c_vmfs.VMFS_MAGIC_NUMBER,
+            c_vmfs.VMFSL_MAGIC_NUMBER,
         )
 
     def get(self, path: str) -> FilesystemEntry:
@@ -56,6 +57,9 @@ class VmfsFilesystem(Filesystem):
 
 
 class VmfsFilesystemEntry(FilesystemEntry):
+    fs: VmfsFilesystem
+    entry: FileDescriptor
+
     def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
@@ -90,7 +94,7 @@ class VmfsFilesystemEntry(FilesystemEntry):
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         for f in self._iterdir():
             path = fsutil.join(self.path, f.name, alt_separator=self.fs.alt_separator)
-            yield VmfsFilesystemEntry(self.fs, path, f)
+            yield VmfsFilesystemEntry(self.fs, path, f.file_descriptor)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         """Return whether this entry is a directory."""
@@ -102,8 +106,7 @@ class VmfsFilesystemEntry(FilesystemEntry):
     def is_file(self, follow_symlinks: bool = True) -> bool:
         """Return whether this entry is a file."""
         try:
-            resolved = self._resolve(follow_symlinks=follow_symlinks)
-            return resolved.entry.is_file() or resolved.entry.is_system()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.is_file()
         except FilesystemError:
             return False
 
@@ -124,20 +127,20 @@ class VmfsFilesystemEntry(FilesystemEntry):
 
     def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
-        node = self.entry.descriptor
+        meta = self.entry.metadata
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         st_info = [
             self.entry.mode,
             self.entry.address,
             id(self.fs),
-            node.numLinks,
-            node.uid,
-            node.gid,
-            node.length,
-            node.accessTime,
-            node.modificationTime,
-            node.creationTime,
+            meta.linkCount,
+            meta.uid,
+            meta.gid,
+            self.entry.size,
+            meta.atime,
+            meta.mtime,
+            meta.ctime,
         ]
 
         return fsutil.stat_result(st_info)
