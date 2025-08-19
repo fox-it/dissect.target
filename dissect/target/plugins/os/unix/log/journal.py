@@ -270,7 +270,7 @@ c_journal = cstruct().load(journal_def)
 class JournalMessagePriority(IntEnumMissing):
     """Journal message priority enum.
 
-    Resources:
+    References:
         - https://wiki.archlinux.org/title/Systemd/Journal
     """
 

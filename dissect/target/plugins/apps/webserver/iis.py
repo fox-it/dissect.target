@@ -166,6 +166,7 @@ class IISLogsPlugin(WebserverPlugin):
                 remote_ip=iis_record.client_ip,
                 method=iis_record.request_method,
                 uri=iis_record.request_path,
+                query=getattr(iis_record, "request_query", None),
                 protocol=getattr(iis_record, "cs_version", None),
                 status_code=getattr(iis_record, "service_status_code", None),
                 bytes_sent=iis_record.response_size_bytes,

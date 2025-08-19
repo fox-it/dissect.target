@@ -45,7 +45,7 @@ PodmanLogRecord = TargetRecordDescriptor(
 class ContainerState(Enum):
     """Enum of possible Container states.
 
-    Resources:
+    References:
         - https://github.com/containers/podman/blob/v4.9/libpod/define/containerstate.go
     """
 
@@ -291,7 +291,7 @@ class PodmanPlugin(ContainerPlugin):
 
         Currently does not parse custom configuration in ``containers.conf`` for ``log_opt path`` values.
 
-        Resources:
+        References:
             - https://docs.podman.io/en/latest/markdown/podman-create.1.html#log-driver-driver
         """
 

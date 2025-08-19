@@ -40,7 +40,7 @@ class LSADefaultPasswordKeyProviderPlugin(DefaultPasswordKeyProvider):
 
         Extracts decrypted ``DefaultPassword`` values from the LSA.
 
-        Resources:
+        References:
             - https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
         """
 
