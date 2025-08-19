@@ -161,7 +161,7 @@ class CredHistPlugin(Plugin):
     Windows XP:         ``C:\\Documents and Settings\\username\\Application Data\\Microsoft\\Protect\\CREDHIST``
     Windows 7 and up:   ``C:\\Users\\username\\AppData\\Roaming\\Microsoft\\Protect\\CREDHIST``
 
-    Resources:
+    References:
         - https://www.passcape.com/index.php?section=docsys&cmd=details&id=28#41
     """
 

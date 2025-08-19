@@ -90,7 +90,7 @@ class PLocateFile:
 
     No documentation other than the source code is available on the format of this file.
 
-    Resources:
+    References:
         - https://git.sesse.net/?p=plocate
     """
 
@@ -188,7 +188,7 @@ class PLocatePlugin(BaseLocatePlugin):
         ``plocate`` is the default package on Ubuntu 22 and newer to locate files.
         It replaces ``mlocate`` and GNU ``locate``.
 
-        Resources:
+        References:
             - https://manpages.debian.org/testing/plocate/plocate.1.en.html
             - https://git.sesse.net/?p=plocate
         """

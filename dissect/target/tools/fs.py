@@ -156,13 +156,16 @@ def main() -> int:
         log.debug("", exc_info=e)
         return 1
 
-    path = target.fs.path(args.path)
+    glob_path = str(args.path).lstrip("/")
 
-    if not path.exists():
+    found = False
+    for path in target.fs.path("/").glob(glob_path):
+        args.handler(target, path, args)
+        found = True
+
+    if not found:
         print("[!] Path doesn't exist")
         return 1
-
-    args.handler(target, path, args)
 
     return 0
 
