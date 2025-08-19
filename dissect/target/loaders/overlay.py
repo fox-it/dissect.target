@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target.filesystems.overlay import Overlay2Filesystem
+from dissect.target.filesystems.overlay import OverlayFilesystem
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
@@ -10,8 +10,8 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-class Overlay2Loader(Loader):
-    """Load overlay2 filesystems."""
+class OverlayLoader(Loader):
+    """Load Podman OCI overlay filesystems."""
 
     @staticmethod
     def detect(path: TargetPath) -> bool:
@@ -19,13 +19,13 @@ class Overlay2Loader(Loader):
         if not path.is_dir():
             return False
 
-        # with the following three files
-        for required_file in ["init-id", "parent", "mount-id"]:
-            if not path.joinpath(required_file).exists():
+        # with the following files
+        for file in ["diff", "link", "lower", "work"]:  # "merged" is optional
+            if not path.joinpath(file).exists():
                 return False
 
         # and should have the following parent folders
-        return not "image/overlay2/layerdb/mounts/" not in path.as_posix()
+        return "containers/storage/overlay/" in path.as_posix()
 
     def map(self, target: Target) -> None:
-        target.filesystems.add(Overlay2Filesystem(self.absolute_path))
+        target.filesystems.add(OverlayFilesystem(self.absolute_path))

@@ -420,7 +420,7 @@ class Target:
                     "An exception occurred while checking for child plugin compatibility: %s", plugin_desc.qualname
                 )
 
-    def open_child(self, child: str | Path) -> Target | None:
+    def open_child(self, child: str | Path) -> Target:
         """Open a child target.
 
         Args:
@@ -902,8 +902,13 @@ class VolumeCollection(Collection[volume.Volume]):
                 if getattr(vol, "fs", None) is not None:
                     self.target.filesystems.add(vol.fs)
             except FilesystemError as e:  # noqa: PERF203
-                self.target.log.warning("Can't identify filesystem: %s", vol)
-                self.target.log.debug("", exc_info=e)
+                vol.seek(0)
+                if not vol.read(8 * 1024 * 1024).strip(b"\x00"):
+                    # If the first 8MB is empty, don't log a warning
+                    self.target.log.debug("Skipping empty volume: %s", vol)
+                else:
+                    self.target.log.warning("Can't identify filesystem: %s", vol)
+                    self.target.log.debug("", exc_info=e)
 
         for fs in filesystem.open_multi_volume(mv_fs_volumes):
             self.target.filesystems.add(fs)

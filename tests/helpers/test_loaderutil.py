@@ -57,7 +57,7 @@ def test_extract_path_info(
             None,
             False,
             [
-                "Opened NTFS filesystem from <VirtualFilesystem> but could not find $MFT, skipping",
+                "Opened NTFS filesystem from <Filesystem type=virtual> but could not find $MFT, skipping",
             ],
         ),
         (None, True, []),
@@ -65,38 +65,38 @@ def test_extract_path_info(
             False,
             None,
             [
-                "Failed to load NTFS filesystem from <VirtualFilesystem>, retrying without $Boot file",
-                "Opened NTFS filesystem from <VirtualFilesystem> but could not find $MFT, skipping",
+                "Failed to load NTFS filesystem from <Filesystem type=virtual>, retrying without $Boot file",
+                "Opened NTFS filesystem from <Filesystem type=virtual> but could not find $MFT, skipping",
             ],
         ),
         (
             False,
             False,
             [
-                "Failed to load NTFS filesystem from <VirtualFilesystem>, retrying without $Boot file",
-                "Failed to load NTFS filesystem from <VirtualFilesystem> without $Boot file, skipping",
+                "Failed to load NTFS filesystem from <Filesystem type=virtual>, retrying without $Boot file",
+                "Failed to load NTFS filesystem from <Filesystem type=virtual> without $Boot file, skipping",
             ],
         ),
         (
             False,
             True,
             [
-                "Failed to load NTFS filesystem from <VirtualFilesystem>, retrying without $Boot file",
+                "Failed to load NTFS filesystem from <Filesystem type=virtual>, retrying without $Boot file",
             ],
         ),
         (
             True,
             None,
             [
-                "Opened NTFS filesystem from <VirtualFilesystem> but could not find $MFT, skipping",
+                "Opened NTFS filesystem from <Filesystem type=virtual> but could not find $MFT, skipping",
             ],
         ),
         (
             True,
             False,
             [
-                "Failed to load NTFS filesystem from <VirtualFilesystem>, retrying without $Boot file",
-                "Failed to load NTFS filesystem from <VirtualFilesystem> without $Boot file, skipping",
+                "Failed to load NTFS filesystem from <Filesystem type=virtual>, retrying without $Boot file",
+                "Failed to load NTFS filesystem from <Filesystem type=virtual> without $Boot file, skipping",
             ],
         ),
         (True, True, []),

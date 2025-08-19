@@ -27,7 +27,7 @@ class ColimaChildTargetPlugin(ChildTargetPlugin):
 
     Colima is a container runtime for macOS and Linux.
 
-    Resources:
+    References:
         - https://github.com/abiosoft/colima/blob/5d2e91c4a491d4ae35d69fb2583f4f959401bc37
     """
 

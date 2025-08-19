@@ -40,7 +40,7 @@ class GNULocateFile:
     The file is encoded with front compression (incremental encoding). This is a form of compression
     which takes a number of characters of the previous encoded entries. Entries are separated with a null byte.
 
-    Resources:
+    References:
         - https://manpages.ubuntu.com/manpages/trusty/en/man5/locatedb.5.html
     """
 
@@ -86,7 +86,7 @@ class GNULocatePlugin(BaseLocatePlugin):
     def locate(self) -> Iterator[GNULocateRecord]:
         """Yield file and directory names from GNU findutils' locatedb file.
 
-        Resources:
+        References:
             - https://manpages.debian.org/testing/locate/locatedb.5.en.html
         """
         locate_fh = self.target.fs.path(self.path).open()
