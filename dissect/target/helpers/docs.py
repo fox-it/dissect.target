@@ -118,7 +118,7 @@ def _get_real_func_obj(func: Callable) -> tuple[type[Plugin], Callable]:
         func = func.fget
 
     if inspect.ismethod(func):
-        for klass in inspect.getmro(func.__self__.__class__):
+        for klass in func.__self__.__class__.__mro__:
             if func.__name__ in klass.__dict__:
                 break
         else:

@@ -58,7 +58,7 @@ def main() -> int:
     parser.add_argument("-J", "--jsonlines", action="store_true", help="output records as one-line json")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     if not args.targets and not args.from_file:
         parser.error("too few arguments")
@@ -72,7 +72,7 @@ def main() -> int:
             targets = targets[:-1]
         args.targets = targets
 
-    process_generic_arguments(args, rest)
+    process_generic_arguments(args)
 
     try:
         for i, target in enumerate(Target.open_all(args.targets, include_children=args.children)):
