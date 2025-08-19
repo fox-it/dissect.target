@@ -4,16 +4,18 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.plugin import export
-from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import KeyProviderPlugin
+from dissect.target.plugins.os.windows.dpapi.keyprovider.defaultpassword.defaultpassword import (
+    DefaultPasswordKeyProvider,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-class WinlogonDefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
+class WinlogonDefaultPasswordKeyProviderPlugin(DefaultPasswordKeyProvider):
     """Windows Winlogon DefaultPassword key provider plugin."""
 
-    __namespace__ = "_dpapi_keyprovider_winlogon_defaultpassword"
+    __namespace__ = "dpapi.keyprovider.defaultpassword.winlogon"
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):
@@ -25,7 +27,7 @@ class WinlogonDefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
 
         Extracts plaintext ``DefaultPassword`` values from the ``Winlogon`` registry.
 
-        Resources:
+        References:
             - https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
         """
 

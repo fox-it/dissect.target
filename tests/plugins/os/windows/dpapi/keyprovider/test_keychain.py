@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers import keychain
+from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from dissect.target.plugins.os.windows.dpapi.keyprovider.keychain import KeychainKeyProviderPlugin
 
 if TYPE_CHECKING:
@@ -24,11 +25,12 @@ def test_dpapi_keyprovider_keychain(target_win: Target) -> None:
         provider=None,
     )
 
+    target_win.add_plugin(DPAPIPlugin, check_compatible=False)
     target_win.add_plugin(KeychainKeyProviderPlugin)
 
-    keys = list(target_win._dpapi_keyprovider_keychain())
+    keys = list(target_win.dpapi.keyprovider.keychain())
 
     assert keys == [
-        ("_dpapi_keyprovider_keychain", "password1"),
-        ("_dpapi_keyprovider_keychain", "password2"),
+        ("dpapi.keyprovider.keychain", "password1"),
+        ("dpapi.keyprovider.keychain", "password2"),
     ]

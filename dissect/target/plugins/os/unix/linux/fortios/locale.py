@@ -44,7 +44,7 @@ class FortiOSLocalePlugin(LocalePlugin):
 def translate_timezone(timezone_num: str) -> str:
     """Translate a FortiOS timezone number to IANA TZ.
 
-    Resources:
+    References:
         - https://<fortios>/ng/system/settings
     """
 

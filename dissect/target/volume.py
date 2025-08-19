@@ -77,7 +77,7 @@ class VolumeSystem:
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} serial={self.serial}>"
+        return f"<VolumeSystem type={self.__type__} serial={self.serial}>"
 
     @classmethod
     def detect(cls, fh: BinaryIO) -> bool:
@@ -285,7 +285,7 @@ class Volume(io.IOBase):
         self.seek(0)
 
     def __repr__(self) -> str:
-        return f"<Volume name={self.name!r} size={self.size!r} fs={self.fs!r}>"
+        return f"<Volume name={self.name!r} size={self.size!r} fs={self.fs.__type__ if self.fs else None!r}>"
 
     def read(self, length: int = -1) -> bytes:
         """Read a ``length`` of bytes from this ``Volume``."""

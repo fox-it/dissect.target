@@ -81,12 +81,12 @@ class EtlPlugin(Plugin):
 
     PATHS: Final[dict[str, list[str]]] = {
         "boot": [
-            "sysvol/windows/system32/wdi/logfiles/bootckcl.etl",
-            "sysvol/windows/system32/wdi/logfiles/bootperfdiaglogger.etl",
+            "%windir%/system32/wdi/logfiles/bootckcl.etl",
+            "%windir%/system32/wdi/logfiles/bootperfdiaglogger.etl",
         ],
         "shutdown": [
-            "sysvol/windows/system32/wdi/logfiles/shutdownckcl.etl",
-            "sysvol/windows/system32/wdi/logfiles/shutdownperfdiaglogger.etl",
+            "%windir%/system32/wdi/logfiles/shutdownckcl.etl",
+            "%windir%/system32/wdi/logfiles/shutdownperfdiaglogger.etl",
         ],
     }
 
@@ -96,14 +96,14 @@ class EtlPlugin(Plugin):
 
     def check_compatible(self) -> None:
         etl_paths = (etl_file for etl_paths in self.PATHS.values() for etl_file in etl_paths)
-        plugin_target_folders = [self.target.fs.path(file).exists() for file in etl_paths]
+        plugin_target_folders = [self.target.resolve(file).exists() for file in etl_paths]
         if not any(plugin_target_folders):
             raise UnsupportedPluginError("No ETL paths found")
 
     def read_etl_files(self, etl_paths: list[str]) -> Iterator[Record]:
         """Read ETL files using an EtlReader."""
         for etl_path in etl_paths:
-            entry = self.target.fs.path(etl_path)
+            entry = self.target.resolve(etl_path)
             if not entry.exists():
                 self.target.log.warning("ETL file does not exist: %s", entry)
                 continue

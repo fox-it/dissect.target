@@ -22,7 +22,7 @@ def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
 
     Data based on example iOS image from Digital Corpora.
 
-    Resources:
+    References:
         - https://corp.digitalcorpora.org/corpora/mobile/iOS17/
     """
 

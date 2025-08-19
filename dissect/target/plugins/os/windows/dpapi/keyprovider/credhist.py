@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class CredHistKeyProviderPlugin(KeyProviderPlugin):
     """Windows CREDHIST SHA1-hash key provider plugin."""
 
-    __namespace__ = "_dpapi_keyprovider_credhist"
+    __namespace__ = "dpapi.keyprovider.credhist"
 
     def check_compatible(self) -> None:
         if not self.target.has_function("credhist"):

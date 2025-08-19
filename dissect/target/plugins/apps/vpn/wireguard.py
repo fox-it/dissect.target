@@ -24,8 +24,8 @@ WireGuardInterfaceRecord = TargetRecordDescriptor(
         ("string", "private_key"),
         ("varint", "listen_port"),
         ("string", "fw_mark"),
-        ("string", "dns"),
-        ("varint", "table"),
+        ("net.ipaddress[]", "dns"),
+        ("string", "table"),
         ("varint", "mtu"),
         ("string", "preup"),
         ("string", "postup"),
@@ -55,6 +55,7 @@ class WireGuardPlugin(Plugin):
     References:
         - https://manpages.debian.org/testing/wireguard-tools/wg.8.en.html#CONFIGURATION_FILE_FORMAT
         - https://github.com/pirate/wireguard-docs
+        - https://wiresock.net/documentation/wireguard/config.html
     """
 
     __namespace__ = "wireguard"
@@ -121,7 +122,7 @@ class WireGuardPlugin(Plugin):
                         listen_port=config_dict("ListenPort"),
                         private_key=config_dict("PrivateKey"),
                         fw_mark=config_dict("FwMark"),
-                        dns=config_dict("DNS"),
+                        dns=[ip.strip() for ip in config_dict("DNS").split(",")] if config_dict("DNS") else None,
                         table=config_dict("Table"),
                         mtu=config_dict("MTU"),
                         preup=config_dict("PreUp"),

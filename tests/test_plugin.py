@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from docutils.core import publish_string
 from docutils.utils import SystemMessage
+from flow.record import RecordDescriptor
 
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -51,6 +52,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from flow.record import Record
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def test_save_plugin_import_failure() -> None:
@@ -424,6 +426,12 @@ def test_find_functions_compatible_check(target_linux: Target) -> None:
         assert "apps.browser.chrome.history" in functions
 
 
+@pytest.mark.benchmark
+def test_benchmark_functions_compatible_check(target_unix_users: Target, benchmark: BenchmarkFixture) -> None:
+    """Benchmark ``_filter_compatible`` performance."""
+    benchmark(lambda: find_functions("*", target_unix_users, compatibility=True))
+
+
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "application/test",
     [
@@ -595,6 +603,59 @@ def test_namesplace_plugin_multiple_same_module(mock_plugins: PluginRegistry) ->
     result, _ = find_functions("*.baz")
     assert len(result) == 2
     assert sorted(desc.name for desc in result) == ["bar.baz", "foo.baz"]
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_nested_namespace_getattr(mock_plugins: PluginRegistry, target_bare: Target) -> None:
+    class Foo(Plugin):
+        __namespace__ = "foo"
+
+        @export(output="yield")
+        def buzz(self) -> Iterator[str]:
+            yield from ["buzz"]
+
+    class FooBar(Plugin):
+        __namespace__ = "foo.bar"
+
+        @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz1"]
+
+        @export(output="yield")
+        def bar(self) -> Iterator[str]:
+            yield from ["bar1"]
+
+    class FooBaz(Plugin):
+        __namespace__ = "foo.baz"
+
+        @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz2"]
+
+        @export(output="yield")
+        def bar(self) -> Iterator[str]:
+            yield from ["bar2"]
+
+    for plugin in [Foo, FooBar, FooBaz]:
+        target_bare._register_plugin_functions(plugin(target_bare))
+
+    assert isinstance(target_bare.foo, Foo)
+    assert isinstance(target_bare.foo.bar, FooBar)
+    assert isinstance(target_bare.foo.baz, FooBaz)
+    assert hasattr(target_bare.foo.bar, "bazz")
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bazz()
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bar.foo()
+
+    # Test whether we can access the plugin this way
+    assert next(target_bare.foo.bar.bazz()) == "bazz1"
+    assert next(target_bare.foo.bar.bar()) == "bar1"
+    assert next(target_bare.foo.baz.bazz()) == "bazz2"
+    assert next(target_bare.foo.baz.bar()) == "bar2"
+    assert next(target_bare.foo.buzz()) == "buzz"
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
@@ -1234,7 +1295,7 @@ def test_plugin_alias(target_bare: Target) -> None:
 def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     """This test checks plugin style guide conformity for all exported plugins.
 
-    Resources:
+    References:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
     # Ignore DefaultOSPlugin and NamespacePlugin instances
@@ -1268,6 +1329,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # The method docstring should compile to rst without warnings
     assert_valid_rst(method_doc_str)
 
+    # The method docstring should follow our conventions
+    assert_compliant_rst(method_doc_str)
+
     # Plugin class should have a docstring
     class_doc_str = descriptor.cls.__doc__
     assert isinstance(class_doc_str, str), f"No docstring for class {descriptor.cls.__name__}"
@@ -1275,6 +1339,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
+
+    # The class docstring should follow our conventions
+    assert_compliant_rst(class_doc_str)
 
     # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
     for arg in descriptor.args:
@@ -1341,6 +1408,99 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
             )
 
 
+def test_plugin_record_field_consistency() -> None:
+    """Test if exported plugin functions yielding records do not have conflicting field names and types.
+
+    For example, take the following TargetRecordDescriptors for plugin X, Y and Z::
+
+        RecordX = TargetRecordDescriptor("record/x", [("varint", "my_field")])
+        RecordY = TargetRecordDescriptor("record/y", [("path", "my_field")])
+        RecordZ = TargetRecordDescriptor("record/y", [("string", "my_field")])
+
+    The ``RecordX`` descriptor will fail in this test, since the field ``my_field`` cannot be of type ``varint``
+    while also being used as ``string`` (and ``path``). The ``RecordY`` and ``RecordZ`` descriptors do not conflict,
+    since the types ``path`` and ``string`` translate to the same ``wildcard`` type.
+
+    Uses ``FIELD_TYPES_MAP`` which is loosely based on flow.record and ElasticSearch field types.
+
+    References:
+        - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
+        - https://github.com/fox-it/flow.record/tree/main/flow/record/fieldtypes
+        - https://github.com/JSCU-NL/dissect-elastic
+    """
+
+    seen_field_names: set[str] = set()
+    seen_field_types: dict[str, tuple[str | None, RecordDescriptor]] = {}
+    inconsistencies: set[str] = set()
+
+    FIELD_TYPES_MAP = {
+        # strings
+        "string": "string",
+        "stringlist": "string",
+        "wstring": "string",
+        "path": "string",
+        "uri": "string",
+        "command": "string",
+        "dynamic": "string",
+        # ints
+        "varint": "int",
+        "filesize": "int",
+        "uint32": "int",
+        "uint16": "int",
+        "float": "float",
+        # ip / cidr
+        "net.ipaddress": "ip",
+        "net.ipnetwork": "ip_range",
+        "net.ipinterface": "ip_range",
+        # dates
+        "datetime": "datetime",
+        # other
+        "boolean": "boolean",
+        "bytes": "binary",
+        "digest": "keyword",
+    }
+
+    for descriptor in find_functions("*", Target(), compatibility=False, show_hidden=True)[0]:
+        # Test if plugin function record fields make sense and do not conflict with other records.
+        if descriptor.output == "record" and hasattr(descriptor, "record"):
+            # Functions can yield a single record or a list of records.
+            records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+
+            for record in records:
+                assert isinstance(record, RecordDescriptor), (
+                    f"{record!r} of function {descriptor!r} is not of type RecordDescriptor"
+                )
+                if record.name != "empty":
+                    assert record.fields, f"{record!r} has no fields"
+
+                for name, field in record.fields.items():
+                    # Make sure field names have the same type when translated. This check does not save multiple field
+                    # name and typenames, this is a bare-minumum check only.
+
+                    # We only care about the field type, not if it is a list of that type.
+                    field_typename = field.typename.replace("[]", "")
+
+                    assert field_typename in FIELD_TYPES_MAP, (
+                        f"Field type {field_typename} is not mapped in FIELD_TYPES_MAP, please add it manually."
+                    )
+
+                    if name in seen_field_names:
+                        seen_typename, seen_record = seen_field_types[name]
+                        if FIELD_TYPES_MAP[seen_typename] != FIELD_TYPES_MAP[field_typename]:
+                            inconsistencies.add(
+                                f"<{record.name} ({field.typename!r}, '{name}')> is duplicate mismatch of <{seen_record.name} ({seen_typename!r}, '{name}')>"  # noqa: E501
+                            )
+
+                    else:
+                        seen_field_names.add(name)
+                        seen_field_types[name] = (field_typename, record)
+
+    if inconsistencies:
+        pytest.fail(
+            f"Found {len(inconsistencies)} inconsistencies in RecordDescriptors:\n" + "\n".join(inconsistencies)
+        )
+
+
 def assert_valid_rst(src: str) -> None:
     """Attempts to compile the given string to rst."""
 
@@ -1352,3 +1512,67 @@ def assert_valid_rst(src: str) -> None:
         # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
         if "Unknown interpreted text role" not in str(e):
             pytest.fail(f"Invalid rst: {e}", pytrace=False)
+
+
+def assert_compliant_rst(src: str) -> None:
+    """Makes sure that the given rst docstring follows the project's conventions."""
+
+    # Explicit message stating we want References instead of Resources to prevent confusion
+    if "Resources:\n" in src:
+        pytest.fail(f"Invalid rst: docstring contains 'Resources' instead of 'References': {src!r}", pytrace=False)
+
+    # Generic message stating lists should start with References (assumes lists always have at least one 'http')
+    if "- http" in src and "References:\n" not in src:
+        pytest.fail(f"Invalid rst: docstring contains list but does not mention 'References': {src!r}", pytrace=False)
+
+    # Make sure we use stripes instead of bullets (assumes lists always have at least one 'http')
+    if "* http" in src:
+        pytest.fail(f"Invalid rst: docstring contains bullet instead of dash in list: {src!r}", pytrace=False)
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    [descriptor for descriptor in plugins() if descriptor.namespace and "." in descriptor.namespace],
+    ids=lambda descriptor: descriptor.namespace,
+)
+def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
+    """Test whether all parts of nested namespaces exist and that there are no conflicts with other functions."""
+
+    parts = descriptor.namespace.split(".")
+    for i in range(len(parts)):
+        part = ".".join(parts[: i + 1])
+        result = list(lookup(part))
+
+        if not result:
+            pytest.fail(f"Unreachable namespace {descriptor.namespace!r}, namespace {part!r} does not exist.")
+
+        if len(result) > 1:
+            conflicts = ", ".join(
+                f"{desc.name} ({desc.module}.{desc.qualname})" for desc in result if desc.namespace != part
+            )
+            pytest.fail(f"Namespace name {descriptor.namespace!r} has conflicts with function name: {conflicts}")
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    # Match plugin classes which are a *direct* base of NamespacePlugin only using :meth:`Plugin.__bases__`,
+    # instead of using ``issubclass`` which would also yield indirectly inherited Plugin classes.
+    [descriptor for descriptor in plugins() if NamespacePlugin in descriptor.cls.__bases__],
+    ids=lambda descriptor: descriptor.qualname,
+)
+def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
+    """This test checks if :class:`NamespacePlugin` usage is correct.
+
+    :class:`NamespacePlugin` is reserved for "grouping" other plugins of the same category. See for
+    example :class:`BrowserPlugin` or :class:`WebserverPlugin`.
+
+    If you want to expose plugin functions under a shared name, e.g. ``foo.bar`` and ``foo.baz``,
+    you should use :class:`Plugin` with ``Plugin.__namespace__ = "foo"`` instead.
+
+    Resources:
+        - https://github.com/fox-it/dissect.target/issues/1180
+    """
+
+    assert descriptor.cls.__subclasses__(), (
+        f"NamespacePlugin {descriptor.module}.{descriptor.qualname} has no subclasses, are you sure you're using NamespacePlugin correctly?"  # noqa: E501
+    )

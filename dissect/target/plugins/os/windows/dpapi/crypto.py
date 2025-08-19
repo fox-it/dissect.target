@@ -40,7 +40,7 @@ class CipherAlgorithm:
     def derive_key(self, key: bytes, hash_algorithm: HashAlgorithm) -> bytes:
         """Mimics the corresponding native Microsoft function.
 
-        Resources:
+        References:
             - https://github.com/tijldeneut/DPAPIck3/blob/main/dpapick3/crypto.py#L185
         """
 

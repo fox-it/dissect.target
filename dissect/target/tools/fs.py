@@ -143,8 +143,8 @@ def main() -> int:
     parser_cp.set_defaults(handler=cp)
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(args)
 
     if args.subcommand is None:
         parser.error("No subcommand specified")
@@ -156,13 +156,16 @@ def main() -> int:
         log.debug("", exc_info=e)
         return 1
 
-    path = target.fs.path(args.path)
+    glob_path = str(args.path).lstrip("/")
 
-    if not path.exists():
+    found = False
+    for path in target.fs.path("/").glob(glob_path):
+        args.handler(target, path, args)
+        found = True
+
+    if not found:
         print("[!] Path doesn't exist")
         return 1
-
-    args.handler(target, path, args)
 
     return 0
 

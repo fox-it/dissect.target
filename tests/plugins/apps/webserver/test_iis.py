@@ -188,6 +188,9 @@ def test_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) ->
     )
     assert w3c_record_3.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
 
+    w3c_record = results[4]
+    assert w3c_record.query == "param=value"
+
 
 @pytest.mark.parametrize(
     "map_dir",

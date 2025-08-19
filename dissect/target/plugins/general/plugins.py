@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import json as jsonlib
 import textwrap
 
 from dissect.target import plugin
@@ -92,7 +92,7 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
     if failures := plugin.failed():
         failed = [{"module": f.module, "stacktrace": "".join(f.stacktrace)} for f in failures]
 
-    return json.dumps({"loaded": loaded, "failed": failed})
+    return jsonlib.dumps({"loaded": loaded, "failed": failed})
 
 
 def _get_os_functions() -> list[plugin.FunctionDescriptor]:
@@ -162,14 +162,10 @@ class PluginListPlugin(Plugin):
 
     @export(output="none", cache=False)
     @arg("--docs", dest="print_docs", action="store_true", help="output docstrings")
-    # NOTE: We would prefer to re-use arguments across plugins from argparse in query.py, but that is not possible yet.
-    # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
-    # https://github.com/fox-it/dissect.target/pull/841
-    # https://github.com/fox-it/dissect.target/issues/889
-    @arg("--as-json", dest="as_json", action="store_true", help="output in JSON format")
-    def plugins(self, print_docs: bool = False, as_json: bool = False) -> None:
+    @arg("-j", "--json", action="store_true", help="output in JSON format")
+    def plugins(self, print_docs: bool = False, json: bool = False) -> None:
         """Print all available plugins."""
-        if as_json:
+        if json:
             print(generate_functions_json(), end="")
         else:
             print(generate_functions_overview(include_docs=print_docs))

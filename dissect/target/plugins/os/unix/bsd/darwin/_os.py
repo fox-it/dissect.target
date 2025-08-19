@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dissect.target.plugin import internal
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from dissect.target.filesystem import Filesystem
@@ -32,6 +34,13 @@ class DarwinPlugin(BsdPlugin):
                 return fs
         return None
 
+    @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        yield from super().misc_user_paths()
+
+        if (user_path := self.target.fs.path("/Users")).exists():
+            yield from ((entry, None) for entry in user_path.iterdir() if entry.is_dir())
+
 
 def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> str | None:
     """Detect the architecture of the system by reading the Mach-O headers of the provided binaries.
@@ -46,7 +55,7 @@ def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> 
     Returns:
         Detected architecture (e.g. ``arm64``) or ``None``.
 
-    Resources:
+    References:
         - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
     """
     for path in paths:

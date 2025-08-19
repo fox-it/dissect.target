@@ -422,7 +422,7 @@ def parse_version(input: str) -> str:
     The input ``FGVM64-7.4.1-FW-build2463-230830:opmode=0:vdom=0`` would
     return the following output: ``FortiGate VM 7.4.1 (build 2463, 2023-08-30)``.
 
-    Resources:
+    References:
         - https://support.fortinet.com/Download/VMImages.aspx
     """
 
@@ -473,7 +473,7 @@ def decrypt_password(input: str) -> str:
 
     Returns decoded plaintext or original input ciphertext when decryption failed.
 
-    Resources:
+    References:
         - https://www.fortiguard.com/psirt/FG-IR-19-007
     """
 
@@ -608,7 +608,7 @@ def decrypt_rootfs(fh: BinaryIO, key: ChaCha20Key | AesKey) -> BinaryIO:
 
     Known keys can be found in the ``_keys.py`` file.
 
-    Resources:
+    References:
         - https://docs.fortinet.com/document/fortimanager/7.4.2/release-notes/519207/special-notices
         - Reversing kernel (fgt_verifier_iv, fgt_verifier_decrypt, fgt_verifier_initrd)
 

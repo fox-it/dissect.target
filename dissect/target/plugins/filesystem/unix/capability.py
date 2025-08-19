@@ -97,7 +97,7 @@ class CapabilityPlugin(Plugin):
     def capability_binaries(self) -> Iterator[CapabilityRecord]:
         """Find all files that have capabilities set on files.
 
-        Resources:
+        References:
             - https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
         """
 

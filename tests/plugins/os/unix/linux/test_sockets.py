@@ -124,11 +124,13 @@ def test_packet(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesy
 
     for result in results:
         assert result.ref == 3
-        assert result.type == 3  # ETH_P_ALL
-        assert result.protocol_type == "ETH_P_ALL"
         assert result.protocol == "packet"
+        assert result.protocol_type == "ETH_P_ALL"
+        assert result.socket_type == 3
+        assert result.sk == 2174716005
         assert result.cmdline in ("acquire -p full --proc", "test cmdline")
         assert result.pid in (1, 1337)
+        assert result.uid == 0
         assert result.owner == "root"
 
 
@@ -143,7 +145,7 @@ def test_unix(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesyst
         assert result.protocol == "unix"
         assert result.type == "STREAM"
         assert result.state in ("LISTENING", "CONNECTED")
-        assert result.flags in ("00010000", "00000000")
+        assert result.socket_flags in ("00010000", "00000000")
 
         assert result.path in (
             "/run/systemd/private",

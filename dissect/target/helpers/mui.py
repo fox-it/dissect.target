@@ -2,7 +2,7 @@
 
 This dictionary was exported from a ``tzres.dll.mui`` file from Windows Server 2019.
 
-Resources:
+References:
     - Reversing DLL String Table in ``C:/Windows/System32/en-US/tzres.dll.mui``.
     - https://learn.microsoft.com/en-us/windows/win32/intl/using-registry-string-redirection
     - https://learn.microsoft.com/en-us/windows/win32/api/winnls/ns-winnls-filemuiinfo
