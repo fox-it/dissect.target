@@ -829,7 +829,7 @@ class SystemD(Indentation):
 
 
 class Leases(Default):
-    """A :class:`ConfigurationParser` that specifically parses dhclient ``.leases` files.
+    """A :class:`ConfigurationParser` that specifically parses dhclient ``.leases`` files.
 
     Examples:
 
