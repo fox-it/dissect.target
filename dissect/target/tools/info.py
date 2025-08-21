@@ -58,7 +58,7 @@ def main() -> int:
     parser.add_argument("-J", "--jsonlines", action="store_true", help="output records as one-line json")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     if not args.targets and not args.from_file:
         parser.error("too few arguments")
@@ -72,7 +72,7 @@ def main() -> int:
             targets = targets[:-1]
         args.targets = targets
 
-    process_generic_arguments(args, rest)
+    process_generic_arguments(args)
 
     try:
         for i, target in enumerate(Target.open_all(args.targets, include_children=args.children)):
@@ -133,7 +133,7 @@ def print_target_info(target: Target) -> None:
                 continue
             print(f"\n{name.capitalize()}")
             for i in value:
-                values = " ".join([f'{k}="{v}"' for k, v in i.items()])
+                values = " ".join([f"{k}={v!r}" for k, v in i.items()])
                 print(f"- <{name.capitalize()[:-1].replace('re', '')} {values}>")
             continue
 
@@ -150,15 +150,15 @@ def print_target_info(target: Target) -> None:
 
 
 def get_disks_info(target: Target) -> list[dict[str, str | int]]:
-    return [{"type": d.__class__.__name__, "size": d.size} for d in target.disks]
+    return [{"type": d.__type__, "size": d.size} for d in target.disks]
 
 
-def get_volumes_info(target: Target) -> list[dict[str, str | int]]:
-    return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
+def get_volumes_info(target: Target) -> list[dict[str, str | int | None]]:
+    return [{"name": v.name, "size": v.size, "fs": v.fs.__type__ if v.fs else None} for v in target.volumes]
 
 
-def get_mounts_info(target: Target) -> list:
-    return [{"fs": fs.__class__.__name__, "path": path} for path, fs in target.fs.mounts.items()]
+def get_mounts_info(target: Target) -> list[dict[str, str | None]]:
+    return [{"fs": fs.__type__, "path": path} for path, fs in target.fs.mounts.items()]
 
 
 def get_children_info(target: Target) -> list[dict[str, str]]:

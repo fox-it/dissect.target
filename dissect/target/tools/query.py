@@ -108,7 +108,7 @@ def main() -> int:
         parser.print_help()
         return 0
 
-    process_generic_arguments(args, rest)
+    process_generic_arguments(args)
 
     if args.no_cache:
         cache.IGNORE_CACHE = True
@@ -164,7 +164,7 @@ def main() -> int:
                     continue
 
                 try:
-                    output_type, result = execute_function_on_target(target, func_def, rest)
+                    output_type, result = execute_function_on_target(target, func_def)
                 except UnsupportedPluginError as e:
                     target.log.error(  # noqa: TRY400
                         "Unsupported plugin for %s: %s",

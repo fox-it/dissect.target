@@ -49,7 +49,7 @@ from dissect.target.tools.utils import (
     escape_str,
     execute_function_on_target,
     find_and_filter_plugins,
-    generate_argparse_for_bound_method,
+    generate_argparse_for_method,
     process_generic_arguments,
 )
 
@@ -128,7 +128,7 @@ class AnsiColors(StrEnum):
 
 
 # ANSI color escape sequences for readline prompt
-ANSI_COLORS = readline_escape(AnsiColors.as_dict())
+ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
 
 
 class ExtendedCmd(cmd.Cmd):
@@ -167,7 +167,7 @@ class ExtendedCmd(cmd.Cmd):
             _, _, command = attr.partition("_")
 
             def print_help(command: str, func: Callable) -> None:
-                parser = generate_argparse_for_bound_method(func, usage_tmpl=f"{command} {{usage}}")
+                parser = generate_argparse_for_method(func, usage_tmpl=f"{command} {{usage}}")
                 parser.print_help()
 
             try:
@@ -295,7 +295,7 @@ class ExtendedCmd(cmd.Cmd):
     def _exec_command(self, command: str, command_args_str: str) -> bool:
         """Command execution helper for ``cmd_`` commands."""
         cmdfunc = getattr(self, self.CMD_PREFIX + command)
-        argparser = generate_argparse_for_bound_method(cmdfunc, usage_tmpl=f"{command} {{usage}}")
+        argparser = generate_argparse_for_method(cmdfunc, usage_tmpl=f"{command} {{usage}}")
 
         def _exec_(argparts: list[str], stdout: TextIO) -> bool:
             try:
@@ -721,7 +721,7 @@ class TargetCli(TargetCmd):
     def do_mounts(self, line: str) -> bool:
         """print target mounts"""
         for mount, fs in self.target.fs.mounts.items():
-            print(f"<Mount path={mount!r} fs={fs!r}>")
+            print(f"<Mount fs={fs.__type__!r} path={mount!r}>")
         return False
 
     def do_info(self, line: str) -> bool:
@@ -1583,8 +1583,8 @@ def main() -> int:
     parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(args)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:

@@ -8,7 +8,7 @@ from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import NamespacePlugin, arg, export
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
     InformationType,
     get_drive_letter,
@@ -133,7 +133,9 @@ FORMAT_INFO = {
 }
 
 
-class MftPlugin(NamespacePlugin):
+class MftPlugin(Plugin):
+    """NTFS MFT plugin."""
+
     __namespace__ = "mft"
 
     def __init__(self, target: Target):
