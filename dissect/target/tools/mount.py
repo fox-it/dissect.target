@@ -58,8 +58,8 @@ def main() -> int:
     parser.add_argument("-o", "--options", help="additional FUSE options")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(args)
 
     if not HAS_FUSE:
         log.error("fusepy is not installed: pip install fusepy")
