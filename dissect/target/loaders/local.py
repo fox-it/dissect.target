@@ -381,7 +381,7 @@ def _windows_get_disk_size(path: str) -> int:
 
 
 def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
-    from ctypes import wintypes
+    from ctypes import wintypes  # noqa: PLC0415
 
     IOCTL_DISK_GET_DRIVE_GEOMETRY_EX = 0x700A0
 
@@ -415,7 +415,7 @@ def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
 
 
 def _windows_get_volume_disk_extents(path: str) -> ctypes.Structure:
-    from ctypes import wintypes
+    from ctypes import wintypes  # noqa: PLC0415
 
     ERROR_MORE_DATA = 234
     IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS = 0x560000
@@ -477,7 +477,7 @@ T = TypeVar("T", bound=ctypes.Structure)
 
 def _windows_ioctl(handle: int, ioctl: int, out_struct: type[T]) -> tuple[int, T]:
     # http://www.ioctls.net/
-    from ctypes import wintypes
+    from ctypes import wintypes  # noqa: PLC0415
 
     out_inst = out_struct()
     bytes_returned = wintypes.DWORD(0)
