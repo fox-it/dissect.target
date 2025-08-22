@@ -3,12 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl
 
-from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
-from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.ssh import SshFilesystem
 from dissect.target.loader import DirLoader, Loader, RawLoader, find_loader
-from dissect.target.loaders.local import LINUX_DRIVE_REGEX, SOLARIS_DRIVE_REGEX
+from dissect.target.loaders.local import (
+    map_esxi_drives,
+    map_linux_drives,
+    map_solaris_drives,
+)
 from dissect.target.plugin import os_plugins
 
 if TYPE_CHECKING:
@@ -20,6 +22,40 @@ if TYPE_CHECKING:
 
 
 class SshLoader(Loader):
+    """A loader that connects to a remote SSH server and maps the filesystem.
+
+    Will use SFTP by default, but can be configured to use other shell dialects.
+
+    Basic connection::
+
+        ssh://user:password@host
+
+    Connect with a key file and passphrase::
+
+        ssh://user@host?key_filename=/path/to/keyfile&key_passphrase=secret
+
+    Connect with a specific shell dialect::
+
+        ssh://user@host?dialect=linux
+
+    Load the local disks, emulating the local loader::
+
+        ssh://user@host?map=local
+
+    Open a specific path on the remote server as target, invoking another loader::
+
+        ssh://user@host/path/to/file.vmdk
+
+    Use the local SSH agent, private keys or host keys::
+
+        ssh://user@host?isolate=false
+
+    Specify a specific OS plugin to use (for performance reasons you may want to do this)::
+
+        ssh://user@host?os=default
+
+    """
+
     def __init__(self, path: Path, parsed_path: ParseResult | None = None):
         super().__init__(path, parsed_path, resolve=False)
         if parsed_path is None:
@@ -67,39 +103,27 @@ def map_shell(target: Target, fs: ShellFilesystem, path: str, map: str, os: str)
         path = fs.path(path)
 
         if loader := find_loader(path, fallbacks=[DirLoader, RawLoader]):
-            ldr = loader(path)
-            ldr.map(target)
+            loader(path).map(target)
+
     # Otherwise, try one of the mapping methods
     elif map == "dir":
         target.filesystems.add(fs)
+
     # Try to load the local disks, emulating the local loader
     elif map == "local":
+        root = fs.path("/")
+
         # ESXi
-        if (path := fs.path("/vmfs/devices/disks")).exists():
-            for drive in path.glob("vml.*"):
-                if ":" in drive.name:
-                    continue
-                target.disks.add(RawContainer(drive.open("rb")))
+        if root.joinpath("vmfs/devices/disks").exists():
+            map_esxi_drives(root, target)
 
         # Solaris
-        elif (path := fs.path("/dev/dsk")).exists():
-            for drive in path.iterdir():
-                if not SOLARIS_DRIVE_REGEX.match(drive.name):
-                    continue
-                target.disks.add(RawContainer(drive.open("rb")))
+        elif root.joinpath("dev/dsk").exists():
+            map_solaris_drives(root, target)
 
         # Linux
-        elif (path := fs.path("/dev")).exists() and (
-            drives := [d for d in path.iterdir() if LINUX_DRIVE_REGEX.match(d.name)]
-        ):
-            for drive in drives:
-                target.disks.add(RawContainer(drive.open("rb")))
-
-            for path in [fs.path("/proc"), fs.path("/sys")]:
-                if path.exists():
-                    dirfs = DirectoryFilesystem(path)
-                    target.filesystems.add(dirfs)
-                    target.fs.mount(str(path), dirfs)
+        elif root.joinpath("dev").exists():
+            map_linux_drives(root, target)
 
     if os != "auto":
         for descriptor in os_plugins():
