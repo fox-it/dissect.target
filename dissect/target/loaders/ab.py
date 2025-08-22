@@ -258,7 +258,7 @@ def _encode_bytes(buf: bytes) -> bytes:
 
 
 def main() -> None:
-    import argparse
+    import argparse  # noqa: PLC0415
 
     parser = argparse.ArgumentParser(description="Android Backup file unwrapper")
     parser.add_argument("path", type=Path, help="source path")

@@ -172,9 +172,9 @@ class FortiFirmwareContainer(Container):
 
 @catch_sigpipe
 def main(argv: list[str] | None = None) -> None:
-    import argparse
-    import shutil
-    import sys
+    import argparse  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+    import sys  # noqa: PLC0415
 
     parser = argparse.ArgumentParser(description="Decompress and deobfuscate Fortinet firmware file to stdout.")
     parser.add_argument("file", type=argparse.FileType("rb"), help="Fortinet firmware file")
