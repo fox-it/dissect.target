@@ -18,6 +18,21 @@ class DissectTransport(Transport):
 
 
 class SshFilesystem(ShellFilesystem):
+    """A filesystem that uses SSH to connect to a remote server and execute shell commands.
+
+    Will attempt to use the SFTP dialect by default, but can be configured to use other shell dialects.
+
+    Args:
+        host: The hostname or IP address of the SSH server.
+        port: The port number of the SSH server (default is 22).
+        username: The username to authenticate with.
+        password: The password to authenticate with.
+        key_filename: Optional path to the private key file for authentication.
+        key_passphrase: Passphrase for the private key file, if required.
+        isolate: Whether to use host SSH agent, private keys or host keys. ``True`` means no external keys are used.
+        dialect: The shell dialect to use (default is "auto").
+    """
+
     __type__ = "ssh"
 
     def __init__(
@@ -82,6 +97,13 @@ class SshFilesystem(ShellFilesystem):
 
 
 class SftpDialect(Dialect):
+    """A dialect for SFTP operations over SSH.
+
+    Args:
+        fs: The SshFilesystem instance to use for SFTP operations.
+        ttl: Time-to-live for cached operations (default is 60 seconds).
+    """
+
     __type__ = "sftp"
 
     def __init__(self, fs: SshFilesystem, ttl: int = 60):
@@ -155,6 +177,8 @@ class SftpDialect(Dialect):
 
 
 class SftpStream(AlignedStream):
+    """A stream for reading files over SFTP in a shell filesystem."""
+
     def __init__(self, fh: SFTPFile, size: int):
         self.fh = fh
         super().__init__(size)

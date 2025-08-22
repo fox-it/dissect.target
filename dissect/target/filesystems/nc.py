@@ -13,6 +13,14 @@ SOCKET_BUFFER_SIZE = 4096
 
 
 class NetcatListenerFilesystem(ShellFilesystem):
+    """A filesystem that uses a netcat listener to execute shell commands.
+
+    Args:
+        host: The hostname or IP address to listen on.
+        port: The port number to listen on (default is 4444).
+        dialect: The shell dialect to use (default is "auto").
+    """
+
     __type__ = "nc"
 
     def __init__(self, host: str, port: int = 4444, dialect: str = "auto", *args, **kwargs):
@@ -27,7 +35,7 @@ class NetcatListenerFilesystem(ShellFilesystem):
 
     @staticmethod
     def detect(fh: BinaryIO) -> bool:
-        raise TypeError("Detect is not allowed on NetcatFilesystem class")
+        raise TypeError("Detect is not allowed on NetcatListenerFilesystem class")
 
     def execute(self, command: str) -> tuple[bytes, bytes]:
         n = random.randint(0, 1000)
@@ -35,6 +43,7 @@ class NetcatListenerFilesystem(ShellFilesystem):
         end_token = random.randbytes(8).hex()
         stderr_token = random.randbytes(8).hex()
 
+        # Some shell magic to separate stdout and stderr
         command = f"({command}) 2> >(sed 's/^/{stderr_token}/;s/$/{stderr_token}/')"
         command = f"\necho -n {start_token}$(({n})); {command}; echo -n {end_token}$(({n}))\n"
 
