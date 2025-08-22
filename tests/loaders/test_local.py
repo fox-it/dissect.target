@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, call, create_autospec, mock_open, patch
+from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.loaders.local import (
-    LINUX_DEV_DIR,
     LINUX_DRIVE_REGEX,
     _add_disk_as_raw_container_to_target,
     _get_windows_drive_volumes,
@@ -79,30 +78,28 @@ def test_add_disk_as_raw_container_to_target_skip_fail(target_bare: Target) -> N
 
 
 def test_map_linux_drives(target_bare: Target, tmp_path: Path) -> None:
-    mock_drive = LINUX_DEV_DIR.joinpath("sda")
-    mock_dev_dir = create_autospec(Path)
-    mock_dev_dir.iterdir.return_value = iter([mock_drive])
+    tmp_path.joinpath("dev").mkdir()
+    tmp_path.joinpath("dev", "sda").touch()
+    tmp_path.joinpath("proc").mkdir()
 
     with (
-        patch("dissect.target.loaders.local.LINUX_DEV_DIR", mock_dev_dir),
         patch(
             "dissect.target.loaders.local._add_disk_as_raw_container_to_target",
             autospec=True,
         ) as mock_add_raw_disks,
-        patch("dissect.target.loaders.local.VOLATILE_LINUX_PATHS", [tmp_path]),
         patch.object(target_bare.filesystems, "add", autospec=True) as mock_add_fs,
         patch.object(target_bare.fs, "mount", autospec=True) as mock_mount,
     ):
-        map_linux_drives(target_bare)
+        map_linux_drives(tmp_path, target_bare)
 
-        mock_add_raw_disks.assert_called_with(mock_drive, target_bare)
+        mock_add_raw_disks.assert_called_with(tmp_path.joinpath("dev/sda"), target_bare)
 
         mock_add_fs.assert_called()
         dir_fs = mock_add_fs.call_args[0][0]
         assert isinstance(dir_fs, DirectoryFilesystem)
-        assert dir_fs.base_path == tmp_path
+        assert dir_fs.base_path == tmp_path.joinpath("proc")
 
-        mock_mount.assert_called_with(str(tmp_path), dir_fs)
+        mock_mount.assert_called_with(str(tmp_path.joinpath("proc")), dir_fs)
 
 
 @pytest.mark.parametrize(

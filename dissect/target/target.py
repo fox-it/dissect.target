@@ -338,7 +338,7 @@ class Target:
                 for sub_entry in loader_cls.find_all(entry, parsed_path=parsed_path):
                     sub_entry, sub_parsed_path = extract_path_info(sub_entry)
                     try:
-                        ldr = loader_cls(sub_entry, parsed_path=sub_parsed_path)
+                        ldr = loader_cls(sub_entry, parsed_path=sub_parsed_path or parsed_path)
                     except Exception as e:
                         message = "Failed to initiate loader: %s"
                         if isinstance(e, TargetPathNotFoundError):
