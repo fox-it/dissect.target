@@ -664,7 +664,7 @@ def _get_plugins() -> PluginRegistry:
 
     if not GENERATED:
         try:
-            from dissect.target.plugins._pluginlist import PLUGINS
+            from dissect.target.plugins._pluginlist import PLUGINS  # noqa: PLC0415
         except ImportError:
             PLUGINS = generate()
 
