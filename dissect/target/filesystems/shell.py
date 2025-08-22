@@ -52,6 +52,18 @@ def ttl_cache(ttl: int = 60) -> Callable[[Callable[..., Any]], Callable[..., Any
 
 
 class ShellFilesystem(Filesystem):
+    """Base class for shell-based filesystems.
+
+    This class provides a common interface for filesystems that interact with the shell, such as SSH, Netcat, or other
+    remote execution environments.
+    It uses a dialect system to handle different shell command sets and behaviors.
+
+    Args:
+        dialect: The dialect to use for shell commands. Can be a string name, a dialect class, or an instance.
+                 Default is "auto", which will try to select a suitable dialect automatically.
+        ttl: Time-to-live for cached results. Default is 60 seconds.
+    """
+
     __fstype__ = "shell"
 
     def __init__(self, dialect: type[Dialect] | Dialect | str = "auto", ttl: int = 60, *args, **kwargs):
@@ -89,6 +101,11 @@ class ShellFilesystem(Filesystem):
         raise TypeError("Detect is not allowed on ShellFilesystem class")
 
     def execute(self, command: str) -> tuple[bytes, bytes]:
+        """Execute a shell command and return its stdout and stderr streams.
+
+        Args:
+            command: The shell command to execute.
+        """
         raise NotImplementedError
 
     def get(self, path: str) -> ShellFilesystemEntry:
@@ -103,21 +120,81 @@ class ShellFilesystem(Filesystem):
 
 
 class Dialect:
+    """Base class for shell dialects.
+
+    Dialects define how to interact with the shell filesystem, including commands for listing directories,
+    reading files, and handling symlinks. Each dialect should implement the methods defined here.
+
+    Args:
+        fs: The shell filesystem instance that this dialect operates on.
+    """
+
     __type__ = None
 
     def __init__(self, fs: ShellFilesystem):
         self.fs = fs
 
+    def detect(self) -> bool:
+        """Detect if this dialect is compatible with the current shell environment.
+
+        Returns:
+            ``True`` if the dialect is compatible, ``False`` otherwise.
+        """
+        raise NotImplementedError
+
     def open(self, path: str) -> BinaryIO:
+        """Open a file at the given path.
+
+        Args:
+            path: The path to the file to open.
+
+        Returns:
+            A file-like object for reading the file.
+        """
         raise NotImplementedError
 
     def iterdir(self, path: str) -> Iterator[str]:
+        """Iterate over the entries in a directory.
+
+        Args:
+            path: The path to the directory to list.
+
+        Returns:
+            An iterator over the names of entries in the directory.
+        """
+        raise NotImplementedError
+
+    def scandir(self, path: str) -> Iterator[tuple[str, fsutil.stat_result]]:
+        """Scan a directory and yield name and stat result tuples.
+
+        Args:
+            path: The path to the directory to scan.
+
+        Returns:
+            An iterator over tuples containing the name of each entry and its stat result.
+        """
         raise NotImplementedError
 
     def readlink(self, path: str) -> str:
+        """Read the target of a symlink.
+
+        Args:
+            path: The path to the symlink.
+
+        Returns:
+            The target of the symlink.
+        """
         raise NotImplementedError
 
     def lstat(self, path: str) -> fsutil.stat_result:
+        """Get the status of a file or symlink without following the symlink.
+
+        Args:
+            path: The path to the file or symlink.
+
+        Returns:
+            A :class:`fsutil.stat_result` object containing file metadata.
+        """
         raise NotImplementedError
 
 
@@ -163,6 +240,8 @@ RE_LINUX_TS = re.compile(r"(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\.(?P<ns>\
 
 
 class LinuxDialect(Dialect):
+    """A basic Linux shell dialect, using ``find``, ``readlink``, and ``stat`` commands."""
+
     __type__ = "linux"
 
     def detect(self) -> bool:
@@ -176,7 +255,7 @@ class LinuxDialect(Dialect):
 
     def iterdir(self, path: str) -> Iterator[str]:
         path = _escape_path(path)
-        stdout, stderr = self.fs.execute(f"find '{path}/' -mindepth 1 -maxdepth 1 -print0")
+        stdout, stderr = self.fs.execute(f"find {path}/ -mindepth 1 -maxdepth 1 -print0")
 
         if not stdout and stderr:
             exc, msg = _stderr_to_exception(stderr.decode())
@@ -195,7 +274,7 @@ class LinuxDialect(Dialect):
 
     def readlink(self, path: str) -> str:
         path = _escape_path(path)
-        stdout, stderr = self.fs.execute(f"readlink -n '{path}'")
+        stdout, stderr = self.fs.execute(f"readlink -n {path}")
         if not stdout:
             exc, msg = _stderr_to_exception(stderr.decode())
             raise exc(f"Failed to read symlink {path}: {msg}")
@@ -203,7 +282,7 @@ class LinuxDialect(Dialect):
 
     def lstat(self, path: str) -> str:
         path = _escape_path(path)
-        stdout, stderr = self.fs.execute(f"stat '{path}'")
+        stdout, stderr = self.fs.execute(f"stat {path}")
 
         if not stdout:
             exc, msg = _stderr_to_exception(stderr.decode())
@@ -240,7 +319,7 @@ class LinuxDialect(Dialect):
         )
 
         if (btime := match.group("btime")) and btime != "-":
-            st_info.st_birthtime = self._parse_ts(match.group("btime"))
+            st_info.st_birthtime = self._parse_ts(match.group("btime")).timestamp()
 
         return st_info
 
@@ -272,6 +351,9 @@ class LinuxDialect(Dialect):
 
 
 class LinuxFastDialect(LinuxDialect):
+    """A faster Linux shell dialect, using a ``stat 'path'/*`` wildcard expansion trick to list directories and get
+    stat information in a single command."""
+
     __type__ = "linux-fast"
 
     def detect(self) -> bool:
@@ -282,7 +364,7 @@ class LinuxFastDialect(LinuxDialect):
 
     def scandir(self, path: str) -> Iterator[tuple[str, fsutil.stat_result]]:
         path = _escape_path(path)
-        stdout, stderr = self.fs.execute(f"stat '{path}'/*")
+        stdout, stderr = self.fs.execute(f"stat {path}/*")
 
         if not stdout and stderr:
             exc, msg = _stderr_to_exception(stderr.decode())
@@ -308,7 +390,8 @@ def _blockdev_size(fs: ShellFilesystem, path: str) -> int:
 
 
 def _escape_path(path: str) -> str:
-    return path.replace("'", "\\'")
+    escaped = path.replace("'", "\\'")
+    return f"'{escaped}'"
 
 
 DIALECT_MAP: dict[str, type[Dialect]] = {
@@ -351,6 +434,8 @@ def _stderr_to_exception(stderr: str) -> tuple[type[FilesystemError], str]:
 
 
 class ShellFilesystemEntry(FilesystemEntry):
+    """A filesystem entry for shell-based filesystems."""
+
     fs: ShellFilesystem
     entry: fsutil.stat_result
 
@@ -394,12 +479,15 @@ class ShellFilesystemEntry(FilesystemEntry):
             # Patch up the size if we can
             try:
                 self.entry.st_size = _blockdev_size(self.fs, self.path)
-            except Exception:
-                pass
+            except Exception as e:
+                log.info("Failed to get size of block device %r", self.path)
+                log.debug("", exc_info=e)
         return self.entry
 
 
 class DdStream(AlignedStream):
+    """A stream for reading files using the ``dd`` command in a shell filesystem."""
+
     def __init__(self, fs: ShellFilesystem, path: str, size: int):
         self.fs = fs
         self.path = _escape_path(path)
@@ -409,7 +497,7 @@ class DdStream(AlignedStream):
         count = (length + self.align - 1) // self.align
         skip = offset // self.align
 
-        stdout, stderr = self.fs.execute(f"dd if='{self.path}' bs={self.align} skip={skip} count={count} status=none")
+        stdout, stderr = self.fs.execute(f"dd if={self.path} bs={self.align} skip={skip} count={count} status=none")
         if stderr:
             exc, msg = _stderr_to_exception(stderr.decode())
             raise exc(f"Failed to read from {self.path}: {msg}")

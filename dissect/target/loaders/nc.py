@@ -15,6 +15,14 @@ if TYPE_CHECKING:
 
 
 class NetcatListenerLoader(Loader):
+    """A loader that accepts reverse TCP shell connections.
+
+    Sets up a TCP listener on the specified host and port and waits for a connection::
+
+        target-shell nc://0.0.0.0:4444
+
+    """
+
     def __init__(self, path: Path, parsed_path: ParseResult | None = None):
         super().__init__(path, parsed_path, resolve=False)
         if parsed_path is None:
