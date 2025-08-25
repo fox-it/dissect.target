@@ -80,7 +80,7 @@ def _try_open(fs: Filesystem, path: str) -> BinaryIO | None:
     return None
 
 
-def parse_path_uri(path: str | Path) -> tuple[Path | None, urllib.parse.ParseResult | None]:
+def parse_path_uri(path: str | Path | None) -> tuple[Path | None, urllib.parse.ParseResult | None]:
     """Parse a path URI into its path component and a parsed path, if applicable.
 
     If the path is a string, it will be parsed as a URI. If it is a Path object, it will be returned as is.

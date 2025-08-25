@@ -76,7 +76,6 @@ class Target:
     """
 
     def __init__(self, path: str | Path | None = None):
-        self.path = None
         self.path_scheme = None
         self.path_query = {}
 
@@ -326,7 +325,7 @@ class Target:
 
     @classmethod
     def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False) -> Iterator[Self]:
-        """Yield targets from a list of paths.
+        """Yield all targets from one or more paths or directories.
 
         If the path is a directory, iterate files one directory deep.
 
@@ -334,7 +333,7 @@ class Target:
             paths: A list of paths to load ``Targets`` from.
                    If the path is a ``os.PathLike`` object, it will be used as-is.
                    If the path is a string and looks like a URI, it will be parsed as such.
-                   If the path is a string and does not like like a URI, it will be treated as a local path.
+                   If the path is a string and does not look like a URI, it will be treated as a local path.
             include_children: Whether to recursively open child targets.
 
         Raises:
