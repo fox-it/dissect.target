@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from dissect.hypervisor import vmx
 
-from dissect.target.containers.vmdk import VmdkContainer
+from dissect.target import container
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
@@ -68,6 +68,6 @@ class VmxLoader(Loader):
                     continue
 
             try:
-                target.disks.add(VmdkContainer(path))
+                target.disks.add(container.open(path))
             except Exception:
                 target.log.exception("Failed to load VMDK: %s", disk)

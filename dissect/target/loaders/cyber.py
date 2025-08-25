@@ -38,9 +38,13 @@ class CyberLoader(Loader):
         return False
 
     def map(self, target: Target) -> None:
-        cols, _ = os.get_terminal_size()
-        width = HEADER.index("\n", 1)
-        header = textwrap.indent(HEADER, " " * ((cols - width) // 2))
+        try:
+            cols, _ = os.get_terminal_size()
+            width = HEADER.index("\n", 1)
+            header = textwrap.indent(HEADER, " " * ((cols - width) // 2))
+        except OSError:
+            header = HEADER
+
         with cyber(mask_space=True, mask_indent=False):
             print(header)
 
