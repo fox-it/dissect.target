@@ -62,6 +62,46 @@ class EventFilter:
     filter_creator_sid: str = ""
 
 
+def get_property_value_safe(consumer: cim.Instance, prop_name: str, default_value: str | None = None) -> str | None:
+    """
+    Extract value of a consumer properties. Fallback to default_value if properties is missing
+    """
+    prop = consumer.properties.get(prop_name)
+    if not prop:
+        return default_value
+    try:
+        return str(prop.value)
+    except ValueError:
+        return default_value
+
+
+def get_filter_name(binding: cim.Instance) -> str:
+    """
+    return unquoted filter name from a __filtertoconsumerbinding class instance
+    """
+    filter_name = binding.properties["Filter"].value
+    # filter name is not always consistent
+    # e.g : __EventFilter.Name="Windows Update Event MOF" or
+    # \\.\root\subscription:__EventFilter.Name="Windows Update Event MOF"
+    if "=" in filter_name:
+        # Required to manage filters name with escaped "
+        filter_name = filter_name.split("=", maxsplit=1)[1]
+        filter_name = filter_name.strip('"').replace('\\"', '"')
+    return filter_name
+
+
+def get_creator_sid(class_instance: cim.Instance) -> str | None:
+    """
+    Extract and parse CreatorSID member
+    """
+    creator_sid = class_instance.properties.get("CreatorSID")
+    if creator_sid:
+        creator_sid_value = getattr(creator_sid, "value", None)
+        if creator_sid:
+            return read_sid(bytes(creator_sid_value))
+    return None
+
+
 class CimPlugin(Plugin):
     """CIM database plugin.
 
@@ -104,7 +144,7 @@ class CimPlugin(Plugin):
         """
         try:
             for binding in self._subscription_ns.class_("__filtertoconsumerbinding").instances:
-                filter_name = self.get_filter_name(binding)
+                filter_name = get_filter_name(binding)
                 yield (
                     self._subscription_ns.query(binding.properties["Consumer"].value),
                     filter_name,
@@ -131,10 +171,10 @@ class CimPlugin(Plugin):
         for consumer, filter_name in self.yield_consumerbinings():
             if consumer.properties.get("CommandLineTemplate"):
                 yield CommandLineEventConsumerRecord(
-                    command_line_template=self.get_property_value_safe(consumer, "CommandLineTemplate", ""),
-                    executable_path=self.get_property_value_safe(consumer, "ExecutablePath", ""),
-                    working_directory=self.get_property_value_safe(consumer, "WorkingDirectory", ""),
-                    creator_sid=self.get_creator_sid(consumer),
+                    command_line_template=get_property_value_safe(consumer, "CommandLineTemplate", ""),
+                    executable_path=get_property_value_safe(consumer, "ExecutablePath", ""),
+                    working_directory=get_property_value_safe(consumer, "WorkingDirectory", ""),
+                    creator_sid=get_creator_sid(consumer),
                     _target=self.target,
                     **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
                 )
@@ -157,39 +197,14 @@ class CimPlugin(Plugin):
         for consumer, filter_name in self.yield_consumerbinings():
             if consumer.properties.get("ScriptText"):
                 yield ActiveScriptEventConsumerRecord(
-                    script_text=self.get_property_value_safe(consumer, "ScriptText", ""),
-                    script_file_name=self.get_property_value_safe(consumer, "ScriptFileName", ""),
-                    scripting_engine=self.get_property_value_safe(consumer, "ScriptingEngine", ""),
-                    machine_name=self.get_property_value_safe(consumer, "MachineName", ""),
-                    name=self.get_property_value_safe(consumer, "Name", ""),
-                    creator_sid=self.get_creator_sid(consumer),
+                    script_text=get_property_value_safe(consumer, "ScriptText", ""),
+                    script_file_name=get_property_value_safe(consumer, "ScriptFileName", ""),
+                    scripting_engine=get_property_value_safe(consumer, "ScriptingEngine", ""),
+                    machine_name=get_property_value_safe(consumer, "MachineName", ""),
+                    name=get_property_value_safe(consumer, "Name", ""),
+                    creator_sid=get_creator_sid(consumer),
                     **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
-                    _target=self.target,
                 )
-
-    @staticmethod
-    def get_property_value_safe(consumer: cim.Instance, prop_name: str, default_value: str | None = None) -> str | None:
-        """
-        Extract value of a consumer properties. Fallback to default_value if properties is missing
-        """
-        prop = consumer.properties.get(prop_name)
-        if not prop:
-            return default_value
-        try:
-            return str(prop.value)
-        except ValueError:
-            return default_value
-
-    def get_creator_sid(self, class_instance: cim.Instance) -> str | None:
-        """
-        Extract and parse CreatorSID member
-        """
-        creator_sid = class_instance.properties.get("CreatorSID")
-        if creator_sid:
-            creator_sid_value = getattr(creator_sid, "value", None)
-            if creator_sid:
-                return read_sid(bytes(creator_sid_value))
-        return None
 
     def generate_filters_dict(self) -> dict[str, EventFilter]:
         """
@@ -202,21 +217,6 @@ class CimPlugin(Plugin):
                 filter_query=event.properties["Query"].value,
                 filter_query_language=event.properties["QueryLanguage"].value,
                 filter_name=filter_name,
-                filter_creator_sid=self.get_creator_sid(event),
+                filter_creator_sid=get_creator_sid(event),
             )
         return filters
-
-    @staticmethod
-    def get_filter_name(binding: cim.Instance) -> str:
-        """
-        return unquoted filter name from a __filtertoconsumerbinding class instance
-        """
-        filter_name = binding.properties["Filter"].value
-        # filter name is not always consistent
-        # e.g : __EventFilter.Name="Windows Update Event MOF" or
-        # \\.\root\subscription:__EventFilter.Name="Windows Update Event MOF"
-        if "=" in filter_name:
-            # Required to manage filters name with escaped "
-            filter_name = filter_name.split("=", maxsplit=1)[1]
-            filter_name = filter_name.strip('"').replace('\\"', '"')
-        return filter_name
