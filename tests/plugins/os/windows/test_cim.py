@@ -1,5 +1,6 @@
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows import cim
+from dissect.target.plugins.os.windows.cim import ActiveScriptEventConsumerRecord, CommandLineEventConsumerRecord
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
@@ -9,9 +10,9 @@ def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     fs_win.map_dir("Windows/System32/wbem/repository", wbem_repository)
 
     target_win.add_plugin(cim.CimPlugin)
-
-    assert len(list(target_win.cim())) == 3
-    assert len(list(target_win.cim.command_line_event_consumer())) == 1
-    assert len(list(target_win.cim.active_script_event_consumer())) == 2
+    consumer_records = list(target_win.cim.consumerbindings())
+    assert len(consumer_records) == 3
+    assert len([r for r in consumer_records if type(r) == CommandLineEventConsumerRecord.recordType]) == 1  # noqa: E721
+    assert len([r for r in consumer_records if type(r) == ActiveScriptEventConsumerRecord.recordType]) == 2  # noqa: E721
     # Ensure associated filter query was correctly found for all
     assert len([record for record in target_win.cim() if record.filter_query]) == 3

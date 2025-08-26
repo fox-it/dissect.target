@@ -153,35 +153,9 @@ class CimPlugin(Plugin):
             self.target.log.warning("Error during consumerbindings execution", exc_info=e)
             self.target.log.debug("", exc_info=e)
 
-    @export(record=CommandLineEventConsumerRecord)
-    def command_line_event_consumer(self) -> Iterator[CommandLineEventConsumerRecord]:
-        """Return all CommandLineEventConsumer queries.
-
-        WMI permanent event subscriptions can be used to trigger actions when specified conditions are met. Attackers
-        often use this functionality to persist the execution of backdoors at system start up. WMI Consumers specify an
-        action to be performed, including executing a command, running a script, adding an entry to a log, or sending
-        an email. WMI Filters define conditions that will trigger a Consumer.
-
-        References:
-            - https://learn-powershell.net/2013/08/14/powershell-and-events-permanent-wmi-event-subscriptions/
-            - https://www.mandiant.com/resources/dissecting-one-ofap
-            - https://support.sophos.com/support/s/article/KB-000038535?language=en_US&c__displayLanguage=en_US
-            - https://learn.microsoft.com/en-us/windows/win32/wmisdk/commandlineeventconsumer
-        """
-        for consumer, filter_name in self.yield_consumerbinings():
-            if consumer.properties.get("CommandLineTemplate"):
-                yield CommandLineEventConsumerRecord(
-                    command_line_template=get_property_value_safe(consumer, "CommandLineTemplate", ""),
-                    executable_path=get_property_value_safe(consumer, "ExecutablePath", ""),
-                    working_directory=get_property_value_safe(consumer, "WorkingDirectory", ""),
-                    creator_sid=get_creator_sid(consumer),
-                    _target=self.target,
-                    **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
-                )
-
-    @export(record=ActiveScriptEventConsumerRecord)
-    def active_script_event_consumer(self) -> Iterator[ActiveScriptEventConsumerRecord]:
-        """Return all ActiveScriptEventConsumer.
+    @export(record=[ActiveScriptEventConsumerRecord, CommandLineEventConsumerRecord])
+    def consumerbindings(self) -> Iterator[ActiveScriptEventConsumerRecord | CommandLineEventConsumerRecord]:
+        """Return all ActiveScriptEventConsumer and CommandLineEventConsumer.
 
         WMI permanent event subscriptions can be used to trigger actions when specified conditions are met. Attackers
         often use this functionality to persist the execution of backdoors at system start up. WMI Consumers specify an
@@ -193,6 +167,7 @@ class CimPlugin(Plugin):
             - https://www.mandiant.com/resources/dissecting-one-ofap
             - https://support.sophos.com/support/s/article/KB-000038535?language=en_US&c__displayLanguage=en_US
             - https://learn.microsoft.com/en-us/windows/win32/wmisdk/activescripteventconsumer
+            - https://learn.microsoft.com/en-us/windows/win32/wmisdk/commandlineeventconsumer
         """
         for consumer, filter_name in self.yield_consumerbinings():
             if consumer.properties.get("ScriptText"):
@@ -203,6 +178,15 @@ class CimPlugin(Plugin):
                     machine_name=get_property_value_safe(consumer, "MachineName", ""),
                     name=get_property_value_safe(consumer, "Name", ""),
                     creator_sid=get_creator_sid(consumer),
+                    **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
+                )
+            if consumer.properties.get("CommandLineTemplate"):
+                yield CommandLineEventConsumerRecord(
+                    command_line_template=get_property_value_safe(consumer, "CommandLineTemplate", ""),
+                    executable_path=get_property_value_safe(consumer, "ExecutablePath", ""),
+                    working_directory=get_property_value_safe(consumer, "WorkingDirectory", ""),
+                    creator_sid=get_creator_sid(consumer),
+                    _target=self.target,
                     **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
                 )
 
