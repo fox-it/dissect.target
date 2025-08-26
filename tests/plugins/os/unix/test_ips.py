@@ -196,7 +196,7 @@ def test_ips_netplan_static_invalid(
 
 
 def test_ips_netplan_static_empty_regression(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_fh("/etc/netplan/01-netcfg.yaml", BytesIO(b""))
+    fs_unix.map_file_fh("/etc/netplan/01-netcfg.yaml", BytesIO())
     target_unix_users.add_plugin(LinuxPlugin)
     assert target_unix_users.ips == []
 

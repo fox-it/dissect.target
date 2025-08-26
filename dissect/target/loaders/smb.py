@@ -4,7 +4,6 @@ import os
 import time
 from functools import cached_property
 from typing import TYPE_CHECKING
-from urllib.parse import ParseResult, parse_qsl
 
 from dissect.regf import regf
 from dissect.util import ts
@@ -32,6 +31,7 @@ from dissect.target.plugins.os.windows.registry import RegistryPlugin
 if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
+    from urllib.parse import ParseResult
 
     from impacket.dcerpc.v5.srvs import SHARE_INFO_1
 
@@ -82,31 +82,27 @@ class SmbLoader(Loader):
     EMPTY_LM = "aad3b435b51404eeaad3b435b51404ee"
 
     def __init__(self, path: Path, parsed_path: ParseResult | None = None):
-        super().__init__(path, parsed_path, resolve=False)
+        super().__init__(path, parsed_path=parsed_path, resolve=False)
 
         if parsed_path is None:
             raise LoaderError("Missing URI connection details")
 
-        self._params = dict(parse_qsl(parsed_path.query, keep_blank_values=False))
-
-        self._ip = self._params.get("ip", os.getenv("SMB_TARGET_IP", parsed_path.hostname))
-        self._host = self._params.get("host", os.getenv("SMB_TARGET_HOST", parsed_path.hostname))
-        self._domain = self._params.get("domain", os.getenv("SMB_DOMAIN", "."))
+        self._ip = self.parsed_query.get("ip", os.getenv("SMB_TARGET_IP", parsed_path.hostname))
+        self._host = self.parsed_query.get("host", os.getenv("SMB_TARGET_HOST", parsed_path.hostname))
+        self._domain = self.parsed_query.get("domain", os.getenv("SMB_DOMAIN", "."))
         self._username = parsed_path.username or os.getenv("SMB_USERNAME", "Guest")
         self._password = parsed_path.password or os.getenv("SMB_PASSWORD", "")
         self._nt, self._lm = "", ""
         if not self._password:
             self._nt, self._lm = self._get_hashes()
 
-        krb_ticket_params = self._params.get("ticket", self._params.get("ccache", ""))
+        krb_ticketparsed_query = self.parsed_query.get("ticket", self.parsed_query.get("ccache", ""))
         krb_ticket_env = os.getenv("SMB_KERBEROS_TICKET", os.getenv("KRB5CCNAME", ""))
-        self._krb_ticket = krb_ticket_params or krb_ticket_env
-        self._krb_aes = self._params.get("aes", os.getenv("SMB_KERBEROS_AES_KEY", ""))
-        self._krb_dc = self._params.get("dc", os.getenv("SMB_KERBEROS_DC", ""))
-        self._krb_dc_ip = self._params.get("dc-ip", os.getenv("SMB_KERBEROS_DC_IP", ""))
-        self._use_kerberos = self._params.get("kerberos", "").lower() in ("true", "1", "yes")
-
-        self._name = f"smb://{self._domain}/{self._username}@{self._host}"
+        self._krb_ticket = krb_ticketparsed_query or krb_ticket_env
+        self._krb_aes = self.parsed_query.get("aes", os.getenv("SMB_KERBEROS_AES_KEY", ""))
+        self._krb_dc = self.parsed_query.get("dc", os.getenv("SMB_KERBEROS_DC", ""))
+        self._krb_dc_ip = self.parsed_query.get("dc-ip", os.getenv("SMB_KERBEROS_DC_IP", ""))
+        self._use_kerberos = self.parsed_query.get("kerberos", "").lower() in ("true", "1", "yes")
 
         self._conn = SMBConnection(
             remoteName=self._host,
@@ -140,10 +136,10 @@ class SmbLoader(Loader):
 
     def _get_hashes(self) -> tuple[str, str]:
         """Attempt to parse NT and LM hashes from the URI query string."""
-        nt = self._params.get("nt", self.EMPTY_NT)
-        lm = self._params.get("lm", self.EMPTY_LM)
+        nt = self.parsed_query.get("nt", self.EMPTY_NT)
+        lm = self.parsed_query.get("lm", self.EMPTY_LM)
 
-        hashes = self._params.get("hash", self._params.get("hashes", f"{nt}:{lm}"))
+        hashes = self.parsed_query.get("hash", self.parsed_query.get("hashes", f"{nt}:{lm}"))
 
         if ":" in hashes:
             nt, lm = hashes.split(":", 1)
