@@ -1,20 +1,29 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.util.stream import AlignedStream
-from paramiko import AutoAddPolicy, SFTPAttributes, SFTPFile, SSHClient, SSHException, Transport
 
 from dissect.target import exceptions
 from dissect.target.filesystems.shell import Dialect, ShellFilesystem, ShellFilesystemEntry, ttl_cache
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 
-class DissectTransport(Transport):
-    _CLIENT_ID = "DISSECT"
+try:
+    from paramiko import AutoAddPolicy, SFTPAttributes, SFTPFile, SSHClient, SSHException, Transport
+
+    class DissectTransport(Transport):
+        _CLIENT_ID = "DISSECT"
+
+    HAS_PARAMIKO = True
+except ImportError:
+    HAS_PARAMIKO = False
+
+    class DissectTransport:
+        pass
 
 
 class SshFilesystem(ShellFilesystem):
@@ -48,6 +57,11 @@ class SshFilesystem(ShellFilesystem):
         *args,
         **kwargs,
     ):
+        if not HAS_PARAMIKO:
+            raise ImportError(
+                "Required dependency 'paramiko' is missing, install with 'pip install dissect.target[ssh]'"
+            )
+
         self.client = SSHClient()
 
         if isolate:

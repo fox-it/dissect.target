@@ -11,6 +11,9 @@ if TYPE_CHECKING:
 
 def test_ssh_filesystem(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
+        if "dissect.target.filesystems.ssh" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.filesystems.ssh")
+
         mock_paramiko = MagicMock()
         m.setitem(sys.modules, "paramiko", mock_paramiko)
 
