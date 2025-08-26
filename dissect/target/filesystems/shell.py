@@ -5,7 +5,7 @@ import re
 import stat
 import time
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.util.stream import AlignedStream
 
@@ -20,7 +20,7 @@ from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 log = logging.getLogger(__name__)
 
