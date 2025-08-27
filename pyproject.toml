@@ -63,7 +63,6 @@ full = [
     "dissect.qnxfs>=1,<2",
     "dissect.shellitem>=3,<4",
     "dissect.squashfs>=1,<2",
-    "dissect.sql>=3.12.dev4,<4",  # TODO: update on release!
     "dissect.thumbcache>=1,<2",
     "dissect.vmfs>=3.12.dev,<4",  # TODO: update on release
     "dissect.xfs>=3,<4",
