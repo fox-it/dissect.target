@@ -32,6 +32,7 @@ dependencies = [
     "dissect.hypervisor>=3.19.dev2,<4",  # TODO: update on release!
     "dissect.ntfs>=3.4,<4",
     "dissect.regf>=3.13,<4",
+    "dissect.sql>=3.12.dev4,<4",  # TODO: update on release!
     "dissect.util>=3,<4",
     "dissect.volume>=2,<4",
     "flow.record~=3.19.0",
