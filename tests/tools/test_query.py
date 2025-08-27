@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
 import re
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
@@ -11,6 +10,7 @@ import pytest
 
 from dissect.target.plugin import FunctionDescriptor, Plugin, PluginRegistry, arg, export
 from dissect.target.tools.query import main as target_query
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
@@ -101,7 +101,7 @@ def test_invalid_functions(
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", ",".join(given_funcs), "tests/_data/loaders/tar/test-archive.tar.gz"],
+            ["target-query", "-f", ",".join(given_funcs), str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
         )
 
         with pytest.raises(SystemExit):
@@ -160,7 +160,7 @@ def test_invalid_excluded_functions(
                 "hostname",
                 "-xf",
                 ",".join(given_funcs),
-                "tests/_data/loaders/tar/test-archive.tar.gz",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
             ],
         )
 
@@ -184,7 +184,7 @@ def test_unsupported_plugin_log(caplog: pytest.LogCaptureFixture, monkeypatch: p
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", "regf", "tests/_data/loaders/tar/test-archive.tar.gz"],
+            ["target-query", "-f", "regf", str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
         )
 
         target_query()
@@ -231,7 +231,7 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
                 "foo,bar,bla,foo",
                 "-xf",
                 "bla",
-                "tests/_data/loaders/tar/test-archive.tar.gz",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
             ],
         )
 
@@ -262,10 +262,7 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-    if os.sep == "\\":
-        target_file = "tests\\_data\\loaders\\tar\\test-archive.tar.gz"
-    else:
-        target_file = "tests/_data/loaders/tar/test-archive.tar.gz"
+    target_file = str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))
 
     with monkeypatch.context() as m:
         m.setattr(
@@ -370,7 +367,10 @@ def test_record_stream_write_exception_handling(
     """Test if we correctly print the function name of the iterator that failed to iterate."""
 
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-query", "-f", "users,walkfs", "tests/_data/loaders/tar/test-archive.tar.gz"])
+        m.setattr(
+            "sys.argv",
+            ["target-query", "-f", "users,walkfs", str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
+        )
 
         with patch("dissect.target.tools.query.record_output", return_value=None):
             target_query()
@@ -396,7 +396,14 @@ def test_arguments_passed_correctly(
 
     with monkeypatch.context() as m:
         m.setattr(
-            "sys.argv", ["target-query", "-fmock", "tests/_data/loaders/tar/test-archive.tar.gz", "--compact", "--json"]
+            "sys.argv",
+            [
+                "target-query",
+                "-fmock",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
+                "--compact",
+                "--json",
+            ],
         )
 
         with (
