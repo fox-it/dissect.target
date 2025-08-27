@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import shutil
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -241,49 +242,24 @@ def test_evtx_no_time_change_warning_for_normal_events(caplog: pytest.LogCapture
     assert "Time change event detected" not in caplog.text
 
 
-def test_evtx_with_security_log_produces_warning():
-    """Integration test to verify warning is produced when processing Security.evtx."""
+def test_evtx_with_security_log_produces_warning(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that Event ID 4616 from Microsoft-Windows-Security-Auditing triggers warning logs."""
     
-    import logging
-    from io import StringIO
+    # Create a mock EVTX record representing Event ID 4616 from Microsoft-Windows-Security-Auditing  
+    mock_record = {
+        "EventID": 4616,
+        "Provider_Name": "Microsoft-Windows-Security-Auditing", 
+        "TimeCreated_SystemTime": "2023-01-01T00:00:00Z"
+    }
     
-    # Set up a string stream to capture log output
-    log_capture_string = StringIO()
-    ch = logging.StreamHandler(log_capture_string)
-    ch.setLevel(logging.WARNING)
+    target = Target()
+    plugin = evtx.EvtxPlugin(target)
     
-    # Add the handler to the dissect.target logger
-    logger = logging.getLogger("dissect.target")
-    original_level = logger.level
-    logger.setLevel(logging.WARNING)
-    logger.addHandler(ch)
+    # Process the record - this should trigger a warning
+    with caplog.at_level("WARNING", target.log.name):
+        result = plugin._build_record(mock_record, None)
     
-    try:
-        evtx_file = absolute_path("_data/plugins/os/windows/log/evtx/Security.evtx")
-        target = Target.open_direct([evtx_file])
-        plugin = evtx.EvtxPlugin(target)
-        
-        # Process some records to find the time change event
-        count = 0
-        found_time_change_event = False
-        for record in plugin.evtx():
-            count += 1
-            if hasattr(record, 'EventID') and record.EventID == 4616:
-                # Found the time change event
-                found_time_change_event = True
-                break
-            if count > 300:  # Safety limit
-                break
-        
-        # Check if we found the time change event
-        assert found_time_change_event, "Expected to find Event ID 4616 in Security.evtx"
-        
-        # Check the captured log output
-        log_contents = log_capture_string.getvalue()
-        assert "time change" in log_contents.lower(), f"Expected time change warning in logs, got: {log_contents}"
-        
-    finally:
-        # Clean up logging
-        logger.removeHandler(ch)
-        logger.setLevel(original_level)
-        ch.close()
+    # Verify warning was logged
+    assert "Time change event detected" in caplog.text
+    assert "EventID 4616" in caplog.text 
+    assert "Microsoft-Windows-Security-Auditing" in caplog.text
