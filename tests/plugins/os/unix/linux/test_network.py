@@ -7,6 +7,8 @@ from ipaddress import ip_address, ip_interface
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from dissect.target.plugins.os.default.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
     DhclientLeaseParser,
@@ -15,6 +17,7 @@ from dissect.target.plugins.os.unix.linux.network import (
     NetworkManagerConfigParser,
     NetworkManagerLeaseParser,
     ProcConfigParser,
+    SyslogConfigParser,
     SystemdNetworkConfigParser,
 )
 from tests._utils import absolute_path
@@ -325,3 +328,75 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
     assert lo.cidr == [ip_interface("::1/128")]
     assert docker.cidr == [ip_interface("172.17.0.1/16")]
     assert vir.cidr == [ip_interface("192.168.122.1/24")]
+
+
+@pytest.mark.parametrize(
+    ("expected_record", "messages"),
+    [
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("10.13.37.1/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'",  # noqa: E501
+        ),
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("10.13.37.2/24")],
+                "gateway": [ip_address("10.13.37.0")],
+                "source": "syslog",
+            },
+            "Feb  2 13:37:02 test systemd-networkd[2]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0",
+        ),
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("10.13.37.3/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Mar  3 13:37:03 localhost NetworkManager[3]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3",
+        ),
+        (
+            {
+                "name": None,
+                "cidr": [ip_interface("10.13.37.4/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.",
+        ),
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("2001:db8::/64")],
+                "gateway": [ip_address("2001:db8:ffff:ffff:ffff:ffff:ffff:ffff")],
+                "source": "syslog",
+            },
+            (
+                "Jun  6 13:37:06 test systemd-networkd[5]: eth0: DHCPv6 address 2001:db8::/64 via 2001:db8:ffff:ffff:ffff:ffff:ffff:ffff\n"  # noqa: E501
+                "May  5 13:37:05 test systemd-networkd[5]: eth0: DHCPv6 lease lost\n"
+            ),
+        ),
+    ],
+)
+def test_ips_dhcp(target_unix_users: Target, fs_unix: VirtualFilesystem, expected_record: dict, messages: str) -> None:
+    """Test DHCP lease messages from /var/log/syslog."""
+
+    fs_unix.map_file_fh(
+        "/var/log/syslog",
+        BytesIO(textwrap.dedent(messages).encode()),
+    )
+
+    syslog_config_parser = SyslogConfigParser(target_unix_users, 5)
+    results = list(syslog_config_parser.interfaces())
+
+    assert len(results) == 1
+    result = results[0]
+    assert result.name == expected_record["name"]
+    assert result.cidr == expected_record["cidr"]
+    assert result.gateway == expected_record["gateway"]
+    assert result.source == expected_record["source"]
