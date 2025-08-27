@@ -49,9 +49,10 @@ class CbLoader(Loader):
     """
 
     def __init__(self, path: Path, parsed_path: ParseResult | None = None):
-        super().__init__(path, parsed_path, resolve=False)
+        super().__init__(path, parsed_path=parsed_path, resolve=False)
 
-        self.host, _, instance = self.parsed_path.netloc.partition("@")
+        self.host = self.parsed_path.path.strip("/")
+        instance = self.parsed_path.hostname
 
         try:
             self.cbc_api = CBCloudAPI(profile=instance or None)

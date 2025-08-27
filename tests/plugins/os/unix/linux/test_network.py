@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import posixpath
 import textwrap
 from datetime import datetime
 from io import BytesIO
@@ -18,6 +17,7 @@ from dissect.target.plugins.os.unix.linux.network import (
     ProcConfigParser,
     SystemdNetworkConfigParser,
 )
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    fixture_dir = "tests/_data/plugins/os/unix/linux/NetworkManager/"
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/NetworkManager")
     fs_linux.map_dir("/etc/NetworkManager/system-connections", fixture_dir)
 
     network_manager_config_parser = NetworkManagerConfigParser(target_linux)
@@ -68,27 +68,21 @@ def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem
 
 
 def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    fixture_dir = "tests/_data/plugins/os/unix/linux/systemd.network/"
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/systemd.network")
 
-    fs_linux.map_file(
-        "/etc/systemd/network/20-wired-static.network", posixpath.join(fixture_dir, "20-wired-static.network")
-    )
+    fs_linux.map_file("/etc/systemd/network/20-wired-static.network", fixture_dir.joinpath("20-wired-static.network"))
     fs_linux.map_file(
         "/etc/systemd/network/30-wired-static-complex.network",
-        posixpath.join(fixture_dir, "30-wired-static-complex.network"),
+        fixture_dir.joinpath("30-wired-static-complex.network"),
     )
-    fs_linux.map_file(
-        "/usr/lib/systemd/network/40-wireless.network", posixpath.join(fixture_dir, "40-wireless.network")
-    )
-    fs_linux.map_file(
-        "/run/systemd/network/40-wireless-ipv4.network", posixpath.join(fixture_dir, "40-wireless-ipv4.network")
-    )
+    fs_linux.map_file("/usr/lib/systemd/network/40-wireless.network", fixture_dir.joinpath("40-wireless.network"))
+    fs_linux.map_file("/run/systemd/network/40-wireless-ipv4.network", fixture_dir.joinpath("40-wireless-ipv4.network"))
     fs_linux.map_file(
         "/usr/local/lib/systemd/network/40-wireless-ipv6.network",
-        posixpath.join(fixture_dir, "40-wireless-ipv6.network"),
+        fixture_dir.joinpath("40-wireless-ipv6.network"),
     )
-    fs_linux.map_file("/etc/systemd/network/20-vlan.netdev", posixpath.join(fixture_dir, "20-vlan.netdev"))
-    fs_linux.map_file("/etc/systemd/network/20-vlan2.netdev", posixpath.join(fixture_dir, "20-vlan2.netdev"))
+    fs_linux.map_file("/etc/systemd/network/20-vlan.netdev", fixture_dir.joinpath("20-vlan.netdev"))
+    fs_linux.map_file("/etc/systemd/network/20-vlan2.netdev", fixture_dir.joinpath("20-vlan2.netdev"))
 
     systemd_network_config_parser = SystemdNetworkConfigParser(target_linux)
     interfaces = list(systemd_network_config_parser.interfaces())
@@ -161,19 +155,19 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
 
 
 def test_systemd_network_drop(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    fixture_dir = "tests/_data/plugins/os/unix/linux/systemd.network/"
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/systemd.network")
 
     fs_linux.map_file(
         "/etc/systemd/network/30-wired-static-complex.network",
-        posixpath.join(fixture_dir, "30-wired-static-complex.network"),
+        fixture_dir.joinpath("30-wired-static-complex.network"),
     )
     fs_linux.map_file(
         "/etc/systemd/network/30-wired-static-complex.network.d/10-override.conf",
-        posixpath.join(fixture_dir, "30-wired-static-complex.network.d/10-override.conf"),
+        fixture_dir.joinpath("30-wired-static-complex.network.d/10-override.conf"),
     )
     fs_linux.map_file(
         "/etc/systemd/network/30-wired-static-complex.network.d/20-override.conf",
-        posixpath.join(fixture_dir, "30-wired-static-complex.network.d/20-override.conf"),
+        fixture_dir.joinpath("30-wired-static-complex.network.d/20-override.conf"),
     )
 
     systemd_network_config_parser = SystemdNetworkConfigParser(target_linux)
@@ -306,11 +300,11 @@ def test_linux_network_networkmanager_leases_file(target_linux: Target, fs_linux
 
 
 def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    fixture_dir = "tests/_data/plugins/os/unix/linux/proc"
-    fs_linux.map_file("/proc/net/route", posixpath.join(fixture_dir, "route"))
-    fs_linux.map_file("/proc/net/tcp", posixpath.join(fixture_dir, "tcp"))
-    fs_linux.map_file("/proc/net/if_inet6", posixpath.join(fixture_dir, "if_inet6"))
-    fs_linux.map_file("/proc/net/fib_trie", posixpath.join(fixture_dir, "fib_trie"))
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/proc")
+    fs_linux.map_file("/proc/net/route", fixture_dir.joinpath("route"))
+    fs_linux.map_file("/proc/net/tcp", fixture_dir.joinpath("tcp"))
+    fs_linux.map_file("/proc/net/if_inet6", fixture_dir.joinpath("if_inet6"))
+    fs_linux.map_file("/proc/net/fib_trie", fixture_dir.joinpath("fib_trie"))
 
     parser = ProcConfigParser(target_linux)
     interfaces = list(parser.interfaces())
