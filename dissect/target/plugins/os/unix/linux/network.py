@@ -4,14 +4,19 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import IPv4Interface, IPv6Interface, ip_address, ip_interface
-from itertools import chain
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from itertools import chain, islice
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union
 
+from typing_extensions import get_args
+
+from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import UnixInterfaceRecord
 from dissect.target.helpers.utils import to_list
-from dissect.target.plugin import export
-from dissect.target.plugins.os.default.network import NetworkPlugin
+from dissect.target.plugin import arg, export
+from dissect.target.plugins.os.default.network import InterfaceRecord, NetworkPlugin
+from dissect.target.plugins.os.unix.log.journal import JournalRecord
+from dissect.target.plugins.os.unix.log.messages import MessagesRecord
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -26,11 +31,31 @@ if TYPE_CHECKING:
 class LinuxNetworkPlugin(NetworkPlugin):
     """Linux network interface plugin."""
 
-    def _interfaces(self) -> Iterator[UnixInterfaceRecord]:
+    @arg("-s", "--syslog", action="store_true", help="Scan syslog for dhcp leases")
+    @arg(
+        "-m",
+        "--maxlines",
+        default=None,
+        action="store_true",
+        help="Maximum number of lines of syslog to scan (0 is unlimited)",
+    )
+    @export(record=get_args(InterfaceRecord))
+    def interfaces(self, syslog: bool = False, maxlines: int | None = None) -> Iterator[UnixInterfaceRecord]:
+        """Yield interfaces."""
+        if self._interface_list is None:
+            self._interface_list = list(self._interfaces(syslog, maxlines))
+
+        yield from self._interface_list
+
+    def _interfaces(self, scan_syslog: bool, maxlines: int | None) -> Iterator[UnixInterfaceRecord]:
         """Try all available network configuration managers and aggregate the results."""
         for manager_cls in MANAGERS + LEASERS:
             manager: LinuxNetworkConfigParser = manager_cls(self.target)
             yield from manager.interfaces()
+
+        if scan_syslog:
+            syslog_parser = SyslogConfigParser(self.target, maxlines)
+            yield from syslog_parser.interfaces()
 
     @export(record=UnixInterfaceRecord)
     def dhcp(self) -> Iterator[UnixInterfaceRecord]:
@@ -590,9 +615,116 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         return result
 
 
+LogRecord = Union[JournalRecord, MessagesRecord]
+
+
+class SyslogConfigParser(LinuxNetworkConfigParser):
+    def __init__(self, target: Target, max_lines: int | None = None):
+        super().__init__(target)
+        self._max_lines = max_lines
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        parsers = [
+            parse_ubuntu_cloud_init_dhcp_lease,
+            parse_network_manager_dhcp_lease,
+            parse_networkd_dhcp_lease,
+            parse_network_manager_centos_dhcp_lease,
+            parse_debian_centos_dhclient_lease,
+        ]
+
+        for record in self._read_logs():
+            for parser in parsers:
+                dhcp_lease = parser(record)
+                if dhcp_lease:
+                    yield UnixInterfaceRecord(
+                        name=dhcp_lease.interface,
+                        cidr={dhcp_lease.ip},
+                        gateway={dhcp_lease.gateway} if dhcp_lease.gateway else set(),
+                        source="syslog",
+                    )
+                    break
+
+    def _read_logs(self) -> Iterator[LogRecord]:
+        try:
+            messages_iter = islice(self._target.messages(), self._max_lines)
+        except PluginError:
+            self._target.log.debug("Could not search for DHCP leases from the messages plugin")
+            messages_iter = iter(())
+
+        try:
+            journal_iter = islice(self._target.journal(), self._max_lines)
+        except PluginError:
+            self._target.log.debug("Could not search for DHCP leases from the journal plugin")
+            journal_iter = iter(())
+
+        return filter(lambda log: log.message, chain(messages_iter, journal_iter))
+
+
 def be_hex_to_int(be_hex: str) -> int:
     """Convert big-endian hex string to integer."""
     return int.from_bytes(bytes.fromhex(be_hex), "little")
+
+
+@dataclass
+class DhcpLease:
+    interface: str | None
+    ip: NetInterface | None
+    gateway: NetAddress | None
+
+
+def parse_ubuntu_cloud_init_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from Ubuntu cloud-init logs."""
+
+    if not (match := re.search(r"Received dhcp lease on (\w*) for (\S+)", log_record.message)):
+        return None
+    interface, ip = match.groups()
+
+    return DhcpLease(interface, ip_interface(ip)) if ip else None
+
+
+def parse_networkd_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from systemd-networkd."""
+
+    if not (match := re.search(r"(\S+): DHCPv[4|6] address (\S+) via (\S+)", log_record.message)):
+        return None
+
+    interface, ip, gateway = match.groups()
+    gateway_address = ip_address(gateway) if gateway else None
+    return DhcpLease(interface, ip_interface(ip), gateway_address) if ip else None
+
+
+def parse_network_manager_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from NetworkManager logs."""
+
+    # dhcp4 (eth0): option ip_address           => '10.13.37.1'
+    if not (match := re.search(r"dhcp[46] \((\S+)\): option ip_address\s+=>\s+'(\S+)'", log_record.message)):
+        return None
+    interface, ip = match.groups()
+
+    return DhcpLease(interface, ip_interface(ip), None) if ip else None
+
+
+def parse_network_manager_centos_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP centos information"""
+
+    if not (match := re.search(r"dhcp[46] \((\S+)\):\s+address\s+(\S+)", log_record.message)):
+        return None
+    interface, ip = match.groups()
+    return DhcpLease(interface, ip_interface(ip), None) if ip else None
+
+
+def parse_debian_centos_dhclient_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from dhclient bound log lines."""
+
+    if not (hasattr(log_record, "service") and log_record.service == "dhclient"):
+        return None
+
+    # Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.
+    match = re.search(r"bound to (\S+)", log_record.message)
+    if not match:
+        return None
+    ip = match.group(1)
+    return DhcpLease(interface=None, ip=ip_interface(ip), gateway=None) if ip else None
 
 
 MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
