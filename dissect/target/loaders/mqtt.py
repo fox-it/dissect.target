@@ -34,7 +34,6 @@ try:
     import paho.mqtt.client as mqtt
 
     HAS_PAHO = True
-
 except ImportError:
     HAS_PAHO = False
 

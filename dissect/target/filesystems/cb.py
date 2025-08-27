@@ -18,7 +18,6 @@ try:
     from cbc_sdk.live_response_api import LiveResponseError, LiveResponseSession
 
     HAS_CARBON_BLACK = True
-
 except ImportError:
     HAS_CARBON_BLACK = False
 

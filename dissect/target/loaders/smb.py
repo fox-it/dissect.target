@@ -40,7 +40,6 @@ try:
     from impacket.smbconnection import SessionError, SMBConnection
 
     HAS_IMPACKET = True
-
 except ImportError:
     HAS_IMPACKET = False
 
@@ -180,7 +179,6 @@ class SmbLoader(Loader):
                     mount_name = share_name.lower().replace("$", ":")
 
                 target.fs.mount(mount_name, smb_filesystem)
-
             except SessionError as e:
                 target.log.warning("Failed to mount share '%s', reason: %s", share_name, e)
 

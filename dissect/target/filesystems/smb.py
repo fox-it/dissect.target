@@ -31,7 +31,6 @@ try:
     from impacket.smbconnection import SessionError, SMBConnection
 
     HAS_IMPACKET = True
-
 except ImportError:
     HAS_IMPACKET = False
 
