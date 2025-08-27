@@ -265,3 +265,21 @@ def test_benchmark_tar_filesystem(
         list(fs.get("LARGE").scandir())
 
     benchmark(benchy)
+
+
+def test_skip_folder_member_if_previously_mapped() -> None:
+    """Test if we skip a directory tar member if the path of said directory is already mapped."""
+    buf = io.BytesIO()
+    tf = tarfile.TarFile(fileobj=buf, mode="w")
+    _mkfile(tf, "folder/file", b"file contents")  # Write the file member first
+    _mkdir(tf, "folder")  # Then write the 'empty' directory member
+    tf.close()
+    buf.seek(0)
+
+    fs = TarFilesystem(buf)
+
+    # Sanity check
+    assert list(fs.get("/").iterdir()) == ["folder"]
+
+    # Make sure the /folder/file entry is mapped.
+    assert list(fs.get("/folder").iterdir()) == ["file"]
