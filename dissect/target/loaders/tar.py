@@ -113,6 +113,15 @@ class GenericTarSubLoader(TarSubLoader):
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             entry = entry_cls(volume, fsutil.normpath(mname), member)
+
+            # Prevent overriding an already created folder with an empty member dir entry.
+            try:
+                if member.isdir() and volume.get(entry.path).is_dir():
+                    log.debug("Skipping directory member %r in tar as %r is already mapped", member, entry.path)
+                    continue
+            except (FileNotFoundError, NotADirectoryError):
+                pass
+
             volume.map_file_entry(entry.path, entry)
 
         for vol_name, vol in volumes.items():

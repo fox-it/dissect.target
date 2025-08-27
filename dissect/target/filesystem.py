@@ -870,7 +870,7 @@ class VirtualDirectory(FilesystemEntry):
         raise TypeError(f"lattr is not allowed on VirtualDirectory: {self.path}")
 
     def add(self, name: str, entry: FilesystemEntry) -> None:
-        """Add an entry to this :class:`VirtualDirectory`."""
+        """Add an entry to this :class:`VirtualDirectory`. Overrides already existing entries with ``name``."""
         if not self.fs.case_sensitive:
             name = name.lower()
 
