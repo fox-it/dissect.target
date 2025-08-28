@@ -60,7 +60,7 @@ class PuTTYPlugin(SSHPlugin):
         - Does not parse ``$HOME/.putty/randomseed`` (GNU/Linux)
           and ``HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile`` (Windows)
 
-    Resources:
+    References:
         - http://www.chiark.greenend.org.uk/~sgtatham/putty/0.78/puttydoc.txt
         - http://www.chiark.greenend.org.uk/~sgtatham/putty/faq.html#faq-settings
     """
@@ -235,7 +235,7 @@ def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, s
 
     NOTE: More key types could be supported in the future.
 
-    Resources:
+    References:
         - https://github.com/github/putty/blob/master/contrib/kh2reg.py
         - https://pycryptodome.readthedocs.io/en/latest/src/public_key/rsa.html
         - https://pycryptodome.readthedocs.io/en/latest/src/public_key/ecc.html
@@ -243,7 +243,7 @@ def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, s
     """
     if not HAS_CRYPTO:
         log.warning("Could not reconstruct public key: missing pycryptodome dependency")
-        return iv
+        return iv, (None, None, None)
 
     if not isinstance(key_type, str) or not isinstance(iv, str):
         raise TypeError("Invalid key_type or iv")

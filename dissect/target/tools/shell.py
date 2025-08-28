@@ -49,7 +49,7 @@ from dissect.target.tools.utils import (
     escape_str,
     execute_function_on_target,
     find_and_filter_plugins,
-    generate_argparse_for_bound_method,
+    generate_argparse_for_method,
     process_generic_arguments,
 )
 
@@ -128,7 +128,7 @@ class AnsiColors(StrEnum):
 
 
 # ANSI color escape sequences for readline prompt
-ANSI_COLORS = readline_escape(AnsiColors.as_dict())
+ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
 
 
 class ExtendedCmd(cmd.Cmd):
@@ -167,7 +167,7 @@ class ExtendedCmd(cmd.Cmd):
             _, _, command = attr.partition("_")
 
             def print_help(command: str, func: Callable) -> None:
-                parser = generate_argparse_for_bound_method(func, usage_tmpl=f"{command} {{usage}}")
+                parser = generate_argparse_for_method(func, usage_tmpl=f"{command} {{usage}}")
                 parser.print_help()
 
             try:
@@ -295,7 +295,7 @@ class ExtendedCmd(cmd.Cmd):
     def _exec_command(self, command: str, command_args_str: str) -> bool:
         """Command execution helper for ``cmd_`` commands."""
         cmdfunc = getattr(self, self.CMD_PREFIX + command)
-        argparser = generate_argparse_for_bound_method(cmdfunc, usage_tmpl=f"{command} {{usage}}")
+        argparser = generate_argparse_for_method(cmdfunc, usage_tmpl=f"{command} {{usage}}")
 
         def _exec_(argparts: list[str], stdout: TextIO) -> bool:
             try:
@@ -461,7 +461,7 @@ class TargetCmd(ExtendedCmd):
 
         def _exec_(argparts: list[str], stdout: TextIO) -> None:
             try:
-                output, value, _ = execute_function_on_target(self.target, func, argparts)
+                output, value = execute_function_on_target(self.target, func, argparts)
             except SystemExit:
                 return
 
@@ -716,6 +716,12 @@ class TargetCli(TargetCmd):
         """print target filesystems"""
         for fs in self.target.filesystems:
             print(str(fs))
+        return False
+
+    def do_mounts(self, line: str) -> bool:
+        """print target mounts"""
+        for mount, fs in self.target.fs.mounts.items():
+            print(f"<Mount fs={fs.__type__!r} path={mount!r}>")
         return False
 
     def do_info(self, line: str) -> bool:
@@ -1066,19 +1072,23 @@ class TargetCli(TargetCmd):
     @arg("-C", "--canonical", action="store_true")
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print a hexdump of a file"""
-        path = self.check_file(args.path)
-        if not path:
+        """print a hexdump of file(s)"""
+        paths = list(self.resolve_glob_path(args.path))
+        if not paths:
+            print(f"{args.path}: No such file or directory")
             return False
 
-        fh = path.open("rb")
-        if args.skip > 0:
-            fh.seek(args.skip + 1)
+        for path in paths:
+            if len(paths) > 1:
+                print(f"[{path}]", file=stdout)
+            with path.open("rb") as fh:
+                if args.skip > 0:
+                    fh.seek(args.skip + 1)
 
-        if args.hex:
-            print(fh.read(args.length).hex(), file=stdout)
-        else:
-            print(hexdump(fh.read(args.length), output="string"), file=stdout)
+                if args.hex:
+                    print(fh.read(args.length).hex(), file=stdout)
+                else:
+                    print(hexdump(fh.read(args.length), output="string"), file=stdout)
 
         return False
 
@@ -1573,8 +1583,8 @@ def main() -> int:
     parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(args)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:

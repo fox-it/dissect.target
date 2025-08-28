@@ -5,10 +5,12 @@ import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
+from itertools import chain
 from typing import TYPE_CHECKING, Callable
 
 import pytest
 
+from dissect.target import container, filesystem, loader, volume
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
@@ -86,6 +88,23 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 @pytest.fixture(autouse=True)
 def clear_caches() -> None:
     _generate_long_paths.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def clear_lazy_imports() -> None:
+    """Clear lazy imports before each test to ensure a clean state."""
+
+    for lazy_attr in chain(
+        loader.LOADERS_BY_SCHEME.values(),
+        filesystem.FILESYSTEMS,
+        container.CONTAINERS,
+        volume.LOGICAL_VOLUME_MANAGERS,
+        volume.ENCRYPTED_VOLUME_MANAGERS,
+    ):
+        lazy_attr._loaded = False
+        lazy_attr._exc = None
+        lazy_attr._module._module = None
+        lazy_attr._module._loaded = False
 
 
 def make_mock_target(tmp_path: pathlib.Path) -> Iterator[Target]:
@@ -287,6 +306,11 @@ def hive_hklm() -> VirtualHive:
 
     # set current control set to ControlSet001 and mock it
     change_controlset(hive, 1)
+
+    # set windir
+    current_version_key = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
+    hive.map_key(current_version_key, VirtualKey(hive, current_version_key))
+    hive.map_value(current_version_key, "SystemRoot", VirtualValue(hive, "SystemRoot", "c:\\Windows"))
 
     return hive
 

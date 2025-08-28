@@ -8,19 +8,21 @@ from dissect.target.filesystem import LayerFilesystem, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 log = logging.getLogger(__name__)
 
 
 class Overlay2Filesystem(LayerFilesystem):
-    """Overlay 2 filesystem implementation.
+    """Docker Overlay 2 filesystem implementation.
 
     Deleted files will be present on the reconstructed filesystem.
     Volumes and bind mounts will be added to their respective mount locations.
     Does not support tmpfs mounts.
 
     References:
+        - https://docs.docker.com/engine/storage/drivers/overlayfs-driver/
         - https://docs.docker.com/storage/storagedriver/
         - https://docs.docker.com/storage/volumes/
         - https://www.didactic-security.com/resources/docker-forensics.pdf
@@ -108,8 +110,48 @@ class Overlay2Filesystem(LayerFilesystem):
             else:
                 layer_fs = DirectoryFilesystem(layer)
 
-            log.info("Adding layer %s to destination %s", layer, dest)
+            log.debug("Adding layer %s to destination %s", layer, dest)
             self.append_layer().mount("/" if layer.is_file() else dest, layer_fs)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.base_path}>"
+
+
+class OverlayFilesystem(LayerFilesystem):
+    """Podman overlay filesystem implementation.
+
+    Currently does not support mounting of (anonymous) volumes, named volumes and bind mounts.
+    Also does not map mount point files, hosts, hostname and resolv.conf files.
+
+    References:
+        - https://github.com/containers/podman
+        - https://docs.podman.io/en/latest/
+    """
+
+    __type__ = "overlay"
+
+    def __init__(self, path: Path, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.base_path = path
+
+        for dest, layer in oci_layers(path):
+            if not layer.exists():
+                log.warning(
+                    "Can not mount layer %s for container %s as it does not exist on the host", layer, path.name
+                )
+                continue
+
+            layer_fs = DirectoryFilesystem(layer)
+            log.debug("Adding layer %s to destination %s", layer, dest)
+            self.append_layer().mount("/" if layer.is_file() else dest, layer_fs)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.base_path}>"
+
+
+def oci_layers(path: Path) -> Iterator[tuple[str, Path]]:
+    """Yield the layers of an OCI container provided the ``mount_path``."""
+    yield ("/", path.joinpath("diff"))
+    for symlink in path.joinpath("lower").read_text().split(":"):
+        if symlink:
+            yield ("/", path.parent.joinpath(symlink).resolve())

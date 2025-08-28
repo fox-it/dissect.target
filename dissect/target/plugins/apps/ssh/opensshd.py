@@ -108,7 +108,7 @@ class SSHServerPlugin(SSHPlugin):
 
         This parser does not (yet) follow Include directives.
 
-        Resources:
+        References:
             - https://github.com/openssh/openssh-portable
             - https://www.man7.org/linux/man-pages/man5/sshd_config.5.html
         """

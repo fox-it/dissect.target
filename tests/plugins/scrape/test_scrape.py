@@ -131,11 +131,12 @@ def test_find(target_bare: Target) -> None:
     target_bare.disks.add(mock_disk)
 
     mock_progress = Mock()
-    for disk, stream, needle, offset in target_bare.scrape.find(b"ABCD", progress=mock_progress):
+    for disk, stream, needle, offset, match in target_bare.scrape.find(b"ABCD", progress=mock_progress):
         assert disk.size == 1024 * 128
         assert stream.size == 1024 * 128
         assert needle == b"ABCD"
         assert offset == 1024 * 64
+        assert not match  # only for regex matches
 
     for i in range(0, 1024 * 128, 8192):
         mock_progress.assert_any_call(mock_disk, i, 1024 * 128)

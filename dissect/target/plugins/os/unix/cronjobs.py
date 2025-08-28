@@ -104,7 +104,7 @@ class CronjobPlugin(Plugin):
         A cronjob is a scheduled task/command on a Unix based system. Adversaries may use cronjobs to gain
         persistence on the system.
 
-        Resources:
+        References:
             - https://linux.die.net/man/8/cron
             - https://linux.die.net/man/1/crontab
             - https://linux.die.net/man/5/crontab

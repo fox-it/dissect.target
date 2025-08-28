@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import contextlib
 import json
-import os
 import re
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugin import FunctionDescriptor
+from dissect.target.plugin import FunctionDescriptor, Plugin, PluginRegistry, arg, export
 from dissect.target.tools.query import main as target_query
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
@@ -19,7 +20,9 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "--list"])
 
-        target_query()
+        with pytest.raises(SystemExit):
+            target_query()
+
         out, _ = capsys.readouterr()
 
         assert out.startswith("Available plugins:")
@@ -52,10 +55,10 @@ def test_list_target(
             m.setattr("sys.argv", args)
 
             # Patch the target that gets opened.
-            with patch("dissect.target.target.Target.open_all", return_value=[target]):
+            with patch("dissect.target.target.Target.open_all", return_value=[target]), contextlib.suppress(SystemExit):
                 target_query()
 
-                return capsys.readouterr()
+            return capsys.readouterr()
 
     stdout_1, stderr_1 = _run_query(args, target)
     stdout_2, stderr_2 = _run_query([*args, "*"], target)
@@ -98,7 +101,7 @@ def test_invalid_functions(
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", ",".join(given_funcs), "tests/_data/loaders/tar/test-archive.tar.gz"],
+            ["target-query", "-f", ",".join(given_funcs), str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
         )
 
         with pytest.raises(SystemExit):
@@ -157,7 +160,7 @@ def test_invalid_excluded_functions(
                 "hostname",
                 "-xf",
                 ",".join(given_funcs),
-                "tests/_data/loaders/tar/test-archive.tar.gz",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
             ],
         )
 
@@ -181,7 +184,7 @@ def test_unsupported_plugin_log(caplog: pytest.LogCaptureFixture, monkeypatch: p
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", "regf", "tests/_data/loaders/tar/test-archive.tar.gz"],
+            ["target-query", "-f", "regf", str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
         )
 
         target_query()
@@ -215,7 +218,7 @@ def mock_execute_function(
     func: FunctionDescriptor,
     arguments: list[str] | None = None,
 ) -> tuple[str, Any, list[str]]:
-    return (func.output, func.name, "")
+    return (func.output, func.name)
 
 
 def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -228,16 +231,11 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
                 "foo,bar,bla,foo",
                 "-xf",
                 "bla",
-                "tests/_data/loaders/tar/test-archive.tar.gz",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
             ],
         )
 
         with (
-            patch(
-                "dissect.target.tools.query.find_functions",
-                autospec=True,
-                side_effect=mock_find_functions,
-            ),
             patch(
                 "dissect.target.tools.utils.find_functions",
                 autospec=True,
@@ -264,10 +262,7 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-    if os.sep == "\\":
-        target_file = "tests\\_data\\loaders\\tar\\test-archive.tar.gz"
-    else:
-        target_file = "tests/_data/loaders/tar/test-archive.tar.gz"
+    target_file = str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))
 
     with monkeypatch.context() as m:
         m.setattr(
@@ -286,13 +281,14 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
 
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "-l", "-j"])
-        target_query()
+        with pytest.raises(SystemExit):
+            target_query()
         out, _ = capsys.readouterr()
 
     try:
         output = json.loads(out)
     except json.JSONDecodeError:
-        pass
+        pytest.fail("Could not decode JSON output of 'target-query --list --json'")
 
     # test the generic structure of the returned dictionary.
     assert isinstance(output, dict), "Could not load JSON output of 'target-query --list --json'"
@@ -371,9 +367,57 @@ def test_record_stream_write_exception_handling(
     """Test if we correctly print the function name of the iterator that failed to iterate."""
 
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-query", "-f", "users,walkfs", "tests/_data/loaders/tar/test-archive.tar.gz"])
+        m.setattr(
+            "sys.argv",
+            ["target-query", "-f", "users,walkfs", str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
+        )
 
         with patch("dissect.target.tools.query.record_output", return_value=None):
             target_query()
 
     assert "Exception occurred while processing output of WalkFSPlugin.walkfs:" in caplog.text
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_arguments_passed_correctly(
+    mock_plugins: PluginRegistry, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class MockPlugin(Plugin):
+        def check_compatible(self) -> None:
+            pass
+
+        @export(output="none")
+        @arg("-j", "--json", action="store_true")
+        @arg("--compact", action="store_true")
+        def mock_function(self, json: bool, compact: bool) -> None:
+            """Mock function to test argument passing."""
+            assert json is True
+            assert compact is True
+
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-fmock",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
+                "--compact",
+                "--json",
+            ],
+        )
+
+        with (
+            patch(
+                "dissect.target.tools.utils.find_functions",
+                autospec=True,
+                side_effect=mock_find_functions,
+            ),
+            patch(
+                "dissect.target.target.Target.get_function",
+                autospec=True,
+                side_effect=lambda self, _: (MockPlugin(self), MockPlugin(self).mock_function),
+            ),
+        ):
+            target_query()
+
+        assert "Exception while executing function mock" not in caplog.text

@@ -92,25 +92,25 @@ def test_amcache_windows_11_general(target_win: Target, fs_win: VirtualFilesyste
     fs_win.map_file("windows/appcompat/pca/PcaGeneralDb1.txt", db1_file)
 
     # To test path resolving
-    fs_win.map_file_fh("C:\\Program Files\\freefilesync\\bin\\freefilesync_x64.exe", BytesIO(b""))
+    fs_win.map_file_fh("C:\\Program Files\\freefilesync\\bin\\freefilesync_x64.exe", BytesIO())
 
     target_win.add_plugin(AmcachePlugin)
 
     with patch(
         "dissect.target.plugins.os.windows.env.EnvironmentVariablePlugin._get_system_env_vars",
-        return_value={"%programfiles%": "C:\\Program Files"},
+        return_value={"%programfiles%": "C:\\Program Files", "%windir%": "c:\\Windows"},
     ):
         records = list(target_win.amcache.general())
 
         assert len(records) == 176
         assert records[0].ts == datetime.datetime(2022, 5, 12, 19, 48, 9, 548000, tzinfo=datetime.timezone.utc)
         assert records[0].path == "C:\\Program Files\\freefilesync\\freefilesync.exe"
-        assert records[0].type == 2
+        assert records[0].type == "ABNORMAL_PROCESS_EXIT"
         assert records[0].name == "freefilesync"
         assert records[0].copyright == "freefilesync.org"
         assert records[0].version == "11.20"
         assert records[0].program_id == "000617915288ba535b4198ae58be4d9e2a4200000904"
-        assert records[0].exit_code == "Abnormal process exit with code 0x2"
+        assert records[0].exit_message == "Abnormal process exit with code 0x2"
 
 
 def mock_read_key_subkeys(self: AmcachePlugin, key: str) -> Iterator[Mock]:
@@ -201,3 +201,5 @@ def test_amcache_install_entry(target_win: Target) -> None:
         assert str(entry.path) == r"C:\Users\JohnCena"
         assert str(entry.longname) == r"7z2201-x64.exe"
         assert entry.filesize == 1575742
+        assert entry.size == 0x180B3E
+        assert entry.pe_checksum == 0
