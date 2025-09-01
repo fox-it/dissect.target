@@ -23,6 +23,8 @@ def mock_cbc_sdk(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
         # function that is running.
         if "dissect.target.loaders.cb" in sys.modules:
             m.delitem(sys.modules, "dissect.target.loaders.cb")
+        if "dissect.target.filesystems.cb" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.filesystems.cb")
 
         mock_cbc_sdk = MagicMock()
         m.setitem(sys.modules, "cbc_sdk", mock_cbc_sdk)

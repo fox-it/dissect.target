@@ -101,8 +101,10 @@ def clear_lazy_imports() -> None:
         volume.LOGICAL_VOLUME_MANAGERS,
         volume.ENCRYPTED_VOLUME_MANAGERS,
     ):
-        lazy_attr._realattr = None
-        lazy_attr.module._module = None
+        lazy_attr._loaded = False
+        lazy_attr._exc = None
+        lazy_attr._module._module = None
+        lazy_attr._module._loaded = False
 
 
 def make_mock_target(tmp_path: pathlib.Path) -> Iterator[Target]:

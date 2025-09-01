@@ -10,6 +10,9 @@ from dissect.target.exceptions import NotADirectoryError
 
 def test_smb_filesystem_windows(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
+        if "dissect.target.filesystems.smb" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.filesystems.smb")
+
         mock_impacket = MagicMock()
         m.setitem(sys.modules, "impacket", mock_impacket)
         m.setitem(sys.modules, "impacket.nt_errors", mock_impacket.nt_errors)
