@@ -364,6 +364,9 @@ class DhclientLeaseParser(LinuxNetworkConfigParser):
                         if (fixed_address := data.get("fixed-address")) is not None:
                             fixed_address = ip_interface(fixed_address)
 
+                        if fixed_address and (subnet_mask := data.get("option", {}).get("subnet-mask")) is not None:
+                            fixed_address = ip_interface((fixed_address.ip, subnet_mask))
+
                         if (router := data.get("option", {}).get("routers")) is not None:
                             router = ip_address(router)
 

@@ -234,6 +234,7 @@ def test_linux_network_dhclient_leases_file(target_linux: Target, fs_linux: Virt
         option dhcp-lease-time 13337;
         option routers 0.0.0.0;
         option host-name "hostname";
+        option subnet-mask 255.255.255.0;
         renew 1 2023/12/31 13:37:00;
         rebind 2 2023/01/01 01:00:00;
         expire 3 2024/01/01 13:37:00;
@@ -263,7 +264,7 @@ def test_linux_network_dhclient_leases_file(target_linux: Target, fs_linux: Virt
     assert len(leases) == 4
     assert leases[0].name == "eth0"
     assert leases[0].type == "dhcp"
-    assert leases[0].cidr == [ip_interface("1.2.3.4/32")]
+    assert leases[0].cidr == [ip_interface("1.2.3.4/24")]
     assert leases[0].gateway == [ip_address("0.0.0.0")]
     assert leases[0].dhcp_ipv4
     assert not leases[0].dhcp_ipv6
