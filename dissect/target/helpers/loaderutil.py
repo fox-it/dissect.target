@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import re
+import os
+import string
 import urllib.parse
-from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -80,24 +80,25 @@ def _try_open(fs: Filesystem, path: str) -> BinaryIO | None:
     return None
 
 
-def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult | None]:
-    """Extracts a ``ParseResult`` from a path if it has a scheme and adjusts the path if necessary.
+def parse_path_uri(path: str | Path | None) -> tuple[Path | None, urllib.parse.ParseResult | None]:
+    """Parse a path URI into its path component and a parsed path, if applicable.
+
+    If the path is a string, it will be parsed as a URI. If it is a Path object, it will be returned as is.
 
     Args:
         path: String or ``Path`` describing the path of a target.
 
     Returns:
-        - a ``Path`` or ``None``
-        - ``ParseResult`` or ``None``
+        A tuple containing a normalized path and the parsed path.
     """
-
     if path is None:
         return None, None
 
-    if isinstance(path, PathLike):
+    if isinstance(path, os.PathLike):
         return path, None
 
     parsed_path = urllib.parse.urlparse(path)
-    if parsed_path.scheme == "" or re.match("^[A-Za-z]$", parsed_path.scheme):
+    if not parsed_path.scheme or (len(parsed_path.scheme) == 1 and parsed_path.scheme in string.ascii_letters):
         return Path(path), None
+
     return Path(parsed_path.netloc + parsed_path.path).expanduser(), parsed_path

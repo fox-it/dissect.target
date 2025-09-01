@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,6 +23,8 @@ def mock_cbc_sdk(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
         # function that is running.
         if "dissect.target.loaders.cb" in sys.modules:
             m.delitem(sys.modules, "dissect.target.loaders.cb")
+        if "dissect.target.filesystems.cb" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.filesystems.cb")
 
         mock_cbc_sdk = MagicMock()
         m.setitem(sys.modules, "cbc_sdk", mock_cbc_sdk)
@@ -51,16 +54,36 @@ def mock_session(mock_device: MagicMock) -> MagicMock:
     return mock_session
 
 
-def test_cb_loader(mock_session: MagicMock) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_session: MagicMock) -> None:
+    """Test that we correctly use ``CbLoader`` when opening a ``Target``."""
+    from dissect.target.loaders.cb import CbLoader
+
+    path = "cb://instance/workstation"
+
+    with patch("dissect.target.target.Target.apply"):
+        target = opener(path)
+        assert isinstance(target._loader, CbLoader)
+        assert target.path == Path("instance/workstation")
+
+
+def test_loader(mock_session: MagicMock, mock_cbc_sdk: MagicMock) -> None:
+    """Test the CB loader."""
     from dissect.target.filesystems.cb import CbFilesystem
     from dissect.target.loader import open as loader_open
     from dissect.target.loaders.cb import CbLoader, CbRegistry
 
-    with patch.dict("dissect.target.loader.LOADERS_BY_SCHEME", {"cb": CbLoader}):
-        loader = loader_open("cb://workstation@instance")
-
+    loader = loader_open("cb://instance/workstation")
     assert isinstance(loader, CbLoader)
     assert loader.session is mock_session
+    assert loader.host == "workstation"
+    mock_cbc_sdk.rest_api.CBCloudAPI.assert_called_with(profile="instance")
 
     mock_session.session_data = {"drives": ["C:\\"]}
 
@@ -75,7 +98,8 @@ def test_cb_loader(mock_session: MagicMock) -> None:
     assert isinstance(t._plugins[0], CbRegistry)
 
 
-def test_cb_registry(target_bare: Target, mock_session: MagicMock) -> None:
+def test_registry(target_bare: Target, mock_session: MagicMock) -> None:
+    """Test the CB registry plugin."""
     from dissect.target.loaders.cb import CbRegistry
 
     mock_session.list_registry_keys_and_values.return_value = {"sub_keys": ["TestKey"]}

@@ -21,7 +21,7 @@ def vfs(files: list[str]) -> VirtualFilesystem:
         if file[-1] == "/":
             vfs.makedirs(file)
         else:
-            vfs.map_file_entry(file, VirtualFile(vfs, file, io.BytesIO(b"")))
+            vfs.map_file_entry(file, VirtualFile(vfs, file, io.BytesIO()))
     return vfs
 
 

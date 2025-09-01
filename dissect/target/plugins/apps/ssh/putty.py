@@ -243,7 +243,7 @@ def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, s
     """
     if not HAS_CRYPTO:
         log.warning("Could not reconstruct public key: missing pycryptodome dependency")
-        return iv
+        return iv, (None, None, None)
 
     if not isinstance(key_type, str) or not isinstance(iv, str):
         raise TypeError("Invalid key_type or iv")

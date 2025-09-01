@@ -67,12 +67,12 @@ WINDOWS_MEMBERS = (
 class TarSubLoader(SubLoader[tf.TarFile]):
     """Tar implementation of a :class:`SubLoader`."""
 
-    def __init__(self, tar: tf.TarFile, *args, **kwargs):
-        super().__init__(tar, *args, **kwargs)
+    def __init__(self, path: Path, tar: tf.TarFile, **kwargs):
+        super().__init__(path, tar, **kwargs)
         self.tar = tar
 
     @staticmethod
-    def detect(tarfile: tf.TarFile) -> bool:
+    def detect(path: Path, tarfile: tf.TarFile) -> bool:
         """Only to be called internally by :class:`TarLoader`."""
         raise NotImplementedError
 
@@ -85,7 +85,7 @@ class GenericTarSubLoader(TarSubLoader):
     """Generic tar sub loader."""
 
     @staticmethod
-    def detect(tarfile: tf.TarFile) -> bool:
+    def detect(path: Path, tarfile: tf.TarFile) -> bool:
         return True
 
     def map(self, target: target.Target) -> None:
@@ -158,8 +158,8 @@ class TarLoader(Loader):
 
     def map(self, target: target.Target) -> None:
         for candidate in self.__subloaders__:
-            if candidate.detect(self.tar):
-                self.subloader = candidate(self.tar)
+            if candidate.detect(self.path, self.tar):
+                self.subloader = candidate(self.path, self.tar, parsed_path=self.parsed_path)
                 self.subloader.map(target)
                 break
 

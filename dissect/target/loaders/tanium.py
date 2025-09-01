@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs
+from dissect.target.loader import Loader
+from dissect.target.loaders.dir import find_and_map_dirs, find_dirs
 from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-class TaniumLoader(DirLoader):
+class TaniumLoader(Loader):
     """Load Tanium forensic image format files."""
 
     @staticmethod
