@@ -5,9 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import IPv4Interface, IPv6Interface, ip_address, ip_interface
 from itertools import chain, islice
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union
-
-from typing_extensions import get_args
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union, get_args
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
