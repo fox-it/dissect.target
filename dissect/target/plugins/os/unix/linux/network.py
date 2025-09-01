@@ -35,8 +35,8 @@ class LinuxNetworkPlugin(NetworkPlugin):
     @arg(
         "-m",
         "--maxlines",
-        default=None,
-        action="store_true",
+        action="store",
+        type=int,
         help="Maximum number of lines of syslog to scan (0 is unlimited)",
     )
     @export(record=get_args(InterfaceRecord))
