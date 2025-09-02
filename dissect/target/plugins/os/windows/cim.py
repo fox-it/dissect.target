@@ -87,10 +87,8 @@ def get_filter_name(binding: cim.Instance) -> str:
 
 def get_creator_sid(class_instance: cim.Instance) -> str | None:
     """Extract and parse ``CreatorSID`` member, if available."""
-    if creator_sid := class_instance.properties.get("CreatorSID"):
-        creator_sid_value = getattr(creator_sid, "value", None)
-        if creator_sid_value:
-            return read_sid(bytes(creator_sid_value))
+    if (creator_sid := class_instance.properties.get("CreatorSID")) and (creator_sid_value := getattr(creator_sid, "value", None)):
+        return read_sid(bytes(creator_sid_value))
     return None
 
 
