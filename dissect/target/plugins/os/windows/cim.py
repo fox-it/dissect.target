@@ -50,24 +50,21 @@ ActiveScriptEventConsumerRecord = TargetRecordDescriptor(
 
 @dataclass
 class EventFilter:
-    """
-    object representing information extracted from __EventFilter
+    """Extracted information from ``__EventFilter``.
+
     References:
         - https://learn.microsoft.com/en-us/windows/win32/wmisdk/--eventfilter
     """
 
-    filter_query: str = ""
-    filter_name: str = ""
-    filter_query_language: str = ""
-    filter_creator_sid: str = ""
+    name: str = ""
+    query: str = ""
+    query_language: str = ""
+    creator_sid: str = ""
 
 
 def get_property_value_safe(consumer: cim.Instance, prop_name: str, default_value: str | None = None) -> str | None:
-    """
-    Extract value of a consumer properties. Fallback to default_value if properties is missing
-    """
-    prop = consumer.properties.get(prop_name)
-    if not prop:
+    """Extract value of a consumer properties. Fallback to ``default_value`` if property is missing."""
+    if not (prop := consumer.properties.get(prop_name)):
         return default_value
     try:
         return str(prop.value)
@@ -76,26 +73,21 @@ def get_property_value_safe(consumer: cim.Instance, prop_name: str, default_valu
 
 
 def get_filter_name(binding: cim.Instance) -> str:
-    """
-    return unquoted filter name from a __filtertoconsumerbinding class instance
-    """
+    """Return unquoted filter name from a ``__filtertoconsumerbinding`` class instance."""
     filter_name = binding.properties["Filter"].value
     # filter name is not always consistent
     # e.g : __EventFilter.Name="Windows Update Event MOF" or
     # \\.\root\subscription:__EventFilter.Name="Windows Update Event MOF"
     if "=" in filter_name:
         # Required to manage filters name with escaped "
-        filter_name = filter_name.split("=", maxsplit=1)[1]
+        _, _, filter_name = filter_name.partition("=")
         filter_name = filter_name.strip('"').replace('\\"', '"')
     return filter_name
 
 
 def get_creator_sid(class_instance: cim.Instance) -> str | None:
-    """
-    Extract and parse CreatorSID member
-    """
-    creator_sid = class_instance.properties.get("CreatorSID")
-    if creator_sid:
+    """Extract and parse ``CreatorSID`` member, if available."""
+    if creator_sid := class_instance.properties.get("CreatorSID"):
         creator_sid_value = getattr(creator_sid, "value", None)
         if creator_sid:
             return read_sid(bytes(creator_sid_value))
@@ -138,19 +130,16 @@ class CimPlugin(Plugin):
     def repo(self) -> cim.CIM:
         return self._repo
 
-    def yield_consumerbinings(self) -> Iterator[tuple[cim.Instance, str]]:
-        """
-        yield consumer binded to __filtertoconsumerbinding of subscription namespace
-        """
+    def _iter_consumerbindings(self) -> Iterator[tuple[cim.Instance, str]]:
+        """Yield consumer bindings from ``__filtertoconsumerbinding`` of subscription namespace."""
         try:
             for binding in self._subscription_ns.class_("__filtertoconsumerbinding").instances:
-                filter_name = get_filter_name(binding)
                 yield (
                     self._subscription_ns.query(binding.properties["Consumer"].value),
-                    filter_name,
+                    get_filter_name(binding),
                 )
         except Exception as e:
-            self.target.log.warning("Error during consumerbindings execution", exc_info=e)
+            self.target.log.warning("Error retrieving consumerbindings")
             self.target.log.debug("", exc_info=e)
 
     @export(record=[ActiveScriptEventConsumerRecord, CommandLineEventConsumerRecord])
@@ -169,7 +158,7 @@ class CimPlugin(Plugin):
             - https://learn.microsoft.com/en-us/windows/win32/wmisdk/activescripteventconsumer
             - https://learn.microsoft.com/en-us/windows/win32/wmisdk/commandlineeventconsumer
         """
-        for consumer, filter_name in self.yield_consumerbinings():
+        for consumer, filter_name in self._iter_consumerbindings():
             if consumer.properties.get("ScriptText"):
                 yield ActiveScriptEventConsumerRecord(
                     script_text=get_property_value_safe(consumer, "ScriptText", ""),
@@ -178,6 +167,7 @@ class CimPlugin(Plugin):
                     machine_name=get_property_value_safe(consumer, "MachineName", ""),
                     name=get_property_value_safe(consumer, "Name", ""),
                     creator_sid=get_creator_sid(consumer),
+                    _target=self.target,
                     **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
                 )
             if consumer.properties.get("CommandLineTemplate"):
@@ -190,17 +180,15 @@ class CimPlugin(Plugin):
                     **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
                 )
 
-    def generate_filters_dict(self) -> dict[str, EventFilter]:
-        """
-        Generate a dict of __EventFilter that will be mapped with __filtertoconsumerbinding
-        """
+    def _get_filters(self) -> dict[str, EventFilter]:
+        """Generate a dictionary of ``__EventFilter`` that can be mapped with ``__filtertoconsumerbinding``."""
         filters = {}
         for event in self._subscription_ns.class_("__EventFilter").instances:
             filter_name = event.properties["Name"].value
             filters[filter_name] = EventFilter(
-                filter_query=event.properties["Query"].value,
-                filter_query_language=event.properties["QueryLanguage"].value,
-                filter_name=filter_name,
-                filter_creator_sid=get_creator_sid(event),
+                name=filter_name,
+                query=event.properties["Query"].value,
+                query_language=event.properties["QueryLanguage"].value,
+                creator_sid=get_creator_sid(event),
             )
         return filters

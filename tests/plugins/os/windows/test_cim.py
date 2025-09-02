@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows import cim
 from dissect.target.plugins.os.windows.cim import ActiveScriptEventConsumerRecord, CommandLineEventConsumerRecord
