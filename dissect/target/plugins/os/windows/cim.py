@@ -56,10 +56,10 @@ class EventFilter:
         - https://learn.microsoft.com/en-us/windows/win32/wmisdk/--eventfilter
     """
 
-    name: str = ""
-    query: str = ""
-    query_language: str = ""
-    creator_sid: str = ""
+    filter_name: str = ""
+    filter_query: str = ""
+    filter_query_language: str = ""
+    filter_creator_sid: str = ""
 
 
 def get_property_value_safe(consumer: cim.Instance, prop_name: str, default_value: str | None = None) -> str | None:
@@ -89,7 +89,7 @@ def get_creator_sid(class_instance: cim.Instance) -> str | None:
     """Extract and parse ``CreatorSID`` member, if available."""
     if creator_sid := class_instance.properties.get("CreatorSID"):
         creator_sid_value = getattr(creator_sid, "value", None)
-        if creator_sid:
+        if creator_sid_value:
             return read_sid(bytes(creator_sid_value))
     return None
 
@@ -120,7 +120,7 @@ class CimPlugin(Plugin):
                     self.target.log.warning("Error opening CIM database")
                     self.target.log.debug("", exc_info=e)
             self._subscription_ns = self._repo.root.namespace("subscription")
-            self._filters = self.generate_filters_dict()
+            self._filters = self._get_filters()
 
     def check_compatible(self) -> None:
         if not self._repo:
@@ -186,9 +186,9 @@ class CimPlugin(Plugin):
         for event in self._subscription_ns.class_("__EventFilter").instances:
             filter_name = event.properties["Name"].value
             filters[filter_name] = EventFilter(
-                name=filter_name,
-                query=event.properties["Query"].value,
-                query_language=event.properties["QueryLanguage"].value,
-                creator_sid=get_creator_sid(event),
+                filter_name=filter_name,
+                filter_query=event.properties["Query"].value,
+                filter_query_language=event.properties["QueryLanguage"].value,
+                filter_creator_sid=get_creator_sid(event),
             )
         return filters
