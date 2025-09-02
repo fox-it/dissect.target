@@ -71,14 +71,8 @@ full = [
     "pycryptodome",
     "ruamel.yaml",
     "tomli; python_version<'3.11'",
-    # dissect.target's caching uses flow.record functionlity which depends on the
-    # zstandard module being available. However flow.record does not define
-    # zstandard as a dependency, nor does it allow zstandard to be installed
-    # through extras.
-    #
-    # Until such time that this dependency can be installed through
-    # flow.record, we define it as a dependency of dissect.target.
-    "zstandard",
+    "zstandard==0.23.0; platform_python_implementation == 'PyPy' and python_version == '3.9'", # Pin to last working for PyPy3.9
+    "zstandard; platform_python_implementation != 'PyPy' and python_version != '3.9'", # Otherwise, pick the latest
 ]
 dev = [
     "dissect.target[full,yara]",
