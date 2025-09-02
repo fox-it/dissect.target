@@ -56,6 +56,29 @@ def target_win_mru(target_win_users: Target) -> Target:
     opensave_sub_key.add_value("b", VirtualValue(user_hive, "b", "C:\\path\\to\\sub\\b"))
     opensave_key.add_subkey("*", opensave_sub_key)
 
+    # OpenSavePidlMRU
+    opensave_pidl_key = VirtualKey(
+        user_hive, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU"
+    )
+    opensave_pidl_subkey = VirtualKey(user_hive, opensave_pidl_key.path + "\\*")
+    opensave_pidl_subkey.add_value(
+        "MRUListEx",
+        VirtualValue(
+            user_hive,
+            "MRUListEx",
+            b"\x08\x00\x00\x00\t\x00\x00\x00\x07\x00\x00\x00\x01\x00\x00\x00\x06\x00\x00\x00\x03\x00\x00\x00\x05\x00\x00\x00\x04\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x13\x00\x00\x00\x12\x00\x00\x00\x11\x00\x00\x00\x10\x00\x00\x00\x0f\x00\x00\x00\x0e\x00\x00\x00\r\x00\x00\x00\x0c\x00\x00\x00\x0b\x00\x00\x00\n\x00\x00\x00\xff\xff\xff\xff",
+        ),
+    )
+    opensave_pidl_subkey.add_value(
+        "0",
+        VirtualValue(
+            user_hive,
+            "0",
+            b"\x14\x00\x1fP\xe0O\xd0 \xea:i\x10\xa2\xd8\x08\x00+00\x9d\x19\x00/Z:\\\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00p\x002\x00\xef\x1d\x01\x00dR|j \x00W9R717~O.ZIP\x00\x00T\x00\t\x00\x04\x00\xef\xbedR|jdR|j.\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00W\x00e\x00b\x00 \x00O\x00p\x00t\x00i\x00m\x00i\x00z\x00e\x00r\x00.\x00z\x00i\x00p\x00\x00\x00\x1c\x00\x00\x00",  # noqa: E501
+        ),
+    )
+    opensave_pidl_key.add_subkey("*", opensave_pidl_subkey)
+
     # LastVisitedMRU
     lastvisited_key = VirtualKey(
         user_hive, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedMRU"
@@ -65,6 +88,27 @@ def target_win_mru(target_win_users: Target) -> Target:
     value_b = b"\x00\x00".join([x.encode("utf-16-le") for x in ["test_b.exe", "c:\\path\\to\\something\\b", ""]])
     lastvisited_key.add_value("a", VirtualValue(user_hive, "a", value_a))
     lastvisited_key.add_value("b", VirtualValue(user_hive, "b", value_b))
+
+    # LastVisitedPidlMRU
+    lastvisited_pidl_key = VirtualKey(
+        user_hive, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedPidlMRU"
+    )
+    lastvisited_pidl_key.add_value(
+        "MRUListEx",
+        VirtualValue(
+            user_hive,
+            "MRUListEx",
+            b"\x05\x00\x00\x00\x07\x00\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x02\x00\x00\x00\x04\x00\x00\x00\x03\x00\x00\x00\x01\x00\x00\x00\xff\xff\xff\xff",
+        ),
+    )
+    lastvisited_pidl_key.add_value(
+        "1",
+        VirtualValue(
+            user_hive,
+            "1",
+            b"K\x00e\x00e\x00P\x00a\x00s\x00s\x00.\x00e\x00x\x00e\x00\x00\x00\x14\x00\x1fP\xe0O\xd0 \xea:i\x10\xa2\xd8\x08\x00+00\x9d\x14\x00.\x80\x92+\x16\xd3e\x93zF\x95k\x92p:\xca\x08\xaf\x00\x00",  # noqa: E501
+        ),
+    )
 
     # ACMru
     acmru_key = VirtualKey(user_hive, "Software\\Microsoft\\Search Assistant\\ACMru\\5603")
@@ -109,7 +153,9 @@ def target_win_mru(target_win_users: Target) -> Target:
         run_key,
         recentdocs_key,
         opensave_key,
+        opensave_pidl_key,
         lastvisited_key,
+        lastvisited_pidl_key,
         acmru_key,
         wordwheel_key,
         networkdrive_key,
@@ -142,11 +188,16 @@ def test_mru_plugin(target_win_mru: Target) -> None:
 
     assert len(run) == 2
     assert len(recentdocs) == 1
-    assert len(opensave) == 4
-    assert len(lastvisited) == 2
+    assert len(opensave) == 5
+    # test if opensave_pidl_key is correctly resolved
+    assert opensave[4].value == "My Computer\\Z:\\Web Optimizer.zip"
+    assert len(lastvisited) == 3
+    # test if lastvisited_pidl_key is correctly resolved
+    assert lastvisited[2].filename == "KeePass.exe"
+    assert lastvisited[2].path == "My Computer\\{d3162b92-9365-467a-956b-92703aca08af}\\"
     assert len(acmru) == 3
     assert len(networkdrive) == 2
     assert len(mstsc) == 3
     assert len(msoffice) == 6
 
-    assert len(list(target_win_mru.mru())) == 23
+    assert len(list(target_win_mru.mru())) == 25

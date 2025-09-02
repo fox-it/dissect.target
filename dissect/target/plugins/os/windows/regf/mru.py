@@ -168,57 +168,43 @@ class MRUPlugin(Plugin):
         """Return the OpenSaveMRU data.
 
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU`` registry key
-        contains information about the most recently opened or saved files.
+        - renamed to ``OpenSavePidlMRU`` since Windows Vista - contains information about the most recently
+        opened or saved files.
 
         References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
 
         KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU"
+        PIDL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU"
 
         for key in self.target.registry.keys(KEY):
             yield from parse_mru_key(self.target, key, OpenSaveMRURecord)
+
+        for key in self.target.registry.keys(PIDL_KEY):
+            yield from parse_mru_ex_key(self.target, key, OpenSaveMRURecord)
 
     @export(record=LastVisitedMRURecord)
     def lastvisited(self) -> Iterator[LastVisitedMRURecord]:
         """Return the LastVisitedMRU data.
 
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedMRU`` registry key
-        contains information about the executable used by an application to open the files that are documented at the
-        OpenSaveMRU registry key. Also each value tracks the directory location for the last file that was accessed by
-        that application.
+        - renamed to ``LastVisitedPidlMRU`` since Windows Vista - contains information about the executable used by
+        an application to open the files that are documented at the ``OpenSaveMRU`` registry key. Also, each value
+        tracks the directory location for the last file that was accessed by that application.
 
         References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
 
         KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedMRU"
+        PIDL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedPidlMRU"
 
         for key in self.target.registry.keys(KEY):
-            user = self.target.registry.get_user(key)
+            yield from parse_mru_key(self.target, key, LastVisitedMRURecord)
 
-            try:
-                mrulist = key.value("MRUList").value
-            except RegistryError:
-                mrulist = None
-
-            for value in key.values():
-                if value.name == "MRUList":
-                    continue
-
-                entry_index = mrulist.index(value.name) if mrulist else None
-                filename, path, _ = value.value.rsplit(b"\x00\x00")
-
-                yield LastVisitedMRURecord(
-                    regf_mtime=key.ts,
-                    index=entry_index,
-                    filename=filename.decode("utf-16-le"),
-                    path=path.decode("utf-16-le"),
-                    key=key.path,
-                    _target=self.target,
-                    _user=user,
-                    _key=key,
-                )
+        for key in self.target.registry.keys(PIDL_KEY):
+            yield from parse_mru_ex_key(self.target, key, LastVisitedMRURecord)
 
     @export(record=ACMruRecord)
     def acmru(self) -> Iterator[ACMruRecord]:
@@ -251,7 +237,6 @@ class MRUPlugin(Plugin):
                         index=int(value.name),
                         category=subkey.name,
                         value=value.value,
-                        key=key.path,
                         _target=self.target,
                         _user=user,
                         _key=subkey,
@@ -294,7 +279,6 @@ class MRUPlugin(Plugin):
                     regf_mtime=key.ts,
                     index=entry_index,
                     value=value.value,
-                    key=key.path,
                     _target=self.target,
                     _user=user,
                     _key=key,
@@ -343,18 +327,31 @@ def parse_mru_key(target: Target, key: RegistryKey, record: TargetRecordDescript
         if value.name == "MRUList":
             continue
 
-        entry_index = mrulist.index(value.name) if mrulist else None
-        entry_value = value.value
+        if record == LastVisitedMRURecord:
+            entry_index = mrulist.index(value.name) if mrulist else None
+            values = read_wstrings(value.value)
 
-        yield record(
-            regf_mtime=key.ts,
-            index=entry_index,
-            value=entry_value,
-            key=key.path,
-            _target=target,
-            _user=user,
-            _key=key,
-        )
+            yield record(
+                regf_mtime=key.ts,
+                index=entry_index,
+                filename=next(values).decode("utf-16-le"),
+                path=next(values).decode("utf-16-le"),
+                _target=target,
+                _user=user,
+                _key=key,
+            )
+        else:
+            entry_index = mrulist.index(value.name) if mrulist else None
+            entry_value = value.value
+
+            yield record(
+                regf_mtime=key.ts,
+                index=entry_index,
+                value=entry_value,
+                _target=target,
+                _user=user,
+                _key=key,
+            )
 
     for subkey in key.subkeys():
         yield from parse_mru_key(target, subkey, record)
@@ -363,30 +360,60 @@ def parse_mru_key(target: Target, key: RegistryKey, record: TargetRecordDescript
 def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescriptor) -> Iterator[Record]:
     user = target.registry.get_user(key)
 
-    mrulist_ex = key.value("MRUListEx").value
-    mrulist_ex = struct.unpack(f"<{len(mrulist_ex) // 4}I", mrulist_ex)
+    try:
+        mrulist_ex = key.value("MRUListEx").value
+        mrulist_ex = struct.unpack(f"<{len(mrulist_ex) // 4}I", mrulist_ex)
+    except RegistryError:
+        mrulist_ex = None
 
     for value in key.values():
         if value.name == "MRUListEx":
             continue
 
         entry_index = mrulist_ex.index(int(value.name))
-        split_idx = value.value.index(b"\x00\x00")
-        # Poor mans null terminated utf-16-le
-        path, bag = value.value[: split_idx + 1], value.value[split_idx + 3 :]
+        if record != OpenSaveMRURecord:
+            path = next(read_wstrings(value.value))
+            bag = value.value[len(path) + 2 :]
+        else:
+            bag = value.value
+            path = None
         parsed_bag = list(parse_shell_item_list(bag))
         if len(parsed_bag) != 1 or not isinstance(parsed_bag, FILE_ENTRY):
             target.log.debug("Unexpected shell bag entry in MRUListEx entry: %s:%s", key, value)
 
-        yield record(
-            regf_mtime=key.ts,
-            index=entry_index,
-            value=path.decode("utf-16-le"),
-            key=key.path,
-            _target=target,
-            _user=user,
-            _key=key,
-        )
+        if record == LastVisitedMRURecord:
+            filepath = "\\".join(el.name.rstrip("\\") for el in parsed_bag) + "\\"
+            yield record(
+                regf_mtime=key.ts,
+                index=entry_index,
+                filename=path.decode("utf-16-le"),
+                path=filepath,
+                _target=target,
+                _user=user,
+                _key=key,
+            )
+        elif record == OpenSaveMRURecord:
+            filepath = "\\".join(el.name.rstrip("\\") for el in parsed_bag)
+            yield record(
+                regf_mtime=key.ts,
+                index=entry_index,
+                value=filepath,
+                _target=target,
+                _user=user,
+                _key=key,
+            )
+        else:
+            yield record(
+                regf_mtime=key.ts,
+                index=entry_index,
+                value=path.decode("utf-16-le"),
+                _target=target,
+                _user=user,
+                _key=key,
+            )
+
+    for subkey in key.subkeys():
+        yield from parse_mru_ex_key(target, subkey, record)
 
 
 def parse_office_mru(target: Target, key: RegistryKey, record: TargetRecordDescriptor) -> Iterator[Record]:
@@ -424,8 +451,23 @@ def parse_office_mru_key(target: Target, key: RegistryKey, record: TargetRecordD
             regf_mtime=key.ts,
             index=entry_index,
             value=path,
-            key=key.path,
             _target=target,
             _user=user,
             _key=key,
         )
+
+
+def read_wstrings(buf: bytes) -> Iterator[bytes]:
+    idx = 0
+    remaining = buf
+    while (idx := remaining.find(b"\x00\x00", idx)) != -1:
+        if idx & 1:
+            idx += 1
+            continue
+
+        yield remaining[:idx]
+        remaining = remaining[idx + 2 :]
+        idx = 0
+
+    if remaining:
+        yield remaining
