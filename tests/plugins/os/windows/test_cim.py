@@ -25,7 +25,7 @@ def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
 
 
 """
-WMI query output on collected system us
+Result of the WMI query on the system used to generate the test data
 
 ## __FilterToConsumerBinding
 ```
