@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from dissect.target.filesystem import VirtualFilesystem
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.windows import cim
 from dissect.target.plugins.os.windows.cim import ActiveScriptEventConsumerRecord, CommandLineEventConsumerRecord
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
