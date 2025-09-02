@@ -28,9 +28,7 @@ def test_stat_information() -> None:
         b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     )
 
-    inode = c_ext.ext4_inode(BytesIO(inode_bytes))
-
-    entry._inode = inode
+    entry.inode = c_ext.ext4_inode(BytesIO(inode_bytes))
 
     fs_entry = ExtFilesystemEntry(Mock(), "some/path", entry)
 
