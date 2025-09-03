@@ -60,7 +60,7 @@ full = [
     "dissect.fve>=4.2,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
     "dissect.jffs>=1.5,<2",
     "dissect.ole>=3,<4",
-    "dissect.qnxfs>=1,<2",
+    "dissect.qnxfs>=1.1.dev,<2", # TODO: update on release
     "dissect.shellitem>=3,<4",
     "dissect.squashfs>=1,<2",
     "dissect.thumbcache>=1,<2",
@@ -71,14 +71,8 @@ full = [
     "pycryptodome",
     "ruamel.yaml",
     "tomli; python_version<'3.11'",
-    # dissect.target's caching uses flow.record functionlity which depends on the
-    # zstandard module being available. However flow.record does not define
-    # zstandard as a dependency, nor does it allow zstandard to be installed
-    # through extras.
-    #
-    # Until such time that this dependency can be installed through
-    # flow.record, we define it as a dependency of dissect.target.
-    "zstandard",
+    "zstandard==0.23.0; platform_python_implementation == 'PyPy' and python_version == '3.9'", # Pin to last working for PyPy3.9
+    "zstandard; platform_python_implementation != 'PyPy' and python_version != '3.9'", # Otherwise, pick the latest
 ]
 dev = [
     "dissect.target[full,yara]",
@@ -98,7 +92,7 @@ dev = [
     "dissect.hypervisor[dev]>=3.19.dev,<4.0.dev",
     "dissect.jffs[dev]>=1.5.dev,<2.0.dev",
     "dissect.ntfs[dev]>=3.4.dev,<4.0.dev",
-    "dissect.qnxfs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.qnxfs[dev]>=1.1.dev,<2.0.dev",
     "dissect.regf[dev]>=3.13.dev,<4.0.dev",
     "dissect.shellitem[dev]>=3.0.dev,<4.0.dev",
     "dissect.sql[dev]>=3.12.dev,<4.0.dev",

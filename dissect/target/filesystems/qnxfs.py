@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, BinaryIO, Union
 
 import dissect.qnxfs as qnxfs
-from dissect.qnxfs.qnx4 import INode as INode4
-from dissect.qnxfs.qnx6 import INode as INode6
+from dissect.qnxfs.qnx4 import INode4
+from dissect.qnxfs.qnx6 import INode6
 
 from dissect.target.exceptions import (
     FileNotFoundError,
