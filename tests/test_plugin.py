@@ -6,7 +6,7 @@ import textwrap
 from functools import reduce
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from docutils.core import publish_string

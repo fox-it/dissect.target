@@ -386,8 +386,8 @@ def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pyt
     assert not output.get("loaders"), "Did not expect a dictionary of loaders"
     assert not output["plugins"].get("failed"), "Some plugin(s) failed to initialize"
 
-    def get_plugin(plugins: list[dict], needle: str) -> dict | bool:
-        match = [p for p in plugins["plugins"]["loaded"] if p["name"] == needle]
+    def get_plugin(plugins: list[dict], name: str) -> dict | bool:
+        match = [p for p in plugins["plugins"]["loaded"] if p["name"] == name]
         return match[0] if match else False
 
     # general plugin

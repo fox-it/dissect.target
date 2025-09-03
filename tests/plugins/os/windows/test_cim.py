@@ -24,7 +24,7 @@ def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert len([record for record in target_win.cim() if record.filter_query]) == 3
 
 
-"""
+r"""
 Result of the WMI query on the system used to generate the test data
 
 ## __FilterToConsumerBinding
@@ -260,4 +260,4 @@ SourceName               : Service Control Manager
 UNCServerName            :
 PSComputerName           : DESKTOP-O8964S4
 ```
-"""  # noqa : W605 E501
+"""  # noqa: E501
