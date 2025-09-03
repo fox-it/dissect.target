@@ -115,17 +115,17 @@ dev = [
 yara = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "yara-python"
+    "yara-python>=4.3.0",
 ]
 smb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "impacket==0.10.0"
+    "impacket==0.10.0",
 ]
 cb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "carbon-black-cloud-sdk~=1.4.3"
+    "carbon-black-cloud-sdk~=1.4.3",
 ]
 mqtt = [
     # Grab the dependencies for dissect.target
