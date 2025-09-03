@@ -361,6 +361,57 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
     }
 
 
+def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test if target-query --list "*" --json <target> returns functions we expect it to."""
+
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-l=*",
+                str(absolute_path("_data/loaders/containerimage/alpine-docker.tar")),
+                "-j",
+            ],
+        )
+        with pytest.raises(SystemExit, check=lambda r: r.code == 0):
+            target_query()
+        out, _ = capsys.readouterr()
+
+    output = json.loads(out)
+
+    # test the generic structure of the returned dictionary.
+    assert isinstance(output, dict), "Could not load JSON output of 'target-query --list --json'"
+    assert output["plugins"], "Expected a dictionary of plugins"
+    assert not output.get("loaders"), "Did not expect a dictionary of loaders"
+    assert not output["plugins"].get("failed"), "Some plugin(s) failed to initialize"
+
+    def get_plugin(plugins: list[dict], name: str) -> dict | bool:
+        match = [p for p in plugins["plugins"]["loaded"] if p["name"] == name]
+        return match[0] if match else False
+
+    # general plugin
+    users_plugin = get_plugin(output, "users")
+    assert isinstance(users_plugin, dict)
+
+    assert users_plugin == {
+        "path": "os.unix.linux._os.users",
+        "name": "users",
+        "description": "Yield unix user records from passwd files or syslog session logins.",
+        "output": "record",
+        "arguments": [
+            {
+                "name": "--sessions",
+                "help": "Parse syslog for recent user sessions",
+                "default": False,
+                "required": False,
+                "type": "bool",
+            }
+        ],
+        "alias": False,
+    }
+
+
 def test_record_stream_write_exception_handling(
     caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
