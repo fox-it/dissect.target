@@ -14,7 +14,6 @@ from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath, join
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
@@ -29,6 +28,7 @@ from dissect.target.plugins.apps.browser.browser import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
     from dissect.sql.sqlite3 import SQLite3
 
@@ -107,29 +107,31 @@ class ChromiumMixin:
         "browser/chromium/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
-    def _build_userdirs(self, hist_paths: list[str]) -> list[tuple[UserDetails, TargetPath]]:
+    def __init__(self, target: Target) -> None:
+        super().__init__(target)
+        self.target = target
+        self.userdirs = self._build_userdirs(self.DIRS)
+
+    def _build_userdirs(self, hist_paths: list[str]) -> set[tuple[UserDetails, Path]]:
         """Join the selected browser dirs with the user home path.
 
         Args:
             hist_paths: A list with browser paths as strings.
 
         Returns:
-            List of tuples containing user and file path objects.
+            List of tuples containing user and unique file path objects.
         """
-        users_dirs: list[tuple] = []
+        users_dirs: set[tuple] = set()
         for user_details in self.target.user_details.all_with_home():
             for d in hist_paths:
-                home_dir: TargetPath = user_details.home_path
+                home_dir: Path = user_details.home_path
                 for cur_dir in home_dir.glob(d):
                     cur_dir = cur_dir.resolve()
-                    if not cur_dir.exists() or (user_details.user, cur_dir) in users_dirs:
-                        continue
-                    users_dirs.append((user_details, cur_dir))
+                    if cur_dir.exists():
+                        users_dirs.add((user_details, cur_dir))
         return users_dirs
 
-    def _iter_db(
-        self, filename: str, subdirs: list[str] | None = None
-    ) -> Iterator[tuple[UserDetails, TargetPath, SQLite3]]:
+    def _iter_db(self, filename: str, subdirs: list[str] | None = None) -> Iterator[tuple[UserDetails, Path, SQLite3]]:
         """Generate a connection to a sqlite database file.
 
         Args:
@@ -144,11 +146,19 @@ class ChromiumMixin:
             SQLError: If the history file could not be opened.
         """
         seen = set()
-        dirs = list(self.DIRS)
-        if subdirs:
-            dirs.extend([join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subdirs)])
 
-        for user, cur_dir in self._build_userdirs(dirs):
+        userdirs = self.userdirs
+
+        if subdirs:
+            userdirs = self.userdirs.copy()
+            userdirs.update(
+                {
+                    (user_details, userdir.joinpath(subdir))
+                    for (user_details, userdir), subdir in itertools.product(userdirs, subdirs)
+                }
+            )
+
+        for user, cur_dir in userdirs:
             db_file = cur_dir.joinpath(filename)
 
             if db_file in seen:
@@ -163,7 +173,7 @@ class ChromiumMixin:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
-    def _iter_json(self, filename: str) -> Iterator[tuple[UserDetails, TargetPath, dict]]:
+    def _iter_json(self, filename: str) -> Iterator[tuple[UserDetails, Path, dict]]:
         """Iterate over all JSON files in the user directories, yielding a tuple
         of username, JSON file path, and the parsed JSON data.
 
@@ -177,7 +187,7 @@ class ChromiumMixin:
         Raises:
             FileNotFoundError: If the json file could not be found.
         """
-        for user, cur_dir in self._build_userdirs(self.DIRS):
+        for user, cur_dir in self.userdirs:
             json_file = cur_dir.joinpath(filename)
             try:
                 yield user, json_file, json.load(json_file.open())
@@ -185,7 +195,7 @@ class ChromiumMixin:
                 self.target.log.warning("Could not find %s file: %s", filename, json_file)
 
     def check_compatible(self) -> None:
-        if not self._build_userdirs(self.DIRS):
+        if not self.userdirs:
             raise UnsupportedPluginError("No Chromium-based browser directories found")
 
     def history(self, browser_name: str | None = None) -> Iterator[BrowserHistoryRecord]:
@@ -564,7 +574,7 @@ class ChromiumMixin:
                     _user=user.user,
                 )
 
-    def decryption_keys(self, local_state_path: TargetPath, username: str) -> ChromiumKeys:
+    def decryption_keys(self, local_state_path: Path, username: str) -> ChromiumKeys:
         """Return decrypted Chromium ``os_crypt.encrypted_key``and ``os_crypt.app_bound_encrypted_key`` values.
 
         Used by :meth:`ChromiumMixin.passwords` and :meth:`ChromiumMixin.cookies` for Windows targets.
