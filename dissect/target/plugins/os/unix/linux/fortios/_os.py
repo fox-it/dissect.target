@@ -338,6 +338,8 @@ class FortiOSPlugin(LinuxPlugin):
 
 
 class ConfigNode(dict):
+    """Constructs a ``ConfigNodes`` using a list of paths."""
+
     def set(self, path: list[str], value: str) -> None:
         node = self
 
@@ -353,6 +355,8 @@ class ConfigNode(dict):
 
 
 class FortiOSConfig(ConfigNode):
+    """Parses the fortios config file to a ``ConfigNode``."""
+
     @classmethod
     def from_fh(cls, fh: TextIO) -> Self:
         root = cls()
