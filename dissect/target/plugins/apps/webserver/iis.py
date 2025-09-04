@@ -125,6 +125,10 @@ class IISLogsPlugin(WebserverPlugin):
 
         return dirs
 
+    def _get_paths(self) -> Iterator[Path]:
+        for path in self.log_dirs.values():
+            yield from path
+
     @export(record=BasicRecordDescriptor)
     def logs(self) -> Iterator[TargetRecordDescriptor]:
         """Return contents of IIS (v7 and above) log files.
