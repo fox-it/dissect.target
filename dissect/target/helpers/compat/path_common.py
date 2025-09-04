@@ -105,7 +105,7 @@ def realpath(path: TargetPath, *, strict: bool = False) -> str:
 def isjunction(path: TargetPath) -> bool:
     """Return True if the path is a junction."""
     try:
-        from dissect.target.filesystems.ntfs import NtfsFilesystemEntry
+        from dissect.target.filesystems.ntfs import NtfsFilesystemEntry  # noqa: PLC0415
     except ImportError:
         return False
 

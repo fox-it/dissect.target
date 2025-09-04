@@ -1509,13 +1509,13 @@ def python_shell(targets: list[Target], commands: list[str] | None = None) -> No
                 eval(command, ns)
             return
 
-        import IPython
+        import IPython  # noqa: PLC0415
 
         IPython.embed(header=banner, user_ns=ns, colors="linux")
 
         # IPython already prints an empty newline
     except ImportError:
-        import code
+        import code  # noqa: PLC0415
 
         shell = code.InteractiveConsole(ns)
         shell.interact(banner)
