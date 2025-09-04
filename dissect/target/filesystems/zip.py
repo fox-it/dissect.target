@@ -162,7 +162,7 @@ class ZipFilesystemEntry(VirtualDirectory):
             mode = stat.S_IFREG | mode
 
         date_time = self.entry.date_time
-        if date_time[0] < 1980 or date_time[:3] == (1980, 0, 0):
+        if date_time[0] < 1980 or date_time[:2] == (1980, 0) or date_time[:3] == (1980, 1, 0):
             date_time = (1980, 1, 1, 0, 0, 0)
         elif date_time[0] > 2107:
             date_time = (2107, 12, 31, 23, 59, 59)
