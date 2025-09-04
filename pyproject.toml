@@ -29,10 +29,10 @@ dependencies = [
     "dissect.cstruct>=4,<5",
     "dissect.eventlog>=3,<4",
     "dissect.evidence>=3,<4",
-    "dissect.hypervisor>=3.19.dev2,<4",  # TODO: update on release!
+    "dissect.hypervisor>=3.19,<4",
     "dissect.ntfs>=3.4,<4",
     "dissect.regf>=3.13,<4",
-    "dissect.sql>=3.12.dev4,<4",  # TODO: update on release!
+    "dissect.sql>=3.12,<4",
     "dissect.util>=3,<4",
     "dissect.volume>=2,<4",
     "flow.record~=3.19.0",
@@ -60,11 +60,11 @@ full = [
     "dissect.fve>=4.2,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
     "dissect.jffs>=1.5,<2",
     "dissect.ole>=3,<4",
-    "dissect.qnxfs>=1.1.dev,<2", # TODO: update on release
+    "dissect.qnxfs>=1.1,<2",
     "dissect.shellitem>=3,<4",
     "dissect.squashfs>=1,<2",
     "dissect.thumbcache>=1,<2",
-    "dissect.vmfs>=3.12.dev,<4",  # TODO: update on release
+    "dissect.vmfs>=3.12,<4",
     "dissect.xfs>=3,<4",
     "ipython",
     "fusepy",
