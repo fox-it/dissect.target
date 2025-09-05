@@ -38,7 +38,7 @@ def cramfs_file_entry(cramfs: CramFSFilesystem) -> Iterator[CramFSFilesystemEntr
     inode = Mock(
         inum=0,
         nlink=1,
-        numblocks=1,
+        blocks=[0],
         is_dir=lambda: False,
         is_file=lambda: True,
         is_symlink=lambda: False,
@@ -64,7 +64,7 @@ def test_cramfs_stat(entry_fixture: str, expected_blocks: int, request: pytest.F
     assert stat.st_uid == entry.uid
     assert stat.st_gid == entry.gid
     assert stat.st_size == entry.size
-    assert stat.st_blksize == c_cramfs.c_cramfs.CRAMFS_BLOCK_SIZE
+    assert stat.st_blksize == c_cramfs.CRAMFS_BLOCK_SIZE
     assert stat.st_blocks == expected_blocks
 
 
@@ -80,3 +80,17 @@ def test_cramfs_symlinks(cramfs: CramFSFilesystem) -> None:
 
     assert target.is_file()
     assert target.name == "dvrbox"
+
+
+def test_cramfs_dir(cramfs: CramFSFilesystem) -> None:
+    dir = cramfs.get("/etc/init.d")
+    assert dir.is_dir()
+
+    entries = list(dir.iterdir())
+    assert len(entries) == 2
+    assert sorted(entries) == sorted(["dnode", "rcS"])
+
+    entries = [entry.name for entry in dir.scandir()]
+    assert dir.is_dir()
+    assert len(entries) == 2
+    assert sorted(entries) == sorted(["dnode", "rcS"])
