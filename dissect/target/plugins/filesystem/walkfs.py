@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, arg, export
+from dissect.target.plugin import Plugin, arg, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -28,6 +29,8 @@ FilesystemRecord = TargetRecordDescriptor(
         ("uint32", "uid"),
         ("uint32", "gid"),
         ("string[]", "fstypes"),
+        ("string[]", "vuuid"),
+        ("string[]", "dserial"),
     ],
 )
 
@@ -66,6 +69,47 @@ class WalkFSPlugin(Plugin):
                 self.target.log.debug("", exc_info=e)
                 continue
 
+@internal
+def get_volume_uuid(entry: FilesystemEntry) -> str:
+    """
+    Returns the volume_uuid if it exists. otherwise, returns none
+
+    Args:
+    entry: :class:`FilesystemEntry` instance
+
+    Returns:
+        UUID as str
+    """
+    if entry.fs.volume.guid:
+        return UUID(bytes_le=entry.fs.volume.guid)
+    elif entry.fs.__type__ == 'ntfs':
+        return UUID(int=entry.fs.ntfs.serial)
+    elif entry.fs.__type__ in ['ext2', 'ext3', 'ext4']:
+        return entry.fs.extfs.uuid
+    elif entry.fs.__type__ == 'fat':
+        return UUID(int=int(entry.fs.fatfs.volume_id, 16))
+    elif entry.fs.__type__ == 'exfat':
+        return UUID(int=entry.fs.exfat.vbr.volume_serial)
+    else:
+        # Return None if no valid UUID or serial is found
+        return None
+    
+
+@internal
+def get_disk_serial(entry: FilesystemEntry) -> str:
+    """
+    Returns the disk_serial if it exists. otherwise, returns none
+
+    Args:
+    entry: :class:`FilesystemEntry` instance
+
+    Returns:
+        serial as str
+    """
+    if hasattr(entry.fs.volume.disk.vs, 'serial'):
+        return entry.fs.volume.disk.vs.serial
+    return None
+
 
 def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
     """Generate a :class:`FilesystemRecord` from the given :class:`FilesystemEntry`.
@@ -81,8 +125,19 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
 
     if isinstance(entry, LayerFilesystemEntry):
         fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
+        volume_uuids = [
+            get_volume_uuid(sub_entry)
+            for sub_entry in entry.entries
+        ]
+
+        disk_serials = [
+            get_disk_serial(sub_entry)
+            for sub_entry in entry.entries
+        ]
     else:
         fs_types = [entry.fs.__type__]
+        volume_uuids = [get_volume_uuid(entry)]
+        disk_serials = [get_disk_serial(entry)]   
 
     return FilesystemRecord(
         atime=from_unix(stat.st_atime),
@@ -96,5 +151,7 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
         uid=stat.st_uid,
         gid=stat.st_gid,
         fstypes=fs_types,
+        vuuid=volume_uuids,
+        dserial=disk_serials,
         _target=target,
     )
