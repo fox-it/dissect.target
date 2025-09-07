@@ -80,7 +80,8 @@ def get_volume_uuid(entry: FilesystemEntry) -> str:
     Returns:
         UUID as str
     """
-    print(entry)
+    if entry.fs.volume is None:
+        return None
     if entry.fs.volume.guid:
         return UUID(bytes_le=entry.fs.volume.guid)
     elif entry.fs.__type__ == 'ntfs':
@@ -107,6 +108,9 @@ def get_disk_serial(entry: FilesystemEntry) -> str:
     Returns:
         serial as str
     """
+    if entry.fs.volume is None:
+        return None
+
     if hasattr(entry.fs.volume.disk.vs, 'serial'):
         return entry.fs.volume.disk.vs.serial
     return None

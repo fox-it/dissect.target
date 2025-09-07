@@ -19,22 +19,13 @@ if TYPE_CHECKING:
 
 
 def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    
     fs_unix.map_file_entry("/path/to/some/file", VirtualFile(fs_unix, "file", None))
     fs_unix.map_file_entry("/path/to/some/other/file.ext", VirtualFile(fs_unix, "file.ext", None))
     fs_unix.map_file_entry("/root_file", VirtualFile(fs_unix, "root_file", None))
     fs_unix.map_file_entry("/other_root_file.ext", VirtualFile(fs_unix, "other_root_file.ext", None))
     fs_unix.map_file_entry("/.test/test.txt", VirtualFile(fs_unix, "test.txt", None))
     fs_unix.map_file_entry("/.test/.more.test.txt", VirtualFile(fs_unix, ".more.test.txt", None))
-
-    mock_volume = Mock()
-    mock_disk = Mock()
-
-    mock_volume.disk = mock_disk
-
-    # Clear any attributes from previous tests
-    mock_volume.guid = None
-    target_unix.fs.volume = mock_volume
-    target_unix.fs.__type__ = 'generic'
 
     target_unix.add_plugin(WalkFSPlugin)
     
@@ -163,9 +154,10 @@ def test_get_disk_serial(mock_fs_entry):
 
 def test_get_disk_serial_no_serial(mock_fs_entry):
     """Test get_disk_serial when the `serial` attribute is missing."""
-    # The default mock does not have the `serial` attribute on `vs`
+    # The default mock aparently does have the `serial` attribute on `vs`
     mock_fs_entry.fs.volume.disk.vs = Mock()
-    
+    if hasattr(mock_fs_entry.fs.volume.disk.vs, 'serial'):
+        delattr(mock_fs_entry.fs.volume.disk.vs, 'serial')
     assert get_disk_serial(mock_fs_entry) is None
 
 
