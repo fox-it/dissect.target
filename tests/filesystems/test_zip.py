@@ -51,6 +51,9 @@ def _create_zip(prefix: str = "", zip_dir: bool = True) -> io.BytesIO:
 
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_1", (1980, 0, 0, 0, 0, 0)), "file 1 contents")
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_2", (2107, 1, 1, 0, 0, 0)), "file 2 contents")
+    zf.writestr(zipfile.ZipInfo(f"{prefix}file_3", (1980, 1, 0, 0, 0, 0)), "file 3 contents")
+    zf.writestr(zipfile.ZipInfo(f"{prefix}file_4", (2107, 13, 1, 0, 0, 0)), "file 4 contents")
+    zf.writestr(zipfile.ZipInfo(f"{prefix}file_5", (2025, 9, 8, 10, 39, 40)), "file 5 contents")
 
     if zip_dir:
         _mkdir(zf, f"{prefix}dir/")
@@ -113,12 +116,16 @@ def test_filesystems_zip(obj: str, base: str, request: pytest.FixtureRequest) ->
 
     fs = ZipFilesystem(fh, base)
     assert isinstance(fs, ZipFilesystem)
-    assert len(fs.listdir("/")) == 5
+    assert len(fs.listdir("/")) == 8
 
     assert fs.get("./file_1").open().read() == b"file 1 contents"
     assert fs.get("./file_2").open().read() == b"file 2 contents"
+    assert fs.get("./file_3").open().read() == b"file 3 contents"
     assert fs.get("./file_1").lstat().st_mtime_ns == 315532800000000000
     assert fs.get("./file_2").lstat().st_mtime_ns == 4323283200000000000
+    assert fs.get("./file_3").lstat().st_mtime_ns == 315532800000000000
+    assert fs.get("./file_4").lstat().st_mtime_ns == 315532800000000000
+    assert fs.get("./file_5").lstat().st_mtime_ns == 1757327980000000000
     assert fs.get("./symlink_file").open().read() == b"file 1 contents"
     assert len(list(fs.glob("./dir/*"))) == 100
     assert len(list(fs.glob("./symlink_dir/*"))) == 100
