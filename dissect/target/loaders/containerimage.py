@@ -41,8 +41,8 @@ class ContainerImageTarSubLoader(TarSubLoader):
         - https://github.com/opencontainers/image-spec/
     """
 
-    def __init__(self, tar: tarfile.TarFile, *args, **kwargs):
-        super().__init__(tar, *args, **kwargs)
+    def __init__(self, path: Path, tar: tarfile.TarFile, **kwargs):
+        super().__init__(path, tar, **kwargs)
 
         self.tarfs: TarFilesystem = None
         self.layers: list[Path] = []
@@ -85,7 +85,7 @@ class ContainerImageTarSubLoader(TarSubLoader):
                 raise ValueError(f"Unable to load OCI container: {e}") from e
 
     @staticmethod
-    def detect(tar: tarfile.TarFile) -> bool:
+    def detect(path: Path, tar: tarfile.TarFile) -> bool:
         names = tar.getnames()
         return OCI_IMAGE.issubset(names) or DOCKER_ARCHIVE_IMAGE.issubset(names)
 

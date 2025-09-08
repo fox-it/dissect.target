@@ -41,8 +41,8 @@ def main() -> int:
     parser.add_argument("-l", "--length", type=int, default=100, help="max length of key value to print")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(args)
 
     try:
         for target in Target.open_all(args.targets):

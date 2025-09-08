@@ -14,7 +14,7 @@ from dissect.target.tools.utils import (
     args_to_uri,
     configure_generic_arguments,
     execute_function_on_target,
-    generate_argparse_for_unbound_method,
+    generate_argparse_for_method,
     persist_execution_report,
     process_generic_arguments,
 )
@@ -51,7 +51,7 @@ def test_persist_execution_report() -> None:
 
 
 @pytest.mark.parametrize(
-    ("targets", "loader_name", "rest", "uris"),
+    ("targets", "loader_name", "args", "uris"),
     [
         (["/path/to/somewhere"], "loader", ["--loader-option", "1"], ["loader:///path/to/somewhere?option=1"]),
         (["/path/to/somewhere"], "loader", ["--loader-option", "2"], ["loader:///path/to/somewhere?option=2"]),
@@ -61,67 +61,74 @@ def test_persist_execution_report() -> None:
         (["/path/to/somewhere"], "invalid", [], ["invalid:///path/to/somewhere"]),
     ],
 )
-def test_args_to_uri(targets: list[str], loader_name: str, rest: list[str], uris: list[str]) -> None:
+def test_args_to_uri(targets: list[str], loader_name: str, args: list[str], uris: list[str]) -> None:
     @arg("--loader-option", dest="option")
     class FakeLoader:
         pass
 
     with patch("dissect.target.tools.utils.LOADERS_BY_SCHEME", {"loader": FakeLoader}):
-        assert args_to_uri(targets, loader_name, rest) == uris
+        assert args_to_uri(targets, loader_name, args) == uris
 
 
-def test_process_generic_arguments() -> None:
+def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
     parser = argparse.ArgumentParser()
     configure_generic_arguments(parser)
 
-    args = parser.parse_args(
-        [
-            "--keychain-file",
-            "/path/to/keychain.csv",
-            "--keychain-value",
-            "some_value",
-            "--loader",
-            "loader_name",
-            "--version",
-            "--plugin-path",
-            "/path/to/plugins",
-        ]
-    )
-    args.targets = ["target1", "target2"]
-    rest = ["--some-other-arg", "value"]
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-mock",
+                "--keychain-file",
+                "/path/to/keychain.csv",
+                "--keychain-value",
+                "some_value",
+                "--loader",
+                "loader_name",
+                "--version",
+                "--plugin-path",
+                "/path/to/plugins",
+                "--some-other-arg",
+                "value",
+            ],
+        )
 
-    with (
-        patch("dissect.target.tools.utils.configure_logging") as mocked_configure_logging,
-        patch("dissect.target.tools.utils.version", return_value="1.0.0") as mocked_version,
-        patch("dissect.target.tools.utils.sys.exit") as mocked_exit,
-        patch(
-            "dissect.target.tools.utils.args_to_uri", return_value=["loader_name://target1", "loader_name://target2"]
-        ) as mocked_args_to_uri,
-        patch("dissect.target.tools.utils.keychain.register_keychain_file") as mocked_register_keychain_file,
-        patch("dissect.target.tools.utils.keychain.register_wildcard_value") as mocked_register_wildcard_value,
-        patch(
-            "dissect.target.tools.utils.get_external_module_paths", return_value=["/path/to/plugins"]
-        ) as mocked_get_external_module_paths,
-        patch("dissect.target.tools.utils.load_modules_from_paths") as mocked_load_modules_from_paths,
-    ):
-        process_generic_arguments(args, rest)
+        args, _ = parser.parse_known_args()
+        args.targets = ["target1", "target2"]
 
-        mocked_configure_logging.assert_called_once_with(0, False, as_plain_text=True)
-        mocked_version.assert_called_once_with("dissect.target")
-        mocked_exit.assert_called_once_with(0)
-        mocked_args_to_uri.assert_called_once_with(["target1", "target2"], "loader_name", rest)
-        mocked_register_keychain_file.assert_called_once_with(Path("/path/to/keychain.csv"))
-        mocked_register_wildcard_value.assert_called_once_with("some_value")
-        mocked_get_external_module_paths.assert_called_once_with([Path("/path/to/plugins")])
-        mocked_load_modules_from_paths.assert_called_once_with(["/path/to/plugins"])
+        with (
+            patch("dissect.target.tools.utils.configure_logging") as mocked_configure_logging,
+            patch("dissect.target.tools.utils.version", return_value="1.0.0") as mocked_version,
+            patch("dissect.target.tools.utils.sys.exit") as mocked_exit,
+            patch(
+                "dissect.target.tools.utils.args_to_uri",
+                return_value=["loader_name://target1", "loader_name://target2"],
+            ) as mocked_args_to_uri,
+            patch("dissect.target.tools.utils.keychain.register_keychain_file") as mocked_register_keychain_file,
+            patch("dissect.target.tools.utils.keychain.register_wildcard_value") as mocked_register_wildcard_value,
+            patch(
+                "dissect.target.tools.utils.get_external_module_paths", return_value=["/path/to/plugins"]
+            ) as mocked_get_external_module_paths,
+            patch("dissect.target.tools.utils.load_modules_from_paths") as mocked_load_modules_from_paths,
+        ):
+            process_generic_arguments(args)
 
-        assert args.targets == ["loader_name://target1", "loader_name://target2"]
+            mocked_configure_logging.assert_called_once_with(0, False, as_plain_text=True)
+            mocked_version.assert_called_once_with("dissect.target")
+            mocked_exit.assert_called_once_with(0)
+            mocked_args_to_uri.assert_called_once_with(["target1", "target2"], "loader_name")
+            mocked_register_keychain_file.assert_called_once_with(Path("/path/to/keychain.csv"))
+            mocked_register_wildcard_value.assert_called_once_with("some_value")
+            mocked_get_external_module_paths.assert_called_once_with([Path("/path/to/plugins")])
+            mocked_load_modules_from_paths.assert_called_once_with(["/path/to/plugins"])
 
-        del args.targets
-        args.target = "target1"
-        process_generic_arguments(args, rest)
+            assert args.targets == ["loader_name://target1", "loader_name://target2"]
 
-        assert args.target == "loader_name://target1"
+            del args.targets
+            args.target = "target1"
+            process_generic_arguments(args)
+
+            assert args.target == "loader_name://target1"
 
 
 @pytest.mark.parametrize(
@@ -155,7 +162,7 @@ def test_plugin_mutual_exclusive_arguments() -> None:
     method = test_plugin_mutual_exclusive_arguments
     method.__args__ = fargs
     with patch("inspect.isfunction", return_value=True):
-        parser = generate_argparse_for_unbound_method(method)
+        parser = generate_argparse_for_method(method)
     assert len(parser._mutually_exclusive_groups) == 2
 
 
