@@ -164,7 +164,8 @@ class ZipFilesystemEntry(VirtualDirectory):
         try:
             mtime = datetime(*self.entry.date_time, tzinfo=timezone.utc)
         except ValueError:
-            mtime = datetime(*(2107, 12, 31, 23, 59, 59) if self.entry.date_time[0] >= 2107 else *(1980, 1, 1, 0, 0, 0), tzinfo=timezone.utc)
+            mtime_tuple = (2107, 12, 31, 23, 59, 59) if self.entry.date_time[0] >= 2107 else (1980, 1, 1, 0, 0, 0)
+            mtime = datetime(*mtime_tuple, tzinfo=timezone.utc)
 
         return fsutil.stat_result(
             [
