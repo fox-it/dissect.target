@@ -162,11 +162,9 @@ class ZipFilesystemEntry(VirtualDirectory):
             mode = stat.S_IFREG | mode
 
         try:
-            timestamp = datetime(*self.entry.date_time, tzinfo=timezone.utc).timestamp()
+            mtime = datetime(*self.entry.date_time, tzinfo=timezone.utc)
         except ValueError:
-            # 4354819199 ==  datetime(*(2107, 12, 31, 23, 59, 59), tzinfo=timezone.utc).timestamp()
-            # 315532800 ==  datetime(*(1980, 1, 1, 0, 0, 0), tzinfo=timezone.utc).timestamp()
-            timestamp = 4354819199 if self.entry.date_time[0] >= 2107 else 315532800
+            mtime = datetime(*(2107, 12, 31, 23, 59, 59) if self.entry.date_time[0] >= 2107 else *(1980, 1, 1, 0, 0, 0), tzinfo=timezone.utc)
 
         return fsutil.stat_result(
             [
@@ -178,7 +176,7 @@ class ZipFilesystemEntry(VirtualDirectory):
                 0,
                 self.entry.file_size,
                 0,
-                timestamp,
+                mtime.timestamp(),
                 0,
             ]
         )
