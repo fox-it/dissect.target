@@ -14,7 +14,7 @@ import os
 import sys
 import traceback
 from dataclasses import dataclass, field
-from itertools import zip_longest
+from itertools import chain, zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -685,15 +685,19 @@ def _module_path(cls: type[Plugin] | str) -> str:
     return module.replace(MODULE_PATH, "").lstrip(".")
 
 
+@functools.lru_cache(256)
 def _os_match(osfilter: type[OSPlugin], module_path: str) -> bool:
     """Check if the a plugin is compatible with the given OS filter."""
-    if issubclass(osfilter, default._os.DefaultOSPlugin):
+    module_parts = module_path.split(".")
+
+    # DefaultOSPlugin is "compatible" with everything, even other `os.*` modules (except `_os`)
+    if issubclass(osfilter, default._os.DefaultOSPlugin) and (len(module_parts) < 2 or module_parts[-2] != "_os"):
         return True
 
     os_parts = _module_path(osfilter).split(".")[:-1]
 
     obj = _get_plugins().__ostree__
-    for plugin_part, os_part in zip_longest(module_path.split("."), os_parts):
+    for plugin_part, os_part in zip_longest(module_parts, os_parts):
         if plugin_part not in obj:
             break
 
@@ -792,7 +796,7 @@ def lookup(
         value for key, value in function_index.items() if osfilter is None or _os_match(osfilter, key)
     )
 
-    yield from sorted(entries, key=lambda x: x.module.count("."), reverse=True)
+    yield from sorted(entries, key=lambda desc: desc.module.count("."), reverse=True)
 
 
 def load(desc: FunctionDescriptor | PluginDescriptor) -> type[Plugin]:
@@ -836,16 +840,18 @@ def failed() -> list[FailureDescriptor]:
 
 
 @functools.cache
-def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
-    """Generate a dictionary of all long paths to their function descriptors."""
-    paths = {}
-    for value in _get_plugins().__functions__.__regular__.values():
-        for descriptor in value.values():
-            # Namespace plugins are callable so exclude the explicit __call__ method
-            if descriptor.method_name == "__call__":
-                continue
+def _generate_long_paths(os_filter: type[OSPlugin]) -> dict[str, list[FunctionDescriptor]]:
+    """Generate a dictionary of all long paths to their function descriptors for the given functions."""
+    __regular__ = functions(os_filter, index="__regular__")
+    __os__ = functions(os_filter, index="__os__")
 
-            paths.setdefault(descriptor.path, []).append(descriptor)
+    paths = {}
+    for descriptor in chain(__regular__, __os__):
+        # Namespace plugins are callable so exclude the explicit __call__ method
+        if descriptor.method_name == "__call__":
+            continue
+
+        paths.setdefault(descriptor.path, []).append(descriptor)
 
     return paths
 
@@ -884,23 +890,18 @@ def find_functions(
         exact_os_match = pattern in os_functions
 
         if exact_match or exact_os_match:
-            if matches := list(_filter_exact_match(pattern, os_filter, exact_match, exact_os_match)):
-                found.extend(matches)
-            else:
-                invalid_functions.add(pattern)
+            matches = list(_filter_exact_match(pattern, os_filter, "__os__" if exact_os_match else "__regular__"))
         else:
             # If we don't have an exact function match, do a slower treematch
-            if matches := list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden)):
-                found.extend(matches)
-            else:
-                invalid_functions.add(pattern)
+            matches = list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden))
 
-    if compatibility and target is not None:
-        result = list(_filter_compatible(found, target, ignore_load_errors))
-    else:
-        result = found
+        if matches:
+            found.extend(matches)
+        else:
+            invalid_functions.add(pattern)
 
-    return result, invalid_functions
+    result = _filter_compatible(found, target, ignore_load_errors) if compatibility and target is not None else found
+    return list(result), invalid_functions
 
 
 def find_functions_by_record_field_type(
@@ -941,22 +942,19 @@ def find_functions_by_record_field_type(
 
 
 def _filter_exact_match(
-    pattern: str, os_filter: str, exact_match: bool, exact_os_match: bool
+    pattern: str,
+    os_filter: type[OSPlugin] | None,
+    index: str = "__regular__",
 ) -> Iterator[FunctionDescriptor]:
-    if exact_match:
-        descriptors = lookup(pattern, os_filter)
-    elif exact_os_match:
-        descriptors = lookup(pattern, os_filter, index="__os__")
-
-    for descriptor in descriptors:
-        if not descriptor.exported:
-            continue
-
-        yield descriptor
+    descriptors = lookup(pattern, os_filter, index=index)
+    yield from (descriptor for descriptor in descriptors if descriptor.exported)
 
 
-def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) -> Iterator[FunctionDescriptor]:
-    path_lookup = _generate_long_paths()
+def _filter_tree_match(
+    pattern: str, os_filter: type[OSPlugin] | None, show_hidden: bool = False
+) -> Iterator[FunctionDescriptor]:
+    """Perform a slow tree match on all ``__regular__`` and ``__os__`` :class:`FunctionDescriptor` instances."""
+    path_lookup = _generate_long_paths(os_filter)
 
     # Change the treematch pattern into an fnmatch-able pattern to give back all functions from the sub-tree
     # (if there is a subtree).
@@ -970,17 +968,16 @@ def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) 
     if not has_glob_magic(pattern):
         search_pattern += "*"
 
+    result: list[FunctionDescriptor] = []
     for path in fnmatch.filter(path_lookup.keys(), search_pattern):
         for descriptor in path_lookup[path]:
             # Skip plugins that don't want to be found by wildcards
             if not descriptor.exported or (not show_hidden and not descriptor.findable):
                 continue
 
-            # Skip plugins that do not match our OS
-            if os_filter and not _os_match(os_filter, descriptor.path):
-                continue
+            result.append(descriptor)
 
-            yield descriptor
+    yield from sorted(result, key=lambda desc: desc.module.count("."), reverse=True)
 
 
 def _filter_compatible(
@@ -1013,7 +1010,14 @@ def _filter_compatible(
             raise
 
         try:
-            if plugincls(target).is_compatible():
+            if issubclass(plugincls, OSPlugin):
+                if issubclass(target._os_plugin, plugincls):
+                    compatible.add(descriptor.qualname)
+                    yield descriptor
+                else:
+                    incompatible.add(descriptor.qualname)
+                    continue
+            elif plugincls(target).is_compatible():
                 compatible.add(descriptor.qualname)
                 yield descriptor
             else:

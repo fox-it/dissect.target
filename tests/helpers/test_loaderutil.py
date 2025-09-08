@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import urllib
+import urllib.parse
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
@@ -8,11 +8,10 @@ from unittest.mock import Mock, patch
 import pytest
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem
-from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import (
     add_virtual_ntfs_filesystem,
-    extract_path_info,
+    parse_path_uri,
 )
 
 if TYPE_CHECKING:
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
         (None, (None, None)),
         # Path objects fall through (BC/DRY)
         (Path("path"), (Path("path"), None)),
-        (TargetPath(DirectoryFilesystem("/")), (TargetPath(DirectoryFilesystem("/")), None)),
+        (TargetPath(VirtualFilesystem()), (TargetPath(VirtualFilesystem()), None)),
         # Strings get upgraded to Paths
         ("/path/to/file", (Path("/path/to/file"), None)),
         # URIs get converted to Path extracted from path part and a ParseResult
@@ -43,10 +42,8 @@ if TYPE_CHECKING:
         ("C:\\path\\to\\file", (Path("C:\\path\\to\\file"), None)),
     ],
 )
-def test_extract_path_info(
-    path: Path | str, expected: tuple[Path | None, urllib.parse.ParseResult[str] | None]
-) -> None:
-    assert extract_path_info(path) == expected
+def test_parse_path_uri(path: Path | str, expected: tuple[Path | None, urllib.parse.ParseResult[str] | None]) -> None:
+    assert parse_path_uri(path) == expected
 
 
 @pytest.mark.parametrize(

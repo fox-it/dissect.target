@@ -18,6 +18,7 @@ WebserverAccessLogRecord = TargetRecordDescriptor(
         ("varint", "pid"),
         ("string", "method"),
         ("uri", "uri"),
+        ("string", "query"),
         ("string", "protocol"),
         ("varint", "status_code"),
         ("varint", "bytes_sent"),

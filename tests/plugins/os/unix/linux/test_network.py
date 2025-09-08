@@ -1,19 +1,23 @@
 from __future__ import annotations
 
-import posixpath
+import textwrap
 from datetime import datetime
+from io import BytesIO
 from ipaddress import ip_address, ip_interface
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 from dissect.target.plugins.os.default.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
+    DhclientLeaseParser,
     LinuxNetworkConfigParser,
     LinuxNetworkPlugin,
     NetworkManagerConfigParser,
+    NetworkManagerLeaseParser,
     ProcConfigParser,
     SystemdNetworkConfigParser,
 )
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
@@ -21,7 +25,7 @@ if TYPE_CHECKING:
 
 
 def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    fixture_dir = "tests/_data/plugins/os/unix/linux/NetworkManager/"
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/NetworkManager")
     fs_linux.map_dir("/etc/NetworkManager/system-connections", fixture_dir)
 
     network_manager_config_parser = NetworkManagerConfigParser(target_linux)
@@ -64,27 +68,21 @@ def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem
 
 
 def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    fixture_dir = "tests/_data/plugins/os/unix/linux/systemd.network/"
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/systemd.network")
 
-    fs_linux.map_file(
-        "/etc/systemd/network/20-wired-static.network", posixpath.join(fixture_dir, "20-wired-static.network")
-    )
+    fs_linux.map_file("/etc/systemd/network/20-wired-static.network", fixture_dir.joinpath("20-wired-static.network"))
     fs_linux.map_file(
         "/etc/systemd/network/30-wired-static-complex.network",
-        posixpath.join(fixture_dir, "30-wired-static-complex.network"),
+        fixture_dir.joinpath("30-wired-static-complex.network"),
     )
-    fs_linux.map_file(
-        "/usr/lib/systemd/network/40-wireless.network", posixpath.join(fixture_dir, "40-wireless.network")
-    )
-    fs_linux.map_file(
-        "/run/systemd/network/40-wireless-ipv4.network", posixpath.join(fixture_dir, "40-wireless-ipv4.network")
-    )
+    fs_linux.map_file("/usr/lib/systemd/network/40-wireless.network", fixture_dir.joinpath("40-wireless.network"))
+    fs_linux.map_file("/run/systemd/network/40-wireless-ipv4.network", fixture_dir.joinpath("40-wireless-ipv4.network"))
     fs_linux.map_file(
         "/usr/local/lib/systemd/network/40-wireless-ipv6.network",
-        posixpath.join(fixture_dir, "40-wireless-ipv6.network"),
+        fixture_dir.joinpath("40-wireless-ipv6.network"),
     )
-    fs_linux.map_file("/etc/systemd/network/20-vlan.netdev", posixpath.join(fixture_dir, "20-vlan.netdev"))
-    fs_linux.map_file("/etc/systemd/network/20-vlan2.netdev", posixpath.join(fixture_dir, "20-vlan2.netdev"))
+    fs_linux.map_file("/etc/systemd/network/20-vlan.netdev", fixture_dir.joinpath("20-vlan.netdev"))
+    fs_linux.map_file("/etc/systemd/network/20-vlan2.netdev", fixture_dir.joinpath("20-vlan2.netdev"))
 
     systemd_network_config_parser = SystemdNetworkConfigParser(target_linux)
     interfaces = list(systemd_network_config_parser.interfaces())
@@ -157,19 +155,19 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
 
 
 def test_systemd_network_drop(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    fixture_dir = "tests/_data/plugins/os/unix/linux/systemd.network/"
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/systemd.network")
 
     fs_linux.map_file(
         "/etc/systemd/network/30-wired-static-complex.network",
-        posixpath.join(fixture_dir, "30-wired-static-complex.network"),
+        fixture_dir.joinpath("30-wired-static-complex.network"),
     )
     fs_linux.map_file(
         "/etc/systemd/network/30-wired-static-complex.network.d/10-override.conf",
-        posixpath.join(fixture_dir, "30-wired-static-complex.network.d/10-override.conf"),
+        fixture_dir.joinpath("30-wired-static-complex.network.d/10-override.conf"),
     )
     fs_linux.map_file(
         "/etc/systemd/network/30-wired-static-complex.network.d/20-override.conf",
-        posixpath.join(fixture_dir, "30-wired-static-complex.network.d/20-override.conf"),
+        fixture_dir.joinpath("30-wired-static-complex.network.d/20-override.conf"),
     )
 
     systemd_network_config_parser = SystemdNetworkConfigParser(target_linux)
@@ -227,12 +225,87 @@ def test_linux_network_plugin_interfaces(target_linux: Target) -> None:
         MockLinuxConfigParser2.return_value.interfaces.assert_called_once()
 
 
+def test_linux_network_dhclient_leases_file(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    lease_dhcp_dhclient = r"""
+    default-duid "\000\001\000\001\037\305\371\341\001\002\003\004\005\006"
+    lease {
+        interface "eth0";  # some comment
+        fixed-address 1.2.3.4;
+        option dhcp-lease-time 13337;
+        option routers 0.0.0.0;
+        option host-name "hostname";
+        option subnet-mask 255.255.255.0;
+        renew 1 2023/12/31 13:37:00;
+        rebind 2 2023/01/01 01:00:00;
+        expire 3 2024/01/01 13:37:00;
+    }
+    lease {
+        interface "eth0";
+        fixed-address 2001:db8::2:1;
+        option dhcp-lease-time 13338;
+        option routers 1.1.1.1;
+        option host-name "hostname";
+        renew 4 2024/12/31 14:37:00;
+        rebind 5 2024/01/01 02:00:00;
+        expire 6 2025/01/01 15:37:00;
+        # some more comments
+    }
+    """
+
+    fs_linux.map_file_fh("/var/lib/dhcp/dhclient.leases", BytesIO(textwrap.dedent(lease_dhcp_dhclient).encode()))
+    fs_linux.map_file_fh(
+        "/var/lib/dhclient/dhclient.eth0.leases", BytesIO(textwrap.dedent(lease_dhcp_dhclient).encode())
+    )
+
+    dhclient = DhclientLeaseParser(target_linux)
+
+    leases = list(dhclient.interfaces())
+
+    assert len(leases) == 4
+    assert leases[0].name == "eth0"
+    assert leases[0].type == "dhcp"
+    assert leases[0].cidr == [ip_interface("1.2.3.4/24")]
+    assert leases[0].gateway == [ip_address("0.0.0.0")]
+    assert leases[0].dhcp_ipv4
+    assert not leases[0].dhcp_ipv6
+    assert leases[0].configurator == "dhclient"
+
+    assert leases[3].name == "eth0"
+    assert leases[3].type == "dhcp"
+    assert leases[3].cidr == [ip_interface("2001:db8::2:1/128")]
+    assert leases[3].gateway == [ip_address("1.1.1.1")]
+    assert not leases[3].dhcp_ipv4
+    assert leases[3].dhcp_ipv6
+    assert leases[0].configurator == "dhclient"
+
+
+def test_linux_network_networkmanager_leases_file(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    lease_networkmanager = """
+    # This is private data. Do not parse.
+    ADDRESS=1.3.3.7
+    """
+
+    fs_linux.map_file_fh(
+        "/var/lib/NetworkManager/internal-d6b936ad-d73f-4898-a826-edbb61d6155a-eth0.lease",
+        BytesIO(textwrap.dedent(lease_networkmanager).encode()),
+    )
+
+    networkmanager = NetworkManagerLeaseParser(target_linux)
+    leases = list(networkmanager.interfaces())
+
+    assert len(leases) == 1
+    assert leases[0].name == "eth0"
+    assert leases[0].type == "dhcp"
+    assert leases[0].configurator == "NetworkManager"
+    assert leases[0].cidr == [ip_interface("1.3.3.7/32")]
+
+
 def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
-    fixture_dir = "tests/_data/plugins/os/unix/linux/proc"
-    fs_linux.map_file("/proc/net/route", posixpath.join(fixture_dir, "route"))
-    fs_linux.map_file("/proc/net/tcp", posixpath.join(fixture_dir, "tcp"))
-    fs_linux.map_file("/proc/net/if_inet6", posixpath.join(fixture_dir, "if_inet6"))
-    fs_linux.map_file("/proc/net/fib_trie", posixpath.join(fixture_dir, "fib_trie"))
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/proc")
+    fs_linux.map_file("/proc/net/route", fixture_dir.joinpath("route"))
+    fs_linux.map_file("/proc/net/tcp", fixture_dir.joinpath("tcp"))
+    fs_linux.map_file("/proc/net/if_inet6", fixture_dir.joinpath("if_inet6"))
+    fs_linux.map_file("/proc/net/fib_trie", fixture_dir.joinpath("fib_trie"))
 
     parser = ProcConfigParser(target_linux)
     interfaces = list(parser.interfaces())

@@ -19,12 +19,12 @@ ZIP_EXT = (".zip",)
 class ZipSubLoader(SubLoader[zf.Path]):
     """Zip implementation of a :class:`SubLoader`."""
 
-    def __init__(self, zipfile: zf.Path, *args, **kwargs):
-        super().__init__(zipfile, *args, **kwargs)
+    def __init__(self, path: Path, zipfile: zf.Path, **kwargs):
+        super().__init__(path, zipfile, **kwargs)
         self.zip = zipfile
 
     @staticmethod
-    def detect(zipfile: zf.Path) -> bool:
+    def detect(path: Path, zipfile: zf.Path) -> bool:
         """Only to be called internally by :class:`ZipLoader`."""
         raise NotImplementedError
 
@@ -37,7 +37,7 @@ class GenericZipSubLoader(ZipSubLoader):
     """Generic zip sub loader."""
 
     @staticmethod
-    def detect(zipfile: zf.Path) -> bool:
+    def detect(path: Path, zipfile: zf.Path) -> bool:
         return True
 
     def map(self, target: target.Target) -> None:
@@ -66,7 +66,7 @@ class ZipLoader(Loader):
 
     def map(self, target: target.Target) -> None:
         for candidate in self.__subloaders__:
-            if candidate.detect(self.zip):
-                self.subloader = candidate(self.zip)
+            if candidate.detect(self.path, self.zip):
+                self.subloader = candidate(self.path, self.zip, parsed_path=self.parsed_path)
                 self.subloader.map(target)
                 break

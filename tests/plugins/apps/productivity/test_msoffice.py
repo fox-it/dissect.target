@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.apps.productivity.msoffice import MSOffice
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
@@ -101,7 +102,7 @@ def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, 
     addin_prog_id = "ExcelAddin"
     addin_key_path = f"Software\\Microsoft\\Office\\Excel\\Addins\\{addin_prog_id}"
 
-    fs_win.map_dir("vsto", "tests/_data/plugins/apps/productivity/vsto")
+    fs_win.map_dir("vsto", absolute_path("_data/plugins/apps/productivity/vsto"))
     addin_key = VirtualKey(hive_hklm, addin_key_path)
     addin_key.add_value("FriendlyName", "An Excel vsto addin")
     addin_key.add_value("LoadBehavior", 2)
@@ -124,7 +125,9 @@ def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, 
 def test_office_web_addin(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     """Test if web add-ins are found."""
 
-    fs_win.map_dir("users/John/AppData/local/Microsoft/Office/16.0/Wef", "tests/_data/plugins/apps/productivity/wef")
+    fs_win.map_dir(
+        "users/John/AppData/local/Microsoft/Office/16.0/Wef", absolute_path("_data/plugins/apps/productivity/wef")
+    )
 
     office_plugin = MSOffice(target_win_users)
     startup_items = list(office_plugin.web())
