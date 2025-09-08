@@ -124,7 +124,7 @@ def test_filesystems_zip(obj: str, base: str, request: pytest.FixtureRequest) ->
     assert fs.get("./file_1").lstat().st_mtime_ns == 315532800000000000
     assert fs.get("./file_2").lstat().st_mtime_ns == 4323283200000000000
     assert fs.get("./file_3").lstat().st_mtime_ns == 315532800000000000
-    assert fs.get("./file_4").lstat().st_mtime_ns == 315532800000000000
+    assert fs.get("./file_4").lstat().st_mtime_ns == 4354819199000000000
     assert fs.get("./file_5").lstat().st_mtime_ns == 1757327980000000000
     assert fs.get("./symlink_file").open().read() == b"file 1 contents"
     assert len(list(fs.glob("./dir/*"))) == 100

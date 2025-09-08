@@ -164,7 +164,9 @@ class ZipFilesystemEntry(VirtualDirectory):
         try:
             timestamp = datetime(*self.entry.date_time, tzinfo=timezone.utc).timestamp()
         except ValueError:
-            timestamp = 315532800  # datetime(*(1980, 1, 1, 0, 0, 0), tzinfo=timezone.utc).timestamp()
+            # 4354819199 ==  datetime(*(2107, 12, 31, 23, 59, 59), tzinfo=timezone.utc).timestamp()
+            # 315532800 ==  datetime(*(1980, 1, 1, 0, 0, 0), tzinfo=timezone.utc).timestamp()
+            timestamp = 4354819199 if self.entry.date_time[0] >= 2107 else 315532800
 
         return fsutil.stat_result(
             [
