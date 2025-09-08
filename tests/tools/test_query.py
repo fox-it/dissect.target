@@ -472,3 +472,29 @@ def test_arguments_passed_correctly(
             target_query()
 
         assert "Exception while executing function mock" not in caplog.text
+
+
+def test_mixed_output_types_regression(
+    capsys: pytest.CaptureFixture, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test if the mixed output warning message can handle NoneType."""
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-f",
+                "example_record,example_namespace",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
+                "-s",
+            ],
+        )
+
+        target_query()
+        out, _ = capsys.readouterr()
+
+    assert "Mixed output types detected: None, record, only outputting records" in caplog.text
+    assert (
+        "<example/descriptor hostname=None domain=None field_a='example' field_b='record'>\n"
+        "<example/descriptor hostname=None domain=None field_a='namespace_example' field_b='record'>\n"
+    ) in out

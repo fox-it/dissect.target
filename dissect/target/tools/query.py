@@ -135,7 +135,9 @@ def main() -> int:
 
     default_output_type = None
     if len(different_output_types) > 1:
-        log.warning("Mixed output types detected: %s, only outputting records", ",".join(different_output_types))
+        log.warning(
+            "Mixed output types detected: %s, only outputting records", ", ".join(map(str, different_output_types))
+        )
         default_output_type = "record"
 
     execution_report = ExecutionReport()
@@ -156,7 +158,7 @@ def main() -> int:
                 # We perform this check here because plugins that require output files/dirs
                 # will exit if we attempt to exec them without (because they are implied by the wildcard).
                 # Also this saves cycles of course.
-                if default_output_type == "record" and func_def.output != "record":
+                if default_output_type == "record" and func_def.output != "record" and not func_def.namespace:
                     continue
 
                 if args.dry_run:
