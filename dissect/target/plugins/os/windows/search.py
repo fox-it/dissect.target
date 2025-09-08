@@ -19,6 +19,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from dissect.esedb.record import Record as EseDBRecord
+    from dissect.esedb.table import Table as EseDBTable
+
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
@@ -146,13 +149,8 @@ class SearchIndexPlugin(Plugin):
             db = EseDB(fh)
             table = db.table("SystemIndex_PropertyStore")
 
-            # Translates e.g. ``System_DateModified`` to ``15F-System_DateModified`` as these column name prefixes might
-            # be dynamic based on the system version.
-            columns = {col: col.split("-", maxsplit=1)[-1] for col in table.column_names}
-
             for record in table.records():
-                values = {clean_k or k: v for k, v in record.as_dict().items() if (clean_k := columns.get(k))}
-                yield from self.build_record(values, user_details, path)
+                yield from self.build_record(TableRecord(table, record), user_details, path)
 
     def parse_sqlite(self, path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the SQLite3 ``SystemIndex_1_PropertyStore`` table."""
@@ -190,7 +188,7 @@ class SearchIndexPlugin(Plugin):
             yield from self.build_record(values, user_details, path)
 
     def build_record(
-        self, values: dict[str, Any], user_details: UserDetails | None, db_path: Path
+        self, values: dict[str, Any] | TableRecord, user_details: UserDetails | None, db_path: Path
     ) -> Iterator[SearchIndexRecords]:
         """Build a ``SearchIndexRecord``, ``SearchIndexActivityRecord`` or ``HistoryRecord``."""
 
@@ -257,3 +255,16 @@ class SearchIndexPlugin(Plugin):
                 source=db_path,
                 _target=self.target,
             )
+
+
+class TableRecord:
+    def __init__(self, table: EseDBTable, record: EseDBRecord) -> None:
+        self.table = table
+        self.record = record
+
+        # Translates e.g. ``System_DateModified`` to ``15F-System_DateModified`` as these column name prefixes might
+        # be dynamic based on the system version.
+        self.columns = {col.split("-", maxsplit=1)[-1]: col for col in table.column_names}
+
+    def get(self, key: str, default: Any | None = None) -> Any:
+        return self.record.get(self.columns.get(key, default))
