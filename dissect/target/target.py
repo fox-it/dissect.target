@@ -396,7 +396,8 @@ class Target:
                     # For file/dir-like paths it's a Path object
                     target = cls._load(load_spec, ldr)
                 except Exception as e:
-                    getlogger(load_spec).error("Failed to load target with loader %s", ldr, exc_info=e)
+                    getlogger(load_spec).error("Failed to load target with loader %s", ldr)
+                    getlogger(load_spec).debug("", exc_info=e)
                     continue
                 else:
                     yield target
