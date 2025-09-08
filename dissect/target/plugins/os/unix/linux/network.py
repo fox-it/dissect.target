@@ -35,11 +35,13 @@ class LinuxNetworkPlugin(NetworkPlugin):
         "--maxlines",
         action="store",
         type=int,
-        help="Maximum number of lines of syslog to scan (0 is unlimited)",
+        help="Maximum number of lines of syslog to scan (0 is all lines)",
+        default=1000,
     )
     @export(record=get_args(InterfaceRecord))
     def interfaces(self, syslog: bool = False, maxlines: int | None = None) -> Iterator[UnixInterfaceRecord]:
         """Yield interfaces."""
+        maxlines = None if maxlines == 0 else maxlines
         if self._interface_list is None:
             self._interface_list = list(self._interfaces(syslog, maxlines))
 
