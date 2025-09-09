@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import IPv4Interface, IPv6Interface, ip_address, ip_interface
-from itertools import chain, islice
+from itertools import chain, islice, product
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union, get_args
 
 from dissect.target.exceptions import PluginError
@@ -632,17 +632,15 @@ class SyslogConfigParser(LinuxNetworkConfigParser):
             parse_debian_centos_dhclient_lease,
         ]
 
-        for record in self._read_logs():
-            for parser in parsers:
-                dhcp_lease = parser(record)
-                if dhcp_lease:
-                    yield UnixInterfaceRecord(
-                        name=dhcp_lease.interface,
-                        cidr={dhcp_lease.ip},
-                        gateway={dhcp_lease.gateway} if dhcp_lease.gateway else set(),
-                        source="syslog",
-                    )
-                    break
+        for record, parser in product(self._read_logs(), parsers):
+            if dhcp_lease := parser(record):
+                yield UnixInterfaceRecord(
+                    name=dhcp_lease.interface,
+                    cidr={dhcp_lease.ip},
+                    gateway={dhcp_lease.gateway} if dhcp_lease.gateway else set(),
+                    source="syslog",
+                )
+                break
 
     def _read_logs(self) -> Iterator[LogRecord]:
         try:
@@ -666,9 +664,9 @@ def be_hex_to_int(be_hex: str) -> int:
 
 
 @dataclass
-class DhcpLease:
+class DhcpLease(NamedTuple):
     interface: str | None
-    ip: NetInterface | None
+    ip: NetInterface
     gateway: NetAddress | None
 
 
