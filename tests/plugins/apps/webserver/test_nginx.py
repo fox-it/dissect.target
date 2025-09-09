@@ -129,8 +129,8 @@ def test_nginx_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesy
     fs_unix.map_file_fh("etc/nginx/nginx.conf", BytesIO(textwrap.dedent(config).encode()))
     fs_unix.map_file_fh("foo/bar/new.log", BytesIO(b"New"))
     fs_unix.map_file_fh("foo/bar/old.log", BytesIO(b"Old"))
-    fs_unix.map_file_fh("foo/bar/error/new.log", BytesIO(b""))
-    fs_unix.map_file_fh("foo/bar/error/old.log", BytesIO(b""))
+    fs_unix.map_file_fh("foo/bar/error/new.log", BytesIO())
+    fs_unix.map_file_fh("foo/bar/error/old.log", BytesIO())
 
     target_unix.add_plugin(NginxPlugin)
 
@@ -201,10 +201,10 @@ def test_nginx_parse_config(target_unix: Target, fs_unix: VirtualFilesystem) -> 
     """
     fs_unix.map_file_fh("/bla/foo.conf", BytesIO(textwrap.dedent(foo_conf).encode()))
 
-    fs_unix.map_file_fh("/some/access.log", BytesIO(b""))
-    fs_unix.map_file_fh("/some/error.log", BytesIO(b""))
-    fs_unix.map_file_fh("/eighty/access.log.1", BytesIO(b""))
-    fs_unix.map_file_fh("/eighty/error.log.1", BytesIO(b""))
+    fs_unix.map_file_fh("/some/access.log", BytesIO())
+    fs_unix.map_file_fh("/some/error.log", BytesIO())
+    fs_unix.map_file_fh("/eighty/access.log.1", BytesIO())
+    fs_unix.map_file_fh("/eighty/error.log.1", BytesIO())
 
     target_unix.add_plugin(NginxPlugin)
 

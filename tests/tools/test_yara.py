@@ -30,7 +30,7 @@ def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: p
                 "target-yara",
                 "example.img",
                 "--rules",
-                str(absolute_path("_data/plugins/filesystem/yara/rule.yar")),
+                str(absolute_path("_data/plugins/filesystem/yara/rule-dir/rule.yar")),
                 "--path",
                 "/",
                 "--check",
@@ -41,8 +41,8 @@ def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: p
 
         out, _ = capsys.readouterr()
 
-        hit1 = "<filesystem/yara/match hostname=None domain=None path='/test_file' digest=(md5=d690ba32b59d28614aebefe9b03c74d4, sha1=4b1ced217aabe37138e96fb93bf40026639b9d3b, sha256=7a644118588ff0dcf2fadbe198ae1f1629c29374bac491ba41d5cf957edf0dfc) rule='test_rule_name' tags=['tag1', 'tag2', 'tag3']"  # noqa E501
-        hit2 = "<filesystem/yara/match hostname=None domain=None path='/test/dir/to/test_file' digest=(md5=bd7490dd2978ce983e2e1613ac8444c0, sha1=849a062cf09280f5c7dce4c7f87c69a1d9262e08, sha256=9bf7629a67c7ce8019910f1c1251fe44b61b3fff55a59a5e148af3c207dc102f) rule='test_rule_name' tags=['tag1', 'tag2', 'tag3']"  # noqa E501
+        hit1 = "<filesystem/yara/match hostname=None domain=None path='/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=d690ba32b59d28614aebefe9b03c74d4, sha1=4b1ced217aabe37138e96fb93bf40026639b9d3b, sha256=7a644118588ff0dcf2fadbe198ae1f1629c29374bac491ba41d5cf957edf0dfc)"  # noqa E501
+        hit2 = "<filesystem/yara/match hostname=None domain=None path='/test/dir/to/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=bd7490dd2978ce983e2e1613ac8444c0, sha1=849a062cf09280f5c7dce4c7f87c69a1d9262e08, sha256=9bf7629a67c7ce8019910f1c1251fe44b61b3fff55a59a5e148af3c207dc102f)"  # noqa E501
 
         assert hit1 in out
         assert hit2 in out

@@ -5,6 +5,7 @@ import json
 import pytest
 
 from dissect.target.tools.info import main as target_info
+from tests._utils import absolute_path
 
 
 @pytest.mark.parametrize(
@@ -15,7 +16,7 @@ def test_target_info(
     capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, output_type: str, options: list
 ) -> None:
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-info", *options, "tests/_data/tools/info/image.tar"])
+        m.setattr("sys.argv", ["target-info", *options, str(absolute_path("_data/tools/info/image.tar"))])
 
         target_info()
         stdout, stderr = capsys.readouterr()

@@ -37,7 +37,6 @@ class RustdeskPlugin(RemoteAccessPlugin):
     SERVER_GLOBS = (
         # Windows >= Windows 7
         "%windir%/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log",
-        "sysvol/ProgramData/RustDesk/*/*/*.log",
         # Linux
         "var/log/rustdesk-server/*.log",
     )
@@ -85,7 +84,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
         The log files are stored in different locations, based on the Target OS and client type.
         Unlike Anydesk, Rustdesk does carry a time zone designator (TZD).
 
-        Refrences:
+        References:
             - https://rustdesk.com/docs/en/self-host/rustdesk-server-pro/faq
             - https://www.reddit.com/r/rustdesk/comments/1072zst/going_to_need_to_know_where_the_client_installer/
             - https://github.com/IRB0T/Remote-Access-Tools---4N6/blob/main/RustDesk/README.md

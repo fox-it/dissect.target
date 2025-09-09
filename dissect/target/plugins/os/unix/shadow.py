@@ -43,7 +43,7 @@ class ShadowPlugin(Plugin):
     def passwords(self) -> Iterator[UnixShadowRecord]:
         """Yield shadow records from /etc/shadow files.
 
-        Resources:
+        References:
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
             - https://linux.die.net/man/5/shadow
         """

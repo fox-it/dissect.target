@@ -174,11 +174,11 @@ class FirefoxPlugin(BrowserPlugin):
             url (uri): History URL.
             title (string): Page title.
             description (string): Page description.
-            rev_host (string): Reverse hostname.
+            host (string): Hostname.
             visit_type (varint): Visit type.
             visit_count (varint): Amount of visits.
             hidden (string): Hidden value.
-            typed (string): Typed value.
+            typed (boolean): Typed value.
             session (varint): Session value.
             from_visit (varint): Record ID of the "from" visit.
             from_url (uri): URL of the "from" visit.
@@ -208,7 +208,9 @@ class FirefoxPlugin(BrowserPlugin):
                         url=try_idna(place.url),
                         title=place.title,
                         description=place.description,
-                        rev_host=try_idna(place.rev_shot),
+                        host="".join(list(reversed(try_idna(place.rev_host).decode()))).lstrip(".")
+                        if place.rev_host
+                        else None,
                         visit_type=row.visit_type,
                         visit_count=place.visit_count,
                         hidden=place.hidden,
@@ -442,7 +444,7 @@ class FirefoxPlugin(BrowserPlugin):
         ``PASSPHRASE`` passwords in the keychain with providers ``browser``, ``firefox``, ``user`` and no provider
         can be used to decrypt secrets for this plugin.
 
-        Resources:
+        References:
             - https://github.com/lclevy/firepwd
         """
         for user, _, profile_dir in self._iter_profiles():
@@ -799,7 +801,7 @@ def decrypt(
     Returns:
         A tuple of decoded username and password strings.
 
-    Resources:
+    References:
         - https://github.com/lclevy/firepwd
     """
     if not HAS_CRYPTO:

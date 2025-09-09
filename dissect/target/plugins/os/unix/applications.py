@@ -59,7 +59,7 @@ class UnixApplicationsPlugin(Plugin):
     def applications(self) -> Iterator[UnixApplicationRecord]:
         """Yield installed Unix GUI applications from GNOME and XFCE.
 
-        Resources:
+        References:
             - https://wiki.archlinux.org/title/Desktop_entries
             - https://specifications.freedesktop.org/desktop-entry-spec/latest/
             - https://unix.stackexchange.com/questions/582928/where-gnome-apps-are-installed
