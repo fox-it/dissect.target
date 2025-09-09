@@ -131,27 +131,26 @@ class ChromiumMixin:
         return users_dirs
 
     def _iter_db(self, filename: str, subdirs: list[str] | None = None) -> Iterator[tuple[UserDetails, Path, SQLite3]]:
-        """Generate a connection to a sqlite database file.
+        """Generate a connection to a SQLite3 database file.
 
         Args:
             filename: The filename as string of the database where the data is stored.
-            subdirs: Subdirectories to also try for every configured directory.
+            subdirs: Optional list of subdirectory names to iterate for every user directory.
 
         Yields:
-            opened db_file (SQLite3)
-
-        Raises:
-            FileNotFoundError: If the history file could not be found.
-            SQLError: If the history file could not be opened.
+            Tuple of :class:`UserDetails`, :class:`Path` of SQLite3 file and :class:`SQLite3` instance.
         """
         seen = set()
         userdirs = self.userdirs
 
         if subdirs:
-            userdirs = itertools.chain(self.userdirs, {
-                (user_details, userdir.joinpath(subdir))
-                for (user_details, userdir), subdir in itertools.product(userdirs, subdirs)
-            })
+            userdirs = itertools.chain(
+                self.userdirs,
+                {
+                    (user_details, userdir.joinpath(subdir))
+                    for (user_details, userdir), subdir in itertools.product(userdirs, subdirs)
+                },
+            )
 
         for user, cur_dir in userdirs:
             db_file = cur_dir.joinpath(filename)
