@@ -13,7 +13,7 @@ import pytest
 
 from dissect.target import loader
 from dissect.target.containers.raw import RawContainer
-from dissect.target.exceptions import FilesystemError
+from dissect.target.exceptions import FilesystemError, TargetError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.fsutil import TargetPath
@@ -748,3 +748,27 @@ def test_expected_path(path: str | Path, expected: Path) -> None:
     assert target.path == expected
     if isinstance(path, Path):
         assert type(target.path) is type(expected)
+
+
+def test_exception_invalid_path() -> None:
+    """Test if we throw small and neat error messages and not long stack traces when giving invalid path(s)."""
+
+    with pytest.raises(TargetError) as e:
+        Target.open("/path/to/invalid.img")
+
+    assert e.value.args == (
+        "Failed to initiate RawLoader for target /path/to/invalid.img: Provided target path does not exist",
+    )
+    assert len(e.traceback) == 2
+
+    with pytest.raises(TargetError) as e:
+        next(Target.open_all("/path/to/invalid.img"))
+
+    assert e.value.args == ("Failed to find loader for /path/to/invalid.img: path does not exist",)
+    assert len(e.traceback) == 2
+
+    with pytest.raises(TargetError) as e:
+        next(Target.open_all("smb://invalid"))
+
+    assert e.value.args == ("Failed to find any loader for targets: ['smb://invalid']",)
+    assert len(e.traceback) == 2
