@@ -33,7 +33,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("uint32", "mode"),
         ("uint32", "uid"),
         ("uint32", "gid"),
-        ("boolean", "suid"),
+        ("boolean", "is_suid"),
         ("string[]", "attr"),
         ("string[]", "fs_types"),
     ],
@@ -58,9 +58,9 @@ class WalkFsPlugin(Plugin):
 
         Can return additional SUID and Capability records when given ``--suid`` and/or ``--capability`` arguments.
 
-        XFS and ExtFS filesystems can set extended attributes (``xattr``) on filesystem entries.
+        Filesystems can set extended attributes (``xattr``) on filesystem entries.
 
-        Resources:
+        References:
             - https://man7.org/linux/man-pages/man2/lstat.2.html
             - https://man7.org/linux/man-pages/man7/inode.7.html
             - https://man7.org/linux/man-pages/man7/xattr.7.html
@@ -84,7 +84,7 @@ class WalkFsPlugin(Plugin):
             mode (uint32): contains the file type and mode.
             uid (uint32): the user id of the owner of the entry.
             gid (uint32): the group id of the owner of the entry.
-            suid (boolean): denotes if the entry has the set-user-id bit set.
+            is_suid (boolean): denotes if the entry has the set-user-id bit set.
             attr (string[]): list of key-value pair attributes separated by '='.
             fs_types (string[]): list of filesystem type(s) of the entry.
         """
@@ -144,7 +144,7 @@ def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capabili
         "mode": entry_stat.st_mode,
         "uid": entry_stat.st_uid,
         "gid": entry_stat.st_gid,
-        "suid": is_suid,
+        "is_suid": is_suid,
         "fs_types": fs_types,
     }
 
