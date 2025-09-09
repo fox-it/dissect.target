@@ -70,7 +70,7 @@ class WindowsApplicationsPlugin(Plugin):
         Use the Windows eventlog plugin (``evtx``, ``evt``) to parse install and uninstall events
         of applications and services (e.g. ``4697``, ``110707``, ``1034`` and ``11724``).
 
-        Resources:
+        References:
             - https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key
 
         Yields ``WindowsApplicationRecord`` records with the following fields:

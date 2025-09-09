@@ -15,8 +15,8 @@ DefenderQuarantineRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/quarantine",
     [
         ("datetime", "ts"),
-        ("bytes", "quarantine_id"),
-        ("bytes", "scan_id"),
+        ("string", "quarantine_id"),
+        ("string", "scan_id"),
         ("varint", "threat_id"),
         ("string", "detection_type"),
         ("string", "detection_name"),
@@ -27,8 +27,8 @@ DefenderFileQuarantineRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/quarantine/file",
     [
         ("datetime", "ts"),
-        ("bytes", "quarantine_id"),
-        ("bytes", "scan_id"),
+        ("string", "quarantine_id"),
+        ("string", "scan_id"),
         ("varint", "threat_id"),
         ("string", "detection_type"),
         ("string", "detection_name"),

@@ -162,4 +162,9 @@ class HyperVLoader(Loader):
                     try:
                         target.disks.add(container.open(disk_path))
                     except Exception:
-                        target.log.exception("Failed to load VHD: %s", drive)
+                        # In some situations we may have something like a .vhdx extension but a raw disk inside
+                        # Fall back on stream based container detection
+                        try:
+                            target.disks.add(container.open(disk_path.open("rb")))
+                        except Exception:
+                            target.log.exception("Failed to load VHD: %s", drive)
