@@ -109,7 +109,6 @@ class ChromiumMixin:
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
-        self.target = target
         self.userdirs = self._build_userdirs(self.DIRS)
 
     def _build_userdirs(self, hist_paths: list[str]) -> set[tuple[UserDetails, Path]]:
@@ -149,11 +148,10 @@ class ChromiumMixin:
         userdirs = self.userdirs
 
         if subdirs:
-            subdirs_ = {
+            userdirs = itertools.chain(self.userdirs, {
                 (user_details, userdir.joinpath(subdir))
                 for (user_details, userdir), subdir in itertools.product(userdirs, subdirs)
-            }
-            userdirs = itertools.chain(self.userdirs, subdirs_)
+            })
 
         for user, cur_dir in userdirs:
             db_file = cur_dir.joinpath(filename)
