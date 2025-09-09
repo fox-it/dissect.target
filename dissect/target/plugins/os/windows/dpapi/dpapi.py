@@ -124,7 +124,11 @@ class DPAPIPlugin(InternalPlugin):
                     try:
                         if mkf.decrypt_with_password(sid, mk_pass):
                             self.target.log.info(
-                                "Decrypted SID %s master key %s with password '%s' from provider %s", sid, file, mk_pass, provider
+                                "Decrypted SID %s master key %s with password '%s' from provider %s",
+                                sid,
+                                file,
+                                mk_pass,
+                                provider,
                             )
                             break
                     except ValueError:
@@ -133,7 +137,11 @@ class DPAPIPlugin(InternalPlugin):
                     try:
                         if mkf.decrypt_with_hash(sid, bytes.fromhex(mk_pass)):
                             self.target.log.info(
-                                "Decrypted SID %s master key %s with hash '%s' from provider %s", sid, file, mk_pass, provider
+                                "Decrypted SID %s master key %s with hash '%s' from provider %s",
+                                sid,
+                                file,
+                                mk_pass,
+                                provider,
                             )
                             break
                     except ValueError:
