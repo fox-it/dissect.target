@@ -4,6 +4,7 @@ import stat
 from typing import TYPE_CHECKING, Union
 
 from dissect.util.ts import from_unix
+from typing_extensions import get_args
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
@@ -49,7 +50,7 @@ class WalkFsPlugin(Plugin):
         if not len(self.target.filesystems):
             raise UnsupportedPluginError("No filesystems to walk")
 
-    @export(record=FilesystemRecord)
+    @export(record=get_args(WalkFsRecord))
     @arg("--walkfs-path", default="/", help="path to recursively walk")
     @arg("--suid", action="store_true", help="output suid records")
     @arg("--capability", action="store_true", help="output capability records")
