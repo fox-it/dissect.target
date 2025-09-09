@@ -29,23 +29,20 @@ if TYPE_CHECKING:
 class LinuxNetworkPlugin(NetworkPlugin):
     """Linux network interface plugin."""
 
-    @arg("-s", "--syslog", action="store_true", help="Scan syslog for dhcp leases")
+    @arg("-s", "--syslog", action="store_true", help="scan syslog for dhcp leases")
     @arg(
         "-m",
         "--maxlines",
         action="store",
         type=int,
-        help="Maximum number of lines of syslog to scan (0 is all lines)",
+        help="maximum number of lines of syslog to scan (0 is all lines)",
         default=1000,
     )
     @export(record=get_args(InterfaceRecord))
     def interfaces(self, syslog: bool = False, maxlines: int | None = None) -> Iterator[UnixInterfaceRecord]:
         """Yield interfaces."""
         maxlines = None if maxlines == 0 else maxlines
-        if self._interface_list is None:
-            self._interface_list = list(self._interfaces(syslog, maxlines))
-
-        yield from self._interface_list
+        yield from super().interfaces(scan_syslog=syslog, maxlines=maxlines)
 
     def _interfaces(self, scan_syslog: bool, maxlines: int | None) -> Iterator[UnixInterfaceRecord]:
         """Try all available network configuration managers and aggregate the results."""
@@ -663,7 +660,6 @@ def be_hex_to_int(be_hex: str) -> int:
     return int.from_bytes(bytes.fromhex(be_hex), "little")
 
 
-@dataclass
 class DhcpLease(NamedTuple):
     interface: str | None
     ip: NetInterface
