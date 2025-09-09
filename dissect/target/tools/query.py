@@ -266,7 +266,7 @@ def main() -> int:
                 if break_out:
                     break
 
-    except (TargetError, FileNotFoundError) as e:
+    except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
         return 1

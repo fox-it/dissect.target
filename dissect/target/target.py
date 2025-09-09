@@ -433,6 +433,11 @@ class Target:
             if parsed_path is None or isinstance(spec, os.PathLike):
                 path = Path(spec) if not isinstance(spec, os.PathLike) else spec
 
+                if not path.exists():
+                    raise TargetError(f"Failed to find loader for {path}: path does not exist")
+                elif not path.is_dir():
+                    raise TargetError(f"Failed to find loader for {path}: path is not a directory")
+
                 for entry in path.iterdir():
                     for target in _open_all(entry, include_children=include_children):
                         at_least_one_loaded = True
