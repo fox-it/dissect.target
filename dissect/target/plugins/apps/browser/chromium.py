@@ -146,17 +146,14 @@ class ChromiumMixin:
             SQLError: If the history file could not be opened.
         """
         seen = set()
-
         userdirs = self.userdirs
 
         if subdirs:
-            userdirs = self.userdirs.copy()
-            userdirs.update(
-                {
-                    (user_details, userdir.joinpath(subdir))
-                    for (user_details, userdir), subdir in itertools.product(userdirs, subdirs)
-                }
-            )
+            subdirs_ = {
+                (user_details, userdir.joinpath(subdir))
+                for (user_details, userdir), subdir in itertools.product(userdirs, subdirs)
+            }
+            userdirs = itertools.chain(self.userdirs, subdirs_)
 
         for user, cur_dir in userdirs:
             db_file = cur_dir.joinpath(filename)
