@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.parsers import DateTimeParser, default_datetime_parser
@@ -8,10 +8,12 @@ from dissect.target.helpers.record import (
     COMMON_APPLICATION_FIELDS,
     TargetRecordDescriptor,
 )
+from dissect.target.helpers.utils import common_datetime_parser
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from datetime import datetime
 
     from dissect.target.target import Target
 
@@ -33,7 +35,7 @@ class WindowsApplicationsPlugin(Plugin):
     def __init__(
         self,
         target: Target,
-        datetime_parser: DateTimeParser = default_datetime_parser,
+        datetime_parser: Callable[[str], datetime | None] = common_datetime_parser,
     ):
         """Initialise the plugin.
 
