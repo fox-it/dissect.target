@@ -754,22 +754,20 @@ def test_expected_path(path: str | Path, expected: Path) -> None:
 def test_exception_invalid_path() -> None:
     """Test if we throw small and neat error messages and not long stack traces when giving invalid path(s)."""
 
-    path = "\\path\\to\\invalid.img" if sys.platform == "windows" else "/path/to/invalid.img"
-
     with pytest.raises(
         TargetError,
-        match=f"Failed to initiate RawLoader for target {path}: Provided target path does not exist",
+        match="Failed to initiate RawLoader for target [/\\]path[/\\]to[/\\]invalid\.img: Provided target path does not exist",
     ):
         Target.open(path)
 
     with pytest.raises(
         TargetError,
-        match=f"Failed to find loader for {path}: path does not exist",
+        match="Failed to find loader for [/\\]path[/\\]to[/\\]invalid\.img: path does not exist",
     ):
         next(Target.open_all(path))
 
     with pytest.raises(
         TargetError,
-        match=r"Failed to find any loader for targets: \['smb://invalid'\]",
+        match="Failed to find any loader for targets: \['smb://invalid'\]",
     ):
         next(Target.open_all("smb://invalid"))
