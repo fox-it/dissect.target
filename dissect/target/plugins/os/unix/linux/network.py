@@ -29,18 +29,29 @@ if TYPE_CHECKING:
 class LinuxNetworkPlugin(NetworkPlugin):
     """Linux network interface plugin."""
 
-    @arg("-s", "--syslog", action="store_true", help="scan syslog for dhcp leases")
+    @arg(
+        "-s",
+        "--syslog",
+        action="store_true",
+        help="scan syslog for dhcp leases; use --maxlines to specify number of lines",
+    )
     @arg(
         "-m",
         "--maxlines",
         action="store",
         type=int,
-        help="maximum number of lines of syslog to scan (0 is all lines)",
-        default=1000,
+        help="maximum number of lines of syslog to scan (implies --syslog); default is 1000 if --syslog is set",
+        default=None,
     )
     @export(record=get_args(InterfaceRecord))
     def interfaces(self, syslog: bool = False, maxlines: int | None = None) -> Iterator[UnixInterfaceRecord]:
         """Yield interfaces."""
+        # If maxlines is specified, syslog is assumed True
+        if maxlines is not None:
+            syslog = True
+        # If syslog is True and maxlines is None, use default 1000
+        if syslog and maxlines is None:
+            maxlines = 1000
         maxlines = None if maxlines == 0 else maxlines
         yield from super().interfaces(scan_syslog=syslog, maxlines=maxlines)
 
