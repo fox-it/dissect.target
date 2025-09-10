@@ -1215,8 +1215,9 @@ class VirtualFilesystem(Filesystem):
                 real_file_path = root.joinpath(file_)
                 directory.add(file_, MappedFile(self, vfs_file_path, str(real_file_path)))
 
-    def map_file(self, vfspath: str, realpath: str, compression: str | None = None) -> None:
+    def map_file(self, vfspath: str, realpath: str | pathlib.Path, compression: str | None = None) -> None:
         """Map a file from the host machine into the VFS."""
+        realpath = str(realpath)
         vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
         if vfspath[-1] == "/":
             raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
