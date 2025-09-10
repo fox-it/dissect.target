@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.ntfs.c_ntfs import segment_reference
+from dissect.ntfs.util import segment_reference
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
