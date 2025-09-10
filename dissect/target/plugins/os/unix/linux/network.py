@@ -632,8 +632,8 @@ class SyslogConfigParser(LinuxNetworkConfigParser):
         for record, parser in product(self._read_logs(), parsers):
             if dhcp_lease := parser(record):
                 yield UnixInterfaceRecord(
-                    name=dhcp_lease.interface,
-                    cidr={dhcp_lease.ip},
+                    name=dhcp_lease.name,
+                    cidr={dhcp_lease.interface},
                     gateway={dhcp_lease.gateway} if dhcp_lease.gateway else set(),
                     source="syslog",
                 )
@@ -661,8 +661,8 @@ def be_hex_to_int(be_hex: str) -> int:
 
 
 class DhcpLease(NamedTuple):
-    interface: str | None
-    ip: NetInterface
+    name: str | None
+    interface: NetInterface
     gateway: NetAddress | None
 
 
@@ -671,9 +671,9 @@ def parse_ubuntu_cloud_init_dhcp_lease(log_record: LogRecord) -> DhcpLease | Non
 
     if not (match := re.search(r"Received dhcp lease on (\w*) for (\S+)", log_record.message)):
         return None
-    interface, ip = match.groups()
+    name, interface = match.groups()
 
-    return DhcpLease(interface, ip_interface(ip)) if ip else None
+    return DhcpLease(name, ip_interface(interface)) if interface else None
 
 
 def parse_networkd_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
@@ -682,9 +682,9 @@ def parse_networkd_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
     if not (match := re.search(r"(\S+): DHCPv[4|6] address (\S+) via (\S+)", log_record.message)):
         return None
 
-    interface, ip, gateway = match.groups()
+    name, interface, gateway = match.groups()
     gateway_address = ip_address(gateway) if gateway else None
-    return DhcpLease(interface, ip_interface(ip), gateway_address) if ip else None
+    return DhcpLease(name, ip_interface(interface), gateway_address) if interface else None
 
 
 def parse_network_manager_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
@@ -693,9 +693,9 @@ def parse_network_manager_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
     # dhcp4 (eth0): option ip_address           => '10.13.37.1'
     if not (match := re.search(r"dhcp[46] \((\S+)\): option ip_address\s+=>\s+'(\S+)'", log_record.message)):
         return None
-    interface, ip = match.groups()
+    name, interface = match.groups()
 
-    return DhcpLease(interface, ip_interface(ip), None) if ip else None
+    return DhcpLease(name, ip_interface(interface), None) if interface else None
 
 
 def parse_network_manager_centos_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
@@ -703,8 +703,8 @@ def parse_network_manager_centos_dhcp_lease(log_record: LogRecord) -> DhcpLease 
 
     if not (match := re.search(r"dhcp[46] \((\S+)\):\s+address\s+(\S+)", log_record.message)):
         return None
-    interface, ip = match.groups()
-    return DhcpLease(interface, ip_interface(ip), None) if ip else None
+    name, interface = match.groups()
+    return DhcpLease(name, ip_interface(interface), None) if interface else None
 
 
 def parse_debian_centos_dhclient_lease(log_record: LogRecord) -> DhcpLease | None:
@@ -714,11 +714,9 @@ def parse_debian_centos_dhclient_lease(log_record: LogRecord) -> DhcpLease | Non
         return None
 
     # Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.
-    match = re.search(r"bound to (\S+)", log_record.message)
-    if not match:
+    if not (match := re.search(r"bound to (\S+)", log_record.message)):
         return None
-    ip = match.group(1)
-    return DhcpLease(interface=None, ip=ip_interface(ip), gateway=None) if ip else None
+    return DhcpLease(name=None, interface=ip_interface(ip), gateway=None) if (ip := match.group(1)) else None
 
 
 MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
