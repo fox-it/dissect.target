@@ -275,7 +275,7 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
     IncludeOptional sites-enabled/*.conf
     """
     fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(textwrap.dedent(config).encode()))
-    fs_unix.map_file_fh("/path/to/apache/logs/error.log", BytesIO(b""))
+    fs_unix.map_file_fh("/path/to/apache/logs/error.log", BytesIO())
 
     envvars = r"""
     export APACHE_LOG_DIR="/path/to/apache/logs"
@@ -286,7 +286,7 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
     CustomLog ${APACHE_LOG_DIR}/example_access.log custom
     """
     fs_unix.map_file_fh("/etc/apache2/conf-enabled/example.conf", BytesIO(textwrap.dedent(enabled_conf).encode()))
-    fs_unix.map_file_fh("/path/to/apache/logs/example_access.log.1.gz", BytesIO(b""))
+    fs_unix.map_file_fh("/path/to/apache/logs/example_access.log.1.gz", BytesIO())
 
     site_conf = """
     <VirtualHost *:80>
@@ -297,8 +297,8 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
     </VirtualHost>
     """
     fs_unix.map_file_fh("/etc/apache2/sites-enabled/example.conf", BytesIO(textwrap.dedent(site_conf).encode()))
-    fs_unix.map_file_fh("/path/to/virtualhost/log/error.log.1", BytesIO(b""))
-    fs_unix.map_file_fh("/path/to/virtualhost/log/access.log.1", BytesIO(b""))
+    fs_unix.map_file_fh("/path/to/virtualhost/log/error.log.1", BytesIO())
+    fs_unix.map_file_fh("/path/to/virtualhost/log/access.log.1", BytesIO())
 
     disabled_conf = """
     CustomLog /path/to/disabled/access.log custom
@@ -306,11 +306,11 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
     fs_unix.map_file_fh(
         "/etc/apache2/sites-available/disabled-site.conf", BytesIO(textwrap.dedent(disabled_conf).encode())
     )
-    fs_unix.map_file_fh("/path/to/disabled/access.log.2", BytesIO(b""))
+    fs_unix.map_file_fh("/path/to/disabled/access.log.2", BytesIO())
 
-    fs_unix.map_file_fh("/var/log/apache2/some-other-vhost-old-log.access.log", BytesIO(b""))
-    fs_unix.map_file_fh("/var/log/apache2/access.log", BytesIO(b""))
-    fs_unix.map_file_fh("/var/log/apache2/error.log", BytesIO(b""))
+    fs_unix.map_file_fh("/var/log/apache2/some-other-vhost-old-log.access.log", BytesIO())
+    fs_unix.map_file_fh("/var/log/apache2/access.log", BytesIO())
+    fs_unix.map_file_fh("/var/log/apache2/error.log", BytesIO())
 
     target_unix.add_plugin(ApachePlugin)
 

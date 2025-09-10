@@ -27,7 +27,6 @@ from dissect.target.plugin import (
 )
 from dissect.target.plugins.general.plugins import (
     _get_default_functions,
-    _get_os_functions,
     generate_functions_json,
     generate_functions_overview,
 )
@@ -202,31 +201,28 @@ def list_plugins(
     include_children: bool = False,
     json: bool = False,
 ) -> None:
-    collected = set()
-    if targets or patterns:
-        collected.update(_get_os_functions())
-
+    functions = None
     if targets:
         for target in Target.open_all(targets, include_children):
-            funcs, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
-            collected.update(funcs)
+            functions, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
     elif patterns:
-        funcs, _ = find_functions(patterns, Target(), show_hidden=True)
-        collected.update(funcs)
+        functions, _ = find_functions(patterns, Target(), show_hidden=True)
     else:
-        collected.update(_get_default_functions())
+        functions = _get_default_functions()
 
     target = Target()
     fparser = generate_argparse_for_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
     fargs, _ = fparser.parse_known_args()
 
     # Display in a user friendly manner
-    if collected:
+    if functions:
         if json:
             print('{"plugins": ', end="")
-            print(generate_functions_json(collected), end="")
+            print(generate_functions_json(functions), end="")
         else:
-            print(generate_functions_overview(collected, include_docs=fargs.print_docs))
+            print(generate_functions_overview(functions, include_docs=fargs.print_docs))
+    elif json:
+        print("{", end="")
 
     # No real targets specified, show the available loaders
     if not targets:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import traceback
+import urllib.parse
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union
@@ -19,13 +20,12 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import config
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.loaderutil import extract_path_info
-from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
+from dissect.target.helpers.loaderutil import parse_path_uri
+from dissect.target.helpers.utils import StrEnum, slugify
 from dissect.target.loaders.direct import DirectLoader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 if TYPE_CHECKING:
-    import urllib
     from collections.abc import Iterator
 
     from typing_extensions import Self
@@ -58,6 +58,10 @@ class TargetLogAdapter(logging.LoggerAdapter):
 class Target:
     """The class that represents the target that you are talking to.
 
+    Usually you do not want to instantiate this class directly, but rather use the
+    :meth:`Target.open` or :meth:`Target.open_all` methods to open a target from a path or URI.
+    The target will then be loaded using the appropriate :class:`Loader <dissect.target.loader.Loader>`.
+
     Targets are the glue that connects the different ``Containers``, ``Loaders``, ``Volumes``
     and ``Filesystems`` together.
     ``Loaders`` are used to map the ``Containers``, ``Volumes`` and ``Filesystems`` of the target
@@ -72,13 +76,16 @@ class Target:
     """
 
     def __init__(self, path: str | Path | None = None):
-        # WIP, part of the introduction of URI-style paths.
-        # Since pathlib.Path does not support URIs, bigger refactoring
-        # is needed in order to fully utilise URI's scheme / path / query
-        # for Target configuration.
-        self.path_scheme, self.path, self.path_query = parse_path_uri(path)
-        if self.path is not None:
-            self.path = Path(self.path)
+        self.path_scheme = None
+        self.path_query = {}
+
+        self.path, self.parsed_path = parse_path_uri(path)
+        if self.parsed_path:
+            # Treat everything after the @ in a URI as part of the path
+            # I.e. "uri://user:password@host:port/path" becomes "host:port/path"
+            self.path = Path(self.parsed_path.netloc.split("@", 1)[-1] + self.parsed_path.path)
+            self.path_scheme = self.parsed_path.scheme
+            self.path_query = dict(urllib.parse.parse_qsl(self.parsed_path.query, keep_blank_values=True))
 
         self.props: dict[Any, Any] = {}
         self.log = getlogger(self)
@@ -86,7 +93,7 @@ class Target:
         self._name = None
         self._plugins: list[plugin.Plugin] = []
         self._functions: dict[str, FunctionTuple] = {}
-        self._loader = None
+        self._loader: loader.Loader = None
         self._os = None
         self._os_plugin: type[plugin.OSPlugin] = None
         self._child_plugins: dict[str, plugin.ChildTargetPlugin] = {}
@@ -271,104 +278,164 @@ class Target:
 
         Args:
             path: Path to load the ``Target`` from.
+                  If the path is a ``os.PathLike`` object, it will be used as-is.
+                  If the path is a string and looks like a URI, it will be parsed as such.
+                  If the path is a string and does not like like a URI, it will be treated as a local path.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
         """
 
-        path, parsed_path = extract_path_info(path)
+        spec = path
 
-        loader_cls = loader.find_loader(path, parsed_path=parsed_path)
-        if loader_cls:
-            try:
-                loader_instance = loader_cls(path, parsed_path=parsed_path)
-            except Exception as e:
-                raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {path}: {e}") from e
-            return cls._load(path, loader_instance)
-        return cls.open_raw(path)
+        # If the path is a URI-like string, separate the path component
+        adjusted_path, parsed_path = parse_path_uri(spec)
+        # We always need a path to work with, so convert the spec into one if it's not one already
+        path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+        if parsed_path is not None and (loader_cls := loader.find_loader_by_scheme(parsed_path.scheme)):
+            # If we find a loader by URI scheme, use the adjusted path (path component of the URI)
+            found_path = adjusted_path
+        elif loader_cls := loader.find_loader(path, fallbacks=[loader.DirLoader, loader.RawLoader]):
+            # Otherwise try to find a loader for the "raw" path
+            # If we succeed, upgrade the "spec" to the path
+            spec = path
+            found_path = path
+            parsed_path = None
+        else:
+            # No loader found
+            return cls.open_raw(spec)
+
+        try:
+            loader_instance = loader_cls(found_path, parsed_path=parsed_path)
+        except Exception as e:
+            raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {spec}: {e}") from e
+
+        return cls._load(spec, loader_instance)
 
     @classmethod
     def open_raw(cls, path: str | Path) -> Self:
         """Open a Target with the given path using the :class:`~dissect.target.loaders.raw.RawLoader`.
 
         Args:
-            path: Path to load the Target from.
+            path: Path to load the ``Target`` from.
         """
-        if not isinstance(path, Path):
-            path = Path(path)
-
-        return cls._load(path, loader.RawLoader(path))
+        adjusted_path = Path(path) if not isinstance(path, os.PathLike) else path
+        return cls._load(path, loader.RawLoader(adjusted_path))
 
     @classmethod
-    def open_all(cls, paths: list[str | Path], include_children: bool = False) -> Iterator[Self]:
-        """Yield targets from a list of paths.
+    def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False) -> Iterator[Self]:
+        """Yield all targets from one or more paths or directories.
 
         If the path is a directory, iterate files one directory deep.
 
         Args:
             paths: A list of paths to load ``Targets`` from.
+                   If the path is a ``os.PathLike`` object, it will be used as-is.
+                   If the path is a string and looks like a URI, it will be parsed as such.
+                   If the path is a string and does not look like a URI, it will be treated as a local path.
+            include_children: Whether to recursively open child targets.
 
         Raises:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
-        def _find(find_path: Path, parsed_path: urllib.parse.ParseResult | None) -> Iterator[Path]:
-            yield find_path
-            if parsed_path is not None:
+        def _open_all(spec: str | Path, include_children: bool = False) -> Iterator[Target]:
+            # If the path is a URI-like string, separate the path component
+            adjusted_path, parsed_path = parse_path_uri(spec)
+            # We always need a path to work with, so convert the spec into one if it's not one already
+            path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+            if parsed_path is not None and (loader_cls := loader.find_loader_by_scheme(parsed_path.scheme)):
+                # If we find a loader by URI scheme, use the adjusted path (path component of the URI)
+                found_path = adjusted_path
+            elif loader_cls := loader.find_loader(path, fallbacks=[loader.DirLoader, loader.RawLoader]):
+                # Otherwise try to find a loader for the "raw" path
+                # If we succeed, upgrade the "spec" to the path
+                spec = path
+                found_path = path
+                parsed_path = None
+            else:
+                # Couldn't find a loader
                 return
 
-            if find_path.is_dir():
-                yield from find_path.iterdir()
+            getlogger(spec).debug("Attempting to use loader: %s", loader_cls)
+            # See if the loader provides any additional paths to load
+            # This is useful for URI-like paths that have wildcard components
+            for sub_path in loader_cls.find_all(found_path, parsed_path=parsed_path):
+                if sub_path is found_path:
+                    # If the sub path is the same, the loader didn't provide any additional paths
+                    # Use the original spec and paths
+                    load_spec = spec
+                    load_path = found_path
+                    load_parsed_path = parsed_path
+                else:
+                    # Otherwise, use the sub path as the spec and optionally parse it as a URI
+                    load_spec = sub_path
+                    if isinstance(sub_path, str):
+                        load_path, load_parsed_path = parse_path_uri(sub_path)
+                    else:
+                        load_path = sub_path
+                        load_parsed_path = parsed_path
 
-        at_least_one_loaded = False
-        fallback_loaders = [loader.DirLoader, loader.RawLoader]
-
-        # Treat every path as a unique target spec
-        for path in paths:
-            loaded = False
-            path, parsed_path = extract_path_info(path)
-
-            # Search for targets one directory deep
-            for entry in _find(path, parsed_path):
-                loader_cls = loader.find_loader(entry, parsed_path=parsed_path, fallbacks=fallback_loaders)
-                if not loader_cls:
+                try:
+                    # Try to instantiate the loader
+                    # For file/dir-like specs, load_path is that file/dir, and parsed_path is None
+                    # For URI-like specs, load_path is the path component of the URI, and parsed_path is the parsed URI
+                    ldr = loader_cls(load_path, parsed_path=load_parsed_path)
+                except Exception as e:
+                    message = "%s" if isinstance(e, TargetPathNotFoundError) else "Failed to initiate loader: %s"
+                    getlogger(load_spec).error(message, e)
+                    getlogger(load_spec).debug("", exc_info=e)
                     continue
 
-                getlogger(entry).debug("Attempting to use loader: %s", loader_cls)
-                for sub_entry in loader_cls.find_all(entry, parsed_path=parsed_path):
-                    sub_entry, sub_parsed_path = extract_path_info(sub_entry)
-                    try:
-                        ldr = loader_cls(sub_entry, parsed_path=sub_parsed_path)
-                    except Exception as e:
-                        message = "Failed to initiate loader: %s"
-                        if isinstance(e, TargetPathNotFoundError):
-                            message = "%s"
+                try:
+                    # Attempt to load the target using this loader
+                    # load_spec is the original "spec"
+                    # For URI-like paths it's the full original URI
+                    # For file/dir-like paths it's a Path object
+                    target = cls._load(load_spec, ldr)
+                except Exception as e:
+                    getlogger(load_spec).error("Failed to load target with loader %s", ldr, exc_info=e)
+                    continue
+                else:
+                    yield target
 
-                        getlogger(sub_entry).error(message, e)
-                        getlogger(sub_entry).debug("", exc_info=e)
-                        continue
-
+                if include_children:
                     try:
-                        # Attempt to load the target using this loader
-                        target = cls._load(sub_entry, ldr)
+                        yield from target.open_children()
                     except Exception as e:
-                        getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
-                        continue
-                    else:
-                        loaded = True
+                        getlogger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
+
+        at_least_one_loaded = False
+
+        if isinstance(paths, (str, Path)):
+            paths = [paths]
+
+        # Treat every path as a unique target spec
+        for spec in paths:
+            loaded = False
+
+            for target in _open_all(spec, include_children=include_children):
+                loaded = True
+                at_least_one_loaded = True
+                yield target
+
+            if loaded:
+                # If we found a loader for the top level path, no need to search a level deeper
+                # Going deeper could cause unwanted behaviour
+                continue
+
+            # If we did not find a loader for the top level path, we will search one directory deep
+            # This only works for directories and non URI-like paths
+            _, parsed_path = parse_path_uri(spec)
+            if parsed_path is None or isinstance(spec, os.PathLike):
+                path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+                for entry in path.iterdir():
+                    for target in _open_all(entry, include_children=include_children):
                         at_least_one_loaded = True
                         yield target
-
-                    if include_children:
-                        try:
-                            yield from target.open_children()
-                        except Exception as e:
-                            getlogger(sub_entry).error("Failed to load child target from %s", target, exc_info=e)
-
-                # Found a compatible loader for the top level path, no need to search a level deeper
-                # Going deeper could cause unwanted behaviour
-                if loaded and entry is path:
-                    break
 
         if not at_least_one_loaded:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
