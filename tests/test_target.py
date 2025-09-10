@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import logging
 import platform
-import sys
 import urllib.parse
 from collections import defaultdict
 from pathlib import Path
