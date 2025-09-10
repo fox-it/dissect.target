@@ -111,7 +111,7 @@ def test_get_owner_and_group_none_attr() -> None:
     ("guid_bytes","ntfs_serial", "expected_result"),
     [
         (b",\xa6\xc1}\x88\xc4\xc5G\x8e\xab\t$\x0f8\x89N", 0x9e0c158a4ce55327 , "7dc1a62c-c488-47c5-8eab-09240f38894e"),
-        (None, 0x2b4a7d188a9163f2 , "00000000-0000-0000-2b4a-7d188a9163f2"),
+        (None, 0x2b4a7d188a9163f2 , "3119443236264961010"),
         (b"", None , None),
         (None, None, None),
     ],
