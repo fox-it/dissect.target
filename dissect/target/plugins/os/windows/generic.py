@@ -578,8 +578,9 @@ class GenericPlugin(Plugin):
                 sid=f"S-1-5-21-{sid[0]}-{sid[1]}-{sid[2]}",
                 _target=self.target,
             )
-        except (RegistryError, struct.error):
-            self.target.log.exception("Cannot read machine SID from registry")
+        except (RegistryError, struct.error) as e:
+            self.target.log.error("Cannot read machine SID from registry")  # noqa: TRY400
+            self.target.log.debug("", exc_info=e)
             return None
 
     @export(record=ComputerSidRecord)

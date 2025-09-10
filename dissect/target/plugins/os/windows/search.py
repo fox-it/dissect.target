@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Union, get_args
 
 from dissect.esedb import EseDB
 from dissect.sql import SQLite3
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers import hashutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.apps.browser.browser import BrowserHistoryRecord
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 SearchIndexRecord = TargetRecordDescriptor(
-    "windows/search_index/entry",
+    "windows/search/index/entry",
     [
         ("datetime", "ts"),
         ("datetime", "ts_mtime"),
@@ -41,7 +40,7 @@ SearchIndexRecord = TargetRecordDescriptor(
 )
 
 SearchIndexActivityRecord = TargetRecordDescriptor(
-    "windows/search_index/activity",
+    "windows/search/index/activity",
     [
         ("datetime", "ts_start"),
         ("datetime", "ts_end"),
@@ -88,16 +87,17 @@ class SearchIndexPlugin(Plugin):
         seen = set()
 
         for system_path in self.SYSTEM_PATHS:
-            if (path := self.target.fs.path(system_path)).is_file() and (
-                digest := hashutil.common(path.open())
-            ) not in seen:
-                seen.add(digest)
-                yield path.resolve(), None
+            if (path := self.target.fs.path(system_path)).is_file():
+                st_info = path.lstat()
+                if (digest := (path.name, st_info.st_size, st_info.st_mtime)) not in seen:
+                    seen.add(digest)
+                    yield path.resolve(), None
 
         for user_details in self.target.user_details.all_with_home():
             for user_path in self.USER_PATHS:
                 for path in user_details.home_path.glob(user_path):
-                    if (digest := hashutil.common(path.open())) not in seen:
+                    st_info = path.lstat()
+                    if (digest := (path.name, st_info.st_size, st_info.st_mtime)) not in seen:
                         seen.add(digest)
                         yield path.resolve(), user_details
 
@@ -105,16 +105,16 @@ class SearchIndexPlugin(Plugin):
         if not self.databases:
             raise UnsupportedPluginError("No Windows Search Index database files found on target")
 
-    @export(record=[SearchIndexRecords])
+    @export(record=get_args(SearchIndexRecords))
     def search(self) -> Iterator[SearchIndexRecords]:
         """Yield Windows Index Search records.
+
+        Parses ``Windows.edb`` EseDB and ``Windows.db`` SQLite3 databases. Currently does not parse
+        ``GatherLogs/SystemIndex/SystemIndex.*.(Crwl|gthr)`` files or ``Windows-gather.db`` and ``Windows-usn.db`` files.
 
         Windows Search is a standard component of Windows 7 and Windows Vista, and is enabled by default. The standard (non-Windows Server)
         configuration of Windows Search indexes the following paths: ``C:\\Users\\*`` and ``C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\*``,
         with some exceptions for certain file extensions (see the linked references for more information).
-
-        Parses ``Windows.edb`` EseDB and ``Windows.db`` SQLite3 databases. Currently does not parse
-        ``GatherLogs/SystemIndex/SystemIndex.*.(Crwl|gthr)`` files or ``Windows-gather.db`` and ``Windows-usn.db`` files.
 
         The difference between the fields ``System_Date*`` and ``System_Document_Date*`` should be researched further.
         It is unclear what the field ``InvertedOnlyMD5`` is a checksum of (record or file content?). It might be possible
@@ -172,17 +172,16 @@ class SearchIndexPlugin(Plugin):
             values = {}
 
             for row in table.rows():
+                work_id = row.get("WorkId")
                 if current_work_id is None:
-                    current_work_id = row.get("WorkId")
-
-                if row.get("WorkId") != current_work_id:
+                    current_work_id = work_id
+                if work_id != current_work_id:
                     yield from self.build_record(values, user_details, path)
-                    current_work_id = row.get("WorkId")
+                    current_work_id = work_id
                     values = {}
 
-                column_id = row.get("ColumnId")
-                column_name = columns[column_id]
                 if value := row.get("Value"):
+                    column_name = columns[row.get("ColumnId")]
                     values[column_name] = value
 
             yield from self.build_record(values, user_details, path)
@@ -258,7 +257,7 @@ class SearchIndexPlugin(Plugin):
 
 
 class TableRecord:
-    def __init__(self, table: EseDBTable, record: EseDBRecord) -> None:
+    def __init__(self, table: EseDBTable, record: EseDBRecord):
         self.table = table
         self.record = record
 

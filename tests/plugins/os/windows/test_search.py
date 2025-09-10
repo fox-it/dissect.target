@@ -2,39 +2,51 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
-from dissect.target.helpers.record import WindowsUserRecord
-from dissect.target.plugins.general.users import UserDetails
 from dissect.target.plugins.os.windows.search import SearchIndexPlugin
 from tests._utils import absolute_path
+from tests.conftest import add_win_user
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
-def test_windows_search_esedb(target_win: Target, fs_win: VirtualFilesystem) -> None:
+def test_windows_search_esedb(
+    target_win: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive, hive_hku: VirtualHive
+) -> None:
     """Test Windows Search EseDB parsing.
 
     Resources:
         - https://github.com/strozfriedberg/sidr/tree/main/tests/testdata
     """
 
+    user_sid = "S-1-5-21-29705265-400737687-482427116-1001"
+
+    add_win_user(
+        hive_hklm,
+        hive_hku,
+        target_win,
+        sid=user_sid,
+        home="C:\\Users\\User",
+    )
+
     fs_win.map_file(
         "ProgramData/Microsoft/Search/Data/Applications/Windows/Windows.edb",
         str(absolute_path("_data/plugins/os/windows/search/Windows.edb")),
     )
 
-    target_win.add_plugin(SearchIndexPlugin)
-
-    user_details = UserDetails(
-        WindowsUserRecord(sid="S-1-5-21-29705265-400737687-482427116-1001", name="User", home="C:\\Users\\User"),
-        target_win.fs.path("C:\\Users\\User"),
+    fs_win.map_file(
+        f"Users/User/AppData/Roaming/Microsoft/Search/Data/Applications/{user_sid}/Windows.edb",
+        str(absolute_path("_data/plugins/os/windows/search/Windows.edb")),
     )
 
-    with patch("dissect.target.plugins.general.users.UsersPlugin.find", return_value=user_details):
-        records = list(target_win.search())
+    plugin = target_win.add_plugin(SearchIndexPlugin)
+    records = list(target_win.search())
+
+    # Test find_databases deduplication
+    assert len(plugin.databases) == 1
 
     len_records = len(records)
     assert len_records == 1183 - 2  # Database contains two empty records.
@@ -97,15 +109,27 @@ def test_windows_search_esedb(target_win: Target, fs_win: VirtualFilesystem) -> 
     )
     assert records[995].title == "This website doesn't work in Internet Explorer - Microsoft Support"
     assert records[995].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
-    assert records[995].user_id == "S-1-5-21-29705265-400737687-482427116-1001"
+    assert records[995].user_id == user_sid
 
 
-def test_windows_search_sqlite(target_win: Target, fs_win: VirtualFilesystem) -> None:
+def test_windows_search_sqlite(
+    target_win: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive, hive_hku: VirtualHive
+) -> None:
     """Test Windows 11 Search SQLite3 parsing.
 
     Resources:
         - https://github.com/strozfriedberg/sidr/tree/main/tests/testdata
     """
+
+    user_sid = "S-1-5-21-4268361623-692440835-3372367631-1001"
+
+    add_win_user(
+        hive_hklm,
+        hive_hku,
+        target_win,
+        sid=user_sid,
+        home="C:\\Users\\User",
+    )
 
     fs_win.map_file(
         "ProgramData/Microsoft/Search/Data/Applications/Windows/Windows.db",
@@ -113,14 +137,7 @@ def test_windows_search_sqlite(target_win: Target, fs_win: VirtualFilesystem) ->
     )
 
     target_win.add_plugin(SearchIndexPlugin)
-
-    user_details = UserDetails(
-        WindowsUserRecord(sid="S-1-5-21-29705265-400737687-482427116-1001", name="User", home="C:\\Users\\User"),
-        target_win.fs.path("C:\\Users\\User"),
-    )
-
-    with patch("dissect.target.plugins.general.users.UsersPlugin.find", return_value=user_details):
-        records = list(target_win.search())
+    records = list(target_win.search())
 
     len_records = len(records)
     assert len_records == 839 - 1  # Database contains one empty record.
@@ -153,4 +170,4 @@ def test_windows_search_sqlite(target_win: Target, fs_win: VirtualFilesystem) ->
         == "https://www.bing.com/search?q=install+chrome&cvid=2ce0f71581824fda82398075bb250924&aqs=edge.0.0j69i57j0l7.2774j0j7&FORM=ANNTA0&PC=U531"
     )
     assert records[711].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
-    assert records[711].user_id == "S-1-5-21-29705265-400737687-482427116-1001"
+    assert records[711].user_id == user_sid
