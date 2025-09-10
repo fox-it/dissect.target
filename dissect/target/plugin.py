@@ -116,7 +116,7 @@ class FunctionDescriptor:
     internal: bool
     findable: bool
     alias: bool
-    output: str | None
+    output: str
     method_name: str
     module: str
     qualname: str
@@ -417,10 +417,6 @@ class Plugin:
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
-        # Do not register the "base" subclasses defined in this file
-        if cls.__module__ != Plugin.__module__:
-            register(cls)
-
         record_descriptors = _get_descriptors_on_nonprivate_methods(cls)
         cls.__record_descriptors__ = record_descriptors
         # This is a bit tricky currently
@@ -428,6 +424,10 @@ class Plugin:
         # export() currently will _always_ return a new object because it always calls ``cache.wrap(obj)``
         # This allows this to work, otherwise the Plugin.__call__ would get all the plugin attributes set on it
         cls.__call__ = export(output="record", record=record_descriptors, cache=False, cls=cls)(cls.__call__)
+
+        # Do not register the "base" subclasses defined in this file
+        if cls.__module__ != Plugin.__module__:
+            register(cls)
 
     def __init__(self, target: Target):
         self.target = target
@@ -592,7 +592,7 @@ def register(plugincls: type[Plugin]) -> None:
                         internal=internal,
                         findable=plugincls.__findable__,
                         alias=name in getattr(attr, "__aliases__", []),
-                        output=getattr(attr, "__output__", None),
+                        output=getattr(attr, "__output__", "none"),
                         method_name=attr.__name__,
                         module=plugincls.__module__,
                         qualname=plugincls.__qualname__,
@@ -617,7 +617,7 @@ def register(plugincls: type[Plugin]) -> None:
                 internal=len(functions) != 0 and len(exports) == 0,
                 findable=plugincls.__findable__,
                 alias=False,
-                output=getattr(plugincls.__call__, "__output__", None),
+                output=getattr(plugincls.__call__, "__output__", "none"),
                 method_name="__call__",
                 module=plugincls.__module__,
                 qualname=plugincls.__qualname__,

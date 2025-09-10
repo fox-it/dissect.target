@@ -235,7 +235,7 @@ def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
                 internal=False,
                 findable=True,
                 alias=False,
-                output=None,
+                output="record",
                 method_name="__call__",
                 module="mypluginns._plugin",
                 qualname="MyPlugin",
