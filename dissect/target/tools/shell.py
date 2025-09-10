@@ -1604,7 +1604,7 @@ def main() -> int:
     try:
         open_shell(args.targets, args.python, args.registry, args.commands)
     except TargetError as e:
-        log.exception("Error opening shell")
+        log.error("Error opening shell: %s", e)  # noqa: TRY400
         log.debug("", exc_info=e)
 
     return 0
