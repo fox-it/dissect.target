@@ -302,18 +302,43 @@ class RegistryPlugin(Plugin):
         return self.key(key).subkey(subkey)
 
     @internal
-    def keys(self, keys: str | Iterable[str]) -> Iterator[RegistryKey]:
+    def keys(self, keys: str | Iterable[str], ignore_regback: bool | None = None) -> Iterator[RegistryKey]:
         """Yields all keys that match the given queries.
 
         Automatically resolves CurrentVersion keys. Also flattens KeyCollections.
+
+        Args:
+            keys: The registry key paths to query.
+            ignore_regback: Whether to ignore registry backup hives (RegBack).
+                           If None, will use the value from target.props['ignore_regback'] if available,
+                           defaults to False.
         """
         keys = [keys] if isinstance(keys, str) else keys
 
+        # Determine if we should ignore RegBack hives
+        if ignore_regback is None:
+            ignore_regback = self.target.props.get("ignore_regback", False)
+
         for key in self._iter_controlset_keypaths(keys):
             try:
-                yield from self.key(key)
-            except (RegistryKeyNotFoundError, HiveUnavailableError):  # noqa: PERF203
+                for k in self.key(key):
+                    if ignore_regback and self._is_regback_key(k):
+                        continue
+                    yield k
+            except (RegistryKeyNotFoundError, HiveUnavailableError):
                 pass
+
+    def _is_regback_key(self, key: RegistryKey) -> bool:
+        """Check if a registry key is from a RegBack hive."""
+        if not key.hive:
+            return False
+
+        # Check if the hive has filepath attribute and if it contains "RegBack"
+        filepath = getattr(key.hive, "filepath", None)
+        if filepath and hasattr(filepath, "parts"):
+            return "RegBack" in filepath.parts
+
+        return False
 
     @internal
     def values(self, keys: str | Iterable[str], value: str | Iterable[str]) -> Iterator[RegistryValue]:

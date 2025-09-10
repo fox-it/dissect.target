@@ -209,3 +209,50 @@ def test_registry_plugin_values_keys(
     hive_hklm.map_key(key_path, key)
 
     assert [v.value for v in target_win_users.registry.values(keys, values)] == expected_output
+
+
+def test_registry_plugin_keys_ignore_regback(
+    target_win_users: Target,
+    hive_hklm: VirtualHive,
+    fs_win: VirtualFilesystem,
+) -> None:
+    """Test that the ignore_regback functionality works correctly."""
+    from pathlib import Path
+    from unittest.mock import Mock
+
+    # Set up the registry plugin on the target
+    target_win_users.registry._hive_collections["SOFTWARE"].add(hive_hklm)
+    target_win_users.registry._map_hive("HKEY_LOCAL_MACHINE\\SOFTWARE", hive_hklm)
+
+    # Create a normal registry key
+    key_path = "SOFTWARE\\TestKey"
+    normal_key = VirtualKey(hive_hklm, key_path)
+    normal_key.add_value("TestValue", VirtualValue(hive_hklm, "TestValue", "NormalValue"))
+    hive_hklm.map_key(key_path, normal_key)
+
+    # Test without ignore_regback parameter (should use default from target.props)
+    target_win_users.props["ignore_regback"] = False
+    normal_keys = list(target_win_users.registry.keys("HKEY_LOCAL_MACHINE\\SOFTWARE\\TestKey"))
+    assert len(normal_keys) == 1  # Only the normal key
+
+    # Test with ignore_regback=True explicitly
+    filtered_keys = list(target_win_users.registry.keys("HKEY_LOCAL_MACHINE\\SOFTWARE\\TestKey", ignore_regback=True))
+    assert len(filtered_keys) == 1  # Still 1 since we only have the normal key
+
+    # Test that target.props.ignore_regback is respected when parameter is not provided
+    target_win_users.props["ignore_regback"] = True
+    default_keys = list(target_win_users.registry.keys("HKEY_LOCAL_MACHINE\\SOFTWARE\\TestKey"))
+    assert len(default_keys) == 1
+
+    # Test the _is_regback_key method directly
+    assert not target_win_users.registry._is_regback_key(normal_keys[0])
+
+    # Test with a mock RegBack key
+    regback_hive = Mock()
+    regback_hive.filepath = Path("sysvol/windows/system32/config/RegBack/SOFTWARE")
+
+    regback_key = Mock()
+    regback_key.hive = regback_hive
+    regback_key.name = "TestKey"
+
+    assert target_win_users.registry._is_regback_key(regback_key)

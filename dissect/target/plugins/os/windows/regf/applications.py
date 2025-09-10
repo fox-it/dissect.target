@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.parsers import DateTimeParser, default_datetime_parser
 from dissect.target.helpers.record import (
     COMMON_APPLICATION_FIELDS,
     TargetRecordDescriptor,
@@ -48,15 +47,8 @@ class WindowsApplicationsPlugin(Plugin):
         super().__init__(target)
         self.datetime_parser = datetime_parser
 
-        key_list = list(self.target.registry.keys(KEYS))
-        """
-        Removing all keys from Backup registry hives located in sysvol/windows/system32/config/RegBack
-        Parsing keys from RegBack leads to duplicate applications. A VirtualHive might not have a filepath attribute.
-        Checking if the attribute exists first. If not, it is assumed it's not from RegBack.
-        """
-        self.keys = [
-            key for key in key_list if not hasattr(key.hive, "filepath") or "RegBack" not in key.hive.filepath.parts
-        ]
+        # Use the registry.keys() method with automatic RegBack filtering based on target props
+        self.keys = list(self.target.registry.keys(KEYS))
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):

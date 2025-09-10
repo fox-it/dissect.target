@@ -1,13 +1,14 @@
 [build-system]
-requires = ["setuptools>=65.5.0", "setuptools_scm[toml]>=6.4.0"]
+requires = ["setuptools>=80.9.0", "setuptools_scm[toml]>=6.4.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "dissect.target"
 description = "This module ties all other Dissect modules together, it provides a programming API and command line tools which allow easy access to various data sources inside disk images or file collections (a.k.a. targets)"
 readme = "README.md"
-requires-python = "~=3.9"
-license.text = "Affero General Public License v3"
+requires-python = ">=3.9.0"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "COPYRIGHT"]
 authors = [
   {name = "Dissect Team", email = "dissect@fox-it.com"}
 ]
@@ -16,7 +17,6 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
-  "License :: OSI Approved",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Topic :: Internet :: Log Analysis",
@@ -102,9 +102,6 @@ dev = [
     "dissect.vmfs[dev]>=3.12.dev,<4.0.dev",
     "dissect.volume[dev]>=3.0.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
-    "pexpect",
-    "docutils",
-    "typing_extensions",
 ]
 yara = [
     # Grab the dependencies for dissect.target
@@ -127,6 +124,29 @@ mqtt = [
     "paho-mqtt==1.6.1",
 ]
 
+[dependency-groups]
+test = [
+    "pytest",
+    "pexpect",
+    "docutils",
+]
+lint = [
+    "typing_extensions",
+    "ruff==0.12.9",
+    "vermin",
+]
+build = [
+    "build",
+]
+debug = [
+    "ipdb",
+]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"},
+    {include-group = "debug"},
+]
+
 [project.scripts]
 target-build-pluginlist = "dissect.target.tools.build_pluginlist:main"
 target-dump = "dissect.target.tools.dump.run:main"
@@ -143,7 +163,7 @@ target-qfind = "dissect.target.tools.qfind:main"
 
 [tool.ruff]
 line-length = 120
-required-version = ">=0.11.0"
+required-version = ">=0.12.0"
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -183,7 +203,7 @@ select = [
   "FURB",
   "RUF",
 ]
-ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003"]
+ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003", "PLC0415"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/_docs/**" = ["INP001"]
@@ -191,9 +211,6 @@ ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM1
 [tool.ruff.lint.isort]
 known-first-party = ["dissect.target"]
 known-third-party = ["dissect"]
-
-[tool.setuptools]
-license-files = ["LICENSE", "COPYRIGHT"]
 
 [tool.setuptools.packages.find]
 include = ["dissect.*"]
