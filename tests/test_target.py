@@ -755,18 +755,18 @@ def test_exception_invalid_path() -> None:
 
     with pytest.raises(
         TargetError,
-        match="Failed to initiate RawLoader for target [/\\]path[/\\]to[/\\]invalid\.img: Provided target path does not exist",
+        match=r"Failed to initiate RawLoader for target [/\\]path[/\\]to[/\\]invalid.img: Provided target path does not exist",  # noqa: E501
     ):
-        Target.open(path)
+        Target.open("/path/to/invalid.img")
 
     with pytest.raises(
         TargetError,
-        match="Failed to find loader for [/\\]path[/\\]to[/\\]invalid\.img: path does not exist",
+        match=r"Failed to find loader for [/\\]path[/\\]to[/\\]invalid.img: path does not exist",
     ):
-        next(Target.open_all(path))
+        next(Target.open_all("/path/to/invalid.img"))
 
     with pytest.raises(
         TargetError,
-        match="Failed to find any loader for targets: \['smb://invalid'\]",
+        match=r"Failed to find any loader for targets: \['smb://invalid'\]",
     ):
         next(Target.open_all("smb://invalid"))
