@@ -137,13 +137,13 @@ def test_dpapi_decrypt_blob_win_10(
     # user master key
     fs_win.map_file(
         "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-1555088973-3915578919-3195617063-1003/f5638f3b-9632-480b-ba9c-c73bdabe9f86",
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/f5638f3b-9632-480b-ba9c-c73bdabe9f86")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/f5638f3b-9632-480b-ba9c-c73bdabe9f86"),
     )
 
     # system master key
     fs_win.map_file(
         "Windows/System32/Microsoft/Protect/S-1-5-18/User/59873e79-ca24-459a-8b17-a5dcd82c6ea1",
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/59873e79-ca24-459a-8b17-a5dcd82c6ea1")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/59873e79-ca24-459a-8b17-a5dcd82c6ea1"),
     )
 
     map_version_value(target_win, "CurrentVersion", 10.0)
@@ -269,13 +269,13 @@ def test_dpapi_decrypt_blob_win_7(
     # user master key
     fs_win.map_file(
         "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-2423314426-1454842194-222297899-1000/835419eb-ce4a-4ae3-a72a-35c1383a6519",
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/835419eb-ce4a-4ae3-a72a-35c1383a6519")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/835419eb-ce4a-4ae3-a72a-35c1383a6519"),
     )
 
     # system master key
     fs_win.map_file(
         "Windows/System32/Microsoft/Protect/S-1-5-18/User/ab15130c-61cd-4065-be48-faba655f80d1",
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/ab15130c-61cd-4065-be48-faba655f80d1")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/ab15130c-61cd-4065-be48-faba655f80d1"),
     )
 
     map_version_value(target_win, "CurrentVersion", 6.1)
@@ -394,13 +394,13 @@ def test_dpapi_decrypt_blob_win_vista(
     # user master key
     fs_win.map_file(
         "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-3694181269-2347385980-100747364-1000/8bd87dd9-10fa-40b5-8614-5d0a7e8911c5",
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/8bd87dd9-10fa-40b5-8614-5d0a7e8911c5")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/8bd87dd9-10fa-40b5-8614-5d0a7e8911c5"),
     )
 
     # system master key
     fs_win.map_file(
         "Windows/System32/Microsoft/Protect/S-1-5-18/User/9ed75ec3-d074-4a7a-a428-1b70188cce4c",
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/9ed75ec3-d074-4a7a-a428-1b70188cce4c")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/9ed75ec3-d074-4a7a-a428-1b70188cce4c"),
     )
 
     map_version_value(target_win, "CurrentVersion", 6.0)
@@ -507,13 +507,13 @@ def test_dpapi_decrypt_blob_win_xp(
     # user master key
     fs_win.map_file(
         "Documents and Settings/user/Application Data/Microsoft/Protect/S-1-5-21-1960408961-57989841-725345543-1003/e1245b49-43d9-465f-b161-eab88c27620d",  # noqa: E501
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/e1245b49-43d9-465f-b161-eab88c27620d")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/e1245b49-43d9-465f-b161-eab88c27620d"),
     )
 
     # system master key
     fs_win.map_file(
         "Windows/System32/Microsoft/Protect/S-1-5-18/User/2ee95631-ed37-43f9-8a08-378924a60de7",
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/2ee95631-ed37-43f9-8a08-378924a60de7")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/2ee95631-ed37-43f9-8a08-378924a60de7"),
     )
 
     map_version_value(target_win, "CurrentVersion", 5.1)
@@ -565,7 +565,7 @@ def test_dpapi_master_keys_deduplicate(
 
     fs_win.map_file(
         "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-1555088973-3915578919-3195617063-1003/f5638f3b-9632-480b-ba9c-c73bdabe9f86",
-        str(absolute_path("_data/plugins/os/windows/dpapi/master_keys/f5638f3b-9632-480b-ba9c-c73bdabe9f86")),
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/f5638f3b-9632-480b-ba9c-c73bdabe9f86"),
     )
 
     plugin = target_win.add_plugin(DPAPIPlugin, check_compatible=False)
