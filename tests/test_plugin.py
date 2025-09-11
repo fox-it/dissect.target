@@ -1907,7 +1907,7 @@ def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
     If you want to expose plugin functions under a shared name, e.g. ``foo.bar`` and ``foo.baz``,
     you should use :class:`Plugin` with ``Plugin.__namespace__ = "foo"`` instead.
 
-    Resources:
+    References:
         - https://github.com/fox-it/dissect.target/issues/1180
     """
 
