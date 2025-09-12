@@ -60,9 +60,13 @@ def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
 
 
 def get_volume_identifier(fs: NtfsFilesystem) -> str | None:
-    """Return the filesystem GUID if available."""
+    """Return the filesystem GUID or serial, if available."""
     try:
-        return f"{UUID(bytes_le=fs.volume.guid)}"
+        if fs.volume.guid:
+            return str(UUID(bytes_le=fs.volume.guid))
+        if fs.ntfs.serial:
+            return str(fs.ntfs.serial)
+        return None
     except (AttributeError, TypeError, ValueError):
         # AttributeError is raised when volume is None
         # TypeError is raised when guid is None
