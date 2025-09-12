@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import (
     COMMON_APPLICATION_FIELDS,
     TargetRecordDescriptor,
 )
+from dissect.target.helpers.utils import common_datetime_parser
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from datetime import datetime
 
     from dissect.target.target import Target
 
@@ -20,13 +21,34 @@ WindowsApplicationRecord = TargetRecordDescriptor(
     COMMON_APPLICATION_FIELDS,
 )
 
+KEYS = (
+    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+)
+
 
 class WindowsApplicationsPlugin(Plugin):
     """Windows Applications plugin."""
 
-    def __init__(self, target: Target):
+    def __init__(
+        self,
+        target: Target,
+        datetime_parser: Callable[[str], datetime | None] = common_datetime_parser,
+    ):
+        """Initialise the plugin.
+
+        Args:
+            target: The target to run this plugin on.
+            datetime_parser: A function to parse date strings. Defaults to
+                `default_datetime_parser`. This allows for dependency injection
+                of custom parsers.
+        """
         super().__init__(target)
-        self.keys = list(self.target.registry.keys("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"))
+        self.datetime_parser = datetime_parser
+
+        # Use the registry.keys() method with automatic RegBack filtering based on target props
+        self.keys = list(self.target.registry.keys(KEYS))
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):
@@ -57,14 +79,14 @@ class WindowsApplicationsPlugin(Plugin):
             type         (string):   type of the application, either user or system
             path         (string):   path to the installed location or installer of the application
         """
+
         for uninstall in self.keys:
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}
 
-                if install_date := values.get("InstallDate"):
-                    install_date = datetime.datetime.strptime(install_date, "%Y%m%d").replace(
-                        tzinfo=datetime.timezone.utc
-                    )
+                install_date = None
+                if install_date_string := values.get("InstallDate"):
+                    install_date = self.datetime_parser(str(install_date_string))
 
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,
