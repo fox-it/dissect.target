@@ -64,7 +64,7 @@ def get_volume_identifier(fs: NtfsFilesystem) -> str | None:
     try:
         if fs.volume.guid:
             return str(UUID(bytes_le=fs.volume.guid))
-        elif fs.ntfs.serial:
+        if fs.ntfs.serial:
             return str(fs.ntfs.serial)
         return None
     except (AttributeError, TypeError, ValueError):
