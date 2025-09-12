@@ -41,7 +41,6 @@ class LinuxNetworkPlugin(NetworkPlugin):
         action="store",
         type=int,
         help="maximum number of lines of syslog to scan (implies --syslog); default is 1000 if --syslog is set",
-        default=None,
     )
     @export(record=get_args(InterfaceRecord))
     def interfaces(self, syslog: bool = False, maxlines: int | None = None) -> Iterator[UnixInterfaceRecord]:
