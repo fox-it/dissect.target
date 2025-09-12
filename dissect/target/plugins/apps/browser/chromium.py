@@ -513,7 +513,7 @@ class ChromiumMixin:
                 try:
                     local_state_path = db_file.parent.parent.joinpath("Local State")
                     keys = self.decryption_keys(local_state_path, user.user.name)
-                except ValueError as e:
+                except Exception as e:
                     self.target.log.warning("Failed to decrypt local state key: %s", e)
                     self.target.log.debug("", exc_info=e)
 
