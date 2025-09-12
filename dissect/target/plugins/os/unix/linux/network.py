@@ -348,7 +348,7 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 class DhclientLeaseParser(LinuxNetworkConfigParser):
     """Parse network interfaces from dhclient DHCP ``.leases`` files.
 
-    Resources:
+    References:
         - https://linux.die.net/man/5/dhclient.conf
     """
 
