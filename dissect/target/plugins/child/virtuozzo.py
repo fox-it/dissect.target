@@ -45,16 +45,18 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
         for container in self.target.fs.path(self.PATH).iterdir():
             name = None
             try:
-                if (vm_config := self.target.fs.path(self.CONFIG_PATH).joinpath(f"{container.name}.conf")).exists():
-                    with vm_config.open("rt") as fh:
-                        for line in fh:
-                            if not (line := line.strip()):
-                                continue
+                if not (vm_config := self.target.fs.path(self.CONFIG_PATH).joinpath(f"{container.name}.conf")).exists():
+                    continue
 
-                            key, _, value = line.partition("=")
-                            if key == "NAME":
-                                name = value.strip('"')
-                                break
+                with vm_config.open("rt") as fh:
+                    for line in fh:
+                        if not (line := line.strip()):
+                            continue
+
+                        key, _, value = line.partition("=")
+                        if key == "NAME":
+                            name = value.strip('"')
+                            break
             except Exception as e:
                 self.target.log.exception("Failed to parse NAME from Virtuozzo config: %s", container)
                 self.target.log.debug("", exc_info=e)
