@@ -233,6 +233,60 @@ def test_auth_year_rollover(target_unix: Target, fs_unix: VirtualFilesystem) -> 
             id="systemd-logind: new seat",
         ),
         pytest.param(
+            "Mar 27 13:06:56 ubuntu-1 systemd-logind[1118]: Removed seat seat0.",
+            {
+                "service": "systemd-logind",
+                "pid": 1118,
+                "action": "removed seat",
+                "seat": "seat0",
+            },
+            id="systemd-logind: removed seat",
+        ),
+        pytest.param(
+            "Dec  1 13:37:37 hostname systemd-logind[1337]: New session 12345 of user root.",
+            {
+                "service": "systemd-logind",
+                "pid": 1337,
+                "action": "new session",
+                "session": 12345,
+                "user": "root",
+            },
+            id="systemd-logind: new session",
+        ),
+        pytest.param(
+            "Dec 31 13:37:37 hostname systemd-logind[1337]: New session '12345' of user 'root' with class 'SESSION_USER' and type 'SESSION_TTY'.",  # noqa: E501
+            {
+                "service": "systemd-logind",
+                "pid": 1337,
+                "action": "new session",
+                "session": 12345,
+                "user": "root",
+                "class": "SESSION_USER",
+                "type": "SESSION_TTY",
+            },
+            id="systemd-logind: new session variant",
+        ),
+        pytest.param(
+            "Dec 31 13:37:37 hostname systemd-logind[1337]: Removed session 12345.",
+            {
+                "service": "systemd-logind",
+                "pid": 1337,
+                "action": "removed session",
+                "session": 12345,
+            },
+            id="systemd-logind: removed session",
+        ),
+        pytest.param(
+            "Dec 31 13:37:37 hostname systemd-logind[1337]: Session 12345 logged out. Waiting for processes to exit.",
+            {
+                "service": "systemd-logind",
+                "pid": 1337,
+                "action": "logged out session",
+                "session": 12345,
+            },
+            id="systemd-logind: session logged out",
+        ),
+        pytest.param(
             "Mar 27 13:10:08 ubuntu-1 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/test_user ; "
             "USER=root ; COMMAND=/usr/bin/apt-key add -",
             {
