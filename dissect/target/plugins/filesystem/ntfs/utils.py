@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 
     from dissect.target.filesystems.ntfs import NtfsFilesystem
     from dissect.target.target import Target
-
+log = logging.getLogger(__name__)
 DRIVE_LETTER_RE = re.compile(r"[a-zA-Z]:")
 
 
@@ -61,17 +62,18 @@ def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
 
 def get_volume_identifier(fs: NtfsFilesystem) -> str | None:
     """Return the filesystem GUID or serial, if available."""
+
     try:
         if fs.volume.guid:
             return str(UUID(bytes_le=fs.volume.guid))
         if fs.ntfs.serial:
             return str(fs.ntfs.serial)
-        return None
-    except (AttributeError, TypeError, ValueError):
+    except (AttributeError, ValueError) as e:
         # AttributeError is raised when volume is None
-        # TypeError is raised when guid is None
         # ValueError is raised when the guid string is smaller than 16 bytes
-        return None
+        log.exception("Error parsing Volume UUID")
+        log.debug("", exc_info=e)
+    return None
 
 
 def get_owner_and_group(entry: MftRecord, fs: NtfsFilesystem) -> tuple[str | None, str | None]:
