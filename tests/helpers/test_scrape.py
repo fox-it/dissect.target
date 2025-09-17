@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, BinaryIO
 from unittest.mock import Mock
 
 import pytest
+from dissect.util.stream import MappingStream
 
 from dissect.target.helpers import scrape
 
@@ -282,3 +283,53 @@ def test_benchmark_find_needles(benchmark: BenchmarkFixture) -> None:
     buf = b"A" * 100 + b"needle" + b"B" * 100
     needles = [b"needle"]
     benchmark(lambda: list(scrape.find_needles(io.BytesIO(buf), needles)))
+
+
+def test_find_needles_within_mappingstream_with_gap() -> None:
+    needle = b"NEEDLE"
+    before = b"A" * 100 + needle + b"B" * 50
+    after = b"C" * 30 + needle + b"D" * 20
+    gap_size = 200
+
+    # The first run starts at offset 0, the second after a gap
+    ms = MappingStream()
+    ms.add(0, len(before), io.BytesIO(before))
+    ms.add(len(before) + gap_size, len(after), io.BytesIO(after))
+
+    # Should find the first needle at offset 100, the second at offset len(before) + gap_size + 30
+    found = list(scrape.find_needles(ms, [needle], block_size=32))
+    assert found == [
+        (needle, 100, None),
+        (needle, len(before) + gap_size + 30, None),
+    ]
+
+
+def test_find_needles_within_mappingstream_starting_with_gap() -> None:
+    needle = b"NEEDLE"
+    run_offset = 123
+    before = b"A" * 50 + needle + b"B" * 20
+    ms = MappingStream()
+    ms.add(run_offset, len(before), io.BytesIO(before))
+
+    # Should find the needle at offset run_offset + 50
+    found = list(scrape.find_needles(ms, [needle], block_size=16))
+    assert found == [
+        (needle, run_offset + 50, None),
+    ]
+
+
+def test_find_needles_within_mappingstream_two_adjacent_runs() -> None:
+    needle1 = b"NEEDLE1"
+    needle2 = b"NEEDLE2"
+    run1 = b"A" * 10 + needle1 + b"B" * 10
+    run2 = b"C" * 5 + needle2 + b"D" * 5
+
+    ms = MappingStream()
+    ms.add(0, len(run1), io.BytesIO(run1))
+    ms.add(len(run1), len(run2), io.BytesIO(run2))
+
+    found = list(scrape.find_needles(ms, [needle1, needle2], block_size=8))
+    assert found == [
+        (needle1, 10, None),
+        (needle2, len(run1) + 5, None),
+    ]
