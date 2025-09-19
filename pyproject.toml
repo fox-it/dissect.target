@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dissect.target"
 description = "This module ties all other Dissect modules together, it provides a programming API and command line tools which allow easy access to various data sources inside disk images or file collections (a.k.a. targets)"
 readme = "README.md"
-requires-python = ">=3.9.0"
+requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE", "COPYRIGHT"]
 authors = [
