@@ -51,7 +51,7 @@ FolderHistoryRecord = TargetRecordDescriptor(
     ],
 )
 
-SevenZipRecord = Union[PanelPathRecord, ArcHistoryRecord, PathHistoryRecord, CopyHistoryRecord, FolderHistoryRecord]
+SevenZipRecord = Union[PanelPathRecord, ArcHistoryRecord, PathHistoryRecord, CopyHistoryRecord, FolderHistoryRecord]  # noqa: UP007
 
 
 class SevenZipPlugin(Plugin):

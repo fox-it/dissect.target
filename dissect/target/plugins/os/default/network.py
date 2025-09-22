@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]
+InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]  # noqa: UP007
 
 
 class NetworkPlugin(Plugin):
