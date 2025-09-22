@@ -13,10 +13,11 @@ import logging
 import os
 import sys
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import chain, zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 try:
     from typing import TypeAlias  # novermin

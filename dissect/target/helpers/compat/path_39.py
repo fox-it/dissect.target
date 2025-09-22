@@ -20,7 +20,7 @@ from __future__ import annotations
 import fnmatch
 import re
 from pathlib import Path, PurePath, _Accessor, _PosixFlavour
-from typing import IO, TYPE_CHECKING, Any, BinaryIO, Callable, ClassVar
+from typing import IO, TYPE_CHECKING, Any, BinaryIO, ClassVar
 
 from dissect.target import filesystem
 from dissect.target.exceptions import (
@@ -32,7 +32,7 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from typing_extensions import Self
 

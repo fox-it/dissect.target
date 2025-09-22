@@ -7,7 +7,7 @@ import os
 import pathlib
 import stat
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Final
+from typing import TYPE_CHECKING, Any, BinaryIO, Final
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -22,7 +22,7 @@ from dissect.target.helpers.lazy import import_lazy
 TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 

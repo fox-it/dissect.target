@@ -320,8 +320,8 @@ class AtTask:
 
             if trigger_type == "MONTHLYDATE":
                 # Convert trigger_specific fields to binary, remove the "0b" prefix, and pad with zeroes to 16 digits
-                day_flag_part1 = bin(trigger.trigger_specific0)[2:].zfill(16)
-                day_flag_part2 = bin(trigger.trigger_specific1)[2:].zfill(16)
+                day_flag_part1 = f"{trigger.trigger_specific0:b}".zfill(16)
+                day_flag_part2 = f"{trigger.trigger_specific1:b}".zfill(16)
                 # Concatenate the two binary strings to form the complete day_flag
                 day_of_month_flag = day_flag_part2 + day_flag_part1
                 # Reverse the day_flag string (LE), find the index of "1", add 1 to get the day of the month
@@ -390,7 +390,7 @@ class AtTask:
         Yields:
             Each item based on the flags.
         """
-        flags_binary = bin(flags)[2:]  # Convert to binary and remove "0b"
+        flags_binary = f"{flags:b}"  # Convert to binary and remove "0b"
         for i, char in enumerate(flags_binary[::-1]):
             if char == "1":
                 yield items[i]

@@ -3,16 +3,16 @@ from __future__ import annotations
 import io
 import re
 import string
-from typing import TYPE_CHECKING, BinaryIO, Callable, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 if TYPE_CHECKING:
     import logging
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.helpers.record import TargetRecordDescriptor
 
 
-Needle = Union[bytes, re.Pattern]
+Needle = bytes | re.Pattern
 
 
 def find_needles(

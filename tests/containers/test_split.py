@@ -26,7 +26,7 @@ def split_fhs() -> list[BinaryIO]:
 def split_paths(tmp_path: Path, split_fhs: list[BinaryIO]) -> list[Path]:
     paths = [(tmp_path / f"split.{i:>03}") for i in range(4)]
 
-    for fh, path in zip(split_fhs, paths):
+    for fh, path in zip(split_fhs, paths, strict=False):
         fh.seek(0)
         path.write_bytes(fh.read())
 
