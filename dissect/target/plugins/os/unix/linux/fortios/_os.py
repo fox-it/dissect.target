@@ -338,6 +338,8 @@ class FortiOSPlugin(LinuxPlugin):
 
 
 class ConfigNode(dict):
+    """Generic configuration node implementation."""
+
     def set(self, path: list[str], value: str) -> None:
         node = self
 
@@ -353,6 +355,8 @@ class ConfigNode(dict):
 
 
 class FortiOSConfig(ConfigNode):
+    """FortiOS configuration parser."""
+
     @classmethod
     def from_fh(cls, fh: TextIO) -> Self:
         root = cls()

@@ -396,7 +396,8 @@ class Target:
                     # For file/dir-like paths it's a Path object
                     target = cls._load(load_spec, ldr)
                 except Exception as e:
-                    getlogger(load_spec).error("Failed to load target with loader %s", ldr, exc_info=e)
+                    getlogger(load_spec).error("Failed to load target with loader %s", ldr)
+                    getlogger(load_spec).debug("", exc_info=e)
                     continue
                 else:
                     yield target
@@ -431,6 +432,11 @@ class Target:
             _, parsed_path = parse_path_uri(spec)
             if parsed_path is None or isinstance(spec, os.PathLike):
                 path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+                if not path.exists():
+                    raise TargetError(f"Failed to find loader for {path}: path does not exist")
+                elif not path.is_dir():
+                    raise TargetError(f"Failed to find loader for {path}: path is not a directory")
 
                 for entry in path.iterdir():
                     for target in _open_all(entry, include_children=include_children):
