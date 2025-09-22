@@ -442,7 +442,7 @@ class ApachePlugin(WebserverPlugin):
                 log = match.groupdict()
                 remote_ip = log.get("client")
                 if remote_ip and ":" in remote_ip:
-                    remote_ip, _, port = remote_ip.rpartition(":")
+                    remote_ip, _, _port = remote_ip.rpartition(":")
                 error_source = log.get("error_source")
                 error_code = log.get("error_code")
 

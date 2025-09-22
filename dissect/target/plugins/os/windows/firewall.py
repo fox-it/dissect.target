@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from itertools import islice
-from typing import TYPE_CHECKING, Any, Callable, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.network import IANAProtocol
@@ -11,7 +11,7 @@ from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescrip
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
     from dissect.target.helpers.regutil import RegistryKey
@@ -254,16 +254,19 @@ class WindowsFirewallPlugin(Plugin):
                     )
                     continue
 
+                tzinfo = self.target.datetime.tzinfo if config.time_format == "local" else timezone.utc
+
                 for line in fh:
                     if not (line := line.strip()):
                         continue
 
                     entry = {
-                        k.replace("-", "_"): v if v != "-" else None for k, v in zip(config.fields, line.split(" "))
+                        k.replace("-", "_"): v if v != "-" else None
+                        for k, v in zip(config.fields, line.split(" "), strict=False)
                     }
 
                     entry["ts"] = datetime.strptime(f"{entry['date']} {entry['time']}", "%Y-%m-%d %H:%M:%S").replace(
-                        tzinfo=self.target.datetime.tzinfo if config.time_format == "local" else timezone.utc
+                        tzinfo=tzinfo
                     )
                     entry.pop("date")
                     entry.pop("time")

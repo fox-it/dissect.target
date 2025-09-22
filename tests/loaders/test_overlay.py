@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -11,6 +11,7 @@ from dissect.target.loaders.overlay import OverlayLoader
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 BASE_PATH = "/home/user/.local/share/containers/storage/overlay/f351129587e2bb1da9ba4f03dcd22e1c838cd4f20dcc70e6da72381d2905b913"  # noqa: E501

@@ -6,7 +6,7 @@ import traceback
 import urllib.parse
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import (
@@ -26,7 +26,7 @@ from dissect.target.loaders.direct import DirectLoader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from typing_extensions import Self
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-FunctionTuple = tuple[plugin.Plugin, Union[plugin.Plugin, property, None]]
+FunctionTuple = tuple[plugin.Plugin, plugin.Plugin | property | None]
 
 
 class Event(StrEnum):

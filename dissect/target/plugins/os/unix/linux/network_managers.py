@@ -7,7 +7,7 @@ from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
 from re import Match, compile, sub
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from defusedxml import ElementTree
 
@@ -15,7 +15,7 @@ from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
@@ -540,7 +540,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 
         # Ubuntu cloud-init
         if "Received dhcp lease on" in line:
-            interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+            _interface, ip, _netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
             ips.add(ip)
             continue
 
@@ -575,7 +575,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             and " address " in line
             and " via " in line
         ):
-            interface, ip, netmask, gateway = re.search(
+            _interface, ip, _netmask, _gateway = re.search(
                 r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line
             ).groups()
             ips.add(ip)

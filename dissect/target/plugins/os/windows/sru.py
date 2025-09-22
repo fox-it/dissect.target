@@ -410,7 +410,7 @@ class SRUPlugin(Plugin):
 
         for entry in self._sru.get_table_entries(table=table):
             values = (entry[name] for name in columns)
-            column_values = zip(columns, values)
+            column_values = zip(columns, values, strict=False)
 
             record_values = {}
             for column, value in column_values:

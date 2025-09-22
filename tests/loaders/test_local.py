@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING
 from unittest.mock import call, create_autospec, mock_open, patch
 
 import pytest
@@ -17,6 +17,9 @@ from dissect.target.loaders.local import (
     map_linux_drives,
 )
 from dissect.target.target import Target, TargetLogAdapter
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @pytest.mark.parametrize(

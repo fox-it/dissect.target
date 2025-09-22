@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from io import BytesIO
 
 import pytest
@@ -47,7 +48,7 @@ def test_key_iv_for_kernel_hash() -> None:
     assert key.iv == bytes.fromhex("5394687ae6c679a74c7901267dfb9bb3")
 
     # test unknown hash
-    with pytest.raises(ValueError, match="No known decryption keys for kernel hash: .*"):
+    with pytest.raises(ValueError, match=r"No known decryption keys for kernel hash: .*"):
         key_iv_for_kernel_hash("12345")
 
 
@@ -61,7 +62,7 @@ def test_decrypt_rootfs() -> None:
 
     # test bad decrypt
     bad_key = ChaCha20Key(key[::-1], iv[::-1])
-    with pytest.raises(ValueError, match="Failed to decrypt: No gzip magic header found."):
+    with pytest.raises(ValueError, match=re.escape("Failed to decrypt: No gzip magic header found.")):
         decrypt_rootfs(BytesIO(encrypted_rootfs_header), bad_key)
 
 

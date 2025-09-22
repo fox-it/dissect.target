@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import platform
 import tarfile
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -15,6 +15,7 @@ from tests._utils import absolute_path
 from tests.filesystems.test_tar import _mkdir
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 
