@@ -234,7 +234,7 @@ SdpNetworkProviderRecord = TargetRecordDescriptor(
     ],
 )
 
-SRURecord = Union[
+SRURecord = Union[  # noqa: UP007
     NetworkDataRecord,
     NetworkConnectivityRecord,
     EnergyEstimatorRecord,
@@ -249,7 +249,6 @@ SRURecord = Union[
     SdpCpuProviderRecord,
     SdpNetworkProviderRecord,
 ]
-
 FIELD_MAPPINGS = {
     "ActiveAcTime": "active_ac_time",
     "ActiveDcTime": "active_dc_time",

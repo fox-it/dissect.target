@@ -362,7 +362,7 @@ CITProgramBitmapForegroundRecord = TargetRecordDescriptor(
 )
 
 
-CITRecords = Union[
+CITRecords = Union[  # noqa: UP007
     CITSystemRecord,
     CITSystemBitmapDisplayPowerRecord,
     CITSystemBitmapDisplayRequestChangeRecord,
