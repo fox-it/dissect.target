@@ -69,7 +69,7 @@ class KapeLoader(Loader):
     def detect(path: Path) -> bool:
         if path.is_dir():
             return is_valid_kape_dir(path)
-        if path.suffix.lower() == ".vhdx" or path.suffix.lower() == ".vhd":
+        if path.suffix.lower() in (".vhdx", ".vhd"):
             return is_valid_kape_file(path)
         return False
 
