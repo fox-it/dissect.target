@@ -45,11 +45,8 @@ def is_valid_kape_dir(path: Path) -> bool:
 
 def is_valid_kape_file(path: Path) -> bool:
     try:
-        if path.suffix == ".vhdx":
-            for fs in open_vhdx(path):
-                return is_valid_kape_dir(fs.path())
-        if path.suffix == ".vhd":
-            for fs in open_vhd(path):
+        if path.suffix.lower() in (".vhdx", ".vhd"):
+            for fs in open_kape_file(path):
                 return is_valid_kape_dir(fs.path())
     except Exception:
         return False
