@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from flow.record.fieldtypes import datetime as dt
+
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.muicache import MuiCachePlugin
 
@@ -24,6 +26,7 @@ def test_muicache_plugin(target_win_users: Target, hive_hku: VirtualHive) -> Non
         "C:\\Windows\\System32\\fsquirt.test.exe.ApplicationCompany",
         VirtualValue(hive_hku, "C:\\Windows\\System32\\fsquirt.test.exe.ApplicationCompany", "fsquir"),
     )
+    muicache_shell_key._timestamp = dt("2025-01-01 10:00:00.123456+00:00")
 
     # NT >= 6.0 (subkey)
     muicache_key = VirtualKey(
@@ -54,6 +57,7 @@ def test_muicache_plugin(target_win_users: Target, hive_hku: VirtualHive) -> Non
     results = list(target_win_users.muicache())
 
     assert len(results) == 4
+    assert results[0].ts == dt("2025-01-01 10:00:00.123456+00:00")
     assert results[0].index == 1
     assert results[0].name == "FriendlyAppName"
     assert results[0].value == "fsquir"
