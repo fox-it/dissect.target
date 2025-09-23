@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target import filesystem, volume
-from dissect.target.containers.vhdx import VhdxContainer
-from dissect.target.containers.vhd import VhdContainer
+from dissect.target import container, filesystem, volume
 from dissect.target.loader import Loader
 from dissect.target.loaders.dir import find_and_map_dirs, find_dirs
 from dissect.target.plugin import OperatingSystem
