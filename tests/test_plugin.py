@@ -1573,7 +1573,7 @@ def test_os_tree(target_bare: Target, os_plugin: type[OSPlugin], results: list[s
     """Test if we correctly return the OS name tree."""
     target_bare._os_plugin = os_plugin
     target_bare.apply()
-    assert target_bare.os_tree() == results
+    assert target_bare.os_tree == results
 
 
 class _TestInternalPlugin(InternalPlugin):

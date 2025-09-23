@@ -1289,7 +1289,7 @@ class OSPlugin(Plugin):
         # when the machinery concerning users and user_paths becomes more complex.
         raise NotImplementedError
 
-    @internal
+    @export(property=True)
     def os_tree(self) -> list[str]:
         """Returns the :func:`os` value of this and all the OS plugin parents."""
         result: list[str] = []
