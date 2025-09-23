@@ -26,10 +26,9 @@ def open_vhdx(path: Path) -> Iterator[Filesystem]:
     for vol in volume_system.volumes:
         yield filesystem.open(vol)
 
-def open_vhd(path: Path) -> Iterator[Filesystem]:
-    container = VhdContainer(path)
-    volume_system = volume.open(container)
-    for vol in volume_system.volumes:
+def open_kape_file(path: Path) -> Iterator[Filesystem]:
+    vs = volume.open(container.open(path))
+    for vol in vs.volumes:
         yield filesystem.open(vol)
 
 
