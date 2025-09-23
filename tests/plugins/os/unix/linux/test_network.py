@@ -400,3 +400,26 @@ def test_ips_dhcp(target_unix_users: Target, fs_unix: VirtualFilesystem, expecte
     assert result.cidr == expected_record["cidr"]
     assert result.gateway == expected_record["gateway"]
     assert result.source == expected_record["source"]
+
+
+def test_syslog_config_parser_multiple_lines(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test that SyslogConfigParser can parse multiple DHCP lease messages from syslog."""
+    messages = """
+    Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'
+    Feb  2 13:37:02 test systemd-networkd[2]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0
+    Mar  3 13:37:03 localhost NetworkManager[3]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3
+    """  # noqa: E501
+
+    fs_unix.map_file_fh(
+        "/var/log/syslog",
+        BytesIO(textwrap.dedent(messages).encode()),
+    )
+
+    syslog_config_parser = SyslogConfigParser(target_unix_users, 5)
+    results = list(syslog_config_parser.interfaces())
+
+    # Should parse 3 records, one for each line
+    assert len(results) == 3
+    assert results[2].cidr == [ip_interface("10.13.37.1/32")]
+    assert results[1].cidr == [ip_interface("10.13.37.2/24")]
+    assert results[0].cidr == [ip_interface("10.13.37.3/32")]
