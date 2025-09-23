@@ -74,16 +74,7 @@ class KapeLoader(Loader):
         return False
 
     def map(self, target: Target) -> None:
-        if self.absolute_path.is_dir():
-            path = self.absolute_path
-        else:
-            suffix = self.absolute_path.suffix.lower()
-            if suffix == ".vhd":
-                path = next(open_vhd(self.absolute_path)).path()
-            elif suffix == ".vhdx":
-                path = next(open_vhdx(self.absolute_path)).path()
-            else:
-                raise ValueError(f"Unknown suffix {suffix} for KAPEs {self.absolute_path}")
+        path = self.absolute_path if self.absolute_path.is_dir() else next(open_kape_file(self.absolute_path)).path()
 
         find_and_map_dirs(
             target,
