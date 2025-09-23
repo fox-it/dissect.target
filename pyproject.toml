@@ -71,8 +71,7 @@ full = [
     "pycryptodome",
     "ruamel.yaml",
     "tomli; python_version<'3.11'",
-    "zstandard==0.23.0; platform_python_implementation == 'PyPy' and python_version == '3.9'", # Pin to last working for PyPy3.9
-    "zstandard; platform_python_implementation != 'PyPy' and python_version != '3.9'", # Otherwise, pick the latest
+    "zstandard; platform_python_implementation != 'PyPy'",
 ]
 dev = [
     "dissect.target[full,yara]",
