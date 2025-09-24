@@ -65,9 +65,10 @@ elif sys.version_info >= (3, 12):
     from dissect.target.helpers.compat.path_312 import PureDissectPath, TargetPath
 elif sys.version_info >= (3, 11):
     from dissect.target.helpers.compat.path_311 import PureDissectPath, TargetPath
-else:
+elif sys.version_info >= (3, 10):  # noqa: UP036
     from dissect.target.helpers.compat.path_310 import PureDissectPath, TargetPath
-
+else:
+    raise RuntimeError("dissect.target requires at least Python 3.10")
 
 log = logging.getLogger(__name__)
 
