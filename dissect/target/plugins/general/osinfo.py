@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from collections.abc import Generator, Iterator
 from typing import Callable
 
@@ -29,7 +28,7 @@ class OSInfoPlugin(Plugin):
     @export(record=OSInfoRecord)
     def osinfo(self) -> Iterator[OSInfoRecord | GroupedRecord]:
         """Yield grouped records with target OS info."""
-        for os_func in self.target._os.__functions__:
+        for os_func in self.target._os.__exports__:
             value = getattr(self.target._os, os_func)
             record = OSInfoRecord(name=os_func, value=None, _target=self.target)
             if isinstance(value, Callable) and isinstance(subrecords := value(), Generator):
@@ -40,9 +39,5 @@ class OSInfoPlugin(Plugin):
                     # that cannot be executed in this context
                     continue
             else:
-                # Skip methods without an attribute
-                if inspect.ismethod(value):
-                    continue
-
                 record.value = value
                 yield record
