@@ -57,7 +57,7 @@ def test_muicache_plugin(target_win_users: Target, hive_hku: VirtualHive) -> Non
     results = list(target_win_users.muicache())
 
     assert len(results) == 4
-    assert results[0].ts == dt("2025-01-01 10:00:00.123456+00:00")
+    assert results[0].regf_mtime == dt("2025-01-01 10:00:00.123456+00:00")
     assert results[0].index == 1
     assert results[0].name == "FriendlyAppName"
     assert results[0].value == "fsquir"

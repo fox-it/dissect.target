@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 MuiCacheRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/muicache",
     [
-        ("datetime", "ts"),
+        ("datetime", "regf_mtime"),
         ("varint", "index"),
         ("string", "name"),
         ("string", "value"),
@@ -60,7 +60,7 @@ class MuiCachePlugin(Plugin):
 
             hostname (string): The target hostname.
             domain (string): The target domain.
-            ts (datetime): The registry key last modified timestamp.
+            regf_mtime (datetime): The registry key last modified timestamp.
             index (varint): The index of the entry.
             name (string): The value name.
             value (string): The value.
@@ -90,7 +90,7 @@ class MuiCachePlugin(Plugin):
                     continue
 
                 yield MuiCacheRecord(
-                    ts=key.ts,
+                    regf_mtime=key.ts,
                     index=index,
                     name=name,
                     value=entry.value,
