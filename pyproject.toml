@@ -35,7 +35,7 @@ dependencies = [
     "dissect.sql>=3.12,<4",
     "dissect.util>=3,<4",
     "dissect.volume>=2,<4",
-    "flow.record~=3.19.0",
+    "flow.record~=3.20.0",
     "structlog",
 ]
 dynamic = ["version"]
