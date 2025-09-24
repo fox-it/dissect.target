@@ -1012,11 +1012,7 @@ class MappedFile(VirtualFile):
         return pathlib.Path(self.entry).open("rb")
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
-        # Python 3.9 does not support follow_symlinks in stat()
-        if follow_symlinks:
-            return fsutil.stat_result.copy(pathlib.Path(self.entry).stat())
-
-        return self.lstat()
+        return fsutil.stat_result.copy(pathlib.Path(self.entry).stat(follow_symlinks=follow_symlinks))
 
     def lstat(self) -> fsutil.stat_result:
         return fsutil.stat_result.copy(pathlib.Path(self.entry).lstat())
