@@ -319,7 +319,7 @@ class AtTask:
                 yield GroupedRecord("filesystem/windows/task/weekly", [base, record, padding_record])
 
             if trigger_type == "MONTHLYDATE":
-                # Convert trigger_specific fields to binary, remove the "0b" prefix, and pad with zeroes to 16 digits
+                # Convert trigger_specific fields to binary and pad with zeroes to 16 digits
                 day_flag_part1 = f"{trigger.trigger_specific0:b}".zfill(16)
                 day_flag_part2 = f"{trigger.trigger_specific1:b}".zfill(16)
                 # Concatenate the two binary strings to form the complete day_flag
@@ -390,7 +390,7 @@ class AtTask:
         Yields:
             Each item based on the flags.
         """
-        flags_binary = f"{flags:b}"  # Convert to binary and remove "0b"
+        flags_binary = f"{flags:b}"  # Convert to binary
         for i, char in enumerate(flags_binary[::-1]):
             if char == "1":
                 yield items[i]
