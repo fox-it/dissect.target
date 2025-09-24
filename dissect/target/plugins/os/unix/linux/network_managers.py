@@ -540,7 +540,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 
         # Ubuntu cloud-init
         if "Received dhcp lease on" in line:
-            _interface, ip, _netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+            _, ip, _ = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
             ips.add(ip)
             continue
 
@@ -575,9 +575,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             and " address " in line
             and " via " in line
         ):
-            _interface, ip, _netmask, _gateway = re.search(
-                r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line
-            ).groups()
+            _, ip, _, _ = re.search(r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line).groups()
             ips.add(ip)
             continue
 

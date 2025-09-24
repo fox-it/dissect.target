@@ -287,7 +287,7 @@ def mocked_lin_volumes_fs() -> Iterator[tuple[Mock, Mock, Mock]]:
 
 
 def test_target_win_force_dirfs(mocked_win_volumes_fs: tuple[Mock, Mock, Mock]) -> None:
-    mock_good_volume, mock_bad_volume, _mock_good_fs = mocked_win_volumes_fs
+    mock_good_volume, mock_bad_volume, _ = mocked_win_volumes_fs
 
     query = {"force-directory-fs": 1}
     target_query = urllib.parse.urlencode(query)
