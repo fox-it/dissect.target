@@ -154,6 +154,9 @@ def test_map_linux_drives(tmp_path: Path) -> None:
         (Path("/dev/hda"), True),  # IDE-Controller
         (Path("/dev/hdb"), True),  # IDE-Controller
         (Path("/dev/hda1"), False),  # Partition
+        (Path("/dev/vda"), True),  # Virtual hard disk
+        (Path("/dev/vdb"), True),  # Virtual hard disk
+        (Path("/dev/vda1"), False),  # Partition
         (Path("/dev/sr0"), False),  # Compact Disc
         (Path("/dev/scd0"), False),  # Compact Disc
         (Path("/dev/tty11"), False),  # Not a disk
