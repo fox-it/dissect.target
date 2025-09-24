@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Generator, Iterator
 from typing import Callable
 
@@ -39,5 +40,9 @@ class OSInfoPlugin(Plugin):
                     # that cannot be executed in this context
                     continue
             else:
+                # Skip methods without an attribute
+                if inspect.ismethod(value):
+                    continue
+
                 record.value = value
                 yield record
