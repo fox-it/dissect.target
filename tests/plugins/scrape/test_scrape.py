@@ -30,7 +30,7 @@ def test_create_streams(target_bare: Target) -> None:
     mock_volume_2.offset = 1024 * 10
     mock_volume_2.size = 1024 * 8
 
-    mock_disk.vs.volumes = [mock_volume_1, mock_volume_2]
+    mock_disk.vs.volumes = [mock_volume_2, mock_volume_1]  # Test out-of-order volumes
 
     target_bare.disks.add(mock_disk)
 
@@ -168,7 +168,7 @@ def test_find(target_bare: Target) -> None:
 
 
 def test_find_needles_in_contiguous_regions(target_bare: Target) -> None:
-    """Test a needle overlapping two contiguous regions"""
+    """Test finding a needle overlapping two contiguous regions"""
     needle = b"NEEDLE"
     buffer = b"A" * 100 + needle + b"B" * 100
     half = len(buffer) // 2
