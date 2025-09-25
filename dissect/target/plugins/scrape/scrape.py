@@ -26,7 +26,7 @@ class ScrapePlugin(Plugin):
 
     def create_streams(
         self, *, encrypted: bool = True, lvm: bool = True, all: bool = False
-    ) -> Iterator[tuple[Container | Volume, MappingStream]]:
+    ) -> Iterator[tuple[Container | Volume, tuple[int | MappingStream]]]:
         """Yields streams for all disks and volumes of a target.
 
         At the basis, each disk of a target is represented as a stream of itself. If the target has volumes, these are
@@ -46,7 +46,8 @@ class ScrapePlugin(Plugin):
             all: Whether to yield all disks and volumes, regardless of their type.
 
         Yields:
-            A tuple containing the disk (or volume, in the case of an LVM volume) and a stream of that disk.
+            A tuple containing the disk (or volume, in the case of an LVM volume), and a list of tuples containing the
+            physical offset and associated stream of contiguous regions on the disk.
         """
         # Create a map of disk regions we want to scrape
         scrape_map = defaultdict(dict)
@@ -100,14 +101,31 @@ class ScrapePlugin(Plugin):
             if not volumes:
                 continue
 
-            size = 0
-            stream = MappingStream()
-            for (map_offset, map_size), (source, source_offset) in volumes.items():
-                stream.add(map_offset, map_size, source, source_offset)
-                size = max(size, map_offset + map_size)
-            stream.size = size
+            # Create a stream for every contiguous region
+            streams = []
+            current_stream = None
+            current_stream_start = 0
+            current_stream_end = 0
+            for (offset, size), (source, source_offset) in volumes.items():
+                # Check for a break in contiguity or the very first item
+                if not current_stream or offset != current_stream_end:
+                    # If a stream is already being built, add it to the list
+                    if current_stream:
+                        streams.append((current_stream_start, current_stream))
 
-            yield disk, stream
+                    # Start a new stream
+                    current_stream = MappingStream()
+                    current_stream_start = offset
+
+                # Add the current region to the stream and update the end pointer
+                current_stream.add(offset - current_stream_start, size, source, source_offset)
+                current_stream_end = offset + size
+
+            # Add the last remaining stream after the loop
+            if current_stream:
+                streams.append((current_stream_start, current_stream))
+
+            yield disk, streams
 
     @internal
     def find(
@@ -126,17 +144,18 @@ class ScrapePlugin(Plugin):
             block_size: The block size to use for reading from the byte stream.
             progress: A function to call with the current disk, offset and size of the stream.
         """
-        for disk, stream in self.create_streams():
-            for needle, offset, match in find_needles(
-                stream,
-                needles,
-                lock_seek=lock_seek,
-                block_size=block_size,
-                progress=(lambda current, disk=disk, stream=stream: progress(disk, current, stream.size))
-                if progress
-                else None,
-            ):
-                yield disk, stream, needle, offset, match
+        for disk, streams in self.create_streams():
+            for physical_offset, stream in streams:
+                for needle, offset, match in find_needles(
+                    stream,
+                    needles,
+                    lock_seek=lock_seek,
+                    block_size=block_size,
+                    progress=(lambda current, disk=disk, stream=stream: progress(disk, current, stream.size))
+                    if progress
+                    else None,
+                ):
+                    yield disk, stream, needle, physical_offset + offset, match
 
     @internal
     def scrape_chunks_from_disks(
