@@ -95,6 +95,9 @@ class CaddyPlugin(WebserverPlugin):
 
         return log_paths
 
+    def _get_paths(self) -> Iterator[Path]:
+        yield from self.log_paths
+
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Parses Caddy V1 CRF and Caddy V2 JSON access logs.
