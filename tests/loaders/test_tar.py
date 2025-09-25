@@ -168,3 +168,15 @@ def test_detect_buffer(file: str, tmp_path: Path) -> None:
     tmp_tar.write_bytes(small_file.read_bytes())
 
     assert TarLoader.detect(tmp_tar)
+
+
+def test_skip_folder_member_if_previously_mapped() -> None:
+    """Test if we skip a directory tar member if the path of said directory is already mapped."""
+
+    path = absolute_path("_data/loaders/tar/test-dir.tar")
+    loader = loader_open(path)
+    target = Target()
+    loader.map(target)
+
+    assert list(target.fs.get("/").iterdir()) == ["folder"]
+    assert list(target.fs.get("/folder").iterdir()) == ["file"]
