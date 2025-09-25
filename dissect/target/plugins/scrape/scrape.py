@@ -56,7 +56,7 @@ class ScrapePlugin(Plugin):
         # Spaces in between volumes are also added as disk regions
         offset = 0
         for disk in self.target.disks:
-            for volume in disk.vs.volumes if disk.vs else []:
+            for volume in sorted(disk.vs.volumes, key=lambda v: v.offset) if disk.vs else []:
                 if offset != volume.offset:
                     # There's data between the volumes, so add that from the disk
                     scrape_map[disk][(offset, volume.offset - offset)] = (disk, offset)
