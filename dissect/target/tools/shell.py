@@ -50,6 +50,7 @@ from dissect.target.tools.utils import (
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_method,
+    open_targets,
     process_generic_arguments,
 )
 
@@ -1181,7 +1182,7 @@ class TargetCli(TargetCmd):
 
         if args.python:
             # Quick path that doesn't require CLI caching
-            open_shell(paths, args.python, args.registry)
+            open_shell(list(open_targets(args)), args.python, args.registry)
             return False
 
         clikey = tuple(str(path) for path in paths)
@@ -1477,10 +1478,8 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, commands: list[str] | None) -> None:
+def open_shell(targets: list[Target], python: bool, registry: bool, commands: list[str] | None) -> None:
     """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
-    targets = list(Target.open_all(targets))
-
     if python:
         python_shell(targets, commands=commands)
     else:
@@ -1584,7 +1583,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
-    process_generic_arguments(args)
+    process_generic_arguments(parser, args)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:
@@ -1602,7 +1601,7 @@ def main() -> int:
             )
 
     try:
-        open_shell(args.targets, args.python, args.registry, args.commands)
+        open_shell(list(open_targets(args)), args.python, args.registry, args.commands)
     except TargetError as e:
         log.error("Error opening shell: %s", e)  # noqa: TRY400
         log.debug("", exc_info=e)

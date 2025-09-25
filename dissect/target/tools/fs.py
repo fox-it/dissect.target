@@ -144,7 +144,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
-    process_generic_arguments(args)
+    process_generic_arguments(parser, args)
 
     if args.subcommand is None:
         parser.error("No subcommand specified")

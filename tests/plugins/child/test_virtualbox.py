@@ -19,8 +19,10 @@ def test_child_virtualbox_linux(target_unix_users: Target, fs_unix: VirtualFiles
         absolute_path("_data/plugins/child/virtualbox/VirtualBox.xml"),
     )
 
+    vbox = absolute_path("_data/plugins/child/virtualbox/vm.vbox")
+
     # vbox to be found by traversing MachineRegistry values
-    fs_unix.map_file_fh("/example/vms/example-vm/example-vm.vbox", BytesIO())
+    fs_unix.map_file("/example/vms/example-vm/example-vm.vbox", vbox)
     fs_unix.map_file_fh("/example/vms/second-vm/second-vm.vbox", BytesIO())
     fs_unix.map_file_fh("/example/vms/third-vm/third-vm.vbox", BytesIO())
 
@@ -37,7 +39,13 @@ def test_child_virtualbox_linux(target_unix_users: Target, fs_unix: VirtualFiles
     )
 
     target_unix_users.add_plugin(VirtualBoxChildTargetPlugin)
-    children = list(target_unix_users.list_children())
+    children = [child for _, child in target_unix_users.list_children()]
+
+    assert len(children) == 5
+
+    assert children[0].type == "virtualbox"
+    assert children[0].name == "test_vm"
+    assert children[0].path == "/example/vms/example-vm/example-vm.vbox"
 
     assert sorted(map(str, [child.path for child in children])) == [
         "/example/vms/example-vm/example-vm.vbox",

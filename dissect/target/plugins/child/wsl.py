@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def find_wsl_installs(target: Target) -> Iterator[Path]:
+def find_wsl_installs(target: Target) -> Iterator[str, Path]:
     """Find all WSL disk files.
 
     Disk files for working (custom) Linux distributions can be located anywhere on the system.
@@ -30,9 +30,15 @@ def find_wsl_installs(target: Target) -> Iterator[Path]:
             for distribution_key in lxss_key.subkeys():
                 if not distribution_key.name.startswith("{"):
                     continue
+
+                name = distribution_key.value("DistributionName").value
                 base_path = target.resolve(distribution_key.value("BasePath").value)
                 # WSL needs diskname to be ext4.vhdx, but they can be renamed when WSL is not active
-                yield from base_path.glob("*.vhdx")
+                if not (disk_path := next(base_path.glob("*.vhdx"), None)):
+                    target.log.warning("No WSL disk file found in %s, check WSL install %r manually!", base_path, name)
+                    continue
+
+                yield name, disk_path
     except PluginError:
         pass
 
@@ -59,9 +65,10 @@ class WSLChildTargetPlugin(ChildTargetPlugin):
             raise UnsupportedPluginError("No WSL installs found")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
-        for install_path in self.installs:
+        for name, disk_path in self.installs:
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=install_path,
+                name=name,
+                path=disk_path,
                 _target=self.target,
             )
