@@ -948,6 +948,9 @@ class VirtualFileHandle(io.RawIOBase):
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         return self.fh.seek(offset, whence)
 
+    def read(self, length: int = -1) -> bytes:
+        return self.fh.read(length)
+
     def readable(self) -> bool:
         return True
 
