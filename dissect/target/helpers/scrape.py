@@ -5,8 +5,6 @@ import re
 import string
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.util.stream import MappingStream
-
 if TYPE_CHECKING:
     import logging
     from collections.abc import Callable, Iterator
@@ -36,7 +34,6 @@ def find_needles(
         end: The offset to stop searching at.
         lock_seek: Whether the file position is maintained by the scraper or the consumer.
                    Setting this to ``False`` will allow the consumer to seek the file pointer, i.e. to skip forward.
-                   When using a MappingStream, this must be set to True.
         block_size: The block size to use for reading from the byte stream.
         progress: A function to call with the current offset.
     """
@@ -56,44 +53,13 @@ def find_needles(
     offset = fh.tell() if start is None else start
     current_block = b""
 
-    # MappingStream gap skipping logic
-    is_mapping_stream = isinstance(fh, MappingStream)
-    if is_mapping_stream:  # We need to seek to skip over empty regions
-        if not lock_seek:
-            raise ValueError("lock_seek must be True when using a MappingStream")
-        if not (runs := fh._runs):
-            return
-        run_idx = 0
-
     while offset < end if end is not None else True:
-        # Special case for MappingStream to skip gaps
-        if is_mapping_stream:
-            # Find the next run that covers the current offset
-            while not (runs[run_idx][0] <= offset < runs[run_idx][0] + runs[run_idx][1]):
-                if offset < runs[run_idx][0]:  # There is a gap, jump
-                    current_block = b""  # No overlap when jumping to a new run
-                    offset = runs[run_idx][0]
-                    break
-
-                run_idx += 1
-                if run_idx >= len(runs):
-                    return
-                offset = runs[run_idx][0]
-
-            # Limit read_size to the current run
-            run_start, run_length, *_ = runs[run_idx]
-            max_run_read = run_start + run_length - offset
-            read_size = (
-                min(block_size, end - offset, max_run_read) if end is not None else min(block_size, max_run_read)
-            )
-        else:  # Not a MappingStream
-            read_size = min(block_size, end - offset) if end is not None else block_size
-
         if lock_seek:
             fh.seek(offset)
         else:
             offset = fh.tell()
 
+        read_size = min(block_size, end - offset) if end is not None else block_size
         if not (next_block := fh.read(read_size)):
             break
 
@@ -131,7 +97,7 @@ def find_needles(
         # The size of the data from the current block that will be prepended to the next block
         overlap_len = min(len(current_block) - last_needle_end, max_needle_len)
 
-        offset += read_size
+        offset += block_size
 
 
 def _read_plain_chunk(fh: BinaryIO, needle: Needle, offset: int, chunk_size: int) -> bytes:

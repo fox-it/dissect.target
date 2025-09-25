@@ -46,6 +46,11 @@ def test_create_streams(target_bare: Target) -> None:
         streams = list(target_bare.scrape.create_streams())
         mock_add.assert_has_calls(expected_base)
 
+        assert len(streams) == 1
+        # Get the number of streams for each disk
+        stream_counts = [len(streams) for _, streams in streams]
+        assert stream_counts == [1]
+
     mock_encrypted_volume = Mock(name="mock_encrypted_volume")
     mock_encrypted_volume.disk = mock_volume_1
     mock_encrypted_volume.offset = 1024
@@ -71,6 +76,11 @@ def test_create_streams(target_bare: Target) -> None:
             ]
         )
 
+        assert len(streams) == 1
+        # Get the number of streams for each disk
+        stream_counts = [len(streams) for _, streams in streams]
+        assert stream_counts == [1]
+
         mock_add.reset_mock()
 
         streams = list(target_bare.scrape.create_streams(encrypted=True, all=True))
@@ -84,6 +94,11 @@ def test_create_streams(target_bare: Target) -> None:
                 call(0, 1024 * 8, mock_encrypted_volume, 0),
             ]
         )
+
+        assert len(streams) == 2
+        # Get the number of streams for each disk
+        stream_counts = [len(streams) for _, streams in streams]
+        assert stream_counts == [1, 1]
 
     mock_lvm_volume = Mock(name="mock_lvm_volume")
     mock_lvm_volume.size = 1024 * 16
@@ -102,11 +117,21 @@ def test_create_streams(target_bare: Target) -> None:
         mock_add.assert_has_calls(
             [
                 call(0, 1024, mock_disk, 0),
-                call(1024 * 9, 1024, mock_disk, 1024 * 9),
-                call(1024 * 18, 1024 * 46, mock_disk, 1024 * 18),
+                call(0, 1024, mock_disk, 1024 * 9),
+                call(0, 1024 * 46, mock_disk, 1024 * 18),
                 call(0, 1024 * 16, mock_lvm_volume, 0),
             ]
         )
+        assert len(streams) == 2
+        # Get the number of streams for each disk
+        stream_counts = [len(streams) for _, streams in streams]
+        assert stream_counts == [3, 1]
+        # Get the offsets for the first disk's streams
+        first_disk_offsets = [streams[0][1][i][0] for i in range(3)]
+        assert first_disk_offsets == [0, 1024 * 9, 1024 * 18]
+        # Get the offset for the second disk's only stream
+        second_disk_offsets = [streams[1][1][i][0] for i in range(1)]
+        assert second_disk_offsets == [0]
 
         mock_add.reset_mock()
 
@@ -140,3 +165,95 @@ def test_find(target_bare: Target) -> None:
 
     for i in range(0, 1024 * 128, 8192):
         mock_progress.assert_any_call(mock_disk, i, 1024 * 128)
+
+
+def test_find_needles_in_contiguous_regions(target_bare: Target) -> None:
+    """Test a needle overlapping two contiguous regions"""
+    needle = b"NEEDLE"
+    buffer = b"A" * 100 + needle + b"B" * 100
+    half = len(buffer) // 2
+
+    disk = RawContainer(io.BytesIO(buffer))
+    disk.size = len(buffer)
+
+    # First volume covers first half
+    volume1 = io.BytesIO(buffer[:half])
+    volume1.disk = disk
+    volume1.offset = 0
+    volume1.size = half
+
+    # Second volume covers second half
+    volume2 = io.BytesIO(buffer[half:])
+    volume2.disk = disk
+    volume2.offset = half
+    volume2.size = half
+
+    disk.vs = Mock()  # Add a mock 'vs' attribute
+    disk.vs.volumes = [volume1, volume2]
+    target_bare.disks.entries = [disk]
+    target_bare.add_plugin(ScrapePlugin)
+
+    found = list(target_bare.scrape.find(needle))
+    # Only check offsets and needle, not disk or stream
+    assert [(n, offset) for (_, _, n, offset, _) in found] == [
+        (needle, 100),
+    ]
+
+
+def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
+    """Test finding needles in non-contiguous regions"""
+
+    # Layout: [---vol1(LVM)---][---volB---][---rest---]
+    needle = b"NEEDLE"
+    disk_size = 4096 * 4
+
+    # Create disk buffer
+    buf = bytearray(b"\x00" * disk_size)
+
+    # Place needle in vol1 (LVM)
+    vol1_offset = 512
+    vol1_size = 1024
+    needle1_offset = 100
+    buf[vol1_offset + needle1_offset : vol1_offset + needle1_offset + len(needle)] = needle
+
+    # Place needle in volB
+    volB_offset = 2048
+    volB_size = 512
+    needle2_offset = volB_offset + 50
+    buf[needle2_offset : needle2_offset + len(needle)] = needle
+
+    disk = RawContainer(io.BytesIO(buf))
+    disk.size = disk_size
+
+    # Create vol1 (LVM base volume)
+    vol1 = io.BytesIO(buf[vol1_offset : vol1_offset + vol1_size])
+    vol1.disk = disk
+    vol1.offset = vol1_offset
+    vol1.size = vol1_size
+
+    # Create volB (regular volume)
+    volB = io.BytesIO(buf[volB_offset : volB_offset + volB_size])
+    volB.disk = disk
+    volB.offset = volB_offset
+    volB.size = volB_size
+
+    # Attach volumes to disk
+    disk.vs = Mock()
+    disk.vs.volumes = [vol1, volB]
+
+    # Create LVM logical volume using vol1 as base
+    lvm_lv = io.BytesIO(buf[vol1_offset : vol1_offset + vol1_size])
+    lvm_lv.disk = [vol1]
+    lvm_lv.offset = 0
+    lvm_lv.size = vol1_size
+    lvm_lv.vs = Mock(spec=LogicalVolumeSystem)
+
+    # Add LVM logical volume to target volumes
+    target_bare.disks.entries = [disk]
+    target_bare.volumes.entries = [lvm_lv]
+    target_bare.add_plugin(ScrapePlugin)
+
+    # Find the needle
+    found = list(target_bare.scrape.find(needle))
+    # Should find the needle in both the LVM logical volume (disk2) and in volB (disk1)
+    assert [(n, offset) for (_, _, n, offset, _) in found] == [(needle, needle2_offset), (needle, needle1_offset)]
