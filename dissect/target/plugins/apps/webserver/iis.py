@@ -239,7 +239,7 @@ def parse_w3c_format_log(target: Target, path: Path) -> Iterator[TargetRecordDes
         if not record_descriptor:
             target.log.warning("Comment line with the fields defined should come before the values, skipping: %r", line)
 
-        raw = replace_dash_with_none(dict(zip(fields, values)))
+        raw = replace_dash_with_none(dict(zip(fields, values, strict=False)))
 
         # Example:
         # {

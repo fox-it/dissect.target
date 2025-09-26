@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
-UserRecord = Union[UnixUserRecord, WindowsUserRecord, MacOSUserRecord, IOSUserRecord]
+UserRecord = Union[UnixUserRecord, WindowsUserRecord, MacOSUserRecord, IOSUserRecord]  # noqa: UP007
 
 
 class UserDetails(NamedTuple):

@@ -8,10 +8,11 @@ import os
 import sys
 import textwrap
 import urllib.parse
+from collections.abc import Callable
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 from typing import TYPE_CHECKING
 
 import pytest
@@ -139,9 +140,9 @@ def test_parse_systemtime_transition() -> None:
 
     # wDay in this case should only go between 1-5, so this should crash
     systemtime = c_tz._SYSTEMTIME(wDay=6)
-    with pytest.raises(ValueError, match="systemtime.wDay should be between 1 and 5"):
+    with pytest.raises(ValueError, match=re.escape(r"systemtime.wDay should be between 1 and 5")):
         parse_systemtime_transition(systemtime, 2025)
 
     systemtime = c_tz._SYSTEMTIME(wDay=0)
-    with pytest.raises(ValueError, match="systemtime.wDay should be between 1 and 5"):
+    with pytest.raises(ValueError, match=re.escape("systemtime.wDay should be between 1 and 5")):
         parse_systemtime_transition(systemtime, 2025)

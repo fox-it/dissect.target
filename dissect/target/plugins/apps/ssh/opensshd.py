@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -9,7 +9,7 @@ from dissect.target.plugins.apps.ssh.openssh import find_sshd_directory
 from dissect.target.plugins.apps.ssh.ssh import SSHPlugin
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.plugins.general.config import ConfigurationTreePlugin
     from dissect.target.target import Target

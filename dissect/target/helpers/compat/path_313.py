@@ -26,7 +26,7 @@ import sys
 from glob import _Globber
 from pathlib import Path, PurePath
 from pathlib._abc import PathBase, UnsupportedOperation
-from typing import IO, TYPE_CHECKING, Callable, ClassVar
+from typing import IO, TYPE_CHECKING, ClassVar
 
 from dissect.target import filesystem
 from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
@@ -34,7 +34,7 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from typing_extensions import Self
 

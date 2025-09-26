@@ -6,7 +6,7 @@ import tempfile
 import textwrap
 from io import BytesIO
 from itertools import chain
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -34,7 +34,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.plugin import OSPlugin
 

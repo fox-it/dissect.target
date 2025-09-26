@@ -83,7 +83,7 @@ class StringSerializer(Serializer[str], Deserializer[str]):
         return OpaqueVarLengthSerializer().deserialize(payload).decode("ascii")
 
 
-class XdrSerializer(Generic[Serializable], Serializer[Serializable]):
+class XdrSerializer(Serializer[Serializable], Generic[Serializable]):
     def _write_uint32(self, i: int) -> bytes:
         return UInt32Serializer().serialize(i)
 
@@ -108,7 +108,7 @@ class XdrSerializer(Generic[Serializable], Serializer[Serializable]):
         return StringSerializer().serialize(s)
 
 
-class XdrDeserializer(Generic[Serializable], Deserializer[Serializable]):
+class XdrDeserializer(Deserializer[Serializable], Generic[Serializable]):
     def _read_uint32(self, payload: io.BytesIO) -> int:
         return UInt32Serializer().deserialize(payload)
 
@@ -151,7 +151,7 @@ class AuthFlavor(IntEnum):
     AUTH_DES = 3
 
 
-class AuthSerializer(Generic[AuthProtocol], XdrSerializer[AuthProtocol], XdrDeserializer[AuthProtocol]):
+class AuthSerializer(XdrSerializer[AuthProtocol], XdrDeserializer[AuthProtocol], Generic[AuthProtocol]):
     def serialize(self, protocol: AuthProtocol) -> bytes:
         flavor = self._flavor()
         result = self._write_int32(flavor)
@@ -214,9 +214,9 @@ class AuthUnixSerializer(AuthSerializer[sunrpc.AuthUnix]):
 
 
 class MessageSerializer(
-    Generic[ProcedureParams, ProcedureResults, Credentials, Verifier],
     XdrSerializer[sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]],
     XdrDeserializer[sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]],
+    Generic[ProcedureParams, ProcedureResults, Credentials, Verifier],
 ):
     def __init__(
         self,

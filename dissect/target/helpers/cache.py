@@ -7,13 +7,13 @@ import os
 from itertools import tee
 from pathlib import Path
 from types import GeneratorType
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from flow.record import RecordReader, RecordWriter
 from flow.record.base import HAS_ZSTD
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from flow.record.adapter.stream import StreamReader, StreamWriter
 

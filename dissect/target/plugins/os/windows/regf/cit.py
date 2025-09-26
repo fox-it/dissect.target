@@ -362,7 +362,7 @@ CITProgramBitmapForegroundRecord = TargetRecordDescriptor(
 )
 
 
-CITRecords = Union[
+CITRecords = Union[  # noqa: UP007
     CITSystemRecord,
     CITSystemBitmapDisplayPowerRecord,
     CITSystemBitmapDisplayRequestChangeRecord,
@@ -889,7 +889,7 @@ class CITPlugin(Plugin):
                     _user=user,
                 )
 
-                for names, duration in zip(applications, dp.ForegroundDurations):
+                for names, duration in zip(applications, dp.ForegroundDurations, strict=False):
                     for name in names:
                         yield CITDPDurationRecord(
                             log_time_start=log_time_start,
