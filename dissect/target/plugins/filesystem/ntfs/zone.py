@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 ZoneIdentifierRecord = TargetRecordDescriptor(
-    "filesystem/ntfs/ads/zone_identifier",
+    "filesystem/ntfs/zone",
     [
         ("uint32", "zone_id"),
         ("string", "referrer_url"),
