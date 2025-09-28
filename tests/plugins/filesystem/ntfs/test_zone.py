@@ -20,11 +20,10 @@ def target_win_mft(target_win: Target) -> Target:
     return target_win
 
 
-
-
 def test_mft_plugin_entries_count(target_win_mft: Target) -> None:
     mft_data = list(target_win_mft.zone())
     assert len(mft_data) == 2
+
 
 def test_mft_plugin_entries(target_win_mft: Target) -> None:
     mft_data = list(target_win_mft.zone())

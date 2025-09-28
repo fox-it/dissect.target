@@ -114,32 +114,30 @@ def iter_records(
         if not zone_identifier:
             return
         zone_identifier_values = parse_zone_identifier_content(zone_identifier, target)
-    except ValueError as error:
-        target.log.error("%s for Path:%s", error, path)
+    except ValueError:
+        target.log.exception("Error processing Zone.Identifier for Path:%s", path)
         return
-
 
     zone_id = zone_identifier_values.get("ZoneId")
     app_zone_id = zone_identifier_values.get("AppZoneId")
-    if zone_id != None and not zone_id.isdigit():
+    if zone_id is not None and not zone_id.isdigit():
         target.log.error("ZoneId is not int or None in path: %s", path)
         return
-    if app_zone_id != None and not app_zone_id.isdigit():
+    if app_zone_id is not None and not app_zone_id.isdigit():
         target.log.error("AppZoneId is not int or None in path: %s", path)
         return
-    if zone_id != None:
+    if zone_id is not None:
         zone_id = int(zone_id)
-    if app_zone_id != None:
+    if app_zone_id is not None:
         app_zone_id = int(app_zone_id)
 
-
     yield ZoneIdentifierRecord(
-        zone_id = zone_id,
-        referrer_url = zone_identifier_values.get("ReferrerUrl"),
-        host_url = zone_identifier_values.get("HostUrl"),
-        app_zone_id = app_zone_id,
-        host_ip_address = zone_identifier_values.get("HostIpAddress"),
-        last_writer = zone_identifier_values.get("LastWriterPackageFamilyName"),
+        zone_id=zone_id,
+        referrer_url=zone_identifier_values.get("ReferrerUrl"),
+        host_url=zone_identifier_values.get("HostUrl"),
+        app_zone_id=app_zone_id,
+        host_ip_address=zone_identifier_values.get("HostIpAddress"),
+        last_writer=zone_identifier_values.get("LastWriterPackageFamilyName"),
         file_path=path,
         volume_uuid=volume_uuid,
         segment=segment,
@@ -169,6 +167,7 @@ def validate_ads_streams(record: MftRecord) -> Attribute | None:
 
     if count == 1:
         return zone_streams[0]
+    return None
 
     # Implicitly skips (yields nothing) if count is 0.
 
@@ -194,14 +193,7 @@ def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
                     or the content has too many lines of data.
     """
 
-    EXPECTED_KEYS = {
-        "AppZoneId",
-        "HostIpAddress",
-        "HostUrl",
-        "LastWriterPackageFamilyName",
-        "ReferrerUrl",
-        "ZoneId"
-    }
+    EXPECTED_KEYS = {"AppZoneId", "HostIpAddress", "HostUrl", "LastWriterPackageFamilyName", "ReferrerUrl", "ZoneId"}
 
     # Read and Decode the ADS content
     try:
@@ -221,14 +213,12 @@ def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
     # Simple, non-robust built-in parsing for Zone.Identifier format
     config_data = {}
 
-
     for line in lines:
         utf_line = line.decode("utf-8")
         if not utf_line.strip():  # Skip empty or whitespace-only lines
             continue
         if "=" not in utf_line:
             raise ValueError("Malformed key-value line")
-
 
         key, value = utf_line.split("=", 1)
         if key not in EXPECTED_KEYS:
