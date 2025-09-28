@@ -2,27 +2,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.ntfs.util import segment_reference
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, arg, export
+from dissect.target.plugin import Plugin, arg
 from dissect.target.plugins.filesystem.ntfs.mft import _Info
-from dissect.target.plugins.filesystem.ntfs.utils import get_drive_letter
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.ntfs import MftRecord
-    from dissect.ntfs.attr import Attribute, FileName, StandardInformation
+    from dissect.ntfs.attr import Attribute
     from flow.record import Record
-    from typing_extensions import Self
 
     from dissect.target.filesystems.ntfs import NtfsFilesystem
     from dissect.target.target import Target
 
-    
+
 ZoneIdentifierRecord = TargetRecordDescriptor(
     "filesystem/ntfs/ads/zone_identifier",
     [
@@ -31,33 +27,31 @@ ZoneIdentifierRecord = TargetRecordDescriptor(
         ("string", "host_url"),
         ("uint32", "app_zone_id"),
         ("string", "host_ip_address"),
-        ("string", "last_writer_package_family_name"),
+        ("string", "last_writer"),
         ("path", "file_path"),
         ("string", "volume_uuid"),
+        ("uint32", "segment"),
     ],
 )
 
 
 class ZoneIdPlugin(Plugin):
     """NFTS UsnJrnl plugin."""
+
     __namespace__ = "zone"
 
     def __init__(self, target: Target):
         super().__init__(target)
         self.ntfs_filesystems = {index: fs for index, fs in enumerate(self.target.filesystems) if fs.__type__ == "ntfs"}
-    
+
     def check_compatible(self) -> None:
         if not len(self.ntfs_filesystems):
             raise UnsupportedPluginError("No NTFS filesystems found")
-        
+
     @arg("--fs", type=int, help="optional filesystem index, zero indexed")
     @arg("--start", type=int, default=0, help="the first MFT segment number")
     @arg("--end", type=int, default=-1, help="the last MFT segment number")
-    def records(
-        self, fs: int | None = None, start: int = 0, end: int = -1
-    ) -> Iterator[
-        ZoneIdentifierRecord
-    ]:
+    def records(self, fs: int | None = None, start: int = 0, end: int = -1) -> Iterator[ZoneIdentifierRecord]:
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
@@ -89,14 +83,12 @@ class ZoneIdPlugin(Plugin):
                 for record in filesystem.ntfs.mft.segments(start, end):
                     try:
                         info.update(record, filesystem)
-
                         for path in record.full_paths():
                             path = f"{info.drive_letter}{path}"
                             yield from iter_records(
                                 record=record,
                                 segment=record.segment,
                                 path=path,
-                                drive_letter=info.drive_letter,
                                 volume_uuid=info.volume_uuid,
                                 target=self.target,
                             )
@@ -106,22 +98,52 @@ class ZoneIdPlugin(Plugin):
 
             except Exception:
                 self.target.log.exception("An error occured constructing FilesystemRecords")
+
     __call__ = records
+
 
 def iter_records(
     record: MftRecord,
     segment: int,
     path: str,
-    drive_letter: str,
     volume_uuid: str,
     target: Target,
 ) -> Iterator[Record]:
     try:
         zone_identifier = validate_ads_streams(record)
+        if not zone_identifier:
+            return
         zone_identifier_values = parse_zone_identifier_content(zone_identifier, target)
     except ValueError as error:
         target.log.error("%s for Path:%s", error, path)
-    yield ZoneIdentifierRecord()
+        return
+
+
+    zone_id = zone_identifier_values.get("ZoneId")
+    app_zone_id = zone_identifier_values.get("AppZoneId")
+    if zone_id != None and not zone_id.isdigit():
+        target.log.error("ZoneId is not int or None in path: %s", path)
+        return
+    if app_zone_id != None and not app_zone_id.isdigit():
+        target.log.error("AppZoneId is not int or None in path: %s", path)
+        return
+    if zone_id != None:
+        zone_id = int(zone_id)
+    if app_zone_id != None:
+        app_zone_id = int(app_zone_id)
+
+
+    yield ZoneIdentifierRecord(
+        zone_id = zone_id,
+        referrer_url = zone_identifier_values.get("ReferrerUrl"),
+        host_url = zone_identifier_values.get("HostUrl"),
+        app_zone_id = app_zone_id,
+        host_ip_address = zone_identifier_values.get("HostIpAddress"),
+        last_writer = zone_identifier_values.get("LastWriterPackageFamilyName"),
+        file_path=path,
+        volume_uuid=volume_uuid,
+        segment=segment,
+    )
 
 
 def validate_ads_streams(record: MftRecord) -> Attribute | None:
@@ -134,35 +156,28 @@ def validate_ads_streams(record: MftRecord) -> Attribute | None:
 
     Returns:
         The single 'Zone.Identifier' attribute object if found, otherwise None.
-        
+
     Raises:
         ValueError: If more than one 'Zone.Identifier' ADS is present.
     """
-    zone_streams = [
-        attr for attr in record.attributes.DATA 
-        if attr.name == "Zone.Identifier"
-    ]
-    
+    zone_streams = [attr for attr in record.attributes.DATA if attr.name == "Zone.Identifier"]
+
     count = len(zone_streams)
-    print(count)
     if count > 1:
         # Policy violation: Only one Zone.Identifier stream is allowed.
         raise ValueError("more then 1 zone id")
-        
+
     if count == 1:
         return zone_streams[0]
 
     # Implicitly skips (yields nothing) if count is 0.
 
 
-def parse_zone_identifier_content(
-    attr: Attribute,
-    target: Target
-) -> dict:
+def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
     """
     Reads, decodes, and parses the INI content from the Zone.Identifier ADS attribute.
 
-    It validates the content starts with the '[ZoneTransfer]' header and validates 
+    It validates the content starts with the '[ZoneTransfer]' header and validates
     the structure against basic INI formatting (key=value on each line).
 
     Args:
@@ -170,12 +185,12 @@ def parse_zone_identifier_content(
         target: The Target object used for logging unrecognized keys.
 
     Returns:
-        A dictionary containing the parsed key-value pairs from the 
+        A dictionary containing the parsed key-value pairs from the
         [ZoneTransfer] section of the Zone.Identifier content.
 
     Raises:
-        ValueError: If decoding fails, the content is missing the expected 
-                    '[ZoneTransfer]' header, a line is malformed (missing '='), 
+        ValueError: If decoding fails, the content is missing the expected
+                    '[ZoneTransfer]' header, a line is malformed (missing '='),
                     or the content has too many lines of data.
     """
 
@@ -190,39 +205,35 @@ def parse_zone_identifier_content(
 
     # Read and Decode the ADS content
     try:
-        content = attr.data().decode("utf-16le")
+        content = attr.data()
     except UnicodeDecodeError as exc:
         raise ValueError("Cannot decode attribute data") from exc
-    
-    if not content.startswith("[ZoneTransfer]\r\n"):
+
+    if not content.startswith(b"[ZoneTransfer]\r\n"):
         raise ValueError("Missing [ZoneTransfer] header")
-    
-    lines = content.split('\r\n')
+    lines = content.split(b"\r\n")
     lines = lines[1:]
-    
+
     # Check for excessive lines of data
     if len(lines) > len(EXPECTED_KEYS):
         raise ValueError("Too many data lines")
 
     # Simple, non-robust built-in parsing for Zone.Identifier format
     config_data = {}
-    
-    # Re-split content using splitlines() for the line-by-line parsing logic
-    lines = content.splitlines() 
-    
+
+
     for line in lines:
-        if not line.strip():  # Skip empty or whitespace-only lines
+        utf_line = line.decode("utf-8")
+        if not utf_line.strip():  # Skip empty or whitespace-only lines
             continue
-        
-        if '=' not in line:
+        if "=" not in utf_line:
             raise ValueError("Malformed key-value line")
-        
-        key, value = line.split('=', 1)
-        
+
+
+        key, value = utf_line.split("=", 1)
         if key not in EXPECTED_KEYS:
             target.log.error("Unrecognized Key in ZoneIdentifier: ", key)
             continue
-        
+
         config_data[key] = value
-        
     return config_data
