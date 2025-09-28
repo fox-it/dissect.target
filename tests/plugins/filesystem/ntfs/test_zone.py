@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def target_win_mft(target_win: Target) -> Target:
-    filesystem = NtfsFilesystem(mft=absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw").open("rb"))
+    filesystem = NtfsFilesystem(mft=absolute_path("_data/plugins/filesystem/ntfs/zone/zone.raw").open("rb"))
     target_win.filesystems = [filesystem]
     target_win.add_plugin(MftPlugin)
     return target_win

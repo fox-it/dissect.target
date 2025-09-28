@@ -29,6 +29,9 @@ ZoneIdentifierRecord = TargetRecordDescriptor(
         ("uint32", "zone_id"),
         ("string", "referrer_url"),
         ("string", "host_url"),
+        ("uint32", "app_zone_id"),
+        ("string", "host_ip_address"),
+        ("string", "last_writer_package_family_name"),
         ("path", "file_path"),
         ("string", "volume_uuid"),
     ],
@@ -105,12 +108,121 @@ class ZoneIdPlugin(Plugin):
                 self.target.log.exception("An error occured constructing FilesystemRecords")
     __call__ = records
 
-    def iter_records(
-        record: MftRecord,
-        segment: int,
-        path: str,
-        drive_letter: str,
-        volume_uuid: str,
-        target: Target,
-    ) -> Iterator[Record]:
-        yield None
+def iter_records(
+    record: MftRecord,
+    segment: int,
+    path: str,
+    drive_letter: str,
+    volume_uuid: str,
+    target: Target,
+) -> Iterator[Record]:
+    try:
+        zone_identifier = validate_ads_streams(record)
+        zone_identifier_values = parse_zone_identifier_content(zone_identifier, target)
+    except ValueError as error:
+        target.log.error("%s for Path:%s", error, path)
+    yield ZoneIdentifierRecord()
+
+
+def validate_ads_streams(record: MftRecord) -> Attribute | None:
+    """
+    Returns the single 'Zone.Identifier' ADS attribute if exactly one is present.
+
+    Args:
+        record: The MFT record containing the attributes.
+        path: The file path (used only for the exception message).
+
+    Returns:
+        The single 'Zone.Identifier' attribute object if found, otherwise None.
+        
+    Raises:
+        ValueError: If more than one 'Zone.Identifier' ADS is present.
+    """
+    zone_streams = [
+        attr for attr in record.attributes.DATA 
+        if attr.name == "Zone.Identifier"
+    ]
+    
+    count = len(zone_streams)
+    print(count)
+    if count > 1:
+        # Policy violation: Only one Zone.Identifier stream is allowed.
+        raise ValueError("more then 1 zone id")
+        
+    if count == 1:
+        return zone_streams[0]
+
+    # Implicitly skips (yields nothing) if count is 0.
+
+
+def parse_zone_identifier_content(
+    attr: Attribute,
+    target: Target
+) -> dict:
+    """
+    Reads, decodes, and parses the INI content from the Zone.Identifier ADS attribute.
+
+    It validates the content starts with the '[ZoneTransfer]' header and validates 
+    the structure against basic INI formatting (key=value on each line).
+
+    Args:
+        attr: The Attribute object containing the raw data of the ADS stream.
+        target: The Target object used for logging unrecognized keys.
+
+    Returns:
+        A dictionary containing the parsed key-value pairs from the 
+        [ZoneTransfer] section of the Zone.Identifier content.
+
+    Raises:
+        ValueError: If decoding fails, the content is missing the expected 
+                    '[ZoneTransfer]' header, a line is malformed (missing '='), 
+                    or the content has too many lines of data.
+    """
+
+    EXPECTED_KEYS = {
+        "AppZoneId",
+        "HostIpAddress",
+        "HostUrl",
+        "LastWriterPackageFamilyName",
+        "ReferrerUrl",
+        "ZoneId"
+    }
+
+    # Read and Decode the ADS content
+    try:
+        content = attr.data().decode("utf-16le")
+    except UnicodeDecodeError as exc:
+        raise ValueError("Cannot decode attribute data") from exc
+    
+    if not content.startswith("[ZoneTransfer]\r\n"):
+        raise ValueError("Missing [ZoneTransfer] header")
+    
+    lines = content.split('\r\n')
+    lines = lines[1:]
+    
+    # Check for excessive lines of data
+    if len(lines) > len(EXPECTED_KEYS):
+        raise ValueError("Too many data lines")
+
+    # Simple, non-robust built-in parsing for Zone.Identifier format
+    config_data = {}
+    
+    # Re-split content using splitlines() for the line-by-line parsing logic
+    lines = content.splitlines() 
+    
+    for line in lines:
+        if not line.strip():  # Skip empty or whitespace-only lines
+            continue
+        
+        if '=' not in line:
+            raise ValueError("Malformed key-value line")
+        
+        key, value = line.split('=', 1)
+        
+        if key not in EXPECTED_KEYS:
+            target.log.error("Unrecognized Key in ZoneIdentifier: ", key)
+            continue
+        
+        config_data[key] = value
+        
+    return config_data
