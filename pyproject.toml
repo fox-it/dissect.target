@@ -27,6 +27,7 @@ classifiers = [
 dependencies = [
     "defusedxml",
     "dissect.cstruct>=4,<5",
+    "dissect.database>=1,<2",
     "dissect.eventlog>=3,<4",
     "dissect.evidence>=3,<4",
     "dissect.hypervisor>=3.19,<4",
@@ -81,6 +82,7 @@ dev = [
     "dissect.cim[dev]>=3.0.dev,<4.0.dev",
     "dissect.clfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cstruct>=4.0.dev,<5.0.dev",
+    "dissect.database>=1.0.dev,<2.0.dev",
     "dissect.esedb[dev]>=3.0.dev,<4.0.dev",
     "dissect.etl[dev]>=3.0.dev,<4.0.dev",
     "dissect.eventlog[dev]>=3.0.dev,<4.0.dev",

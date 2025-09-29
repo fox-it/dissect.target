@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
+from dissect.database import Error as DatabaseError
+from dissect.database import LocalStorage, SessionStorage, SQLite3
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -22,6 +22,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_LOCAL_STORAGE_FIELDS,
     GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
     try_idna,
@@ -29,8 +30,6 @@ from dissect.target.plugins.apps.browser.browser import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from dissect.sql.sqlite3 import SQLite3
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -85,6 +84,8 @@ DOWNLOAD_STATES = {
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
+    target: Target
+
     DIRS = ()
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -93,6 +94,14 @@ class ChromiumMixin:
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/cookie", GENERIC_COOKIE_FIELDS
+    )
+
+    BrowserLocalStorageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/localstorage", GENERIC_LOCAL_STORAGE_FIELDS
+    )
+
+    BrowserSessionStorageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/sessionstorage", GENERIC_LOCAL_STORAGE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -128,8 +137,11 @@ class ChromiumMixin:
         return users_dirs
 
     def _iter_db(
-        self, filename: str, subdirs: list[str] | None = None
-    ) -> Iterator[tuple[UserDetails, TargetPath, SQLite3]]:
+        self,
+        filename: str,
+        subdirs: list[str] | None = None,
+        db_type: SQLite3 | LocalStorage | SessionStorage = SQLite3,
+    ) -> Iterator[tuple[UserDetails, TargetPath, SQLite3 | LocalStorage | SessionStorage]]:
         """Generate a connection to a sqlite database file.
 
         Args:
@@ -137,16 +149,19 @@ class ChromiumMixin:
             subdirs: Subdirectories to also try for every configured directory.
 
         Yields:
-            opened db_file (SQLite3)
+            opened db_file (SQLite3, LocalStorage or SessionStorage)
 
         Raises:
             FileNotFoundError: If the history file could not be found.
-            SQLError: If the history file could not be opened.
+            DatabaseError: If the history file could not be opened.
         """
         seen = set()
         dirs = list(self.DIRS)
         if subdirs:
             dirs.extend([join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subdirs)])
+
+        if db_type not in (SQLite3, LocalStorage, SessionStorage):
+            raise ValueError(f"Unknown db_type: {db_type!r}")
 
         for user, cur_dir in self._build_userdirs(dirs):
             db_file = cur_dir.joinpath(filename)
@@ -156,11 +171,12 @@ class ChromiumMixin:
             seen.add(db_file)
 
             try:
-                yield user, db_file, sqlite3.SQLite3(db_file.open())
+                yield user, db_file, db_type(db_file.open()) if db_type is SQLite3 else db_type(db_file)
+
             except FileNotFoundError:
                 self.target.log.warning("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
-                self.target.log.warning("Could not open %s file: %s", filename, db_file)
+            except DatabaseError as e:
+                self.target.log.warning("Could not open database %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
     def _iter_json(self, filename: str) -> Iterator[tuple[UserDetails, TargetPath, dict]]:
@@ -249,7 +265,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DatabaseError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -325,9 +341,44 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:
+            except DatabaseError as e:
                 self.target.log.warning("Error processing cookie file %s: %s", db_file, e)
                 self.target.log.debug("", exc_info=e)
+
+    def local_storage(self, browser_name: str | None = None) -> Iterator[BrowserLocalStorageRecord]:
+        """Return browser Local Storage records from supported Chromium-based browsers."""
+
+        for user, db_file, db in self._iter_db("Local Storage/leveldb", db_type=LocalStorage):
+            for store in db.stores:
+                for record in store.records:
+                    yield self.BrowserLocalStorageRecord(
+                        ts_created=record.meta["created"],
+                        ts_last_modified=record.meta["last_modified"],
+                        ts_last_accessed=record.meta["last_accessed"],
+                        browser=browser_name,
+                        host=store.host,
+                        key=record.key,
+                        value=record.value,
+                        source=db_file,
+                        _user=user.user,
+                        _target=self.target,
+                    )
+
+    def session_storage(self, browser_name: str | None = None) -> Iterator[BrowserSessionStorageRecord]:
+        """Return browser Session Storage records from supported Chromium-based browsers."""
+
+        for user, db_file, db in self._iter_db("Session Storage", db_type=SessionStorage):
+            for namespace in db.namespaces:
+                for record in namespace.records:
+                    yield self.BrowserSessionStorageRecord(
+                        browser=browser_name,
+                        host=namespace.host,
+                        key=record.key,
+                        value=record.value,
+                        source=db_file,
+                        _user=user.user,
+                        _target=self.target,
+                    )
 
     def downloads(self, browser_name: str | None = None) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from supported Chromium-based browsers.
@@ -393,7 +444,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DatabaseError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -718,6 +769,16 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
     def cookies(self) -> Iterator[ChromiumMixin.BrowserCookieRecord]:
         """Return browser cookie records for Chromium browser."""
         yield from super().cookies("chromium")
+
+    @export(record=ChromiumMixin.BrowserLocalStorageRecord)
+    def local_storage(self) -> Iterator[ChromiumMixin.BrowserLocalStorageRecord]:
+        """Return browser local storage records for Chromium browser."""
+        yield from super().local_storage("chromium")
+
+    @export(record=ChromiumMixin.BrowserSessionStorageRecord)
+    def session_storage(self) -> Iterator[ChromiumMixin.BrowserSessionStorageRecord]:
+        """Return browser session storage records for Chromium browser."""
+        yield from super().session_storage("chromium")
 
     @export(record=ChromiumMixin.BrowserDownloadRecord)
     def downloads(self) -> Iterator[ChromiumMixin.BrowserDownloadRecord]:
