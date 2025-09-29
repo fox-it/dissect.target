@@ -98,7 +98,7 @@ def str_to_bool(string_to_convert: str) -> bool | None:
     raise ValueError(f"Invalid boolean string: '{string_to_convert}' (expected 'true' or 'false')")
 
 
-def str_to_isoformat(string_to_convert: str) -> str | None:
+def str_to_isoformat(string_to_convert: str) -> datetime | None:
     """Convert a datetime string to ISO 8601 format.
 
     Accepts strings in the form YYYY-MM-DDThh:mm:ss
