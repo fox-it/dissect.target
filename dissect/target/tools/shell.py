@@ -19,6 +19,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
@@ -268,20 +269,43 @@ class ExtendedCmd(cmd.Cmd):
         """
 
     def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False) -> bool:
-        """Command execution helper that chains initial command and piped subprocesses (if any) together."""
+        """Command execution helper that chains initial command, piped subprocesses, and output redirection together."""
 
         argparts = []
         if command_args_str is not None:
             argparts = arg_str_to_arg_list(command_args_str)
 
+        # Enforce that output redirection (>) only appears after the last pipe (|)
+        redirect_idx = None
+        redirect_file = None
+        if ">" in argparts:
+            redirect_idx = argparts.index(">")
+            # Only support single output redirection for now
+            if redirect_idx + 1 >= len(argparts):
+                print("Syntax error: missing filename after '>'")
+                return False
+            # If there are pipes, > must be after the last |
+            last_pipe_idx = max((i for i, v in enumerate(argparts) if v == "|"), default=-1)
+            if last_pipe_idx != -1 and redirect_idx < last_pipe_idx:
+                print("Syntax error: output redirection must come after the last pipe")
+                return False
+            redirect_file = argparts[redirect_idx + 1]
+            # Remove redirect from argparts
+            argparts = argparts[:redirect_idx]
+
+        # Handle pipes
         if "|" in argparts:
             pipeidx = argparts.index("|")
             argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
             try:
-                with build_pipe_stdout(pipeparts) as pipe_stdin:
-                    return func(argparts, pipe_stdin)
+                # If redirect, open file for writing and pass as stdout
+                if redirect_file:
+                    with Path(redirect_file).open("w") as f, build_pipe(pipeparts, pipe_stdout=f) as (pipe_stdin, _):
+                        return func(argparts, pipe_stdin)
+                else:
+                    with build_pipe_stdout(pipeparts) as pipe_stdin:
+                        return func(argparts, pipe_stdin)
             except OSError as e:
-                # in case of a failure in a subprocess
                 print(e)
                 return False
         else:
@@ -289,8 +313,13 @@ class ExtendedCmd(cmd.Cmd):
             if self.cyber and not no_cyber:
                 ctx = cyber.cyber(color=None, run_at_end=True)
 
-            with ctx:
-                return func(argparts, sys.stdout)
+            # If redirect, open file for writing and pass as stdout
+            if redirect_file:
+                with Path(redirect_file).open("w") as f, ctx:
+                    return func(argparts, f)
+            else:
+                with ctx:
+                    return func(argparts, sys.stdout)
 
     def _exec_command(self, command: str, command_args_str: str) -> bool:
         """Command execution helper for ``cmd_`` commands."""
@@ -761,7 +790,12 @@ class TargetCli(TargetCmd):
             print(args.path)  # mimic ls behaviour
             return False
 
-        print_ls(path, 0, stdout, args.l, args.human_readable, args.recursive, args.use_ctime, args.use_atime)
+        # Disable color if output is redirected to a file
+        use_color = False
+        if hasattr(stdout, "isatty") and stdout.isatty():
+            use_color = True
+
+        print_ls(path, 0, stdout, args.l, args.human_readable, args.recursive, args.use_ctime, args.use_atime, color=use_color)
         return False
 
     @arg("path", nargs="?")
