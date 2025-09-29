@@ -20,12 +20,6 @@ if TYPE_CHECKING:
 USNJRNL_PATHS = ["$Extend/$J", "$Extend/$UsnJrnl$J"]
 
 
-def open_vhdx(path: Path) -> Iterator[Filesystem]:
-    container = VhdxContainer(path)
-    volume_system = volume.open(container)
-    for vol in volume_system.volumes:
-        yield filesystem.open(vol)
-
 def open_kape_file(path: Path) -> Iterator[Filesystem]:
     vs = volume.open(container.open(path))
     for vol in vs.volumes:
