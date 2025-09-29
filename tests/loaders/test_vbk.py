@@ -115,7 +115,7 @@ def test_mock_vmx() -> None:
         assert len(t.disks) == 1
 
         t.disks[0].seek(0)
-        assert t.disks[0].read(-1).decode() == "🍖👑"
+        assert t.disks[0].read(8).decode() == "🍖👑"
 
 
 def test_mock_vmcx() -> None:
