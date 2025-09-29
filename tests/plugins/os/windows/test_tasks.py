@@ -9,6 +9,7 @@ import pytest
 from flow.record import GroupedRecord
 
 from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord, TasksPlugin
+from dissect.target.plugins.os.windows.tasks.xml import str_to_isoformat
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -265,3 +266,29 @@ def test_xml_task_invalid(
     with caplog.at_level(logging.WARNING, target_win.log.name):
         assert len(list(target_win.tasks(group=True))) == 18
         assert "Invalid task file encountered:" in caplog.text
+
+def test_xml_task_time(
+    target_win, setup_invalid_tasks_test, caplog
+) -> None:
+    assert str_to_isoformat("2023-07-05T14:30:00") == datetime.strptime("2023-07-05 14:30:00", "%Y-%m-%d %H:%M:%S")
+
+def test_xml_task_time_valid_space(
+    target_win, setup_invalid_tasks_test, caplog
+) -> None:
+    assert str_to_isoformat("2024-01-01 09:15:00") == datetime.strptime("2024-01-01 09:15:00", "%Y-%m-%d %H:%M:%S")
+
+def test_xml_task_time_empty(
+    target_win, setup_invalid_tasks_test, caplog
+) -> None:
+    assert str_to_isoformat("") is None
+
+def test_xml_task_time_invalid(
+    target_win, setup_invalid_tasks_test, caplog
+) -> None:
+    with pytest.raises(ValueError):
+        str_to_isoformat("invalid datetime")
+
+def test_xml_task_time_utc(
+    target_win, setup_invalid_tasks_test, caplog
+) -> None:
+    assert str_to_isoformat("2025-07-14T07:15:00Z") == datetime.strptime("2025-07-14 07:15:00+00:00", "%Y-%m-%d %H:%M:%S%z")

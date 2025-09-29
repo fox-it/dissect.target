@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from datetime import datetime
 from defusedxml import ElementTree
 from flow.record import GroupedRecord
 
@@ -114,13 +115,14 @@ def str_to_isoformat(string_to_convert: str) -> str | None:
     if "T" in string_to_convert:
         date_part, time_part = string_to_convert.split("T")
     elif " " in string_to_convert:
-        date_part, time_part = string_to_convert.split(" ")
+        date_part, time_part = string_to_convert.split(" ") 
     else:
         raise ValueError(f"Invalid datetime string: '{string_to_convert}' (expected 'YYYY-MM-DDThh:mm:ss')")
 
     try:
         year, month, day = date_part.split("-")
-        return f"{year}-{int(month):02d}-{int(day):02d}T{time_part}"
+        iso_8601_format =  f"{year}-{int(month):02d}-{int(day):02d}T{time_part}"
+        return datetime.fromisoformat(iso_8601_format)
     except Exception:
         raise ValueError(f"Invalid datetime string: '{string_to_convert}' (expected 'YYYY-MM-DDThh:mm:ss')")
 
