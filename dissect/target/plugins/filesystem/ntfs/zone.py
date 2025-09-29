@@ -6,7 +6,6 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg
 from dissect.target.plugins.filesystem.ntfs.mft import _Info
-from dissect.target.target import Target
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -36,7 +35,7 @@ ZoneIdentifierRecord = TargetRecordDescriptor(
 
 
 class ZoneIdPlugin(Plugin):
-    """NFTS UsnJrnl plugin."""
+    """NFTS ZoneId plugin."""
 
     __namespace__ = "zone"
 
@@ -109,6 +108,25 @@ def iter_records(
     volume_uuid: str,
     target: Target,
 ) -> Iterator[Record]:
+    """
+    Yields ZoneIdentifierRecord from a validated, single **'Zone.Identifier' ADS**.
+    Parses content, validates 'ZoneId' and 'AppZoneId' as numeric, logging errors on failure.
+
+    Args:
+        record: The MFT record containing the attributes.
+        segment: The MFT segment number.
+        path: The file path.
+        volume_uuid: The volume UUID.
+        target: The target object for logging.
+
+    Yields:
+        A ZoneIdentifierRecord object.
+
+    Raises:
+        ValueError: Raised by internal calls to `validate_ads_streams` (if >1 stream) or 
+                    `parse_zone_identifier_content` (if content is malformed), though 
+                    this function catches and handles the exception by logging an error.
+    """
     try:
         zone_identifier = validate_ads_streams(record)
         if not zone_identifier:
@@ -167,9 +185,10 @@ def validate_ads_streams(record: MftRecord) -> Attribute | None:
 
     if count == 1:
         return zone_streams[0]
+    
     return None
 
-    # Implicitly skips (yields nothing) if count is 0.
+
 
 
 def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
@@ -195,15 +214,12 @@ def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
 
     EXPECTED_KEYS = {"AppZoneId", "HostIpAddress", "HostUrl", "LastWriterPackageFamilyName", "ReferrerUrl", "ZoneId"}
 
-    # Read and Decode the ADS content
-    try:
-        content = attr.data()
-    except UnicodeDecodeError as exc:
-        raise ValueError("Cannot decode attribute data") from exc
-
+    content = attr.data()
+    # verify the header and split into lines
     if not content.startswith(b"[ZoneTransfer]\r\n"):
         raise ValueError("Missing [ZoneTransfer] header")
     lines = content.split(b"\r\n")
+    # remove the header line
     lines = lines[1:]
 
     # Check for excessive lines of data
@@ -214,12 +230,15 @@ def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
     config_data = {}
 
     for line in lines:
-        utf_line = line.decode("utf-8")
+        try:
+            utf_line = line.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError("Cannot decode attribute data") from exc
         if not utf_line.strip():  # Skip empty or whitespace-only lines
             continue
         if "=" not in utf_line:
             raise ValueError("Malformed key-value line")
-
+        # split limited to one as URL can have = sign
         key, value = utf_line.split("=", 1)
         if key not in EXPECTED_KEYS:
             target.log.error("Unrecognized Key in ZoneIdentifier: ", key)

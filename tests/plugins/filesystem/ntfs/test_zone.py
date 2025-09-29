@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.filesystems.ntfs import NtfsFilesystem
-from dissect.target.plugins.filesystem.ntfs.mft import MftPlugin
+from dissect.target.plugins.filesystem.ntfs.zone import ZoneIdPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -16,16 +16,18 @@ if TYPE_CHECKING:
 def target_win_mft(target_win: Target) -> Target:
     filesystem = NtfsFilesystem(mft=absolute_path("_data/plugins/filesystem/ntfs/zone/zone.raw").open("rb"))
     target_win.filesystems = [filesystem]
-    target_win.add_plugin(MftPlugin)
+    target_win.add_plugin(ZoneIdPlugin)
     return target_win
 
 
 def test_mft_plugin_entries_count(target_win_mft: Target) -> None:
+    # tests whether the correct number of entries are returned
     mft_data = list(target_win_mft.zone())
     assert len(mft_data) == 2
 
 
 def test_mft_plugin_entries(target_win_mft: Target) -> None:
+    # tests whether the returned info is correct
     mft_data = list(target_win_mft.zone())
     for entry in mft_data:
         filename = entry.file_path
