@@ -19,6 +19,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
@@ -268,21 +269,52 @@ class ExtendedCmd(cmd.Cmd):
             - https://github.com/python/cpython/blob/3.12/Lib/cmd.py#L10
         """
 
-    def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False) -> bool:
-        """Command execution helper that chains initial command and piped subprocesses (if any) together."""
+    def _exec(
+        self,
+        func: Callable[[list[str], TextIO], bool],
+        command_args_str: str,
+        no_cyber: bool = False,
+    ) -> bool:
+        """Command execution helper that chains initial command, piped subprocesses, and output redirection together."""
 
         argparts = []
         if command_args_str is not None:
             argparts = arg_str_to_arg_list(command_args_str)
 
+        # Enforce that output redirection (>) only appears after the last pipe (|)
+        redirect_idx = None
+        redirect_file = None
+        if ">" in argparts:
+            redirect_idx = argparts.index(">")
+            # Only support single output redirection for now
+            if redirect_idx + 1 >= len(argparts):
+                print("Syntax error: missing filename after '>'")
+                return False
+            # If there are pipes, > must be after the last |
+            last_pipe_idx = max((i for i, v in enumerate(argparts) if v == "|"), default=-1)
+            if last_pipe_idx != -1 and redirect_idx < last_pipe_idx:
+                print("Syntax error: output redirection must come after the last pipe")
+                return False
+            redirect_file = argparts[redirect_idx + 1]
+            # Remove redirect from argparts
+            argparts = argparts[:redirect_idx]
+
+        # Handle pipes
         if "|" in argparts:
             pipeidx = argparts.index("|")
             argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
             try:
-                with build_pipe_stdout(pipeparts) as pipe_stdin:
-                    return func(argparts, pipe_stdin)
+                # If redirect, open file for writing and pass as stdout
+                if redirect_file:
+                    with (
+                        Path(redirect_file).open("w") as f,
+                        build_pipe(pipeparts, pipe_stdout=f) as (pipe_stdin, _),
+                    ):
+                        return func(argparts, pipe_stdin)
+                else:
+                    with build_pipe_stdout(pipeparts) as pipe_stdin:
+                        return func(argparts, pipe_stdin)
             except OSError as e:
-                # in case of a failure in a subprocess
                 print(e)
                 return False
         else:
@@ -290,8 +322,13 @@ class ExtendedCmd(cmd.Cmd):
             if self.cyber and not no_cyber:
                 ctx = cyber.cyber(color=None, run_at_end=True)
 
-            with ctx:
-                return func(argparts, sys.stdout)
+            # If redirect, open file for writing and pass as stdout
+            if redirect_file:
+                with Path(redirect_file).open("w") as f, ctx:
+                    return func(argparts, f)
+            else:
+                with ctx:
+                    return func(argparts, sys.stdout)
 
     def _exec_command(self, command: str, command_args_str: str) -> bool:
         """Command execution helper for ``cmd_`` commands."""
@@ -369,7 +406,10 @@ class ExtendedCmd(cmd.Cmd):
     def do_cyber(self, line: str) -> bool:
         """cyber"""
         self.cyber = not self.cyber
-        word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[self.cyber]
+        word, color = {
+            False: ("D I S E N", cyber.Color.RED),
+            True: ("E N", cyber.Color.YELLOW),
+        }[self.cyber]
         with cyber.cyber(color=color):
             print(f"C Y B E R - M O D E - {word} G A G E D")
         return False
@@ -424,7 +464,11 @@ class TargetCmd(ExtendedCmd):
         """Get the path to the run commands file."""
 
         return pathlib.Path(
-            getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
+            getattr(
+                self.target._config,
+                self.CONFIG_KEY_RUNCOMMANDS_FILE,
+                self.DEFAULT_RUNCOMMANDS_FILE,
+            )
         ).expanduser()
 
     def preloop(self) -> None:
@@ -742,8 +786,18 @@ class TargetCli(TargetCmd):
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
-    @arg("-R", "--recursive", action="store_true", help="recursively list subdirectories encountered")
-    @arg("-c", action="store_true", dest="use_ctime", help="show time when file status was last changed")
+    @arg(
+        "-R",
+        "--recursive",
+        action="store_true",
+        help="recursively list subdirectories encountered",
+    )
+    @arg(
+        "-c",
+        action="store_true",
+        dest="use_ctime",
+        help="show time when file status was last changed",
+    )
     @arg("-u", action="store_true", dest="use_atime", help="show time of last access")
     @alias("l")
     @alias("dir")
@@ -763,7 +817,22 @@ class TargetCli(TargetCmd):
             print(args.path)  # mimic ls behaviour
             return False
 
-        print_ls(path, 0, stdout, args.l, args.human_readable, args.recursive, args.use_ctime, args.use_atime)
+        # Disable color if output is redirected to a file
+        use_color = False
+        if hasattr(stdout, "isatty") and stdout.isatty():
+            use_color = True
+
+        print_ls(
+            path,
+            0,
+            stdout,
+            args.l,
+            args.human_readable,
+            args.recursive,
+            args.use_ctime,
+            args.use_atime,
+            color=use_color,
+        )
         return False
 
     @arg("path", nargs="?")
@@ -786,7 +855,11 @@ class TargetCli(TargetCmd):
     @arg("-iname", help="like -name, but the match is case insensitive")
     @arg("-atime", type=int, help="file was last accessed n*24 hours ago")
     @arg("-mtime", type=int, help="file was last modified n*24 hours ago")
-    @arg("-ctime", type=int, help="file (windows) or metadata (unix) was last changed n*24 hours ago")
+    @arg(
+        "-ctime",
+        type=int,
+        help="file (windows) or metadata (unix) was last changed n*24 hours ago",
+    )
     @arg("-btime", type=int, help="file was born n*24 hours ago (ext4)")
     def cmd_find(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """search for files in a directory hierarchy"""
@@ -921,7 +994,9 @@ class TargetCli(TargetCmd):
             return diverging_path
 
         def save_path(
-            src_path: pathlib.Path, dst_path: pathlib.Path, create_dst_subdir: pathlib.Path | None = None
+            src_path: pathlib.Path,
+            dst_path: pathlib.Path,
+            create_dst_subdir: pathlib.Path | None = None,
         ) -> None:
             """Save a common file or directory in src_path to dst_path.
 
