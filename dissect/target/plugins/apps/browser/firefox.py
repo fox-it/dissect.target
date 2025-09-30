@@ -9,8 +9,8 @@ from hashlib import pbkdf2_hmac, sha1
 from itertools import chain
 from typing import TYPE_CHECKING
 
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -29,8 +29,6 @@ from dissect.target.plugins.apps.browser.browser import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from dissect.sql.sqlite3 import SQLite3
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.plugins.general.users import UserRecord
@@ -153,10 +151,10 @@ class FirefoxPlugin(BrowserPlugin):
                 db_file = profile_dir.joinpath(filename)
 
             try:
-                yield user, db_file, sqlite3.SQLite3(db_file.open())
+                yield user, db_file, SQLite3(db_file.open())
             except FileNotFoundError:
                 self.target.log.info("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -222,7 +220,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -269,7 +267,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing cookie file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -357,7 +355,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user,
                     )
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -725,7 +723,7 @@ def decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, glo
 
 def query_global_salt(key4_file: TargetPath) -> tuple[str, str]:
     with key4_file.open("rb") as fh:
-        db = sqlite3.SQLite3(fh)
+        db = SQLite3(fh)
         for row in db.table("metadata").rows():
             if row.get("id") == "password":
                 return row.get("item1", ""), row.get("item2", "")
@@ -734,7 +732,7 @@ def query_global_salt(key4_file: TargetPath) -> tuple[str, str]:
 
 def query_master_key(key4_file: TargetPath) -> tuple[str, str]:
     with key4_file.open("rb") as fh:
-        db = sqlite3.SQLite3(fh)
+        db = SQLite3(fh)
         if row := next(db.table("nssPrivate").rows(), None):
             return row.get("a11", ""), row.get("a102", "")
         return None

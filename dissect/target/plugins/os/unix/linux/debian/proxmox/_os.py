@@ -4,7 +4,7 @@ import stat
 from io import BytesIO
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.sql import sqlite3
+from dissect.database.sqlite3 import Row, SQLite3
 from dissect.util.stream import BufferedStream
 
 from dissect.target.filesystem import (
@@ -65,7 +65,7 @@ DT_REG = 8
 
 def _create_pmxcfs(fh: BinaryIO, hostname: str | None = None) -> VirtualFilesystem:
     # https://pve.proxmox.com/wiki/Proxmox_Cluster_File_System_(pmxcfs)
-    db = sqlite3.SQLite3(fh)
+    db = SQLite3(fh)
 
     entries = {row.inode: row for row in db.table("tree")}
 
@@ -123,7 +123,7 @@ class ProxmoxConfigFileEntry(VirtualFile):
 
 
 class ProxmoxConfigDirectoryEntry(VirtualDirectory):
-    def __init__(self, fs: VirtualFilesystem, path: str, entry: sqlite3.Row):
+    def __init__(self, fs: VirtualFilesystem, path: str, entry: Row):
         super().__init__(fs, path)
         self.entry = entry
 
