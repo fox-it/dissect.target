@@ -60,7 +60,7 @@ def test_driveletter(drive_letters: Iterator[str], expected: str) -> None:
     mocked_target = Mock()
     mocked_disk = Mock()
     num_drives = len(drive_letters)
-    mocked_target.fs.mounts = dict(zip(drive_letters, [mocked_disk] * num_drives))
+    mocked_target.fs.mounts = dict(zip(drive_letters, [mocked_disk] * num_drives, strict=False))
 
     assert get_drive_letter(mocked_target, mocked_disk) == expected
 

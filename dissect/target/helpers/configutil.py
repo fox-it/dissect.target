@@ -6,13 +6,12 @@ import logging
 import re
 import sys
 from collections import deque
-from collections.abc import ItemsView, Iterable, Iterator, KeysView
+from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Literal,
     TextIO,
 )
@@ -294,7 +293,7 @@ class CSVish(Default):
             columns = re.split(self.SEPARATOR, line, maxsplit=self.maxsplit)
 
             # keep unparsed lines separate (often env vars)
-            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns))
+            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns, strict=False))
 
             information_dict[str(i)] = data
 
