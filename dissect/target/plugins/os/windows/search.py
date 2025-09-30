@@ -4,8 +4,8 @@ import re
 import urllib.parse
 from typing import TYPE_CHECKING, Any, Union, get_args
 
-from dissect.esedb import EseDB
-from dissect.sql import SQLite3
+from dissect.database.ese import ESE
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import FilesystemError, UnsupportedPluginError
@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    from dissect.esedb.record import Record as EseDBRecord
-    from dissect.esedb.table import Table as EseDBTable
+    from dissect.database.ese.record import Record as EseRecord
+    from dissect.database.ese.table import Table as EseTable
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -69,14 +69,14 @@ class SearchIndexPlugin(Plugin):
     SYSTEM_PATHS = (
         # Windows 11 22H2 (SQLite3)
         "sysvol/ProgramData/Microsoft/Search/Data/Applications/Windows/Windows.db",
-        # Windows Vista and Windows 10 (EseDB)
+        # Windows Vista and Windows 10 (ESE)
         "sysvol/ProgramData/Microsoft/Search/Data/Applications/Windows/Windows.edb",
-        # Windows XP (EseDB)
+        # Windows XP (ESE)
         "sysvol/Documents and Settings/All Users/Application Data/Microsoft/Search/Data/Applications/Windows/Windows.edb",  # noqa: E501
     )
 
     USER_PATHS = (
-        # Windows 10 Server Roaming (EseDB / SQLite)
+        # Windows 10 Server Roaming (ESE / SQLite3)
         "AppData/Roaming/Microsoft/Search/Data/Applications/S-1-*/*.*db",
     )
 
@@ -120,7 +120,7 @@ class SearchIndexPlugin(Plugin):
     def search(self) -> Iterator[SearchIndexRecords]:
         """Yield Windows Search Index records.
 
-        Parses ``Windows.edb`` EseDB and ``Windows.db`` SQLite3 databases. Currently does not parse
+        Parses ``Windows.edb`` ESE and ``Windows.db`` SQLite3 databases. Currently does not parse
         ``GatherLogs/SystemIndex/SystemIndex.*.(Crwl|gthr)`` files or ``Windows-gather.db`` and ``Windows-usn.db`` files.
 
         Windows Search is a standard component of Windows 7 and Windows Vista, and is enabled by default. The standard (non-Windows Server)
@@ -154,10 +154,10 @@ class SearchIndexPlugin(Plugin):
                 self.target.log.warning("Unknown Windows Search Index database file %r", db_path)
 
     def parse_esedb(self, path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
-        """Parse the EseDB ``SystemIndex_PropertyStore`` table."""
+        """Parse the ESE ``SystemIndex_PropertyStore`` table."""
 
         with path.open("rb") as fh:
-            db = EseDB(fh)
+            db = ESE(fh)
             table = db.table("SystemIndex_PropertyStore")
 
             for record in table.records():
@@ -277,7 +277,7 @@ class SearchIndexPlugin(Plugin):
 
 
 class TableRecord:
-    def __init__(self, table: EseDBTable, record: EseDBRecord):
+    def __init__(self, table: EseTable, record: EseRecord):
         self.table = table
         self.record = record
 
