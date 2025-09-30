@@ -16,7 +16,7 @@ from getpass import getpass
 from pathlib import Path
 from struct import pack, unpack_from
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from dissect.util.stream import AlignedStream
 
@@ -26,7 +26,7 @@ from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 

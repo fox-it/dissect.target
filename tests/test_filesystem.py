@@ -1128,14 +1128,13 @@ def test_mapped_file_stat(mapped_file: MappedFile) -> None:
     with (
         patch("dissect.target.helpers.fsutil.stat_result.copy", autospec=True) as stat_copy,
         patch("pathlib.Path.stat", autospec=True, return_value=mock_stat) as path_stat,
-        patch("pathlib.Path.lstat", autospec=True, return_value=mock_stat) as path_lstat,
     ):
         mapped_file.stat(follow_symlinks=False)
-        path_lstat.assert_called_with(pathlib.Path(mapped_file.entry))
+        path_stat.assert_called_with(pathlib.Path(mapped_file.entry), follow_symlinks=False)
         stat_copy.assert_called_with(mock_stat)
 
         mapped_file.stat(follow_symlinks=True)
-        path_stat.assert_called_with(pathlib.Path(mapped_file.entry))
+        path_stat.assert_called_with(pathlib.Path(mapped_file.entry), follow_symlinks=True)
         stat_copy.assert_called_with(mock_stat)
 
 

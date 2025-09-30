@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tarfile
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -11,6 +11,7 @@ from dissect.target.loaders.ova import OvaLoader
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 

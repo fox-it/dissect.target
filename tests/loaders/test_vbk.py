@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
@@ -17,6 +17,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 
@@ -61,7 +62,7 @@ def test_loader(path: str, disk_sizes: list[int]) -> None:
     t = Target()
     loader.map(t)
     assert len(t.disks) == len(disk_sizes)
-    for disk, size in zip(sorted(t.disks, key=lambda disk: disk.size), sorted(disk_sizes)):
+    for disk, size in zip(sorted(t.disks, key=lambda disk: disk.size), sorted(disk_sizes), strict=False):
         assert disk.size == size
 
 
