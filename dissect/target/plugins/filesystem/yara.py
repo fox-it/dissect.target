@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",
     [
-        ("datetime", "ts"),
+        ("datetime", "ts_mtime"),
         ("path", "path"),
         ("string", "rule"),
         ("string[]", "matches"),
@@ -100,7 +100,7 @@ class YaraPlugin(Plugin):
                             string_matches.extend(f"{string}={instance}" for instance in string.instances)
 
                         yield YaraMatchRecord(
-                            ts=file.stat().st_mtime,
+                            ts_mtime=file.stat().st_mtime,
                             path=self.target.fs.path(file.path),
                             rule=match.rule,
                             matches=string_matches,
