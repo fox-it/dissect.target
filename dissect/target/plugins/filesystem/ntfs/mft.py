@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from flow.record.fieldtypes import windows_path
@@ -18,7 +18,7 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.ntfs import MftRecord
     from dissect.ntfs.attr import Attribute, FileName, StandardInformation

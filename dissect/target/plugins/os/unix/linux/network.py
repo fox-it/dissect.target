@@ -348,7 +348,7 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 class DhclientLeaseParser(LinuxNetworkConfigParser):
     """Parse network interfaces from dhclient DHCP ``.leases`` files.
 
-    Resources:
+    References:
         - https://linux.die.net/man/5/dhclient.conf
     """
 
@@ -479,7 +479,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
             # Only add CIDR if not default route
             if (addr := be_hex_to_int(destination_hex)) != 0:
-                mask_bit_count = bin(be_hex_to_int(mask)).count("1")
+                mask_bit_count = be_hex_to_int(mask).bit_count()
                 route_interfaces.setdefault(iface_name, set()).add(ip_interface((addr, mask_bit_count)))
 
             # Add gateway if not 0.0.0.0

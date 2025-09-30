@@ -6,7 +6,7 @@ import traceback
 import urllib.parse
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import (
@@ -26,7 +26,7 @@ from dissect.target.loaders.direct import DirectLoader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from typing_extensions import Self
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-FunctionTuple = tuple[plugin.Plugin, Union[plugin.Plugin, property, None]]
+FunctionTuple = tuple[plugin.Plugin, plugin.Plugin | property | None]
 
 
 class Event(StrEnum):
@@ -396,7 +396,8 @@ class Target:
                     # For file/dir-like paths it's a Path object
                     target = cls._load(load_spec, ldr)
                 except Exception as e:
-                    getlogger(load_spec).error("Failed to load target with loader %s", ldr, exc_info=e)
+                    getlogger(load_spec).error("Failed to load target with loader %s", ldr)
+                    getlogger(load_spec).debug("", exc_info=e)
                     continue
                 else:
                     yield target
@@ -431,6 +432,11 @@ class Target:
             _, parsed_path = parse_path_uri(spec)
             if parsed_path is None or isinstance(spec, os.PathLike):
                 path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+                if not path.exists():
+                    raise TargetError(f"Failed to find loader for {path}: path does not exist")
+                elif not path.is_dir():
+                    raise TargetError(f"Failed to find loader for {path}: path is not a directory")
 
                 for entry in path.iterdir():
                     for target in _open_all(entry, include_children=include_children):
