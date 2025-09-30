@@ -795,7 +795,17 @@ class TargetCli(TargetCmd):
         if hasattr(stdout, "isatty") and stdout.isatty():
             use_color = True
 
-        print_ls(path, 0, stdout, args.l, args.human_readable, args.recursive, args.use_ctime, args.use_atime, color=use_color)
+        print_ls(
+            path,
+            0,
+            stdout,
+            args.l,
+            args.human_readable,
+            args.recursive,
+            args.use_ctime,
+            args.use_atime,
+            color=use_color,
+        )
         return False
 
     @arg("path", nargs="?")
