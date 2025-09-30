@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from flow.record import GroupedRecord, Record, RecordDescriptor, fieldtypes
 
@@ -70,7 +71,7 @@ def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
     with resolved_path.open() as fh:
         path_hash = common(fh)
 
-    type_info = zip(RECORD_TYPES, NAME_SUFFIXES, [resolved_path, path_hash])
+    type_info = zip(RECORD_TYPES, NAME_SUFFIXES, [resolved_path, path_hash], strict=False)
 
     return _create_modified_record("filesystem/file/digest", field_name, type_info)
 

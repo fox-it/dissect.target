@@ -42,9 +42,7 @@ typedef struct _REG_TZI_FORMAT {
 c_tz = cstruct().load(tz_def)
 
 
-# Althoug calendar.SUNDAY is only officially documented since Python 3.10, it
-# is present in Python 3.9, so we ignore the vermin warnings.
-SUNDAY = calendar.SUNDAY  # novermin
+SUNDAY = calendar.SUNDAY
 SundayFirstCalendar = calendar.Calendar(SUNDAY)
 
 

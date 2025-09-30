@@ -9,7 +9,7 @@ import json
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 import structlog
 
@@ -34,7 +34,7 @@ from flow.record.adapter.jsonfile import JsonfileWriter
 from flow.record.jsonpacker import JsonRecordPacker
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.plugin import FunctionDescriptor
     from dissect.target.target import Target

@@ -13,16 +13,11 @@ import logging
 import os
 import sys
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import chain, zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
-
-try:
-    from typing import TypeAlias  # novermin
-except ImportError:
-    # COMPAT: Remove this when we drop Python 3.9
-    TypeAlias = Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from flow.record import Record, RecordDescriptor
 
@@ -74,11 +69,8 @@ class OperatingSystem(StrEnum):
     WINDOWS = "windows"
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class PluginDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("exports", "findable", "functions", "module", "namespace", "path", "qualname")
-
     module: str
     qualname: str
     namespace: str
@@ -92,23 +84,8 @@ class PluginDescriptor:
         return load(self)
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FunctionDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = (
-        "alias",
-        "exported",
-        "findable",
-        "internal",
-        "method_name",
-        "module",
-        "name",
-        "namespace",
-        "output",
-        "path",
-        "qualname",
-    )
-
     name: str
     namespace: str
     path: str
@@ -138,18 +115,13 @@ class FunctionDescriptor:
         return getattr(self.func, "__args__", [])
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FailureDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("module", "stacktrace")
-
     module: str
     stacktrace: list[str]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginDescriptorLookup:
     # All regular plugins
     # {"<module_path>": PluginDescriptor}
@@ -162,9 +134,7 @@ class PluginDescriptorLookup:
     __child__: dict[str, PluginDescriptor] = field(default_factory=dict)
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FunctionDescriptorLookup:
     # All regular plugins
     # {"<function_name>": {"<module_path>": FunctionDescriptor}}
@@ -180,9 +150,7 @@ class FunctionDescriptorLookup:
 _OSTree: TypeAlias = dict[str, "_OSTree"]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginRegistry:
     # Plugin descriptor lookup
     __plugins__: PluginDescriptorLookup = field(default_factory=PluginDescriptorLookup)
