@@ -8,7 +8,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -25,7 +25,7 @@ from dissect.target.filesystems.ntfs import NtfsFilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 
@@ -257,8 +257,8 @@ def path_fs() -> VirtualFilesystem:
     vfs.symlink("nonexistent", "/some/dir/link.txt")
     vfs.symlink("/some/dir/nested", "/some/dirlink")
     vfs.map_file_fh("/some/file.txt", io.BytesIO(b"content"))
-    vfs.map_file_fh("/some/dir/file.txt", io.BytesIO(b""))
-    vfs.map_file_fh("/some/dir/nested/file.txt", io.BytesIO(b""))
+    vfs.map_file_fh("/some/dir/file.txt", io.BytesIO())
+    vfs.map_file_fh("/some/dir/nested/file.txt", io.BytesIO())
 
     return vfs
 
@@ -563,33 +563,19 @@ def test_target_path_errors(path_fs: VirtualFilesystem) -> None:
         path_fs.path("symlink1/symlink2/symlink1").resolve()
 
     # This should raise from the final stat() call
-    if sys.version_info >= (3, 10):
-        assert [tb.name for tb in e.traceback[1:3]] == [
-            "resolve",
-            "stat",
-        ]
-    else:
-        # In 3.9 there's no difference between these two
-        assert [tb.name for tb in e.traceback[1:3]] == [
-            "resolve",
-            "resolve",
-        ]
+    assert [tb.name for tb in e.traceback[1:3]] == [
+        "resolve",
+        "stat",
+    ]
 
     with pytest.raises(SymlinkRecursionError) as e:
         path_fs.path("symlink1/symlink2/symlink1").resolve(strict=True)
 
     # This should raise from the inner realpath() call
-    if sys.version_info >= (3, 10):
-        assert [tb.frame.code.name for tb in e.traceback[1:3]] == [
-            "resolve",
-            "realpath",
-        ]
-    else:
-        # In 3.9 there's no difference between these two
-        assert [tb.frame.code.name for tb in e.traceback[1:3]] == [
-            "resolve",
-            "resolve",
-        ]
+    assert [tb.frame.code.name for tb in e.traceback[1:3]] == [
+        "resolve",
+        "realpath",
+    ]
 
     with pytest.raises(NotASymlinkError):
         path_fs.path("some/file.txt").readlink()
@@ -634,12 +620,8 @@ def test_target_path_not_implemented(path_fs: VirtualFilesystem) -> None:
     with pytest.raises(NotImplementedError):
         assert path_fs.path().symlink_to("foo")
 
-    if sys.version_info >= (3, 10):
-        with pytest.raises(NotImplementedError):
-            assert path_fs.path().hardlink_to("foo")
-    else:
-        with pytest.raises(NotImplementedError):
-            assert path_fs.path().link_to("foo")
+    with pytest.raises(NotImplementedError):
+        assert path_fs.path().hardlink_to("foo")
 
     with pytest.raises(NotImplementedError):
         assert path_fs.path().mkdir()
@@ -772,7 +754,7 @@ def test_reverse_readlines() -> None:
         ("🦊" * 8000) + ("a" * 200)
     ]
 
-    vfs.map_file_fh("empty", io.BytesIO(b""))
+    vfs.map_file_fh("empty", io.BytesIO())
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
 
     broken_content = (b"foobar\r\n" * 2) + (b"\xc2broken\r\n") + (b"barfoo\r\n" * 2)

@@ -5,6 +5,7 @@ import json
 import pytest
 
 from dissect.target.tools.info import main as target_info
+from tests._utils import absolute_path
 
 
 @pytest.mark.parametrize(
@@ -15,7 +16,7 @@ def test_target_info(
     capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, output_type: str, options: list
 ) -> None:
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-info", *options, "tests/_data/tools/info/image.tar"])
+        m.setattr("sys.argv", ["target-info", *options, str(absolute_path("_data/tools/info/image.tar"))])
 
         target_info()
         stdout, stderr = capsys.readouterr()
@@ -37,12 +38,13 @@ def test_target_info(
                 "timezone": "Europe/Amsterdam",
                 "install_date": "2024-07-02 12:00:56+00:00",
                 "last_activity": None,
+                "mounts": [{"fs": "virtual", "path": "/"}],
             }
 
         elif output_type == "record":
             assert (
                 stdout
-                == "<target/info hostname='ubuntu' domain=None last_activity=None install_date=2024-07-02 12:00:56+00:00 ips=[net.ipaddress('1.2.3.4')] os_family='linux' os_version='Ubuntu 22.04.4 LTS (Jammy Jellyfish)' architecture=None language=[] timezone='Europe/Amsterdam' disks=[] volumes=[] children=[]>\n"  # noqa: E501
+                == "<target/info hostname='ubuntu' domain=None last_activity=None install_date=2024-07-02 12:00:56+00:00 ips=[net.ipaddress('1.2.3.4')] os_family='linux' os_version='Ubuntu 22.04.4 LTS (Jammy Jellyfish)' architecture=None language=[] timezone='Europe/Amsterdam' disks=[] volumes=[] mounts=[\"{'fs': 'virtual', 'path': '/'}\"] children=[]>\n"  # noqa: E501
             )
 
         else:

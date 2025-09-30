@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import io
+import logging
+import platform
 import urllib.parse
 from collections import defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
@@ -10,18 +13,18 @@ import pytest
 
 from dissect.target import loader
 from dissect.target.containers.raw import RawContainer
-from dissect.target.exceptions import FilesystemError
+from dissect.target.exceptions import FilesystemError, TargetError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
 from dissect.target.target import DiskCollection, Event, Target, TargetLogAdapter, log
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from logging import Logger
-    from pathlib import Path
 
 
 class ErrorCounter(TargetLogAdapter):
@@ -284,7 +287,7 @@ def mocked_lin_volumes_fs() -> Iterator[tuple[Mock, Mock, Mock]]:
 
 
 def test_target_win_force_dirfs(mocked_win_volumes_fs: tuple[Mock, Mock, Mock]) -> None:
-    mock_good_volume, mock_bad_volume, mock_good_fs = mocked_win_volumes_fs
+    mock_good_volume, mock_bad_volume, _ = mocked_win_volumes_fs
 
     query = {"force-directory-fs": 1}
     target_query = urllib.parse.urlencode(query)
@@ -548,6 +551,31 @@ def test_vs_offset_0(target_bare: Target) -> None:
         assert len(target_bare.filesystems) == 1
 
 
+def test_empty_volume_log(target_bare: Target, caplog: pytest.LogCaptureFixture) -> None:
+    """Test whether we correctly log an undetectable filesystem warning."""
+    mock_volume = MagicMock()
+    mock_volume.fs = None
+    mock_volume.read = Mock(side_effect=lambda size: b"\x00" * size)
+
+    target_bare.volumes.add(mock_volume)
+
+    with caplog.at_level(logging.DEBUG, target_bare.log.name):
+        target_bare.volumes.apply()
+
+    assert "Skipping empty volume" in caplog.text
+    assert "Can't identify filesystem" not in caplog.text
+
+    # Now test that we do log a warning if the volume is not empty
+    mock_volume.read = Mock(side_effect=lambda size: b"\x01" * size)
+
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, target_bare.log.name):
+        target_bare.volumes.apply()
+
+    assert "Skipping empty volume" not in caplog.text
+    assert "Can't identify filesystem" in caplog.text
+
+
 @pytest.mark.parametrize("nr_of_fs", [1, 2])
 def test_fs_mount_others(target_unix: Target, nr_of_fs: int) -> None:
     for _ in range(nr_of_fs):
@@ -588,3 +616,157 @@ def test_children_on_invalid_target(caplog: pytest.LogCaptureFixture, tmp_path: 
             pass
 
     assert "Failed to load child target from None" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_open_uri(opener: Callable[[str | Path], Target]) -> None:
+    """Test that we can open a URI with a custom scheme."""
+
+    class MockLoader(loader.Loader):
+        def __init__(self, path: Path, parsed_path: urllib.parse.ParseResult | None = None):
+            super().__init__(path, parsed_path=parsed_path, resolve=False)
+
+        def map(self, target: Target) -> None:
+            target.filesystems.add(VirtualFilesystem())
+
+    with patch.dict(loader.LOADERS_BY_SCHEME, {"mock": MockLoader}):
+        path = "mock://user:password@example.com:1337/path/to/resource?query=1&other=2"
+        target = opener(path)
+
+        assert target.path == Path("example.com:1337/path/to/resource")
+        assert target.path_query == {"query": "1", "other": "2"}
+        assert isinstance(target._loader, MockLoader)
+        assert target._loader.parsed_path
+        assert target._loader.parsed_path.scheme == "mock"
+        assert target._loader.parsed_path.netloc == "user:password@example.com:1337"
+        assert target._loader.parsed_path.path == "/path/to/resource"
+        assert target._loader.parsed_path.query == "query=1&other=2"
+
+
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test")
+def test_open_uri_path(opener: Callable[[str | Path], Target], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "mock:").mkdir()
+    (tmp_path / "mock:" / "file").write_bytes(b"I'm a hard drive!")
+
+    monkeypatch.chdir(tmp_path)
+
+    # If we pass in a Path object, we should not parse it as a URI
+    target = opener(Path("mock:/file"))
+    assert target.path == Path("mock:/file")
+    assert isinstance(target._loader, RawLoader)
+    assert target._loader.path == Path("mock:/file")
+    assert target._loader.parsed_path is None
+
+    # If we pass it in as a string and we have no loader for it, it should still be treated as a local path
+    target = opener("mock:/file")
+    assert target.path == Path("mock:/file")
+    assert isinstance(target._loader, RawLoader)
+    assert target._loader.path == Path("mock:/file")
+    assert target._loader.parsed_path is None
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        pytest.param("", Path(), id="str-empty"),
+        # Empty path with query, could be the filename
+        pytest.param("?query=1", Path("?query=1"), id="str-empty-query"),
+        pytest.param("who-am-i?", Path("who-am-i?"), id="str-question-mark"),
+        # Normal relative file paths
+        pytest.param("Test", Path("Test"), id="str-relative"),
+        pytest.param("/Test", Path("/Test"), id="str-absolute"),
+        pytest.param("./Test", Path("./Test"), id="str-explicit-relative"),
+        # Windows drive letter path
+        pytest.param("C:\\Test", Path("C:\\Test"), id="str-drive-letter"),
+        # The "local" path is a special case because we use it for the local loader, but it should behave the same
+        pytest.param("local", Path("local"), id="str-local"),
+        # local path with query, still should be treated the same for consistency
+        pytest.param("local?query=1&other=2", Path("local?query=1&other=2"), id="str-local-query"),
+        # Normal absolute paths
+        pytest.param("/path/to/Test", Path("/path/to/Test"), id="str-absolute-directory"),
+        pytest.param(
+            "/path/to/Test?query=1&other=2", Path("/path/to/Test?query=1&other=2"), id="str-absolute-directory-query"
+        ),
+        pytest.param("C:\\path\\to\\Test", Path("C:\\path\\to\\Test"), id="str-drive-letter-directory"),
+        pytest.param("\\\\UNC\\share\\path\\to\\Test", Path("\\\\UNC\\share\\path\\to\\Test"), id="str-unc"),
+        # URI paths is where we start to see differences
+        pytest.param("uri://Example.com/path/to/Test", Path("Example.com/path/to/Test"), id="str-uri"),
+        pytest.param(
+            "uri://wing@SafeComputer.com:1337/path/to/Test",
+            Path("SafeComputer.com:1337/path/to/Test"),
+            id="str-uri-user",
+        ),
+        pytest.param(
+            "uri://user:password@Example.com:6969/path/to/Test",
+            Path("Example.com:6969/path/to/Test"),
+            id="str-uri-user-password",
+        ),
+        pytest.param(
+            "uri://Example.com/path/to/Test?query=1&other=2", Path("Example.com/path/to/Test"), id="str-uri-query"
+        ),
+        # Path objects should behave the same as strings, except that the type should be preserved
+        pytest.param(Path(), Path(), id="path-empty"),
+        pytest.param(Path("?query=1"), Path("?query=1"), id="path-empty-query"),
+        pytest.param(Path("who-am-i?"), Path("who-am-i?"), id="path-question-mark"),
+        pytest.param(Path("Test"), Path("Test"), id="path-relative"),
+        pytest.param(Path("/Test"), Path("/Test"), id="path-absolute"),
+        pytest.param(Path("./Test"), Path("./Test"), id="path-explicit-relative"),
+        pytest.param(Path("C:\\Test"), Path("C:\\Test"), id="path-drive-letter"),
+        pytest.param(Path("local"), Path("local"), id="path-local"),
+        pytest.param(Path("local?query=1&other=2"), Path("local?query=1&other=2"), id="path-local-query"),
+        pytest.param(Path("\\\\UNC\\share\\path\\to\\Test"), Path("\\\\UNC\\share\\path\\to\\Test"), id="path-unc"),
+        pytest.param(TargetPath(VirtualFilesystem(), ""), TargetPath(VirtualFilesystem(), ""), id="path-custom-empty"),
+        pytest.param(
+            TargetPath(VirtualFilesystem(), "Custom"),
+            TargetPath(VirtualFilesystem(), "Custom"),
+            id="path-custom-simple",
+        ),
+        pytest.param(
+            TargetPath(VirtualFilesystem(), "/sub/Custom"),
+            TargetPath(VirtualFilesystem(), "/sub/Custom"),
+            id="path-custom-directory",
+        ),
+    ],
+)
+def test_expected_path(path: str | Path, expected: Path) -> None:
+    """Test that ``target.path`` has the expected value for a given path."""
+    target = Target(path)
+
+    assert target.path == expected
+    if isinstance(path, Path):
+        assert type(target.path) is type(expected)
+
+
+def test_exception_invalid_path() -> None:
+    """Test if we throw small and neat error messages and not long stack traces when giving invalid path(s)."""
+
+    with pytest.raises(
+        TargetError,
+        match=r"Failed to initiate RawLoader for target [/\\]path[/\\]to[/\\]invalid.img: Provided target path does not exist",  # noqa: E501
+    ):
+        Target.open("/path/to/invalid.img")
+
+    with pytest.raises(
+        TargetError,
+        match=r"Failed to find loader for [/\\]path[/\\]to[/\\]invalid.img: path does not exist",
+    ):
+        next(Target.open_all("/path/to/invalid.img"))
+
+    with pytest.raises(
+        TargetError,
+        match=r"Failed to find any loader for targets: \['smb://invalid'\]",
+    ):
+        next(Target.open_all("smb://invalid"))

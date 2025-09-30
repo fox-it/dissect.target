@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import struct
+from itertools import chain
 from typing import TYPE_CHECKING
 
 from dissect.util.sid import read_sid
@@ -183,14 +184,14 @@ class GenericPlugin(Plugin):
         last_seen = 0
 
         try:
-            for f in self.target.fs.scandir("sysvol/windows/system32/winevt/logs"):
+            for f in self.target.resolve("%windir%/system32/winevt/logs").iterdir():
                 if f.stat().st_mtime > last_seen:
                     last_seen = f.stat().st_mtime
         except Exception as e:
             self.target.log.debug("Could not determine last activity", exc_info=e)
 
         try:
-            for f in self.target.fs.scandir("sysvol/windows/system32/config"):
+            for f in self.target.resolve("%windir%/system32/config").iterdir():
                 if f.stat().st_mtime > last_seen:
                     last_seen = f.stat().st_mtime
         except Exception as e:
@@ -561,17 +562,16 @@ class GenericPlugin(Plugin):
             pass
 
     @export(record=ComputerSidRecord)
-    def sid(self) -> Iterator[ComputerSidRecord]:
-        """Return the machine- and optional domain SID of the system."""
+    def machine_sid(self) -> Iterator[ComputerSidRecord]:
+        """Return the machine SID of the system."""
 
         try:
             key = self.target.registry.key("HKLM\\SAM\\SAM\\Domains\\Account")
 
             # The machine SID is stored in the last 12 bytes of the V value as little-endian
-            # The machine SID differs from a 'normal' binary SID as only holds 3 values and lacks a prefix / Revision
+            # The machine SID differs from a 'normal' binary SID as it only holds 3 values and lacks a prefix / Revision
             # NOTE: Consider moving this to dissect.util.sid if we encounter this more often
             sid = struct.unpack_from("<III", key.value("V").value, -12)
-
             yield ComputerSidRecord(
                 ts=key.timestamp,
                 sidtype="Machine",
@@ -579,7 +579,15 @@ class GenericPlugin(Plugin):
                 _target=self.target,
             )
         except (RegistryError, struct.error):
-            pass
+            self.target.log.exception("Cannot read machine SID from registry")
+            return None
+
+    @export(record=ComputerSidRecord)
+    def domain_sid(self) -> Iterator[ComputerSidRecord]:
+        """Return the domain SID of the system.
+
+        The domain SID is stored in the registry under HKLM\\SECURITY\\Policy\\PolMachineAccountS.
+        """
 
         try:
             key = self.target.registry.key("HKLM\\SECURITY\\Policy\\PolMachineAccountS")
@@ -592,4 +600,11 @@ class GenericPlugin(Plugin):
                 _target=self.target,
             )
         except (RegistryError, struct.error):
-            pass
+            self.target.log.exception("Cannot read domain SID from registry")
+            return None
+
+    @export(record=ComputerSidRecord)
+    def sid(self) -> Iterator[ComputerSidRecord]:
+        """Return the machine- and optional domain SID of the system."""
+
+        yield from chain(self.machine_sid(), self.domain_sid())

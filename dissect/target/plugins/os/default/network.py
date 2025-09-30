@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from operator import attrgetter
-from typing import TYPE_CHECKING, Any, Callable, Union, get_args
+from typing import TYPE_CHECKING, Any, Union, get_args
 
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
 
@@ -13,10 +13,11 @@ from dissect.target.helpers.record import (
 from dissect.target.plugin import Plugin, export, internal
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
-InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]
+
+InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]  # noqa: UP007
 
 
 class NetworkPlugin(Plugin):

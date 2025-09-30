@@ -9,7 +9,7 @@ import json
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 import structlog
 
@@ -34,7 +34,7 @@ from flow.record.adapter.jsonfile import JsonfileWriter
 from flow.record.jsonpacker import JsonRecordPacker
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.plugin import FunctionDescriptor
     from dissect.target.target import Target
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
-class Compression(enum.Enum):
+class Compression(str, enum.Enum):
     """Supported compression types."""
 
     BZIP2 = "bzip2"
@@ -54,7 +54,7 @@ class Compression(enum.Enum):
     NONE = None
 
 
-class Serialization(enum.Enum):
+class Serialization(str, enum.Enum):
     """Supported serialization methods."""
 
     JSONLINES = "jsonlines"

@@ -58,8 +58,8 @@ def main() -> int:
     parser.add_argument("-o", "--options", help="additional FUSE options")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(args)
 
     if not HAS_FUSE:
         log.error("fusepy is not installed: pip install fusepy")
@@ -96,7 +96,8 @@ def main() -> int:
     for i, fs in enumerate(t.filesystems):
         volumes = fs.volume if isinstance(fs.volume, list) else [fs.volume]
         for volume in volumes:
-            fname = f"filesystems/{vnames[volume] if volume else f'fs_{i}'}"
+            default_name = f"fs_{i}"
+            fname = f"filesystems/{vnames.get(volume, default_name) if volume else default_name}"
             vfs.mount(fname, fs)
 
     # This is kinda silly because fusepy will convert this back into string arguments

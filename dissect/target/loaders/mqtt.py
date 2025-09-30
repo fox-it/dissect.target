@@ -16,9 +16,8 @@ from getpass import getpass
 from pathlib import Path
 from struct import pack, unpack_from
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
-import paho.mqtt.client as mqtt
 from dissect.util.stream import AlignedStream
 
 from dissect.target.containers.raw import RawContainer
@@ -27,9 +26,16 @@ from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
+
+try:
+    import paho.mqtt.client as mqtt
+
+    HAS_PAHO = True
+except ImportError:
+    HAS_PAHO = False
 
 log = logging.getLogger(__name__)
 
@@ -298,6 +304,9 @@ class Broker:
         self.username = username
         self.password = password
         self.command = kwargs.get("command")
+
+        if not HAS_PAHO:
+            raise ImportError("Required dependency 'paho' is missing, install with 'pip install dissect.target[mqtt]'")
 
     def clear_cache(self) -> None:
         self.index = {}

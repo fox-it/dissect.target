@@ -46,7 +46,7 @@ class SnapPlugin(Plugin):
         Reads information from installed SquashFS ``*.snap`` files found in ``/var/lib/snapd/snaps``.
         Logs of the ``snapd`` daemon can be parsed using the ``journal`` or ``syslog`` plugins.
 
-        Resources:
+        References:
             - https://github.com/canonical/snapcraft
             - https://en.wikipedia.org/wiki/Snap_(software)
 

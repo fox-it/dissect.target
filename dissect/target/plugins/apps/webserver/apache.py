@@ -286,7 +286,7 @@ class ApachePlugin(WebserverPlugin):
 
         Apache / Httpd directives are case-insensitive which is why we convert lines to lowercase for pattern matching.
 
-        Resources:
+        References:
             - https://httpd.apache.org/docs/2.4/en/configuring.html#syntax
         """
         seen = set() if seen is None else seen
@@ -442,7 +442,7 @@ class ApachePlugin(WebserverPlugin):
                 log = match.groupdict()
                 remote_ip = log.get("client")
                 if remote_ip and ":" in remote_ip:
-                    remote_ip, _, port = remote_ip.rpartition(":")
+                    remote_ip, _, _ = remote_ip.rpartition(":")
                 error_source = log.get("error_source")
                 error_code = log.get("error_code")
 
@@ -473,10 +473,11 @@ class ApachePlugin(WebserverPlugin):
                 self.target.log.warning("An error occured parsing Apache log file %s: %s", path, str(e))
                 self.target.log.debug("", exc_info=e)
 
+    @export(record=WebserverHostRecord)
     def hosts(self) -> Iterator[WebserverHostRecord]:
         """Return found ``VirtualHost`` directives in the Apache configuration.
 
-        Resources:
+        References:
             - https://httpd.apache.org/docs/2.4/mod/core.html#virtualhost
         """
 

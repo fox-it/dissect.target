@@ -13,21 +13,16 @@ import logging
 import os
 import sys
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from itertools import zip_longest
+from itertools import chain, zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
-
-try:
-    from typing import TypeAlias  # novermin
-except ImportError:
-    # COMPAT: Remove this when we drop Python 3.9
-    TypeAlias = Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from flow.record import Record, RecordDescriptor
 
 import dissect.target.plugins.os.default as default
-from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import EmptyRecord
@@ -74,11 +69,8 @@ class OperatingSystem(StrEnum):
     WINDOWS = "windows"
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class PluginDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("exports", "findable", "functions", "module", "namespace", "path", "qualname")
-
     module: str
     qualname: str
     namespace: str
@@ -92,23 +84,8 @@ class PluginDescriptor:
         return load(self)
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FunctionDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = (
-        "alias",
-        "exported",
-        "findable",
-        "internal",
-        "method_name",
-        "module",
-        "name",
-        "namespace",
-        "output",
-        "path",
-        "qualname",
-    )
-
     name: str
     namespace: str
     path: str
@@ -116,7 +93,7 @@ class FunctionDescriptor:
     internal: bool
     findable: bool
     alias: bool
-    output: str | None
+    output: str
     method_name: str
     module: str
     qualname: str
@@ -138,18 +115,13 @@ class FunctionDescriptor:
         return getattr(self.func, "__args__", [])
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FailureDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("module", "stacktrace")
-
     module: str
     stacktrace: list[str]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginDescriptorLookup:
     # All regular plugins
     # {"<module_path>": PluginDescriptor}
@@ -162,9 +134,7 @@ class PluginDescriptorLookup:
     __child__: dict[str, PluginDescriptor] = field(default_factory=dict)
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FunctionDescriptorLookup:
     # All regular plugins
     # {"<function_name>": {"<module_path>": FunctionDescriptor}}
@@ -180,9 +150,7 @@ class FunctionDescriptorLookup:
 _OSTree: TypeAlias = dict[str, "_OSTree"]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginRegistry:
     # Plugin descriptor lookup
     __plugins__: PluginDescriptorLookup = field(default_factory=PluginDescriptorLookup)
@@ -417,10 +385,6 @@ class Plugin:
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
-        # Do not register the "base" subclasses defined in this file
-        if cls.__module__ != Plugin.__module__:
-            register(cls)
-
         record_descriptors = _get_descriptors_on_nonprivate_methods(cls)
         cls.__record_descriptors__ = record_descriptors
         # This is a bit tricky currently
@@ -429,8 +393,26 @@ class Plugin:
         # This allows this to work, otherwise the Plugin.__call__ would get all the plugin attributes set on it
         cls.__call__ = export(output="record", record=record_descriptors, cache=False, cls=cls)(cls.__call__)
 
+        # Do not register the "base" subclasses defined in this file
+        if cls.__module__ != Plugin.__module__:
+            register(cls)
+
     def __init__(self, target: Target):
         self.target = target
+
+    def __getattr__(self, name: str, /) -> Any:
+        # "Magic" attribute access is only allowed on namespace plugins, to allow for indirect nesting of namespaces
+        # E.g. `__namespace__ = "foo.bar"`, we should try to resolve `bar` on a plugin instance of `foo`
+        if not self.__namespace__:
+            raise AttributeError(name)
+
+        # Attempt to lookup the attribute using the namespace
+        try:
+            _, func = self.target.get_function(f"{self.__class__.__namespace__}.{name}")
+        except PluginNotFoundError:
+            raise AttributeError(name)
+
+        return func
 
     def is_compatible(self) -> bool:
         """Perform a compatibility check with the target."""
@@ -578,7 +560,7 @@ def register(plugincls: type[Plugin]) -> None:
                         internal=internal,
                         findable=plugincls.__findable__,
                         alias=name in getattr(attr, "__aliases__", []),
-                        output=getattr(attr, "__output__", None),
+                        output=getattr(attr, "__output__", "none"),
                         method_name=attr.__name__,
                         module=plugincls.__module__,
                         qualname=plugincls.__qualname__,
@@ -603,7 +585,7 @@ def register(plugincls: type[Plugin]) -> None:
                 internal=len(functions) != 0 and len(exports) == 0,
                 findable=plugincls.__findable__,
                 alias=False,
-                output=getattr(plugincls.__call__, "__output__", None),
+                output=getattr(plugincls.__call__, "__output__", "none"),
                 method_name="__call__",
                 module=plugincls.__module__,
                 qualname=plugincls.__qualname__,
@@ -671,15 +653,19 @@ def _module_path(cls: type[Plugin] | str) -> str:
     return module.replace(MODULE_PATH, "").lstrip(".")
 
 
+@functools.lru_cache(256)
 def _os_match(osfilter: type[OSPlugin], module_path: str) -> bool:
     """Check if the a plugin is compatible with the given OS filter."""
-    if issubclass(osfilter, default._os.DefaultOSPlugin):
+    module_parts = module_path.split(".")
+
+    # DefaultOSPlugin is "compatible" with everything, even other `os.*` modules (except `_os`)
+    if issubclass(osfilter, default._os.DefaultOSPlugin) and (len(module_parts) < 2 or module_parts[-2] != "_os"):
         return True
 
     os_parts = _module_path(osfilter).split(".")[:-1]
 
     obj = _get_plugins().__ostree__
-    for plugin_part, os_part in zip_longest(module_path.split("."), os_parts):
+    for plugin_part, os_part in zip_longest(module_parts, os_parts):
         if plugin_part not in obj:
             break
 
@@ -778,7 +764,7 @@ def lookup(
         value for key, value in function_index.items() if osfilter is None or _os_match(osfilter, key)
     )
 
-    yield from sorted(entries, key=lambda x: x.module.count("."), reverse=True)
+    yield from sorted(entries, key=lambda desc: desc.module.count("."), reverse=True)
 
 
 def load(desc: FunctionDescriptor | PluginDescriptor) -> type[Plugin]:
@@ -822,16 +808,18 @@ def failed() -> list[FailureDescriptor]:
 
 
 @functools.cache
-def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
-    """Generate a dictionary of all long paths to their function descriptors."""
-    paths = {}
-    for value in _get_plugins().__functions__.__regular__.values():
-        for descriptor in value.values():
-            # Namespace plugins are callable so exclude the explicit __call__ method
-            if descriptor.method_name == "__call__":
-                continue
+def _generate_long_paths(os_filter: type[OSPlugin]) -> dict[str, list[FunctionDescriptor]]:
+    """Generate a dictionary of all long paths to their function descriptors for the given functions."""
+    __regular__ = functions(os_filter, index="__regular__")
+    __os__ = functions(os_filter, index="__os__")
 
-            paths.setdefault(descriptor.path, []).append(descriptor)
+    paths = {}
+    for descriptor in chain(__regular__, __os__):
+        # Namespace plugins are callable so exclude the explicit __call__ method
+        if descriptor.method_name == "__call__":
+            continue
+
+        paths.setdefault(descriptor.path, []).append(descriptor)
 
     return paths
 
@@ -870,23 +858,18 @@ def find_functions(
         exact_os_match = pattern in os_functions
 
         if exact_match or exact_os_match:
-            if matches := list(_filter_exact_match(pattern, os_filter, exact_match, exact_os_match)):
-                found.extend(matches)
-            else:
-                invalid_functions.add(pattern)
+            matches = list(_filter_exact_match(pattern, os_filter, "__os__" if exact_os_match else "__regular__"))
         else:
             # If we don't have an exact function match, do a slower treematch
-            if matches := list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden)):
-                found.extend(matches)
-            else:
-                invalid_functions.add(pattern)
+            matches = list(_filter_tree_match(pattern, os_filter, show_hidden=show_hidden))
 
-    if compatibility and target is not None:
-        result = list(_filter_compatible(found, target, ignore_load_errors))
-    else:
-        result = found
+        if matches:
+            found.extend(matches)
+        else:
+            invalid_functions.add(pattern)
 
-    return result, invalid_functions
+    result = _filter_compatible(found, target, ignore_load_errors) if compatibility and target is not None else found
+    return list(result), invalid_functions
 
 
 def find_functions_by_record_field_type(
@@ -927,22 +910,19 @@ def find_functions_by_record_field_type(
 
 
 def _filter_exact_match(
-    pattern: str, os_filter: str, exact_match: bool, exact_os_match: bool
+    pattern: str,
+    os_filter: type[OSPlugin] | None,
+    index: str = "__regular__",
 ) -> Iterator[FunctionDescriptor]:
-    if exact_match:
-        descriptors = lookup(pattern, os_filter)
-    elif exact_os_match:
-        descriptors = lookup(pattern, os_filter, index="__os__")
-
-    for descriptor in descriptors:
-        if not descriptor.exported:
-            continue
-
-        yield descriptor
+    descriptors = lookup(pattern, os_filter, index=index)
+    yield from (descriptor for descriptor in descriptors if descriptor.exported)
 
 
-def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) -> Iterator[FunctionDescriptor]:
-    path_lookup = _generate_long_paths()
+def _filter_tree_match(
+    pattern: str, os_filter: type[OSPlugin] | None, show_hidden: bool = False
+) -> Iterator[FunctionDescriptor]:
+    """Perform a slow tree match on all ``__regular__`` and ``__os__`` :class:`FunctionDescriptor` instances."""
+    path_lookup = _generate_long_paths(os_filter)
 
     # Change the treematch pattern into an fnmatch-able pattern to give back all functions from the sub-tree
     # (if there is a subtree).
@@ -956,17 +936,16 @@ def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) 
     if not has_glob_magic(pattern):
         search_pattern += "*"
 
+    result: list[FunctionDescriptor] = []
     for path in fnmatch.filter(path_lookup.keys(), search_pattern):
         for descriptor in path_lookup[path]:
             # Skip plugins that don't want to be found by wildcards
             if not descriptor.exported or (not show_hidden and not descriptor.findable):
                 continue
 
-            # Skip plugins that do not match our OS
-            if os_filter and not _os_match(os_filter, descriptor.path):
-                continue
+            result.append(descriptor)
 
-            yield descriptor
+    yield from sorted(result, key=lambda desc: desc.module.count("."), reverse=True)
 
 
 def _filter_compatible(
@@ -993,12 +972,20 @@ def _filter_compatible(
             raise
 
         try:
-            if plugincls(target).is_compatible():
+            if issubclass(plugincls, OSPlugin):
+                if issubclass(target._os_plugin, plugincls):
+                    compatible.add(descriptor.qualname)
+                    yield descriptor
+                else:
+                    incompatible.add(descriptor.qualname)
+                    continue
+            elif plugincls(target).is_compatible():
                 compatible.add(descriptor.qualname)
                 yield descriptor
+            else:
+                incompatible.add(descriptor.qualname)
         except Exception:
             incompatible.add(descriptor.qualname)
-            continue
 
 
 def generate() -> dict[str, Any]:
@@ -1257,6 +1244,34 @@ class OSPlugin(Plugin):
             A slug of the OS name, e.g. 'windows' or 'linux'.
         """
         raise NotImplementedError
+
+    @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        """Yields miscellaneous user paths and user keys.
+
+        Example:
+            ("c:/Windows/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
+        """
+
+        # Consider moving this to the UsersPlugin class, and create separate UsersPlugin subclasses for each OS
+        # when the machinery concerning users and user_paths becomes more complex.
+        raise NotImplementedError
+
+    @internal
+    def os_tree(self) -> list[str]:
+        """Returns the :func:`os` value of this and all the OS plugin parents."""
+        result: list[str] = []
+        for klass in self.__class__.mro():
+            if not issubclass(klass, OSPlugin):
+                # In case the plugin extends multiple different classes.
+                continue
+
+            if klass is OSPlugin:
+                break
+
+            result.append(klass.os.__get__(self))
+        # dicts maintain insertion order, we use it here to get rid of duplicates
+        return list(dict.fromkeys(result))
 
     @export(property=True)
     def architecture(self) -> str | None:

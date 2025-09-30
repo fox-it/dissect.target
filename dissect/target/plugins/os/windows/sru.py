@@ -234,7 +234,7 @@ SdpNetworkProviderRecord = TargetRecordDescriptor(
     ],
 )
 
-SRURecord = Union[
+SRURecord = Union[  # noqa: UP007
     NetworkDataRecord,
     NetworkConnectivityRecord,
     EnergyEstimatorRecord,
@@ -249,7 +249,6 @@ SRURecord = Union[
     SdpCpuProviderRecord,
     SdpNetworkProviderRecord,
 ]
-
 FIELD_MAPPINGS = {
     "ActiveAcTime": "active_ac_time",
     "ActiveDcTime": "active_dc_time",
@@ -385,7 +384,7 @@ class SRUPlugin(Plugin):
         super().__init__(target)
         self._sru = None
 
-        srupath = target.fs.path("sysvol/Windows/System32/sru/SRUDB.dat")
+        srupath = target.resolve("%windir%/System32/sru/SRUDB.dat")
         if srupath.exists():
             try:
                 self._sru = sru.SRU(srupath.open())
@@ -410,7 +409,7 @@ class SRUPlugin(Plugin):
 
         for entry in self._sru.get_table_entries(table=table):
             values = (entry[name] for name in columns)
-            column_values = zip(columns, values)
+            column_values = zip(columns, values, strict=False)
 
             record_values = {}
             for column, value in column_values:

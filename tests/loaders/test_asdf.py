@@ -1,24 +1,49 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
+import pytest
+
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.asdf import AsdfLoader
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from dissect.target.target import Target
+    from collections.abc import Callable
+    from pathlib import Path
 
 
-def test_asdf_loader_metadata(target_bare: Target) -> None:
-    asdf_path = Path(absolute_path("_data/loaders/asdf/metadata.asdf"))
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+    """Test that we correctly use ``AsdfLoader`` when opening a ``Target``."""
+    path = absolute_path("_data/loaders/asdf/metadata.asdf")
 
-    loader = AsdfLoader(asdf_path)
-    loader.map(target_bare)
+    with patch("dissect.target.target.Target.apply"):
+        target = opener(path)
+        assert isinstance(target._loader, AsdfLoader)
+        assert target.path == path
 
-    assert len(target_bare.filesystems) == 0
 
-    assert list(map(str, target_bare.fs.path("/").rglob("*"))) == [
+def test_loader_metadata() -> None:
+    """Test the ASDF loader with metadata."""
+    path = absolute_path("_data/loaders/asdf/metadata.asdf")
+
+    loader = loader_open(path)
+    assert isinstance(loader, AsdfLoader)
+
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 0
+
+    assert list(map(str, t.fs.path("/").rglob("*"))) == [
         "/$asdf$",
         "/$asdf$/file_1",
         "/$asdf$/dir",

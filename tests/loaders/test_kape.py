@@ -1,18 +1,22 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+import pytest
+
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.kape import KapeLoader
+from dissect.target.target import Target
 from tests._utils import absolute_path, mkdirs
 
 if TYPE_CHECKING:
-    from dissect.target.target import Target
+    from collections.abc import Callable
+    from pathlib import Path
 
 
-@patch("dissect.target.filesystems.dir.DirectoryFilesystem.ntfs", None, create=True)
-def test_kape_dir_loader(target_bare: Target, tmp_path: Path) -> None:
+@pytest.fixture
+def mock_kape_dir(tmp_path: Path) -> Path:
     root = tmp_path
     mkdirs(root, ["C/windows/system32", "C/$Extend", "D/test", "E/test"])
 
@@ -28,32 +32,56 @@ def test_kape_dir_loader(target_bare: Target, tmp_path: Path) -> None:
     )
     (root / "C/$Extend/$J").write_bytes(data)
 
-    assert KapeLoader.detect(root)
+    return root
 
-    loader = KapeLoader(root)
-    loader.map(target_bare)
-    target_bare.apply()
 
-    assert "sysvol" in target_bare.fs.mounts
-    assert "c:" in target_bare.fs.mounts
-    assert "d:" in target_bare.fs.mounts
-    assert "e:" in target_bare.fs.mounts
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_kape_dir: Path) -> None:
+    """Test that we correctly use ``KapeLoader`` when opening a ``Target``."""
+    for path in [mock_kape_dir, absolute_path("_data/loaders/kape/test.vhdx")]:
+        target = opener(path)
+        assert isinstance(target._loader, KapeLoader)
+        assert target.path == path
+
+
+@patch("dissect.target.filesystems.dir.DirectoryFilesystem.ntfs", None, create=True)
+def test_dir(mock_kape_dir: Path) -> None:
+    """Test the ``KapeLoader`` with a directory."""
+    loader = loader_open(mock_kape_dir)
+    assert isinstance(loader, KapeLoader)
+
+    t = Target()
+    loader.map(t)
+    t.apply()
+
+    assert "sysvol" in t.fs.mounts
+    assert "c:" in t.fs.mounts
+    assert "d:" in t.fs.mounts
+    assert "e:" in t.fs.mounts
 
     # The 3 found drive letter directories + the fake NTFS filesystem
-    assert len(target_bare.filesystems) == 4
+    assert len(t.filesystems) == 4
     # The 3 found drive letters + sysvol + the fake NTFS filesystem at /$fs$
-    assert len(target_bare.fs.mounts) == 5
-    assert len(list(target_bare.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
+    assert len(t.fs.mounts) == 5
+    assert len(list(t.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
 
 
-def test_kape_vhdx_loader(target_bare: Target) -> None:
-    p = Path(absolute_path("_data/loaders/kape/test.vhdx"))
+def test_vhdx() -> None:
+    """Test the ``KapeLoader`` with a VHDX file."""
+    path = absolute_path("_data/loaders/kape/test.vhdx")
 
-    assert KapeLoader.detect(p)
+    loader = loader_open(path)
+    assert KapeLoader.detect(path)
 
-    loader = KapeLoader(p)
-    loader.map(target_bare)
-    target_bare.apply()
+    t = Target()
+    loader.map(t)
+    t.apply()
 
-    assert "sysvol" in target_bare.fs.mounts
-    assert "c:" in target_bare.fs.mounts
+    assert "sysvol" in t.fs.mounts
+    assert "c:" in t.fs.mounts

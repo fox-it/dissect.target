@@ -3,16 +3,16 @@ from __future__ import annotations
 import io
 import re
 import string
-from typing import TYPE_CHECKING, BinaryIO, Callable, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 if TYPE_CHECKING:
     import logging
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.helpers.record import TargetRecordDescriptor
 
 
-Needle = Union[bytes, re.Pattern]
+Needle = bytes | re.Pattern
 
 
 def find_needles(
@@ -24,8 +24,8 @@ def find_needles(
     lock_seek: bool = True,
     block_size: int = io.DEFAULT_BUFFER_SIZE,
     progress: Callable[[int], None] | None = None,
-) -> Iterator[tuple[bytes, int]]:
-    """Yields needles and their offsets found in provided byte stream.
+) -> Iterator[tuple[Needle, int, re.Match | None]]:
+    """Yields needles, their offsets and optional regex match found in provided byte stream.
 
     Args:
         fh: The byte stream to search for needles.
@@ -74,22 +74,22 @@ def find_needles(
         last_needle_pos = -1
         last_needle_end = 0
         while True:
-            needle_positions = [
-                (pos, needle)
-                for needle in needles
+            needle_positions = []
+
+            for needle in needles:
+                match = None
                 if (
                     pos := (match.start(0) if (match := needle.search(current_block, last_needle_pos + 1)) else -1)
                     if isinstance(needle, re.Pattern)
                     else current_block.find(needle, last_needle_pos + 1)
-                )
-                > -1
-            ]
+                ) > -1:
+                    needle_positions.append((pos, needle, match))
 
             if not needle_positions:
                 break
 
-            closest_needle_pos, closest_needle = min(needle_positions)
-            yield closest_needle, current_block_offset + closest_needle_pos
+            closest_needle_pos, closest_needle, match = min(needle_positions)
+            yield closest_needle, current_block_offset + closest_needle_pos, match
 
             last_needle_pos = closest_needle_pos
             last_needle_end = last_needle_pos + 1
@@ -112,8 +112,8 @@ def find_needle_chunks(
     chunk_reader: Callable[[BinaryIO, Needle, int, int], bytes] | None = None,
     lock_seek: bool = True,
     block_size: int = io.DEFAULT_BUFFER_SIZE,
-) -> Iterator[tuple[bytes, int, bytes]]:
-    """Yields tuples with an offset, a needle and a byte chunk found in provided byte stream.
+) -> Iterator[tuple[bytes, int, bytes, re.Match | None]]:
+    """Yields tuples with an offset, a needle, a byte chunk and optional regex match found in provided byte stream.
 
     Args:
         fh: The byte stream to search for needles.
@@ -126,8 +126,8 @@ def find_needle_chunks(
     chunk_reader = chunk_reader or _read_plain_chunk
 
     needles = list(needle_chunk_size_map.keys())
-    for needle, offset in find_needles(fh, needles, lock_seek=lock_seek, block_size=block_size):
-        yield (needle, offset, chunk_reader(fh, needle, offset, needle_chunk_size_map[needle]))
+    for needle, offset, match in find_needles(fh, needles, lock_seek=lock_seek, block_size=block_size):
+        yield (needle, offset, chunk_reader(fh, needle, offset, needle_chunk_size_map[needle]), match)
 
 
 def scrape_chunks(
@@ -159,7 +159,7 @@ def scrape_chunks(
         chunk_reader=chunk_reader or _read_plain_chunk,
     )
 
-    for needle, _, chunk in chunk_stream:
+    for needle, _, chunk, _ in chunk_stream:
         try:
             for record in chunk_parser(needle, chunk):
                 yield record

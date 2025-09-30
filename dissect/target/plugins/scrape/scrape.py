@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from collections import defaultdict
-from typing import TYPE_CHECKING, BinaryIO, Callable
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import MappingStream
 
@@ -11,7 +11,8 @@ from dissect.target.plugin import Plugin, internal
 from dissect.target.volume import EncryptedVolumeSystem, LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    import re
+    from collections.abc import Callable, Iterator
 
     from dissect.target.container import Container
     from dissect.target.helpers.record import TargetRecordDescriptor
@@ -115,8 +116,8 @@ class ScrapePlugin(Plugin):
         lock_seek: bool = True,
         block_size: int = io.DEFAULT_BUFFER_SIZE,
         progress: Callable[[Container | Volume, int, int], None] | None = None,
-    ) -> Iterator[tuple[Container | Volume, MappingStream, Needle, int]]:
-        """Yields needles and their offsets found in all disks and volumes of a target.
+    ) -> Iterator[tuple[Container | Volume, MappingStream, Needle, int, re.Match | None]]:
+        """Yields needles, their offsets and an optional regex match found in all disks and volumes of a target.
 
         Args:
             needles: The needle or list of needles to search for.
@@ -126,7 +127,7 @@ class ScrapePlugin(Plugin):
             progress: A function to call with the current disk, offset and size of the stream.
         """
         for disk, stream in self.create_streams():
-            for needle, offset in find_needles(
+            for needle, offset, match in find_needles(
                 stream,
                 needles,
                 lock_seek=lock_seek,
@@ -135,7 +136,7 @@ class ScrapePlugin(Plugin):
                 if progress
                 else None,
             ):
-                yield disk, stream, needle, offset
+                yield disk, stream, needle, offset, match
 
     @internal
     def scrape_chunks_from_disks(
@@ -182,7 +183,7 @@ class ScrapePlugin(Plugin):
         needle: Needle | None = None,
         needles: list[Needle] | None = None,
         block_size: int = io.DEFAULT_BUFFER_SIZE,
-    ) -> Iterator[tuple[BinaryIO, bytes, int]]:
+    ) -> Iterator[tuple[BinaryIO, bytes, int, re.Match | None]]:
         """Yields ``(bytestream, needle, offset)`` tuples, scraped from ``target.disks``.
 
         Args:
@@ -201,5 +202,5 @@ class ScrapePlugin(Plugin):
 
         for disk in self.target.disks:
             disk.seek(0)
-            for needle, offset in find_needles(disk, needles=needles, block_size=block_size):
-                yield disk, needle, offset
+            for needle, offset, match in find_needles(disk, needles=needles, block_size=block_size):
+                yield disk, needle, offset, match

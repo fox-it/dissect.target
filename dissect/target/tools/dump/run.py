@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.exceptions import FatalError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.target import Target
 from dissect.target.tools.dump.state import (
     DumpState,
@@ -27,9 +27,12 @@ from dissect.target.tools.dump.utils import (
 from dissect.target.tools.utils import (
     FunctionDescriptor,
     configure_generic_arguments,
+    configure_plugin_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
+    open_targets,
     process_generic_arguments,
+    process_plugin_arguments,
 )
 
 if TYPE_CHECKING:
@@ -45,7 +48,7 @@ log = structlog.get_logger("dissect.target.tools.dump.run")
 @dataclass
 class RecordStreamElement:
     target: Target
-    func: str
+    func: FunctionDescriptor
     record: Record
     end_pos: int | None = None
     sink_path: Path | None = None
@@ -56,7 +59,9 @@ def get_targets(targets: list[str]) -> Iterator[Target]:
     yield from Target.open_all(targets)
 
 
-def execute_function(target: Target, function: FunctionDescriptor) -> TargetRecordDescriptor:
+def execute_function(
+    target: Target, function: FunctionDescriptor, dry_run: bool, arguments: list[str]
+) -> Iterator[TargetRecordDescriptor]:
     """Execute function ``function`` on provided target ``target`` and return a generator
     with the records produced.
 
@@ -66,17 +71,33 @@ def execute_function(target: Target, function: FunctionDescriptor) -> TargetReco
     local_log = log.bind(func=function, target=target)
     local_log.debug("Function execution")
 
-    try:
-        output_type, target_attr, _ = execute_function_on_target(target, function)
-    except UnsupportedPluginError:
-        local_log.error("Function is not supported for target", exc_info=True)
-        return
-    except PluginError:
-        local_log.error("Plugin error while executing function for target", exc_info=True)
+    if dry_run:
+        print(f"  execute: {function.name} ({function.path})")
         return
 
-    if output_type != "record":
-        local_log.warn("Output format is not supported", output=output_type)
+    if function.output != "record":
+        local_log.info(
+            "Skipping target/func pair since its output type is not a record",
+            target=target.path,
+            func=function.name,
+        )
+        return
+    try:
+        _, target_attr = execute_function_on_target(target, function)
+    except UnsupportedPluginError as e:
+        local_log.error("Unsupported plugin for %s: %s", function.name, e.root_cause_str())
+        local_log.debug("%s", function, exc_info=e)
+        return
+    except PluginNotFoundError:
+        local_log.error("Cannot find plugin `%s`", function)
+        return
+    except FatalError as e:
+        e.emit_last_message(local_log.error)
+        sys.exit(1)
+    except Exception as e:
+        local_log.error("Exception while executing function %s (%s): %s", function.name, function.path, e)
+        local_log.debug("", exc_info=e)
+        local_log.debug("Function info: %s", function)
         return
 
     # no support for function-specific arguments
@@ -84,14 +105,14 @@ def execute_function(target: Target, function: FunctionDescriptor) -> TargetReco
 
     try:
         yield from result
-    except Exception:
-        local_log.error("Error while executing function", exc_info=True)
+    except Exception as e:
+        local_log.error("Error occurred while processing output of %s.%s: %s", function.qualname, function.name, e)
+        local_log.debug("", exc_info=e)
         return
 
 
 def produce_target_func_pairs(
     targets: Iterable[Target],
-    functions: str,
     state: DumpState,
 ) -> Iterator[tuple[Target, FunctionDescriptor]]:
     """Return a generator with target and function pairs for execution.
@@ -103,7 +124,7 @@ def produce_target_func_pairs(
         pairs_to_skip.update((str(sink.target_path), sink.func) for sink in state.finished_sinks)
 
     for target in targets:
-        for func_def in find_and_filter_plugins(functions, target):
+        for func_def in find_and_filter_plugins(state.functions, target, state.excluded_functions):
             if state and (target.path, func_def.name) in pairs_to_skip:
                 log.info(
                     "Skipping target/func pair since its marked as done in provided state",
@@ -112,17 +133,20 @@ def produce_target_func_pairs(
                     state=state.path,
                 )
                 continue
+
             yield (target, func_def)
             state.mark_as_finished(target, func_def.name)
 
 
-def execute_functions(target_func_stream: Iterable[tuple[Target, str]]) -> Iterator[RecordStreamElement]:
+def execute_functions(
+    target_func_stream: Iterable[tuple[Target, FunctionDescriptor]], dry_run: bool, arguments: list[str]
+) -> Iterator[RecordStreamElement]:
     """Execute a function on a target for target / function pairs in the stream.
 
     Returns a generator of ``RecordStreamElement`` objects.
     """
     for target, func in target_func_stream:
-        for record in execute_function(target, func):
+        for record in execute_function(target, func, dry_run, arguments):
             yield RecordStreamElement(target=target, func=func, record=record)
 
 
@@ -168,29 +192,18 @@ def persist_processing_state(
             yield element
 
 
-def execute_pipeline(
-    targets: list[str],
-    functions: str,
-    output_dir: Path,
-    serialization: Serialization,
-    compression: Compression | None = None,
-    restart: bool | None = False,
-    limit: int | None = None,
-) -> None:
-    """Run the record generation, processing and sinking pipeline."""
-
-    compression = compression or Compression.NONE
-
-    state = None if restart else load_state(output_dir=output_dir)
+def configure_state(args: argparse.Namespace) -> DumpState | None:
+    state = None if args.restart else load_state(output_dir=args.output)
 
     if state:
-        log.info("Resuming state", output=output_dir, state=state.path)
+        log.info("Resuming state", output=args.output, state=state.path)
 
         if (
-            state.serialization != serialization
-            or state.compression != compression
-            or state.functions != functions
-            or state.target_paths != targets
+            state.serialization != args.serialization
+            or state.compression != args.compression
+            or state.functions != args.function
+            or state.excluded_functions != args.excluded_functions
+            or state.target_paths != args.targets
         ):
             log.error(
                 "Configuration of the existing state conflicts with parameters provided",
@@ -198,30 +211,39 @@ def execute_pipeline(
                 state_compression=state.compression,
                 state_targets=state.target_paths,
                 state_functions=state.functions,
-                targets=targets,
-                functions=functions,
-                serialization=serialization,
-                compression=compression,
+                state_excluded_fucntions=state.excluded_functions,
+                targets=args.targets,
+                functions=args.function,
+                serialization=args.serialization,
+                compression=args.compression,
                 state_path=state.path,
             )
-            return
+            return None
     else:
         state = create_state(
-            output_dir=output_dir,
-            target_paths=targets,
-            functions=functions,
-            serialization=serialization,
-            compression=compression,
+            output_dir=args.output,
+            target_paths=args.targets,
+            functions=args.function,
+            excluded_functions=args.excluded_functions,
+            serialization=args.serialization,
+            compression=args.compression,
         )
-        log.info("New state created", restart=restart, state=state.path)
+        log.info("New state created", restart=args.restart, state=state.path)
 
-    targets_stream = get_targets(targets)
-    target_func_pairs_stream = produce_target_func_pairs(targets_stream, functions, state)
-    record_stream = execute_functions(target_func_pairs_stream)
+    return state
 
-    if limit:
-        record_stream = itertools.islice(record_stream, limit)
 
+def execute_pipeline(
+    state: DumpState,
+    targets: Iterator[Target],
+    dry_run: bool,
+    arguments: list[str],
+    limit: int | None = None,
+) -> None:
+    """Run the record generation, processing and sinking pipeline."""
+
+    target_func_pairs_stream = produce_target_func_pairs(targets, state)
+    record_stream = itertools.islice(execute_functions(target_func_pairs_stream, dry_run, arguments), limit)
     record_stream = sink_records(record_stream, state)
     record_stream = log_progress(record_stream)
     record_stream = persist_processing_state(record_stream, state)
@@ -232,34 +254,37 @@ def execute_pipeline(
     log.info("Pipeline has finished")
 
 
-def parse_arguments() -> argparse.Namespace:
+def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
-        add_help=True,
+        add_help=False,
     )
-    parser.add_argument("targets", metavar="TARGET", nargs="+", help="targets to load")
-    parser.add_argument("-f", "--function", required=True, help="one or more comma separated functions to execute")
+    parser.add_argument("targets", metavar="TARGET", nargs="*", help="targets to load")
+
+    configure_plugin_arguments(parser)
 
     parser.add_argument(
         "-c",
         "--compression",
         choices=[c.value for c in Compression if c is not Compression.NONE],
+        type=Compression,
         help="compression method",
+        default=Compression.NONE,
     )
     parser.add_argument(
         "--restart",
         action="store_true",
         help="restart the session and overwrite the state file if it exists",
     )
-
     parser.add_argument(
         "-s",
         "--serialization",
         choices=[s.value for s in Serialization],
-        default=Serialization.JSONLINES.value,
+        default=Serialization.JSONLINES,
+        type=Serialization,
         help="serialization method",
     )
     parser.add_argument(
@@ -271,25 +296,35 @@ def parse_arguments() -> argparse.Namespace:
         help="output directory",
     )
     parser.add_argument("--limit", type=int, help="limit number of records produced")
+
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    process_generic_arguments(args)
 
-    return args
+    if not args.function and ("-h" in rest or "--help" in rest):
+        parser.print_help()
+        parser.exit(0)
+
+    process_plugin_arguments(parser, args, rest)
+
+    return args, rest
 
 
 def main() -> None:
-    args = parse_arguments()
+    args, rest = parse_arguments()
 
     try:
+        state = configure_state(args)
+        if state is None:
+            # Error was already shown above, stopping execution
+            return
+        targets = open_targets(args)
         execute_pipeline(
-            targets=args.targets,
-            functions=args.function,
-            output_dir=args.output,
-            serialization=Serialization(args.serialization),
-            compression=Compression(args.compression),
-            restart=args.restart,
+            state=state,
+            targets=targets,
+            arguments=rest,
+            dry_run=args.dry_run,
             limit=args.limit,
         )
     except Exception:

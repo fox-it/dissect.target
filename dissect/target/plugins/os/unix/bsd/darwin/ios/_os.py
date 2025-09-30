@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 class IOSPlugin(DarwinPlugin):
     """Apple iOS plugin.
 
-    Resources:
+    References:
         - https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
         - https://corp.digitalcorpora.org/corpora/mobile/iOS17/
     """
