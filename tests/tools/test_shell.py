@@ -244,6 +244,38 @@ def test_target_cli_info(target_win: Target, capsys: pytest.CaptureFixture, monk
     assert all(key in captured.out for key in ["Hostname", "path", "Os"])
 
 
+def test_redirect_simple_ls(tmp_path: Path, target_win: Target, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(fsutils, "LS_COLORS", {"di": "\033[34m", "fi": "\033[0m"})
+    cli = TargetCli(target_win)
+    out_file = tmp_path / "ls_out.txt"
+    cli.onecmd(f"ls > {out_file}")
+    content = out_file.read_text()
+    # Should not contain color codes
+    assert "\033[" not in content
+    # Should contain expected output
+    assert "c:" in content
+    assert "sysvol" in content
+
+
+def test_redirect_pipe(tmp_path: Path, target_win: Target, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(fsutils, "LS_COLORS", {"di": "\033[34m", "fi": "\033[0m"})
+    cli = TargetCli(target_win)
+    out_file = tmp_path / "ls_grep_out.txt"
+    # Simulate a pipeline: ls | grep sysvol > out_file
+    cli.onecmd(f"ls | grep sysvol > {out_file}")
+    content = out_file.read_text()
+    assert "sysvol" in content
+    assert "\033[" not in content
+
+
+def test_redirect_syntax_error(target_win: Target, capsys: pytest.CaptureFixture) -> None:
+    cli = TargetCli(target_win)
+    # Redirect before pipe should fail
+    cli.onecmd("ls > out.txt | grep sysvol")
+    captured = capsys.readouterr()
+    assert "Syntax error" in captured.out
+
+
 @pytest.mark.parametrize(
     ("folders", "files", "save", "expected"),
     [
