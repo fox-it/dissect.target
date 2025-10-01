@@ -633,7 +633,8 @@ class SyslogConfigParser(LinuxNetworkConfigParser):
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
         parsers = [
             parse_ubuntu_cloud_init_dhcp_lease,
-            parse_network_manager_dhcp_lease,
+            parse_network_manager_dhcp_lease_old,
+            parse_network_manager_dhcp_lease_new,
             parse_networkd_dhcp_lease,
             parse_network_manager_centos_dhcp_lease,
             parse_debian_centos_dhclient_lease,
@@ -698,11 +699,22 @@ def parse_networkd_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
     return DhcpLease(name, ip_interface(interface), gateway_address) if interface else None
 
 
-def parse_network_manager_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
-    """Parse DHCP lease information from NetworkManager logs."""
+def parse_network_manager_dhcp_lease_old(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from NetworkManager logs old style."""
 
     # dhcp4 (eth0): option ip_address           => '10.13.37.1'
     if not (match := re.search(r"dhcp[46] \((\S+)\): option ip_address\s+=>\s+'(\S+)'", log_record.message)):
+        return None
+    name, interface = match.groups()
+
+    return DhcpLease(name, ip_interface(interface), None) if interface else None
+
+
+def parse_network_manager_dhcp_lease_new(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from NetworkManager logs new style."""
+
+    # dhcp4 (eth0): state changed new lease, address=10.13.37.1
+    if not (match := re.search(r"dhcp[46] \((\S+)\): state changed new lease, address=(\S+)", log_record.message)):
         return None
     name, interface = match.groups()
 

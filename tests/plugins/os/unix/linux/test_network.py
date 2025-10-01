@@ -345,11 +345,20 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
         (
             {
                 "name": "eth0",
+                "cidr": [ip_interface("10.13.37.1/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Jan  1 13:37:01 hostname NetworkManager[2]: <info>  [1600000000.0000] dhcp4 (eth0): state changed new lease, address=10.13.37.1",  # noqa: E501
+        ),
+        (
+            {
+                "name": "eth0",
                 "cidr": [ip_interface("10.13.37.2/24")],
                 "gateway": [ip_address("10.13.37.0")],
                 "source": "syslog",
             },
-            "Feb  2 13:37:02 test systemd-networkd[2]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0",
+            "Feb  2 13:37:02 test systemd-networkd[3]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0",
         ),
         (
             {
@@ -358,7 +367,7 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "gateway": [],
                 "source": "syslog",
             },
-            "Mar  3 13:37:03 localhost NetworkManager[3]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3",
+            "Mar  3 13:37:03 localhost NetworkManager[4]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3",
         ),
         (
             {
@@ -367,7 +376,7 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "gateway": [],
                 "source": "syslog",
             },
-            "Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.",
+            "Apr  4 13:37:04 localhost dhclient[5]: bound to 10.13.37.4 -- renewal in 1337 seconds.",
         ),
         (
             {
@@ -377,8 +386,8 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "source": "syslog",
             },
             (
-                "Jun  6 13:37:06 test systemd-networkd[5]: eth0: DHCPv6 address 2001:db8::/64 via 2001:db8:ffff:ffff:ffff:ffff:ffff:ffff\n"  # noqa: E501
-                "May  5 13:37:05 test systemd-networkd[5]: eth0: DHCPv6 lease lost\n"
+                "Jun  6 13:37:06 test systemd-networkd[6]: eth0: DHCPv6 address 2001:db8::/64 via 2001:db8:ffff:ffff:ffff:ffff:ffff:ffff\n"  # noqa: E501
+                "May  5 13:37:05 test systemd-networkd[6]: eth0: DHCPv6 lease lost\n"
             ),
         ),
     ],
