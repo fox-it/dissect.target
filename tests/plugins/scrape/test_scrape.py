@@ -168,7 +168,7 @@ def test_find(target_bare: Target) -> None:
 
 
 def test_find_needles_in_contiguous_regions(target_bare: Target) -> None:
-    """Test finding a needle overlapping two contiguous regions"""
+    """Test finding a needle overlapping two contiguous regions."""
     needle = b"NEEDLE"
     buffer = b"A" * 100 + needle + b"B" * 100
     half = len(buffer) // 2
@@ -201,7 +201,7 @@ def test_find_needles_in_contiguous_regions(target_bare: Target) -> None:
 
 
 def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
-    """Test finding needles in non-contiguous regions"""
+    """Test finding needles in non-contiguous regions."""
 
     # Layout: [---vol1(LVM)---][---volB---][---rest---]
     needle = b"NEEDLE"
