@@ -354,6 +354,15 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
         (
             {
                 "name": "eth0",
+                "cidr": [ip_interface("10.13.37.1/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Jan  1 13:37:01 hostname NetworkManager[2]: <info>  [1600000000.0000] dhcp4 (eth0): state changed new lease, address=10.13.37.1, acd pending",  # noqa: E501
+        ),
+        (
+            {
+                "name": "eth0",
                 "cidr": [ip_interface("10.13.37.2/24")],
                 "gateway": [ip_address("10.13.37.0")],
                 "source": "syslog",

@@ -714,7 +714,7 @@ def parse_network_manager_dhcp_lease_new(log_record: LogRecord) -> DhcpLease | N
     """Parse DHCP lease information from NetworkManager logs new style."""
 
     # dhcp4 (eth0): state changed new lease, address=10.13.37.1
-    if not (match := re.search(r"dhcp[46] \((\S+)\): state changed new lease, address=(\S+)", log_record.message)):
+    if not (match := re.search(r"dhcp[46] \((\S+)\): state changed new lease, address=([^\s,]+)", log_record.message)):
         return None
     name, interface = match.groups()
 
