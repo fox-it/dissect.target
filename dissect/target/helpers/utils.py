@@ -175,3 +175,32 @@ def year_rollover_helper(
                 continue
 
             yield relative_ts, line
+
+
+def common_datetime_parser(date_string: str) -> datetime | None:
+    """Parses a date string by trying a list of common formats.
+
+    This is the default implementation that can be swapped out.
+
+    Args:
+        date_string: The string representation of the date.
+
+    Returns:
+        A datetime object with UTC timezone, or None if parsing fails.
+    """
+    if not isinstance(date_string, str):
+        return None
+
+    date_formats = [
+        "%Y%m%d",  # e.g., 20231225
+        "%m/%d/%Y",  # e.g., 12/25/2023
+        "%d/%m/%Y",  # e.g., 25/12/2023
+        "%d.%m.%Y",  # e.g., 25.12.2023
+    ]
+    for fmt in date_formats:
+        try:
+            return datetime.strptime(date_string, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:  # noqa: PERF203
+            continue
+
+    return None
