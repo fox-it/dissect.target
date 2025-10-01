@@ -721,7 +721,7 @@ def parse_network_manager_centos_dhcp_lease(log_record: LogRecord) -> DhcpLease 
 def parse_debian_centos_dhclient_lease(log_record: LogRecord) -> DhcpLease | None:
     """Parse DHCP lease information from dhclient bound log lines."""
 
-    if not (hasattr(log_record, "service") and log_record.service == "dhclient"):
+    if getattr(log_record, "service", None) != "dhclient":
         return None
 
     # Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.
