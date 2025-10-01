@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, NewType, TextIO, Union
+from typing import TYPE_CHECKING, BinaryIO, NewType, TextIO
 
 from dissect.regf import c_regf, regf
 
@@ -26,10 +26,10 @@ if TYPE_CHECKING:
 GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
 GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 
-KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.KeyNode]
+KeyType = regf.IndexLeaf | regf.FastLeaf | regf.HashLeaf | regf.IndexRoot | regf.KeyNode
 """The possible key types that can be returned from the registry."""
 
-ValueType = Union[int, str, bytes, list[str], None]
+ValueType = int | str | bytes | list[str] | None
 """The possible value types that can be returned from the registry."""
 
 

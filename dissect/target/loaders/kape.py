@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target import filesystem, volume
-from dissect.target.containers.vhdx import VhdxContainer
+from dissect.target import container, filesystem, volume
 from dissect.target.loader import Loader
 from dissect.target.loaders.dir import find_and_map_dirs, find_dirs
 from dissect.target.plugin import OperatingSystem
@@ -21,10 +20,9 @@ if TYPE_CHECKING:
 USNJRNL_PATHS = ["$Extend/$J", "$Extend/$UsnJrnl$J"]
 
 
-def open_vhdx(path: Path) -> Iterator[Filesystem]:
-    container = VhdxContainer(path)
-    volume_system = volume.open(container)
-    for vol in volume_system.volumes:
+def open_kape_file(path: Path) -> Iterator[Filesystem]:
+    vs = volume.open(container.open(path))
+    for vol in vs.volumes:
         yield filesystem.open(vol)
 
 
@@ -39,13 +37,13 @@ def is_valid_kape_dir(path: Path) -> bool:
     return False
 
 
-def is_valid_kape_vhdx(path: Path) -> bool:
-    if path.suffix == ".vhdx":
-        try:
-            for fs in open_vhdx(path):
+def is_valid_kape_file(path: Path) -> bool:
+    try:
+        if path.suffix.lower() in (".vhdx", ".vhd"):
+            for fs in open_kape_file(path):
                 return is_valid_kape_dir(fs.path())
-        except Exception:
-            return False
+    except Exception:
+        return False
 
     return False
 
@@ -55,18 +53,19 @@ class KapeLoader(Loader):
 
     References:
         - https://www.kroll.com/en/insights/publications/cyber/kroll-artifact-parser-extractor-kape
+        - https://ericzimmerman.github.io/KapeDocs/#!Pages\3.-Using-KAPE.md#container-switches
     """
 
     @staticmethod
     def detect(path: Path) -> bool:
         if path.is_dir():
             return is_valid_kape_dir(path)
-        if path.suffix.lower() == ".vhdx":
-            return is_valid_kape_vhdx(path)
+        if path.suffix.lower() in (".vhdx", ".vhd"):
+            return is_valid_kape_file(path)
         return False
 
     def map(self, target: Target) -> None:
-        path = self.absolute_path if self.absolute_path.is_dir() else next(open_vhdx(self.absolute_path)).path()
+        path = self.absolute_path if self.absolute_path.is_dir() else next(open_kape_file(self.absolute_path)).path()
 
         find_and_map_dirs(
             target,

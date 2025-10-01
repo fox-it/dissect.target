@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -371,7 +372,8 @@ def test_decrypt_with_bad_primary_password_is_unsuccesful(
     logins_with_primary_password: dict[str, str],
 ) -> None:
     with pytest.raises(
-        ValueError, match="Failed to decrypt password using keyfile: /key4.db, password: BAD_PRIMARY_PASSWORD"
+        ValueError,
+        match=re.escape("Failed to decrypt password using keyfile: /key4.db, password: BAD_PRIMARY_PASSWORD"),
     ):
         decrypt(
             logins_with_primary_password.get("username"),

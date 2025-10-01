@@ -19,7 +19,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, ClassVar, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
 from flow.record import RecordOutput
@@ -55,7 +55,7 @@ from dissect.target.tools.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.filesystem import FilesystemEntry
 

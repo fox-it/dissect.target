@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import lzma
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 import zstandard
 from dissect.cstruct import cstruct
@@ -15,7 +15,7 @@ from dissect.target.helpers.utils import IntEnumMissing
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 

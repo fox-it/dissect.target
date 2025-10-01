@@ -4,7 +4,10 @@ import errno
 import os
 import sys
 import traceback
-from typing import Callable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class Error(Exception):

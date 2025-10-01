@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING
 from unittest.mock import call, patch
 
 import pytest
@@ -11,6 +11,9 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.multiraw import MultiRawLoader
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @pytest.mark.parametrize(

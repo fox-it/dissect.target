@@ -22,7 +22,7 @@ from dissect.target.tools.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Callable
+    from collections.abc import Callable
 
     from dissect.target.container import Container
     from dissect.target.target import Target

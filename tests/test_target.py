@@ -6,7 +6,7 @@ import platform
 import urllib.parse
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
 import pytest
@@ -24,7 +24,7 @@ from dissect.target.loaders.vbox import VBoxLoader
 from dissect.target.target import DiskCollection, Event, Target, TargetLogAdapter, log
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from logging import Logger
 
 
@@ -288,7 +288,7 @@ def mocked_lin_volumes_fs() -> Iterator[tuple[Mock, Mock, Mock]]:
 
 
 def test_target_win_force_dirfs(mocked_win_volumes_fs: tuple[Mock, Mock, Mock]) -> None:
-    mock_good_volume, mock_bad_volume, mock_good_fs = mocked_win_volumes_fs
+    mock_good_volume, mock_bad_volume, _ = mocked_win_volumes_fs
 
     query = {"force-directory-fs": 1}
     target_query = urllib.parse.urlencode(query)
