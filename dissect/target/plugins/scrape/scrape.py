@@ -26,7 +26,7 @@ class ScrapePlugin(Plugin):
 
     def create_streams(
         self, *, encrypted: bool = True, lvm: bool = True, all: bool = False
-    ) -> Iterator[tuple[Container | Volume, tuple[int | MappingStream]]]:
+    ) -> Iterator[tuple[Container | Volume, list[tuple[int | MappingStream]]]]:
         """Yields streams for all disks and volumes of a target.
 
         At the basis, each disk of a target is represented as a stream of itself. If the target has volumes, these are
