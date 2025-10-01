@@ -286,7 +286,7 @@ class ExtendedCmd(cmd.Cmd):
         redirect_file = None
         if ">" in argparts:
             redirect_idx = argparts.index(">")
-            # Only support single output redirection for now
+            # Only support single output redirection; in standard Unix shels, only the last redirect takes effect
             if redirect_idx + 1 >= len(argparts):
                 print("Syntax error: missing filename after '>'")
                 return False
@@ -322,7 +322,7 @@ class ExtendedCmd(cmd.Cmd):
             if self.cyber and not no_cyber:
                 ctx = cyber.cyber(color=None, run_at_end=True)
 
-            # If redirect, open file for writing and pass as stdout
+            # If redirect without pipes, open file for writing and pass as stdout
             if redirect_file:
                 with Path(redirect_file).open("w") as f, ctx:
                     return func(argparts, f)
