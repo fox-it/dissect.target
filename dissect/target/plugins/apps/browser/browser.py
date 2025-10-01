@@ -55,6 +55,17 @@ GENERIC_COOKIE_FIELDS = [
     ("path", "source"),
 ]
 
+GENERIC_LOCAL_STORAGE_FIELDS = [
+    ("datetime", "ts_created"),
+    ("datetime", "ts_last_accessed"),
+    ("datetime", "ts_last_modified"),
+    ("string", "browser"),
+    ("string", "host"),
+    ("string", "key"),
+    ("string", "value"),
+    ("path", "source"),
+]
+
 GENERIC_HISTORY_RECORD_FIELDS = [
     ("datetime", "ts"),
     ("string", "browser"),

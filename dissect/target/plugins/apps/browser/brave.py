@@ -55,6 +55,14 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
         "browser/brave/cookie", GENERIC_COOKIE_FIELDS
     )
 
+    BrowserLocalStorageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/brave/localstorage", GENERIC_LOCAL_STORAGE_FIELDS
+    )
+
+    BrowserSessionStorageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/brave/sessionstorage", GENERIC_LOCAL_STORAGE_FIELDS
+    )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/brave/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
@@ -76,6 +84,16 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
     def cookies(self) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records for Brave."""
         yield from super().cookies("brave")
+
+    @export(record=BrowserLocalStorageRecord)
+    def local_storage(self) -> Iterator[BrowserLocalStorageRecord]:
+        """Return browser local storage records for Brave."""
+        yield from super().local_storage("brave")
+
+    @export(record=BrowserSessionStorageRecord)
+    def session_storage(self) -> Iterator[BrowserSessionStorageRecord]:
+        """Return browser session storage records for Brave."""
+        yield from super().session_storage("brave")
 
     @export(record=BrowserDownloadRecord)
     def downloads(self) -> Iterator[BrowserDownloadRecord]:

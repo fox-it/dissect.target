@@ -10,6 +10,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_LOCAL_STORAGE_FIELDS,
     GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
 )
@@ -55,6 +56,14 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
         "browser/chrome/cookie", GENERIC_COOKIE_FIELDS
     )
 
+    BrowserLocalStorageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chrome/localstorage", GENERIC_LOCAL_STORAGE_FIELDS
+    )
+
+    BrowserSessionStorageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chrome/sessionstorage", GENERIC_LOCAL_STORAGE_FIELDS
+    )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
@@ -76,6 +85,16 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
     def cookies(self) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records for Google Chrome."""
         yield from super().cookies("chrome")
+
+    @export(record=BrowserLocalStorageRecord)
+    def local_storage(self) -> Iterator[BrowserLocalStorageRecord]:
+        """Return browser local storage records for Google Chrome."""
+        yield from super().local_storage("chromium")
+
+    @export(record=BrowserSessionStorageRecord)
+    def session_storage(self) -> Iterator[BrowserSessionStorageRecord]:
+        """Return browser session storage records for Google Chrome."""
+        yield from super().session_storage("chromium")
 
     @export(record=BrowserDownloadRecord)
     def downloads(self) -> Iterator[BrowserDownloadRecord]:
