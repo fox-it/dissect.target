@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import IPv4Interface, IPv6Interface, ip_address, ip_interface
 from itertools import chain, islice
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Union, get_args
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_args
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
@@ -13,17 +13,18 @@ from dissect.target.helpers.record import UnixInterfaceRecord
 from dissect.target.helpers.utils import to_list
 from dissect.target.plugin import arg, export
 from dissect.target.plugins.os.default.network import InterfaceRecord, NetworkPlugin
-from dissect.target.plugins.os.unix.log.journal import JournalRecord
-from dissect.target.plugins.os.unix.log.messages import MessagesRecord
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from ipaddress import IPv4Address, IPv6Address
 
+    from dissect.target.plugins.os.unix.log.journal import JournalRecord
+    from dissect.target.plugins.os.unix.log.messages import MessagesRecord
     from dissect.target.target import Target, TargetPath
 
     NetAddress = IPv4Address | IPv6Address
     NetInterface = IPv4Interface | IPv6Interface
+    LogRecord = JournalRecord | MessagesRecord
 
 
 class LinuxNetworkPlugin(NetworkPlugin):
@@ -33,35 +34,35 @@ class LinuxNetworkPlugin(NetworkPlugin):
         "-s",
         "--syslog",
         action="store_true",
-        help="scan syslog for dhcp leases; use --maxlines to specify number of lines",
+        help="scan syslog for dhcp leases; use --max-lines to specify number of lines",
     )
     @arg(
         "-m",
-        "--maxlines",
+        "--max-lines",
         action="store",
         type=int,
         help="maximum number of lines of syslog to scan (implies --syslog); default is 1000 if --syslog is set",
     )
     @export(record=get_args(InterfaceRecord))
-    def interfaces(self, syslog: bool = False, maxlines: int | None = None) -> Iterator[UnixInterfaceRecord]:
+    def interfaces(self, syslog: bool = False, max_lines: int | None = None) -> Iterator[UnixInterfaceRecord]:
         """Yield interfaces."""
-        # If maxlines is specified, syslog is assumed True
-        if maxlines is not None:
+        # If max_lines is specified, syslog is assumed True
+        if max_lines is not None:
             syslog = True
-        # If syslog is True and maxlines is None, use default 1000
-        if syslog and maxlines is None:
-            maxlines = 1000
-        maxlines = None if maxlines == 0 else maxlines
-        yield from super().interfaces(scan_syslog=syslog, maxlines=maxlines)
+        # If syslog is True and max_lines is None, use default 1000
+        if syslog and max_lines is None:
+            max_lines = 1000
+        max_lines = None if max_lines == 0 else max_lines
+        yield from super().interfaces(scan_syslog=syslog, max_lines=max_lines)
 
-    def _interfaces(self, scan_syslog: bool, maxlines: int | None) -> Iterator[UnixInterfaceRecord]:
+    def _interfaces(self, scan_syslog: bool, max_lines: int | None) -> Iterator[UnixInterfaceRecord]:
         """Try all available network configuration managers and aggregate the results."""
         for manager_cls in MANAGERS + LEASERS:
             manager: LinuxNetworkConfigParser = manager_cls(self.target)
             yield from manager.interfaces()
 
         if scan_syslog:
-            syslog_parser = SyslogConfigParser(self.target, maxlines)
+            syslog_parser = SyslogConfigParser(self.target, max_lines)
             yield from syslog_parser.interfaces()
 
     @export(record=UnixInterfaceRecord)
@@ -197,7 +198,11 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
         return datetime.fromtimestamp(int(last_connected), timezone.utc)
 
     def _parse_ip_section_key(
-        self, key: str, value: str, context: ParserContext, ip_version: Literal["ipv4", "ipv6"]
+        self,
+        key: str,
+        value: str,
+        context: ParserContext,
+        ip_version: Literal["ipv4", "ipv6"],
     ) -> None:
         if not (trimmed := value.strip()):
             return
@@ -240,7 +245,14 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
     Documentation: https://www.freedesktop.org/software/systemd/man/latest/systemd.network.html
     """
 
-    collapsable_items: tuple[str, ...] = ("Match", "Network", "Link", "MACAddress", "Name", "Type")
+    collapsable_items: tuple[str, ...] = (
+        "Match",
+        "Network",
+        "Link",
+        "MACAddress",
+        "Name",
+        "Type",
+    )
 
     config_paths: tuple[str, ...] = (
         "/etc/systemd/network/",
@@ -321,7 +333,12 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 
                 route_sections: list[dict[str, Any]] = config.get("Route", [])
                 gateway_values = (to_list(route_section.get("Gateway", [])) for route_section in route_sections)
-                gateways.update(filter(None, map(self._parse_gateway, chain.from_iterable(gateway_values))))
+                gateways.update(
+                    filter(
+                        None,
+                        map(self._parse_gateway, chain.from_iterable(gateway_values)),
+                    )
+                )
 
                 dhcp_ipv4, dhcp_ipv6 = self._parse_dhcp(network_section.get("DHCP"))
 
@@ -487,7 +504,9 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         for iface in interfaces.values():
             yield iface.to_record(self._target)
 
-    def _parse_proc_net_route(self) -> tuple[dict[str, set[IPv4Interface]], dict[str, ProcConfigParser.ParserContext]]:
+    def _parse_proc_net_route(
+        self,
+    ) -> tuple[dict[str, set[IPv4Interface]], dict[str, ProcConfigParser.ParserContext]]:
         try:
             with self._target.fs.path("/proc/net/route").open("r") as f:
                 lines = f.readlines()
@@ -622,9 +641,6 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         return result
 
 
-LogRecord = Union[JournalRecord, MessagesRecord]
-
-
 class SyslogConfigParser(LinuxNetworkConfigParser):
     def __init__(self, target: Target, max_lines: int | None = None):
         super().__init__(target)
@@ -714,7 +730,12 @@ def parse_network_manager_dhcp_lease_new(log_record: LogRecord) -> DhcpLease | N
     """Parse DHCP lease information from NetworkManager logs new style."""
 
     # dhcp4 (eth0): state changed new lease, address=10.13.37.1
-    if not (match := re.search(r"dhcp[46] \((\S+)\): state changed new lease, address=([^\s,]+)", log_record.message)):
+    if not (
+        match := re.search(
+            r"dhcp[46] \((\S+)\): state changed new lease, address=([^\s,]+)",
+            log_record.message,
+        )
+    ):
         return None
     name, interface = match.groups()
 
