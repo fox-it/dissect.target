@@ -26,28 +26,28 @@ if TYPE_CHECKING:
 
 # User Account Control flags mapping
 UAC_FLAGS = {
-    0x0001: "script",
-    0x0002: "account_disable",
-    0x0008: "home_dir_required",
-    0x0010: "lockout",
-    0x0020: "passwd_not_reqd",
-    0x0040: "passwd_cant_change",
-    0x0080: "encrypted_text_pwd_allowed",
-    0x0100: "temp_duplicate_account",
-    0x0200: "normal_account",
-    0x0800: "interdomain_trust_account",
-    0x1000: "workstation_trust_account",
-    0x2000: "server_trust_account",
-    0x10000: "dont_expire_password",
-    0x20000: "mns_logon_account",
-    0x40000: "smartcard_required",
-    0x80000: "trusted_for_delegation",
-    0x100000: "not_delegated",
-    0x200000: "use_des_key_only",
-    0x400000: "dont_req_preauth",
-    0x800000: "password_expired",
-    0x1000000: "trusted_to_auth_for_delegation",
-    0x04000000: "partial_secrets_account",
+    0x0001: "SCRIPT",
+    0x0002: "ACCOUNTDISABLE",
+    0x0008: "HOMEDIR_REQUIRED",
+    0x0010: "LOCKOUT",
+    0x0020: "PASSWD_NOTREQD",
+    0x0040: "PASSWD_CANT_CHANGE",
+    0x0080: "ENCRYPTED_TEXT_PWD_ALLOWED",
+    0x0100: "TEMP_DUPLICATE_ACCOUNT",
+    0x0200: "NORMAL_ACCOUNT",
+    0x0800: "INTERDOMAIN_TRUST_ACCOUNT",
+    0x1000: "WORKSTATION_TRUST_ACCOUNT",
+    0x2000: "SERVER_TRUST_ACCOUNT",
+    0x10000: "DONT_EXPIRE_PASSWORD",
+    0x20000: "MNS_LOGON_ACCOUNT",
+    0x40000: "SMARTCARD_REQUIRED",
+    0x80000: "TRUSTED_FOR_DELEGATION",
+    0x100000: "NOT_DELEGATED",
+    0x200000: "USE_DES_KEY_ONLY",
+    0x400000: "DONT_REQ_PREAUTH",
+    0x800000: "PASSWORD_EXPIRED",
+    0x1000000: "TRUSTED_TO_AUTH_FOR_DELEGATION",
+    0x04000000: "PARTIAL_SECRETS_ACCOUNT",
 }
 
 # NTDS attribute name to internal field mapping
@@ -73,6 +73,16 @@ NAME_TO_INTERNAL = {
     "supplemental_credentials": "ATTk589949",
     "password_last_set": "ATTq589920",
     "instance_type": "ATTj131073",
+    "governs_id": "ATTc131094",
+    "object_class": "ATTc0",
+    "link_id": "ATTj131122",
+    "is_deleted": "ATTi131120",
+    "attribute_id": "ATTc131102",
+    "attribute_name_ldap": "ATTm131532",
+    "Attribute_name_cn": "ATTm3",
+    "Attribute_name_dn": "ATTb49",
+    "msds-int_id": "ATTj591540",
+    "rdn": "ATTm589825",
 }
 
 # Kerberos encryption type mappings
@@ -96,6 +106,22 @@ KERBEROS_TYPE = {
     24: "rc4-hmac-exp-old",
 }
 
+# SAM account type constants
+SAM_ACCOUNT_TYPE = {
+    "SAM_DOMAIN_OBJECT": 0x0,
+    "SAM_GROUP_OBJECT": 0x10000000,
+    "SAM_NON_SECURITY_GROUP_OBJECT": 0x10000001,
+    "SAM_ALIAS_OBJECT": 0x20000000,
+    "SAM_NON_SECURITY_ALIAS_OBJECT": 0x20000001,
+    "SAM_USER_OBJECT": 0x30000000,
+    "SAM_NORMAL_USER_ACCOUNT": 0x30000000,
+    "SAM_MACHINE_ACCOUNT": 0x30000001,
+    "SAM_TRUST_ACCOUNT": 0x30000002,
+    "SAM_APP_BASIC_GROUP": 0x40000000,
+    "SAM_APP_QUERY_GROUP": 0x40000001,
+    "SAM_ACCOUNT_TYPE_MAX": 0x7FFFFFFF,
+}
+
 # Record descriptor for NTDS user secrets
 NtdsUserSecretRecord = TargetRecordDescriptor(
     "windows/credential/ntds",
@@ -107,7 +133,8 @@ NtdsUserSecretRecord = TargetRecordDescriptor(
         ("string[]", "lm_history"),
         ("string", "nt"),
         ("string[]", "nt_history"),
-        *[("boolean", flag) for flag in UAC_FLAGS.values()],
+        ("boolean", "is_deleted"),
+        *[("boolean", flag.lower()) for flag in UAC_FLAGS.values()],
         ("string", "cleartext_password"),
         ("string", "credential_type"),
         ("string", "kerberos_type"),
@@ -285,17 +312,15 @@ class NtdsPlugin(Plugin):
         EMPTY_BYTE = b"\x00"
         DEFAULT_AES_IV = b"\x00" * 16
 
-    # SAM account type constants
-    class AccountTypes:
-        """SAM account type constants."""
-
-        NORMAL_USER = 0x30000000
-        MACHINE = 0x30000001
-        TRUST = 0x30000002
-        ALL_TYPES = (NORMAL_USER, MACHINE, TRUST)
-
     # Other constants
     OBJECT_IS_WRITEABLE_ON_THIS_DIRECTORY = 4
+
+    # Currenlty supported types
+    SUPPORTED_ACOUNT_TYPES = tuple(
+        account_type
+        for key, account_type in SAM_ACCOUNT_TYPE.items()
+        if key in ("SAM_USER_OBJECT", "SAM_NORMAL_USER_ACCOUNT", "SAM_MACHINE_ACCOUNT", "SAM_TRUST_ACCOUNT")
+    )
 
     def __init__(self, target: Target):
         """Initialize the NTDS plugin.
@@ -387,7 +412,7 @@ class NtdsPlugin(Plugin):
             True if the record is a valid user account, False otherwise.
         """
         return (
-            record[NAME_TO_INTERNAL["sam_account_type"]] in self.AccountTypes.ALL_TYPES
+            record[NAME_TO_INTERNAL["sam_account_type"]] in self.SUPPORTED_ACOUNT_TYPES
             and record[NAME_TO_INTERNAL["instance_type"]] & self.OBJECT_IS_WRITEABLE_ON_THIS_DIRECTORY
         )
 
@@ -740,7 +765,7 @@ class NtdsPlugin(Plugin):
         Returns:
             Dictionary mapping flag names to boolean values.
         """
-        return {flag_name: bool(uac & flag_bit) for flag_bit, flag_name in UAC_FLAGS.items()}
+        return {flag_name.lower(): bool(uac & flag_bit) for flag_bit, flag_name in UAC_FLAGS.items()}
 
     def _decrypt_supplemental_info(self, record: Record) -> Iterator[dict[str, str | None]]:
         """Extract and decrypt supplemental credentials (Kerberos keys, cleartext passwords).
@@ -936,6 +961,7 @@ class NtdsPlugin(Plugin):
                 lm_history=lm_history,
                 nt=nt_hash,
                 nt_history=nt_history,
+                is_deleted=bool(record[NAME_TO_INTERNAL["is_deleted"]]),
                 **uac_flags,
                 **supplemental_info,
                 _target=self.target,
