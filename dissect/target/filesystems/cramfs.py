@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from dissect.cramfs import INode
 
 
-class CramFSFilesystem(Filesystem):
+class CramfsFilesystem(Filesystem):
     __type__ = "cramfs"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
@@ -34,7 +34,7 @@ class CramFSFilesystem(Filesystem):
         return int.from_bytes(fh.read(4), "little") == c_cramfs.CRAMFS_MAGIC
 
     def get(self, path: str) -> FilesystemEntry:
-        return CramFSFilesystemEntry(self, path, self._get_node(path))
+        return CramfsFilesystemEntry(self, path, self._get_node(path))
 
     def _get_node(self, path: str, node: INode | None = None) -> INode:
         """Returns an internal CramFS inode for a given path and optional relative inode."""
@@ -50,13 +50,13 @@ class CramFSFilesystem(Filesystem):
             raise FileNotFoundError(path) from e
 
 
-class CramFSFilesystemEntry(FilesystemEntry):
-    fs: CramFSFilesystem
+class CramfsFilesystemEntry(FilesystemEntry):
+    fs: CramfsFilesystem
     entry: INode
 
     def get(self, path: str) -> FilesystemEntry:
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
-        return CramFSFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
+        return CramfsFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
 
     def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
@@ -117,7 +117,7 @@ class CramFSFilesystemEntry(FilesystemEntry):
         # mode, ino, dev, nlink, uid, gid, size, ..., blocksize, numblocks
         st_info = [
             node.mode,
-            0,  # cramfs inodes don't have an inode number
+            node.offset,  # use inode offset as inode number
             id(self.fs),  # device ID of the filesystem
             1,  # cramfs inodes always have 1 nlinks
             node.uid,
