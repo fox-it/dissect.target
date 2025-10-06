@@ -3,18 +3,19 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from ipaddress import ip_address, ip_interface
+from ipaddress import IPv4Interface, IPv6Interface, ip_address, ip_interface
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import UnixInterfaceRecord
 from dissect.target.helpers.utils import to_list
+from dissect.target.plugin import export
 from dissect.target.plugins.os.default.network import NetworkPlugin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from ipaddress import IPv4Address, IPv4Interface, IPv6Address, IPv6Interface
+    from ipaddress import IPv4Address, IPv6Address
 
     from dissect.target.target import Target, TargetPath
 
@@ -27,9 +28,16 @@ class LinuxNetworkPlugin(NetworkPlugin):
 
     def _interfaces(self) -> Iterator[UnixInterfaceRecord]:
         """Try all available network configuration managers and aggregate the results."""
-        for manager_cls in MANAGERS:
+        for manager_cls in MANAGERS + LEASERS:
             manager: LinuxNetworkConfigParser = manager_cls(self.target)
             yield from manager.interfaces()
+
+    @export(record=UnixInterfaceRecord)
+    def dhcp(self) -> Iterator[UnixInterfaceRecord]:
+        """Return interfaces obtained via DHCP."""
+        for interface in self.interfaces():
+            if interface.type == "dhcp":
+                yield interface
 
 
 VlanIdByInterface = dict[str, set[int]]
@@ -337,6 +345,77 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
         return ip_address(value)
 
 
+class DhclientLeaseParser(LinuxNetworkConfigParser):
+    """Parse network interfaces from dhclient DHCP ``.leases`` files.
+
+    References:
+        - https://linux.die.net/man/5/dhclient.conf
+    """
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        """Parse network interfaces from dhclient DHCP ``.leases`` files."""
+
+        # TODO: Add support for renew, rebind, expire events.
+        for file in self._config_files(["/var/lib/dhclient/", "/var/lib/dhcp/"], "*.leases"):
+            try:
+                leases = configutil.parse(file, hint="leases")
+                for label, data in leases.parsed_data.items():
+                    if "lease" in label:
+                        if (fixed_address := data.get("fixed-address")) is not None:
+                            if (subnet_mask := data.get("option", {}).get("subnet-mask")) is not None:
+                                fixed_address = ip_interface((fixed_address, subnet_mask))
+                            else:
+                                fixed_address = ip_interface(fixed_address)
+
+                        if (router := data.get("option", {}).get("routers")) is not None:
+                            router = ip_address(router)
+
+                        yield UnixInterfaceRecord(
+                            name=data.get("interface").strip('"'),
+                            type="dhcp",
+                            cidr={fixed_address},
+                            gateway={router},
+                            source=file,
+                            dhcp_ipv4=isinstance(fixed_address, IPv4Interface),
+                            dhcp_ipv6=isinstance(fixed_address, IPv6Interface),
+                            configurator="dhclient",
+                            _target=self._target,
+                        )
+            except Exception as e:  # noqa: PERF203
+                self._target.log.warning("Error parsing dhclient leases file %s", file)
+                self._target.log.debug("", exc_info=e)
+                continue
+
+
+class NetworkManagerLeaseParser(LinuxNetworkConfigParser):
+    """Parse network interfaces from NetworkManager DHCP ``.lease`` files."""
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        """Parse network interfaces from NetworkManager DHCP ``.lease`` files."""
+        for file in self._config_files(["/var/lib/NetworkManager/"], "*.lease"):
+            try:
+                lease = configutil.parse(file, hint="env")
+
+                interface = file.stem.split("-")[-1]  # Extract interface name from file stem
+                if ip_address := lease.get("ADDRESS"):
+                    ip_address = ip_interface(ip_address)
+
+                yield UnixInterfaceRecord(
+                    name=interface,
+                    type="dhcp",
+                    cidr={ip_address},
+                    source=file,
+                    configurator="NetworkManager",
+                    dhcp_ipv4=isinstance(ip_address, IPv4Interface),
+                    dhcp_ipv6=isinstance(ip_address, IPv6Interface),
+                    _target=self._target,
+                )
+            except Exception as e:  # noqa: PERF203
+                self._target.log.warning("Error parsing NetworkManager lease file %s", file)
+                self._target.log.debug("", exc_info=e)
+                continue
+
+
 class ProcConfigParser(LinuxNetworkConfigParser):
     """Parser for dynamic network configuration data from /proc/net.
 
@@ -400,7 +479,7 @@ class ProcConfigParser(LinuxNetworkConfigParser):
 
             # Only add CIDR if not default route
             if (addr := be_hex_to_int(destination_hex)) != 0:
-                mask_bit_count = bin(be_hex_to_int(mask)).count("1")
+                mask_bit_count = be_hex_to_int(mask).bit_count()
                 route_interfaces.setdefault(iface_name, set()).add(ip_interface((addr, mask_bit_count)))
 
             # Add gateway if not 0.0.0.0
@@ -517,3 +596,4 @@ def be_hex_to_int(be_hex: str) -> int:
 
 
 MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
+LEASERS = [DhclientLeaseParser, NetworkManagerLeaseParser]

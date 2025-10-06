@@ -63,20 +63,33 @@ class ServicesPlugin(Plugin):
                 if should_ignore_file(service_file.name, ignored_suffixes):
                     continue
 
+                config = {}
+                types = []
+
                 try:
-                    parsed_config = configutil.parse(service_file, hint="systemd")
-                    config = {}
-                    types = []
-                    for segment, configuration in parsed_config.items():
+                    for segment, configuration in configutil.parse(service_file, hint="systemd").items():
                         if not configuration:
                             continue
 
-                        for key, value in configuration.items():
-                            _value = value or None
-                            _key = f"{segment}_{key}"
-                            _key = _key.replace("-", "_")
-                            types.append(("string", _key))
-                            config.update({_key: _value})
+                        if not isinstance(configuration, list):
+                            configuration = [configuration]
+
+                        for nested_conf in configuration:
+                            for key, value in nested_conf.items():
+                                _key = f"{segment}_{key}".replace("-", "_")
+
+                                if _key not in config:
+                                    config.update({_key: value or None})
+                                else:
+                                    if not isinstance(config[_key], list):
+                                        config[_key] = [config[_key]]
+                                    config[_key].append(value or None)
+
+                                if isinstance(config[_key], list):
+                                    types.append(("string[]", _key))
+                                else:
+                                    types.append(("string", _key))
+
                 except FileNotFoundError:
                     # The service is registered but the symlink is broken.
                     yield LinuxServiceRecord(

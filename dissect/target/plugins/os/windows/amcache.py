@@ -346,17 +346,15 @@ class AmcachePluginOldMixin:
 class AmcachePlugin(AmcachePluginOldMixin, Plugin):
     """Appcompat plugin for amcache.hve.
 
-    Supported registry keys:
-
-        for old version of Amcache:
+    Supported registry keys for old version of Amcache:
         * File
         * Programs
 
-        for new version of Amcache:
-        • InventoryDriverBinary
-        • InventoryDeviceContainer
-        • InventoryApplication
-        • InventoryApplicationFile
+    Supported registry keys for new version of Amcache:
+        * InventoryDriverBinary
+        * InventoryDeviceContainer
+        * InventoryApplication
+        * InventoryApplicationFile
         * InventoryApplicationShortcut
 
     References:

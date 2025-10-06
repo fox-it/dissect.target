@@ -65,7 +65,7 @@ def test_hash_path_records_with_paths(
     assert len(hashed_record.records) == expected_records
     assert hashed_record.records[0] == record
 
-    for name, _record in zip(path_field_names, hashed_record.records[1:]):
+    for name, _record in zip(path_field_names, hashed_record.records[1:], strict=False):
         assert getattr(_record, f"{name}_resolved") is not None
         assert getattr(_record, f"{name}_digest").__dict__ == digest(HASHES).__dict__
 
@@ -137,7 +137,7 @@ def test_hash_path_records_with_exception(
     if not expected:
         assert hashed_record == record
     else:
-        for _record, key in zip(hashed_record.records[1:], found_type_names):
+        for _record, key in zip(hashed_record.records[1:], found_type_names, strict=False):
             assert getattr(_record, f"{key}_resolved") == "test"
             assert getattr(_record, f"{key}_digest").__dict__ == digest(HASHES).__dict__
 
