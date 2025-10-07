@@ -269,12 +269,7 @@ class ExtendedCmd(cmd.Cmd):
             - https://github.com/python/cpython/blob/3.12/Lib/cmd.py#L10
         """
 
-    def _exec(
-        self,
-        func: Callable[[list[str], TextIO], bool],
-        command_args_str: str,
-        no_cyber: bool = False,
-    ) -> bool:
+    def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False) -> bool:
         """Command execution helper that chains initial command, piped subprocesses, and output redirection together."""
 
         argparts = []
@@ -307,14 +302,16 @@ class ExtendedCmd(cmd.Cmd):
                 # If redirect, open file for writing and pass as stdout
                 if redirect_file:
                     with (
-                        Path(redirect_file).open("w") as f,
-                        build_pipe(pipeparts, pipe_stdout=f) as (pipe_stdin, _),
+                        Path(redirect_file).open("wb") as f,
+                        io.TextIOWrapper(f, encoding="utf-8") as tf,
+                        build_pipe(pipeparts, pipe_stdout=tf) as (pipe_stdin, _),
                     ):
                         return func(argparts, pipe_stdin)
                 else:
                     with build_pipe_stdout(pipeparts) as pipe_stdin:
                         return func(argparts, pipe_stdin)
             except OSError as e:
+                # in case of a failure in a subprocess
                 print(e)
                 return False
         else:
@@ -324,8 +321,12 @@ class ExtendedCmd(cmd.Cmd):
 
             # If redirect without pipes, open file for writing and pass as stdout
             if redirect_file:
-                with Path(redirect_file).open("w") as f, ctx:
-                    return func(argparts, f)
+                with (
+                    Path(redirect_file).open("wb") as f,
+                    io.TextIOWrapper(f, encoding="utf-8") as tf,
+                    ctx,
+                ):
+                    return func(argparts, tf)
             else:
                 with ctx:
                     return func(argparts, sys.stdout)
@@ -406,7 +407,7 @@ class ExtendedCmd(cmd.Cmd):
     def do_cyber(self, line: str) -> bool:
         """cyber"""
         self.cyber = not self.cyber
-        word, color = { False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW), }[self.cyber]
+        word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[self.cyber]
         with cyber.cyber(color=color):
             print(f"C Y B E R - M O D E - {word} G A G E D")
         return False
@@ -461,7 +462,7 @@ class TargetCmd(ExtendedCmd):
         """Get the path to the run commands file."""
 
         return pathlib.Path(
-            getattr( self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
+            getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
         ).expanduser()
 
     def preloop(self) -> None:
@@ -973,9 +974,7 @@ class TargetCli(TargetCmd):
             return diverging_path
 
         def save_path(
-            src_path: pathlib.Path,
-            dst_path: pathlib.Path,
-            create_dst_subdir: pathlib.Path | None = None,
+            src_path: pathlib.Path, dst_path: pathlib.Path, create_dst_subdir: pathlib.Path | None = None
         ) -> None:
             """Save a common file or directory in src_path to dst_path.
 
