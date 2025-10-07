@@ -406,10 +406,7 @@ class ExtendedCmd(cmd.Cmd):
     def do_cyber(self, line: str) -> bool:
         """cyber"""
         self.cyber = not self.cyber
-        word, color = {
-            False: ("D I S E N", cyber.Color.RED),
-            True: ("E N", cyber.Color.YELLOW),
-        }[self.cyber]
+        word, color = { False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW), }[self.cyber]
         with cyber.cyber(color=color):
             print(f"C Y B E R - M O D E - {word} G A G E D")
         return False
@@ -464,11 +461,7 @@ class TargetCmd(ExtendedCmd):
         """Get the path to the run commands file."""
 
         return pathlib.Path(
-            getattr(
-                self.target._config,
-                self.CONFIG_KEY_RUNCOMMANDS_FILE,
-                self.DEFAULT_RUNCOMMANDS_FILE,
-            )
+            getattr( self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
         ).expanduser()
 
     def preloop(self) -> None:
