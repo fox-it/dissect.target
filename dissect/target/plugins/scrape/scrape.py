@@ -87,10 +87,14 @@ class ScrapePlugin(Plugin):
 
             if lvm and isinstance(volume.vs, LogicalVolumeSystem):
                 if not all:
-                    # Remove the base volumes from the map
                     for source_volume in volume.disk:
                         source_disk = source_volume.disk
-                        del scrape_map[source_disk][(source_volume.offset, source_volume.size)]
+                        if isinstance(source_volume.vs, EncryptedVolumeSystem):
+                            # For encrypted volumes, delete the underlying disk and encrypted size
+                            physical_disk = source_disk.disk
+                            del scrape_map[physical_disk][source_volume.offset, source_disk.size]
+                        else:
+                            del scrape_map[source_disk][(source_volume.offset, source_volume.size)]
 
                 # Add the logical volumes to the map
                 scrape_map[volume][(0, volume.size)] = (volume, 0)
