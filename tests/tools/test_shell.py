@@ -248,7 +248,7 @@ def test_redirect_simple_ls(tmp_path: Path, target_win: Target, monkeypatch: pyt
     monkeypatch.setattr(fsutils, "LS_COLORS", {"di": "\033[34m", "fi": "\033[0m"})
     cli = TargetCli(target_win)
     out_file = tmp_path / "ls_out.txt"
-    cli.onecmd(f"ls > {out_file}")
+    cli.onecmd(f'ls > "{out_file}"')
     content = out_file.read_text()
     # Should not contain color codes
     assert "\033[" not in content
@@ -257,6 +257,7 @@ def test_redirect_simple_ls(tmp_path: Path, target_win: Target, monkeypatch: pyt
     assert "sysvol" in content
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_redirect_pipe(tmp_path: Path, target_win: Target, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fsutils, "LS_COLORS", {"di": "\033[34m", "fi": "\033[0m"})
     cli = TargetCli(target_win)
@@ -268,6 +269,7 @@ def test_redirect_pipe(tmp_path: Path, target_win: Target, monkeypatch: pytest.M
     assert "\033[" not in content
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_redirect_syntax_error(target_win: Target, capsys: pytest.CaptureFixture) -> None:
     cli = TargetCli(target_win)
     # Redirect before pipe should fail

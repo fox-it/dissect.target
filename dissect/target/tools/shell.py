@@ -786,18 +786,8 @@ class TargetCli(TargetCmd):
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
-    @arg(
-        "-R",
-        "--recursive",
-        action="store_true",
-        help="recursively list subdirectories encountered",
-    )
-    @arg(
-        "-c",
-        action="store_true",
-        dest="use_ctime",
-        help="show time when file status was last changed",
-    )
+    @arg("-R", "--recursive", action="store_true", help="recursively list subdirectories encountered")
+    @arg("-c", action="store_true", dest="use_ctime", help="show time when file status was last changed")
     @arg("-u", action="store_true", dest="use_atime", help="show time of last access")
     @alias("l")
     @alias("dir")
@@ -855,11 +845,7 @@ class TargetCli(TargetCmd):
     @arg("-iname", help="like -name, but the match is case insensitive")
     @arg("-atime", type=int, help="file was last accessed n*24 hours ago")
     @arg("-mtime", type=int, help="file was last modified n*24 hours ago")
-    @arg(
-        "-ctime",
-        type=int,
-        help="file (windows) or metadata (unix) was last changed n*24 hours ago",
-    )
+    @arg("-ctime", type=int, help="file (windows) or metadata (unix) was last changed n*24 hours ago")
     @arg("-btime", type=int, help="file was born n*24 hours ago (ext4)")
     def cmd_find(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """search for files in a directory hierarchy"""
