@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from datetime import datetime
 from defusedxml import ElementTree
 from flow.record import GroupedRecord
 
@@ -112,19 +112,16 @@ def str_to_isoformat(string_to_convert: str) -> datetime | None:
     """
     if not string_to_convert:
         return None
-    if "T" in string_to_convert:
-        date_part, time_part = string_to_convert.split("T")
-    elif " " in string_to_convert:
-        date_part, time_part = string_to_convert.split(" ") 
-    else:
-        raise ValueError(f"Invalid datetime string: '{string_to_convert}' (expected 'YYYY-MM-DDThh:mm:ss')")
-
     try:
-        year, month, day = date_part.split("-")
-        iso_8601_format =  f"{year}-{int(month):02d}-{int(day):02d}T{time_part}"
-        return datetime.fromisoformat(iso_8601_format)
-    except Exception:
-        raise ValueError(f"Invalid datetime string: '{string_to_convert}' (expected 'YYYY-MM-DDThh:mm:ss')")
+        date = datetime.fromisoformat(string_to_convert)
+    except ValueError:
+        string_to_convert = string_to_convert.replace(" ", "T")
+
+        if "Z" in string_to_convert:
+            date = datetime.strptime(string_to_convert, "%Y-%m-%dT%H:%M:%S%z")
+            return date.replace(tzinfo=timezone.utc)
+        date = datetime.strptime(string_to_convert, "%Y-%m-%dT%H:%M:%S")
+    return date
 
 
 class XmlTask:
