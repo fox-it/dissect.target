@@ -120,7 +120,7 @@ def str_to_isoformat(string_to_convert: str) -> datetime | None:
         if "Z" in string_to_convert:
             date = datetime.strptime(string_to_convert, "%Y-%m-%dT%H:%M:%S%z")
             return date.replace(tzinfo=timezone.utc)
-        date = datetime.strptime(string_to_convert, "%Y-%m-%dT%H:%M:%S")
+        date = datetime.strptime(string_to_convert, "%Y-%m-%dT%H:%M:%S")  # noqa: DTZ007
     return date
 
 

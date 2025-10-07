@@ -269,20 +269,27 @@ def test_xml_task_invalid(
 
 
 def test_xml_task_time() -> None:
-    assert str_to_isoformat("2023-07-05T14:30:00") == datetime.strptime("2023-07-05 14:30:00", "%Y-%m-%d %H:%M:%S")
+    assert str_to_isoformat("2023-07-05T14:30:00") == datetime.strptime("2023-07-05 14:30:00", "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
+
 
 def test_xml_task_time_valid_space() -> None:
-    assert str_to_isoformat("2024-01-01 09:15:00") == datetime.strptime("2024-01-01 09:15:00", "%Y-%m-%d %H:%M:%S")
+    assert str_to_isoformat("2024-01-01 09:15:00") == datetime.strptime("2024-01-01 09:15:00", "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
+
 
 def test_xml_task_time_empty() -> None:
     assert str_to_isoformat("") is None
 
+
 def test_xml_task_time_invalid() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError):  # noqa: PT011
         str_to_isoformat("invalid datetime")
 
+
 def test_xml_task_time_utc() -> None:
-    assert str_to_isoformat("2025-07-14T07:15:00Z") == datetime.strptime("2025-07-14 07:15:00+00:00", "%Y-%m-%d %H:%M:%S%z")
+    assert str_to_isoformat("2025-07-14T07:15:00Z") == datetime.strptime(
+        "2025-07-14 07:15:00+00:00", "%Y-%m-%d %H:%M:%S%z"
+    )
+
 
 def test_xml_task_time_no_leading_zero() -> None:
-    assert str_to_isoformat("2023-3-12T11:00:00") == datetime.strptime("2023-3-12 11:00:00", "%Y-%m-%d %H:%M:%S")
+    assert str_to_isoformat("2023-3-12T11:00:00") == datetime.strptime("2023-3-12 11:00:00", "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
