@@ -230,12 +230,14 @@ def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
     vol1.disk = disk
     vol1.offset = vol1_offset
     vol1.size = vol1_size
+    vol1.vs = None
 
     # Create volB (regular volume)
     volB = io.BytesIO(buf[volB_offset : volB_offset + volB_size])
     volB.disk = disk
     volB.offset = volB_offset
     volB.size = volB_size
+    volB.vs = None
 
     # Attach volumes to disk
     disk.vs = Mock()

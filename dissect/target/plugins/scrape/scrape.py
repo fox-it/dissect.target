@@ -92,7 +92,7 @@ class ScrapePlugin(Plugin):
                         if isinstance(source_volume.vs, EncryptedVolumeSystem):
                             # For encrypted volumes, delete the underlying disk and encrypted size
                             physical_disk = source_disk.disk
-                            del scrape_map[physical_disk][source_volume.offset, source_disk.size]
+                            del scrape_map[physical_disk][(source_volume.offset, source_disk.size)]
                         else:
                             del scrape_map[source_disk][(source_volume.offset, source_volume.size)]
 
