@@ -131,7 +131,7 @@ class ChromiumMixin:
         return users_dirs
 
     def _iter_db(self, filename: str, subdirs: list[str] | None = None) -> Iterator[tuple[UserDetails, Path, SQLite3]]:
-        """Generate a connection to a SQLite3 database file.
+        """Iterate database files of all users.
 
         Args:
             filename: The filename as string of the database where the data is stored.
