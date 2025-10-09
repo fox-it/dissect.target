@@ -10,6 +10,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_LOCAL_STORAGE_FIELDS,
     GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
 )
@@ -51,6 +52,14 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         "browser/edge/cookie", GENERIC_COOKIE_FIELDS
     )
 
+    BrowserLocalStorageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/edge/localstorage", GENERIC_LOCAL_STORAGE_FIELDS
+    )
+
+    BrowserSessionStorageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/edge/sessionstorage", GENERIC_LOCAL_STORAGE_FIELDS
+    )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
@@ -72,6 +81,16 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
     def cookies(self) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records for Microsoft Edge."""
         yield from super().cookies("edge")
+
+    @export(record=BrowserLocalStorageRecord)
+    def local_storage(self) -> Iterator[BrowserLocalStorageRecord]:
+        """Return browser local storage records for Microsoft Edge."""
+        yield from super().local_storage("edge")
+
+    @export(record=BrowserSessionStorageRecord)
+    def session_storage(self) -> Iterator[BrowserSessionStorageRecord]:
+        """Return browser session storage records for Microsoft Edge."""
+        yield from super().session_storage("edge")
 
     @export(record=BrowserDownloadRecord)
     def downloads(self) -> Iterator[BrowserDownloadRecord]:
