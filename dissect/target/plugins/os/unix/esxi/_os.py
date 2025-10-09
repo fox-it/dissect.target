@@ -102,6 +102,9 @@ class ESXiPlugin(UnixPlugin):
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
+        # First handle 'simple' case where we have to deal with a live collection
+        if len(target.filesystems) == 1 and target.filesystems[0].path("/etc/vmware/esx.conf").exists():
+            return target.filesystems[0]
         bootbanks = [
             fs for fs in target.filesystems if fs.path("boot.cfg").exists() and list(fs.path("/").glob("*.v00"))
         ]
@@ -113,6 +116,9 @@ class ESXiPlugin(UnixPlugin):
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
+        if len(target.filesystems) == 1:
+            target.fs.mount("/", sysvol)
+            return cls(target)
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
 
         # Mount all the visor tars in individual filesystem layers
@@ -164,7 +170,8 @@ class ESXiPlugin(UnixPlugin):
     def version(self) -> str | None:
         boot_cfg = self.target.fs.path("/bootbank/boot.cfg")
         if not boot_cfg.exists():
-            return None
+            # Default to retrieve version, but without build number
+            return self._cfg("/resourceGroups/version")
 
         for line in boot_cfg.read_text().splitlines():
             if not line.startswith("build="):
