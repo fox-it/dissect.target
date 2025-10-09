@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
@@ -95,6 +96,32 @@ def str_to_bool(string_to_convert: str) -> bool | None:
         return False
 
     raise ValueError(f"Invalid boolean string: '{string_to_convert}' (expected 'true' or 'false')")
+
+
+def str_to_isoformat(string_to_convert: str) -> datetime | None:
+    """Convert a datetime string to ISO 8601 format.
+
+    Accepts strings in the form YYYY-MM-DDThh:mm:ss
+    and returns a zero-padded ISO format string.
+
+    Args:
+        string_to_convert: The input datetime string.
+
+    Returns:
+        None for an empty string, otherwise a ISO 8601 formatted string.
+    """
+    if not string_to_convert:
+        return None
+    try:
+        date = datetime.fromisoformat(string_to_convert)
+    except ValueError:
+        string_to_convert = string_to_convert.replace(" ", "T")
+
+        if "Z" in string_to_convert:
+            date = datetime.strptime(string_to_convert, "%Y-%m-%dT%H:%M:%S%z")
+            return date.replace(tzinfo=timezone.utc)
+        date = datetime.strptime(string_to_convert, "%Y-%m-%dT%H:%M:%S")  # noqa: DTZ007
+    return date
 
 
 class XmlTask:
@@ -245,8 +272,8 @@ class XmlTask:
         for trigger in self.task_element.findall("Triggers/*"):
             trigger_type = trigger.tag
             trigger_enabled = str_to_bool(self.get_element("Enabled", trigger))
-            start_boundary = self.get_element("StartBoundary", trigger)
-            end_boundary = self.get_element("EndBoundary", trigger)
+            start_boundary = str_to_isoformat(self.get_element("StartBoundary", trigger))
+            end_boundary = str_to_isoformat(self.get_element("EndBoundary", trigger))
             repetition_interval = self.get_element("Repetition/Interval", trigger)
             repetition_duration = self.get_element("Repetition/Duration", trigger)
             repetition_stop_duration_end = str_to_bool(self.get_element("Repetition/StopAtDurationEnd", trigger))
