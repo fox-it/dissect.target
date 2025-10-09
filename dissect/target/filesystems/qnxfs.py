@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 import dissect.qnxfs as qnxfs
 from dissect.qnxfs.qnx4 import INode4
@@ -19,7 +19,7 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-INode = Union[INode4, INode6]
+INode = INode4 | INode6
 
 
 class QnxFilesystem(Filesystem):

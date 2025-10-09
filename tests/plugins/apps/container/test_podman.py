@@ -76,7 +76,7 @@ def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesyste
     target_unix_podman.add_plugin(PodmanPlugin)
     records = list(target_unix_podman.container.containers())
 
-    assert sorted([r.names for r in records]) == [
+    assert sorted([r.name for r in records]) == [
         "boring_mirzakhani",
         "fervent_proskuriakova",
         "hardcore_khayyam",
@@ -93,7 +93,7 @@ def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesyste
     assert records[0].started == datetime(2025, 4, 9, 11, 37, 42, 68128, tzinfo=timezone.utc)
     assert records[0].finished == datetime(1, 1, 1, tzinfo=timezone.utc)
     assert records[0].ports == []
-    assert records[0].names == "hardcore_khayyam"
+    assert records[0].name == "hardcore_khayyam"
     assert records[0].volumes == ["/tmp/host-folder:/data"]
     assert records[0].environment == [
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",

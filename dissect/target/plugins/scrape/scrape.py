@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from collections import defaultdict
-from typing import TYPE_CHECKING, BinaryIO, Callable
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import MappingStream
 
@@ -12,7 +12,7 @@ from dissect.target.volume import EncryptedVolumeSystem, LogicalVolumeSystem, Vo
 
 if TYPE_CHECKING:
     import re
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.container import Container
     from dissect.target.helpers.record import TargetRecordDescriptor

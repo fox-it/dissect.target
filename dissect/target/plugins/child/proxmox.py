@@ -21,8 +21,25 @@ class ProxmoxChildTargetPlugin(ChildTargetPlugin):
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for vm in self.target.vmlist():
+            vm_path = self.target.fs.path(vm.path)
+
+            name = None
+            try:
+                with vm_path.open("rt") as fh:
+                    for line in fh:
+                        if not (line := line.strip()):
+                            continue
+
+                        if (key_value := line.split(":", 1)) and key_value[0] == "name":
+                            name = key_value[1].strip()
+                            break
+            except Exception as e:
+                self.target.log.error("Failed parsing name from VM config: %s", vm_path)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
+
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=vm.path,
+                name=name,
+                path=vm_path,
                 _target=self.target,
             )

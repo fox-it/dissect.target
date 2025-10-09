@@ -26,7 +26,7 @@ SOLARIS_DEV_DIR = Path("/dev/dsk")
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
 
 LINUX_DEV_DIR = Path("/dev")
-LINUX_DRIVE_REGEX = re.compile(r"(([sh]|xv)d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
+LINUX_DRIVE_REGEX = re.compile(r"(([shv]|xv)d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
 VOLATILE_LINUX_PATHS = [
     Path("/proc"),
     Path("/sys"),

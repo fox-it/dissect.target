@@ -20,12 +20,10 @@ def test_duplicate_volume_name(target_bare: Target, monkeypatch: pytest.MonkeyPa
         m.setattr("dissect.target.tools.mount.HAS_FUSE", True)
 
         with (
-            patch("dissect.target.tools.mount.Target") as MockTarget,
+            patch("dissect.target.tools.mount.open_target", return_value=target_bare),
             patch("dissect.target.tools.mount.FUSE", create=True) as MockFUSE,
             patch("dissect.target.tools.mount.DissectMount", create=True) as MockDissectMount,
         ):
-            MockTarget.open.return_value = target_bare
-
             target_bare.volumes.add(Volume(BytesIO(), 1, 0, 0, None, name="first"))
             target_bare.volumes.add(Volume(BytesIO(), 2, 0, 0, None, name="second"))
             target_bare.volumes.add(Volume(BytesIO(), 3, 0, 0, None, name="second_1"))
@@ -57,12 +55,10 @@ def test_mounting_multi_volume_filesystem(target_bare: Target, monkeypatch: pyte
         m.setattr("dissect.target.tools.mount.HAS_FUSE", True)
 
         with (
-            patch("dissect.target.tools.mount.Target") as MockTarget,
+            patch("dissect.target.tools.mount.open_target", return_value=target_bare),
             patch("dissect.target.tools.mount.FUSE", create=True) as MockFUSE,
             patch("dissect.target.tools.mount.DissectMount", create=True) as MockDissectMount,
         ):
-            MockTarget.open.return_value = target_bare
-
             volumes = [
                 Volume(BytesIO(), 1, 0, 0, None, name="first"),
                 Volume(BytesIO(), 2, 0, 0, None, name="second"),
