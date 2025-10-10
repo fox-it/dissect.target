@@ -24,6 +24,7 @@ class PodmanChildTargetPlugin(ChildTargetPlugin):
             if container.mount_path:
                 yield ChildTargetRecord(
                     type=self.__type__,
+                    name=container.name,
                     path=container.mount_path,
                     _target=self.target,
                 )

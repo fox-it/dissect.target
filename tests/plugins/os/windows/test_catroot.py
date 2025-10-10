@@ -90,7 +90,7 @@ def test_catroot_files(
 
     sorted_file_hints = sorted(file_hints)
     # Make sure the order is constant by sorting on digest
-    for cat_hash, record in zip(sorted(hashes), sorted(records, key=lambda r: r.digest.sha256)):
+    for cat_hash, record in zip(sorted(hashes), sorted(records, key=lambda r: r.digest.sha256), strict=False):
         assert str(record.source) == "c:" + file_location
         assert record.catroot_name == filename
         assert sorted(record.hints) == sorted_file_hints
@@ -116,6 +116,7 @@ def test_catroot_catdb(target_win: Target, fs_win: VirtualFilesystem) -> None:
     for expected_digest, record in zip(
         sorted(hashes, key=lambda d: d.sha1 or d.sha256),
         sorted(records, key=lambda r: r.digest.sha1 or r.digest.sha256),
+        strict=False,
     ):
         assert record.catroot_name == "Containers-ApplicationGuard-Package~31bf3856ad364e35~amd64~~10.0.19041.1288.cat"
         assert record.source == "c:\\windows\\system32\\catroot2\\{ID}\\catdb"

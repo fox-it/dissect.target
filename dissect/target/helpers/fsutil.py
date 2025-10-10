@@ -11,7 +11,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 try:
     import lzma
@@ -53,7 +53,7 @@ from dissect.target.helpers.polypath import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Callable, Iterator, Sequence
 
     from typing_extensions import Self
 
@@ -65,13 +65,10 @@ elif sys.version_info >= (3, 12):
     from dissect.target.helpers.compat.path_312 import PureDissectPath, TargetPath
 elif sys.version_info >= (3, 11):
     from dissect.target.helpers.compat.path_311 import PureDissectPath, TargetPath
-elif sys.version_info >= (3, 10):
+elif sys.version_info >= (3, 10):  # noqa: UP036
     from dissect.target.helpers.compat.path_310 import PureDissectPath, TargetPath
-elif sys.version_info >= (3, 9):  # noqa: UP036
-    from dissect.target.helpers.compat.path_39 import PureDissectPath, TargetPath
 else:
-    raise RuntimeError("dissect.target requires at least Python 3.9")
-
+    raise RuntimeError("dissect.target requires at least Python 3.10")
 
 log = logging.getLogger(__name__)
 

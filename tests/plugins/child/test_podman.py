@@ -8,19 +8,17 @@ from tests.plugins.apps.container.test_podman import target_unix_podman  # noqa:
 
 if TYPE_CHECKING:
     from dissect.target import Target
-    from dissect.target.filesystem import VirtualFilesystem
 
 
-def test_plugins_child_podman(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:  # noqa: F811
+def test_plugins_child_podman(target_unix_podman: Target) -> None:  # noqa: F811
     """Test if we can find, parse and correctly yield child Podman targets."""
-
     target_unix_podman.add_plugin(PodmanPlugin)
     target_unix_podman.add_plugin(PodmanChildTargetPlugin)
-
-    children = sorted(target_unix_podman.list_children(), key=lambda r: r.path)
+    children = sorted([child for _, child in target_unix_podman.list_children()], key=lambda r: r.path)
 
     assert len(children) == 3
     assert children[0].type == "podman"
+    assert children[0].name == "zen_taussig"
 
     assert sorted([c.path for c in children]) == [
         "/home/user/.local/share/containers/storage/overlay/04a40aded310ba9deffbd5b5b0120a0a4416e6083420e338e998250f1a2e2f2b",

@@ -164,7 +164,7 @@ def print_ls(
     if not long_listing:
         for target_path, name in contents:
             print(name, file=stdout)
-            if target_path.is_dir():
+            if not target_path.is_symlink() and target_path.is_dir():
                 subdirs.append(target_path)
     else:
         if len(contents) > 1:
