@@ -86,6 +86,11 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
         type=Path,
         help="a file or directory containing plugins and extensions",
     )
+    parser.add_argument(
+        "--ignore-regback",
+        action="store_true",
+        help="ignore registry backup hives (RegBack) to avoid duplicate results",
+    )
 
 
 def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
@@ -242,6 +247,10 @@ def open_targets(args: argparse.Namespace) -> Iterator[Target]:
     )
 
     for target in targets:
+        # Set the ignore_regback property if the argument was provided
+        if hasattr(args, "ignore_regback"):
+            target.props["ignore_regback"] = args.ignore_regback
+
         if child:
             try:
                 target.log.warning("Switching to --child %s", child)
