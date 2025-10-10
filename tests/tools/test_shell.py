@@ -232,6 +232,18 @@ def test_target_cli_ls(target_win: Target, capsys: pytest.CaptureFixture, monkey
     assert captured.out == "c:\nsysvol" + "\n"
 
 
+def test_target_cli_info(target_win: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    # disable colorful output in `target-shell`
+    monkeypatch.setattr(fsutils, "LS_COLORS", {})
+
+    cli = TargetCli(target_win)
+    cli.onecmd("info")
+
+    captured = capsys.readouterr()
+    # Check if common keywords are present in output
+    assert all(key in captured.out for key in ["Hostname", "path", "Os"])
+
+
 @pytest.mark.parametrize(
     ("folders", "files", "save", "expected"),
     [
