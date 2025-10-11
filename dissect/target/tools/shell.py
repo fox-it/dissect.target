@@ -42,7 +42,7 @@ from dissect.target.tools.fsutils import (
     print_stat,
     print_xattr,
 )
-from dissect.target.tools.info import print_target_info
+from dissect.target.tools.info import get_target_info, print_target_info
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -727,7 +727,8 @@ class TargetCli(TargetCmd):
 
     def do_info(self, line: str) -> bool:
         """print target information"""
-        print_target_info(self.target)
+        target_info = get_target_info(self.target)
+        print_target_info(self.target, target_info)
         return False
 
     def do_reload(self, line: str) -> bool:
