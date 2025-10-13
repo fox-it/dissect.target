@@ -19,7 +19,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, ClassVar, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
 from flow.record import RecordOutput
@@ -42,19 +42,20 @@ from dissect.target.tools.fsutils import (
     print_stat,
     print_xattr,
 )
-from dissect.target.tools.info import print_target_info
+from dissect.target.tools.info import get_target_info, print_target_info
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
     escape_str,
     execute_function_on_target,
     find_and_filter_plugins,
-    generate_argparse_for_bound_method,
+    generate_argparse_for_method,
+    open_targets,
     process_generic_arguments,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.filesystem import FilesystemEntry
 
@@ -167,7 +168,7 @@ class ExtendedCmd(cmd.Cmd):
             _, _, command = attr.partition("_")
 
             def print_help(command: str, func: Callable) -> None:
-                parser = generate_argparse_for_bound_method(func, usage_tmpl=f"{command} {{usage}}")
+                parser = generate_argparse_for_method(func, usage_tmpl=f"{command} {{usage}}")
                 parser.print_help()
 
             try:
@@ -295,7 +296,7 @@ class ExtendedCmd(cmd.Cmd):
     def _exec_command(self, command: str, command_args_str: str) -> bool:
         """Command execution helper for ``cmd_`` commands."""
         cmdfunc = getattr(self, self.CMD_PREFIX + command)
-        argparser = generate_argparse_for_bound_method(cmdfunc, usage_tmpl=f"{command} {{usage}}")
+        argparser = generate_argparse_for_method(cmdfunc, usage_tmpl=f"{command} {{usage}}")
 
         def _exec_(argparts: list[str], stdout: TextIO) -> bool:
             try:
@@ -726,7 +727,8 @@ class TargetCli(TargetCmd):
 
     def do_info(self, line: str) -> bool:
         """print target information"""
-        print_target_info(self.target)
+        target_info = get_target_info(self.target)
+        print_target_info(self.target, target_info)
         return False
 
     def do_reload(self, line: str) -> bool:
@@ -1181,7 +1183,7 @@ class TargetCli(TargetCmd):
 
         if args.python:
             # Quick path that doesn't require CLI caching
-            open_shell(paths, args.python, args.registry)
+            open_shell(list(open_targets(args)), args.python, args.registry)
             return False
 
         clikey = tuple(str(path) for path in paths)
@@ -1477,10 +1479,8 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, commands: list[str] | None) -> None:
+def open_shell(targets: list[Target], python: bool, registry: bool, commands: list[str] | None) -> None:
     """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
-    targets = list(Target.open_all(targets))
-
     if python:
         python_shell(targets, commands=commands)
     else:
@@ -1583,8 +1583,8 @@ def main() -> int:
     parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(parser, args)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:
@@ -1602,9 +1602,9 @@ def main() -> int:
             )
 
     try:
-        open_shell(args.targets, args.python, args.registry, args.commands)
+        open_shell(list(open_targets(args)), args.python, args.registry, args.commands)
     except TargetError as e:
-        log.exception("Error opening shell")
+        log.error("Error opening shell: %s", e)  # noqa: TRY400
         log.debug("", exc_info=e)
 
     return 0

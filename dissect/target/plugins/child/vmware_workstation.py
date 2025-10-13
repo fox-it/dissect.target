@@ -9,8 +9,29 @@ from dissect.target.plugins.apps.virtualization.vmware_workstation import find_v
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
     from dissect.target.target import Target
+
+
+def parse_vm_inventory(path: Path) -> dict[str, dict[str, str]]:
+    config = {}
+
+    with path.open("rt") as fh:
+        for line in fh:
+            if not (line := line.strip()) or line.startswith("."):
+                continue
+
+            full_key, value = line.split("=", 1)
+            vm, key = full_key.strip().split(".", 1)
+
+            # Only process vmlist entries, not index entries
+            if "vmlist" not in vm:
+                continue
+
+            config.setdefault(vm, {})[key] = value.strip().strip('"')
+
+    return config
 
 
 class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
@@ -28,21 +49,12 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for inv in self.inventories:
-            for line in inv.open("rt"):
-                line = line.strip()
-                if not line.startswith("vmlist"):
-                    continue
+            inventory = parse_vm_inventory(inv)
 
-                key, _, value = line.partition("=")
-                if not key.strip().endswith(".config"):
-                    continue
-
-                value = value.strip().strip('"')
-                if value.startswith("folder") or not value:
-                    continue
-
+            for config in inventory.values():
                 yield ChildTargetRecord(
                     type=self.__type__,
-                    path=self.target.fs.path(value.strip('"')),
+                    name=config.get("DisplayName"),
+                    path=config.get("config"),
                     _target=self.target,
                 )

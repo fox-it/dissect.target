@@ -3,81 +3,100 @@ from __future__ import annotations
 import contextlib
 import logging
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.vmx import VmxLoader
+from dissect.target.target import Target
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from pathlib import Path
-
-    import pytest
-
-    from dissect.target.target import Target
 
 
 @contextlib.contextmanager
-def _mock_vmx_and_vmdk(disks: list[str]) -> Iterator[MagicMock]:
+def _mock_vmx_and_container_open(disks: list[str]) -> Iterator[MagicMock]:
     with (
-        patch("dissect.hypervisor.descriptor.vmx.VMX") as MockVMX,
-        patch("dissect.target.loaders.vmx.VmdkContainer") as MockVmdkContainer,
+        patch("dissect.hypervisor.descriptor.vmx.VMX") as mock_vmx,
+        patch("dissect.target.container.open") as mock_container_open,
     ):
-        MockVMX.parse.return_value = MockVMX
-        MockVMX.disks.return_value = disks
-        MockVmdkContainer.return_value = MockVmdkContainer
-
-        yield MockVmdkContainer
+        mock_vmx.parse.return_value = mock_vmx
+        mock_vmx.disks.return_value = disks
+        yield mock_container_open
 
 
-def test_vmx_loader(target_bare: Target, tmp_path: Path) -> None:
-    root = tmp_path.resolve()
-    vm_path = root / "Test.vmwarevm"
-    vm_path.mkdir()
-    vmx_path = vm_path / "Test.vmx"
-    vmx_path.touch()
-    (vm_path / "mock.vmdk").touch()
-
-    with _mock_vmx_and_vmdk(["mock.vmdk"]) as MockVmdkContainer:
-        assert VmxLoader.detect(vmx_path)
-
-        VmxLoader(vmx_path).map(target_bare)
-        assert len(target_bare.disks) == 1
-        assert MockVmdkContainer.mock_calls == [call(vm_path / "mock.vmdk")]
-
-
-def test_vmx_loader_missing_disk(target_bare: Target, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    root = tmp_path.resolve()
-    vm_path = root / "Test.vmwarevm"
+@pytest.fixture
+def mock_vmwarevm_dir(tmp_path: Path) -> Path:
+    vm_path = tmp_path / "Test.vmwarevm"
     vm_path.mkdir()
     vmx_path = vm_path / "Test.vmx"
     vmx_path.touch()
 
-    with _mock_vmx_and_vmdk(["mock.vmdk"]), caplog.at_level(logging.DEBUG, target_bare.log.name):
-        assert VmxLoader.detect(vmx_path)
+    return vm_path
 
-        VmxLoader(vmx_path).map(target_bare)
-        assert len(target_bare.disks) == 0
 
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: Path) -> None:
+    """Test that we correctly use ``VmwarevmLoader`` when opening a ``Target``."""
+    path = mock_vmwarevm_dir / "Test.vmx"
+
+    with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
+        target = opener(path)
+        assert isinstance(target._loader, VmxLoader)
+        assert target.path == path
+
+
+def test_loader(mock_vmwarevm_dir: Path) -> None:
+    (mock_vmwarevm_dir / "mock.vmdk").touch()
+
+    with _mock_vmx_and_container_open(["mock.vmdk"]) as mock_container_open:
+        loader = loader_open(mock_vmwarevm_dir / "Test.vmx")
+        assert isinstance(loader, VmxLoader)
+
+        t = Target()
+        loader.map(t)
+
+        assert len(t.disks) == 1
+        mock_container_open.assert_called_with(mock_vmwarevm_dir / "mock.vmdk")
+
+
+def test_missing_disk(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    t = Target()
+
+    with _mock_vmx_and_container_open(["mock.vmdk"]), caplog.at_level(logging.DEBUG, t.log.name):
+        loader = loader_open(mock_vmwarevm_dir / "Test.vmx")
+        assert isinstance(loader, VmxLoader)
+
+        loader.map(t)
+        assert len(t.disks) == 0
         assert "Disk not found: mock.vmdk" in caplog.text
 
 
-def test_vmx_loader_missing_snapshots(target_bare: Target, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    root = tmp_path
-    vm_path = root / "Test.vmwarevm"
-    vm_path.mkdir()
-    vmx_path = vm_path / "Test.vmx"
-    vmx_path.touch()
-    (vm_path / "mock.vmdk").touch()
-    (vm_path / "mock-000001.vmdk").touch()
+def test_missing_snapshots(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    (mock_vmwarevm_dir / "mock.vmdk").touch()
+    (mock_vmwarevm_dir / "mock-000001.vmdk").touch()
+
+    t = Target()
 
     with (
-        _mock_vmx_and_vmdk(["mock-000002.vmdk"]) as MockVmdkContainer,
-        caplog.at_level(logging.DEBUG, target_bare.log.name),
+        _mock_vmx_and_container_open(["mock-000002.vmdk"]) as mock_container_open,
+        caplog.at_level(logging.DEBUG, t.log.name),
     ):
-        VmxLoader(vmx_path).map(target_bare)
+        loader = loader_open(mock_vmwarevm_dir / "Test.vmx")
+        assert isinstance(loader, VmxLoader)
 
-        assert len(target_bare.disks) == 1
-        assert MockVmdkContainer.mock_calls == [call(vm_path / "mock-000001.vmdk")]
+        loader.map(t)
+
+        assert len(t.disks) == 1
+        mock_container_open.assert_called_with(mock_vmwarevm_dir / "mock-000001.vmdk")
 
         assert "Disk not found but seems to be a snapshot, trying previous snapshots: mock-000002.vmdk" in caplog.text
         assert "Trying to load snapshot: mock-000001.vmdk" in caplog.text
@@ -87,24 +106,22 @@ def test_vmx_loader_missing_snapshots(target_bare: Target, tmp_path: Path, caplo
         )
 
 
-def test_vmx_loader_missing_snapshots_base(
-    target_bare: Target, tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    root = tmp_path
-    vm_path = root / "Test.vmwarevm"
-    vm_path.mkdir()
-    vmx_path = vm_path / "Test.vmx"
-    vmx_path.touch()
-    (vm_path / "mock.vmdk").touch()
+def test_missing_snapshots_base(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    (mock_vmwarevm_dir / "mock.vmdk").touch()
+
+    t = Target()
 
     with (
-        _mock_vmx_and_vmdk(["mock-000002.vmdk"]) as MockVmdkContainer,
-        caplog.at_level(logging.DEBUG, target_bare.log.name),
+        _mock_vmx_and_container_open(["mock-000002.vmdk"]) as mock_container_open,
+        caplog.at_level(logging.DEBUG, t.log.name),
     ):
-        VmxLoader(vmx_path).map(target_bare)
+        loader = loader_open(mock_vmwarevm_dir / "Test.vmx")
+        assert isinstance(loader, VmxLoader)
 
-        assert len(target_bare.disks) == 1
-        assert MockVmdkContainer.mock_calls == [call(vm_path / "mock.vmdk")]
+        loader.map(t)
+
+        assert len(t.disks) == 1
+        mock_container_open.assert_called_with(mock_vmwarevm_dir / "mock.vmdk")
 
         assert "Disk not found but seems to be a snapshot, trying previous snapshots: mock-000002.vmdk" in caplog.text
         assert "Trying to load snapshot: mock-000001.vmdk" in caplog.text
@@ -115,18 +132,15 @@ def test_vmx_loader_missing_snapshots_base(
         )
 
 
-def test_vmx_loader_missing_all_snapshots(
-    target_bare: Target, tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    root = tmp_path
-    vm_path = root / "Test.vmwarevm"
-    vm_path.mkdir()
-    vmx_path = vm_path / "Test.vmx"
-    vmx_path.touch()
+def test_missing_all_snapshots(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    t = Target()
 
-    with _mock_vmx_and_vmdk(["mock-000001.vmdk"]), caplog.at_level(logging.DEBUG, target_bare.log.name):
-        VmxLoader(vmx_path).map(target_bare)
+    with _mock_vmx_and_container_open(["mock-000001.vmdk"]), caplog.at_level(logging.DEBUG, t.log.name):
+        loader = loader_open(mock_vmwarevm_dir / "Test.vmx")
+        assert isinstance(loader, VmxLoader)
 
-        assert len(target_bare.disks) == 0
+        loader.map(t)
+
+        assert len(t.disks) == 0
 
         assert "Failed to find previous snapshot for disk: mock-000001.vmdk" in caplog.text

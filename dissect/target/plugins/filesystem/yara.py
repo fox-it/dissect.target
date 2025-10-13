@@ -29,10 +29,12 @@ log = logging.getLogger(__name__)
 YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",
     [
+        ("datetime", "ts_mtime"),
         ("path", "path"),
-        ("digest", "digest"),
         ("string", "rule"),
+        ("string[]", "matches"),
         ("string[]", "tags"),
+        ("digest", "digest"),
         ("string", "namespace"),
     ],
 )
@@ -93,11 +95,17 @@ class YaraPlugin(Plugin):
 
                     buf = file.open().read()
                     for match in compiled_rules.match(data=buf):
+                        string_matches: list[str] = []
+                        for string in match.strings:
+                            string_matches.extend(f"{string}={instance}" for instance in string.instances)
+
                         yield YaraMatchRecord(
+                            ts_mtime=file.stat().st_mtime,
                             path=self.target.fs.path(file.path),
-                            digest=hashutil.common(BytesIO(buf)),
                             rule=match.rule,
+                            matches=string_matches,
                             tags=match.tags,
+                            digest=hashutil.common(BytesIO(buf)),
                             namespace=match.namespace,
                             _target=self.target,
                         )

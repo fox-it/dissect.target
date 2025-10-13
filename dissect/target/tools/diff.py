@@ -37,7 +37,7 @@ from dissect.target.tools.shell import (
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
-    generate_argparse_for_bound_method,
+    generate_argparse_for_method,
     process_generic_arguments,
 )
 
@@ -119,7 +119,7 @@ def get_plugin_output_records(plugin_name: str, plugin_arg_parts: list[str], tar
         raise ValueError("Comparing plugin output is only supported for plugins outputting records.")
 
     if callable(attr):
-        argparser = generate_argparse_for_bound_method(attr)
+        argparser = generate_argparse_for_method(attr)
         try:
             args = argparser.parse_args(plugin_arg_parts)
         except SystemExit:
@@ -965,8 +965,8 @@ def main() -> int:
 
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(parser, args)
 
     if len(args.targets) < 2:
         parser.error("at least two targets are required for target-diff")

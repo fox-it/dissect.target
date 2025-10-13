@@ -3,15 +3,16 @@ from __future__ import annotations
 import argparse
 import errno
 import inspect
-import json
+import json as jsonlib
 import os
 import sys
 import textwrap
 import urllib.parse
+from collections.abc import Callable
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
@@ -27,7 +28,6 @@ from dissect.target.plugin import (
 )
 from dissect.target.plugins.general.plugins import (
     _get_default_functions,
-    _get_os_functions,
     generate_functions_json,
     generate_functions_overview,
 )
@@ -42,10 +42,40 @@ if TYPE_CHECKING:
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
+class _OverrideRequiredAction(argparse.Action):
+    """A special argparse action that sets all required arguments to not required.
+
+    This is useful for implementing flags such as ``--list-children``, that should not be "blocked" by the ommission of
+    an otherwise required argument.
+    """
+
+    def __init__(self, option_strings: list, dest: str, **kwargs):
+        super().__init__(
+            option_strings=option_strings,
+            dest=dest,
+            nargs=0,
+            const=True,
+            default=False,
+            **kwargs,
+        )
+
+    def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, *args, **kwargs):
+        for action in parser._get_positional_actions():
+            action.required = False
+
+        setattr(namespace, self.dest, self.const)
+
+
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
-    parser.add_argument("-L", "--loader", action="store", help="select a specific loader (i.e. vmx, raw)")
+    parser.add_argument("-L", "--loader", help="select a specific loader (i.e. vmx, raw)")
+    parser.add_argument("--child", help="load child of target by path of index (see --list-children)")
+    parser.add_argument("--children", action="store_true", help="include children")
+    parser.add_argument(
+        "--list-children", action=_OverrideRequiredAction, help="list all children indices and paths, then exit"
+    )
+    parser.add_argument("--recursive", action="store_true", help="make --list-children behave recursively")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", action="store_true", help="print version")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
@@ -58,7 +88,7 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None:
+def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     configure_logging(args.verbose, args.quiet, as_plain_text=True)
 
     if args.version:
@@ -66,16 +96,24 @@ def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None
             print("dissect.target version " + version("dissect.target"))
         except PackageNotFoundError:
             print("unable to determine version")
-        sys.exit(0)
+        parser.exit(0)
 
     targets = args.targets if hasattr(args, "targets") else [args.target] if hasattr(args, "target") else []
     if targets and args.loader:
-        targets = args_to_uri(targets, args.loader, rest)
+        targets = args_to_uri(targets, args.loader)
 
     if hasattr(args, "targets"):
         args.targets = targets
     elif hasattr(args, "target"):
         args.target = targets[0]
+
+    if args.child and len(getattr(args, "targets", [])) > 1:
+        parser.error("--child can only be used on a single target, not multiple")
+
+    if args.list_children:
+        # List found children on targets and exit
+        list_children(args)
+        parser.exit(0)
 
     if args.keychain_file:
         keychain.register_keychain_file(args.keychain_file)
@@ -100,7 +138,6 @@ def configure_plugin_arguments(parser: argparse.ArgumentParser) -> None:
         help="list (matching) available plugins and loaders",
     )
     parser.add_argument(
-        "-n",
         "--dry-run",
         action="store_true",
         help="do not execute the functions, but just print which functions would be executed",
@@ -108,12 +145,13 @@ def configure_plugin_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace, rest: list[str]) -> set:
-    """Processes the arguments concerting plugin functions (-f, --function) and exclusion list (-xf, --exclude-funciton)
+    """Processes the arguments concerting plugin functions (``-f``, ``--function``) and
+    exclusion list (``-xf``, ``--exclude-funciton``).
 
-    It puts the excluded function paths inside args.excluded_functions as a side effect
+    It puts the excluded function paths inside ``args.excluded_functions`` as a side effect.
 
     Returns:
-        True if there are multiple output types detected, false otherwise.
+        ``True`` if there are multiple output types detected, false otherwise.
     """
 
     # Show help for a function or in general
@@ -132,7 +170,7 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
         if isinstance(obj, type) and issubclass(obj, Plugin):
             parser = generate_argparse_for_plugin_class(obj, usage_tmpl=USAGE_FORMAT_TMPL)
         elif isinstance(obj, (Callable, property)):
-            parser = generate_argparse_for_unbound_method(getattr(obj, "fget", obj), usage_tmpl=USAGE_FORMAT_TMPL)
+            parser = generate_argparse_for_method(getattr(obj, "fget", obj), usage_tmpl=USAGE_FORMAT_TMPL)
         else:
             parser.error(f"can't find plugin with function `{func.method_name}`")
         parser.print_help()
@@ -141,7 +179,7 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list is not None:
-        list_plugins(args.targets, args.list, getattr(args, "children", False), getattr(args, "json", False), rest)
+        list_plugins(args.targets, args.list, getattr(args, "children", False), getattr(args, "json", False))
         parser.exit(0)
 
     if not args.function:
@@ -174,10 +212,31 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
     return {func.output for func in funcs if func.path not in args.excluded_functions}
 
 
+def open_target(args: argparse.Namespace) -> Target:
+    direct: bool = getattr(args, "direct", False)
+    child: str | None = getattr(args, "child", None)
+
+    target = Target.open_direct(args.target) if direct else Target.open(args.target)
+
+    if child:
+        try:
+            target.log.warning("Switching to --child %s", child)
+            target = target.open_child(child)
+        except Exception as e:
+            target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
+            target.log.debug("", exc_info=e)
+
+            # Do not continue processing, we requested a child but got none
+            raise
+
+    return target
+
+
 def open_targets(args: argparse.Namespace) -> Iterator[Target]:
     direct: bool = getattr(args, "direct", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
+
     targets: Iterable[Target] = (
         [Target.open_direct(args.targets)] if direct else Target.open_all(args.targets, children)
     )
@@ -185,42 +244,86 @@ def open_targets(args: argparse.Namespace) -> Iterator[Target]:
     for target in targets:
         if child:
             try:
-                target: Target = target.open_child(child)
+                target.log.warning("Switching to --child %s", child)
+                target = target.open_child(child)
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
                 target.log.debug("", exc_info=e)
 
-        if getattr(args, "dry_run", False):
-            print(f"Dry run on: {target}")
+                # Do not continue processing, we requested a child but got none
+                continue
 
         yield target
 
 
-def generate_argparse_for_bound_method(
+def list_plugins(
+    targets: list[str] | None = None,
+    patterns: str = "",
+    include_children: bool = False,
+    json: bool = False,
+) -> None:
+    functions = None
+    if targets:
+        for target in Target.open_all(targets, include_children):
+            functions, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
+    elif patterns:
+        functions, _ = find_functions(patterns, Target(), show_hidden=True)
+    else:
+        functions = _get_default_functions()
+
+    target = Target()
+    fparser = generate_argparse_for_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
+    fargs, _ = fparser.parse_known_args()
+
+    # Display in a user friendly manner
+    if functions:
+        if json:
+            print('{"plugins": ', end="")
+            print(generate_functions_json(functions), end="")
+        else:
+            print(generate_functions_overview(functions, include_docs=fargs.print_docs))
+    elif json:
+        print("{", end="")
+
+    # No real targets specified, show the available loaders
+    if not targets:
+        fparser = generate_argparse_for_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
+        fargs, _ = fparser.parse_known_args()
+        if json:
+            print(', "loaders": ', end="")
+        target.loaders(**vars(fargs))
+
+    if json:
+        print("}")
+
+
+def list_children(args: argparse.Namespace) -> None:
+    """Pretty print children of targets (recursively)."""
+    found_one = False
+    for target in open_targets(args) if hasattr(args, "targets") else [open_target(args)]:
+        for child_id, child in target.list_children(recursive=args.recursive):
+            found_one = True
+            prefix = "-" * child_id.count(".")
+            print(
+                f" {prefix}{' ' if prefix else ''}[{child_id}]: type={child.type!r} name={child.name!r} path={str(child.path)!r}"  # noqa: E501
+            )
+
+    if not found_one:
+        print("No children found on target(s)")
+
+
+def generate_argparse_for_method(
     method: Callable,
     usage_tmpl: str | None = None,
 ) -> argparse.ArgumentParser:
-    """Generate an ``argparse.ArgumentParser`` for a bound ``Plugin`` class method."""
+    """Generate an ``argparse.ArgumentParser`` for a bound or unbound ``Plugin`` class method."""
 
     # allow functools.partial wrapped method
     while hasattr(method, "func"):
         method = method.func
 
-    if not inspect.ismethod(method):
-        raise ValueError(f"Value `{method}` is not a bound plugin instance method")
-
-    unbound_method = method.__func__
-    return generate_argparse_for_unbound_method(unbound_method, usage_tmpl=usage_tmpl)
-
-
-def generate_argparse_for_unbound_method(
-    method: Callable,
-    usage_tmpl: str | None = None,
-) -> argparse.ArgumentParser:
-    """Generate an ``argparse.ArgumentParser`` for an unbound ``Plugin`` class method."""
-
-    if not inspect.isfunction(method):
-        raise ValueError(f"Value `{method}` is not an unbound plugin method")
+    if not inspect.isfunction(method) and not inspect.ismethod(method):
+        raise ValueError(f"Value `{method}` is not a plugin method")
 
     desc = method.__doc__ or docs.get_func_description(method, with_docstrings=True)
 
@@ -239,52 +342,6 @@ def generate_argparse_for_unbound_method(
     parser.usage = usage_tmpl.format(prog=parser.prog, name=func_name, usage=usage[offset:])
 
     return parser
-
-
-def list_plugins(
-    targets: list[str] | None = None,
-    patterns: str = "",
-    include_children: bool = False,
-    as_json: bool = False,
-    argv: list[str] | None = None,
-) -> None:
-    collected = set()
-    if targets or patterns:
-        collected.update(_get_os_functions())
-
-    if targets:
-        for target in Target.open_all(targets, include_children):
-            funcs, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
-            collected.update(funcs)
-    elif patterns:
-        funcs, _ = find_functions(patterns, Target(), show_hidden=True)
-        collected.update(funcs)
-    else:
-        collected.update(_get_default_functions())
-
-    target = Target()
-    fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
-    fargs, rest = fparser.parse_known_args(argv or [])
-
-    # Display in a user friendly manner
-    if collected:
-        if as_json:
-            print('{"plugins": ', end="")
-            print(generate_functions_json(collected), end="")
-        else:
-            print(generate_functions_overview(collected, include_docs=fargs.print_docs))
-
-    # No real targets specified, show the available loaders
-    if not targets:
-        fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
-        fargs, rest = fparser.parse_known_args(rest)
-        del fargs.as_json
-        if as_json:
-            print(', "loaders": ', end="")
-        target.loaders(**vars(fargs), as_json=as_json)
-
-    if as_json:
-        print("}")
 
 
 def generate_argparse_for_plugin_class(
@@ -313,6 +370,21 @@ def generate_argparse_for_plugin_class(
     return parser
 
 
+def generate_argparse_for_plugin(
+    plugin_instance: Plugin,
+    usage_tmpl: str | None = None,
+) -> argparse.ArgumentParser:
+    """Generate an ``argparse.ArgumentParser`` for a ``Plugin`` instance."""
+
+    if not isinstance(plugin_instance, Plugin):
+        raise TypeError(f"`plugin_instance` must be a valid plugin instance, not `{plugin_instance}`")
+
+    if not hasattr(plugin_instance, "__namespace__"):
+        raise ValueError(f"Plugin `{plugin_instance}` is not a namespace plugin and is not callable")
+
+    return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
+
+
 def _add_args_to_parser(
     parser: argparse.ArgumentParser,
     fargs: list[tuple[list[str], dict[str, Any]]],
@@ -334,35 +406,21 @@ def _add_args_to_parser(
             parser.add_argument(*args, **kwargs)
 
 
-def generate_argparse_for_plugin(
-    plugin_instance: Plugin,
-    usage_tmpl: str | None = None,
-) -> argparse.ArgumentParser:
-    """Generate an ``argparse.ArgumentParser`` for a ``Plugin`` instance."""
-
-    if not isinstance(plugin_instance, Plugin):
-        raise TypeError(f"`plugin_instance` must be a valid plugin instance, not `{plugin_instance}`")
-
-    if not hasattr(plugin_instance, "__namespace__"):
-        raise ValueError(f"Plugin `{plugin_instance}` is not a namespace plugin and is not callable")
-
-    return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
-
-
 def execute_function_on_target(
     target: Target,
     func: FunctionDescriptor,
-    arguments: list[str] | None = None,
+    args: list[str] | None = None,
 ) -> tuple[str, Any]:
-    """Execute function on provided target with provided arguments."""
+    """Execute function on provided target with optional provided arguments.
 
-    arguments = arguments or []
+    If no explicit arguments are provided, they will be parsed from ``sys.argv``.
+    """
 
     func_cls, func_obj = target.get_function(func.name)
     plugin_method, parser = plugin_function_with_argparser(func_obj)
 
     if parser:
-        known_args, _ = parser.parse_known_args(arguments)
+        known_args, _ = parser.parse_known_args(args)
         value = plugin_method(**vars(known_args))
     elif isinstance(func_obj, property):
         value = func_obj.__get__(func_cls)
@@ -391,7 +449,7 @@ def plugin_function_with_argparser(
         parser = generate_argparse_for_plugin(plugin_obj)
     elif callable(target_attr):
         plugin_method = target_attr
-        parser = generate_argparse_for_bound_method(target_attr)
+        parser = generate_argparse_for_method(target_attr)
     return plugin_method, parser
 
 
@@ -399,7 +457,7 @@ def persist_execution_report(output_dir: Path, report_data: dict, timestamp: dat
     timestamp = timestamp.strftime("%Y-%m-%d-%H%M%S")
     report_filename = f"target-report-{timestamp}.json"
     report_full_path = output_dir / report_filename
-    report_full_path.write_text(json.dumps(report_data, sort_keys=True, indent=4))
+    report_full_path.write_text(jsonlib.dumps(report_data, sort_keys=True, indent=4))
     return report_full_path
 
 
@@ -425,7 +483,7 @@ def catch_sigpipe(func: Callable) -> Callable:
     return wrapper
 
 
-def args_to_uri(targets: list[str], loader_name: str, rest: list[str]) -> list[str]:
+def args_to_uri(targets: list[str], loader_name: str, args: list[str] | None = None) -> list[str]:
     """Converts argument-style ``-L`` to URI-style.
 
     Turns:
@@ -442,7 +500,7 @@ def args_to_uri(targets: list[str], loader_name: str, rest: list[str]) -> list[s
     )
     for load_arg in getattr(loader, "__args__", []):
         parser.add_argument(*load_arg[0], **load_arg[1])
-    args = vars(parser.parse_known_args(rest)[0])
+    args = vars(parser.parse_known_args(args)[0])
     return [f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else "") for target in targets]
 
 

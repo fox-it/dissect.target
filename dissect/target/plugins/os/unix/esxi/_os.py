@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import gzip
-import json
+import json as jsonlib
 import lzma
 import struct
 import subprocess
@@ -180,7 +180,7 @@ class ESXiPlugin(UnixPlugin):
         if not inv_file.exists():
             return []
 
-        root = ElementTree.fromstring(inv_file.read_text("utf-8"))
+        root = ElementTree.fromstring(inv_file.read_text())
         for entry in root.iter("ConfigEntry"):
             yield VirtualMachineRecord(
                 path=self.target.fs.path(entry.findtext("vmxCfgPath")),
@@ -189,12 +189,12 @@ class ESXiPlugin(UnixPlugin):
 
     @export(output="none")
     @arg("path", help="config path")
-    @arg("--as-json", action="store_true", help="format as json")
-    def esxconf(self, path: str, as_json: bool) -> None:
+    @arg("-j", "--json", action="store_true", help="output in JSON format")
+    def esxconf(self, path: str, json: bool) -> None:
         obj = self._cfg(path)
 
-        if as_json:
-            print(json.dumps(obj, indent=4, sort_keys=True))
+        if json:
+            print(jsonlib.dumps(obj, indent=4, sort_keys=True))
         else:
             print(obj)
 
@@ -578,11 +578,11 @@ def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
             identifier["creation_time"] = row.CreationTime
             identifier["version"] = row.Version
             identifier["success"] = row.Success
-            identifier["auto_conf_value"] = json.loads(row.AutoConfValue) if row.AutoConfValue else None
-            identifier["user_value"] = json.loads(row.UserValue) if row.UserValue else None
-            identifier["vital_value"] = json.loads(row.VitalValue) if row.VitalValue else None
-            identifier["cached_value"] = json.loads(row.CachedValue) if row.CachedValue else None
-            identifier["desired_value"] = json.loads(row.DesiredValue) if row.DesiredValue else None
+            identifier["auto_conf_value"] = jsonlib.loads(row.AutoConfValue) if row.AutoConfValue else None
+            identifier["user_value"] = jsonlib.loads(row.UserValue) if row.UserValue else None
+            identifier["vital_value"] = jsonlib.loads(row.VitalValue) if row.VitalValue else None
+            identifier["cached_value"] = jsonlib.loads(row.CachedValue) if row.CachedValue else None
+            identifier["desired_value"] = jsonlib.loads(row.DesiredValue) if row.DesiredValue else None
             identifier["revision"] = row.Revision
 
     return store

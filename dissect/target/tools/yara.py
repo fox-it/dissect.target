@@ -6,11 +6,11 @@ import logging
 
 from dissect.target.exceptions import TargetError
 from dissect.target.plugins.filesystem.yara import HAS_YARA, YaraPlugin
-from dissect.target.target import Target
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_targets,
     process_generic_arguments,
 )
 
@@ -28,15 +28,14 @@ def main() -> int:
 
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
-    parser.add_argument("--children", action="store_true", help="include children")
 
     for args, kwargs in getattr(YaraPlugin.yara, "__args__", []):
         parser.add_argument(*args, **kwargs)
 
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(parser, args)
 
     if not HAS_YARA:
         log.error("yara-python is not installed: pip install yara-python")
@@ -47,7 +46,7 @@ def main() -> int:
         return 1
 
     try:
-        for target in Target.open_all(args.targets, args.children):
+        for target in open_targets(args):
             rs = record_output(args.strings, False)
             for record in target.yara(args.rules, args.path, args.max_size, args.check):
                 rs.write(record)

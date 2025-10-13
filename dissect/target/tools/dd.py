@@ -9,10 +9,10 @@ import sys
 from dissect.util.stream import RangeStream
 
 from dissect.target.exceptions import TargetError
-from dissect.target.target import Target
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_target,
     process_generic_arguments,
 )
 
@@ -35,11 +35,11 @@ def main() -> int:
     parser.add_argument("-b", "--bytes", type=int, default=-1, help="amount of bytes to read")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(parser, args)
 
     try:
-        t = Target.open(args.target)
+        t = open_target(args)
     except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)

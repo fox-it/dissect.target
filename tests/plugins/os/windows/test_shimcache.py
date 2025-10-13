@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import binascii
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
@@ -23,7 +23,7 @@ from dissect.target.plugins.os.windows.regf.shimcache import (
 
 if TYPE_CHECKING:
     import datetime
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 
@@ -45,7 +45,7 @@ def create_header_bytes(magic: int, position: int = 0, length: int = 0x100) -> B
 @pytest.fixture
 def mocked_shimcache() -> ShimCache:
     with patch.object(ShimCache, "identify"):
-        return ShimCache(fh=BytesIO(b""), ntversion="", noheader=False)
+        return ShimCache(fh=BytesIO(), ntversion="", noheader=False)
 
 
 @pytest.fixture(params=[True, False])

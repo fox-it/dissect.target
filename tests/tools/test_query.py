@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
 import re
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugin import FunctionDescriptor
+from dissect.target.plugin import FunctionDescriptor, Plugin, PluginRegistry, arg, export
 from dissect.target.tools.query import main as target_query
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
@@ -101,7 +101,7 @@ def test_invalid_functions(
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", ",".join(given_funcs), "tests/_data/loaders/tar/test-archive.tar.gz"],
+            ["target-query", "-f", ",".join(given_funcs), str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
         )
 
         with pytest.raises(SystemExit):
@@ -160,7 +160,7 @@ def test_invalid_excluded_functions(
                 "hostname",
                 "-xf",
                 ",".join(given_funcs),
-                "tests/_data/loaders/tar/test-archive.tar.gz",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
             ],
         )
 
@@ -184,7 +184,7 @@ def test_unsupported_plugin_log(caplog: pytest.LogCaptureFixture, monkeypatch: p
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", "regf", "tests/_data/loaders/tar/test-archive.tar.gz"],
+            ["target-query", "-f", "regf", str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
         )
 
         target_query()
@@ -218,7 +218,7 @@ def mock_execute_function(
     func: FunctionDescriptor,
     arguments: list[str] | None = None,
 ) -> tuple[str, Any, list[str]]:
-    return (func.output, func.name, "")
+    return (func.output, func.name)
 
 
 def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -231,7 +231,7 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
                 "foo,bar,bla,foo",
                 "-xf",
                 "bla",
-                "tests/_data/loaders/tar/test-archive.tar.gz",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
             ],
         )
 
@@ -262,10 +262,7 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-    if os.sep == "\\":
-        target_file = "tests\\_data\\loaders\\tar\\test-archive.tar.gz"
-    else:
-        target_file = "tests/_data/loaders/tar/test-archive.tar.gz"
+    target_file = str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))
 
     with monkeypatch.context() as m:
         m.setattr(
@@ -291,7 +288,7 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
     try:
         output = json.loads(out)
     except json.JSONDecodeError:
-        pass
+        pytest.fail("Could not decode JSON output of 'target-query --list --json'")
 
     # test the generic structure of the returned dictionary.
     assert isinstance(output, dict), "Could not load JSON output of 'target-query --list --json'"
@@ -364,13 +361,67 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
     }
 
 
+def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test if target-query --list "*" --json <target> returns functions we expect it to."""
+
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-l=*",
+                str(absolute_path("_data/loaders/containerimage/alpine-docker.tar")),
+                "-j",
+            ],
+        )
+        with pytest.raises(SystemExit, check=lambda r: r.code == 0):
+            target_query()
+        out, _ = capsys.readouterr()
+
+    output = json.loads(out)
+
+    # test the generic structure of the returned dictionary.
+    assert isinstance(output, dict), "Could not load JSON output of 'target-query --list --json'"
+    assert output["plugins"], "Expected a dictionary of plugins"
+    assert not output.get("loaders"), "Did not expect a dictionary of loaders"
+    assert not output["plugins"].get("failed"), "Some plugin(s) failed to initialize"
+
+    def get_plugin(plugins: list[dict], name: str) -> dict | bool:
+        match = [p for p in plugins["plugins"]["loaded"] if p["name"] == name]
+        return match[0] if match else False
+
+    # general plugin
+    users_plugin = get_plugin(output, "users")
+    assert isinstance(users_plugin, dict)
+
+    assert users_plugin == {
+        "path": "os.unix.linux._os.users",
+        "name": "users",
+        "description": "Yield unix user records from passwd files or syslog session logins.",
+        "output": "record",
+        "arguments": [
+            {
+                "name": "--sessions",
+                "help": "Parse syslog for recent user sessions",
+                "default": False,
+                "required": False,
+                "type": "bool",
+            }
+        ],
+        "alias": False,
+    }
+
+
 def test_record_stream_write_exception_handling(
     caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test if we correctly print the function name of the iterator that failed to iterate."""
 
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-query", "-f", "users,walkfs", "tests/_data/loaders/tar/test-archive.tar.gz"])
+        m.setattr(
+            "sys.argv",
+            ["target-query", "-f", "users,walkfs", str(absolute_path("_data/loaders/tar/test-archive.tar.gz"))],
+        )
 
         with patch("dissect.target.tools.query.record_output", return_value=None):
             target_query()
@@ -378,17 +429,69 @@ def test_record_stream_write_exception_handling(
     assert "Exception occurred while processing output of WalkFSPlugin.walkfs:" in caplog.text
 
 
-def test_arguments_passed_correctly(monkeypatch: pytest.MonkeyPatch) -> None:
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_arguments_passed_correctly(
+    mock_plugins: PluginRegistry, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class MockPlugin(Plugin):
+        def check_compatible(self) -> None:
+            pass
+
+        @export(output="none")
+        @arg("-j", "--json", action="store_true")
+        @arg("--compact", action="store_true")
+        def mock_function(self, json: bool, compact: bool) -> None:
+            """Mock function to test argument passing."""
+            assert json is True
+            assert compact is True
+
     with monkeypatch.context() as m:
         m.setattr(
-            "sys.argv", ["target-query", "-fprefetch,mft", "tests/_data/loaders/tar/test-archive.tar.gz", "--compact"]
+            "sys.argv",
+            [
+                "target-query",
+                "-fmock",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
+                "--compact",
+                "--json",
+            ],
         )
 
-        with patch(
-            "dissect.target.tools.query.execute_function_on_target", side_effect=mock_execute_function
-        ) as mocked_execute:
+        with (
+            patch(
+                "dissect.target.tools.utils.find_functions",
+                autospec=True,
+                side_effect=mock_find_functions,
+            ),
+            patch(
+                "dissect.target.target.Target.get_function",
+                autospec=True,
+                side_effect=lambda self, _: (MockPlugin(self), MockPlugin(self).mock_function),
+            ),
+        ):
             target_query()
 
-        assert len(mocked_execute.mock_calls) == 2
-        for call in mocked_execute.mock_calls:
-            assert call.args[2] == ["--compact"]
+        assert "Exception while executing function mock" not in caplog.text
+
+
+def test_mixed_namespace_and_regular_regression(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test for regression where executing a namespace and a regular plugin at the same time caused issues."""
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-f",
+                "example_record,example_namespace",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
+                "-s",
+            ],
+        )
+
+        target_query()
+        out, _ = capsys.readouterr()
+
+    assert (
+        "<example/descriptor hostname=None domain=None field_a='example' field_b='record'>\n"
+        "<example/descriptor hostname=None domain=None field_a='namespace_example' field_b='record'>\n"
+    ) in out

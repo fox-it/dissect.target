@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import stat
+from collections.abc import Callable
 from functools import cached_property
-from typing import TYPE_CHECKING, BinaryIO, Callable, TypeVar
+from typing import TYPE_CHECKING, BinaryIO, TypeVar
 
 from dissect.util.stream import AlignedStream
 

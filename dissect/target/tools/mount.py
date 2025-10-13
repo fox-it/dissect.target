@@ -8,10 +8,10 @@ from dissect.util.feature import Feature, feature_enabled
 from dissect.target import filesystem
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.utils import parse_options_string
-from dissect.target.target import Target
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_target,
     process_generic_arguments,
 )
 
@@ -58,15 +58,15 @@ def main() -> int:
     parser.add_argument("-o", "--options", help="additional FUSE options")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(parser, args)
 
     if not HAS_FUSE:
         log.error("fusepy is not installed: pip install fusepy")
         return 1
 
     try:
-        t = Target.open(args.target)
+        t = open_target(args)
     except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)

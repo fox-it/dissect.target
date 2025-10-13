@@ -200,7 +200,7 @@ class DockerPlugin(ContainerPlugin):
                     started=convert_timestamp(config.get("State", {}).get("StartedAt")),
                     finished=convert_timestamp(config.get("State", {}).get("FinishedAt")),
                     ports=list(convert_ports(ports)),
-                    names=config.get("Name", "").replace("/", "", 1),
+                    name=config.get("Name", "").replace("/", "", 1),
                     volumes=volumes,
                     environment=config.get("Config", {}).get("Env", []),
                     mount_path=mount_path,

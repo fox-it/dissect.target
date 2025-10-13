@@ -5,17 +5,19 @@ import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
-from typing import TYPE_CHECKING, Callable
+from itertools import chain
+from typing import TYPE_CHECKING
 
 import pytest
 
+from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
-from dissect.target.plugin import _generate_long_paths
+from dissect.target.plugin import _generate_long_paths, _os_match
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
@@ -32,7 +34,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.plugin import OSPlugin
 
@@ -86,6 +88,32 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 @pytest.fixture(autouse=True)
 def clear_caches() -> None:
     _generate_long_paths.cache_clear()
+    _os_match.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def clear_lazy_imports() -> None:
+    """Clear lazy imports before each test to ensure a clean state."""
+
+    for lazy_attr in chain(
+        loader.LOADERS_BY_SCHEME.values(),
+        filesystem.FILESYSTEMS,
+        container.CONTAINERS,
+        volume.LOGICAL_VOLUME_MANAGERS,
+        volume.ENCRYPTED_VOLUME_MANAGERS,
+    ):
+        lazy_attr._loaded = False
+        lazy_attr._exc = None
+        lazy_attr._module._module = None
+        lazy_attr._module._loaded = False
+
+
+CLEAN_PLUGINS = plugin.generate()
+
+
+@pytest.fixture(autouse=True)
+def reset_plugins() -> None:
+    plugin.PLUGINS = CLEAN_PLUGINS
 
 
 def make_mock_target(tmp_path: pathlib.Path) -> Iterator[Target]:

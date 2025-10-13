@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any, BinaryIO
 
-from cbc_sdk.live_response_api import LiveResponseError, LiveResponseSession
 from dissect.util import ts
 
 from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
@@ -14,6 +13,13 @@ from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+try:
+    from cbc_sdk.live_response_api import LiveResponseError, LiveResponseSession
+
+    HAS_CARBON_BLACK = True
+except ImportError:
+    HAS_CARBON_BLACK = False
 
 CB_TIMEFORMAT = "%Y-%m-%dT%H:%M:%S%fZ"
 
@@ -28,6 +34,11 @@ class CbFilesystem(Filesystem):
     __type__ = "cb"
 
     def __init__(self, session: LiveResponseSession, prefix: str, *args, **kwargs):
+        if not HAS_CARBON_BLACK:
+            raise ImportError(
+                "Required dependency 'carbon-black-cloud-sdk-python' is missing, install with 'pip install dissect.target[cb]'"  # noqa: E501
+            )
+
         self.session = session
         self.prefix = prefix.lower()
 

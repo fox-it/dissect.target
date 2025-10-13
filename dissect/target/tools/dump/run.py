@@ -300,7 +300,7 @@ def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    process_generic_arguments(parser, args)
 
     if not args.function and ("-h" in rest or "--help" in rest):
         parser.print_help()
