@@ -6,24 +6,25 @@ import platform
 import urllib.parse
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, ClassVar
+from typing import TYPE_CHECKING, ClassVar
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
 import pytest
 
 from dissect.target import loader
 from dissect.target.containers.raw import RawContainer
-from dissect.target.exceptions import FilesystemError
+from dissect.target.exceptions import FilesystemError, TargetError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
 from dissect.target.target import DiskCollection, Event, Target, TargetLogAdapter, log
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from logging import Logger
 
 
@@ -287,7 +288,7 @@ def mocked_lin_volumes_fs() -> Iterator[tuple[Mock, Mock, Mock]]:
 
 
 def test_target_win_force_dirfs(mocked_win_volumes_fs: tuple[Mock, Mock, Mock]) -> None:
-    mock_good_volume, mock_bad_volume, mock_good_fs = mocked_win_volumes_fs
+    mock_good_volume, mock_bad_volume, _ = mocked_win_volumes_fs
 
     query = {"force-directory-fs": 1}
     target_query = urllib.parse.urlencode(query)
@@ -748,3 +749,101 @@ def test_expected_path(path: str | Path, expected: Path) -> None:
     assert target.path == expected
     if isinstance(path, Path):
         assert type(target.path) is type(expected)
+
+
+def test_exception_invalid_path() -> None:
+    """Test if we throw small and neat error messages and not long stack traces when giving invalid path(s)."""
+
+    with pytest.raises(
+        TargetError,
+        match=r"Failed to initiate RawLoader for target [/\\]path[/\\]to[/\\]invalid.img: Provided target path does not exist",  # noqa: E501
+    ):
+        Target.open("/path/to/invalid.img")
+
+    with pytest.raises(
+        TargetError,
+        match=r"Failed to find loader for [/\\]path[/\\]to[/\\]invalid.img: path does not exist",
+    ):
+        next(Target.open_all("/path/to/invalid.img"))
+
+    with pytest.raises(
+        TargetError,
+        match=r"Failed to find any loader for targets: \['smb://invalid'\]",
+    ):
+        next(Target.open_all("smb://invalid"))
+
+
+def test_list_children() -> None:
+    """Test that ``list_children`` returns child records."""
+
+    class MockChildTargetPlugin:
+        def list_children(self) -> Iterator[ChildTargetRecord]:
+            yield ChildTargetRecord(type="mock", name="child0", path="/mock/child0")
+            yield ChildTargetRecord(type="mock", name="child1", path="/mock/child1")
+
+    target = Target()
+    target._child_plugins = {"mock": MockChildTargetPlugin()}
+
+    children = list(target.list_children())
+    assert len(children) == 2
+
+    child_id, child_record = children[0]
+    assert child_id == "0"
+    assert child_record.type == "mock"
+    assert child_record.name == "child0"
+    assert child_record.path == "/mock/child0"
+
+    child_id, child_record = children[1]
+    assert child_id == "1"
+    assert child_record.type == "mock"
+    assert child_record.name == "child1"
+    assert child_record.path == "/mock/child1"
+
+
+def test_list_children_recursive() -> None:
+    """Test that ``list_children(recursive=True)`` returns child records recursively."""
+
+    class MockChildTargetPlugin:
+        def list_children(self) -> Iterator[ChildTargetRecord]:
+            yield ChildTargetRecord(type="mock", name="child0", path="/mock/child0")
+            yield ChildTargetRecord(type="mock", name="child1", path="/mock/child1")
+
+    class EmptyChildTargetPlugin:
+        def list_children(self) -> Iterator[ChildTargetRecord]:
+            return iter([])
+
+    target = Target()
+    target._child_plugins = {"mock": MockChildTargetPlugin()}
+
+    child_0_target = Target()
+    child_0_target._child_plugins = {"mock": EmptyChildTargetPlugin()}
+    child_1_target = Target()
+    child_1_target._child_plugins = {"mock": MockChildTargetPlugin()}
+
+    child_1_0_target = Target()
+    child_1_0_target._child_plugins = {"mock": MockChildTargetPlugin()}
+    child_1_1_target = Target()
+    child_1_1_target._child_plugins = {"mock": EmptyChildTargetPlugin()}
+
+    child_target_1_0_0 = Target()
+    child_target_1_0_0._child_plugins = {"mock": EmptyChildTargetPlugin()}
+    child_target_1_0_1 = Target()
+    child_target_1_0_1._child_plugins = {"mock": MockChildTargetPlugin()}
+
+    target.open_child = lambda path: child_0_target if path == "/mock/child0" else child_1_target
+    child_1_target.open_child = lambda path: child_1_0_target if path == "/mock/child0" else child_1_1_target
+    child_1_0_target.open_child = lambda path: child_target_1_0_0 if path == "/mock/child0" else child_target_1_0_1
+    child_target_1_0_1.open_child = Mock(side_effect=TargetError("Mock error"))
+
+    children = list(target.list_children(recursive=True))
+
+    assert [child_id for child_id, _ in children] == [
+        "0",
+        "1",
+        "1.0",
+        "1.0.0",
+        "1.0.1",
+        "1.0.1.0",
+        "1.0.1.1",
+        "1.1",
+    ]

@@ -6,11 +6,11 @@ import tempfile
 import textwrap
 from io import BytesIO
 from itertools import chain
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import container, filesystem, loader, volume
+from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
@@ -34,7 +34,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.plugin import OSPlugin
 
@@ -106,6 +106,14 @@ def clear_lazy_imports() -> None:
         lazy_attr._exc = None
         lazy_attr._module._module = None
         lazy_attr._module._loaded = False
+
+
+CLEAN_PLUGINS = plugin.generate()
+
+
+@pytest.fixture(autouse=True)
+def reset_plugins() -> None:
+    plugin.PLUGINS = CLEAN_PLUGINS
 
 
 def make_mock_target(tmp_path: pathlib.Path) -> Iterator[Target]:

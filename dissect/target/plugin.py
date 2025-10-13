@@ -13,16 +13,11 @@ import logging
 import os
 import sys
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import chain, zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
-
-try:
-    from typing import TypeAlias  # novermin
-except ImportError:
-    # COMPAT: Remove this when we drop Python 3.9
-    TypeAlias = Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from flow.record import Record, RecordDescriptor
 
@@ -74,11 +69,8 @@ class OperatingSystem(StrEnum):
     WINDOWS = "windows"
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class PluginDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("exports", "findable", "functions", "module", "namespace", "path", "qualname")
-
     module: str
     qualname: str
     namespace: str
@@ -92,23 +84,8 @@ class PluginDescriptor:
         return load(self)
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FunctionDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = (
-        "alias",
-        "exported",
-        "findable",
-        "internal",
-        "method_name",
-        "module",
-        "name",
-        "namespace",
-        "output",
-        "path",
-        "qualname",
-    )
-
     name: str
     namespace: str
     path: str
@@ -116,7 +93,7 @@ class FunctionDescriptor:
     internal: bool
     findable: bool
     alias: bool
-    output: str | None
+    output: str
     method_name: str
     module: str
     qualname: str
@@ -138,18 +115,13 @@ class FunctionDescriptor:
         return getattr(self.func, "__args__", [])
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FailureDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("module", "stacktrace")
-
     module: str
     stacktrace: list[str]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginDescriptorLookup:
     # All regular plugins
     # {"<module_path>": PluginDescriptor}
@@ -162,9 +134,7 @@ class PluginDescriptorLookup:
     __child__: dict[str, PluginDescriptor] = field(default_factory=dict)
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FunctionDescriptorLookup:
     # All regular plugins
     # {"<function_name>": {"<module_path>": FunctionDescriptor}}
@@ -180,9 +150,7 @@ class FunctionDescriptorLookup:
 _OSTree: TypeAlias = dict[str, "_OSTree"]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginRegistry:
     # Plugin descriptor lookup
     __plugins__: PluginDescriptorLookup = field(default_factory=PluginDescriptorLookup)
@@ -417,10 +385,6 @@ class Plugin:
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
-        # Do not register the "base" subclasses defined in this file
-        if cls.__module__ != Plugin.__module__:
-            register(cls)
-
         record_descriptors = _get_descriptors_on_nonprivate_methods(cls)
         cls.__record_descriptors__ = record_descriptors
         # This is a bit tricky currently
@@ -428,6 +392,10 @@ class Plugin:
         # export() currently will _always_ return a new object because it always calls ``cache.wrap(obj)``
         # This allows this to work, otherwise the Plugin.__call__ would get all the plugin attributes set on it
         cls.__call__ = export(output="record", record=record_descriptors, cache=False, cls=cls)(cls.__call__)
+
+        # Do not register the "base" subclasses defined in this file
+        if cls.__module__ != Plugin.__module__:
+            register(cls)
 
     def __init__(self, target: Target):
         self.target = target
@@ -592,7 +560,7 @@ def register(plugincls: type[Plugin]) -> None:
                         internal=internal,
                         findable=plugincls.__findable__,
                         alias=name in getattr(attr, "__aliases__", []),
-                        output=getattr(attr, "__output__", None),
+                        output=getattr(attr, "__output__", "none"),
                         method_name=attr.__name__,
                         module=plugincls.__module__,
                         qualname=plugincls.__qualname__,
@@ -617,7 +585,7 @@ def register(plugincls: type[Plugin]) -> None:
                 internal=len(functions) != 0 and len(exports) == 0,
                 findable=plugincls.__findable__,
                 alias=False,
-                output=getattr(plugincls.__call__, "__output__", None),
+                output=getattr(plugincls.__call__, "__output__", "none"),
                 method_name="__call__",
                 module=plugincls.__module__,
                 qualname=plugincls.__qualname__,
