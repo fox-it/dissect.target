@@ -89,7 +89,7 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
     @export(record=BrowserLocalStorageRecord)
     def local_storage(self) -> Iterator[BrowserLocalStorageRecord]:
         """Return browser local storage records for Google Chrome."""
-        yield from super().local_storage("chromium")
+        yield from super().local_storage("chrome")
 
     @export(record=BrowserSessionStorageRecord)
     def session_storage(self) -> Iterator[BrowserSessionStorageRecord]:
