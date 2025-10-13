@@ -94,7 +94,7 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
     @export(record=BrowserSessionStorageRecord)
     def session_storage(self) -> Iterator[BrowserSessionStorageRecord]:
         """Return browser session storage records for Google Chrome."""
-        yield from super().session_storage("chromium")
+        yield from super().session_storage("chrome")
 
     @export(record=BrowserDownloadRecord)
     def downloads(self) -> Iterator[BrowserDownloadRecord]:
