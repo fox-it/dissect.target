@@ -1,21 +1,32 @@
 from __future__ import annotations
-import subprocess
-from pathlib import Path
 
-from dissect.target.plugin import Plugin, internal, OperatingSystem
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import OperatingSystem, Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+HyperVHostInfo = TargetRecordDescriptor("hypervisor/hyperv/host_info", [("string", "hyperv_host_name")])
 
 
 class HyperVPlugin(Plugin):
     __namespace__ = "hyperv"
 
-    @internal
-    def get_parent_hostname(self) -> str | None:
+    def check_compatible(self) -> None:
+        pass
+
+    @export(record=HyperVHostInfo)
+    def host(self) -> Iterator[TargetRecordDescriptor]:
         """Extract the hostname of the parent Hyper-V system (Windows or Linux guest)."""
         if self.target.os == OperatingSystem.WINDOWS.value:
-            return self._get_parent_hostname_windows()
+            host_name = self._get_parent_hostname_windows()
         if self.target.os == OperatingSystem.LINUX.value:
-            return self._get_parent_hostname_linux()
-        return None
+            host_name = self._get_parent_hostname_linux()
+
+        yield HyperVHostInfo(hyperv_host_name=host_name)
 
     def _get_parent_hostname_windows(self) -> str | None:
         try:
@@ -37,6 +48,5 @@ class HyperVPlugin(Plugin):
                     vendor = p.read_text().strip()
                     if vendor:
                         return vendor
-            return None
         except Exception:
             return None
