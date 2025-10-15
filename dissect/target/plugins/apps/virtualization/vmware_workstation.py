@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
-from dissect.hypervisor import vmx
+from dissect.hypervisor.descriptor.vmx import VMX
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -26,7 +26,7 @@ VmwareDragAndDropRecord = create_extended_descriptor([UserRecordDescriptorExtens
     ],
 )
 
-VmwareConfigRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+VmwareVirtualMachineRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "virtualization/vmware/virtual_machine",
     [
         ("datetime", "ts"),
@@ -96,8 +96,8 @@ class VmwareWorkstationPlugin(Plugin):
                     _target=self.target,
                 )
 
-    @export(record=VmwareConfigRecord)
-    def config(self) -> Iterator[VmwareConfigRecord]:
+    @export(record=VmwareVirtualMachineRecord)
+    def config(self) -> Iterator[VmwareVirtualMachineRecord]:
         """Yield VMware Workstation Virtual Machine inventory configurations.
 
         Parses ``inventory.vmls`` and ``.vmx`` descriptor files. Does not parse newer ``.vmxf`` XML files.
@@ -112,11 +112,10 @@ class VmwareWorkstationPlugin(Plugin):
                 vmx_config = {}
 
                 if (vmx_path := self.target.fs.path(config.get("config"))).exists():
-                    vmx_parsed = vmx.VMX.parse(vmx_path.read_text())
-                    vmx_config = vmx_parsed.attr
-                    vmx_config["__disks__"] = vmx_parsed.disks()
+                    vmx = VMX.parse(vmx_path.read_text())
+                    vmx_config = vmx.attr
 
-                yield VmwareConfigRecord(
+                yield VmwareVirtualMachineRecord(
                     ts=vmx_path.lstat().st_mtime if vmx_config else inventory.lstat().st_mtime,
                     # Inventory config fields
                     name=config.get("DisplayName"),
@@ -127,7 +126,7 @@ class VmwareWorkstationPlugin(Plugin):
                     # VMX config fields
                     annotation=vmx_config.get("annotation"),
                     mac_addresses={v for k, v in vmx_config.items() if k.endswith(("generatedAddress", "address"))},
-                    disks=vmx_config.get("__disks__"),
+                    disks=vmx.disks(),
                     # Metadata
                     sources=[inventory, vmx_path],
                     _user=user_details.user if user_details else None,
@@ -136,7 +135,7 @@ class VmwareWorkstationPlugin(Plugin):
 
 
 def find_vm_inventory(target: Target) -> Iterator[tuple[TargetPath, UserDetails]]:
-    """Search for inventory.vmls files in user home folders."""
+    """Search for ``inventory.vmls`` files in user home folders."""
 
     for user_details in target.user_details.all_with_home():
         for inv_path in INVENTORY_PATHS:
@@ -145,7 +144,7 @@ def find_vm_inventory(target: Target) -> Iterator[tuple[TargetPath, UserDetails]
 
 
 def parse_inventory_file(inventory: Path) -> dict[str, Any] | None:
-    """Parse a single inventory.vmls file."""
+    """Parse a single ``inventory.vmls`` file."""
 
     config = defaultdict(dict)
     with inventory.open("rt") as fh:
