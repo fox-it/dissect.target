@@ -24,7 +24,7 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
 
     def check_compatible(self) -> None:
         if not self.inventories:
-            raise UnsupportedPluginError("No VMWare inventories found")
+            raise UnsupportedPluginError("No VMWare Workstation inventories found")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for inv in self.inventories:

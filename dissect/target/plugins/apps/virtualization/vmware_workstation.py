@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
@@ -48,6 +47,8 @@ INVENTORY_PATHS = [
     "AppData/Roaming/VMware/inventory.vmls",
     # Linux
     ".vmware/inventory.vmls",
+    # macOS (Fusion)
+    "Library/Application Support/VMware Fusion/vmInventory",
 ]
 
 
@@ -73,7 +74,7 @@ class VmwareWorkstationPlugin(Plugin):
         if not self.dnd_dirs and not self.inventories:
             raise UnsupportedPluginError("No VMware Workstation artifact(s) found")
 
-    def find_dnd_dirs(self) -> Iterator[tuple[UserDetails, TargetPath]]:
+    def find_dnd_dirs(self) -> Iterator[tuple[UserDetails, Path]]:
         for user_details in self.target.user_details.all_with_home():
             for dnd_path in DND_PATHS:
                 if (dnd_dir := user_details.home_path.joinpath(dnd_path)).exists():
@@ -134,7 +135,7 @@ class VmwareWorkstationPlugin(Plugin):
                 )
 
 
-def find_vm_inventory(target: Target) -> Iterator[tuple[TargetPath, UserDetails]]:
+def find_vm_inventory(target: Target) -> Iterator[tuple[Path, UserDetails]]:
     """Search for ``inventory.vmls`` files in user home folders."""
 
     for user_details in target.user_details.all_with_home():
@@ -144,7 +145,7 @@ def find_vm_inventory(target: Target) -> Iterator[tuple[TargetPath, UserDetails]
 
 
 def parse_inventory_file(inventory: Path) -> dict[str, Any] | None:
-    """Parse a single ``inventory.vmls`` file."""
+    """Parse a single ``inventory.vmls`` (Windows, Linux) or ``vmInventory`` (macOS) file."""
 
     config = defaultdict(dict)
     with inventory.open("rt") as fh:
