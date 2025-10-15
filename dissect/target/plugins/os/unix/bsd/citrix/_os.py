@@ -46,9 +46,15 @@ class CitrixPlugin(BsdPlugin):
                     # Current configuration of the netscaler
                     if hostname_match := RE_CONFIG_HOSTNAME.search(config):
                         self._hostname = hostname_match.groupdict()["hostname"]
+                    # Collect timezone from nsconfig/ns.conf or from shell/date.out if exists
                     if timezone_match := RE_CONFIG_TIMEZONE.search(config):
                         tzinfo = timezone_match.groupdict()
                         self.target.timezone = tzinfo["zone_name"]
+                    # Netscaler collector specific check:
+                    elif self.target.fs.path("/shell/date.out").exists():
+                        # If timezone not set in ns.conf it is often UTC, lets check for that.
+                        if "UTC" in self.target.fs.path("/shell/date.out").open("rt").read():
+                            self.target.timezone = "Etc/UTC"
 
         self._config_usernames = list(usernames)
         self._ips = list(ips)
@@ -82,8 +88,13 @@ class CitrixPlugin(BsdPlugin):
             if fs.exists("/bin/freebsd-version"):
                 # If available, mount the ramdisk first.
                 target.fs.mount("/", fs)
-        # The 'disk' filesystem is mounted at '/var'.
-        target.fs.mount("/var", sysvol)
+
+        # Check if we are dealing with netscaler-collector filesystem (/shell exists) or full image
+        if sysvol.exists("/shell"):
+            target.fs.mount("/", sysvol)
+        else:
+            # The 'disk' filesystem is mounted at '/var'.
+            target.fs.mount("/var", sysvol)
 
         # Enumerate filesystems for flash partition
         for fs in target.filesystems:
@@ -103,10 +114,13 @@ class CitrixPlugin(BsdPlugin):
         if version_path.is_file():
             version = version_path.read_text().strip()
 
-        loader_conf_path = self.target.fs.path("/flash/boot/loader.conf")
-        if loader_conf_path.is_file():
-            loader_conf = loader_conf_path.read_text()
-            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(loader_conf):
+        # Loader.conf exists in different location for NS image vs Techsupport Collection
+        for config_path in ["/flash/boot/loader.conf", "nsconfig/loader.conf"]:
+            config = self.target.fs.path(config_path)
+            if not config.is_file():
+                continue
+
+            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(config.read_text()):
                 kernel_version = match.groupdict()["version"]
                 version = f"{version} ({kernel_version})" if version else kernel_version
 
