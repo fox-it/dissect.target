@@ -65,7 +65,9 @@ class OpenSSHPlugin(SSHPlugin):
     @export(record=AuthorizedKeysRecord)
     def authorized_keys(self) -> Iterator[AuthorizedKeysRecord]:
         """Yields the content of the authorized_keys files on a target for each user."""
-        for user_details, authorized_keys_file in self.ssh_directory_globs("authorized_keys*", "administrator_authorized_keys"):
+        for user_details, authorized_keys_file in self.ssh_directory_globs(
+            "authorized_keys*", "administrator_authorized_keys"
+        ):
             for line in authorized_keys_file.open("rt"):
                 line = line.strip()
                 if not line or line.startswith("#"):
