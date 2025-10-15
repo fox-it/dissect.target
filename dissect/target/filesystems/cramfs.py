@@ -102,7 +102,7 @@ class CramfsFilesystemEntry(FilesystemEntry):
     def readlink(self) -> str:
         """Read the link of the given path if it is a symlink. Returns a string."""
         if not self.is_symlink():
-            raise NotASymlinkError
+            raise NotASymlinkError(self.path)
 
         return self.entry.link
 
