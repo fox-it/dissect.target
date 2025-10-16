@@ -280,8 +280,12 @@ class ExtendedCmd(cmd.Cmd):
         redirect_idx = None
         redirect_file = None
         if ">" in argparts:
-            redirect_idx = argparts.index(">")
-            # Only support single output redirection; in standard Unix shels, only the last redirect takes effect
+            redirect_indices = [i for i, v in enumerate(argparts) if v == ">"]
+            # Only support single output redirection
+            if len(redirect_indices) > 1:
+                print("Syntax error: multiple output redirections specified")
+                return False
+            redirect_idx = redirect_indices[0]
             if redirect_idx + 1 >= len(argparts):
                 print("Syntax error: missing filename after '>'")
                 return False
