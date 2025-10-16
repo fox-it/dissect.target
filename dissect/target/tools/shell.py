@@ -290,8 +290,7 @@ class ExtendedCmd(cmd.Cmd):
                 print("Syntax error: missing filename after '>'")
                 return False
             # If there are pipes, > must be after the last |
-            last_pipe_idx = max((i for i, v in enumerate(argparts) if v == "|"), default=-1)
-            if last_pipe_idx != -1 and redirect_idx < last_pipe_idx:
+            if "|" in argparts[redirect_idx:]:
                 print("Syntax error: output redirection must come after the last pipe")
                 return False
             redirect_file = argparts[redirect_idx + 1]
