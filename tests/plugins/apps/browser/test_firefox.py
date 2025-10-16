@@ -180,24 +180,20 @@ def test_firefox_extensions(target_platform: Target, request: pytest.FixtureRequ
     "target_platform",
     ["target_firefox_win", "target_firefox_unix"],
 )
-def test_firefox_passwords(target_platform: Target, request: pytest.FixtureRequest) -> None:
-    target_platform = request.getfixturevalue(target_platform)
+def test_firefox_passwords(target_platform: str, request: pytest.FixtureRequest) -> None:
+    target: Target = request.getfixturevalue(target_platform)
 
-    records = list(target_platform.firefox.passwords())
+    records = list(target.firefox.passwords())
     assert len(records) == 2
 
     assert records[0].browser == "firefox"
     assert records[0].decrypted_username == "username"
-    assert records[0].encrypted_password == bytes.fromhex(
-        "303a0410f8000000000000000000000000000001301406082a864886f70d030704081d993c26413915090410d9f1d0595158040a88850f9bcfbd36cf"
-    )
+    assert records[0].encrypted_password is None
     assert records[0].decrypted_password == "password"
 
     assert records[1].browser == "firefox"
     assert records[1].decrypted_username == "username"
-    assert records[1].encrypted_password == bytes.fromhex(
-        "303a0410f8000000000000000000000000000001301406082a864886f70d030704086fc7f57e0d7c456d04109b40eb0ebf5275d3a3a26f46a910b975"
-    )
+    assert records[1].encrypted_password is None
     assert records[1].decrypted_password == "password"
 
 
@@ -223,9 +219,7 @@ def test_unix_firefox_passwords_with_primary_password(target_unix_users: Target,
     assert records[0].username == "root"
     assert records[0].user_home == "/root"
     assert records[0].decrypted_username == "username"
-    assert records[0].encrypted_password == bytes.fromhex(
-        "303a0410f8000000000000000000000000000001301406082a864886f70d03070408cd349ac9ccc45c950410724daaeb9d2f85491e4e1d08597ecf2d"
-    )
+    assert records[0].encrypted_password is None
     assert records[0].decrypted_password == "password"
 
 
@@ -350,7 +344,7 @@ def test_decrypt_is_succesful(path_key4: TargetPath, logins: dict[str, str], dec
 
 @patch("dissect.target.plugins.apps.browser.firefox.retrieve_master_key", side_effect=ValueError(""))
 def test_decrypt_bad_master_key(path_key4: TargetPath, logins: dict[str, str]) -> None:
-    with pytest.raises(ValueError, match="Failed to decrypt password using keyfile:"):
+    with pytest.raises(ValueError, match="Failed to decrypt Firefox master key:"):
         decrypt(logins.get("username"), logins.get("password"), path_key4)
 
 
@@ -373,7 +367,9 @@ def test_decrypt_with_bad_primary_password_is_unsuccesful(
 ) -> None:
     with pytest.raises(
         ValueError,
-        match=re.escape("Failed to decrypt password using keyfile: /key4.db, password: BAD_PRIMARY_PASSWORD"),
+        match=re.escape(
+            "Failed to decrypt Firefox master key: Master key decryption failed. Provided password could be missing or incorrect"  # noqa: E501
+        ),
     ):
         decrypt(
             logins_with_primary_password.get("username"),
