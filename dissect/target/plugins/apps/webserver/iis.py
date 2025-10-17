@@ -81,7 +81,9 @@ class IISLogsPlugin(WebserverPlugin):
         self.config = self.target.resolve(self.APPLICATION_HOST_CONFIG)
 
     def check_compatible(self) -> None:
-        if not self.log_dirs:
+        path_sets = [bool(dir) for dir in self.log_dirs.values()]
+
+        if not any(path_sets):
             raise UnsupportedPluginError("No IIS log files found")
 
     @cached_property
