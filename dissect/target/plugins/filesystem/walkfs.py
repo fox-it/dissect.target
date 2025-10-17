@@ -72,35 +72,34 @@ class WalkFSPlugin(Plugin):
 
 def get_volume_uuid(entry: Filesystem) -> UUID | None:
     """
-    Returns the volume_uuid if it exists. otherwise, returns none
+    Returns the volume UUID if it exists; otherwise, returns None.
 
     Args:
         entry: :class:`Filesystem` instance
 
     Returns:
-        UUID as str
+        UUID or None
     """
+    
+    return getattr(getattr(entry, "volume", None), "uuid", None)
 
-    return entry.volume.uuid
 
 
 @internal
 def get_disk_serial(entry: Filesystem) -> str | None:
     """
-    Returns the disk_serial if it exists. otherwise, returns none
+    Returns the disk serial number if it exists; otherwise, returns None.
 
     Args:
-    entry: :class:`Filesystem` instance
+        entry: :class:`Filesystem` instance
 
     Returns:
-        serial as str
+        Disk serial number as str, or None if not available.
     """
-    if entry.volume is None:
-        return None
+    entry_volume = getattr(entry, "volume", None)
+    volume_vs = getattr(entry_volume, "vs", None)
+    return getattr(volume_vs, "serial", None)
 
-    if hasattr(entry.volume.vs, "serial"):
-        return entry.volume.vs.serial
-    return None
 
 
 def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
@@ -123,12 +122,12 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
         for sub_entry in entry.entries:
             fs_types.append(sub_entry.fs.__type__)
             volume_uuids.append(get_volume_uuid(sub_entry.fs))
-            disk_serials.append(get_disk_serial(sub_entry).fs)
+            disk_serials.append(get_disk_serial(sub_entry.fs))
 
     else:
         fs_types = [entry.fs.__type__]
         volume_uuids = [get_volume_uuid(entry).fs]
-        disk_serials = [get_disk_serial(entry).fs]
+        disk_serials = [get_disk_serial(entry.fs)]
 
     return FilesystemRecord(
         atime=from_unix(stat.st_atime),
