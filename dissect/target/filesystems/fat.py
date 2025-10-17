@@ -4,6 +4,7 @@ import datetime
 import math
 import stat
 from typing import TYPE_CHECKING, BinaryIO
+from uuid import UUID
 
 from dissect.fat import exceptions as fat_exc
 from dissect.fat import fat
@@ -52,6 +53,13 @@ class FatFilesystem(Filesystem):
             raise NotADirectoryError(path) from e
         except fat_exc.Error as e:
             raise FileNotFoundError(path) from e
+
+    @property
+    def uuid(self) -> UUID | None:
+        base = super().uuid
+        if base:
+            return base
+        return UUID(int=int(self.fatfs.volume_id, 16))
 
 
 class FatFilesystemEntry(FilesystemEntry):

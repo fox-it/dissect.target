@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from dissect.util.ts import from_unix
 
@@ -12,6 +11,7 @@ from dissect.target.plugin import Plugin, arg, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from uuid import UUID
 
     from dissect.target.target import Target
 
@@ -80,20 +80,8 @@ def get_volume_uuid(entry: Filesystem) -> UUID | None:
     Returns:
         UUID as str
     """
-    if entry.volume is None:
-        return None
-    if entry.volume.guid:
-        return UUID(bytes_le=entry.volume.guid)
-    if entry.__type__ == "ntfs":
-        return UUID(int=entry.ntfs.serial)
-    if entry.__type__ in ["ext2", "ext3", "ext4"]:
-        return entry.extfs.uuid
-    if entry.__type__ == "fat":
-        return UUID(int=int(entry.fatfs.volume_id, 16))
-    if entry.__type__ == "exfat":
-        return UUID(int=entry.exfat.vbr.volume_serial)
-    # Return None if no valid UUID or serial is found
-    return None
+
+    return entry.volume.uuid
 
 
 @internal

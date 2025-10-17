@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import stat
 from typing import TYPE_CHECKING, BinaryIO
+from uuid import UUID
 
 from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
 from dissect.ntfs.exceptions import Error as NtfsError
@@ -58,6 +59,13 @@ class NtfsFilesystem(Filesystem):
             raise NotADirectoryError(path) from e
         except NtfsError as e:
             raise FileNotFoundError(path) from e
+
+    @property
+    def uuid(self) -> UUID | None:
+        base = super().uuid
+        if base:
+            return base
+        return UUID(int=self.ntfs.serial)
 
 
 class NtfsFilesystemEntry(FilesystemEntry):

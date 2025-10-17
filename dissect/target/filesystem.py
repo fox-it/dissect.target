@@ -8,6 +8,7 @@ import pathlib
 import stat
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Final
+from uuid import UUID
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -1431,6 +1432,13 @@ class LayerFilesystem(Filesystem):
     def case_sensitive(self) -> bool:
         """Whether the filesystem is case sensitive."""
         return self._case_sensitive
+
+    @property
+    def uuid(self) -> UUID | None:
+        """filesystem UUID"""
+        if self.volume and self.volume.guid:
+            return UUID(bytes_le=self.volume.guid)
+        return None
 
     @property
     def alt_separator(self) -> str:
