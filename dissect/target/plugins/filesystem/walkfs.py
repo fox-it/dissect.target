@@ -69,6 +69,7 @@ class WalkFSPlugin(Plugin):
                 self.target.log.debug("", exc_info=e)
                 continue
 
+
 def get_volume_uuid(entry: Filesystem) -> UUID | None:
     """
     Returns the volume_uuid if it exists. otherwise, returns none
@@ -109,7 +110,7 @@ def get_disk_serial(entry: Filesystem) -> str | None:
     if entry.volume is None:
         return None
 
-    if hasattr(entry.volume.vs, 'serial'):
+    if hasattr(entry.volume.vs, "serial"):
         return entry.volume.vs.serial
     return None
 
