@@ -75,7 +75,7 @@ def get_volume_uuid(entry: FilesystemEntry) -> str:
     Returns the volume_uuid if it exists. otherwise, returns none
 
     Args:
-    entry: :class:`FilesystemEntry` instance
+        entry: :class:`FilesystemEntry` instance
 
     Returns:
         UUID as str
@@ -110,8 +110,8 @@ def get_disk_serial(entry: FilesystemEntry) -> str:
     if entry.fs.volume is None:
         return None
 
-    if hasattr(entry.fs.volume.disk.vs, "serial"):
-        return entry.fs.volume.disk.vs.serial
+    if hasattr(entry.fs.volume.vs, 'serial'):
+        return entry.fs.volume.vs.serial
     return None
 
 
