@@ -69,7 +69,7 @@ class WalkFSPlugin(Plugin):
                 self.target.log.debug("", exc_info=e)
                 continue
 
-@internal
+
 def get_volume_uuid(entry: FilesystemEntry) -> str:
     """
     Returns the volume_uuid if it exists. otherwise, returns none
@@ -84,18 +84,17 @@ def get_volume_uuid(entry: FilesystemEntry) -> str:
         return None
     if entry.fs.volume.guid:
         return UUID(bytes_le=entry.fs.volume.guid)
-    elif entry.fs.__type__ == 'ntfs':
+    if entry.fs.__type__ == "ntfs":
         return UUID(int=entry.fs.ntfs.serial)
-    elif entry.fs.__type__ in ['ext2', 'ext3', 'ext4']:
+    if entry.fs.__type__ in ["ext2", "ext3", "ext4"]:
         return entry.fs.extfs.uuid
-    elif entry.fs.__type__ == 'fat':
+    if entry.fs.__type__ == "fat":
         return UUID(int=int(entry.fs.fatfs.volume_id, 16))
-    elif entry.fs.__type__ == 'exfat':
+    if entry.fs.__type__ == "exfat":
         return UUID(int=entry.fs.exfat.vbr.volume_serial)
-    else:
-        # Return None if no valid UUID or serial is found
-        return None
-    
+    # Return None if no valid UUID or serial is found
+    return None
+
 
 @internal
 def get_disk_serial(entry: FilesystemEntry) -> str:
@@ -111,10 +110,9 @@ def get_disk_serial(entry: FilesystemEntry) -> str:
     if entry.fs.volume is None:
         return None
 
-    if hasattr(entry.fs.volume.disk.vs, 'serial'):
+    if hasattr(entry.fs.volume.disk.vs, "serial"):
         return entry.fs.volume.disk.vs.serial
     return None
-    
 
 
 def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
@@ -130,20 +128,19 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
     stat = entry.lstat()
 
     if isinstance(entry, LayerFilesystemEntry):
-        fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
-        volume_uuids = [
-            get_volume_uuid(sub_entry)
-            for sub_entry in entry.entries
-        ]
+        fs_types = []
+        volume_uuids = []
+        disk_serials = []
 
-        disk_serials = [
-            get_disk_serial(sub_entry)
-            for sub_entry in entry.entries
-        ]
+        for sub_entry in entry.entries:
+            fs_types.append(sub_entry.fs.__type__)
+            volume_uuids.append(get_volume_uuid(sub_entry))
+            disk_serials.append(get_disk_serial(sub_entry))
+
     else:
         fs_types = [entry.fs.__type__]
         volume_uuids = [get_volume_uuid(entry)]
-        disk_serials = [get_disk_serial(entry)]   
+        disk_serials = [get_disk_serial(entry)]
 
     return FilesystemRecord(
         atime=from_unix(stat.st_atime),
