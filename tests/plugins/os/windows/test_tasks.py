@@ -9,7 +9,7 @@ import pytest
 from flow.record import GroupedRecord
 
 from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord, TasksPlugin
-from dissect.target.plugins.os.windows.tasks.xml import str_to_isoformat
+from dissect.target.plugins.os.windows.tasks.xml import parse_datetime
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -269,27 +269,33 @@ def test_xml_task_invalid(
 
 
 def test_xml_task_time() -> None:
-    assert str_to_isoformat("2023-07-05T14:30:00") == datetime.strptime("2023-07-05 14:30:00", "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
+    assert parse_datetime("2023-07-05T14:30:00") == datetime.strptime(
+        "2023-07-05 14:30:00", "%Y-%m-%d %H:%M:%S"
+    ).replace(tzinfo=timezone.utc).replace(tzinfo=None)
 
 
 def test_xml_task_time_valid_space() -> None:
-    assert str_to_isoformat("2024-01-01 09:15:00") == datetime.strptime("2024-01-01 09:15:00", "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
+    assert parse_datetime("2024-01-01 09:15:00") == datetime.strptime(
+        "2024-01-01 09:15:00", "%Y-%m-%d %H:%M:%S"
+    ).replace(tzinfo=timezone.utc).replace(tzinfo=None)
 
 
 def test_xml_task_time_empty() -> None:
-    assert str_to_isoformat("") is None
+    assert parse_datetime("") is None
 
 
 def test_xml_task_time_invalid() -> None:
-    with pytest.raises(ValueError):  # noqa: PT011
-        str_to_isoformat("invalid datetime")
+    with pytest.raises(ValueError, match=r"(does not match format)"):
+        parse_datetime("invalid datetime")
 
 
 def test_xml_task_time_utc() -> None:
-    assert str_to_isoformat("2025-07-14T07:15:00Z") == datetime.strptime(
+    assert parse_datetime("2025-07-14T07:15:00Z") == datetime.strptime(
         "2025-07-14 07:15:00+00:00", "%Y-%m-%d %H:%M:%S%z"
     )
 
 
 def test_xml_task_time_no_leading_zero() -> None:
-    assert str_to_isoformat("2023-3-12T11:00:00") == datetime.strptime("2023-3-12 11:00:00", "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
+    assert parse_datetime("2023-3-12T11:00:00") == datetime.strptime("2023-3-12 11:00:00", "%Y-%m-%d %H:%M:%S").replace(
+        tzinfo=timezone.utc
+    ).replace(tzinfo=None)
