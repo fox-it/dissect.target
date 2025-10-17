@@ -3,6 +3,7 @@ from __future__ import annotations
 import stat
 from datetime import timedelta, timezone
 from typing import TYPE_CHECKING, BinaryIO, Optional
+from uuid import UUID
 
 from dissect.fat import exfat
 from dissect.util.stream import RunlistStream
@@ -57,6 +58,13 @@ class ExfatFilesystem(Filesystem):
                 raise FileNotFoundError(f"File not found: {path}")
 
         return dirent
+
+    @property
+    def uuid(self) -> UUID | None:
+        base = super().uuid
+        if base:
+            return base
+        return UUID(int=self.exfat.vbr.volume_serial)
 
 
 class ExfatFilesystemEntry(FilesystemEntry):

@@ -17,6 +17,7 @@ from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from uuid import UUID
 
 
 class ExtFilesystem(Filesystem):
@@ -45,6 +46,13 @@ class ExtFilesystem(Filesystem):
             raise NotASymlinkError(path) from e
         except extfs.Error as e:
             raise FileNotFoundError(path) from e
+
+    @property
+    def uuid(self) -> UUID | None:
+        base = super().uuid
+        if base:
+            return base
+        return self.extfs.uuid
 
 
 class ExtFilesystemEntry(FilesystemEntry):
