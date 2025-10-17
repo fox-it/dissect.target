@@ -8,7 +8,7 @@ import pytest
 
 from dissect.target.filesystem import FilesystemEntry, VirtualFile, VirtualFilesystem
 from dissect.target.loaders.tar import TarLoader
-from dissect.target.plugins.filesystem.walkfs import WalkFSPlugin, get_disk_serial, get_volume_uuid
+from dissect.target.plugins.filesystem.walkfs import WalkFSPlugin, get_disk_serial
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -98,8 +98,6 @@ def test_get_disk_serial_no_serial(mock_fs_entry: MagicMock) -> None:
     """Test get_disk_serial when the `serial` attribute is missing."""
     # The default mock aparently does have the `serial` attribute on `vs`
 
-
-    
     mock_fs_entry.fs.volume.disk.vs = Mock()
     if hasattr(mock_fs_entry.fs.volume.vs, "serial"):
         delattr(mock_fs_entry.fs.volume.vs, "serial")

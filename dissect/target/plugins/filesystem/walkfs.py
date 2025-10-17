@@ -84,7 +84,6 @@ def get_volume_uuid(entry: Filesystem) -> UUID | None:
     return getattr(volume, "uuid", None)
 
 
-
 @internal
 def get_disk_serial(entry: Filesystem) -> str | None:
     """
@@ -99,7 +98,6 @@ def get_disk_serial(entry: Filesystem) -> str | None:
     entry_volume = getattr(entry, "volume", None)
     volume_vs = getattr(entry_volume, "vs", None)
     return getattr(volume_vs, "serial", None)
-
 
 
 def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:

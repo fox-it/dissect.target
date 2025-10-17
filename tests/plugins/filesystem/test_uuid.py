@@ -1,13 +1,13 @@
 from io import BytesIO
 from types import SimpleNamespace
-from uuid import UUID
 from unittest.mock import patch
+from uuid import UUID
 
 from dissect.target.filesystem import Filesystem
-from dissect.target.filesystems.ntfs import NtfsFilesystem
-from dissect.target.filesystems.fat import FatFilesystem
 from dissect.target.filesystems.exfat import ExfatFilesystem
 from dissect.target.filesystems.extfs import ExtFilesystem
+from dissect.target.filesystems.fat import FatFilesystem
+from dissect.target.filesystems.ntfs import NtfsFilesystem
 from tests._utils import absolute_path
 
 
@@ -18,7 +18,7 @@ class MockFilesystem(Filesystem):
 dummy_fh = BytesIO(b"")  # empty in-memory file handle
 
 
-def test_filesystem_uuid_from_volume_guid():
+def test_filesystem_uuid_from_volume_guid() -> None:
     """Filesystem.uuid returns a UUID when volume.guid is set."""
     guid_bytes = b"\x01" * 16
     volume = SimpleNamespace(guid=guid_bytes)
@@ -29,7 +29,7 @@ def test_filesystem_uuid_from_volume_guid():
     assert fs.uuid == UUID(bytes_le=guid_bytes)
 
 
-def test_filesystem_uuid_none_when_no_guid():
+def test_filesystem_uuid_none_when_no_guid() -> None:
     """Filesystem.uuid returns None when volume.guid is None."""
     volume = SimpleNamespace(guid=None)
 
@@ -39,7 +39,7 @@ def test_filesystem_uuid_none_when_no_guid():
     assert fs.uuid is None
 
 
-def test_ntfs_uuid_from_volume_guid():
+def test_ntfs_uuid_from_volume_guid() -> None:
     """NTFS filesystem UUID is derived correctly from volume GUID."""
     guid_bytes = b"\x01" * 16
     volume = SimpleNamespace(guid=guid_bytes)
@@ -50,7 +50,7 @@ def test_ntfs_uuid_from_volume_guid():
     assert fs.uuid == UUID(bytes_le=guid_bytes)
 
 
-def test_ntfs_uuid_no_guid():
+def test_ntfs_uuid_no_guid() -> None:
     """NTFS.uuid falls back to serial when volume.guid is None."""
     serial_number = 123456789
     volume = SimpleNamespace(guid=None)
@@ -62,7 +62,7 @@ def test_ntfs_uuid_no_guid():
     assert fs.uuid == expected_uuid
 
 
-def test_fat_uuid_no_guid():
+def test_fat_uuid_no_guid() -> None:
     """FAT.uuid fallback using fatfs.volume_id when volume.guid is None."""
     volume = SimpleNamespace(guid=None)
     with patch("dissect.target.filesystems.fat.FatFilesystem.__init__", lambda self, fh: None):
@@ -74,7 +74,7 @@ def test_fat_uuid_no_guid():
         assert fs.uuid == expected_uuid
 
 
-def test_exfat_uuid_no_guid():
+def test_exfat_uuid_no_guid() -> None:
     """ExFAT.uuid fallback using exfat.vbr.volume_serial when volume.guid is None."""
     volume = SimpleNamespace(guid=None)
     with patch("dissect.target.filesystems.exfat.ExfatFilesystem.__init__", lambda self, fh: None):
@@ -86,7 +86,7 @@ def test_exfat_uuid_no_guid():
         assert fs.uuid == expected_uuid
 
 
-def test_ext_uuid_no_guid():
+def test_ext_uuid_no_guid() -> None:
     """EXT.uuid fallback using extfs.uuid when volume.guid is None."""
     volume = SimpleNamespace(guid=None)
     fs = ExtFilesystem(fh=absolute_path("_data/filesystems/symlink_disk.ext4").open("rb"))

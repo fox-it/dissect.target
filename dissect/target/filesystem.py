@@ -496,7 +496,7 @@ class Filesystem:
             The digests of the contents of ``path``.
         """
         return self.get(path).hash(algos)
-    
+
     @property
     def uuid(self) -> UUID | None:
         """filesystem UUID"""
@@ -1440,7 +1440,6 @@ class LayerFilesystem(Filesystem):
     def case_sensitive(self) -> bool:
         """Whether the filesystem is case sensitive."""
         return self._case_sensitive
-
 
     @property
     def alt_separator(self) -> str:
