@@ -96,7 +96,7 @@ def get_volume_uuid(entry: Filesystem) -> UUID | None:
 
 
 @internal
-def get_disk_serial(entry: Filesystem) -> str:
+def get_disk_serial(entry: Filesystem) -> str | None:
     """
     Returns the disk_serial if it exists. otherwise, returns none
 
