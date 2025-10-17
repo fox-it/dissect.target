@@ -269,10 +269,15 @@ def test_xml_task_invalid(
 
 
 def test_xml_task_time() -> None:
-    assert parse_datetime("2023-07-05T14:30:00") == datetime(2023,7,5,14,30,0, tzinfo=timezone.utc).replace(tzinfo=None)
+    assert parse_datetime("2023-07-05T14:30:00") == datetime(2023, 7, 5, 14, 30, 0, tzinfo=timezone.utc).replace(
+        tzinfo=None
+    )
+
 
 def test_xml_task_time_valid_space() -> None:
-    assert parse_datetime("2024-01-01 09:15:00") == datetime(2024,1,1,9,15,0, tzinfo=timezone.utc).replace(tzinfo=None)
+    assert parse_datetime("2024-01-01 09:15:00") == datetime(2024, 1, 1, 9, 15, 0, tzinfo=timezone.utc).replace(
+        tzinfo=None
+    )
 
 
 def test_xml_task_time_empty() -> None:
@@ -291,4 +296,6 @@ def test_xml_task_time_utc() -> None:
 
 
 def test_xml_task_time_no_leading_zero() -> None:
-    assert parse_datetime("2023-3-12T11:00:00") == datetime(2023,3,12,11,0,0, tzinfo=timezone.utc).replace(tzinfo=None)
+    assert parse_datetime("2023-3-12T11:00:00") == datetime(2023, 3, 12, 11, 0, 0, tzinfo=timezone.utc).replace(
+        tzinfo=None
+    )
