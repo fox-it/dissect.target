@@ -80,8 +80,8 @@ def get_volume_uuid(entry: Filesystem) -> UUID | None:
     Returns:
         UUID or None
     """
-    
-    return getattr(getattr(entry, "volume", None), "uuid", None)
+    volume = getattr(entry, "volume", None)
+    return getattr(volume, "uuid", None)
 
 
 
