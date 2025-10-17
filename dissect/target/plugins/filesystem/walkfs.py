@@ -6,7 +6,7 @@ from uuid import UUID
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import Filesystem, FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export, internal
 
@@ -69,49 +69,48 @@ class WalkFSPlugin(Plugin):
                 self.target.log.debug("", exc_info=e)
                 continue
 
-
-def get_volume_uuid(entry: FilesystemEntry) -> str:
+def get_volume_uuid(entry: Filesystem) -> UUID | None:
     """
     Returns the volume_uuid if it exists. otherwise, returns none
 
     Args:
-        entry: :class:`FilesystemEntry` instance
+        entry: :class:`Filesystem` instance
 
     Returns:
         UUID as str
     """
-    if entry.fs.volume is None:
+    if entry.volume is None:
         return None
-    if entry.fs.volume.guid:
-        return UUID(bytes_le=entry.fs.volume.guid)
-    if entry.fs.__type__ == "ntfs":
-        return UUID(int=entry.fs.ntfs.serial)
-    if entry.fs.__type__ in ["ext2", "ext3", "ext4"]:
-        return entry.fs.extfs.uuid
-    if entry.fs.__type__ == "fat":
-        return UUID(int=int(entry.fs.fatfs.volume_id, 16))
-    if entry.fs.__type__ == "exfat":
-        return UUID(int=entry.fs.exfat.vbr.volume_serial)
+    if entry.volume.guid:
+        return UUID(bytes_le=entry.volume.guid)
+    if entry.__type__ == "ntfs":
+        return UUID(int=entry.ntfs.serial)
+    if entry.__type__ in ["ext2", "ext3", "ext4"]:
+        return entry.extfs.uuid
+    if entry.__type__ == "fat":
+        return UUID(int=int(entry.fatfs.volume_id, 16))
+    if entry.__type__ == "exfat":
+        return UUID(int=entry.exfat.vbr.volume_serial)
     # Return None if no valid UUID or serial is found
     return None
 
 
 @internal
-def get_disk_serial(entry: FilesystemEntry) -> str:
+def get_disk_serial(entry: Filesystem) -> str:
     """
     Returns the disk_serial if it exists. otherwise, returns none
 
     Args:
-    entry: :class:`FilesystemEntry` instance
+    entry: :class:`Filesystem` instance
 
     Returns:
         serial as str
     """
-    if entry.fs.volume is None:
+    if entry.volume is None:
         return None
 
-    if hasattr(entry.fs.volume.vs, 'serial'):
-        return entry.fs.volume.vs.serial
+    if hasattr(entry.volume.vs, 'serial'):
+        return entry.volume.vs.serial
     return None
 
 
@@ -134,13 +133,13 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
 
         for sub_entry in entry.entries:
             fs_types.append(sub_entry.fs.__type__)
-            volume_uuids.append(get_volume_uuid(sub_entry))
-            disk_serials.append(get_disk_serial(sub_entry))
+            volume_uuids.append(get_volume_uuid(sub_entry.fs))
+            disk_serials.append(get_disk_serial(sub_entry).fs)
 
     else:
         fs_types = [entry.fs.__type__]
-        volume_uuids = [get_volume_uuid(entry)]
-        disk_serials = [get_disk_serial(entry)]
+        volume_uuids = [get_volume_uuid(entry).fs]
+        disk_serials = [get_disk_serial(entry).fs]
 
     return FilesystemRecord(
         atime=from_unix(stat.st_atime),
