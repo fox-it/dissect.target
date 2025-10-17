@@ -62,7 +62,7 @@ def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> N
 
 
 @pytest.fixture
-def mock_fs_entry():
+def mock_fs_entry() -> MagicMock:
     """Fixture to create a mock FilesystemEntry object."""
     mock_entry = MagicMock(spec=FilesystemEntry)
     mock_fs = Mock()
@@ -81,12 +81,12 @@ def mock_fs_entry():
         if hasattr(mock_fs, attr):
             setattr(mock_fs, attr, None)
     if hasattr(mock_disk.vs, "serial"):
-        setattr(mock_disk, vs, None)
+        mock_disk.vs = None
 
     return mock_entry
 
 
-def test_get_volume_uuid_ntfs(mock_fs_entry):
+def test_get_volume_uuid_ntfs(mock_fs_entry: MagicMock) -> None:
     """Test get_volume_uuid for an NTFS filesystem."""
     # Mock NTFS-specific attributes
     mock_fs_entry.fs.__type__ = "ntfs"
@@ -96,7 +96,7 @@ def test_get_volume_uuid_ntfs(mock_fs_entry):
     assert get_volume_uuid(mock_fs_entry) == expected_uuid
 
 
-def test_get_volume_uuid_ext(mock_fs_entry):
+def test_get_volume_uuid_ext(mock_fs_entry: MagicMock) -> None:
     """Test get_volume_uuid for an EXT filesystem (ext2/3/4)."""
     # Mock EXT-specific attributes
     mock_fs_entry.fs.__type__ = "ext4"
@@ -106,7 +106,7 @@ def test_get_volume_uuid_ext(mock_fs_entry):
     assert get_volume_uuid(mock_fs_entry) == expected_uuid
 
 
-def test_get_volume_uuid_fat(mock_fs_entry):
+def test_get_volume_uuid_fat(mock_fs_entry: MagicMock) -> None:
     """Test get_volume_uuid for a FAT filesystem."""
     # Mock FAT-specific attributes
     mock_fs_entry.fs.__type__ = "fat"
@@ -116,7 +116,7 @@ def test_get_volume_uuid_fat(mock_fs_entry):
     assert get_volume_uuid(mock_fs_entry) == expected_uuid
 
 
-def test_get_volume_uuid_exfat(mock_fs_entry):
+def test_get_volume_uuid_exfat(mock_fs_entry: MagicMock) -> None:
     """Test get_volume_uuid for an ExFAT filesystem."""
     # Mock ExFAT-specific attributes
     mock_fs_entry.fs.__type__ = "exfat"
@@ -126,7 +126,7 @@ def test_get_volume_uuid_exfat(mock_fs_entry):
     assert get_volume_uuid(mock_fs_entry) == expected_uuid
 
 
-def test_get_volume_uuid_guid(mock_fs_entry):
+def test_get_volume_uuid_guid(mock_fs_entry: MagicMock) -> None:
     """Test get_volume_uuid when `volume.guid` exists (higher priority)."""
     # Mock a GUID that should be returned first
     mock_fs_entry.fs.volume.guid = b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f"
@@ -135,7 +135,7 @@ def test_get_volume_uuid_guid(mock_fs_entry):
     assert get_volume_uuid(mock_fs_entry) == expected_uuid
 
 
-def test_get_volume_uuid_no_match(mock_fs_entry):
+def test_get_volume_uuid_no_match(mock_fs_entry: MagicMock) -> None:
     """Test get_volume_uuid when no valid UUID is found."""
     # The default mock has no specific filesystem type
     mock_fs_entry.fs.__type__ = "unsupported_fs"
@@ -143,7 +143,7 @@ def test_get_volume_uuid_no_match(mock_fs_entry):
     assert get_volume_uuid(mock_fs_entry) is None
 
 
-def test_get_disk_serial(mock_fs_entry):
+def test_get_disk_serial(mock_fs_entry: MagicMock) -> None:
     """Test get_disk_serial when a serial number is available."""
     # Mock the `serial` attribute on the `vs` object
     mock_fs_entry.fs.volume.disk.vs = Mock(serial="A1B2C3D4")
@@ -151,13 +151,10 @@ def test_get_disk_serial(mock_fs_entry):
     assert get_disk_serial(mock_fs_entry) == "A1B2C3D4"
 
 
-def test_get_disk_serial_no_serial(mock_fs_entry):
+def test_get_disk_serial_no_serial(mock_fs_entry: MagicMock) -> None:
     """Test get_disk_serial when the `serial` attribute is missing."""
     # The default mock aparently does have the `serial` attribute on `vs`
     mock_fs_entry.fs.volume.disk.vs = Mock()
     if hasattr(mock_fs_entry.fs.volume.disk.vs, "serial"):
         delattr(mock_fs_entry.fs.volume.disk.vs, "serial")
     assert get_disk_serial(mock_fs_entry) is None
-
-
-
