@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import cached_property
 import gzip
 import io
 import logging
@@ -8,8 +7,8 @@ import os
 import pathlib
 import stat
 from collections import defaultdict
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, BinaryIO, Final
-from uuid import UUID
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -25,6 +24,7 @@ TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from uuid import UUID
 
     from dissect.target.target import Target
 
@@ -515,7 +515,10 @@ class Filesystem:
             return str(self.serial)
         if self.volume and self.volume.guid:
             return self.volume.guid
-        return self.volume.name
+        if self.volume and self.volume.name:
+            return self.volume.name
+        log.error("no identifier found for filesystem of type %s", self.__type__)
+        return f"filesystem_{self.__type__}"
 
 
 class FilesystemEntry:

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import datetime
-from functools import cached_property
 import math
 import stat
+from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO
-from uuid import UUID
 
 from dissect.fat import exceptions as fat_exc
 from dissect.fat import fat
@@ -58,7 +57,6 @@ class FatFilesystem(Filesystem):
     @cached_property
     def serial(self) -> int | str | None:
         return int(self.fatfs.volume_id, 16)
-
 
 
 class FatFilesystemEntry(FilesystemEntry):

@@ -11,7 +11,6 @@ from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from uuid import UUID
 
     from dissect.target.target import Target
 
@@ -65,23 +64,10 @@ class WalkFSPlugin(Plugin):
                 self.target.log.warning("File not found: %s", entry)
                 self.target.log.debug("", exc_info=e)
             except Exception as e:
+                print(e)
                 self.target.log.warning("Exception generating record for: %s", entry)
                 self.target.log.debug("", exc_info=e)
                 continue
-
-
-def get_volume_uuid(filesystem: Filesystem) -> UUID | None:
-    """
-    Returns the volume UUID if it exists; otherwise, returns None.
-
-    Args:
-        entry: :class:`Filesystem` instance
-
-    Returns:
-        UUID or None
-    """
-    volume = getattr(filesystem, "volume", None)
-    return getattr(volume, "uuid", None)
 
 
 def get_disk_serial(filesystem: Filesystem) -> str | None:
@@ -118,12 +104,12 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
 
         for sub_entry in entry.entries:
             fs_types.append(sub_entry.fs.__type__)
-            volume_uuids.append(get_volume_uuid(sub_entry.fs))
+            volume_uuids.append(sub_entry.fs.identifier)
             disk_serials.append(get_disk_serial(sub_entry.fs))
 
     else:
         fs_types = [entry.fs.__type__]
-        volume_uuids = [get_volume_uuid(entry)]
+        volume_uuids = [entry.fs.identifier]
         disk_serials = [get_disk_serial(entry.fs)]
 
     return FilesystemRecord(

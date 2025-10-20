@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from functools import cached_property
 import stat
 from datetime import timedelta, timezone
+from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO, Optional
-from uuid import UUID
 
 from dissect.fat import exfat
 from dissect.util.stream import RunlistStream
@@ -59,11 +58,11 @@ class ExfatFilesystem(Filesystem):
                 raise FileNotFoundError(f"File not found: {path}")
 
         return dirent
-    
 
     @cached_property
     def serial(self) -> int | str | None:
         return self.exfat.vbr.volume_serial
+
 
 class ExfatFilesystemEntry(FilesystemEntry):
     def __init__(

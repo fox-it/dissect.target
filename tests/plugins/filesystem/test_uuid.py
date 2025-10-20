@@ -1,6 +1,5 @@
 from io import BytesIO
 from unittest.mock import Mock, patch
-from uuid import UUID
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.exfat import ExfatFilesystem
@@ -14,17 +13,14 @@ class MockFilesystem(Filesystem):
     __type__ = "test"
 
 
-
-
-
 def test_filesystem_uuid_from_volume_guid() -> None:
     """Filesystem.uuid returns a UUID when volume.guid is set."""
-    guid_bytes = b"\x01" * 16
+    guid = "test" * 4
 
     fs = MockFilesystem()
-    fs.volume = Mock(guid=guid_bytes)
+    fs.volume = Mock(guid=guid)
 
-    assert fs.uuid == UUID(bytes_le=guid_bytes)
+    assert fs.identifier == guid
 
 
 def test_filesystem_uuid_none_when_no_guid() -> None:
@@ -32,30 +28,30 @@ def test_filesystem_uuid_none_when_no_guid() -> None:
 
     fs = MockFilesystem()
     fs.volume = Mock(guid=None)
+    fs.volume.name = "TestVolume"
 
-    assert fs.uuid is None
+    assert fs.identifier == "TestVolume"
 
 
 def test_ntfs_uuid_from_volume_guid() -> None:
     """NTFS filesystem UUID is derived correctly from volume GUID."""
-    guid_bytes = b"\x01" * 16
-    volume = Mock(guid=guid_bytes)
+    guid = "test" * 4
+    volume = Mock(guid=guid)
 
     fs = NtfsFilesystem()
     fs.volume = volume
 
-    assert fs.uuid == UUID(bytes_le=guid_bytes)
+    assert fs.identifier == guid
 
 
 def test_ntfs_uuid_no_guid() -> None:
     """NTFS.uuid falls back to serial when volume.guid is None."""
-    serial_number = 123456789
+    serial_number = "123456789"
     fs = NtfsFilesystem()
     fs.volume = Mock(guid=None)
     fs.ntfs = Mock(serial=serial_number)
 
-    expected_uuid = UUID(int=serial_number)
-    assert fs.uuid == expected_uuid
+    assert fs.identifier == serial_number
 
 
 def test_fat_uuid_no_guid() -> None:
@@ -66,8 +62,8 @@ def test_fat_uuid_no_guid() -> None:
         fs.volume = Mock(guid=None)
         fs.fatfs = Mock(volume_id="1a2b3c4d")
 
-        expected_uuid = UUID(int=0x1A2B3C4D)
-        assert fs.uuid == expected_uuid
+        expected_uuid = "439041101"  # in decimal
+        assert fs.identifier == expected_uuid
 
 
 def test_exfat_uuid_no_guid() -> None:
@@ -78,15 +74,15 @@ def test_exfat_uuid_no_guid() -> None:
         fs.volume = Mock(guid=None)
         fs.exfat = Mock(vbr=Mock(volume_serial=987654321))
 
-        expected_uuid = UUID(int=987654321)
-        assert fs.uuid == expected_uuid
+        expected_uuid = "987654321"
+        assert fs.identifier == expected_uuid
 
 
 def test_ext_uuid_no_guid() -> None:
-    """EXT.uuid fallback using extfs.uuid when volume.guid is None."""
+    """EXT.uuid fallback using extfs.identifier when volume.guid is None."""
     fs = ExtFilesystem(fh=absolute_path("_data/filesystems/symlink_disk.ext4").open("rb"))
     fs.volume = Mock(guid=None)
     fs.extfs = Mock(uuid="e0c3d987-a36c-4f9e-9b2f-90e633d7d7a1")
 
     expected_uuid = "e0c3d987-a36c-4f9e-9b2f-90e633d7d7a1"
-    assert fs.uuid == expected_uuid
+    assert fs.identifier == expected_uuid

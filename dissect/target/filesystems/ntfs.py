@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from functools import cached_property
 import math
 import stat
+from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO
-from uuid import UUID
 
 from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
 from dissect.ntfs.exceptions import Error as NtfsError
@@ -64,7 +63,6 @@ class NtfsFilesystem(Filesystem):
     @cached_property
     def serial(self) -> int | str | None:
         return self.ntfs.serial
-    
 
 
 class NtfsFilesystemEntry(FilesystemEntry):
