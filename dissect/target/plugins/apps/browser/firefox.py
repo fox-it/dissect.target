@@ -478,10 +478,11 @@ class FirefoxPlugin(BrowserPlugin):
                 self.target.log.error("Missing dependencies pycryptodome or asn1crypto for Firefox password decryption")
                 continue
 
-            # Decrypt the master key for this profile first.
+            # Decrypt the master key for this profile first. The ``BrowserPlugin.keychain()`` includes an empty password
+            # which is required to decrypt Firefox master keys with no primary password set.
             key = None
 
-            for primary_password in itertools.chain(working_passwords, ("",), self.keychain()):
+            for primary_password in itertools.chain(working_passwords, self.keychain()):
                 try:
                     key = decrypt_master_key(key4_file, primary_password.encode())
                     working_passwords.add(primary_password)
@@ -493,7 +494,9 @@ class FirefoxPlugin(BrowserPlugin):
                     )
 
             if not key:
-                self.target.log.warning("Failed to decrypt Firefox master key in file '%s'", key4_file)
+                self.target.log.error(
+                    "Failed to decrypt Firefox master key in file '%s' using provided passphrase(s)", key4_file
+                )
                 continue
 
             try:
@@ -762,6 +765,7 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
         raise ValueError(f"Encountered unknown algorithm {algorithm} while decrypting Firefox master key")
 
     expected_password_check = b"password-check\x02\x02"
+
     if decrypted_password_check != expected_password_check:
         log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
         raise ValueError("Master key decryption failed. Provided password could be missing or incorrect")
