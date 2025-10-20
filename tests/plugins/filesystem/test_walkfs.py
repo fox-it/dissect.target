@@ -28,7 +28,6 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     target_unix.add_plugin(WalkFSPlugin)
 
     results = list(target_unix.walkfs())
-    print(results)
     assert len(results) == 14
     assert sorted([r.path for r in results]) == [
         "/",

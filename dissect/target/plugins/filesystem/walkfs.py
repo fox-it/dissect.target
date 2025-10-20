@@ -7,7 +7,7 @@ from dissect.util.ts import from_unix
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, arg, export, internal
+from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -70,7 +70,7 @@ class WalkFSPlugin(Plugin):
                 continue
 
 
-def get_volume_uuid(entry: Filesystem) -> UUID | None:
+def get_volume_uuid(filesystem: Filesystem) -> UUID | None:
     """
     Returns the volume UUID if it exists; otherwise, returns None.
 
@@ -80,12 +80,11 @@ def get_volume_uuid(entry: Filesystem) -> UUID | None:
     Returns:
         UUID or None
     """
-    volume = getattr(entry, "volume", None)
+    volume = getattr(filesystem, "volume", None)
     return getattr(volume, "uuid", None)
 
 
-@internal
-def get_disk_serial(entry: Filesystem) -> str | None:
+def get_disk_serial(filesystem: Filesystem) -> str | None:
     """
     Returns the disk serial number if it exists; otherwise, returns None.
 
@@ -95,7 +94,7 @@ def get_disk_serial(entry: Filesystem) -> str | None:
     Returns:
         Disk serial number as str, or None if not available.
     """
-    entry_volume = getattr(entry, "volume", None)
+    entry_volume = getattr(filesystem, "volume", None)
     volume_vs = getattr(entry_volume, "vs", None)
     return getattr(volume_vs, "serial", None)
 
