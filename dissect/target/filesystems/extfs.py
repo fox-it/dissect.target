@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 import stat
 from typing import TYPE_CHECKING, Any, BinaryIO
 
@@ -46,12 +47,10 @@ class ExtFilesystem(Filesystem):
             raise NotASymlinkError(path) from e
         except extfs.Error as e:
             raise FileNotFoundError(path) from e
-
-    @property
+        
+    
+    @cached_property
     def uuid(self) -> UUID | None:
-        base = super().uuid
-        if base:
-            return base
         return self.extfs.uuid
 
 

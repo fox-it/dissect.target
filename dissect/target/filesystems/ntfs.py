@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 import math
 import stat
 from typing import TYPE_CHECKING, BinaryIO
@@ -60,12 +61,10 @@ class NtfsFilesystem(Filesystem):
         except NtfsError as e:
             raise FileNotFoundError(path) from e
 
-    @property
-    def uuid(self) -> UUID | None:
-        base = super().uuid
-        if base:
-            return base
-        return UUID(int=self.ntfs.serial)
+    @cached_property
+    def serial(self) -> int | str | None:
+        return self.ntfs.serial
+    
 
 
 class NtfsFilesystemEntry(FilesystemEntry):

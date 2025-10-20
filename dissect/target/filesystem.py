@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 import gzip
 import io
 import logging
@@ -497,12 +498,24 @@ class Filesystem:
         """
         return self.get(path).hash(algos)
 
-    @property
+    @cached_property
     def uuid(self) -> UUID | None:
-        """filesystem UUID"""
-        if self.volume and self.volume.guid:
-            return UUID(bytes_le=self.volume.guid)
         return None
+
+    @cached_property
+    def serial(self) -> int | str | None:
+        return None
+
+    @cached_property
+    def identifier(self) -> str:
+        """Returns the identifier of the Filesystem."""
+        if self.uuid:
+            return str(self.uuid)
+        if self.serial:
+            return str(self.serial)
+        if self.volume and self.volume.guid:
+            return self.volume.guid
+        return self.volume.name
 
 
 class FilesystemEntry:

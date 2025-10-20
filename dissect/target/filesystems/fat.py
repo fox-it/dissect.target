@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+from functools import cached_property
 import math
 import stat
 from typing import TYPE_CHECKING, BinaryIO
@@ -54,12 +55,10 @@ class FatFilesystem(Filesystem):
         except fat_exc.Error as e:
             raise FileNotFoundError(path) from e
 
-    @property
-    def uuid(self) -> UUID | None:
-        base = super().uuid
-        if base:
-            return base
-        return UUID(int=int(self.fatfs.volume_id, 16))
+    @cached_property
+    def serial(self) -> int | str | None:
+        return int(self.fatfs.volume_id, 16)
+
 
 
 class FatFilesystemEntry(FilesystemEntry):
