@@ -92,7 +92,7 @@ class BtrfsSubvolumeFilesystem(Filesystem):
 
 
 class BtrfsFilesystemEntry(FilesystemEntry):
-    fs: BtrfsFilesystem
+    fs: BtrfsSubvolumeFilesystem
     entry: btrfs.INode
 
     def get(self, path: str) -> FilesystemEntry:
