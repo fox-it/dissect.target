@@ -129,7 +129,8 @@ class FirefoxPlugin(BrowserPlugin):
     def _iter_profiles(self) -> Iterator[tuple[UserDetails | None, Path, Path]]:
         """Yield user directories by iterating over found Firefox install directories.
 
-        Currently does not parse ``$INSTALL/profiles.ini`` file."""
+        Currently does not parse ``$INSTALL/profiles.ini`` file.
+        """
 
         seen = set()
 
