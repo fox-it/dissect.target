@@ -410,29 +410,6 @@ class FirefoxPlugin(BrowserPlugin):
 
             try:
                 extensions = json.load(extension_file.open())
-
-                for extension in extensions.get("addons", []):
-                    yield self.BrowserExtensionRecord(
-                        ts_install=from_unix_ms(extension.get("installDate", 0)),
-                        ts_update=from_unix_ms(extension.get("updateDate", 0)),
-                        browser="firefox",
-                        extension_id=extension.get("id"),
-                        name=(extension.get("defaultLocale", {}) or {}).get("name"),
-                        short_name=None,
-                        default_title=None,
-                        description=(extension.get("defaultLocale", {}) or {}).get("description"),
-                        version=extension.get("version"),
-                        ext_path=extension.get("path"),
-                        from_webstore=None,
-                        permissions=(extension.get("userPermissions", {}) or {}).get("permissions"),
-                        manifest_version=extension.get("manifestVersion"),
-                        source_uri=extension.get("sourceURI"),
-                        optional_permissions=(extension.get("optionalPermissions", {}) or {}).get("permissions"),
-                        source=extension_file,
-                        _target=self.target,
-                        _user=user_details.user if user_details else None,
-                    )
-
             except (UnicodeDecodeError, json.JSONDecodeError) as e:
                 self.target.log.warning(
                     "Firefox file '%s' is malformed, consider inspecting the file manually: %s",
@@ -440,6 +417,28 @@ class FirefoxPlugin(BrowserPlugin):
                     e,
                 )
                 self.target.log.debug("", exc_info=e)
+
+            for extension in extensions.get("addons", []):
+                yield self.BrowserExtensionRecord(
+                    ts_install=from_unix_ms(extension.get("installDate", 0)),
+                    ts_update=from_unix_ms(extension.get("updateDate", 0)),
+                    browser="firefox",
+                    extension_id=extension.get("id"),
+                    name=(extension.get("defaultLocale", {}) or {}).get("name"),
+                    short_name=None,
+                    default_title=None,
+                    description=(extension.get("defaultLocale", {}) or {}).get("description"),
+                    version=extension.get("version"),
+                    ext_path=extension.get("path"),
+                    from_webstore=None,
+                    permissions=(extension.get("userPermissions", {}) or {}).get("permissions"),
+                    manifest_version=extension.get("manifestVersion"),
+                    source_uri=extension.get("sourceURI"),
+                    optional_permissions=(extension.get("optionalPermissions", {}) or {}).get("permissions"),
+                    source=extension_file,
+                    _target=self.target,
+                    _user=user_details.user if user_details else None,
+                )
 
     @export(record=BrowserPasswordRecord)
     def passwords(self) -> Iterator[BrowserPasswordRecord]:
@@ -459,11 +458,14 @@ class FirefoxPlugin(BrowserPlugin):
         working_passwords = set()
 
         for user_details, _, profile_dir in self._iter_profiles():
-            login_file = profile_dir.joinpath("logins.json")
+            logins_file = profile_dir.joinpath("logins.json")
+            logins_backup = profile_dir.joinpath("logins-backup.json")
+
             key3_file = profile_dir.joinpath("key3.db")
             key4_file = profile_dir.joinpath("key4.db")
 
-            if not login_file.is_file():
+            # Do not attempt master key decryption if this profile has no logins.
+            if not logins_file.is_file() and not logins_backup.is_file():
                 continue
 
             if key3_file.is_file() and not key4_file.is_file():
@@ -499,8 +501,19 @@ class FirefoxPlugin(BrowserPlugin):
                 )
                 continue
 
-            try:
-                logins = json.load(login_file.open())
+            for login_file in (logins_file, logins_backup):
+                if not login_file.is_file():
+                    continue
+
+                try:
+                    logins = json.load(login_file.open())
+                except (UnicodeDecodeError, json.JSONDecodeError) as e:
+                    self.target.log.warning(
+                        "Firefox file '%s' is malformed, consider inspecting the file manually: %s",
+                        login_file,
+                        e,
+                    )
+                    self.target.log.debug("", exc_info=e)
 
                 for login in logins.get("logins", []):
                     decrypted_username = None
@@ -535,14 +548,6 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user_details.user if user_details else None,
                     )
-
-            except (UnicodeDecodeError, json.JSONDecodeError) as e:
-                self.target.log.warning(
-                    "Firefox file '%s' is malformed, consider inspecting the file manually: %s",
-                    login_file,
-                    e,
-                )
-                self.target.log.debug("", exc_info=e)
 
 
 # Define separately because it is not defined in asn1crypto

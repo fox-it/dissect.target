@@ -374,3 +374,18 @@ def test_passwords_decrypt_aes() -> None:
 
     b64_unknown = "MEMEEPgAAAAAAAAAAAAAAAAAAAEwHQYJYIZIAWUDBAEqBBDH5u9D6iZZ7WbagSHJpDGnBBCeA5eSi8teghT3FHogzqOF"
     assert decrypt_value(b64_unknown, key) == b""
+
+
+def test_passwords_backup(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
+    """Test if we find ``logins-backup.json`` files."""
+
+    fs_win.map_dir(
+        "Users/John/AppData/Roaming/Mozilla/Firefox/Profiles/8jb1c7qs.default-release",
+        absolute_path("_data/plugins/apps/browser/firefox/passwords/144.0/"),
+    )
+    target_win_users.add_plugin(FirefoxPlugin)
+
+    records = list(target_win_users.firefox.passwords())
+    assert len(records) == 3
+
+    assert records[-1].source == "C:\\Users\\John\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\8jb1c7qs.default-release\\logins-backup.json"  # noqa: E501
