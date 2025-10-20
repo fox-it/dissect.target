@@ -123,7 +123,7 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
 
     else:
         fs_types = [entry.fs.__type__]
-        volume_uuids = [get_volume_uuid(entry).fs]
+        volume_uuids = [get_volume_uuid(entry)]
         disk_serials = [get_disk_serial(entry.fs)]
 
     return FilesystemRecord(
