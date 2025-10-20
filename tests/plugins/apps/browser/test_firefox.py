@@ -388,4 +388,7 @@ def test_passwords_backup(target_win_users: Target, fs_win: VirtualFilesystem) -
     records = list(target_win_users.firefox.passwords())
     assert len(records) == 3
 
-    assert records[-1].source == "C:\\Users\\John\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\8jb1c7qs.default-release\\logins-backup.json"  # noqa: E501
+    assert (
+        records[-1].source
+        == "C:\\Users\\John\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\8jb1c7qs.default-release\\logins-backup.json"
+    )

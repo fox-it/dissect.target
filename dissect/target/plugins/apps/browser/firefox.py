@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import hmac
 import itertools
 import json
 import logging
@@ -622,63 +621,15 @@ def _decrypt_master_key_pbes2(decoded_item: core.Sequence, primary_password: byt
     return AES.new(key, AES.MODE_CBC, iv).decrypt(cipher_text)
 
 
-def _decrypt_master_key_sha1_triple_des_cbc(
-    decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes
-) -> bytes:
-    """Decrypt a Firefox master key with the given Firefox primary password and salt.
-
-    Args:
-        decoded_item: ``core.Sequence`` is a ``list`` representation of ``SEQUENCE`` as described below.
-        primary_password: ``bytes`` of Firefox primary password to decrypt ciphertext with.
-        global_salt: ``bytes`` of salt to prepend to primary password when calculating AES key.
-
-    Raises:
-        ValueError: When missing ``pycryptodome`` or ``asn1crypto`` dependencies.
-
-    Returns:
-        Bytes of decrypted 3DES ciphertext.
-    """
-
-    # SEQUENCE {
-    #     SEQUENCE {
-    #         OBJECTIDENTIFIER 1.2.840.113549.1.12.5.1.3
-    #         SEQUENCE {
-    #             OCTETSTRING entry_salt
-    #             INTEGER 01
-    #         }
-    #     }
-    #     OCTETSTRING encrypted
-    # }
-
-    def decrypt_moz_3des(global_salt: bytes, primary_password: bytes, entry_salt: str, encrypted: bytes) -> bytes:
-        """Decrypt mozilla 3DES primary password."""
-
-        hp = sha1(global_salt + primary_password).digest()
-        pes = entry_salt + b"\x00" * (20 - len(entry_salt))
-        chp = sha1(hp + entry_salt).digest()
-        k1 = hmac.new(chp, pes + entry_salt, sha1).digest()
-        tk = hmac.new(chp, pes, sha1).digest()
-        k2 = hmac.new(chp, tk + entry_salt, sha1).digest()
-        k = k1 + k2
-
-        iv = k[-8:]
-        key = k[:24]
-
-        return DES3.new(key, DES3.MODE_CBC, iv).decrypt(encrypted)
-
-    entry_salt = decoded_item[0][1][0].native
-    cipher_text = decoded_item[1].native
-    key = decrypt_moz_3des(global_salt, primary_password, entry_salt, cipher_text)
-    return key[:24]
-
-
 def _decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> tuple[bytes, str]:
     """Decrypt the provided ``core.Sequence`` with the provided Firefox primary password and salt.
 
     At this stage we are not yet sure of the structure of ``decoded_item``. The structure will depend on the
     ``core.Sequence`` object identifier at ``decoded_item[0][0]``, hence we extract it. This function will
-    then call the apropriate ``decrypt_master_key_pbes2``or ``decrypt_master_key_sha1_triple_des_cbc`` functions
-    to decrypt the item.
+    then call the apropriate ``_decrypt_master_key_pbes2`` function to decrypt the item.
+
+    Firefox supports other algorithms (i.e. Firefox before 2018 and ``pbeWithSha1AndTripleDES-CBC`` from ``key3.db``
+    files), but decrypting these is not (yet) supported by this plugin.
 
     Args:
         decoded_item: ``core.Sequence`` is a ``list`` representation of ``SEQUENCE`` as described below.
@@ -686,7 +637,7 @@ def _decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, gl
         global_salt: ``bytes`` of salt to prepend to primary password when calculating AES key.
 
     Returns:
-        Tuple of decrypted bytes and a string representation of the identified encryption algorithm.
+        Tuple of decrypted bytes and a dotted ASN.1 string representation of the identified encryption algorithm.
     """
 
     # SEQUENCE {
@@ -703,10 +654,6 @@ def _decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, gl
     if algos.EncryptionAlgorithmId.map(algorithm) == "pbes2":
         return _decrypt_master_key_pbes2(decoded_item, primary_password, global_salt), algorithm
 
-    if algorithm == pbeWithSha1AndTripleDES_CBC:
-        return _decrypt_master_key_sha1_triple_des_cbc(decoded_item, primary_password, global_salt), algorithm
-
-    # Firefox supports other algorithms (i.e. Firefox before 2018), but decrypting these is not (yet) supported.
     raise ValueError(f"Unsupported Firefox master key encryption algorihm {algorithm!s}")
 
 
