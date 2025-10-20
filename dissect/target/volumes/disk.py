@@ -36,7 +36,7 @@ class DissectVolumeSystem(VolumeSystem):
                 v.size,
                 v.type,
                 name,
-                guid=v.guid,
+                guid=str(v.guid) if v.guid else None,
                 raw=v,
                 disk=self.disk,
                 vs=self,

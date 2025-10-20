@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dissect.target"
 description = "This module ties all other Dissect modules together, it provides a programming API and command line tools which allow easy access to various data sources inside disk images or file collections (a.k.a. targets)"
 readme = "README.md"
-requires-python = ">=3.9.0"
+requires-python = ">=3.10"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE", "COPYRIGHT"]
 authors = [
@@ -34,7 +34,7 @@ dependencies = [
     "dissect.regf>=3.13,<4",
     "dissect.sql>=3.12,<4",
     "dissect.util>=3,<4",
-    "dissect.volume>=2,<4",
+    "dissect.volume>=3.17.dev1,<4",  # TODO: update on release!
     "flow.record~=3.20.0",
     "structlog",
 ]
@@ -52,6 +52,7 @@ full = [
     "dissect.btrfs>=1,<2",
     "dissect.cim>=3,<4",
     "dissect.clfs>=1,<2",
+    "dissect.cramfs>=1,<2",
     "dissect.esedb>=3,<4",
     "dissect.etl>=3,<4",
     "dissect.extfs>=3,<4",
@@ -71,8 +72,7 @@ full = [
     "pycryptodome",
     "ruamel.yaml",
     "tomli; python_version<'3.11'",
-    "zstandard==0.23.0; platform_python_implementation == 'PyPy' and python_version == '3.9'", # Pin to last working for PyPy3.9
-    "zstandard; platform_python_implementation != 'PyPy' and python_version != '3.9'", # Otherwise, pick the latest
+    "zstandard; platform_python_implementation != 'PyPy'",
 ]
 dev = [
     "dissect.target[full,yara]",
@@ -80,6 +80,7 @@ dev = [
     "dissect.btrfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cim[dev]>=3.0.dev,<4.0.dev",
     "dissect.clfs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.cramfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cstruct>=4.0.dev,<5.0.dev",
     "dissect.esedb[dev]>=3.0.dev,<4.0.dev",
     "dissect.etl[dev]>=3.0.dev,<4.0.dev",
@@ -100,7 +101,7 @@ dev = [
     "dissect.thumbcache[dev]>=1.0.dev,<2.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.vmfs[dev]>=3.12.dev,<4.0.dev",
-    "dissect.volume[dev]>=3.0.dev,<4.0.dev",
+    "dissect.volume[dev]>=3.17.dev,<4.0.dev",  # TODO: update on release!
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
 ]
 yara = [
@@ -132,7 +133,7 @@ test = [
 ]
 lint = [
     "typing_extensions",
-    "ruff==0.12.9",
+    "ruff==0.13.1",
     "vermin",
 ]
 build = [
@@ -163,7 +164,7 @@ target-qfind = "dissect.target.tools.qfind:main"
 
 [tool.ruff]
 line-length = 120
-required-version = ">=0.12.0"
+required-version = ">=0.13.1"
 
 [tool.ruff.format]
 docstring-code-format = true
