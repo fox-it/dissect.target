@@ -26,7 +26,7 @@ VmwareDragAndDropRecord = create_extended_descriptor([UserRecordDescriptorExtens
 )
 
 VmwareVirtualMachineRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "virtualization/vmware/virtual_machine",
+    "virtualization/vmware/vm",
     [
         ("datetime", "ts"),
         ("string", "name"),
