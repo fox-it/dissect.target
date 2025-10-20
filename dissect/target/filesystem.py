@@ -7,7 +7,7 @@ import os
 import pathlib
 import stat
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Final
+from typing import TYPE_CHECKING, Any, BinaryIO, Final
 from uuid import UUID
 
 from dissect.target.exceptions import (
@@ -23,7 +23,7 @@ from dissect.target.helpers.lazy import import_lazy
 TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 
@@ -1020,11 +1020,7 @@ class MappedFile(VirtualFile):
         return pathlib.Path(self.entry).open("rb")
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
-        # Python 3.9 does not support follow_symlinks in stat()
-        if follow_symlinks:
-            return fsutil.stat_result.copy(pathlib.Path(self.entry).stat())
-
-        return self.lstat()
+        return fsutil.stat_result.copy(pathlib.Path(self.entry).stat(follow_symlinks=follow_symlinks))
 
     def lstat(self) -> fsutil.stat_result:
         return fsutil.stat_result.copy(pathlib.Path(self.entry).lstat())
@@ -1776,6 +1772,7 @@ register("vmfs", "VmfsFilesystem")
 register("btrfs", "BtrfsFilesystem")
 register("exfat", "ExfatFilesystem")
 register("squashfs", "SquashFSFilesystem")
+register("cramfs", "CramfsFilesystem")
 register("jffs", "JffsFilesystem")
 register("qnxfs", "QnxFilesystem")
 register("zip", "ZipFilesystem")

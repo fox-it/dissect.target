@@ -9,7 +9,7 @@ import sys
 from collections import ChainMap
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Callable, TextIO
+from typing import IO, TYPE_CHECKING, TextIO
 from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
@@ -26,7 +26,7 @@ from dissect.target.tools.shell import main as target_shell
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 
@@ -230,6 +230,18 @@ def test_target_cli_ls(target_win: Target, capsys: pytest.CaptureFixture, monkey
 
     captured = capsys.readouterr()
     assert captured.out == "c:\nsysvol" + "\n"
+
+
+def test_target_cli_info(target_win: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    # disable colorful output in `target-shell`
+    monkeypatch.setattr(fsutils, "LS_COLORS", {})
+
+    cli = TargetCli(target_win)
+    cli.onecmd("info")
+
+    captured = capsys.readouterr()
+    # Check if common keywords are present in output
+    assert all(key in captured.out for key in ["Hostname", "path", "Os"])
 
 
 @pytest.mark.parametrize(

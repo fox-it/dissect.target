@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from defusedxml import ElementTree
 from dissect.hypervisor import hyperv
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -10,6 +11,7 @@ from dissect.target.plugin import ChildTargetPlugin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -45,16 +47,43 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
             data = hyperv.HyperVFile(self.data_vmcx.open()).as_dict()
 
             if virtual_machines := data["Configurations"].get("VirtualMachines"):
-                for vm_path in virtual_machines.values():
+                for path in virtual_machines.values():
+                    vm_path = self.target.fs.path(path)
                     yield ChildTargetRecord(
                         type=self.__type__,
-                        path=self.target.fs.path(vm_path),
+                        name=self._name_from_vmcx(vm_path),
+                        path=vm_path,
                         _target=self.target,
                     )
 
         for xml_path in self.vm_xml:
+            vm_path = xml_path.resolve()
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=xml_path.resolve(),
+                name=self._name_from_xml(vm_path),
+                path=vm_path,
                 _target=self.target,
             )
+
+    def _name_from_vmcx(self, path: Path) -> str | None:
+        try:
+            with path.open("rb") as fh:
+                config = hyperv.HyperVFile(fh).as_dict()
+                return config.get("configuration", {}).get("properties", {}).get("name")
+        except Exception as e:
+            self.target.log.error("Failed parsing name from VMCX: %s", path)  # noqa: TRY400
+            self.target.log.debug("", exc_info=e)
+
+        return None
+
+    def _name_from_xml(self, path: Path) -> str | None:
+        try:
+            xml = ElementTree.fromstring(path.read_bytes())
+
+            if (name := xml.find(".//properties/name")) is not None:
+                return name.text
+        except Exception as e:
+            self.target.log.error("Failed parsing name from XML: %s", path)  # noqa: TRY400
+            self.target.log.debug("", exc_info=e)
+
+        return None

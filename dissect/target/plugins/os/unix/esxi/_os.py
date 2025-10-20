@@ -180,7 +180,7 @@ class ESXiPlugin(UnixPlugin):
         if not inv_file.exists():
             return []
 
-        root = ElementTree.fromstring(inv_file.read_text("utf-8"))
+        root = ElementTree.fromstring(inv_file.read_text())
         for entry in root.iter("ConfigEntry"):
             yield VirtualMachineRecord(
                 path=self.target.fs.path(entry.findtext("vmxCfgPath")),
