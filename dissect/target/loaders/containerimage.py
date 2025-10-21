@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import logging
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loaders.tar import TarSubLoader
 
 if TYPE_CHECKING:
@@ -14,7 +14,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DOCKER_ARCHIVE_IMAGE = {
     "manifest.json",

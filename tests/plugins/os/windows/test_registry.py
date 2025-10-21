@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from dissect.target.helpers.logging import TRACE_LEVEL
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
@@ -21,7 +22,7 @@ def test_missing_hives(fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixtu
     target = Target()
     target.filesystems.add(fs_win)
 
-    with caplog.at_level(logging.DEBUG, target.log.name):
+    with caplog.at_level(TRACE_LEVEL, target.log.name):
         target.apply()
 
         expected = []
