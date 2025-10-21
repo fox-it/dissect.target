@@ -10,12 +10,14 @@ from typing import TYPE_CHECKING, BinaryIO
 from dissect.util.stream import AlignedStream, RangeStream, RelativeStream
 
 from dissect.target.container import Container
-from dissect.target.tools.utils import catch_sigpipe
+from dissect.target.helpers.logging import get_logger
+from dissect.target.tools.utils.cli import catch_sigpipe
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 def find_xor_key(fh: BinaryIO) -> bytes:

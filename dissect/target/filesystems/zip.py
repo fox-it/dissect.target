@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import stat
 import zipfile
 from datetime import datetime, timezone
@@ -22,11 +21,13 @@ from dissect.target.filesystem import (
     VirtualFilesystem,
 )
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class ZipFilesystem(Filesystem):

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from base64 import b64decode
 from typing import TYPE_CHECKING
 
@@ -16,6 +15,7 @@ from flow.record.fieldtypes import posix_path, windows_path
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.ssh.ssh import (
@@ -33,7 +33,8 @@ if TYPE_CHECKING:
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 PuTTYUserRecordDescriptor = create_extended_descriptor([UserRecordDescriptorExtension])
 PuTTYSessionRecord = PuTTYUserRecordDescriptor(

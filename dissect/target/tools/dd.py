@@ -9,14 +9,15 @@ import sys
 from dissect.util.stream import RangeStream
 
 from dissect.target.exceptions import TargetError
-from dissect.target.tools.utils import (
+from dissect.target.helpers.logging import get_logger
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     open_target,
     process_generic_arguments,
 )
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 

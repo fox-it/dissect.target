@@ -3,7 +3,6 @@ from __future__ import annotations
 import bz2
 import dataclasses
 import io
-import logging
 import struct
 from enum import IntEnum
 from functools import lru_cache
@@ -11,6 +10,8 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.cstruct import BaseType, cstruct
 from dissect.util.ts import wintimestamp
+
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -20,7 +21,8 @@ BZIP_HEADER = b"BZh9"
 FILE_MAGIC = b"ESDb"
 COMPAT_1 = (1, 7, 9)
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class EverythingVarInt(int, BaseType):
