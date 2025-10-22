@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import stat_result
-from dissect.target.tools.fsutils import print_extensive_file_stat_listing
+from dissect.target.tools.utils.fs import print_extensive_file_stat_listing
 
 if TYPE_CHECKING:
     import pytest

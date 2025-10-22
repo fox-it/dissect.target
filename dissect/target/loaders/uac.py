@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 from dissect.target.loaders.dir import find_and_map_dirs, find_dirs, map_dirs
 from dissect.target.loaders.tar import TarSubLoader
@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 FILESYSTEMS_ROOT = "[root]"
 UAC_CHECK_FILE = "uac.log"
