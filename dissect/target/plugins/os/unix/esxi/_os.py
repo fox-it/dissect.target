@@ -354,7 +354,13 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
     else:
         target.log.debug("Skipping static decryption because of missing crypto module")
 
-    if not local_tgz and target.name == "local":
+    if local_tgz is None:
+        if target.name != "local":
+            target.log.warning(
+                "local.tgz is encrypted but static decryption failed and no dynamic decryption available!"
+            )
+            return None
+
         target.log.info(
             "local.tgz is encrypted but static decryption failed, attempting dynamic decryption using crypto-util"
         )
@@ -362,12 +368,8 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
 
         if local_tgz is None:
             target.log.warning("Dynamic decryption of %s failed", local_tgz_ve)
-    else:
-        target.log.warning("local.tgz is encrypted but static decryption failed and no dynamic decryption available!")
 
-    if local_tgz:
-        return tar.TarFilesystem(local_tgz)
-    return None
+    return tar.TarFilesystem(local_tgz) if local_tgz else None
 
 
 def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:
