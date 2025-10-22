@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import Filesystem, FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 
@@ -28,6 +28,8 @@ FilesystemRecord = TargetRecordDescriptor(
         ("uint32", "uid"),
         ("uint32", "gid"),
         ("string[]", "fstypes"),
+        ("string[]", "vuuid"),
+        ("string[]", "dserial"),
     ],
 )
 
@@ -62,9 +64,25 @@ class WalkFSPlugin(Plugin):
                 self.target.log.warning("File not found: %s", entry)
                 self.target.log.debug("", exc_info=e)
             except Exception as e:
+                print(e)
                 self.target.log.warning("Exception generating record for: %s", entry)
                 self.target.log.debug("", exc_info=e)
                 continue
+
+
+def get_disk_serial(filesystem: Filesystem) -> str | None:
+    """
+    Returns the disk serial number if it exists; otherwise, returns None.
+
+    Args:
+        entry: :class:`Filesystem` instance
+
+    Returns:
+        Disk serial number as str, or None if not available.
+    """
+    entry_volume = getattr(filesystem, "volume", None)
+    volume_vs = getattr(entry_volume, "vs", None)
+    return getattr(volume_vs, "serial", None)
 
 
 def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
@@ -80,9 +98,19 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
     stat = entry.lstat()
 
     if isinstance(entry, LayerFilesystemEntry):
-        fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
+        fs_types = []
+        volume_uuids = []
+        disk_serials = []
+
+        for sub_entry in entry.entries:
+            fs_types.append(sub_entry.fs.__type__)
+            volume_uuids.append(sub_entry.fs.identifier)
+            disk_serials.append(get_disk_serial(sub_entry.fs))
+
     else:
         fs_types = [entry.fs.__type__]
+        volume_uuids = [entry.fs.identifier]
+        disk_serials = [get_disk_serial(entry.fs)]
 
     return FilesystemRecord(
         atime=from_unix(stat.st_atime),
@@ -96,5 +124,7 @@ def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
         uid=stat.st_uid,
         gid=stat.st_gid,
         fstypes=fs_types,
+        vuuid=volume_uuids,
+        dserial=disk_serials,
         _target=target,
     )
