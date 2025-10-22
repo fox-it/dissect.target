@@ -69,7 +69,7 @@ class VolumeSystem:
         self, fh: BinaryIO | list[BinaryIO], disk: BinaryIO | list[BinaryIO] | None = None, serial: str | None = None
     ):
         self.fh = fh
-        self.disk = disk or fh
+        self._disk = disk
         self.serial = serial
         self._volumes_list: list[Volume] = None
 
@@ -126,6 +126,17 @@ class VolumeSystem:
             self._volumes_list = list(self._volumes())
 
         return self._volumes_list
+
+    @property
+    def disk(self) -> BinaryIO | list[BinaryIO]:
+        """The source disk or container on which the volume system is opened."""
+        if self._disk:
+            return self._disk
+
+        if isinstance(self.fh, list):
+            return [f.disk if isinstance(f, Volume) else f for f in self.fh]
+
+        return self.fh.disk if isinstance(self.fh, Volume) else self.fh
 
 
 class EncryptedVolumeSystem(VolumeSystem):
@@ -230,6 +241,18 @@ class LogicalVolumeSystem(VolumeSystem):
             An iterator of :class:`LogicalVolumeSystem`.
         """
         raise NotImplementedError
+
+    @property
+    def disk(self) -> BinaryIO | list[BinaryIO]:
+        """The source disk or container on which the volume system is opened."""
+        if self._disk:
+            return self._disk
+
+        if isinstance(self.fh, list):
+            return [dev.fh.disk if isinstance(dev.fh, Volume) else dev.fh for dev in self.fh]
+
+        dev = self.fh
+        return dev.fh.disk if isinstance(dev.fh, Volume) else dev.fh
 
 
 class Volume(io.IOBase):
