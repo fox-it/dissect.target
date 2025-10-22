@@ -33,7 +33,7 @@ class MdVolumeSystem(LogicalVolumeSystem):
 
         for devs in devices.values():
             try:
-                yield cls(devs, disk=[dev.fh for dev in devs])
+                yield cls(devs)
             except Exception:  # noqa: PERF203
                 continue
 

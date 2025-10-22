@@ -72,28 +72,37 @@ class ScrapePlugin(Plugin):
                 scrape_map[disk][(offset, disk.size - offset)] = (disk, offset)
 
         # Iterate over all volumes and add the decrypted variant of encrypted volumes
+        encrypted_volumes = []
+        lvm_volumes = []
         for volume in self.target.volumes:
             if encrypted and isinstance(volume.vs, EncryptedVolumeSystem):
-                if not all:
-                    # Decrypted volumes have the encrypted volume as the disk
-                    source_volume: Volume = volume.disk
-                    source_disk = source_volume.disk
+                encrypted_volumes.append(volume)
+            if isinstance(volume.vs, LogicalVolumeSystem):
+                lvm_volumes.append(volume)
 
-                    # Replace the encrypted volume region with the decrypted volume region
-                    scrape_map[source_disk][(source_volume.offset, source_volume.size)] = (volume, 0)
-                else:
-                    # Add the encrypted volume separately to the map
-                    scrape_map[volume][(0, volume.size)] = (volume, 0)
+        # Process the encrypted volumes first to replace
+        for volume in encrypted_volumes:
+            if not all:
+                # Decrypted volumes have the encrypted volume as the backing volume
+                source_volume: Volume = volume.vs.fh
 
-            if lvm and isinstance(volume.vs, LogicalVolumeSystem):
-                if not all:
-                    # Remove the base volumes from the map
-                    for source_volume in volume.disk:
-                        source_disk = source_volume.disk
-                        del scrape_map[source_disk][(source_volume.offset, source_volume.size)]
-
-                # Add the logical volumes to the map
+                # Replace the encrypted volume region with the decrypted volume region
+                key = (source_volume.offset, source_volume.size)
+                del scrape_map[volume.disk][key]
+                # Reinsert the decrypted volume region with the size of the decrypted data
+                scrape_map[volume.disk][source_volume.offset, volume.size] = (volume, 0)
+            else:
+                # Add the decrypted volume separately to the map
                 scrape_map[volume][(0, volume.size)] = (volume, 0)
+
+        for volume in lvm_volumes:
+            if not all:
+                # Remove the base volumes from the map
+                for source_dev, source_disk in zip(volume.vs.fh, volume.disk, strict=True):
+                    del scrape_map[source_disk][(source_dev.fh.offset, source_dev.fh.size)]
+
+            # Add the logical volumes to the map
+            scrape_map[volume][(0, volume.size)] = (volume, 0)
 
         for disk, volumes in scrape_map.items():
             # If we ended up removing all regions from the disk, skip it

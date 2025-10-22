@@ -14,8 +14,8 @@ class DissectVolumeSystem(VolumeSystem):
     __type__ = "disk"
 
     def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
-        self._disk = disk.Disk(fh)
-        super().__init__(fh, *args, serial=self._disk.serial, **kwargs)
+        self._backing_disk = disk.Disk(fh)
+        super().__init__(fh, *args, serial=self._backing_disk.serial, **kwargs)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
@@ -27,7 +27,7 @@ class DissectVolumeSystem(VolumeSystem):
             return True
 
     def _volumes(self) -> Iterator[Volume]:
-        for v in self._disk.partitions:
+        for v in self._backing_disk.partitions:
             name = v.name or f"part_{v.offset:08x}"
             yield Volume(
                 v.open(),
