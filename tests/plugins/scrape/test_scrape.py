@@ -4,6 +4,8 @@ import io
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, call, patch
 
+from dissect.volume.lvm.physical import LVM2Device
+
 from dissect.target.containers.raw import RawContainer
 from dissect.target.plugins.scrape.scrape import ScrapePlugin
 from dissect.target.volume import EncryptedVolumeSystem, LogicalVolumeSystem
@@ -52,10 +54,10 @@ def test_create_streams(target_bare: Target) -> None:
         assert stream_counts == [1]
 
     mock_encrypted_volume = Mock(name="mock_encrypted_volume")
-    mock_encrypted_volume.disk = mock_volume_1
+    mock_encrypted_volume.disk = mock_disk
     mock_encrypted_volume.offset = 1024
     mock_encrypted_volume.size = 1024 * 8
-    mock_encrypted_volume.vs = Mock(spec=EncryptedVolumeSystem)
+    mock_encrypted_volume.vs = Mock(spec=EncryptedVolumeSystem, fh=mock_encrypted_volume)
 
     target_bare.volumes.entries = [mock_encrypted_volume]
 
@@ -243,10 +245,15 @@ def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
 
     # Create LVM logical volume using vol1 as base
     lvm_lv = io.BytesIO(buf[vol1_offset : vol1_offset + vol1_size])
-    lvm_lv.disk = [vol1]
+    lvm_lv.disk = [disk]
     lvm_lv.offset = 0
     lvm_lv.size = vol1_size
-    lvm_lv.vs = Mock(spec=LogicalVolumeSystem)
+
+    # Create a mock LVM volume system and assign to the logical volume
+    lvm_vs = Mock(spec=LogicalVolumeSystem)
+    lvm_dev = Mock(spec=LVM2Device, fh=vol1)
+    lvm_vs.fh = [lvm_dev]
+    lvm_lv.vs = lvm_vs
 
     # Add LVM logical volume to target volumes
     target_bare.disks.entries = [disk]
