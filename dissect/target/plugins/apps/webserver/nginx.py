@@ -106,6 +106,7 @@ class NginxPlugin(WebserverPlugin):
         self.access_paths = set()
         self.error_paths = set()
         self.host_paths = set()
+        self.config_paths = set()
 
         self.find_logs()
 
@@ -127,18 +128,15 @@ class NginxPlugin(WebserverPlugin):
             if "*" in config_file:
                 base, _, glob = config_file.partition("*")
                 for f in self.target.fs.path(base).rglob(f"*{glob}"):
+                    self.config_paths.add(f)
                     self.parse_config(f)
 
             elif (config_file := self.target.fs.path(config_file)).exists():
+                self.config_paths.add(config_file)
                 self.parse_config(config_file)
 
     def _get_paths(self) -> set:
-        config_paths = set()
-
-        for path in self.DEFAULT_CONFIG_PATHS:
-            config_paths.add(Path(path))
-
-        yield from self.access_paths | self.error_paths | config_paths
+        yield from self.access_paths | self.error_paths | self.config_paths
 
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
         """Parse the given NGINX ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
