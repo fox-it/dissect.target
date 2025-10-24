@@ -473,6 +473,7 @@ class Plugin:
             should stay the same.
         """
         yield from self.get_paths()
+        yield from self._get_auxiliary_paths()
 
     def _get_paths_direct(self) -> Iterator[Path]:
         """Return all paths as given by the user."""
@@ -480,11 +481,19 @@ class Plugin:
             yield self.target.fs.path(str(path))
 
     def _get_paths(self) -> Iterator[Path]:
-        """Return all files of interest to the plugin.
+        """Return all artifact files of interest to the plugin.
 
         To be implemented by the plugin subclass.
         """
         raise NotImplementedError
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        """Return all auxiliary files of interest to the plugin.
+
+        To be implemented by the plugin subclass.
+        """
+        raise NotImplementedError
+
 
 
 def register(plugincls: type[Plugin]) -> None:
