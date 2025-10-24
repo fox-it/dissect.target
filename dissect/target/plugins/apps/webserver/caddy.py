@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
@@ -17,7 +18,6 @@ from dissect.target.plugins.apps.webserver.webserver import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -31,6 +31,8 @@ class CaddyPlugin(WebserverPlugin):
     """Caddy webserver plugin."""
 
     __namespace__ = "caddy"
+
+    DEFAULT_CONFIG_PATH = "/etc/caddy/Caddyfile"
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -47,7 +49,7 @@ class CaddyPlugin(WebserverPlugin):
         log_paths.extend(self.target.fs.path("/var/log").glob("caddy_access.log*"))
 
         # Check for custom paths in Caddy config
-        if (config_file := self.target.fs.path("/etc/caddy/Caddyfile")).exists():
+        if (config_file := self.target.fs.path(self.DEFAULT_CONFIG_PATH)).exists():
             found_roots = []
             for line in config_file.open("rt"):
                 line = line.strip()
@@ -96,7 +98,10 @@ class CaddyPlugin(WebserverPlugin):
         return log_paths
 
     def _get_paths(self) -> Iterator[Path]:
-        yield from self.log_paths
+        config_paths = {Path(self.DEFAULT_CONFIG_PATH)}
+        log_paths = set(self.log_paths)
+
+        yield from log_paths | config_paths
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -17,7 +18,6 @@ from dissect.target.plugins.apps.webserver.webserver import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -133,7 +133,12 @@ class NginxPlugin(WebserverPlugin):
                 self.parse_config(config_file)
 
     def _get_paths(self) -> set:
-        yield from self.access_paths | self.error_paths
+        config_paths = set()
+
+        for path in self.DEFAULT_CONFIG_PATHS:
+            config_paths.add(Path(path))
+
+        yield from self.access_paths | self.error_paths | config_paths
 
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
         """Parse the given NGINX ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
