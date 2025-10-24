@@ -221,7 +221,7 @@ class PodmanPlugin(ContainerPlugin):
                 started=container.get("startedTime"),
                 finished=container.get("finishedTime"),
                 ports=list(convert_ports(container.get("newPortMappings", []))),  # TODO: research "exposedPorts"
-                names=container.get("name"),
+                name=container.get("name"),
                 volumes=volumes,
                 environment=container.get("spec", {}).get("process", {}).get("env", []),
                 mount_path=mount_path,
@@ -271,7 +271,7 @@ class PodmanPlugin(ContainerPlugin):
                 image_id=other_config.get("image"),
                 command=" ".join(config.get("process", {}).get("args", [])),
                 created=other_config.get("created"),
-                names=other_config.get("names"),
+                name=other_config.get("names"),
                 environment=config.get("process", {}).get("env", []),
                 mount_path=path.joinpath(f"storage/overlay/{other_config.get('layer')}") if other_config else None,
                 config_path=config_path,
