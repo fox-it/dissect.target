@@ -495,7 +495,6 @@ class Plugin:
         raise NotImplementedError
 
 
-
 def register(plugincls: type[Plugin]) -> None:
     """Register a plugin, and put related data inside :attr:`PLUGINS`.
 
