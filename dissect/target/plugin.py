@@ -459,10 +459,20 @@ class Plugin:
                 self.target.log.debug("", exc_info=e)
 
     def get_paths(self) -> Iterator[Path]:
+        """Return all artifact paths."""
         if self.target.is_direct:
             yield from self._get_paths_direct()
         else:
             yield from self._get_paths()
+
+    def get_all_paths(self) -> Iterator[Path]:
+        """Return all arrtifact and auxiliary paths.
+
+            The implementation of this function will
+            probably change in the future, but the interface
+            should stay the same.
+        """
+        yield from self.get_paths()
 
     def _get_paths_direct(self) -> Iterator[Path]:
         """Return all paths as given by the user."""

@@ -126,8 +126,13 @@ class IISLogsPlugin(WebserverPlugin):
         return dirs
 
     def _get_paths(self) -> Iterator[Path]:
+        log_paths = set()
+        config_paths = {self.config}
+
         for path in self.log_dirs.values():
-            yield from path
+            log_paths = log_paths | path
+
+        yield from log_paths | config_paths
 
     @export(record=BasicRecordDescriptor)
     def logs(self) -> Iterator[TargetRecordDescriptor]:
