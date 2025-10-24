@@ -135,8 +135,11 @@ class NginxPlugin(WebserverPlugin):
                 self.config_paths.add(config_file)
                 self.parse_config(config_file)
 
-    def _get_paths(self) -> set:
-        yield from self.access_paths | self.error_paths | self.config_paths
+    def _get_paths(self) -> Iterator[Path]:
+        yield from self.access_paths | self.error_paths
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        yield from self.config_paths
 
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
         """Parse the given NGINX ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""

@@ -98,10 +98,10 @@ class CaddyPlugin(WebserverPlugin):
         return log_paths
 
     def _get_paths(self) -> Iterator[Path]:
-        config_paths = {Path(self.DEFAULT_CONFIG_PATH)}
-        log_paths = set(self.log_paths)
+        yield from self.log_paths
 
-        yield from log_paths | config_paths
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        yield from {Path(self.DEFAULT_CONFIG_PATH)}
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:

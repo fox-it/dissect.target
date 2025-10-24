@@ -283,13 +283,16 @@ class ApachePlugin(WebserverPlugin):
                     self._process_conf_file(path, seen)
 
     def _get_paths(self) -> Iterator[Path]:
+        yield from self.access_paths | self.error_paths
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
         config_paths = set()
         for path in self.DEFAULT_CONFIG_PATHS:
             config_paths.add(Path(path))
 
         config_paths.update(self.resolved_config_paths)
 
-        yield from self.access_paths | self.error_paths | config_paths
+        yield from config_paths
 
     def _process_conf_file(self, path: Path, seen: set[Path] | None = None) -> None:
         """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
