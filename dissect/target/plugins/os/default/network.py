@@ -32,7 +32,7 @@ class NetworkPlugin(Plugin):
     def check_compatible(self) -> None:
         pass
 
-    def _interfaces(self) -> Iterator[InterfaceRecord]:
+    def _interfaces(self, *args, **kwargs) -> Iterator[InterfaceRecord]:
         yield from ()
 
     def _get_record_type(self, field_name: str, func: Callable[[Any], Any] | None = None) -> Iterator[Any]:
@@ -46,11 +46,11 @@ class NetworkPlugin(Plugin):
             yield from (map(func, output) if func else output)
 
     @export(record=get_args(InterfaceRecord))
-    def interfaces(self) -> Iterator[InterfaceRecord]:
+    def interfaces(self, *args, **kwargs) -> Iterator[InterfaceRecord]:
         """Yield interfaces."""
         # Only search for the interfaces once
         if self._interface_list is None:
-            self._interface_list = list(self._interfaces())
+            self._interface_list = list(self._interfaces(*args, **kwargs))
 
         yield from self._interface_list
 
