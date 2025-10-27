@@ -119,6 +119,7 @@ class ESXiPlugin(UnixPlugin):
         if len(target.filesystems) == 1:
             target.fs.mount("/", sysvol)
             return cls(target)
+
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
 
         # Mount all the visor tars in individual filesystem layers
