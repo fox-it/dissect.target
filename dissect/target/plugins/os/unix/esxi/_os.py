@@ -106,6 +106,7 @@ class ESXiPlugin(UnixPlugin):
         for fs in target.filesystems:
             if fs.path("/etc/vmware/esx.conf").exists():
                 return fs
+
         bootbanks = [
             fs for fs in target.filesystems if fs.path("boot.cfg").exists() and list(fs.path("/").glob("*.v00"))
         ]
