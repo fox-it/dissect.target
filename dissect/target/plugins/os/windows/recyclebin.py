@@ -100,11 +100,9 @@ class RecyclebinPlugin(Plugin):
             yield from self.read_bin_file(bin_path)
             return
 
-        if not bin_path.is_dir():
-            return
-
-        for new_file in bin_path.iterdir():
-            yield from self.read_recycle_bin(new_file)
+        if bin_path.is_dir():
+            for new_file in bin_path.iterdir():
+                yield from self.read_recycle_bin(new_file)
 
     def read_bin_file(self, bin_path: TargetPath) -> Iterator[RecycleBinRecord]:
         data = bin_path.read_bytes()
@@ -121,7 +119,7 @@ class RecyclebinPlugin(Plugin):
         original_path = self.target.fs.path(entry.filename.rstrip("\x00"))
         deleted_timestamp = wintimestamp(entry.timestamp)
 
-        # Yield the deleted entry from the metedata
+        # Yield the deleted entry from the metadata
         yield RecycleBinRecord(
             ts=deleted_timestamp,
             path=original_path,
@@ -133,21 +131,19 @@ class RecyclebinPlugin(Plugin):
             _user=user,
         )
 
-        if not deleted_path.is_dir():
-            return
-
-        for path in deleted_path.rglob("*"):
-            # Yield all the path inside a deleted directory
-            yield RecycleBinRecord(
-                ts=deleted_timestamp,
-                path=original_path.joinpath(path.relative_to(deleted_path)),
-                # The size of this deleted file
-                filesize=path.stat().st_size,
-                deleted_path=path,
-                source=bin_path,
-                _target=self.target,
-                _user=user,
-            )
+        if deleted_path.is_dir():
+            for path in deleted_path.rglob("*"):
+                # Yield all the path inside a deleted directory
+                yield RecycleBinRecord(
+                    ts=deleted_timestamp,
+                    path=original_path.joinpath(path.relative_to(deleted_path)),
+                    # The size of this deleted file
+                    filesize=path.stat().st_size,
+                    deleted_path=path,
+                    source=bin_path,
+                    _target=self.target,
+                    _user=user,
+                )
 
     def find_sid(self, path: TargetPath) -> str:
         parent_path = path.parent
