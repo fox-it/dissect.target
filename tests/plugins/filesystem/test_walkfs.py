@@ -78,7 +78,7 @@ def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert results[-1].path == "/path/to/suid/binary"
     assert results[-1].fs_types == ["virtual"]
     assert results[-1].mode == 34816
-    assert results[-1].suid
+    assert results[-1].is_suid
 
 
 def test_walkfs_xattr(target_unix: Target, fs_unix: VirtualFilesystem) -> None:

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import stat
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, get_args
 
 from dissect.util.ts import from_unix
-from typing_extensions import get_args
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
@@ -40,7 +39,9 @@ FilesystemRecord = TargetRecordDescriptor(
     ],
 )
 
-WalkFsRecord = Union[FilesystemRecord, SuidRecord, CapabilityRecord]
+WalkFsRecord = Union[FilesystemRecord]  # noqa: UP007
+# Should be Union[FilesystemRecord, SuidRecord, CapabilityRecord] but
+# those are LazyAttr and not a RecordDescriptor type.
 
 
 class WalkFsPlugin(Plugin):
@@ -130,8 +131,6 @@ def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capabili
     else:
         fs_types = [entry.fs.__type__]
 
-    XATTR_CAPABLE = any(fs for fs in fs_types if fs in ("extfs", "xfs"))
-
     is_suid = bool(entry_stat.st_mode & stat.S_ISUID)
 
     fields = {
@@ -149,12 +148,16 @@ def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capabili
         "fs_types": fs_types,
     }
 
-    if XATTR_CAPABLE:
-        try:
-            fields["attr"] = [f"{attr.name}={attr.value.hex()}" for attr in entry.lattr()]
-        except Exception as e:
-            target.log.warning("Unable to expand xattr for entry %s: %s", entry.path, e)
-            target.log.debug("", exc_info=e)
+    try:
+        fields["attr"] = [f"{attr.name}={attr.value.hex()}" for attr in entry.lattr()]
+
+    except (TypeError, AttributeError, NotImplementedError):
+        # Suppress lattr calls on VirtualDirectory entries, filesystems without implemented attr's and NTFS attr's.
+        pass
+
+    except Exception as e:
+        target.log.warning("Unable to expand xattr for entry %s: %s", entry.path, e)
+        target.log.debug("", exc_info=e)
 
     yield FilesystemRecord(
         **fields,
@@ -167,5 +170,5 @@ def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capabili
             _target=target,
         )
 
-    if capability and XATTR_CAPABLE and fields.get("attr"):
+    if capability and fields.get("attr"):
         yield from parse_capability_entry(entry, target)
