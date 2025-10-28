@@ -109,7 +109,7 @@ def test_read_bin_file_unknown(target_win: Target, path: str) -> None:
     assert output.path == "hello_world"
 
 
-def test_recyclebin_plugin_file(target_win: Target, recycle_bin: VirtualFilesystem) -> None:
+def test_reading_multiple_recyclebins(target_win: Target, recycle_bin: VirtualFilesystem) -> None:
     recycle_bin.map_file_fh("$ihello_world", io.BytesIO())
 
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
@@ -151,7 +151,7 @@ def test_reading_deleted_directory_entries(target_win: Target, tmp_path: Path) -
     assert file_dir.source == "\\c:\\$recycle.bin\\$Ihello_world"
 
 
-def test_recyclebin_plugin_wrong_prefix(target_win: Target, recycle_bin: VirtualFilesystem) -> None:
+def test_recyclebin_wrong_prefix(target_win: Target, recycle_bin: VirtualFilesystem) -> None:
     recycle_bin.map_file_fh("hello_world", io.BytesIO())
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
     target_win.add_plugin(RecyclebinPlugin)
