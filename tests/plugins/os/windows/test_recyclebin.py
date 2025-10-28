@@ -122,7 +122,8 @@ def test_recyclebin_plugin_file(target_win: Target, recycle_bin: VirtualFilesyst
         assert recycle_bin_entries == [bin_file] * 2
 
 
-def test_recyclebin_plugin_iterate_files(target_win: Target, tmp_path: Path) -> None:
+def test_reading_deleted_directory_entries(target_win: Target, tmp_path: Path) -> None:
+    """Test whether a records gets created for all the entries within a deleted directory."""
     filename = "c:\\path\\to\\hello_world\0"
     header = c_recyclebin.header_v2(version=2, file_size=0, filename_length=len(filename), filename=filename)
 
