@@ -116,7 +116,7 @@ class ESXiPlugin(UnixPlugin):
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
-        if len(target.filesystems) == 1:
+        if sysvol.path("/etc/vmware/esx.conf").exists():
             target.fs.mount("/", sysvol)
             return cls(target)
 
