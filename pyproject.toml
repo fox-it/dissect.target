@@ -34,7 +34,7 @@ dependencies = [
     "dissect.regf>=3.13,<4",
     "dissect.sql>=3.12,<4",
     "dissect.util>=3,<4",
-    "dissect.volume>=2,<4",
+    "dissect.volume>=3.17.dev1,<4",  # TODO: update on release!
     "flow.record~=3.20.0",
     "structlog",
 ]
@@ -52,6 +52,7 @@ full = [
     "dissect.btrfs>=1,<2",
     "dissect.cim>=3,<4",
     "dissect.clfs>=1,<2",
+    "dissect.cramfs>=1,<2",
     "dissect.esedb>=3,<4",
     "dissect.etl>=3,<4",
     "dissect.extfs>=3,<4",
@@ -79,6 +80,7 @@ dev = [
     "dissect.btrfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cim[dev]>=3.0.dev,<4.0.dev",
     "dissect.clfs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.cramfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cstruct>=4.0.dev,<5.0.dev",
     "dissect.esedb[dev]>=3.0.dev,<4.0.dev",
     "dissect.etl[dev]>=3.0.dev,<4.0.dev",
@@ -99,7 +101,7 @@ dev = [
     "dissect.thumbcache[dev]>=1.0.dev,<2.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.vmfs[dev]>=3.12.dev,<4.0.dev",
-    "dissect.volume[dev]>=3.0.dev,<4.0.dev",
+    "dissect.volume[dev]>=3.17.dev,<4.0.dev",  # TODO: update on release!
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
 ]
 yara = [
