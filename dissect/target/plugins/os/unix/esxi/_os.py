@@ -103,8 +103,9 @@ class ESXiPlugin(UnixPlugin):
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
         # First handle 'simple' case where we have to deal with a live collection
-        if len(target.filesystems) == 1 and target.filesystems[0].path("/etc/vmware/esx.conf").exists():
-            return target.filesystems[0]
+        for fs in target.filesystems:
+            if fs.path("/etc/vmware/esx.conf").exists():
+                return fs
         bootbanks = [
             fs for fs in target.filesystems if fs.path("boot.cfg").exists() and list(fs.path("/").glob("*.v00"))
         ]
