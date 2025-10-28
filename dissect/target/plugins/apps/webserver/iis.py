@@ -81,7 +81,7 @@ class IISLogsPlugin(WebserverPlugin):
         self.config = self.target.resolve(self.APPLICATION_HOST_CONFIG)
 
     def check_compatible(self) -> None:
-        if not self.log_dirs:
+        if not any(self.log_dirs.values()):
             raise UnsupportedPluginError("No IIS log files found")
 
     @cached_property
@@ -239,7 +239,7 @@ def parse_w3c_format_log(target: Target, path: Path) -> Iterator[TargetRecordDes
         if not record_descriptor:
             target.log.warning("Comment line with the fields defined should come before the values, skipping: %r", line)
 
-        raw = replace_dash_with_none(dict(zip(fields, values)))
+        raw = replace_dash_with_none(dict(zip(fields, values, strict=False)))
 
         # Example:
         # {

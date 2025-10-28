@@ -6,7 +6,7 @@ import tempfile
 import textwrap
 from io import BytesIO
 from itertools import chain
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -34,7 +34,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.plugin import OSPlugin
 
@@ -295,6 +295,13 @@ def fs_ios() -> VirtualFilesystem:
 def fs_bsd() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.map_file("/bin/freebsd-version", absolute_path("_data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
+    return fs
+
+
+@pytest.fixture
+def fs_esxi() -> VirtualFilesystem:
+    fs = VirtualFilesystem()
+    fs.map_file("/etc/vmware/esx.conf", absolute_path("_data/plugins/os/unix/esxi/_os/etc/vmware/esx.conf"))
     return fs
 
 

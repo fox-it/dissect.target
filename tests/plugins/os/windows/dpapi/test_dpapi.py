@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -50,7 +51,7 @@ To create mock Windows targets you'll need the following additional data:
 @pytest.mark.parametrize(
     ("user_type", "master_key_guid", "enc_data", "plaintext"),
     [
-        (
+        pytest.param(
             "user",
             "f5638f3b-9632-480b-ba9c-c73bdabe9f86",
             (
@@ -66,8 +67,9 @@ To create mock Windows targets you'll need the following additional data:
                 "3940324b68b9"
             ),
             "this is a windows 10 user secret!",
+            id="user",
         ),
-        (
+        pytest.param(
             "system",
             "59873e79-ca24-459a-8b17-a5dcd82c6ea1",
             (
@@ -83,6 +85,7 @@ To create mock Windows targets you'll need the following additional data:
                 "e5db2b95ff71"
             ),
             "this is a windows 10 system secret!",
+            id="system",
         ),
     ],
 )
@@ -174,7 +177,7 @@ def test_dpapi_decrypt_blob_win_10(
 @pytest.mark.parametrize(
     ("user_type", "master_key_guid", "enc_data", "plaintext"),
     [
-        (
+        pytest.param(
             "user",
             "835419eb-ce4a-4ae3-a72a-35c1383a6519",
             (
@@ -189,8 +192,9 @@ def test_dpapi_decrypt_blob_win_10(
                 "e40d07649869"
             ),
             "this is a user secret!",
+            id="user",
         ),
-        (
+        pytest.param(
             "system",
             "ab15130c-61cd-4065-be48-faba655f80d1",
             (
@@ -205,6 +209,7 @@ def test_dpapi_decrypt_blob_win_10(
                 "a80b813315de746d3334e7abb3bddae312a87b132384"
             ),
             "this is a system secret!",
+            id="system",
         ),
     ],
 )
@@ -299,7 +304,7 @@ def test_dpapi_decrypt_blob_win_7(
 @pytest.mark.parametrize(
     ("user_type", "master_key_guid", "enc_data", "plaintext"),
     [
-        (
+        pytest.param(
             "user",
             "8bd87dd9-10fa-40b5-8614-5d0a7e8911c5",
             (
@@ -312,8 +317,9 @@ def test_dpapi_decrypt_blob_win_7(
                 "91941400000070e42b6873f1372abd5dbaced1e97dd0fbeee5c0"
             ),
             "this is a windows vista user secret!",
+            id="user",
         ),
-        (
+        pytest.param(
             "system",
             "9ed75ec3-d074-4a7a-a428-1b70188cce4c",
             (
@@ -326,6 +332,7 @@ def test_dpapi_decrypt_blob_win_7(
                 "bea5140000003ec445826ec3c1dce592a6b15d467290ca1f4068"
             ),
             "this is a windows vista system secret!",
+            id="system",
         ),
     ],
 )
@@ -422,7 +429,7 @@ def test_dpapi_decrypt_blob_win_vista(
 @pytest.mark.parametrize(
     ("user_type", "master_key_guid", "enc_data", "plaintext"),
     [
-        (
+        pytest.param(
             "user",
             "e1245b49-43d9-465f-b161-eab88c27620d",
             (
@@ -435,8 +442,9 @@ def test_dpapi_decrypt_blob_win_vista(
                 "f626a57c4b1c4dd15267560b945c4c7e9124"
             ),
             "this is a windows xp user secret!",
+            id="user",
         ),
-        (
+        pytest.param(
             "system",
             "2ee95631-ed37-43f9-8a08-378924a60de7",
             (
@@ -449,6 +457,7 @@ def test_dpapi_decrypt_blob_win_vista(
                 "50be593b511450387842969ee1217fc07870"
             ),
             "this is a windows xp system secret!",
+            id="system",
         ),
     ],
 )
@@ -536,3 +545,31 @@ def test_dpapi_decrypt_blob_win_xp(
         decrypted = target_win.dpapi.decrypt_system_blob(enc_data)
 
     assert decrypted.decode("utf-16-le") == plaintext
+
+
+def test_dpapi_master_keys_deduplicate(
+    target_win: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive, hive_hku: VirtualHive
+) -> None:
+    """Test if we correctly deduplicate master keys."""
+
+    add_win_user(
+        hive_hklm,
+        hive_hku,
+        target_win,
+        sid="S-1-5-21-1555088973-3915578919-3195617063-1003",
+        home="c:\\users\\user",
+    )
+
+    # Mock "Application Data" -> "AppData/Roaming" symlink
+    fs_win.symlink("/sysvol/Users/user/AppData/Roaming", "/Users/user/Application Data")
+
+    fs_win.map_file(
+        "Users/user/AppData/Roaming/Microsoft/Protect/S-1-5-21-1555088973-3915578919-3195617063-1003/f5638f3b-9632-480b-ba9c-c73bdabe9f86",
+        absolute_path("_data/plugins/os/windows/dpapi/master_keys/f5638f3b-9632-480b-ba9c-c73bdabe9f86"),
+    )
+
+    plugin = target_win.add_plugin(DPAPIPlugin, check_compatible=False)
+
+    with patch("dissect.target.plugins.os.windows.dpapi.dpapi.MasterKeyFile") as MasterKeyFileMock:
+        dict(plugin.master_keys)
+        MasterKeyFileMock.assert_called_once()

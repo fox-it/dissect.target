@@ -1573,6 +1573,10 @@ def test_os_tree(target_bare: Target, os_plugin: type[OSPlugin], results: list[s
     """Test if we correctly return the OS name tree."""
     target_bare._os_plugin = os_plugin
     target_bare.apply()
+    os_funcs = [record.name for record in target_bare.osinfo()]
+
+    # Ensure that os_tree is not present in os_info
+    assert "os_tree" not in os_funcs
     assert target_bare.os_tree() == results
 
 
@@ -1907,7 +1911,7 @@ def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
     If you want to expose plugin functions under a shared name, e.g. ``foo.bar`` and ``foo.baz``,
     you should use :class:`Plugin` with ``Plugin.__namespace__ = "foo"`` instead.
 
-    Resources:
+    References:
         - https://github.com/fox-it/dissect.target/issues/1180
     """
 

@@ -338,7 +338,7 @@ def test_network_dhcp_and_static(
         gateways = set()
         macs = set()
 
-        for interface, expected in zip(interfaces, expected_values):
+        for interface, expected in zip(interfaces, expected_values, strict=False):
             ips.update({iface.ip for iface in interface.cidr})
             dns.update(interface.dns)
             gateways.update(interface.gateway)
