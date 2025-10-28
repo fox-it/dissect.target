@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import re
+import urllib.parse
 from typing import TYPE_CHECKING, Any, Union, get_args
 
 from dissect.esedb import EseDB
 from dissect.sql import SQLite3
 from dissect.util.ts import wintimestamp
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import FilesystemError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.apps.browser.browser import BrowserHistoryRecord
@@ -59,7 +60,7 @@ BROWSER_RECORD_MAP = {
     "winrt": EdgePlugin.BrowserHistoryRecord,
 }
 
-SearchIndexRecords = Union[SearchIndexRecord, SearchIndexActivityRecord, BrowserHistoryRecord]
+SearchIndexRecords = Union[SearchIndexRecord, SearchIndexActivityRecord, BrowserHistoryRecord]  # noqa: UP007
 
 
 class SearchIndexPlugin(Plugin):
@@ -88,18 +89,28 @@ class SearchIndexPlugin(Plugin):
 
         for system_path in self.SYSTEM_PATHS:
             if (path := self.target.fs.path(system_path)).is_file():
-                st_info = path.lstat()
-                if (digest := (path.name, st_info.st_size, st_info.st_mtime)) not in seen:
-                    seen.add(digest)
-                    yield path.resolve(), None
+                try:
+                    if any(seen_file.samefile(path) for seen_file in seen):
+                        continue
+                except FilesystemError:
+                    pass
+
+                seen.add(path)
+                yield path.resolve(), None
 
         for user_details in self.target.user_details.all_with_home():
             for user_path in self.USER_PATHS:
                 for path in user_details.home_path.glob(user_path):
-                    st_info = path.lstat()
-                    if (digest := (path.name, st_info.st_size, st_info.st_mtime)) not in seen:
-                        seen.add(digest)
-                        yield path.resolve(), user_details
+                    if not path.is_file():
+                        continue
+                    try:
+                        if any(seen_file.samefile(path) for seen_file in seen):
+                            continue
+                    except FilesystemError:
+                        pass
+
+                    seen.add(path)
+                    yield path.resolve(), user_details
 
     def check_compatible(self) -> None:
         if not self.databases:
@@ -107,7 +118,7 @@ class SearchIndexPlugin(Plugin):
 
     @export(record=get_args(SearchIndexRecords))
     def search(self) -> Iterator[SearchIndexRecords]:
-        """Yield Windows Index Search records.
+        """Yield Windows Search Index records.
 
         Parses ``Windows.edb`` EseDB and ``Windows.db`` SQLite3 databases. Currently does not parse
         ``GatherLogs/SystemIndex/SystemIndex.*.(Crwl|gthr)`` files or ``Windows-gather.db`` and ``Windows-usn.db`` files.
@@ -227,12 +238,21 @@ class SearchIndexPlugin(Plugin):
             if not user and user_details:
                 user = user_details.user
 
+            url = values.get("System_Link_TargetUrl") or url
+            host = None
+
+            if url:
+                try:
+                    host = urllib.parse.urlparse(url).hostname
+                except Exception:
+                    pass
+
             yield CurrentBrowserHistoryRecord(
                 ts=wintimestamp(int.from_bytes(values.get("System_Link_DateVisited", b""), "little")),
                 browser=browser,
-                url=values.get("System_Link_TargetUrl") or url,
+                url=url,
                 title=values.get("System_Title"),
-                host=None,  # TODO: derive from url
+                host=host,
                 source=db_path,
                 _user=user,
                 _target=self.target,

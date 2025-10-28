@@ -107,6 +107,7 @@ def test_windows_search_esedb(
         records[995].url
         == "https://support.microsoft.com/en-us/microsoft-edge/this-website-doesn-t-work-in-internet-explorer-8f5fc675-cd47-414c-9535-12821ddfc554?ui=en-us&rs=en-us&ad=us"
     )
+    assert records[995].host == "support.microsoft.com"
     assert records[995].title == "This website doesn't work in Internet Explorer - Microsoft Support"
     assert records[995].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
     assert records[995].user_id == user_sid
@@ -169,5 +170,6 @@ def test_windows_search_sqlite(
         records[711].url
         == "https://www.bing.com/search?q=install+chrome&cvid=2ce0f71581824fda82398075bb250924&aqs=edge.0.0j69i57j0l7.2774j0j7&FORM=ANNTA0&PC=U531"
     )
+    assert records[711].host == "www.bing.com"
     assert records[711].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
     assert records[711].user_id == user_sid
