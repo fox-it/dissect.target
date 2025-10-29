@@ -133,3 +133,7 @@ class ConfigurationParsingError(Error):
 
 class TargetPathNotFoundError(TargetError):
     """The path to the target does not exist."""
+
+
+class UncompressionError(Error):
+    """An Uncompression error occurred."""

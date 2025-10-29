@@ -28,13 +28,16 @@ except ImportError:
     HAS_BZ2 = False
 
 try:
-    import zstandard
+    if sys.version_info >= (3, 14):
+        from compression import zstd
+    else:
+        from backports import zstd
 
     HAS_ZSTD = True
 except ImportError:
     HAS_ZSTD = False
 
-from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError
+from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError, UncompressionError
 from dissect.target.helpers.polypath import (
     abspath,
     basename,
@@ -524,6 +527,10 @@ def open_decompress(
     Returns:
         An binary or text IO stream, depending on the mode with which the file was opened.
 
+    Raises:
+        UncompressionError: Uncompression failed
+        ValueError: path and fileobj are mutually exclusive, but one of them is required
+
     Example:
         .. code-block:: python
 
@@ -562,11 +569,10 @@ def open_decompress(
         # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
         return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    if HAS_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
-        # stream_reader is not seekable, so we have to resort to the less
-        # efficient decompressor which returns bytes.
-        return io.BytesIO(zstandard.decompress(file.read()))
-
+    if magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
+        if HAS_ZSTD:
+            return zstd.open(file, mode=mode, encoding=encoding, errors=errors, newline=newline)
+        raise UncompressionError("fail to uncompress zstd file, missing backport.zstd dependency")
     if path:
         file.close()
         return path.open(mode, encoding=encoding, errors=errors, newline=newline)
