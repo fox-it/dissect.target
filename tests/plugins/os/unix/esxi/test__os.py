@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.esxi._os import (
+    ESXiPlugin,
     _create_local_fs,
     _decrypt_crypto_util,
     esxi_hash,
@@ -78,3 +80,15 @@ def test_hash_full() -> None:
 def test_hash_empty_key() -> None:
     h = esxi_hash(b"", 666)
     assert h == 8664614747486377173
+
+
+def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> None:
+    target_bare.filesystems.add(fs_esxi)
+    target_bare.apply()
+
+    assert ESXiPlugin.detect(target_bare)
+    assert isinstance(target_bare._os, ESXiPlugin)
+    assert target_bare.os == OperatingSystem.ESXI
+    assert target_bare.hostname == "localhost"
+    assert target_bare.version == "6.7.0"
+    assert target_bare.ips == ["192.168.56.101"]
