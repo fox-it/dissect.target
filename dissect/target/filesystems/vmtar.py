@@ -27,8 +27,7 @@ class VmtarFilesystem(TarFilesystem):
     def _detect(fh: BinaryIO) -> bool:
         """Detect a vmtar file on a given file-like object."""
         # vmtar files can be double compressed (gzip + lzma)
-        fileobj = open_decompress(fileobj=fh)
-        fh = open_decompress(fileobj=fileobj)
+        fh = open_decompress(fileobj=open_decompress(fileobj=fh))
 
         fh.seek(257)
         return fh.read(8) == b"visor  \x00"
