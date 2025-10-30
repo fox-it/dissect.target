@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import textwrap
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from dissect.target.target import Event, Target
@@ -15,7 +14,7 @@ if TYPE_CHECKING:
 BLOCK_INDENT = 4 * " "
 
 
-@dataclass
+@dataclasses.dataclass
 class TargetExecutionReport:
     target: Target
 
@@ -44,7 +43,7 @@ class TargetExecutionReport:
         }
 
 
-@dataclass
+@dataclasses.dataclass
 class ExecutionReport:
     plugin_import_errors: dict[str, str] = dataclasses.field(default_factory=dict)
 

@@ -11,7 +11,8 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     TargetError,
 )
-from dissect.target.tools.utils import (
+from dissect.target.helpers.logging import get_logger
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     open_targets,
@@ -21,7 +22,8 @@ from dissect.target.tools.utils import (
 if TYPE_CHECKING:
     from dissect.target.helpers.regutil import RegistryKey
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import urllib.parse
 from pathlib import Path
@@ -8,6 +7,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.loaderutil import parse_path_uri
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -21,7 +21,7 @@ __all__ = [
     "register",
 ]
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 DirLoader: Loader = import_lazy("dissect.target.loaders.dir").DirLoader
 """A lazy loaded :class:`dissect.target.loaders.dir.DirLoader`."""

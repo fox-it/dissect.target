@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import io
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import ContainerError
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ MODULE_PATH = "dissect.target.containers"
 RawContainer = import_lazy("dissect.target.containers.raw").RawContainer
 """A lazy import of :mod:`dissect.target.containers.raw`."""
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 class Container(io.IOBase):

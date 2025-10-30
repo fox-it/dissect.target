@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.helpers.fsutil import stat_result
-from dissect.target.tools import fsutils
 from dissect.target.tools.diff import (
     DifferentialCli,
     TargetComparison,
@@ -16,6 +15,7 @@ from dissect.target.tools.diff import (
     likely_unchanged,
 )
 from dissect.target.tools.diff import main as target_diff
+from dissect.target.tools.utils import fs
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -203,7 +203,7 @@ def test_differentiate_plugins(src_target: Target, dst_target: Target) -> None:
 def test_shell_ls(
     src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(fsutils, "LS_COLORS", {})
+    monkeypatch.setattr(fs, "LS_COLORS", {})
 
     cli = DifferentialCli(src_target, dst_target, deep=True)
     cli.onecmd("ls changes")
@@ -230,7 +230,7 @@ def test_shell_ls(
 def test_shell_find(
     src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(fsutils, "LS_COLORS", {})
+    monkeypatch.setattr(fs, "LS_COLORS", {})
 
     cli = DifferentialCli(src_target, dst_target, deep=True)
     cli.onecmd("find /changes -cmd")
@@ -290,7 +290,7 @@ def test_shell_plugin(src_target: Target, dst_target: Target, capsys: pytest.Cap
 
 def test_target_diff_shell(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
-        m.setattr(fsutils, "LS_COLORS", {})
+        m.setattr(fs, "LS_COLORS", {})
         m.setenv("NO_COLOR", "1")
         src_target_path = str(absolute_path("_data/tools/diff/src.tar"))
         dst_target_path = str(absolute_path("_data/tools/diff/dst.tar"))

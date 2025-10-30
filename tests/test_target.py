@@ -165,7 +165,7 @@ class ErrorCounter(TargetLogAdapter):
         ),
     ],
 )
-@patch("dissect.target.target.getlogger", new=lambda t: ErrorCounter(log, {"target": t}))
+@patch("dissect.target.target.get_target_logger", new=lambda t: ErrorCounter(log, {"target": t}))
 def test_target_open_dirs(topo: list[str], entry_point: str, expected_result: str, expected_errors: int) -> None:
     # TestLoader to mix Raw Targets with Test Targets without depending on
     # specific implementations.

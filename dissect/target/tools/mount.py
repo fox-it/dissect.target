@@ -3,12 +3,11 @@ from __future__ import annotations
 import argparse
 import logging
 
-from dissect.util.feature import Feature, feature_enabled
-
 from dissect.target import filesystem
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import parse_options_string
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     open_target,
@@ -19,19 +18,7 @@ from dissect.target.tools.utils import (
 logging.basicConfig(level=logging.INFO)
 
 try:
-    if feature_enabled(Feature.BETA):
-        from fuse3 import FUSE3 as FUSE
-        from fuse3 import util
-
-        FUSE_VERSION = "3"
-        FUSE_LIB_PATH = util.libfuse._name
-    else:
-        from fuse import FUSE, _libfuse
-
-        FUSE_VERSION = "2"
-        FUSE_LIB_PATH = _libfuse._name
-
-    logging.info("Using fuse%s library: %s", FUSE_VERSION, FUSE_LIB_PATH)
+    from fuse import FUSE
 
     from dissect.target.helpers.mount import DissectMount
 
@@ -40,7 +27,7 @@ except Exception:
     HAS_FUSE = False
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
