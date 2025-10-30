@@ -212,6 +212,16 @@ class ESXiPlugin(UnixPlugin):
     def configstore(self) -> dict[str, Any]:
         return self._configstore
 
+    @internal
+    def osdata_fs(self) -> TargetPath | None:
+        """
+        return path to osdata vmfs, present in esxi 7+
+        """
+        os_data = list(self.target.fs.path("/vmfs/volumes/").glob("OSDATA-*"))
+        if os_data:
+            return os_data[0]
+        return None
+
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.ESXI.value
