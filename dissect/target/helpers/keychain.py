@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import os
 from enum import Enum
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -122,3 +123,8 @@ def register_keychain_file(keychain_path: Path) -> None:
                 identifier=identifier,
                 provider=provider,
             )
+
+
+# Add DISSECT_KEYCHAIN_VALUE from environment to KEYCHAIN on module load
+if _env_value := os.getenv("DISSECT_KEYCHAIN_VALUE"):
+    register_wildcard_value(_env_value)
