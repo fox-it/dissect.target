@@ -100,9 +100,28 @@ def test_walkfs_xattr(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
     target_unix.add_plugin(WalkFsPlugin)
 
-    results = list(target_unix.walkfs())
-    assert len(results) == 7
+    results = list(target_unix.walkfs(capability=True))
+    assert len(results) == 8
 
-    assert results[-1].path == "/path/to/xattr1/file"
-    assert results[-1].fs_types == ["extfs"]
-    assert results[-1].attr == ["security.capability=010000010020f00000f00f0f", "example.attr=736f6d652076616c7565"]
+    assert results[-2].path == "/path/to/xattr1/file"
+    assert results[-2].fs_types == ["extfs"]
+    assert results[-2].attr == ["security.capability=010000010020f00000f00f0f", "example.attr=736f6d652076616c7565"]
+
+    assert results[-1].mtime
+    assert results[-1].permitted == ["CAP_NET_RAW", "CAP_SYS_PACCT", "CAP_SYS_ADMIN", "CAP_SYS_BOOT", "CAP_SYS_NICE"]
+    assert results[-1].inheritable == [
+        "CAP_NET_ADMIN",
+        "CAP_NET_RAW",
+        "CAP_IPC_LOCK",
+        "CAP_IPC_OWNER",
+        "CAP_SYS_MODULE",
+        "CAP_SYS_RAWIO",
+        "CAP_SYS_CHROOT",
+        "CAP_SYS_PTRACE",
+        "CAP_SYS_RESOURCE",
+        "CAP_SYS_TIME",
+        "CAP_SYS_TTY_CONFIG",
+        "CAP_MKNOD",
+    ]
+    assert results[-1].effective
+    assert results[-1].root_id is None

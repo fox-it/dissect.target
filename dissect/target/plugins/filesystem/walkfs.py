@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import stat
-from typing import TYPE_CHECKING, Union, get_args
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
-from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.unix.capability import parse_entry as parse_capability_entry
-
-CapabilityRecord = import_lazy("dissect.target.plugins.filesystem.unix.capability").CapabilityRecord
-SuidRecord = import_lazy("dissect.target.plugins.filesystem.unix.suid").SuidRecord
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -39,10 +35,6 @@ FilesystemRecord = TargetRecordDescriptor(
     ],
 )
 
-WalkFsRecord = Union[FilesystemRecord]  # noqa: UP007
-# Should be Union[FilesystemRecord, SuidRecord, CapabilityRecord] but
-# those are LazyAttr and not a RecordDescriptor type.
-
 
 class WalkFsPlugin(Plugin):
     """Filesystem agnostic walkfs plugin."""
@@ -51,26 +43,22 @@ class WalkFsPlugin(Plugin):
         if not len(self.target.filesystems):
             raise UnsupportedPluginError("No filesystems to walk")
 
-    @export(record=get_args(WalkFsRecord))
+    @export(record=FilesystemRecord)
     @arg("--walkfs-path", default="/", help="path to recursively walk")
-    @arg("--suid", action="store_true", help="output suid records")
     @arg("--capability", action="store_true", help="output capability records")
-    def walkfs(self, walkfs_path: str = "/", suid: bool = False, capability: bool = False) -> Iterator[WalkFsRecord]:
+    def walkfs(self, walkfs_path: str = "/", capability: bool = False) -> Iterator[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries.
-
-        Can return additional SUID and Capability records when given ``--suid`` and/or ``--capability`` arguments.
-
-        Filesystems can set extended attributes (``xattr``) on filesystem entries.
 
         References:
             - https://man7.org/linux/man-pages/man2/lstat.2.html
             - https://man7.org/linux/man-pages/man7/inode.7.html
             - https://man7.org/linux/man-pages/man7/xattr.7.html
             - https://man7.org/linux/man-pages/man2/execve.2.html
-            - https://steflan-security.com/linux-privilege-escalation-suid-binaries/
+            - https://steflan-security.com/linux-privilege-escalation-suid-binaries
             - https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
 
-        Yields FilesystemRecords and optionally SuidRecords and CapabilityRecords.
+        Yields FilesystemRecords for every filesystem entry and CapabilityRecords if ``xattr`` security
+        attributes were found in the filesystem entry and the ``--capability`` flag is set.
 
         .. code-block:: text
 
@@ -103,7 +91,7 @@ class WalkFsPlugin(Plugin):
 
         for entry in self.target.fs.recurse(walkfs_path):
             try:
-                yield from generate_record(self.target, entry, suid, capability)
+                yield from generate_record(self.target, entry, capability)
 
             except FileNotFoundError as e:  # noqa: PERF203
                 self.target.log.warning("File not found: %s", entry)
@@ -114,7 +102,7 @@ class WalkFsPlugin(Plugin):
                 continue
 
 
-def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capability: bool) -> Iterator[WalkFsRecord]:
+def generate_record(target: Target, entry: FilesystemEntry, capability: bool) -> Iterator[FilesystemRecord]:
     """Generate a :class:`WalkFsRecord` from the given :class:`FilesystemEntry`.
 
     Args:
@@ -122,7 +110,7 @@ def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capabili
         entry: :class:`FilesystemEntry` instance
 
     Returns:
-        Generator of :class:`WalkFsRecord` for the given :class:`FilesystemEntry`.
+        Generator of :class:`FilesystemRecord` for the given :class:`FilesystemEntry`.
     """
     entry_stat = entry.lstat()
 
@@ -130,8 +118,6 @@ def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capabili
         fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
     else:
         fs_types = [entry.fs.__type__]
-
-    is_suid = bool(entry_stat.st_mode & stat.S_ISUID)
 
     fields = {
         "atime": from_unix(entry_stat.st_atime),
@@ -144,7 +130,7 @@ def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capabili
         "mode": entry_stat.st_mode,
         "uid": entry_stat.st_uid,
         "gid": entry_stat.st_gid,
-        "is_suid": is_suid,
+        "is_suid": bool(entry_stat.st_mode & stat.S_ISUID),
         "fs_types": fs_types,
     }
 
@@ -163,12 +149,6 @@ def generate_record(target: Target, entry: FilesystemEntry, suid: bool, capabili
         **fields,
         _target=target,
     )
-
-    if suid and is_suid:
-        yield SuidRecord(
-            **fields,
-            _target=target,
-        )
 
     if capability and fields.get("attr"):
         yield from parse_capability_entry(entry, target)

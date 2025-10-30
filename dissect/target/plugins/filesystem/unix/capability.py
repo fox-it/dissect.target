@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 CapabilityRecord = TargetRecordDescriptor(
     "filesystem/unix/capability",
     [
-        ("datetime", "ts_mtime"),
+        ("datetime", "mtime"),
         ("path", "path"),
         ("string[]", "permitted"),
         ("string[]", "inheritable"),
@@ -126,7 +126,7 @@ def parse_entry(entry: FilesystemEntry, target: Target) -> Iterator[CapabilityRe
             target.log.debug("", exc_info=e)
 
         yield CapabilityRecord(
-            ts_mtime=entry.lstat().st_mtime,
+            mtime=entry.lstat().st_mtime,
             path=target.fs.path(entry.path),
             permitted=permitted,
             inheritable=inheritable,
