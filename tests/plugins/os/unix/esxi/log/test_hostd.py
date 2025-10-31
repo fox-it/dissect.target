@@ -20,7 +20,7 @@ def test_esxi_6_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     target_esxi.add_plugin(HostdPlugin)
 
     results = list(target_esxi.hostd())
-    assert len(results) == 2759
+    assert len(results) == 2757
     # line without application
     assert results[0].ts == dt("2025-08-22T07:35:20.895Z")
     assert results[0].application is None
@@ -30,24 +30,25 @@ def test_esxi_6_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     )
 
     # Multiline result
-    assert results[1466].ts == dt("2025-08-22T07:35:25.968Z")
-    assert results[1466].application == "hostd"
-    assert results[1466].log_level == "info"
-    assert results[1466].pid == "2098599"
-    assert results[1466].source == "/var/log/hostd.1.gz"
+    assert results[1465].ts == dt("2025-08-22T07:35:25.968Z")
+    assert results[1465].application == "hostd"
+    assert results[1465].log_level == "info"
+    assert results[1465].pid == "2098599"
+    assert results[1465].source == "/var/log/hostd.1.gz"
     assert (
-        results[1466].message
+        results[1465].message
         == "Loaded vSAN management connection configuration.\n port: 80\n path: /vsanperf\n sdkTunnelPath: /vsanperf\n "
         "retryDelaySec: 2\n maxPooledConnections: 2\n maxOpenConnections: 5\n privateKey: /etc/vmware/ssl/rui.key\n "
         "certificate: /etc/vmware/ssl/rui.crt"
     )
 
+    assert results[1466].event_metadata == "Originator@6876 sub=SessionOrientedStub[0]"
     # Line with user/opID in metadata
-    assert results[1749].ts == dt("2025-08-22T07:35:28.264Z")
-    assert results[1749].user == "dcui"
-    assert results[1749].op_id == "vsan-bdc1-4715"
+    assert results[1747].ts == dt("2025-08-22T07:35:28.264Z")
+    assert results[1747].user == "dcui"
+    assert results[1747].op_id == "vsan-bdc1-4715"
     assert (
-        results[1749].message
+        results[1747].message
         == "Event 5 : User dcui@127.0.0.1 logged out (login time: Friday, 22 August, 2025 07:35:28 AM,"
         " number of API invocations: 0, user agent: VMware-client/6.5.0)"
     )
@@ -97,3 +98,25 @@ def test_esxi_7_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
         '       value = "192.168.101.96"\n       }\n    ],\n    objectId = "ha-host",\n    '
         'objectType = "vim.HostSystem",\n }'
     )
+
+
+def test_esxi_8_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
+    """Test with log from an ESXi 7"""
+    data_file = absolute_path("_data/plugins/os/unix/esxi/log/hostd/esxi8/hostd.1.gz")
+    fs_esxi.map_file("/var/log/hostd.1.gz", data_file)
+
+    target_esxi.add_plugin(HostdPlugin)
+
+    results = list(target_esxi.hostd())
+    assert len(results) == 3192
+
+
+def test_esxi_9_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
+    """Test with log from an ESXi 7"""
+    data_file = absolute_path("_data/plugins/os/unix/esxi/log/hostd/esxi9/hostd.0.gz")
+    fs_esxi.map_file("/var/log/hostd.0.gz", data_file)
+
+    target_esxi.add_plugin(HostdPlugin)
+
+    results = list(target_esxi.hostd())
+    assert len(results) == 9554

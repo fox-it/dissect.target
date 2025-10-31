@@ -37,12 +37,16 @@ class HostdPlugin(Plugin):
 
     RE_HOSTD: Pattern = re.compile(
         r"""
-        (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) # ts, including milliseconds
-        \s
-        ((?P<log_level>\w+)\s)? # info, warning, of In(166), Wa(164) in esxi8+
-        ((?P<application>(\w+|-))\[(?P<pid>(\d+))\]|-)\s
-        ((\[(?P<metadata>([^\]]+))\])\s)?
-        (?P<message>.*)""",
+        (
+            (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) # ts, including milliseconds
+            \s
+            ((?P<log_level>[\w()]+)\s)? # info, warning, of In(166), Wa(164), Er(163) in esxi8+
+            ((?P<application>(\w+|-))\[(?P<pid>(\d+))\]|-):?\s  # hostd[pid] < esxi8, Hostd[pid]: esxi8+
+
+        )?
+       (?P<newline_delimiter>--> ?)? # in Exi8+, newline marker is positionned after the ts loglevel application part
+       (\[(?P<metadata>(.+))\]\s)?
+       (?P<message>.*?)""",
         re.VERBOSE,
     )
 
@@ -84,14 +88,15 @@ class HostdPlugin(Plugin):
                     line = line.strip("\n")
                     # For multiline event, line start with --> Before Esxi8
                     # For Esxi8+, --> is after the Date loglevel application[pid] block
-                    if line.startswith("-->"):
-                        line = "\n" + line[3:]
-                        current_record.message = current_record.message + line
-                    else:
-                        if current_record:
-                            yield current_record
-                        if match := self.RE_HOSTD.match(line):
-                            log = match.groupdict()
+                    if match := self.RE_HOSTD.fullmatch(line):
+                        log = match.groupdict()
+                        if log.get("newline_delimiter") == "-->" or log.get("ts") is None:
+                            # for multiline log entries --> should be present, but sometime this marker is missing
+                            current_record.message = current_record.message + "\n" + log.get("message")
+                        else:
+                            if current_record:
+                                yield current_record
+                            current_record = None
                             if metadata := log.get("metadata"):
                                 user = re.search(r"user=(\S+)", metadata)
                                 op_id = re.search(r"opID=(\S+)", metadata)
@@ -100,7 +105,7 @@ class HostdPlugin(Plugin):
                                 op_id = None
                             current_record = HostdRecord(
                                 _target=self.target,
-                                message=log.get("message"),
+                                message=log.get("message", ""),
                                 log_level=log.get("log_level", None),
                                 application=log.get("application", None),
                                 pid=log.get("pid", None),
@@ -110,10 +115,11 @@ class HostdPlugin(Plugin):
                                 ts=datetime.strptime(log["ts"], "%Y-%m-%dT%H:%M:%S.%f%z"),
                                 source=path,
                             )
-                        else:
-                            self.target.log.warning("log file contains unrecognized format in %s", path)
-                            self.target.log.warning("log file contains unrecognized format in %s : %s", path, line)
-                            continue
+                    else:
+                        print("NO MATCH")
+                        self.target.log.warning("log file contains unrecognized format in %s", path)
+                        self.target.log.warning("log file contains unrecognized format in %s : %s", path, line)
+                        continue
                 if current_record:
                     yield current_record
             except Exception as e:
