@@ -110,9 +110,27 @@ def test_esxi_8_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     results = list(target_esxi.hostd())
     assert len(results) == 3192
 
+    assert results[0].ts == dt("2025-10-28T08:36:40.940Z")
+    assert results[0].application == "Hostd"
+    assert (
+        results[0].message == "- time the service was last started 2025-10-28T08:36:40.939Z, Section for VMware ESX, "
+        "pid=132083, version=8.0.3, build=24677879, option=Release"
+    )
+    # test multiline line with metadata
+    assert results[2749].ts == dt("2025-10-28T08:36:47.515Z")
+    assert results[2749].user == ":vsanmgmtd"
+    assert results[2749].message == (
+        "Result:\n"
+        " (vim.fault.NotAuthenticated) {\n"
+        "    object = 'vim.host.StorageSystem:storageSystem', \n"
+        '    privilegeId = "System.Read", \n'
+        '    msg = "", \n'
+        " }"
+    )
+
 
 def test_esxi_9_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
-    """Test with log from an ESXi 7"""
+    """Test with log from an ESXi 9"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/hostd/esxi9/hostd.0.gz")
     fs_esxi.map_file("/var/log/hostd.0.gz", data_file)
 
@@ -120,3 +138,36 @@ def test_esxi_9_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     results = list(target_esxi.hostd())
     assert len(results) == 9554
+
+    assert results[0].ts == dt("2025-10-28T16:01:55.286Z")
+    assert results[0].log_level == "In(166)"
+    assert results[0].user is None
+    assert (
+        results[0].message
+        == "- time the service was last started 2025-10-28T16:01:55.285Z, Section for VMware ESXi, pid=132123, "
+        "version=9.0.0, build=24678710, option=Release"
+    )
+    # multiline
+    assert results[2377].ts == dt("2025-10-28T16:01:59.555Z")
+    assert results[2377].application == "Hostd"
+    assert results[2377].log_level == "Er(163)"
+    assert results[2377].pid == "132123"
+    assert results[2377].source == "/var/log/hostd.0.gz"
+    assert results[2377].message == (
+        "Failed to load event type <EventType>\n"
+        "                "
+        "<eventTypeId>com.vmware.vim.vm.reboot.powerOff</eventTypeId>\n"
+        "                <description>Virtual machine reboot converted to power off "
+        "because the rebootPowerOff option is enabled</description>\n"
+        "             </EventType>: No eventTypeID (spelling?)"
+    )
+    # bracket in metadata
+    assert results[2821].ts == dt("2025-10-28T16:01:59.699Z")
+    assert results[2821].event_metadata == "Originator@6876 sub=vmomi.soapStub[0]"
+    assert results[2821].message == (
+        "Resetting stub adapter: service state request failed; a: <<<cs p:0000006b69cebfe0, "
+        "TCP:localhost.localdomain:80> >, /vsanperf>, pa: <<cs p:0000006b69cebfe0, TCP:localhost.localdomain:80> >, "
+        "N7Vmacore4Http13HttpExceptionE(HTTP error response: Service Unavailable)\n"
+        " [context]zKq7AVICAgAAADaReAEJaG9zdGQAACaiPWxpYnZtYWNvcmUuc28AAAtmNQB7Zy"
+        "QAwmokAG4TJQBgOCUAu4hKAV5fCGxpYmMuc28uNgABMFwQ[/context]"
+    )

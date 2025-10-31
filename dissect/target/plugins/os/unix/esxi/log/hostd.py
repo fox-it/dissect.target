@@ -12,9 +12,8 @@ from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
-    from dissect.target.target import Target
+    from dissect.target.target import Target, TargetPath
 
 HostdRecord = TargetRecordDescriptor(
     "esxi/log/hostd",
@@ -45,7 +44,8 @@ class HostdPlugin(Plugin):
 
         )?
        (?P<newline_delimiter>--> ?)? # in Exi8+, newline marker is positionned after the ts loglevel application part
-       (\[(?P<metadata>(.+))\]\s)?
+       # but for some log this marker is missing...
+       (\[(?P<metadata>(.+?))\]\s)?
        (?P<message>.*?)""",
         re.VERBOSE,
     )
@@ -58,7 +58,7 @@ class HostdPlugin(Plugin):
         if not len(self.log_paths):
             raise UnsupportedPluginError("No hostd path found")
 
-    def get_log_paths(self) -> list[Path]:
+    def get_log_paths(self) -> list[TargetPath]:
         log_paths = []
 
         log_paths.extend(self.target.fs.path("/var/log").glob("hostd.*"))
