@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.plugins.os.unix.esxi.log.hostd import HostdPlugin
+from dissect.target.plugins.os.unix.esxi.log import HostdPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_esxi_6_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
+def test_esxi_6_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi6"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/hostd/esxi6/hostd.1.gz")
     fs_esxi.map_file("/var/log/hostd.1.gz", data_file)
@@ -54,7 +54,7 @@ def test_esxi_6_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     )
 
 
-def test_esxi_7_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
+def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi 7"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/hostd/esxi7/hostd.0.gz")
     fs_esxi.map_file("/var/log/hostd.0.gz", data_file)
@@ -100,7 +100,7 @@ def test_esxi_7_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     )
 
 
-def test_esxi_8_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
+def test_esxi_8_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi 7"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/hostd/esxi8/hostd.1.gz")
     fs_esxi.map_file("/var/log/hostd.1.gz", data_file)
@@ -129,7 +129,7 @@ def test_esxi_8_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     )
 
 
-def test_esxi_9_hostd_log(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
+def test_esxi_9_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi 9"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/hostd/esxi9/hostd.0.gz")
     fs_esxi.map_file("/var/log/hostd.0.gz", data_file)

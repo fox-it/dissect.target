@@ -1,24 +1,27 @@
 from __future__ import annotations
 
+import abc
 import re
+from abc import ABC
 from datetime import datetime
 from re import Pattern
 from typing import TYPE_CHECKING
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import UnsupportedPluginError, FilesystemError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, export, OperatingSystem
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target, TargetPath
 
-HostdRecord = TargetRecordDescriptor(
-    "esxi/log/hostd",
+ESXiLogRecord = TargetRecordDescriptor(
+    "esxi/log",
     [
         ("datetime", "ts"),
+        ("string", "type"),
         ("string", "log_level"),
         ("string", "application"),
         ("string", "pid"),
@@ -31,10 +34,17 @@ HostdRecord = TargetRecordDescriptor(
 )
 
 
-class HostdPlugin(Plugin):
-    """Unix audit log plugin."""
-
-    RE_HOSTD: Pattern = re.compile(
+class EsxiLogBasePlugin(Plugin, ABC):
+    """Esxi log plugin."""
+    # ESXi relies a lot on symlink, depending on version/collection log dir may change...
+    __register__ = False
+    COMMON_LOG_LOCATION = [
+        "/var/log",
+        "/var/run/log",
+        "/scratch/log",
+        "/var/lib/vmware/osdata"
+    ]
+    RE_LOG_FORMAT: Pattern = re.compile(
         r"""
         (
             (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) # ts, including milliseconds
@@ -55,21 +65,34 @@ class HostdPlugin(Plugin):
         self.log_paths = self.get_log_paths()
 
     def check_compatible(self) -> None:
+        # Log path as the same as on other unix target, so we fail fast
+        if not self.target.os == OperatingSystem.ESXI:
+            raise UnsupportedPluginError(f"No {self.logname} path found")
         if not len(self.log_paths):
-            raise UnsupportedPluginError("No hostd path found")
+            raise UnsupportedPluginError("Not an ESXi host")
+
+    @property
+    @abc.abstractmethod
+    def logname(self) -> str:
+        """
+        base name of the log file (e.g : shell, auth, hostd)
+        """
+        pass
 
     def get_log_paths(self) -> list[TargetPath]:
         log_paths = []
+        for log_location in self.COMMON_LOG_LOCATION:
+            for path in self.target.fs.path(log_location).glob(f"{self.logname}.*"):
+                try:
+                    log_paths.append(path.resolve(strict=True))
+                except FilesystemError as e:
+                    self.target.info.warning("Fail to resolve path to %s : %s", path, str(e))
 
-        log_paths.extend(self.target.fs.path("/var/log").glob("hostd.*"))
-        log_paths.extend(self.target.fs.path("/var/run/log").glob("hostd.*"))
-        log_paths.extend(self.target.fs.path("/var/lib/vmware/osdata").glob("hostd.*"))
         if osdata_fs := self.target.osdata_fs():
-            log_paths.extend(osdata_fs.glob("log/hostd.*"))
-        return log_paths
+            log_paths.extend(osdata_fs.glob(f"log/{self.logname}.*"))
+        return list(set(log_paths))
 
-    @export(record=HostdRecord)
-    def hostd(self) -> Iterator[HostdRecord]:
+    def yield_log_records(self) -> Iterator[ESXiLogRecord]:
         """Return CentOS and RedHat audit information stored in /var/log/audit*.
 
         The audit log file on a Linux machine stores security-relevant information.
@@ -80,7 +103,6 @@ class HostdPlugin(Plugin):
         """
         for path in self.log_paths:
             try:
-                path = path.resolve(strict=True)
                 current_record = None
                 for line in open_decompress(path, "rt"):
                     if not line:
@@ -88,7 +110,7 @@ class HostdPlugin(Plugin):
                     line = line.strip("\n")
                     # For multiline event, line start with --> Before Esxi8
                     # For Esxi8+, --> is after the Date loglevel application[pid] block
-                    if match := self.RE_HOSTD.fullmatch(line):
+                    if match := self.RE_LOG_FORMAT.fullmatch(line):
                         log = match.groupdict()
                         if log.get("newline_delimiter") == "-->" or log.get("ts") is None:
                             # for multiline log entries --> should be present, but sometime this marker is missing
@@ -103,8 +125,9 @@ class HostdPlugin(Plugin):
                             else:
                                 user = None
                                 op_id = None
-                            current_record = HostdRecord(
+                            current_record = ESXiLogRecord(
                                 _target=self.target,
+                                type=self.logname,
                                 message=log.get("message", ""),
                                 log_level=log.get("log_level", None),
                                 application=log.get("application", None),
@@ -116,12 +139,42 @@ class HostdPlugin(Plugin):
                                 source=path,
                             )
                     else:
-                        print("NO MATCH")
                         self.target.log.warning("log file contains unrecognized format in %s", path)
                         self.target.log.warning("log file contains unrecognized format in %s : %s", path, line)
                         continue
                 if current_record:
                     yield current_record
             except Exception as e:
-                self.target.log.warning("An error occurred parsing hostd log file %s: %s", path, str(e), exc_info=e)
+                self.target.log.warning("An error occurred parsing %s log file %s: %s", self.logname, path, str(e),
+                                        exc_info=e)
                 self.target.log.debug("", exc_info=e)
+
+
+class HostdPlugin(EsxiLogBasePlugin):
+    __register__ = True
+
+    @export(record=ESXiLogRecord)
+    def hostd(self) -> Iterator[ESXiLogRecord]:
+        """
+        Records for hostd log file (Host management service logs, including virtual machine and host Task and Events)
+        """
+        yield from self.yield_log_records()
+
+    @property
+    def logname(self) -> str:
+        return "hostd"
+
+
+class EsxiAuthPLugin(EsxiLogBasePlugin):
+    __register__ = True
+
+    @export(record=ESXiLogRecord)
+    def auth(self) -> Iterator[ESXiLogRecord]:
+        """
+        Records for hostd log file (Host management service logs, including virtual machine and host Task and Events)
+        """
+        yield from self.yield_log_records()
+
+    @property
+    def logname(self) -> str:
+        return "auth"

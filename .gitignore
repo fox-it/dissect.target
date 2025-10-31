@@ -9,3 +9,6 @@ __pycache__/
 tests/_docs/api
 tests/_docs/build
 .tox/
+
+.coverage*
+uv.lock
