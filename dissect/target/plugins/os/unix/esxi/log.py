@@ -24,7 +24,7 @@ ESXiLogRecord = TargetRecordDescriptor(
         ("string", "type"),
         ("string", "log_level"),
         ("string", "application"),
-        ("string", "pid"),
+        ("varint", "pid"),
         ("string", "op_id"),
         ("string", "user"),
         ("string", "event_metadata"),
@@ -35,7 +35,7 @@ ESXiLogRecord = TargetRecordDescriptor(
 
 
 class EsxiLogBasePlugin(Plugin, ABC):
-    """Esxi log plugin."""
+    """Esxi base log plugin."""
 
     # ESXi relies a lot on symlink, depending on version/collection log dir may change...
     __register__ = False
@@ -147,10 +147,11 @@ class EsxiLogBasePlugin(Plugin, ABC):
 
 
 class HostdPlugin(EsxiLogBasePlugin):
+    """ESXi hostd logs plugins"""
     __register__ = True
 
     @export(record=ESXiLogRecord)
-    def esxi_hostd(self) -> Iterator[ESXiLogRecord]:
+    def hostd(self) -> Iterator[ESXiLogRecord]:
         """
         Records for hostd log file (Host management service logs, including virtual machine and host Task and Events)
         """
@@ -162,12 +163,13 @@ class HostdPlugin(EsxiLogBasePlugin):
 
 
 class EsxiAuthPLugin(EsxiLogBasePlugin):
+    """ESXi auth logs plugins"""
     __register__ = True
 
     @export(record=ESXiLogRecord)
     def auth(self) -> Iterator[ESXiLogRecord]:
         """
-        Records for hostd log file (Host management service logs, including virtual machine and host Task and Events)
+        Records for auth log file (ESXi Shell authentication success and failure.)
         """
         yield from self.yield_log_records()
 

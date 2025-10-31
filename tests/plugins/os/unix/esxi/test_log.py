@@ -19,7 +19,7 @@ def test_esxi_6_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     target_esxi.add_plugin(HostdPlugin)
 
-    results = list(target_esxi.esxi_hostd())
+    results = list(target_esxi.hostd())
     assert len(results) == 2757
     # line without application
     assert results[0].ts == dt("2025-08-22T07:35:20.895Z")
@@ -33,7 +33,7 @@ def test_esxi_6_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     assert results[1465].ts == dt("2025-08-22T07:35:25.968Z")
     assert results[1465].application == "hostd"
     assert results[1465].log_level == "info"
-    assert results[1465].pid == "2098599"
+    assert results[1465].pid == 2098599
     assert results[1465].source == "/var/log/hostd.1.gz"
     assert (
         results[1465].message
@@ -61,7 +61,7 @@ def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     target_esxi.add_plugin(HostdPlugin)
 
-    results = list(target_esxi.esxi_hostd())
+    results = list(target_esxi.hostd())
     assert len(results) == 170
     # line without application
     assert results[0].ts == dt("2025-09-09T23:09:51.835Z")
@@ -86,7 +86,7 @@ def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     assert results[29].ts == dt("2025-09-09T23:10:51.079Z")
     assert results[29].application == "hostd"
     assert results[29].log_level == "info"
-    assert results[29].pid == "2100292"
+    assert results[29].pid == 2100292
     assert results[29].source == "/var/log/hostd.0.gz"
     assert (
         results[29].message
@@ -107,7 +107,7 @@ def test_esxi_8_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     target_esxi.add_plugin(HostdPlugin)
 
-    results = list(target_esxi.esxi_hostd())
+    results = list(target_esxi.hostd())
     assert len(results) == 3192
 
     assert results[0].ts == dt("2025-10-28T08:36:40.940Z")
@@ -136,7 +136,7 @@ def test_esxi_9_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     target_esxi.add_plugin(HostdPlugin)
 
-    results = list(target_esxi.esxi_hostd())
+    results = list(target_esxi.hostd())
     assert len(results) == 9554
 
     assert results[0].ts == dt("2025-10-28T16:01:55.286Z")
@@ -151,7 +151,7 @@ def test_esxi_9_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     assert results[2377].ts == dt("2025-10-28T16:01:59.555Z")
     assert results[2377].application == "Hostd"
     assert results[2377].log_level == "Er(163)"
-    assert results[2377].pid == "132123"
+    assert results[2377].pid == 132123
     assert results[2377].source == "/var/log/hostd.0.gz"
     assert results[2377].message == (
         "Failed to load event type <EventType>\n"
