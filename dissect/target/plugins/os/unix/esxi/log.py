@@ -5,12 +5,12 @@ import re
 from abc import ABC
 from datetime import datetime
 from re import Pattern
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
-from dissect.target.exceptions import UnsupportedPluginError, FilesystemError
+from dissect.target.exceptions import FilesystemError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export, OperatingSystem
+from dissect.target.plugin import OperatingSystem, Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -36,15 +36,11 @@ ESXiLogRecord = TargetRecordDescriptor(
 
 class EsxiLogBasePlugin(Plugin, ABC):
     """Esxi log plugin."""
+
     # ESXi relies a lot on symlink, depending on version/collection log dir may change...
     __register__ = False
-    COMMON_LOG_LOCATION = [
-        "/var/log",
-        "/var/run/log",
-        "/scratch/log",
-        "/var/lib/vmware/osdata"
-    ]
-    RE_LOG_FORMAT: Pattern = re.compile(
+    COMMON_LOG_LOCATION: ClassVar[list[str]] = ["/var/log", "/var/run/log", "/scratch/log", "/var/lib/vmware/osdata"]
+    RE_LOG_FORMAT: ClassVar[Pattern] = re.compile(
         r"""
         (
             (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) # ts, including milliseconds
@@ -77,7 +73,6 @@ class EsxiLogBasePlugin(Plugin, ABC):
         """
         base name of the log file (e.g : shell, auth, hostd)
         """
-        pass
 
     def get_log_paths(self) -> list[TargetPath]:
         log_paths = []
@@ -85,7 +80,7 @@ class EsxiLogBasePlugin(Plugin, ABC):
             for path in self.target.fs.path(log_location).glob(f"{self.logname}.*"):
                 try:
                     log_paths.append(path.resolve(strict=True))
-                except FilesystemError as e:
+                except FilesystemError as e:  # noqa PERF203
                     self.target.info.warning("Fail to resolve path to %s : %s", path, str(e))
 
         if osdata_fs := self.target.osdata_fs():
@@ -145,8 +140,9 @@ class EsxiLogBasePlugin(Plugin, ABC):
                 if current_record:
                     yield current_record
             except Exception as e:
-                self.target.log.warning("An error occurred parsing %s log file %s: %s", self.logname, path, str(e),
-                                        exc_info=e)
+                self.target.log.warning(
+                    "An error occurred parsing %s log file %s: %s", self.logname, path, str(e), exc_info=e
+                )
                 self.target.log.debug("", exc_info=e)
 
 
@@ -154,7 +150,7 @@ class HostdPlugin(EsxiLogBasePlugin):
     __register__ = True
 
     @export(record=ESXiLogRecord)
-    def hostd(self) -> Iterator[ESXiLogRecord]:
+    def esxi_hostd(self) -> Iterator[ESXiLogRecord]:
         """
         Records for hostd log file (Host management service logs, including virtual machine and host Task and Events)
         """

@@ -19,7 +19,7 @@ def test_esxi_6_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     target_esxi.add_plugin(HostdPlugin)
 
-    results = list(target_esxi.hostd())
+    results = list(target_esxi.esxi_hostd())
     assert len(results) == 2757
     # line without application
     assert results[0].ts == dt("2025-08-22T07:35:20.895Z")
@@ -61,7 +61,7 @@ def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     target_esxi.add_plugin(HostdPlugin)
 
-    results = list(target_esxi.hostd())
+    results = list(target_esxi.esxi_hostd())
     assert len(results) == 170
     # line without application
     assert results[0].ts == dt("2025-09-09T23:09:51.835Z")
@@ -107,7 +107,7 @@ def test_esxi_8_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     target_esxi.add_plugin(HostdPlugin)
 
-    results = list(target_esxi.hostd())
+    results = list(target_esxi.esxi_hostd())
     assert len(results) == 3192
 
     assert results[0].ts == dt("2025-10-28T08:36:40.940Z")
@@ -136,7 +136,7 @@ def test_esxi_9_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
     target_esxi.add_plugin(HostdPlugin)
 
-    results = list(target_esxi.hostd())
+    results = list(target_esxi.esxi_hostd())
     assert len(results) == 9554
 
     assert results[0].ts == dt("2025-10-28T16:01:55.286Z")
