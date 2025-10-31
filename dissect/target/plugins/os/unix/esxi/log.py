@@ -148,6 +148,7 @@ class EsxiLogBasePlugin(Plugin, ABC):
 
 class HostdPlugin(EsxiLogBasePlugin):
     """ESXi hostd logs plugins"""
+
     __register__ = True
 
     @export(record=ESXiLogRecord)
@@ -164,6 +165,7 @@ class HostdPlugin(EsxiLogBasePlugin):
 
 class EsxiAuthPLugin(EsxiLogBasePlugin):
     """ESXi auth logs plugins"""
+
     __register__ = True
 
     @export(record=ESXiLogRecord)
