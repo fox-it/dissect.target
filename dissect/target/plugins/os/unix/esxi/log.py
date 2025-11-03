@@ -37,7 +37,6 @@ ESXiLogRecord = TargetRecordDescriptor(
 class EsxiLogBasePlugin(Plugin, ABC):
     """Esxi base log plugin."""
 
-    # ESXi relies a lot on symlink, depending on version/collection log dir may change...
     __register__ = False
     COMMON_LOG_LOCATION: ClassVar[list[str]] = ["/var/log", "/var/run/log", "/scratch/log", "/var/lib/vmware/osdata"]
     RE_LOG_FORMAT: ClassVar[Pattern] = re.compile(
@@ -62,9 +61,9 @@ class EsxiLogBasePlugin(Plugin, ABC):
     def check_compatible(self) -> None:
         # Log path as the same as on other unix target, so we fail fast
         if not self.target.os == OperatingSystem.ESXI:
-            raise UnsupportedPluginError(f"No {self.logname} path found")
-        if not len(self.log_paths):
             raise UnsupportedPluginError("Not an ESXi host")
+        if not len(self.log_paths):
+            raise UnsupportedPluginError(f"No {self.logname} path found")
 
     @property
     @abc.abstractmethod
@@ -74,17 +73,26 @@ class EsxiLogBasePlugin(Plugin, ABC):
         """
 
     def get_log_paths(self) -> list[TargetPath]:
+        """
+        Get log location, looking in most usual location, as well as in the osdata partition
+
+        References:
+            - https://knowledge.broadcom.com/external/article/306962/location-of-esxi-log-files.html
+        :return:
+        """
         log_paths = []
         for log_location in self.COMMON_LOG_LOCATION:
             for path in self.target.fs.path(log_location).glob(f"{self.logname}.*"):
                 try:
+
                     log_paths.append(path.resolve(strict=True))
                 except FilesystemError as e:  # noqa PERF203
                     self.target.info.warning("Fail to resolve path to %s : %s", path, str(e))
 
         if osdata_fs := self.target.osdata_fs():
             log_paths.extend(osdata_fs.glob(f"log/{self.logname}.*"))
-        # TODO : read /etc/vmsyslog.conf / /etc/vmsyslog.conf.d -> logdircat
+        # TODO : read /etc/vmsyslog.conf / /etc/vmsyslog.conf.d -> logdir
+        # as ESXi use a lot of symlink, use resolve list(set to deduplicate files
         return list(set(log_paths))
 
     def yield_log_records(self) -> Iterator[ESXiLogRecord]:
@@ -103,13 +111,13 @@ class EsxiLogBasePlugin(Plugin, ABC):
                     if not line:
                         continue
                     line = line.strip("\n")
-                    # For multiline event, line start with --> Before Esxi8
-                    # For Esxi8+, --> is after the Date loglevel application[pid] block
                     if match := self.RE_LOG_FORMAT.fullmatch(line):
                         log = match.groupdict()
+                        # For multiline event, line start with --> Before Esxi8
+                        # For Esxi8+, --> is after the Date loglevel application[pid] block
+                        # but sometime --> is missing but it's still previous line continuation
                         if log.get("newline_delimiter") == "-->" or log.get("ts") is None:
                             if current_record:
-                                # for multiline log entries --> should be present, but sometime this marker is missing
                                 current_record.message = current_record.message + "\n" + log.get("message")
                             else:
                                 self.target.log.warning("log file contains unrecognized format in %s", path)
