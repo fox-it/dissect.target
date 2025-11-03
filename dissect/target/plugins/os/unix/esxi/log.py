@@ -42,16 +42,15 @@ class EsxiLogBasePlugin(Plugin, ABC):
     COMMON_LOG_LOCATION: ClassVar[list[str]] = ["/var/log", "/var/run/log", "/scratch/log", "/var/lib/vmware/osdata"]
     RE_LOG_FORMAT: ClassVar[Pattern] = re.compile(
         r"""
+        ((?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)\s)? # ts, moslty including milliseconds, but not always
         (
-            (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z) # ts, moslty including milliseconds, but not always
-            \s
             ((?P<log_level>[\w()]+)\s)? # info, warning, of In(166), Wa(164), Er(163) in esxi8+, sometime missing
             ((?P<application>(\w+|-))\[(?P<pid>(\d+))\]|-):?\s  # hostd[pid] < esxi8, Hostd[pid]: esxi8+
 
         )?
        (?P<newline_delimiter>--> ?)? # in Exi8+, newline marker is positionned after the ts loglevel application part
        # but for some log this marker is missing...
-       (\[(?P<metadata>(.+?))\]\s)?
+       (\[(?P<metadata>(.*?))\]\s)?
        (?P<message>.*?)""",
         re.VERBOSE,
     )
@@ -171,6 +170,23 @@ class HostdPlugin(EsxiLogBasePlugin):
         return "hostd"
 
 
+class EsxiAuthPlugin(EsxiLogBasePlugin):
+    """ESXi auth logs plugins"""
+
+    __register__ = True
+
+    @export(record=ESXiLogRecord)
+    def auth(self) -> Iterator[ESXiLogRecord]:
+        """
+        Records for auth log file (ESXi Shell authentication success and failure.) Seems to be empty in ESXi8+
+        """
+        yield from self.yield_log_records()
+
+    @property
+    def logname(self) -> str:
+        return "auth"
+
+
 class EsxiAuthPLugin(EsxiLogBasePlugin):
     """ESXi auth logs plugins"""
 
@@ -186,3 +202,41 @@ class EsxiAuthPLugin(EsxiLogBasePlugin):
     @property
     def logname(self) -> str:
         return "auth"
+
+
+class ShellLogPlugin(EsxiLogBasePlugin):
+    """ESXi auth logs plugins"""
+
+    __register__ = True
+    # Mostly equal to EsxiLogBasePlugin.RE_LOG_FORMAT, but some difference in metadata part
+    RE_LOG_FORMAT: ClassVar[Pattern] = re.compile(
+        r"""
+        ((?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)\s)? # ts, moslty including milliseconds, but not always
+        (
+            ((?P<log_level>[\w()]+)\s)? # info, warning, of In(166), Wa(164), Er(163) in esxi8+, sometime missing
+            ((?P<application>(\w+))\[(?P<pid>(\d+))\]):?\s  # hostd[pid] < esxi8, Hostd[pid]: esxi8+
+
+        )?
+       (?P<newline_delimiter>--> ?)? # in Exi8+, newline marker is positionned after the ts loglevel application part
+       # but for some log this marker is missing...
+       (\[(?P<metadata>(.+?))\]:\s)? # Metadata = user. Instead of \s, metadata is followed by a ":"
+       (?P<message>.*?)""",
+        re.VERBOSE,
+    )
+
+    @export(record=ESXiLogRecord)
+    def shell_log(self) -> Iterator[ESXiLogRecord]:
+        """
+        Records for shell.log files (ESXi Shell usage logs, including enable/disable and every command entered).
+
+        References:
+            - https://knowledge.broadcom.com/external/article/321910
+        """
+        for record in self.yield_log_records():
+            record.user = record.event_metadata
+            record.event_metadata = None
+            yield record
+
+    @property
+    def logname(self) -> str:
+        return "shell"
