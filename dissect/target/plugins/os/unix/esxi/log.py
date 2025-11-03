@@ -187,23 +187,6 @@ class EsxiAuthPlugin(EsxiLogBasePlugin):
         return "auth"
 
 
-class EsxiAuthPLugin(EsxiLogBasePlugin):
-    """ESXi auth logs plugins"""
-
-    __register__ = True
-
-    @export(record=ESXiLogRecord)
-    def auth(self) -> Iterator[ESXiLogRecord]:
-        """
-        Records for auth log file (ESXi Shell authentication success and failure.) Seems to be empty in ESXi8+
-        """
-        yield from self.yield_log_records()
-
-    @property
-    def logname(self) -> str:
-        return "auth"
-
-
 class ShellLogPlugin(EsxiLogBasePlugin):
     """ESXi auth logs plugins"""
 
