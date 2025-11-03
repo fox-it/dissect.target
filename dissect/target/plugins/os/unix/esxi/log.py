@@ -171,7 +171,7 @@ class HostdPlugin(EsxiLogBasePlugin):
 
 
 class EsxiAuthPlugin(EsxiLogBasePlugin):
-    """ESXi auth logs plugins"""
+    """ESXi auth.log plugins"""
 
     __register__ = True
 
@@ -188,7 +188,7 @@ class EsxiAuthPlugin(EsxiLogBasePlugin):
 
 
 class ShellLogPlugin(EsxiLogBasePlugin):
-    """ESXi auth logs plugins"""
+    """ESXi shell.log plugins"""
 
     __register__ = True
     # Mostly equal to EsxiLogBasePlugin.RE_LOG_FORMAT, but some difference in metadata part
