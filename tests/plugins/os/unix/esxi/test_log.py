@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.plugins.os.unix.esxi.log import HostdPlugin
+from dissect.target.plugins.os.unix.esxi.log import HostdPlugin, EsxiAuthPLugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -171,3 +171,14 @@ def test_esxi_9_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
         " [context]zKq7AVICAgAAADaReAEJaG9zdGQAACaiPWxpYnZtYWNvcmUuc28AAAtmNQB7Zy"
         "QAwmokAG4TJQBgOCUAu4hKAV5fCGxpYmMuc28uNgABMFwQ[/context]"
     )
+
+
+def test_esxi_6_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
+    """Test with log from an ESXi6"""
+    data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi6/auth.log")
+    fs_esxi.map_file("/scratch/log/auth.log", data_file)
+
+    target_esxi.add_plugin(EsxiAuthPLugin)
+
+    results = list(target_esxi.auth())
+    assert len(results) == 2757
