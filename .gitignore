@@ -1,5 +1,6 @@
 coverage.xml
 .coverage
+.coverage*
 dist/
 .eggs/
 *.egg-info/
@@ -10,5 +11,5 @@ tests/_docs/api
 tests/_docs/build
 .tox/
 
-.coverage*
 uv.lock
+.idea
