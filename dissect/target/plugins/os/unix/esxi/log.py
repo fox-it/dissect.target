@@ -96,14 +96,7 @@ class EsxiLogBasePlugin(Plugin, ABC):
         return list(set(log_paths))
 
     def yield_log_records(self) -> Iterator[ESXiLogRecord]:
-        """Return CentOS and RedHat audit information stored in /var/log/audit*.
-
-        The audit log file on a Linux machine stores security-relevant information.
-        Based on pre-configured rules. Log messages consist of space delimited key=value pairs.
-
-        References:
-            - https://knowledge.broadcom.com/external/article/306962/location-of-esxi-log-files.html
-        """
+        """Yield parsed log entries, iterate on identified log files"""
         for path in self.log_paths:
             try:
                 current_record = None
