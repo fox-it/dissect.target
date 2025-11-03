@@ -43,9 +43,9 @@ class EsxiLogBasePlugin(Plugin, ABC):
     RE_LOG_FORMAT: ClassVar[Pattern] = re.compile(
         r"""
         (
-            (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z) # ts, including milliseconds
+            (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z) # ts, moslty including milliseconds, but not always
             \s
-            ((?P<log_level>[\w()]+)\s)? # info, warning, of In(166), Wa(164), Er(163) in esxi8+
+            ((?P<log_level>[\w()]+)\s)? # info, warning, of In(166), Wa(164), Er(163) in esxi8+, sometime missing
             ((?P<application>(\w+|-))\[(?P<pid>(\d+))\]|-):?\s  # hostd[pid] < esxi8, Hostd[pid]: esxi8+
 
         )?
@@ -85,6 +85,7 @@ class EsxiLogBasePlugin(Plugin, ABC):
 
         if osdata_fs := self.target.osdata_fs():
             log_paths.extend(osdata_fs.glob(f"log/{self.logname}.*"))
+        # TODO : read /etc/vmsyslog.conf / /etc/vmsyslog.conf.d -> logdircat
         return list(set(log_paths))
 
     def yield_log_records(self) -> Iterator[ESXiLogRecord]:
@@ -108,8 +109,12 @@ class EsxiLogBasePlugin(Plugin, ABC):
                     if match := self.RE_LOG_FORMAT.fullmatch(line):
                         log = match.groupdict()
                         if log.get("newline_delimiter") == "-->" or log.get("ts") is None:
-                            # for multiline log entries --> should be present, but sometime this marker is missing
-                            current_record.message = current_record.message + "\n" + log.get("message")
+                            if current_record:
+                                # for multiline log entries --> should be present, but sometime this marker is missing
+                                current_record.message = current_record.message + "\n" + log.get("message")
+                            else:
+                                self.target.log.warning("log file contains unrecognized format in %s", path)
+                                self.target.log.debug("log file contains unrecognized format in %s : %s", path, line)
                         else:
                             if current_record:
                                 yield current_record
@@ -120,6 +125,7 @@ class EsxiLogBasePlugin(Plugin, ABC):
                             else:
                                 user = None
                                 op_id = None
+                            ts = log["ts"]
                             current_record = ESXiLogRecord(
                                 _target=self.target,
                                 type=self.logname,
@@ -130,12 +136,14 @@ class EsxiLogBasePlugin(Plugin, ABC):
                                 user=None if user is None else user.groups()[0],
                                 op_id=None if op_id is None else op_id.groups()[0],
                                 event_metadata=log.get("metadata", ""),
-                                ts=datetime.strptime(log["ts"], "%Y-%m-%dT%H:%M:%S.%f%z"),
+                                ts=datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S.%f%z")
+                                if "." in ts
+                                else datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S%z"),
                                 source=path,
                             )
                     else:
                         self.target.log.warning("log file contains unrecognized format in %s", path)
-                        self.target.log.warning("log file contains unrecognized format in %s : %s", path, line)
+                        self.target.log.debug("log file contains unrecognized format in %s : %s", path, line)
                         continue
                 if current_record:
                     yield current_record
@@ -171,7 +179,7 @@ class EsxiAuthPLugin(EsxiLogBasePlugin):
     @export(record=ESXiLogRecord)
     def auth(self) -> Iterator[ESXiLogRecord]:
         """
-        Records for auth log file (ESXi Shell authentication success and failure.)
+        Records for auth log file (ESXi Shell authentication success and failure.) Seems to be empty in ESXi8+
         """
         yield from self.yield_log_records()
 
