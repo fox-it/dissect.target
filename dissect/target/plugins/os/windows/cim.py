@@ -132,11 +132,11 @@ class CimPlugin(Plugin):
         """Yield consumer bindings from ``__filtertoconsumerbinding`` of all namespaces."""
         try:
             for ns in self._repo.root.namespaces:
-                    for binding in ns.class_("__filtertoconsumerbinding").instances:
-                        yield (
-                            ns.query(binding.properties["Consumer"].value),
-                            get_filter_name(binding),
-                        )
+                for binding in ns.class_("__filtertoconsumerbinding").instances:
+                    yield (
+                        ns.query(binding.properties["Consumer"].value),
+                        get_filter_name(binding),
+                    )
         except Exception as e:
             self.target.log.warning("Error retrieving consumerbindings")
             self.target.log.debug("", exc_info=e)
