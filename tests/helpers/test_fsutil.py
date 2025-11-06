@@ -404,6 +404,7 @@ def test_target_path_glob(path_fs: VirtualFilesystem) -> None:
 
 
 def test_target_path_rglob(path_fs: VirtualFilesystem) -> None:
+    assert next(path_fs.path("/some").rglob("file.txt")).__class__ is fsutil.TargetPath
     assert list(map(str, path_fs.path("/some").rglob("*.txt"))) == [
         "/some/symlink.txt",
         "/some/file.txt",
@@ -433,6 +434,7 @@ def test_target_path_rglob(path_fs: VirtualFilesystem) -> None:
 
 @pytest.mark.skipif(sys.version_info < (3, 12), reason="requires Python 3.12+")
 def test_target_path_rglob_case_sensitive(path_fs: VirtualFilesystem) -> None:
+    assert next(path_fs.path("/some").rglob("file.txt", case_sensitive=True)).__class__ is fsutil.TargetPath
     assert list(map(str, path_fs.path("/some").rglob("*.TXT", case_sensitive=False))) == [
         "/some/symlink.txt",
         "/some/file.txt",
@@ -811,7 +813,7 @@ def test_reverse_read() -> None:
     assert list(fsutil.reverse_read(fs.path("file").open("rb"), chunk_size=2)) == [b"09", b"87", b"65", b"43", b"21"]
 
     fs.map_file_fh("large_emoji", io.BytesIO(("🐱" * 10_000).encode()))
-    content = list(fsutil.reverse_read(fs.path("large_emoji").open("rb")))
+    content = list(fsutil.reverse_read(fs.path("large_emoji").open("rb"), chunk_size=8192))
     assert len(content) == 5
     assert len(content[0]) == 1024 * 8
     assert len(content[-1]) == 7232
