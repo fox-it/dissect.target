@@ -14,7 +14,6 @@ from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
-from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import _generate_long_paths, _os_match
@@ -623,6 +622,10 @@ def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
 @pytest.fixture(autouse=True)
 def guarded_keychain() -> Iterator[None]:
     """This fixture clears the keychain from any previously added values."""
+    from dissect.target.helpers import keychain  # keychain might be reloaded
+
     keychain.KEYCHAIN.clear()
     yield
+    from dissect.target.helpers import keychain
+
     keychain.KEYCHAIN.clear()
