@@ -92,7 +92,6 @@ class WalkFsPlugin(Plugin):
         for entry in self.target.fs.recurse(walkfs_path):
             try:
                 yield from generate_record(self.target, entry, capability)
-
             except FileNotFoundError as e:  # noqa: PERF203
                 self.target.log.warning("File not found: %s", entry)
                 self.target.log.debug("", exc_info=e)
