@@ -61,9 +61,10 @@ def test_unix_applications_desktop_files(target_unix_users: Target, fs_unix: Vir
     assert results[0].author is None
     assert results[0].type == "user"
     assert (
-        results[0].path
+        results[0].exec
         == "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/firefox_firefox.desktop /snap/bin/firefox %u"
     )
+    assert results[0].path == "/var/lib/snapd/desktop/applications/firefox_firefox.desktop"
     assert results[0].hostname == "hostname"
 
     assert [r.name for r in results] == [
@@ -76,7 +77,7 @@ def test_unix_applications_desktop_files(target_unix_users: Target, fs_unix: Vir
         "Visual Studio Code",
     ]
 
-    assert [r.path for r in results] == [
+    assert [r.exec for r in results] == [
         "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/firefox_firefox.desktop /snap/bin/firefox %u",
         "gimp-2.10 %U",
         "/usr/bin/python3.12",
@@ -84,6 +85,16 @@ def test_unix_applications_desktop_files(target_unix_users: Target, fs_unix: Vir
         "/usr/bin/vlc --started-from-file %U",
         "/usr/bin/vmware %U",
         "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/code_code.desktop /snap/bin/code --force-user-env %F",  # noqa: E501
+    ]
+
+    assert [r.path for r in results] == [
+        "/var/lib/snapd/desktop/applications/firefox_firefox.desktop",
+        "/usr/share/applications/gimp.desktop",
+        "/var/lib/flatpak/exports/share/applications/python.desktop",
+        "/root/.local/share/applications/terminal.desktop",
+        "/home/user/.local/share/applications/vlc.desktop",
+        "/usr/local/share/applications/vmware-workstation.desktop",
+        "/var/lib/snapd/desktop/applications/code_code.desktop",
     ]
 
     assert [r.type for r in results] == [
@@ -131,7 +142,7 @@ def test_unix_autostart_applications_desktop_files(target_unix_users: Target, fs
     assert results[0].author is None
     assert results[0].type == "user"
     assert (
-        results[0].path
+        results[0].exec
         == "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/firefox_firefox.desktop /snap/bin/firefox %u"
     )
 
@@ -141,7 +152,19 @@ def test_unix_autostart_applications_desktop_files(target_unix_users: Target, fs
         "Visual Studio Code",
     ]
 
+    assert [r.exec for r in results] == [
+        "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/firefox_firefox.desktop /snap/bin/firefox %u",
+        "gimp-2.10 %U",
+        "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/code_code.desktop /snap/bin/code --force-user-env %F",  # noqa: E501
+    ]
+
     assert [r.path for r in results] == [
+        "/etc/xdg/autostart/firefox_firefox.desktop",
+        "/home/user/.config/autostart/gimp.desktop",
+        "/root/.config/autostart/code_code.desktop.desktop",
+    ]
+
+    assert [r.exec for r in results] == [
         "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/firefox_firefox.desktop /snap/bin/firefox %u",
         "gimp-2.10 %U",
         "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/code_code.desktop /snap/bin/code --force-user-env %F",  # noqa: E501
