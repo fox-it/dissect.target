@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 UnixApplicationRecord = TargetRecordDescriptor(
     "unix/application",
-    COMMON_APPLICATION_FIELDS,
+    [*COMMON_APPLICATION_FIELDS, ("boolean", "autostart")],
 )
 
 
@@ -32,11 +32,9 @@ class UnixApplicationsPlugin(Plugin):
         "/var/lib/snapd/desktop/applications/",
         "/var/lib/flatpak/exports/share/applications/",
     )
-
     DESKTOP_USER_PATHS = (".local/share/applications/",)
 
     AUTOSTART_SYSTEM_PATHS = ("/etc/xdg/autostart/",)
-
     AUTOSTART_USER_PATHS = (".config/autostart/",)
 
     SYSTEM_APPS = ("org.gnome.",)
@@ -68,14 +66,36 @@ class UnixApplicationsPlugin(Plugin):
         if not (self.desktop_files or self.autostart_desktop_files):
             raise UnsupportedPluginError("No application .desktop files found")
 
+    def _parse_desktop_entry(self, path: TargetPath, is_autostart: bool = False) -> dict:
+        config = configutil.parse(path, hint="ini").get("Desktop Entry") or {}
+        stat = path.lstat()
+
+        return UnixApplicationRecord(
+            ts_modified=stat.st_mtime,
+            ts_installed=stat.st_btime if hasattr(stat, "st_btime") else None,
+            name=config.get("Name"),
+            version=config.get("Version"),
+            path=config.get("Exec"),
+            type=("system" if config.get("Icon", "").startswith(self.SYSTEM_APPS) else "user"),
+            autostart=is_autostart,
+            _target=self.target,
+        )
+
     @export(record=UnixApplicationRecord)
     def applications(self) -> Iterator[UnixApplicationRecord]:
         """Yield installed Unix GUI applications from GNOME and XFCE.
+
+        When desktop applications are placed inside certain directories (Autostart directories),
+        these applications can be automatically started by the desktop environment.
 
         Resources:
             - https://wiki.archlinux.org/title/Desktop_entries
             - https://specifications.freedesktop.org/desktop-entry-spec/latest/
             - https://unix.stackexchange.com/questions/582928/where-gnome-apps-are-installed
+            - https://www.freedesktop.org/wiki/Specifications/autostart-spec/
+            - https://specifications.freedesktop.org/autostart-spec/latest/
+            - https://www.welivesecurity.com/en/eset-research/unveiling-wolfsbane-gelsemiums-linux-counterpart-to-gelsevirine/
+
 
         Yields ``UnixApplicationRecord`` records with the following fields:
 
@@ -88,62 +108,9 @@ class UnixApplicationsPlugin(Plugin):
             author       (string):   author of the application
             type         (string):   type of the application, either user or system
             path         (string):   path to the desktop file entry of the application
+            autostart    (boolean):  True when the application is an autostart desktop application, else False
         """
         for file in self.desktop_files:
-            config = configutil.parse(file, hint="ini").get("Desktop Entry") or {}
-            stat = file.lstat()
-
-            yield UnixApplicationRecord(
-                ts_modified=stat.st_mtime,
-                ts_installed=stat.st_btime if hasattr(stat, "st_btime") else None,
-                name=config.get("Name"),
-                version=config.get("Version"),
-                path=config.get("Exec"),
-                type=("system" if config.get("Icon", "").startswith(self.SYSTEM_APPS) else "user"),
-                _target=self.target,
-            )
-
-    @export(record=UnixApplicationRecord)
-    def autostart_desktop_applications(self) -> Iterator[UnixApplicationRecord]:
-        """Yield Desktop applications that will be automatically started by desktop software following the freedesktop.org autostart specification.
-
-        freedesktop.org, formerly known as XDG (Cross-Desktop Group), produces specifications
-        that can be used by desktop software to make software more interoperable. They wrote
-        a specification on autostarting desktop applications for desktops software.
-
-        According to the specification:
-
-            "The autostart specification defines a method for automatically starting applications
-            during the startup of a desktop environment after the user has logged in, and after
-            mounting a removable medium."
-
-        References:
-        - https://www.freedesktop.org/wiki/Specifications/autostart-spec/
-        - https://specifications.freedesktop.org/autostart-spec/latest/
-        - https://www.welivesecurity.com/en/eset-research/unveiling-wolfsbane-gelsemiums-linux-counterpart-to-gelsevirine/
-
-        Yields ``UnixApplicationRecord`` records with the following fields:
-
-        .. code-block:: text
-
-            ts_modified  (datetime): timestamp when the installation was modified
-            ts_installed (datetime): timestamp when the application was installed on the system
-            name         (string):   name of the application
-            version      (string):   version of the application
-            author       (string):   author of the application
-            type         (string):   type of the application, either user or system
-            path         (string):   path to the desktop file entry of the application
-        """  # noqa: E501
+            yield self._parse_desktop_entry(file, is_autostart=False)
         for file in self.autostart_desktop_files:
-            config = configutil.parse(file, hint="ini").get("Desktop Entry") or {}
-            stat = file.lstat()
-
-            yield UnixApplicationRecord(
-                ts_modified=stat.st_mtime,
-                ts_installed=stat.st_btime if hasattr(stat, "st_btime") else None,
-                name=config.get("Name"),
-                version=config.get("Version"),
-                path=config.get("Exec"),
-                type=("system" if config.get("Icon", "").startswith(self.SYSTEM_APPS) else "user"),
-                _target=self.target,
-            )
+            yield self._parse_desktop_entry(file, is_autostart=True)
