@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import importlib
+import os
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers import keychain
@@ -8,8 +10,6 @@ from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from dissect.target.plugins.os.windows.dpapi.keyprovider.keychain import KeychainKeyProviderPlugin
 
 if TYPE_CHECKING:
-    import pytest
-
     from dissect.target.target import Target
 
 
@@ -39,11 +39,21 @@ def test_dpapi_keyprovider_keychain(target_win: Target) -> None:
     ]
 
 
-def test_env_keychain(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Set environment variable before module import
-    monkeypatch.setenv("DISSECT_KEYCHAIN_VALUE", "envtestpass")
-    # Reload keychain module to trigger environment variable registration
-    importlib.reload(keychain)
-    keys = keychain.get_all_keys()
-    # There should be at least one key with value 'envtestpass' and is_wildcard True
-    assert any(k.value == "envtestpass" and k.is_wildcard for k in keys)
+def test_env_keychain() -> None:
+    """test if we can read keychain items from environment variables."""
+
+    # Create a new environment
+    env = os.environ.copy()
+    env["DISSECT_KEYCHAIN_VALUE"] = "envtestpass"
+
+    # Runs the env test in a separate, isolated process to prevent env var and module cache pollution.
+    script = (
+        "from dissect.target.helpers import keychain; "
+        "keys = keychain.get_all_keys(); "
+        "assert any(k.value == 'envtestpass' and k.is_wildcard for k in keys)"
+    )
+
+    # sys.executable ensures we use the same Python interpreter
+    result = subprocess.run([sys.executable, "-c", script], env=env, capture_output=True, text=True)
+
+    assert result.returncode == 0, f"Subprocess test failed: {result.stderr}"
