@@ -83,7 +83,7 @@ class MssqlPlugin(Plugin):
                 for line in fh:
                     # If we have a buffer with a timestamp and
                     # our current line also has a timestamp,
-                    # we should have a record to be yielded.
+                    # we should have a complete record in our buffer.
                     if previous_ts := RE_TIMESTAMP_PATTERN.match(buf):
                         if current_ts := RE_TIMESTAMP_PATTERN.match(line):
                             yield MssqlErrorlogRecord(
