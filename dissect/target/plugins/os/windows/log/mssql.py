@@ -26,7 +26,6 @@ MssqlErrorlogRecord = TargetRecordDescriptor(
 )
 
 RE_TIMESTAMP_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{2}")
-RE_LOGLINE_PATTERN = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{2})\s+(.{12})\s+(.*)")
 
 
 class MssqlPlugin(Plugin):
@@ -79,7 +78,6 @@ class MssqlPlugin(Plugin):
             for errorlog in log_path.glob(self.FILE_GLOB):
                 # The errorlog includes a BOM, so endianess gets determined automatically
                 fh = errorlog.open(mode="rt", encoding="utf-16", errors="surrogateescape")
-
                 buf = ""
 
                 for line in fh:
