@@ -41,7 +41,7 @@ def test_dpapi_keyprovider_keychain(target_win: Target) -> None:
 
 
 def test_env_keychain(monkeypatch: pytest.MonkeyPatch) -> None:
-    """test if we can read keychain items from environment variables."""
+    """Test if we can read keychain items from environment variables."""
     KEYCHAIN_MODULE = "dissect.target.helpers.keychain"
 
     # Set environment variable before module import
