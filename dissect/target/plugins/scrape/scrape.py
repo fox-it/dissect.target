@@ -52,26 +52,36 @@ class ScrapePlugin(Plugin):
         # Create a map of disk regions we want to scrape
         scrape_map = defaultdict(dict)
 
-        # Start off by making a very simple `disk: {(offset, size): volume}` map for every volume
-        # Spaces in between volumes are also added as disk regions
+        # This map tracks where every "available" volume object is located
+        # within the scrape_map structure
+        # Format: {volume_obj: (map_key, region_key)}
+
+        # This can be optimized by creating a graph of volumes, and performing a topological sort
+        volume_region_map = {}
+
+        # Build initial map from physical disks
         offset = 0
         for disk in self.target.disks:
             for volume in sorted(disk.vs.volumes, key=lambda v: v.offset) if disk.vs else []:
                 if offset != volume.offset:
-                    # There's data between the volumes, so add that from the disk
+                    # We don't add gaps (source=disk) to the volume_region_map
+                    # as they can't be dependencies.
                     scrape_map[disk][(offset, volume.offset - offset)] = (disk, offset)
                     offset = volume.offset
 
-                # Add the volume to the stream
-                scrape_map[disk][(volume.offset, volume.size)] = (volume, 0)
+                # Add the volume to the scrape_map
+                region_key = (volume.offset, volume.size)
+                scrape_map[disk][region_key] = (volume, 0)
+
+                # Add this partition to our index
+                volume_region_map[volume] = (disk, region_key)
+
                 offset += volume.size
 
-            # There's data after the volumes until the end of the disk
-            # Coincidentally this also takes care of disks with no volumes
             if offset != disk.size:
                 scrape_map[disk][(offset, disk.size - offset)] = (disk, offset)
 
-        # Iterate over all volumes and add the decrypted variant of encrypted volumes
+        # Collect all layered volumes
         encrypted_volumes = []
         lvm_volumes = []
         for volume in self.target.volumes:
@@ -80,30 +90,95 @@ class ScrapePlugin(Plugin):
             if isinstance(volume.vs, LogicalVolumeSystem):
                 lvm_volumes.append(volume)
 
-        # Process the encrypted volumes first to replace
-        for volume in encrypted_volumes:
-            if not all:
-                # Decrypted volumes have the encrypted volume as the backing volume
-                source_volume: Volume = volume.vs.fh
+        # Iteratively process all layered volumes until none remain
+        pending_lvm = lvm_volumes
+        pending_encrypted = encrypted_volumes
+        deleted_scrape_regions = set()
 
-                # Replace the encrypted volume region with the decrypted volume region
-                key = (source_volume.offset, source_volume.size)
-                del scrape_map[volume.disk][key]
-                # Reinsert the decrypted volume region with the size of the decrypted data
-                scrape_map[volume.disk][source_volume.offset, volume.size] = (volume, 0)
-            else:
-                # Add the decrypted volume separately to the map
-                scrape_map[volume][(0, volume.size)] = (volume, 0)
+        while pending_lvm or pending_encrypted:
+            processed_this_pass = False
 
-        for volume in lvm_volumes:
-            if not all:
-                # Remove the base volumes from the map
-                for source_dev, source_disk in zip(volume.vs.fh, volume.disk, strict=True):
-                    del scrape_map[source_disk][(source_dev.fh.offset, source_dev.fh.size)]
+            # Attempt to process pending LVM volumes
+            for volume in list(pending_lvm):
+                dependencies_met = True
+                backing_regions_info = []  # List of (map_key, region_key)
 
-            # Add the logical volumes to the map
-            scrape_map[volume][(0, volume.size)] = (volume, 0)
+                try:
+                    for source_dev in volume.vs.fh:
+                        backing_vol_obj = source_dev.fh
 
+                        if backing_vol_obj not in volume_region_map:
+                            dependencies_met = False
+                            break
+
+                        backing_regions_info.append(volume_region_map[backing_vol_obj])
+
+                except (AttributeError, TypeError):
+                    dependencies_met = False
+
+                if dependencies_met:
+                    if not all:
+                        for map_key, region_key in backing_regions_info:
+                            # Only delete the scrape_map region if it hasn't
+                            # been deleted by another LV in this VG.
+                            # This occurs when multiple LVs share the same backing PV.
+                            key_to_delete = (map_key, region_key)
+                            if key_to_delete not in deleted_scrape_regions:
+                                del scrape_map[map_key][region_key]
+                                deleted_scrape_regions.add(key_to_delete)
+
+                    # Add the new LVM volume as a new "disk"
+                    new_region_key = (0, volume.size)
+                    scrape_map[volume][new_region_key] = (volume, 0)
+
+                    # Add this new LV to our index
+                    volume_region_map[volume] = (volume, new_region_key)
+
+                    pending_lvm.remove(volume)
+                    processed_this_pass = True
+
+            # Attempt to process pending Encrypted volumes
+            for volume in list(pending_encrypted):
+                backing_vol_obj = None
+                try:
+                    backing_vol_obj = volume.vs.fh
+                except (AttributeError, TypeError):
+                    continue
+
+                if backing_vol_obj in volume_region_map:
+                    # Dependency is met!
+                    map_key, region_key = volume_region_map[backing_vol_obj]
+
+                    if not all:
+                        # Remove encrypted region from scrape_map
+                        del scrape_map[map_key][region_key]
+
+                        # Reinsert the decrypted volume region
+                        new_region_key = (region_key[0], volume.size)  # Same offset, new size
+                        scrape_map[map_key][new_region_key] = (volume, 0)
+
+                        # Add this new decrypted volume to our index
+                        volume_region_map[volume] = (map_key, new_region_key)
+
+                    else:
+                        # Add the decrypted volume separately
+                        new_region_key = (0, volume.size)
+                        scrape_map[volume][new_region_key] = (volume, 0)
+                        # Add this new decrypted volume to our index
+                        volume_region_map[volume] = (volume, new_region_key)
+
+                    pending_encrypted.remove(volume)
+                    processed_this_pass = True
+
+            #  Stalemate Check
+            if not processed_this_pass and (pending_lvm or pending_encrypted):
+                raise RuntimeError(
+                    f"Could not resolve storage dependencies. "
+                    f"Stuck with {len(pending_lvm)} LVM volumes and "
+                    f"{len(pending_encrypted)} encrypted volumes."
+                )
+
+        # Generate streams from the scrape_map
         for disk, volumes in scrape_map.items():
             # If we ended up removing all regions from the disk, skip it
             # I.e. when a disk is fully occupied by an LVM volume
