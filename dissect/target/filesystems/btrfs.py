@@ -13,7 +13,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -91,42 +91,40 @@ class BtrfsSubvolumeFilesystem(Filesystem):
             raise FileNotFoundError(path) from e
 
 
+class BtrfsDirEntry(DirEntry):
+    fs: BtrfsSubvolumeFilesystem
+    entry: btrfs.INode
+
+    def get(self) -> BtrfsFilesystemEntry:
+        return BtrfsFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class BtrfsFilesystemEntry(FilesystemEntry):
-    fs: BtrfsFilesystem
+    fs: BtrfsSubvolumeFilesystem
     entry: btrfs.INode
 
     def get(self, path: str) -> FilesystemEntry:
-        entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
-        entry = self.fs._get_node(path, self.entry)
-        return BtrfsFilesystemEntry(self.fs, entry_path, entry)
+        path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        return BtrfsFilesystemEntry(self.fs, path, self.fs._get_node(path, self.entry))
 
     def open(self) -> BinaryIO:
         if self.is_dir():
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def _iterdir(self) -> Iterator[btrfs.INode]:
+    def scandir(self) -> Iterator[BtrfsDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            for entry in self.readlink_ext().iterdir():
-                yield entry
-        else:
-            for name, entry in self.entry.iterdir():
-                if name in (".", ".."):
-                    continue
+        for name, entry in self._resolve().entry.iterdir():
+            if name in (".", ".."):
+                continue
 
-                yield name, entry
-
-    def iterdir(self) -> Iterator[str]:
-        for name, _ in self._iterdir():
-            yield name
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        for name, entry in self._iterdir():
-            entry_path = fsutil.join(self.path, name, alt_separator=self.fs.alt_separator)
-            yield BtrfsFilesystemEntry(self.fs, entry_path, entry)
+            # TODO: Separate INodes and DirEntry in dissect.btrfs
+            yield BtrfsDirEntry(self.fs, self.path, name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

@@ -12,7 +12,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -50,6 +50,17 @@ class CramfsFilesystem(Filesystem):
             raise FileNotFoundError(path) from e
 
 
+class CramfsDirEntry(DirEntry):
+    fs: CramfsFilesystem
+    entry: INode
+
+    def get(self) -> CramfsFilesystemEntry:
+        return CramfsFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class CramfsFilesystemEntry(FilesystemEntry):
     fs: CramfsFilesystem
     entry: INode
@@ -64,22 +75,16 @@ class CramfsFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def _iterdir(self) -> Iterator[INode]:
+    def scandir(self) -> Iterator[CramfsDirEntry]:
+        """List the directory contents of this directory. Returns a generator of filesystem entries."""
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            yield from self.readlink_ext().iterdir()
-        else:
-            yield from self.entry.iterdir()
+        for entry in self._resolve().entry.iterdir():
+            if entry.name in (".", ".."):
+                continue
 
-    def iterdir(self) -> Iterator[str]:
-        """List the directory contents of a directory. Returns a generator of strings."""
-        yield from (inode.name for inode in self._iterdir())
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        """List the directory contents of this directory. Returns a generator of filesystem entries."""
-        yield from (self.get(entry.name) for entry in self._iterdir())
+            yield CramfsDirEntry(self.fs, self.path, entry.name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         """Return whether this entry is a directory."""
