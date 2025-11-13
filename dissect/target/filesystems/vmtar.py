@@ -11,7 +11,15 @@ from dissect.target.helpers.fsutil import open_decompress
 class VmtarFilesystem(TarFilesystem):
     __type__ = "vmtar"
 
-    def __init__(self, fh: BinaryIO, base: str | None = None, *args, **kwargs):
+    def __init__(self, fh: BinaryIO, base: str | None = None, uncompress: bool = True, *args, **kwargs):
+        """
+        Load a vmtar files (modified tar version used on ESXi)
+        In most case vmtar files are compressed using zstd, xz or LZMA, and then using gzip
+
+        Args:
+            fh: Handler to vmtar data stream
+            base: TarFilesystem base
+        """
         fh = open_decompress(fileobj=open_decompress(fileobj=fh))
         super().__init__(fh, base, *args, tarinfo=vmtar.VisorTarInfo, **kwargs)
 
