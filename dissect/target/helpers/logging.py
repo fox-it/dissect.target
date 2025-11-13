@@ -7,12 +7,15 @@ from typing import Any
 TRACE_LEVEL = 5
 logging.addLevelName(TRACE_LEVEL, "TRACE")
 
+# For some reason, 3.10 and earlier need stacklevel=3
+_STACK_LEVEL = 2 if sys.version_info >= (3, 11) else 3
+
 
 class TraceLogger(logging.Logger):
     def trace(self, msg: Any, *args: Any, **kwargs: Any) -> None:
         if self.isEnabledFor(TRACE_LEVEL):
-            # For some reason, 3.10 and earlier need stacklevel=3 to get correct caller info
-            kwargs.setdefault("stacklevel", 2 if sys.version_info >= (3, 11) else 3)
+            # Set stacklevel so that logging shows the correct caller info
+            kwargs.setdefault("stacklevel", _STACK_LEVEL)
             self._log(TRACE_LEVEL, msg, args, **kwargs)
 
 
@@ -30,5 +33,5 @@ class TargetLogAdapter(logging.LoggerAdapter):
 
     def trace(self, msg: Any, *args, **kwargs) -> None:
         """Delegate a trace call to the underlying logger."""
-        # For some reason, 3.10 and earlier need stacklevel=3 to get correct caller info
-        self.log(TRACE_LEVEL, msg, *args, stacklevel=2 if sys.version_info >= (3, 11) else 3, **kwargs)
+        # Set stacklevel so that logging shows the correct caller info
+        self.log(TRACE_LEVEL, msg, *args, stacklevel=_STACK_LEVEL, **kwargs)
