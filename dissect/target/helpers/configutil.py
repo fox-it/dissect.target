@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import json
-import logging
 import re
 import sys
 from collections import deque
@@ -19,6 +18,7 @@ from typing import (
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import to_list
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ except ImportError:
     HAS_TOML = False
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:

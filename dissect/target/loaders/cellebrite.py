@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -9,6 +8,7 @@ from defusedxml import ElementTree as ET
 from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import configutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 @dataclass

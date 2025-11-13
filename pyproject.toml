@@ -150,7 +150,7 @@ dev = [
 
 [project.scripts]
 target-build-pluginlist = "dissect.target.tools.build_pluginlist:main"
-target-dump = "dissect.target.tools.dump.run:main"
+target-dump = "dissect.target.tools.dump:main"
 target-dd = "dissect.target.tools.dd:main"
 target-diff = "dissect.target.tools.diff:main"
 target-fs = "dissect.target.tools.fs:main"
