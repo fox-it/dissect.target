@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from binascii import hexlify, unhexlify
+from functools import cached_property
 from hashlib import md5
+from itertools import chain
 from struct import unpack
 from typing import TYPE_CHECKING
 
 from Cryptodome.Cipher import AES, ARC4, DES
 from dissect.cstruct import cstruct
-from dissect.esedb import EseDB
-from dissect.util import ts
-from dissect.util.sid import read_sid
+from dissect.database.ese.ntds import NTDS
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, UnsupportedPluginError, export
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.cstruct.types import structure
-    from flow.record import Record
+    from dissect.database.ese.ntds.objects import Computer, User
 
     from dissect.target.target import Target
 
@@ -50,41 +50,6 @@ UAC_FLAGS = {
     0x04000000: "PARTIAL_SECRETS_ACCOUNT",
 }
 
-# NTDS attribute name to internal field mapping
-NAME_TO_INTERNAL = {
-    "usn_created": "ATTq131091",
-    "usn_changed": "ATTq131192",
-    "name": "ATTm3",
-    "object_guid": "ATTk589826",
-    "object_sid": "ATTr589970",
-    "user_account_control": "ATTj589832",
-    "primary_group_id": "ATTj589922",
-    "account_expires": "ATTq589983",
-    "logon_count": "ATTj589993",
-    "sam_account_name": "ATTm590045",
-    "sam_account_type": "ATTj590126",
-    "last_logon_timestamp": "ATTq589876",
-    "user_principal_name": "ATTm590480",
-    "unicode_pwd": "ATTk589914",
-    "dbcspwd": "ATTk589879",
-    "nt_pwd_history": "ATTk589918",
-    "lm_pwd_history": "ATTk589984",
-    "pek_list": "ATTk590689",
-    "supplemental_credentials": "ATTk589949",
-    "password_last_set": "ATTq589920",
-    "instance_type": "ATTj131073",
-    "governs_id": "ATTc131094",
-    "object_class": "ATTc0",
-    "link_id": "ATTj131122",
-    "is_deleted": "ATTi131120",
-    "attribute_id": "ATTc131102",
-    "attribute_name_ldap": "ATTm131532",
-    "Attribute_name_cn": "ATTm3",
-    "Attribute_name_dn": "ATTb49",
-    "msds-int_id": "ATTj591540",
-    "rdn": "ATTm589825",
-}
-
 # Kerberos encryption type mappings
 KERBEROS_TYPE = {
     # DES
@@ -107,28 +72,37 @@ KERBEROS_TYPE = {
 }
 
 # SAM account type constants
-SAM_ACCOUNT_TYPE = {
-    "SAM_DOMAIN_OBJECT": 0x0,
-    "SAM_GROUP_OBJECT": 0x10000000,
-    "SAM_NON_SECURITY_GROUP_OBJECT": 0x10000001,
-    "SAM_ALIAS_OBJECT": 0x20000000,
-    "SAM_NON_SECURITY_ALIAS_OBJECT": 0x20000001,
-    "SAM_USER_OBJECT": 0x30000000,
-    "SAM_NORMAL_USER_ACCOUNT": 0x30000000,
-    "SAM_MACHINE_ACCOUNT": 0x30000001,
-    "SAM_TRUST_ACCOUNT": 0x30000002,
-    "SAM_APP_BASIC_GROUP": 0x40000000,
-    "SAM_APP_QUERY_GROUP": 0x40000001,
-    "SAM_ACCOUNT_TYPE_MAX": 0x7FFFFFFF,
+SAM_ACCOUNT_TYPE_INTERNAL_TO_NAME = {
+    0x0: "SAM_DOMAIN_OBJECT",
+    0x10000000: "SAM_GROUP_OBJECT",
+    0x10000001: "SAM_NON_SECURITY_GROUP_OBJECT",
+    0x20000000: "SAM_ALIAS_OBJECT",
+    0x20000001: "SAM_NON_SECURITY_ALIAS_OBJECT",
+    0x30000000: "SAM_USER_OBJECT",
+    0x30000001: "SAM_MACHINE_ACCOUNT",
+    0x30000002: "SAM_TRUST_ACCOUNT",
+    0x40000000: "SAM_APP_BASIC_GROUP",
+    0x40000001: "SAM_APP_QUERY_GROUP",
+    0x7FFFFFFF: "SAM_ACCOUNT_TYPE_MAX",
 }
 
 # Record descriptor for NTDS user secrets
-NtdsUserSecretRecord = TargetRecordDescriptor(
+NtdsAccountSecretRecord = TargetRecordDescriptor(
     "windows/credential/ntds",
     [
+        ("string[]", "object_classes"),
         ("string", "upn"),
         ("string", "sam_name"),
+        ("string", "sam_type"),
+        ("string", "description"),
+        ("string", "sid"),
+        ("varint", "rid"),
         ("datetime", "password_last_set"),
+        ("datetime", "logon_last_failed"),
+        ("datetime", "logon_last_success"),
+        ("datetime", "account_expires"),
+        ("datetime", "creation_time"),
+        ("datetime", "last_modified_time"),
         ("string", "lm"),
         ("string[]", "lm_history"),
         ("string", "nt"),
@@ -310,17 +284,6 @@ class NtdsPlugin(Plugin):
         DEFAULT_LM_HASH = "aad3b435b51404eeaad3b435b51404ee"
         DEFAULT_NT_HASH = "31d6cfe0d16ae931b73c59d7e0c089c0"
         EMPTY_BYTE = b"\x00"
-        DEFAULT_AES_IV = b"\x00" * 16
-
-    # Other constants
-    OBJECT_IS_WRITEABLE_ON_THIS_DIRECTORY = 4
-
-    # Currenlty supported types
-    SUPPORTED_ACOUNT_TYPES = tuple(
-        account_type
-        for key, account_type in SAM_ACCOUNT_TYPE.items()
-        if key in ("SAM_USER_OBJECT", "SAM_NORMAL_USER_ACCOUNT", "SAM_MACHINE_ACCOUNT", "SAM_TRUST_ACCOUNT")
-    )
 
     def __init__(self, target: Target):
         """Initialize the NTDS plugin.
@@ -329,33 +292,14 @@ class NtdsPlugin(Plugin):
             target: The target system to analyze.
         """
         super().__init__(target)
-        self.ntds_path = self.target.fs.path("/sysvol/Windows/NTDS/ntds.dit")
+
+        if self.target.has_function("registry"):
+            ntds_path_key = self.target.registry.value(
+                key="HKLM\\SYSTEM\\CurrentControlSet\\Services\\NTDS\\Parameters", value="DSA Database file"
+            )
+            self.ntds_path = self.target.fs.path(ntds_path_key.value)
+
         self._pek_list: list[bytes] = []
-        self.ntds_database = None
-        self._filter_fields = self._get_filter_fields()
-
-    def _get_filter_fields(self) -> set[str]:
-        """Get the set of fields to filter for when scanning the database.
-
-        Returns:
-            Set of internal field names to filter records by.
-        """
-        return {
-            NAME_TO_INTERNAL["object_sid"],
-            NAME_TO_INTERNAL["dbcspwd"],
-            NAME_TO_INTERNAL["name"],
-            NAME_TO_INTERNAL["sam_account_type"],
-            NAME_TO_INTERNAL["unicode_pwd"],
-            NAME_TO_INTERNAL["sam_account_name"],
-            NAME_TO_INTERNAL["user_principal_name"],
-            NAME_TO_INTERNAL["nt_pwd_history"],
-            NAME_TO_INTERNAL["lm_pwd_history"],
-            NAME_TO_INTERNAL["password_last_set"],
-            NAME_TO_INTERNAL["user_account_control"],
-            NAME_TO_INTERNAL["supplemental_credentials"],
-            NAME_TO_INTERNAL["pek_list"],
-            NAME_TO_INTERNAL["instance_type"],
-        }
 
     def check_compatible(self) -> None:
         """Check if the plugin can run on the target system.
@@ -363,65 +307,30 @@ class NtdsPlugin(Plugin):
         Raises:
             UnsupportedPluginError: If NTDS.dit is not found or system hive is missing.
         """
+        if not self.target.has_function("registry"):
+            raise UnsupportedPluginError("Registry function not available")
+
         if not self.ntds_path.exists():
             raise UnsupportedPluginError("NTDS.dit file not found")
 
         if not self.target.has_function("lsa") or not hasattr(self.target.lsa, "syskey"):
             raise UnsupportedPluginError("System Hive is not present or LSA function not available")
 
-    def _collect_pek_and_user_records(self) -> tuple[bytes, list[Record]]:
-        """Scan the ESE database and extract PEK list and user records.
+    @cached_property
+    def ntds(self) -> NTDS:
+        return NTDS(self.ntds_path.open())
 
-        Returns:
-            Tuple containing:
-                - Raw PEK list blob (bytes)
-                - List of user records from the database
+    def _extract_and_decrypt_pek_list(self) -> None:
+        """Extract PEK list structure and decrypt PEK keys.
+
+        Raises:
+            ValueError: If PEK list cannot be found in the database.
         """
-        db = EseDB(self.ntds_path.open(), False)
-        pek_blob = None
-        user_records: list[Record] = []
+        pek_blob = next(self.ntds.lookup(objectCategory="domainDNS")).pekList
 
-        for table in db.tables():
-            for record in table.records():
-                try:
-                    columns = record.as_dict().keys()
-                except TypeError:
-                    continue
+        if not pek_blob:
+            raise ValueError("Couldn't find pek_list in NTDS.dit")
 
-                if not self._filter_fields.intersection(columns):
-                    continue
-
-                # Extract PEK list if present
-                if record[NAME_TO_INTERNAL["pek_list"]]:
-                    pek_blob = record[NAME_TO_INTERNAL["pek_list"]]
-
-                # Collect user records that are writable and of valid account type
-                if self._is_valid_user_record(record):
-                    user_records.append(record)
-
-        self.ntds_database = db
-        return pek_blob, user_records
-
-    def _is_valid_user_record(self, record: Record) -> bool:
-        """Check if a record represents a valid user account.
-
-        Args:
-            record: Database record to check.
-
-        Returns:
-            True if the record is a valid user account, False otherwise.
-        """
-        return (
-            record[NAME_TO_INTERNAL["sam_account_type"]] in self.SUPPORTED_ACOUNT_TYPES
-            and record[NAME_TO_INTERNAL["instance_type"]] & self.OBJECT_IS_WRITEABLE_ON_THIS_DIRECTORY
-        )
-
-    def _parse_and_decrypt_pek_list(self, pek_blob: bytes) -> None:
-        """Parse PEK list structure and decrypt PEK keys.
-
-        Args:
-            pek_blob: Raw PEK list blob from the database.
-        """
         # Create structure with correct size
         enc_struct = cstruct().load(
             CryptoStructures.PEK_LIST_ENC_DEF.format(Length=len(pek_blob) - self.StructConstant.PEK_LIST_ENC_LENGTH)
@@ -520,11 +429,11 @@ class NtdsPlugin(Plugin):
         if pos < len(data):
             self.target.log.warning("PEK list contained extra data after terminator")
 
-    def _derive_rc4_key(self, syskey: bytes, key_material: bytes, iterations: int) -> bytes:
+    def _derive_rc4_key(self, key: bytes, key_material: bytes, iterations: int) -> bytes:
         """Derive RC4 key using MD5 with multiple iterations.
 
         Args:
-            syskey: System key from LSA.
+            key: RC4 key.
             key_material: Random key material for this encryption.
             iterations: Number of MD5 iterations to perform.
 
@@ -532,7 +441,7 @@ class NtdsPlugin(Plugin):
             16-byte RC4 key.
         """
         hasher = md5()
-        hasher.update(syskey)
+        hasher.update(key)
         for _ in range(iterations):
             hasher.update(key_material)
         return hasher.digest()
@@ -718,7 +627,7 @@ class NtdsPlugin(Plugin):
 
         if header_bytes.startswith(self.CryptoConstants.WINDOWS_2016_TP4_HASH_HEADER):
             # Modern AES encryption
-            decrypted = self._decrypt_history_modern(blob, rid)
+            decrypted = self._decrypt_history_modern(blob)
         else:
             # Legacy RC4 encryption
             decrypted = self._remove_rc4_layer(crypted)
@@ -734,12 +643,11 @@ class NtdsPlugin(Plugin):
 
         return hashes
 
-    def _decrypt_history_modern(self, blob: bytes, rid: int) -> bytes:
+    def _decrypt_history_modern(self, blob: bytes) -> bytes:
         """Decrypt password history using modern AES encryption.
 
         Args:
             blob: Encrypted history blob.
-            rid: User's relative ID.
 
         Returns:
             Decrypted history data containing multiple hashes.
@@ -767,11 +675,11 @@ class NtdsPlugin(Plugin):
         """
         return {flag_name.lower(): bool(uac & flag_bit) for flag_bit, flag_name in UAC_FLAGS.items()}
 
-    def _decrypt_supplemental_info(self, record: Record) -> Iterator[dict[str, str | None]]:
+    def _decrypt_supplemental_info(self, account: User | Computer) -> Iterator[dict[str, str | None]]:
         """Extract and decrypt supplemental credentials (Kerberos keys, cleartext passwords).
 
         Args:
-            record: User record from database.
+            account: Account record from the database.
 
         Yields:
             Dictionary containing supplemental credential information.
@@ -785,7 +693,12 @@ class NtdsPlugin(Plugin):
             "credential_type": None,
         }
 
-        blob = record[NAME_TO_INTERNAL["supplemental_credentials"]]
+        try:
+            blob = account.supplementalCredentials
+        except KeyError:
+            yield default_info
+            return
+
         if not blob or len(blob) < self.StructConstant.CRYPTED_BLOB_LENGTH:
             yield default_info
             return
@@ -917,85 +830,107 @@ class NtdsPlugin(Plugin):
 
                 yield info
 
-    def _record_to_secret(self, record: Record) -> Iterator[NtdsUserSecretRecord]:
-        """Convert a database record to NTDS user secret records.
+    @staticmethod
+    def __extract_sid_and_rid(account: User | Computer) -> tuple[str, int]:
+        rid = int(account.objectSid.split("-").pop())
+
+        return account.objectSid, rid
+
+    def _account_record_to_secret(self, account: User | Computer) -> Iterator[NtdsAccountSecretRecord]:
+        """Convert a database account record to NTDS account secret records.
 
         Args:
-            record: User record from the database.
+            account: Account object from the database.
 
         Yields:
             NtdsUserSecretRecord containing decrypted credentials.
         """
-        self.target.log.debug("Decrypting hash for user: %s", record[NAME_TO_INTERNAL["name"]])
-
-        # Extract RID from SID
-        sid = read_sid(record[NAME_TO_INTERNAL["object_sid"]], swap_last=True)
-        rid = int(sid.split("-").pop())
+        self.target.log.debug("Decrypting hash for user: %s", account.name)
+        sid, rid = self.__extract_sid_and_rid(account)
 
         # Decrypt password hashes
-        lm_hash = self._decrypt_hash(record[NAME_TO_INTERNAL["dbcspwd"]], rid, is_lm=True)
-        nt_hash = self._decrypt_hash(record[NAME_TO_INTERNAL["unicode_pwd"]], rid, is_lm=False)
+        try:
+            lm_hash = self._decrypt_hash(account.dBCSPwd, rid, True)
+        except KeyError:
+            lm_hash = self.CryptoConstants.DEFAULT_LM_HASH
+
+        try:
+            nt_hash = self._decrypt_hash(account.unicodePwd, rid, False)
+        except KeyError:
+            nt_hash = self.CryptoConstants.DEFAULT_NT_HASH
 
         # Decrypt password histories
-        lm_history = self._decrypt_history(record[NAME_TO_INTERNAL["lm_pwd_history"]], rid)
-        nt_history = self._decrypt_history(record[NAME_TO_INTERNAL["nt_pwd_history"]], rid)
+        try:
+            lm_history = self._decrypt_history(account.lmPwdHistory, rid)
+        except KeyError:
+            lm_history = []
+
+        try:
+            nt_history = self._decrypt_history(account.ntPwdHistory, rid)
+        except KeyError:
+            nt_history = []
 
         # Decode UAC flags
-        uac = record[NAME_TO_INTERNAL["user_account_control"]]
-        uac_flags = self._decode_user_account_control(uac) if uac else dict.fromkeys(UAC_FLAGS.values())
-
-        # Get password timestamp
-        password_ts = (
-            ts.wintimestamp(record[NAME_TO_INTERNAL["password_last_set"]])
-            if record[NAME_TO_INTERNAL["password_last_set"]]
-            else None
+        uac_flags = (
+            self._decode_user_account_control(account.userAccountControl)
+            if account.userAccountControl
+            else dict.fromkeys(UAC_FLAGS.values())
         )
 
+        # Peripheral information
+        try:
+            upn = account.userPrincipalName
+        except KeyError:
+            upn = None
+
+        try:
+            description = account.description
+        except KeyError:
+            description = None
+
+        try:
+            is_deleted = account.isDeleted
+        except KeyError:
+            is_deleted = False
+
         # Extract supplemental credentials and yield records
-        for supplemental_info in self._decrypt_supplemental_info(record):
-            yield NtdsUserSecretRecord(
-                upn=record[NAME_TO_INTERNAL["user_principal_name"]],
-                sam_name=record[NAME_TO_INTERNAL["sam_account_name"]],
-                password_last_set=password_ts,
+        for supplemental_info in self._decrypt_supplemental_info(account):
+            yield NtdsAccountSecretRecord(
+                object_classes=account.objectClass,
+                upn=upn,
+                sam_name=account.sAMAccountName,
+                sam_type=SAM_ACCOUNT_TYPE_INTERNAL_TO_NAME[account.sAMAccountType].lower(),
+                description=description,
+                sid=sid,
+                rid=rid,
+                password_last_set=account.pwdLastSet,
+                logon_last_failed=account.badPasswordTime,
+                logon_last_success=account.lastLogon,
+                account_expires=account.accountExpires if not isinstance(account.accountExpires, float) else None,
+                creation_time=account.whenCreated,
+                last_modified_time=account.whenChanged,
                 lm=lm_hash,
                 lm_history=lm_history,
                 nt=nt_hash,
                 nt_history=nt_history,
-                is_deleted=bool(record[NAME_TO_INTERNAL["is_deleted"]]),
+                is_deleted=is_deleted,
                 **uac_flags,
                 **supplemental_info,
                 _target=self.target,
             )
 
-    @export(record=NtdsUserSecretRecord, description="Extract credentials from NTDS.dit database")
-    def secrets(self) -> Iterator[NtdsUserSecretRecord]:
+    @export(record=NtdsAccountSecretRecord, description="Extract users & thier sercrets from NTDS.dit database")
+    def secrets(self) -> Iterator[NtdsAccountSecretRecord]:
         """Extract and decrypt all user credentials from the NTDS.dit database.
-
-        This function orchestrates the entire extraction process:
-        1. Opens and scans the NTDS.dit database
-        2. Extracts and decrypts the PEK list using the system key
-        3. Uses PEK keys to decrypt user password hashes
-        4. Extracts additional credentials like Kerberos keys
 
         Yields:
             NtdsUserSecretRecord for each user account found in the database.
-
-        Raises:
-            ValueError: If PEK list cannot be found in the database.
         """
-        # Collect PEK blob and user records from database
-        pek_blob, user_records = self._collect_pek_and_user_records()
-
-        if not pek_blob:
-            raise ValueError("Couldn't find pek_list in NTDS.dit")
-
-        # Decrypt the PEK list
-        self._parse_and_decrypt_pek_list(pek_blob)
+        self._extract_and_decrypt_pek_list()
 
         if not self._pek_list:
             self.target.log.error("No PEK keys obtained. Can't decrypt hashes.")
             return
 
-        # Process each user record
-        for record in user_records:
-            yield from self._record_to_secret(record)
+        for user in chain(self.ntds.users(), self.ntds.computers()):
+            yield from self._account_record_to_secret(user)
