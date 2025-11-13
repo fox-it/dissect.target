@@ -151,7 +151,7 @@ class DPAPIPlugin(InternalPlugin):
                                 provider,
                             )
                             break
-                    except ValueError:
+                    except (ValueError, TypeError):
                         pass
 
                 if not mkf.decrypted:
