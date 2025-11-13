@@ -1750,10 +1750,57 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
             )
 
 
+def test_plugin_record_name_consistency() -> None:
+    """Ensure all exported plugin functions that yield records define unique record names.
+
+    This test checks that no two `TargetRecordDescriptor` objects share the same `name`
+    across all discovered plugin functions. Record names must be unique across the entire
+    plugin ecosystem to prevent ambiguity during data parsing and export.
+
+    Example:
+        Suppose two plugins (or two functions within the same plugin) define:
+
+            RecordX = TargetRecordDescriptor("record/x", [("varint", "my_field_1")])
+            RecordY = TargetRecordDescriptor("record/x", [("path", "my_field_2")])
+
+        Both share the same name ("record/x"), which will cause this test to fail.
+
+    Failing this test indicates that multiple record descriptors use identical names,
+    which can lead to incorrect data handling downstream.
+    """
+    all_records: set[RecordDescriptor] = set()
+
+    # Collect all record descriptors from plugin functions
+    for descriptor in find_functions("*")[0]:
+        if descriptor.output == "record" and hasattr(descriptor, "record"):
+            # Some plugin functions return a single record, others a list of records
+            records = descriptor.record
+            if isinstance(records, list):
+                all_records.update(records)
+            else:
+                all_records.add(records)
+
+    seen_names: set[str] = set()
+    duplicate_names: set[str] = set()
+
+    # Identify duplicates
+    for record in all_records:
+        if record.name in seen_names:
+            duplicate_names.add(record.name)
+        else:
+            seen_names.add(record.name)
+
+    if duplicate_names:
+        pytest.fail(
+            f"Found {len(duplicate_names)} duplicate record names in TargetRecordDescriptors:\n"
+            + "\n".join(sorted(duplicate_names))
+        )
+
+
 def test_plugin_record_field_consistency() -> None:
     """Test if exported plugin functions yielding records do not have conflicting field names and types.
 
-    For example, take the following TargetRecordDescriptors for plugin X, Y and Z::
+    For example, take the following TargetRecordDescriptors for plugin X, Y and Z:
 
         RecordX = TargetRecordDescriptor("record/x", [("varint", "my_field")])
         RecordY = TargetRecordDescriptor("record/y", [("path", "my_field")])
