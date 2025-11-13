@@ -832,8 +832,21 @@ class NtdsPlugin(Plugin):
 
     @staticmethod
     def __extract_sid_and_rid(account: User | Computer) -> tuple[str, int]:
-        rid = int(account.objectSid.split("-").pop())
+        """Extract the Security Identifier (SID) and Relative Identifier (RID) from a user or computer account.
 
+        The SID is a unique identifier for the security principal in Active Directory.
+        The RID is the last component of the SID, which uniquely identifies the account within its domain.
+
+        Args:
+            account (User | Computer): The Active Directory account object (User or Computer)
+                                       containing the `objectSid` attribute.
+
+        Returns:
+            tuple[str, int]: A tuple containing:
+                - The full SID as a string (e.g., "S-1-5-21-1234567890-987654321-112233445-1001")
+                - The RID as an integer (e.g., 1001)
+        """
+        rid = int(account.objectSid.split("-")[-1])
         return account.objectSid, rid
 
     def _account_record_to_secret(self, account: User | Computer) -> Iterator[NtdsAccountSecretRecord]:
@@ -919,7 +932,7 @@ class NtdsPlugin(Plugin):
                 _target=self.target,
             )
 
-    @export(record=NtdsAccountSecretRecord, description="Extract users & thier sercrets from NTDS.dit database")
+    @export(record=NtdsAccountSecretRecord, description="Extract accounts & thier sercrets from NTDS.dit database")
     def secrets(self) -> Iterator[NtdsAccountSecretRecord]:
         """Extract and decrypt all user credentials from the NTDS.dit database.
 
