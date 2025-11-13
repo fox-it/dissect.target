@@ -19,6 +19,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
@@ -32,25 +33,27 @@ from dissect.target.exceptions import (
     TargetError,
 )
 from dissect.target.helpers import cyber, fsutil, regutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
 from dissect.target.target import Target
-from dissect.target.tools.fsutils import (
-    fmt_ls_colors,
-    ls_scandir,
-    print_ls,
-    print_stat,
-    print_xattr,
-)
-from dissect.target.tools.info import print_target_info
-from dissect.target.tools.utils import (
+from dissect.target.tools.info import get_target_info, print_target_info
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     escape_str,
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_method,
+    open_targets,
     process_generic_arguments,
+)
+from dissect.target.tools.utils.fs import (
+    fmt_ls_colors,
+    ls_scandir,
+    print_ls,
+    print_stat,
+    print_xattr,
 )
 
 if TYPE_CHECKING:
@@ -58,7 +61,8 @@ if TYPE_CHECKING:
 
     from dissect.target.filesystem import FilesystemEntry
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -268,18 +272,49 @@ class ExtendedCmd(cmd.Cmd):
         """
 
     def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False) -> bool:
-        """Command execution helper that chains initial command and piped subprocesses (if any) together."""
+        """Command execution helper that chains initial command, piped subprocesses, and output redirection together."""
 
         argparts = []
         if command_args_str is not None:
             argparts = arg_str_to_arg_list(command_args_str)
 
+        # Enforce that output redirection (>) only appears after the last pipe (|)
+        redirect_idx = None
+        redirect_file = None
+        if ">" in argparts:
+            redirect_indices = [i for i, v in enumerate(argparts) if v == ">"]
+            # Only support single output redirection
+            if len(redirect_indices) > 1:
+                print("Syntax error: multiple output redirections specified")
+                return False
+            redirect_idx = redirect_indices[0]
+            if redirect_idx + 1 >= len(argparts):
+                print("Syntax error: missing filename after '>'")
+                return False
+            # If there are pipes, > must be after the last |
+            if "|" in argparts[redirect_idx:]:
+                print("Syntax error: output redirection must come after the last pipe")
+                return False
+            redirect_file = argparts[redirect_idx + 1]
+            # Remove redirect from argparts
+            argparts = argparts[:redirect_idx]
+
+        # Handle pipes
         if "|" in argparts:
             pipeidx = argparts.index("|")
             argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
             try:
-                with build_pipe_stdout(pipeparts) as pipe_stdin:
-                    return func(argparts, pipe_stdin)
+                # If redirect, open file for writing and pass as stdout
+                if redirect_file:
+                    with (
+                        Path(redirect_file).open("wb") as f,
+                        io.TextIOWrapper(f, encoding="utf-8") as tf,
+                        build_pipe(pipeparts, pipe_stdout=tf) as (pipe_stdin, _),
+                    ):
+                        return func(argparts, pipe_stdin)
+                else:
+                    with build_pipe_stdout(pipeparts) as pipe_stdin:
+                        return func(argparts, pipe_stdin)
             except OSError as e:
                 # in case of a failure in a subprocess
                 print(e)
@@ -289,8 +324,17 @@ class ExtendedCmd(cmd.Cmd):
             if self.cyber and not no_cyber:
                 ctx = cyber.cyber(color=None, run_at_end=True)
 
-            with ctx:
-                return func(argparts, sys.stdout)
+            # If redirect without pipes, open file for writing and pass as stdout
+            if redirect_file:
+                with (
+                    Path(redirect_file).open("wb") as f,
+                    io.TextIOWrapper(f, encoding="utf-8") as tf,
+                    ctx,
+                ):
+                    return func(argparts, tf)
+            else:
+                with ctx:
+                    return func(argparts, sys.stdout)
 
     def _exec_command(self, command: str, command_args_str: str) -> bool:
         """Command execution helper for ``cmd_`` commands."""
@@ -726,7 +770,8 @@ class TargetCli(TargetCmd):
 
     def do_info(self, line: str) -> bool:
         """print target information"""
-        print_target_info(self.target)
+        target_info = get_target_info(self.target)
+        print_target_info(self.target, target_info)
         return False
 
     def do_reload(self, line: str) -> bool:
@@ -761,7 +806,22 @@ class TargetCli(TargetCmd):
             print(args.path)  # mimic ls behaviour
             return False
 
-        print_ls(path, 0, stdout, args.l, args.human_readable, args.recursive, args.use_ctime, args.use_atime)
+        # Disable color if output is redirected to a file
+        use_color = False
+        if hasattr(stdout, "isatty") and stdout.isatty():
+            use_color = True
+
+        print_ls(
+            path,
+            0,
+            stdout,
+            args.l,
+            args.human_readable,
+            args.recursive,
+            args.use_ctime,
+            args.use_atime,
+            color=use_color,
+        )
         return False
 
     @arg("path", nargs="?")
@@ -1181,7 +1241,7 @@ class TargetCli(TargetCmd):
 
         if args.python:
             # Quick path that doesn't require CLI caching
-            open_shell(paths, args.python, args.registry)
+            open_shell(list(open_targets(args)), args.python, args.registry)
             return False
 
         clikey = tuple(str(path) for path in paths)
@@ -1477,10 +1537,8 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, commands: list[str] | None) -> None:
+def open_shell(targets: list[Target], python: bool, registry: bool, commands: list[str] | None) -> None:
     """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
-    targets = list(Target.open_all(targets))
-
     if python:
         python_shell(targets, commands=commands)
     else:
@@ -1584,7 +1642,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
-    process_generic_arguments(args)
+    process_generic_arguments(parser, args)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:
@@ -1602,7 +1660,7 @@ def main() -> int:
             )
 
     try:
-        open_shell(args.targets, args.python, args.registry, args.commands)
+        open_shell(list(open_targets(args)), args.python, args.registry, args.commands)
     except TargetError as e:
         log.error("Error opening shell: %s", e)  # noqa: TRY400
         log.debug("", exc_info=e)

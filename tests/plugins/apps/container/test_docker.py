@@ -101,7 +101,7 @@ def test_docker_plugin_containers(target_unix_users: Target, fs_unix: VirtualFil
         "0.0.0.0:5678->5678/tcp",
         ":::5678->5678/tcp",
     ]
-    assert result.names == "example_container_name"
+    assert result.name == "example_container_name"
     assert result.volumes == ["/tmp/test:/test"]
     assert result.config_path == path.from_posix(f"/var/lib/docker/containers/{id}/config.v2.json")
     assert result.mount_path == path.from_posix(f"/var/lib/docker/image/overlay2/layerdb/mounts/{id}")
@@ -218,7 +218,7 @@ def test_regression_running_container_parsing(target_unix: Target, fs_unix: Virt
     assert results[0].started == datetime.datetime(2024, 12, 31, 13, 37, 0, 123456, tzinfo=datetime.timezone.utc)
     assert results[0].finished is None
     assert results[0].ports == ["0.0.0.0:1337->1337/tcp", "0.0.0.0:1337->1337/udp"]
-    assert results[0].names == "foo"
+    assert results[0].name == "foo"
     assert results[0].volumes == ["/somewhere/on/host/file.txt:/dest/file.txt"]
     assert results[0].environment == ["FOO=bar", "HELLO=world"]
     assert results[0].mount_path == "/var/lib/docker/image/overlay2/layerdb/mounts/deadbeef"

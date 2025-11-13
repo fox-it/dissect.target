@@ -10,7 +10,7 @@ import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, arg, find_functions
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     args_to_uri,
     configure_generic_arguments,
     execute_function_on_target,
@@ -66,7 +66,7 @@ def test_args_to_uri(targets: list[str], loader_name: str, args: list[str], uris
     class FakeLoader:
         pass
 
-    with patch("dissect.target.tools.utils.LOADERS_BY_SCHEME", {"loader": FakeLoader}):
+    with patch("dissect.target.tools.utils.cli.LOADERS_BY_SCHEME", {"loader": FakeLoader}):
         assert args_to_uri(targets, loader_name, args) == uris
 
 
@@ -97,21 +97,21 @@ def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
         args.targets = ["target1", "target2"]
 
         with (
-            patch("dissect.target.tools.utils.configure_logging") as mocked_configure_logging,
-            patch("dissect.target.tools.utils.version", return_value="1.0.0") as mocked_version,
-            patch("dissect.target.tools.utils.sys.exit") as mocked_exit,
+            patch("dissect.target.tools.utils.cli.configure_logging") as mocked_configure_logging,
+            patch("dissect.target.tools.utils.cli.version", return_value="1.0.0") as mocked_version,
+            patch("dissect.target.tools.utils.cli.sys.exit") as mocked_exit,
             patch(
-                "dissect.target.tools.utils.args_to_uri",
+                "dissect.target.tools.utils.cli.args_to_uri",
                 return_value=["loader_name://target1", "loader_name://target2"],
             ) as mocked_args_to_uri,
-            patch("dissect.target.tools.utils.keychain.register_keychain_file") as mocked_register_keychain_file,
-            patch("dissect.target.tools.utils.keychain.register_wildcard_value") as mocked_register_wildcard_value,
+            patch("dissect.target.tools.utils.cli.keychain.register_keychain_file") as mocked_register_keychain_file,
+            patch("dissect.target.tools.utils.cli.keychain.register_wildcard_value") as mocked_register_wildcard_value,
             patch(
-                "dissect.target.tools.utils.get_external_module_paths", return_value=["/path/to/plugins"]
+                "dissect.target.tools.utils.cli.get_external_module_paths", return_value=["/path/to/plugins"]
             ) as mocked_get_external_module_paths,
-            patch("dissect.target.tools.utils.load_modules_from_paths") as mocked_load_modules_from_paths,
+            patch("dissect.target.tools.utils.cli.load_modules_from_paths") as mocked_load_modules_from_paths,
         ):
-            process_generic_arguments(args)
+            process_generic_arguments(parser, args)
 
             mocked_configure_logging.assert_called_once_with(0, False, as_plain_text=True)
             mocked_version.assert_called_once_with("dissect.target")
@@ -126,7 +126,7 @@ def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
 
             del args.targets
             args.target = "target1"
-            process_generic_arguments(args)
+            process_generic_arguments(parser, args)
 
             assert args.target == "loader_name://target1"
 

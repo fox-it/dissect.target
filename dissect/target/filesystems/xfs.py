@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import stat
 from typing import TYPE_CHECKING, Any, BinaryIO
 
@@ -15,11 +14,13 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class XfsFilesystem(Filesystem):

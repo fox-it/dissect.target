@@ -18,10 +18,10 @@ from flow.record import Record, RecordOutput, ignore_fields_for_comparison
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import alias, arg
 from dissect.target.target import Target
-from dissect.target.tools.fsutils import print_extensive_file_stat_listing
 from dissect.target.tools.query import record_output
 from dissect.target.tools.shell import (
     ANSI_COLORS,
@@ -34,19 +34,21 @@ from dissect.target.tools.shell import (
     python_shell,
     run_cli,
 )
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     generate_argparse_for_method,
     process_generic_arguments,
 )
+from dissect.target.tools.utils.fs import print_extensive_file_stat_listing
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.filesystem import FilesystemEntry
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -966,7 +968,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
-    process_generic_arguments(args)
+    process_generic_arguments(parser, args)
 
     if len(args.targets) < 2:
         parser.error("at least two targets are required for target-diff")

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import logging
 import os
 import random
 import sys
@@ -11,13 +10,14 @@ from typing import TYPE_CHECKING
 from dissect.cstruct import utils
 
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.scrape import recover_string
 from dissect.target.plugins.scrape.qfind import QFindMatchRecord, QFindPlugin
-from dissect.target.target import Target
 from dissect.target.tools.query import record_output
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_targets,
     process_generic_arguments,
 )
 
@@ -25,9 +25,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dissect.target.container import Container
+    from dissect.target.target import Target
     from dissect.target.volume import Volume
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 NO_COLOR = os.getenv("NO_COLOR")
 COLOR_GREY = "\033[38;5;248m"
@@ -43,7 +45,6 @@ def main() -> int:
     )
 
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument(
         "-R", "--raw", action="store_true", help="show raw hex dumps instead of post-processed string output"
     )
@@ -58,7 +59,7 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
-    process_generic_arguments(args)
+    process_generic_arguments(parser, args)
 
     if not args.targets:
         log.error("No targets provided")
@@ -69,7 +70,7 @@ def main() -> int:
         rs = record_output(args.strings, args.json)
 
     try:
-        for target in Target.open_all(args.targets, args.children):
+        for target in open_targets(args):
             hit: QFindMatchRecord
             for hit in target.qfind(
                 args.needles,
