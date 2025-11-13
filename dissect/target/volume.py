@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import io
-import logging
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
@@ -32,7 +32,8 @@ bde = import_lazy("dissect.target.volumes.bde")
 luks = import_lazy("dissect.target.volumes.luks")
 """A lazy import of :mod:`dissect.target.volumes.luks`."""
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 """A logger instance for this module."""
 
 LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [

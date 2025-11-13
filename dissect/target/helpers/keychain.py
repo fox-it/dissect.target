@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import csv
-import logging
 import os
 from enum import Enum
 from typing import TYPE_CHECKING, NamedTuple
 
+from dissect.target.helpers.logging import get_logger
+
 if TYPE_CHECKING:
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class KeyType(Enum):

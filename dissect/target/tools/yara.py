@@ -2,19 +2,19 @@
 from __future__ import annotations
 
 import argparse
-import logging
 
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.plugins.filesystem.yara import HAS_YARA, YaraPlugin
 from dissect.target.tools.query import record_output
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     open_targets,
     process_generic_arguments,
 )
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 @catch_sigpipe
