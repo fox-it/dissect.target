@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import itertools
 import json
-import logging
 from base64 import b64decode
 from hashlib import pbkdf2_hmac, sha1
 from itertools import chain
@@ -15,6 +14,7 @@ from dissect.util.ts import from_unix_ms, from_unix_us
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
@@ -59,7 +59,8 @@ FIREFOX_EXTENSION_RECORD_FIELDS = [
     ("string[]", "optional_permissions"),
 ]
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class FirefoxPlugin(BrowserPlugin):

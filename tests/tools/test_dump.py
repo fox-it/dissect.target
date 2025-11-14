@@ -9,9 +9,16 @@ import pytest
 
 from dissect.target.plugins.apps.webserver import iis
 from dissect.target.plugins.os.windows import amcache
-from dissect.target.tools.dump import run, state, utils
-from dissect.target.tools.dump.run import create_state
-from dissect.target.tools.dump.run import main as target_dump
+from dissect.target.tools.dump import (
+    COMPRESSION_TO_EXT,
+    SERIALIZERS,
+    STATE_FILE_NAME,
+    Compression,
+    Serialization,
+    create_state,
+    execute_pipeline,
+)
+from dissect.target.tools.dump import main as target_dump
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -66,12 +73,12 @@ def test_execute_pipeline(
         assert count == 128
 
     with (
-        patch("dissect.target.tools.dump.run.log_progress", new=mock_log_progress),
+        patch("dissect.target.tools.dump.log_progress", new=mock_log_progress),
     ):
         output_dir = tmp_path / "output"
 
-        serialization = utils.Serialization(serialization_name)
-        compression = utils.Compression(compression_name) if compression_name else utils.Compression.NONE
+        serialization = Serialization(serialization_name)
+        compression = Compression(compression_name) if compression_name else Compression.NONE
 
         functions = "iis.logs,amcache.applications"
         _state = create_state(
@@ -83,7 +90,7 @@ def test_execute_pipeline(
             compression=compression,
         )
 
-        run.execute_pipeline(
+        execute_pipeline(
             state=_state,
             targets=mock_get_targets(["dummy"]),
             arguments=[],
@@ -97,8 +104,8 @@ def test_execute_pipeline(
 
         assert (output_dir / target_name / "iis").exists()
 
-        serialization_ext = utils.SERIALIZERS[serialization]["ext"]
-        compression_ext = utils.COMPRESSION_TO_EXT[compression]
+        serialization_ext = SERIALIZERS[serialization]["ext"]
+        compression_ext = COMPRESSION_TO_EXT[compression]
 
         iis_sink_filename = f"filesystem_windows_iis_logs.{serialization_ext}"
         if compression_ext:
@@ -117,7 +124,7 @@ def test_execute_pipeline(
         assert (output_dir / target_name / "amcache" / amcache_sink_filename).exists()
 
         # verify that serialized state is in place
-        state_path = output_dir / state.STATE_FILE_NAME
+        state_path = output_dir / STATE_FILE_NAME
         assert state_path.exists()
 
         state_blob = json.loads(state_path.read_text())
@@ -164,8 +171,8 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
             assert count == 128
 
     with (
-        patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets),
-        patch("dissect.target.tools.dump.run.log_progress", new=mock_log_progress),
+        patch("dissect.target.tools.dump.get_targets", new=mock_get_targets),
+        patch("dissect.target.tools.dump.log_progress", new=mock_log_progress),
     ):
         output_dir = tmp_path / "output"
 
@@ -175,11 +182,11 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
             target_paths=["dummy"],
             functions=functions,
             excluded_functions=[],
-            serialization=utils.Serialization.JSONLINES,
-            compression=utils.Compression.NONE,
+            serialization=Serialization.JSONLINES,
+            compression=Compression.NONE,
         )
 
-        run.execute_pipeline(
+        execute_pipeline(
             state=_state,
             targets=mock_get_targets(["dummy"]),
             arguments=[],
@@ -192,13 +199,13 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
         # verify that iis records are in place
         assert (output_dir / target_name / "iis").exists()
 
-        serialization_ext = utils.SERIALIZERS[utils.Serialization.JSONLINES]["ext"]
+        serialization_ext = SERIALIZERS[Serialization.JSONLINES]["ext"]
         iis_sink_filename = f"filesystem_windows_iis_logs.{serialization_ext}"
 
         assert (output_dir / target_name / "iis" / iis_sink_filename).exists()
 
         # verify that serialized state is in place
-        state_path = output_dir / state.STATE_FILE_NAME
+        state_path = output_dir / STATE_FILE_NAME
         assert state_path.exists()
 
         state_blob = json.loads(state_path.read_text())
@@ -245,7 +252,7 @@ def test_execute_excluded_plugins(target_win_iis_amcache: Target, tmp_path: path
     def mock_get_targets(targets: list[str]) -> Iterator[Target]:
         yield target_win_iis_amcache
 
-    with patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets):
+    with patch("dissect.target.tools.dump.get_targets", new=mock_get_targets):
         output_dir = tmp_path.joinpath("output")
 
         functions = "amcache.applications"
@@ -254,11 +261,11 @@ def test_execute_excluded_plugins(target_win_iis_amcache: Target, tmp_path: path
             target_paths=["dummy"],
             functions=functions,
             excluded_functions=[functions],
-            serialization=utils.Serialization.JSONLINES,
-            compression=utils.Compression.NONE,
+            serialization=Serialization.JSONLINES,
+            compression=Compression.NONE,
         )
 
-        run.execute_pipeline(
+        execute_pipeline(
             state=_state,
             targets=mock_get_targets(["dummy"]),
             arguments=[],

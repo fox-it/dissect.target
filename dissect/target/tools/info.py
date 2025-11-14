@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.tools.query import record_output
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     open_targets,
@@ -41,7 +42,7 @@ InfoRecord = TargetRecordDescriptor(
 )
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
