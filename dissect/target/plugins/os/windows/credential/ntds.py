@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from binascii import hexlify, unhexlify
-from functools import cached_property
+from functools import cached_property, lru_cache
 from hashlib import md5
-from itertools import chain
 from struct import unpack
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from Cryptodome.Cipher import AES, ARC4, DES
 from dissect.cstruct import cstruct
 from dissect.database.ese.ntds import NTDS
+from dissect.database.ese.ntds.utils import format_GUID
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, UnsupportedPluginError, export
@@ -86,35 +86,61 @@ SAM_ACCOUNT_TYPE_INTERNAL_TO_NAME = {
     0x7FFFFFFF: "SAM_ACCOUNT_TYPE_MAX",
 }
 
+
+GENERIC_FIELDS = [
+    ("string", "common_name"),
+    ("string", "upn"),
+    ("string", "sam_name"),
+    ("string", "sam_type"),
+    ("string", "description"),
+    ("string", "sid"),
+    ("varint", "rid"),
+    ("datetime", "password_last_set"),
+    ("datetime", "logon_last_failed"),
+    ("datetime", "logon_last_success"),
+    ("datetime", "account_expires"),
+    ("datetime", "creation_time"),
+    ("datetime", "last_modified_time"),
+    ("boolean", "admin_count"),
+    ("boolean", "is_deleted"),
+    ("string", "lm"),
+    ("string[]", "lm_history"),
+    ("string", "nt"),
+    ("string[]", "nt_history"),
+    ("string", "cleartext_password"),
+    ("string", "credential_type"),
+    ("string", "kerberos_type"),
+    ("string", "kerberos_key"),
+    ("string", "default_salt"),
+    ("uint32", "iteration_count"),
+    ("uint32", "user_account_control"),
+    *[("boolean", flag.lower()) for flag in UAC_FLAGS.values()],
+    ("string[]", "object_classes"),
+    ("string", "distinguished_name"),
+    ("string", "object_guid"),
+    ("uint32", "primary_group_id"),
+    ("string[]", "member_of"),
+    ("string[]", "service_principal_name"),
+]
+
 # Record descriptor for NTDS user secrets
-NtdsAccountSecretRecord = TargetRecordDescriptor(
-    "windows/credential/ntds",
+NtdsUserAccountRecord = TargetRecordDescriptor(
+    "windows/credential/ntds/user",
     [
-        ("string[]", "object_classes"),
-        ("string", "upn"),
-        ("string", "sam_name"),
-        ("string", "sam_type"),
-        ("string", "description"),
-        ("string", "sid"),
-        ("varint", "rid"),
-        ("datetime", "password_last_set"),
-        ("datetime", "logon_last_failed"),
-        ("datetime", "logon_last_success"),
-        ("datetime", "account_expires"),
-        ("datetime", "creation_time"),
-        ("datetime", "last_modified_time"),
-        ("string", "lm"),
-        ("string[]", "lm_history"),
-        ("string", "nt"),
-        ("string[]", "nt_history"),
-        ("boolean", "is_deleted"),
-        *[("boolean", flag.lower()) for flag in UAC_FLAGS.values()],
-        ("string", "cleartext_password"),
-        ("string", "credential_type"),
-        ("string", "kerberos_type"),
-        ("string", "kerberos_key"),
-        ("string", "default_salt"),
-        ("uint32", "iteration_count"),
+        *GENERIC_FIELDS,
+        ("string", "info"),
+        ("string", "comment"),
+        ("string", "telephone_number"),
+        ("string", "home_directory"),
+    ],
+)
+NtdsComputerAccountRecord = TargetRecordDescriptor(
+    "windows/credential/ntds/computer",
+    [
+        *GENERIC_FIELDS,
+        ("string", "dns_hostname"),
+        ("string", "operating_system"),
+        ("string", "operating_system_version"),
     ],
 )
 
@@ -320,16 +346,18 @@ class NtdsPlugin(Plugin):
     def ntds(self) -> NTDS:
         return NTDS(self.ntds_path.open())
 
+    @lru_cache(maxsize=1)  # noqa: B019
     def _extract_and_decrypt_pek_list(self) -> None:
         """Extract PEK list structure and decrypt PEK keys.
 
         Raises:
-            ValueError: If PEK list cannot be found in the database.
+            RuntimeError: If PEK list cannot be found in the database.
+            RuntimeError: If couldn't extract PEK keys.
         """
         pek_blob = next(self.ntds.lookup(objectCategory="domainDNS")).pekList
 
         if not pek_blob:
-            raise ValueError("Couldn't find pek_list in NTDS.dit")
+            raise RuntimeError("Couldn't find pek_list in NTDS.dit")
 
         # Create structure with correct size
         enc_struct = cstruct().load(
@@ -345,6 +373,9 @@ class NtdsPlugin(Plugin):
             self._decrypt_pek_modern(pek_list_enc)
         else:
             self.target.log.error("Unknown PEK list header: %s", header)
+
+        if not self._pek_list:
+            raise RuntimeError("No PEK keys obtained. Can't decrypt hashes.")
 
     def _decrypt_pek_modern(self, pek_list_enc: structure) -> None:
         """Decrypt PEK list for Windows Server 2016+ using AES encryption.
@@ -849,7 +880,7 @@ class NtdsPlugin(Plugin):
         rid = int(account.objectSid.split("-")[-1])
         return account.objectSid, rid
 
-    def _account_record_to_secret(self, account: User | Computer) -> Iterator[NtdsAccountSecretRecord]:
+    def extract_generic_account_info(self, account: User | Computer) -> Iterator[dict[str, Any]]:
         """Convert a database account record to NTDS account secret records.
 
         Args:
@@ -876,19 +907,15 @@ class NtdsPlugin(Plugin):
         try:
             lm_history = self._decrypt_history(account.lmPwdHistory, rid)
         except KeyError:
-            lm_history = []
+            lm_history = None
 
         try:
             nt_history = self._decrypt_history(account.ntPwdHistory, rid)
         except KeyError:
-            nt_history = []
+            nt_history = None
 
         # Decode UAC flags
-        uac_flags = (
-            self._decode_user_account_control(account.userAccountControl)
-            if account.userAccountControl
-            else dict.fromkeys(UAC_FLAGS.values())
-        )
+        uac_flags = self._decode_user_account_control(account.userAccountControl)
 
         # Peripheral information
         try:
@@ -906,10 +933,29 @@ class NtdsPlugin(Plugin):
         except KeyError:
             is_deleted = False
 
+        try:
+            admin_count = bool(account.adminCount)
+        except KeyError:
+            admin_count = False
+
+        try:
+            member_of = [group.distinguishedName for group in account.groups()]
+        except KeyError:
+            member_of = None
+
+        try:
+            service_principal_name = (
+                [account.servicePrincipalName]
+                if isinstance(account.servicePrincipalName, str)
+                else account.servicePrincipalName
+            )
+        except KeyError:
+            service_principal_name = None
+
         # Extract supplemental credentials and yield records
         for supplemental_info in self._decrypt_supplemental_info(account):
-            yield NtdsAccountSecretRecord(
-                object_classes=account.objectClass,
+            yield dict(
+                common_name=account.cn,
                 upn=upn,
                 sam_name=account.sAMAccountName,
                 sam_type=SAM_ACCOUNT_TYPE_INTERNAL_TO_NAME[account.sAMAccountType].lower(),
@@ -922,28 +968,97 @@ class NtdsPlugin(Plugin):
                 account_expires=account.accountExpires if not isinstance(account.accountExpires, float) else None,
                 creation_time=account.whenCreated,
                 last_modified_time=account.whenChanged,
+                admin_count=admin_count,
+                is_deleted=is_deleted,
                 lm=lm_hash,
                 lm_history=lm_history,
                 nt=nt_hash,
                 nt_history=nt_history,
-                is_deleted=is_deleted,
-                **uac_flags,
                 **supplemental_info,
-                _target=self.target,
+                user_account_control=account.userAccountControl,
+                **uac_flags,
+                object_classes=account.objectClass,
+                distinguished_name=account.distinguishedName,
+                object_guid=format_GUID(account.objectGUID),
+                primary_group_id=account.primaryGroupID,
+                member_of=member_of,
+                service_principal_name=service_principal_name,
             )
 
-    @export(record=NtdsAccountSecretRecord, description="Extract accounts & thier sercrets from NTDS.dit database")
-    def secrets(self) -> Iterator[NtdsAccountSecretRecord]:
-        """Extract and decrypt all user credentials from the NTDS.dit database.
+    @export(record=NtdsUserAccountRecord, description="Extract user accounts & thier sercrets from NTDS.dit database")
+    def user_accounts(self) -> Iterator[NtdsUserAccountRecord]:
+        """Extract all user account from the NTDS.dit database.
 
         Yields:
-            NtdsUserSecretRecord for each user account found in the database.
+            ``NtdsUserAccountRecord``: for each user account found in the database.
         """
         self._extract_and_decrypt_pek_list()
 
-        if not self._pek_list:
-            self.target.log.error("No PEK keys obtained. Can't decrypt hashes.")
-            return
+        for account in self.ntds.users():
+            for generic_info in self.extract_generic_account_info(account):
+                # TODO: Fix the extraction here
+                try:
+                    info = account.info
+                except KeyError:
+                    info = None
 
-        for user in chain(self.ntds.users(), self.ntds.computers()):
-            yield from self._account_record_to_secret(user)
+                try:
+                    comment = account.comment
+                except KeyError:
+                    comment = None
+
+                try:
+                    telephone_number = account.telephoneNumber
+                except KeyError:
+                    telephone_number = None
+
+                try:
+                    home_directory = account.homeDirectory
+                except KeyError:
+                    home_directory = None
+
+                yield NtdsUserAccountRecord(
+                    **generic_info,
+                    info=info,
+                    comment=comment,
+                    telephone_number=telephone_number,
+                    home_directory=home_directory,
+                    _target=self.target,
+                )
+
+    @export(
+        record=NtdsComputerAccountRecord,
+        description="Extract computer accounts & thier sercrets from NTDS.dit database",
+    )
+    def computer_accounts(self) -> Iterator[NtdsComputerAccountRecord]:
+        """Extract all computer account from the NTDS.dit database.
+
+        Yields:
+            ``NtdsComputerAccountRecord``: for each computer account found in the database.
+        """
+        self._extract_and_decrypt_pek_list()
+
+        for account in self.ntds.computers():
+            for generic_info in self.extract_generic_account_info(account):
+                try:
+                    dns_hostname = account.dNSHostName
+                except KeyError:
+                    dns_hostname = None
+
+                try:
+                    operating_system = account.operatingSystem
+                except KeyError:
+                    operating_system = None
+
+                try:
+                    operating_system_version = account.operatingSystemVersion
+                except KeyError:
+                    operating_system_version = None
+
+                yield NtdsComputerAccountRecord(
+                    **generic_info,
+                    dns_hostname=dns_hostname,
+                    operating_system=operating_system,
+                    operating_system_version=operating_system_version,
+                    _target=self.target,
+                )
