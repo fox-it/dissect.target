@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from binascii import hexlify, unhexlify
-from functools import cached_property, lru_cache
+from functools import cached_property
 from hashlib import md5
 from struct import unpack
 from typing import TYPE_CHECKING, Any
@@ -325,8 +325,6 @@ class NtdsPlugin(Plugin):
             )
             self.ntds_path = self.target.fs.path(ntds_path_key.value)
 
-        self._pek_list: list[bytes] = []
-
     def check_compatible(self) -> None:
         """Check if the plugin can run on the target system.
 
@@ -346,12 +344,15 @@ class NtdsPlugin(Plugin):
     def ntds(self) -> NTDS:
         return NTDS(self.ntds_path.open())
 
-    @lru_cache(maxsize=1)  # noqa: B019
-    def _extract_and_decrypt_pek_list(self) -> None:
+    @cached_property
+    def pek_list(self) -> list[bytes]:
         """Extract PEK list structure and decrypt PEK keys.
 
         Raises:
             RuntimeError: If PEK list cannot be found in the database or couldn't extract PEK keys from the PEK list.
+
+        Returns:
+            pek_list: list containing PEK keys
         """
         pek_blob = next(self.ntds.lookup(objectCategory="domainDNS")).pekList
 
@@ -367,20 +368,25 @@ class NtdsPlugin(Plugin):
         header = bytearray(pek_list_enc.Header)
 
         if header.startswith(self.CryptoConstants.UP_TO_WINDOWS_2012_R2_PEK_HEADER):
-            self._decrypt_pek_legacy(pek_list_enc)
+            extracted_keys = self._decrypt_pek_legacy(pek_list_enc)
         elif header.startswith(self.CryptoConstants.WINDOWS_2016_TP4_PEK_HEADER):
-            self._decrypt_pek_modern(pek_list_enc)
+            extracted_keys = self._decrypt_pek_modern(pek_list_enc)
         else:
             self.target.log.error("Unknown PEK list header: %s", header)
 
-        if not self._pek_list:
+        if not extracted_keys:
             raise RuntimeError("No PEK keys obtained. Can't decrypt hashes.")
 
-    def _decrypt_pek_modern(self, pek_list_enc: structure) -> None:
+        return extracted_keys
+
+    def _decrypt_pek_modern(self, pek_list_enc: structure) -> list[bytes]:
         """Decrypt PEK list for Windows Server 2016+ using AES encryption.
 
         Args:
             pek_list_enc: Encrypted PEK list structure.
+
+        Returns:
+            pek_list: list containing PEK keys
         """
         # Decrypt using AES with syskey as key and KeyMaterial as IV
         pek_plain_raw = self._aes_decrypt(
@@ -396,14 +402,19 @@ class NtdsPlugin(Plugin):
         plain = plain_struct.PEKLIST_PLAIN(pek_plain_raw)
 
         # Extract PEK entries (4-byte index + 16-byte key)
-        self._extract_pek_entries(plain.DecryptedPek)
+        return self._extract_pek_entries(plain.DecryptedPek)
 
-    def _decrypt_pek_legacy(self, pek_list_enc: structure) -> None:
+    def _decrypt_pek_legacy(self, pek_list_enc: structure) -> list[bytes]:
         """Decrypt PEK list for Windows Server 2012 R2 and earlier using RC4.
 
         Args:
             pek_list_enc: Encrypted PEK list structure.
+
+        Returns:
+            pek_list: list containing PEK keys
         """
+        pek_list: list[bytes] = []
+
         # Derive RC4 key from syskey and KeyMaterial
         rc4_key = self._derive_rc4_key(
             self.target.lsa.syskey, pek_list_enc.KeyMaterial, self.CryptoConstants.PEK_KEY_DERIVATION_ITERATIONS
@@ -425,10 +436,12 @@ class NtdsPlugin(Plugin):
         pek_key_len = len(c_ntds_crypto.PEK_KEY)
         for i in range(0, len(plain.DecryptedPek), pek_key_len):
             pek_key = c_ntds_crypto.PEK_KEY(plain.DecryptedPek[i : i + pek_key_len]).Key
-            self._pek_list.append(pek_key)
+            pek_list.append(pek_key)
             self.target.log.info("PEK #%d decrypted: %s", i // pek_key_len, hexlify(pek_key).decode())
 
-    def _extract_pek_entries(self, data: bytes) -> None:
+        return pek_list
+
+    def _extract_pek_entries(self, data: bytes) -> list[bytes]:
         """Extract PEK entries from decrypted data.
 
         PEK entries are stored as: [4-byte index][16-byte key]
@@ -436,7 +449,12 @@ class NtdsPlugin(Plugin):
 
         Args:
             data: Decrypted PEK data containing entries.
+
+        Returns:
+            pek_list: list containing PEK keys
         """
+        pek_list: list[bytes] = []
+
         entry_size = self.CryptoConstants.PEK_LIST_ENTRY_SIZE
         pos, expected_index = 0, 0
 
@@ -450,7 +468,7 @@ class NtdsPlugin(Plugin):
                 pos = len(data)
                 continue
 
-            self._pek_list.append(pek)
+            pek_list.append(pek)
             self.target.log.info("PEK #%d found and decrypted: %s", index, hexlify(pek).decode())
 
             expected_index += 1
@@ -458,6 +476,8 @@ class NtdsPlugin(Plugin):
 
         if pos < len(data):
             self.target.log.warning("PEK list contained extra data after terminator")
+
+        return pek_list
 
     def _derive_rc4_key(self, key: bytes, key_material: bytes, iterations: int) -> bytes:
         """Derive RC4 key using MD5 with multiple iterations.
@@ -531,7 +551,7 @@ class NtdsPlugin(Plugin):
         """
         pek_index = self._get_pek_index_from_header(crypted.Header)
         rc4_key = self._derive_rc4_key(
-            self._pek_list[pek_index],
+            self.pek_list[pek_index],
             bytearray(crypted.KeyMaterial),
             iterations=1,  # Single iteration for hash decryption
         )
@@ -614,7 +634,7 @@ class NtdsPlugin(Plugin):
         # Decrypt AES layer
         pek_index = self._get_pek_index_from_header(crypted.Header)
         decrypted = self._aes_decrypt(
-            self._pek_list[pek_index],
+            self.pek_list[pek_index],
             bytearray(crypted.EncryptedHash[: self.CryptoConstants.NTLM_HASH_SIZE]),
             bytearray(crypted.KeyMaterial),
         )
@@ -689,7 +709,7 @@ class NtdsPlugin(Plugin):
 
         pek_index = self._get_pek_index_from_header(crypted.Header)
         return self._aes_decrypt(
-            self._pek_list[pek_index],
+            self.pek_list[pek_index],
             bytearray(crypted.EncryptedHash[: self.CryptoConstants.NTLM_HASH_SIZE]),
             bytearray(crypted.KeyMaterial),
         )
@@ -780,7 +800,7 @@ class NtdsPlugin(Plugin):
             # Modern AES encryption (skip first 4 bytes of EncryptedHash)
             pek_index = self._get_pek_index_from_header(crypted.Header)
             return self._aes_decrypt(
-                self._pek_list[pek_index],
+                self.pek_list[pek_index],
                 bytearray(crypted.EncryptedHash[self.CryptoConstants.AES_HASH_HEADER_SIZE :]),
                 bytearray(crypted.KeyMaterial),
             )
@@ -991,8 +1011,6 @@ class NtdsPlugin(Plugin):
         Yields:
             ``NtdsUserAccountRecord``: for each user account found in the database.
         """
-        self._extract_and_decrypt_pek_list()
-
         for account in self.ntds.users():
             for generic_info in self.extract_generic_account_info(account):
                 # TODO: Fix the extraction here
@@ -1035,8 +1053,6 @@ class NtdsPlugin(Plugin):
         Yields:
             ``NtdsComputerAccountRecord``: for each computer account found in the database.
         """
-        self._extract_and_decrypt_pek_list()
-
         for account in self.ntds.computers():
             for generic_info in self.extract_generic_account_info(account):
                 try:
