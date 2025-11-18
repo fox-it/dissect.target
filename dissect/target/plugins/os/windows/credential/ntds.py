@@ -351,8 +351,7 @@ class NtdsPlugin(Plugin):
         """Extract PEK list structure and decrypt PEK keys.
 
         Raises:
-            RuntimeError: If PEK list cannot be found in the database.
-            RuntimeError: If couldn't extract PEK keys.
+            RuntimeError: If PEK list cannot be found in the database or couldn't extract PEK keys from the PEK list.
         """
         pek_blob = next(self.ntds.lookup(objectCategory="domainDNS")).pekList
 
