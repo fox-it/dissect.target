@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Union
 
-from dissect.esedb.exceptions import Error
-from dissect.esedb.tools import sru
+from dissect.database.ese.tools import sru
+from dissect.database.exception import Error
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
