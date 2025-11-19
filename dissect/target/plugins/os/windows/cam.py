@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from dissect.sql import SQLite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import wintimestamp
 from flow.record.fieldtypes import digest, windows_path
 
@@ -26,7 +26,7 @@ from dissect.target.plugin import Plugin, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dissect.sql.sqlite3 import Row
+    from dissect.database.sqlite3 import Row
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target

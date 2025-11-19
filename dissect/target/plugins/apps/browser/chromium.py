@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -29,8 +29,6 @@ from dissect.target.plugins.apps.browser.browser import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
-
-    from dissect.sql.sqlite3 import SQLite3
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -160,10 +158,10 @@ class ChromiumMixin:
             seen.add(db_file)
 
             try:
-                yield user, db_file, sqlite3.SQLite3(db_file.open())
+                yield user, db_file, SQLite3(db_file.open())
             except FileNotFoundError:
                 self.target.log.warning("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -253,7 +251,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -329,7 +327,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Error processing cookie file %s: %s", db_file, e)
                 self.target.log.debug("", exc_info=e)
 
@@ -397,7 +395,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 

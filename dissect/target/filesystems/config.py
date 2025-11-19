@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import io
 import textwrap
-from logging import getLogger
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
 
-log = getLogger(__name__)
+log = get_logger(__name__)
 
 
 class ConfigurationFilesystem(VirtualFilesystem):

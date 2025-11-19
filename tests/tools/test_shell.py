@@ -15,7 +15,6 @@ from unittest.mock import MagicMock, call, mock_open, patch
 import pytest
 
 from dissect.target.helpers.fsutil import TargetPath, normalize
-from dissect.target.tools import fsutils
 from dissect.target.tools.shell import (
     TargetCli,
     TargetHubCli,
@@ -23,6 +22,7 @@ from dissect.target.tools.shell import (
     build_pipe_stdout,
 )
 from dissect.target.tools.shell import main as target_shell
+from dissect.target.tools.utils import fs
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -223,7 +223,7 @@ def test_exec_target_command(capfd: pytest.CaptureFixture, target_default: Targe
 
 def test_target_cli_ls(target_win: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     # disable colorful output in `target-shell`
-    monkeypatch.setattr(fsutils, "LS_COLORS", {})
+    monkeypatch.setattr(fs, "LS_COLORS", {})
 
     cli = TargetCli(target_win)
     cli.onecmd("ls")
@@ -234,7 +234,7 @@ def test_target_cli_ls(target_win: Target, capsys: pytest.CaptureFixture, monkey
 
 def test_target_cli_info(target_win: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     # disable colorful output in `target-shell`
-    monkeypatch.setattr(fsutils, "LS_COLORS", {})
+    monkeypatch.setattr(fs, "LS_COLORS", {})
 
     cli = TargetCli(target_win)
     cli.onecmd("info")
@@ -242,6 +242,40 @@ def test_target_cli_info(target_win: Target, capsys: pytest.CaptureFixture, monk
     captured = capsys.readouterr()
     # Check if common keywords are present in output
     assert all(key in captured.out for key in ["Hostname", "path", "Os"])
+
+
+def test_redirect_simple_ls(tmp_path: Path, target_win: Target, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(fs, "LS_COLORS", {"di": "\033[34m", "fi": "\033[0m"})
+    cli = TargetCli(target_win)
+    out_file = tmp_path / "ls_out.txt"
+    cli.onecmd(f'ls > "{out_file}"')
+    content = out_file.read_text()
+    # Should not contain color codes
+    assert "\033[" not in content
+    # Should contain expected output
+    assert "c:" in content
+    assert "sysvol" in content
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test")
+def test_redirect_pipe(tmp_path: Path, target_win: Target, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(fs, "LS_COLORS", {"di": "\033[34m", "fi": "\033[0m"})
+    cli = TargetCli(target_win)
+    out_file = tmp_path / "ls_grep_out.txt"
+    # Simulate a pipeline: ls | grep sysvol > out_file
+    cli.onecmd(f"ls | grep sysvol > {out_file}")
+    content = out_file.read_text()
+    assert "sysvol" in content
+    assert "\033[" not in content
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test")
+def test_redirect_syntax_error(target_win: Target, capsys: pytest.CaptureFixture) -> None:
+    cli = TargetCli(target_win)
+    # Redirect before pipe should fail
+    cli.onecmd("ls > out.txt | grep sysvol")
+    captured = capsys.readouterr()
+    assert "Syntax error" in captured.out
 
 
 @pytest.mark.parametrize(

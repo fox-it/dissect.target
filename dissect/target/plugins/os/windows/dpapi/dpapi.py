@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import re
 from functools import cache, cached_property
 from typing import TYPE_CHECKING
@@ -135,6 +136,12 @@ class DPAPIPlugin(InternalPlugin):
                         pass
 
                     try:
+                        # NOTE: This is a workaround for a PyPy bug
+                        # `bytes.fromhex` errors on subclasses of `str`
+                        # (see https://github.com/pypy/pypy/issues/5327)
+                        if platform.python_implementation() == "PyPy":
+                            mk_pass = str(mk_pass)
+
                         if mkf.decrypt_with_hash(sid, bytes.fromhex(mk_pass)):
                             self.target.log.info(
                                 "Decrypted SID %s master key %s with hash '%s' from provider %s",

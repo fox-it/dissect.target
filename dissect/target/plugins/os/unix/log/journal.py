@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import lzma
 from typing import TYPE_CHECKING, Any, BinaryIO
 
@@ -10,6 +9,7 @@ from dissect.util import ts
 from dissect.util.compression import lz4
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import IntEnumMissing
 from dissect.target.plugin import Plugin, export
@@ -19,7 +19,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 # The events have undocumented fields that are not part of the record
 JournalRecord = TargetRecordDescriptor(

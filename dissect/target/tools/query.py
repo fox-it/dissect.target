@@ -17,13 +17,13 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
+from dissect.target.helpers.logging import get_logger
 from dissect.target.plugin import (
     PLUGINS,
     FunctionDescriptor,
 )
 from dissect.target.target import Target
-from dissect.target.tools.report import ExecutionReport
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     configure_plugin_arguments,
@@ -34,13 +34,15 @@ from dissect.target.tools.utils import (
     process_generic_arguments,
     process_plugin_arguments,
 )
+from dissect.target.tools.utils.report import ExecutionReport
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from flow.record.adapter import AbstractWriter
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -276,7 +278,7 @@ def main() -> int:
     timestamp = datetime.now(tz=timezone.utc)
 
     execution_report.set_plugin_stats(PLUGINS)
-    log.debug("%s", execution_report.get_formatted_report())
+    log.trace("%s", execution_report.get_formatted_report())
     if args.report_dir:
         persist_execution_report(
             args.report_dir,

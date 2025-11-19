@@ -22,6 +22,7 @@ from dissect.util.stream import AlignedStream
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
@@ -37,7 +38,8 @@ try:
 except ImportError:
     HAS_PAHO = False
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DISK_INDEX_OFFSET = 9
 
