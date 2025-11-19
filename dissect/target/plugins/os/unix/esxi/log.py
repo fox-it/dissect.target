@@ -14,8 +14,9 @@ from dissect.target.plugin import OperatingSystem, Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
-    from dissect.target.target import Target, TargetPath
+    from dissect.target.target import Target
 
 ESXiLogRecord = TargetRecordDescriptor(
     "esxi/log",
@@ -56,7 +57,7 @@ class EsxiLogBasePlugin(Plugin, ABC):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.log_paths = self.get_log_paths()
+        self.log_paths = self._get_paths()
 
     def check_compatible(self) -> None:
         # Log path as the same as on other unix target, so we fail fast
@@ -72,7 +73,7 @@ class EsxiLogBasePlugin(Plugin, ABC):
         base name of the log file (e.g : shell, auth, hostd)
         """
 
-    def get_log_paths(self) -> list[TargetPath]:
+    def _get_paths(self) -> list[Path]:
         """
         Get log location, looking in most usual location, as well as in the osdata partition
 
@@ -84,7 +85,6 @@ class EsxiLogBasePlugin(Plugin, ABC):
         for log_location in self.COMMON_LOG_LOCATION:
             for path in self.target.fs.path(log_location).glob(f"{self.logname}.*"):
                 try:
-
                     log_paths.append(path.resolve(strict=True))
                 except FilesystemError as e:  # noqa PERF203
                     self.target.info.warning("Fail to resolve path to %s : %s", path, str(e))
