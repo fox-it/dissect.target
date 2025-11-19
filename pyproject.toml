@@ -27,15 +27,15 @@ classifiers = [
 dependencies = [
     "defusedxml",
     "dissect.cstruct>=4,<5",
+    "dissect.database>=1,<2",
     "dissect.eventlog>=3,<4",
     "dissect.evidence>=3,<4",
     "dissect.hypervisor>=3.20.dev,<4",  # TODO: update on release
     "dissect.ntfs>=3.15.dev1,<4",  # TODO: update on release
     "dissect.regf>=3.13,<4",
-    "dissect.sql>=3.12,<4",
     "dissect.util>=3,<4",
     "dissect.volume>=3.17.dev1,<4",  # TODO: update on release!
-    "flow.record~=3.20.0",
+    "flow.record~=3.21.0",
     "structlog",
 ]
 dynamic = ["version"]
@@ -53,7 +53,6 @@ full = [
     "dissect.cim>=3,<4",
     "dissect.clfs>=1,<2",
     "dissect.cramfs>=1,<2",
-    "dissect.esedb>=3.17.dev1,<4",  # TODO: update on release!
     "dissect.etl>=3,<4",
     "dissect.extfs>=3,<4",
     "dissect.fat>=3,<4",
@@ -83,7 +82,7 @@ dev = [
     "dissect.clfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cramfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cstruct>=4.0.dev,<5.0.dev",
-    "dissect.esedb[dev]>=3.0.dev,<4.0.dev",
+    "dissect.database[dev]>=1.0.dev,<2.0.dev",
     "dissect.etl[dev]>=3.0.dev,<4.0.dev",
     "dissect.eventlog[dev]>=3.0.dev,<4.0.dev",
     "dissect.evidence[dev]>=3.0.dev,<4.0.dev",
@@ -97,7 +96,6 @@ dev = [
     "dissect.qnxfs[dev]>=1.1.dev,<2.0.dev",
     "dissect.regf[dev]>=3.13.dev,<4.0.dev",
     "dissect.shellitem[dev]>=3.0.dev,<4.0.dev",
-    "dissect.sql[dev]>=3.12.dev,<4.0.dev",
     "dissect.squashfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.thumbcache[dev]>=1.0.dev,<2.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
@@ -151,7 +149,7 @@ dev = [
 
 [project.scripts]
 target-build-pluginlist = "dissect.target.tools.build_pluginlist:main"
-target-dump = "dissect.target.tools.dump.run:main"
+target-dump = "dissect.target.tools.dump:main"
 target-dd = "dissect.target.tools.dd:main"
 target-diff = "dissect.target.tools.diff:main"
 target-fs = "dissect.target.tools.fs:main"

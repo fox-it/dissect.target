@@ -6,12 +6,13 @@ import fnmatch
 import gzip
 import hashlib
 import io
-import logging
 import os
 import re
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
+
+from dissect.target.helpers.logging import get_logger
 
 try:
     import lzma
@@ -73,7 +74,8 @@ elif sys.version_info >= (3, 10):  # noqa: UP036
 else:
     raise RuntimeError("dissect.target requires at least Python 3.10")
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 re_glob_magic = re.compile(r"[*?[]")
 re_glob_index = re.compile(r"(?<=\/)[^\/]*[*?[]")

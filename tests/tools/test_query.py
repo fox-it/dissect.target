@@ -237,7 +237,7 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
 
         with (
             patch(
-                "dissect.target.tools.utils.find_functions",
+                "dissect.target.tools.utils.cli.find_functions",
                 autospec=True,
                 side_effect=mock_find_functions,
             ),
@@ -426,7 +426,7 @@ def test_record_stream_write_exception_handling(
         with patch("dissect.target.tools.query.record_output", return_value=None):
             target_query()
 
-    assert "Exception occurred while processing output of WalkFSPlugin.walkfs:" in caplog.text
+    assert "Exception occurred while processing output of WalkFsPlugin.walkfs:" in caplog.text
 
 
 @patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
@@ -459,7 +459,7 @@ def test_arguments_passed_correctly(
 
         with (
             patch(
-                "dissect.target.tools.utils.find_functions",
+                "dissect.target.tools.utils.cli.find_functions",
                 autospec=True,
                 side_effect=mock_find_functions,
             ),

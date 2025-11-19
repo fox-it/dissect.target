@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import string
 import urllib.parse
@@ -9,12 +8,14 @@ from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 def add_virtual_ntfs_filesystem(

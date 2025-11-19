@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from dissect.sql import SQLite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import UnsupportedPluginError
