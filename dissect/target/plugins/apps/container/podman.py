@@ -5,8 +5,8 @@ import re
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from dissect.sql import Error as SQLError
-from dissect.sql import SQLite3
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -176,7 +176,7 @@ class PodmanPlugin(ContainerPlugin):
 
         try:
             db = SQLite3(path.open("rb"))
-        except (ValueError, SQLError) as e:
+        except (ValueError, DBError) as e:
             self.target.log.warning("Unable to read Podman database %s: %s", path, e)
             self.target.log.debug("", exc_info=e)
             return
