@@ -154,8 +154,7 @@ class IISLogsPlugin(WebserverPlugin):
                     self.target.log.info("Processing IIS log file %s in %s format", log_file, format)
                     yield from parsers[format](self.target, log_file)
 
-        # We don't implement _get_paths() in the IIS plugin because there's little use for it for the way the plugin
-        # is currently implemented. So handle direct files here.
+        # We handle direct files here because _get_paths cannot select (filter) on the type of logfile.
         if self.target.is_direct:
             for log_file in self.get_paths():
                 yield from parse_autodetect_format_log(self.target, log_file)
