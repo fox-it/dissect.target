@@ -117,7 +117,7 @@ class RegistryPlugin(Plugin):
             for fname in self.SYSTEM:
                 hive_file = config_dir.joinpath(fname)
                 if not hive_file.exists():
-                    self.target.log.debug("Could not find hive: %s", hive_file)
+                    self.target.log.trace("Could not find hive: %s", hive_file)
                     continue
 
                 if hive_file.stat().st_size == 0:

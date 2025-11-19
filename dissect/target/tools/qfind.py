@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import logging
 import os
 import random
 import sys
@@ -11,10 +10,11 @@ from typing import TYPE_CHECKING
 from dissect.cstruct import utils
 
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.scrape import recover_string
 from dissect.target.plugins.scrape.qfind import QFindMatchRecord, QFindPlugin
 from dissect.target.tools.query import record_output
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     open_targets,
@@ -28,7 +28,8 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
     from dissect.target.volume import Volume
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 NO_COLOR = os.getenv("NO_COLOR")
 COLOR_GREY = "\033[38;5;248m"

@@ -6,6 +6,8 @@ from typing import Any
 
 import structlog
 
+from dissect.target.helpers.logging import TRACE_LEVEL, get_logger
+
 
 def custom_obj_renderer(
     logger: structlog.types.WrappedLogger,
@@ -43,8 +45,9 @@ def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = 
     If ``be_quiet`` is set to ``True``, logging level is set to the least noisy ``CRITICAL`` level.
     """
 
+    styles = structlog.dev.ConsoleRenderer.get_default_level_styles()
     renderer = (
-        structlog.dev.ConsoleRenderer(colors=True, pad_event=10)
+        structlog.dev.ConsoleRenderer(colors=True, pad_event=10, level_styles=styles)
         if as_plain_text
         else structlog.processors.JSONRenderer(sort_keys=True)
     )
@@ -90,7 +93,7 @@ def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = 
     # redirected to the ``py.warnings`` logger
     logging.captureWarnings(True)
 
-    dissect_logger = logging.getLogger("dissect")
+    dissect_logger = get_logger("dissect")
 
     if be_quiet:
         dissect_logger.setLevel(level=logging.CRITICAL)
@@ -98,8 +101,10 @@ def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = 
         dissect_logger.setLevel(level=logging.WARNING)
     elif verbose_value == 1:
         dissect_logger.setLevel(level=logging.INFO)
-    elif verbose_value > 1:
+    elif verbose_value == 2:
         dissect_logger.setLevel(level=logging.DEBUG)
+    elif verbose_value >= 3:
+        dissect_logger.setLevel(level=TRACE_LEVEL)
     else:
         pass
 

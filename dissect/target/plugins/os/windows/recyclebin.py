@@ -23,7 +23,7 @@ RecycleBinRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         ("path", "path"),
         ("filesize", "filesize"),
         ("path", "deleted_path"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -80,12 +80,12 @@ class RecyclebinPlugin(Plugin):
           hostname (string): The target hostname
           domain (string): The target domain
           ts (datetime): The time of deletion
-          path (uri): The file original location before deletion
-          filesize (filesize): Filesize of the deleted file
-          sid (string): SID of the user deleted the file, parsed from $I filepath
+          path (path): The file original location before deletion
+          filesize (filesize): Filesize of the deleted path
+          deleted_path (path): Location of the deleted file after deletion $R file
+          source (path): Location of $I meta file on disk
+          user_id (string): SID of the user deleted the file, parsed from $I filepath
           user (string): Username matching SID, lookup using Dissect user plugin
-          deleted_path (uri): Location of the deleted file after deletion $R file
-          source (uri): Location of $I meta file on disk
         """
 
         for recyclebin in self.recyclebin_paths:
@@ -97,35 +97,53 @@ class RecyclebinPlugin(Plugin):
 
     def read_recycle_bin(self, bin_path: TargetPath) -> Iterator[RecycleBinRecord]:
         if self._is_recycle_file(bin_path):
-            yield self.read_bin_file(bin_path)
+            yield from self.read_bin_file(bin_path)
             return
 
         if bin_path.is_dir():
             for new_file in bin_path.iterdir():
                 yield from self.read_recycle_bin(new_file)
 
-    def read_bin_file(self, bin_path: TargetPath) -> RecycleBinRecord:
+    def read_bin_file(self, bin_path: TargetPath) -> Iterator[RecycleBinRecord]:
         data = bin_path.read_bytes()
 
         header = self.select_header(data)
         entry = header(data)
 
         sid = self.find_sid(bin_path)
-        source_path = str(bin_path).lstrip("/")
-        deleted_path = str(bin_path.parent / bin_path.name.replace("/$i", "/$r")).lstrip("/")
+        deleted_path = bin_path.parent / bin_path.name.replace("$I", "$R")
 
         user_details = self.target.user_details.find(sid=sid)
         user = user_details.user if user_details else None
 
-        return RecycleBinRecord(
-            ts=wintimestamp(entry.timestamp),
-            path=self.target.fs.path(entry.filename.rstrip("\x00")),
-            source=self.target.fs.path(source_path),
+        original_path = self.target.fs.path(entry.filename.rstrip("\x00"))
+        deleted_timestamp = wintimestamp(entry.timestamp)
+
+        # Yield the deleted entry from the metadata
+        yield RecycleBinRecord(
+            ts=deleted_timestamp,
+            path=original_path,
+            # This is the size of the all the deleted data
             filesize=entry.file_size,
-            deleted_path=self.target.fs.path(deleted_path),
+            deleted_path=deleted_path,
+            source=bin_path,
             _target=self.target,
             _user=user,
         )
+
+        if deleted_path.is_dir():
+            for path in deleted_path.rglob("*"):
+                # Yield all the path inside a deleted directory
+                yield RecycleBinRecord(
+                    ts=deleted_timestamp,
+                    path=original_path.joinpath(path.relative_to(deleted_path)),
+                    # The size of this deleted file
+                    filesize=path.stat().st_size,
+                    deleted_path=path,
+                    source=bin_path,
+                    _target=self.target,
+                    _user=user,
+                )
 
     def find_sid(self, path: TargetPath) -> str:
         parent_path = path.parent

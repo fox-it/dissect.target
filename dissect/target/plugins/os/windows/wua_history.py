@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from dissect.esedb.c_esedb import decode_guid
-from dissect.esedb.esedb import EseDB
+from dissect.database.ese import ESE
+from dissect.database.ese.util import decode_guid
 from dissect.util.ts import oatimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -954,7 +954,7 @@ class WuaHistoryPlugin(Plugin):
 
         if (path := target.resolve(self.DATASTORE_PATH)).exists():
             try:
-                self._datastore = EseDB(path.open())
+                self._datastore = ESE(path.open())
                 self._update_table = self._datastore.table(self.DATASTORE_UPDATE_TABLE)
             except Exception as e:
                 self.target.log.warning("Error opening Windows Update Agent datastore")

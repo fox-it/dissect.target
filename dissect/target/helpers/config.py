@@ -3,14 +3,16 @@ from __future__ import annotations
 import ast
 import importlib.machinery
 import importlib.util
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from types import ModuleType
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 CONFIG_NAME = ".targetcfg.py"
 

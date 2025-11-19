@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import csv
-import logging
+import os
 from enum import Enum
 from typing import TYPE_CHECKING, NamedTuple
+
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class KeyType(Enum):
@@ -122,3 +125,8 @@ def register_keychain_file(keychain_path: Path) -> None:
                 identifier=identifier,
                 provider=provider,
             )
+
+
+# Add DISSECT_KEYCHAIN_VALUE from environment to KEYCHAIN on module load
+if _env_value := os.getenv("DISSECT_KEYCHAIN_VALUE"):
+    register_wildcard_value(_env_value)
