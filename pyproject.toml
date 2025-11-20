@@ -30,11 +30,11 @@ dependencies = [
     "dissect.database>=1,<2",
     "dissect.eventlog>=3,<4",
     "dissect.evidence>=3,<4",
-    "dissect.hypervisor>=3.20.dev,<4",  # TODO: update on release
-    "dissect.ntfs>=3.15.dev1,<4",  # TODO: update on release
+    "dissect.hypervisor>=3.20,<4",
+    "dissect.ntfs>=3.15,<4",
     "dissect.regf>=3.13,<4",
     "dissect.util>=3,<4",
-    "dissect.volume>=3.17.dev1,<4",  # TODO: update on release!
+    "dissect.volume>=3.17,<4",
     "flow.record~=3.21.0",
     "structlog",
 ]
@@ -99,7 +99,7 @@ dev = [
     "dissect.thumbcache[dev]>=1.0.dev,<2.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.vmfs[dev]>=3.12.dev,<4.0.dev",
-    "dissect.volume[dev]>=3.17.dev,<4.0.dev",  # TODO: update on release!
+    "dissect.volume[dev]>=3.17.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
 ]
 yara = [
