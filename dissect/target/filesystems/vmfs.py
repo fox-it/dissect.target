@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, BinaryIO
 
 import dissect.vmfs as vmfs
 from dissect.vmfs.c_vmfs import c_vmfs
-from dissect.vmfs.descriptor import FileDescriptor
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -19,6 +18,7 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.vmfs.descriptor import DirEntry
     from dissect.vmfs.vmfs import FileDescriptor
 
 
@@ -71,7 +71,7 @@ class VmfsFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def _iterdir(self) -> Iterator[FileDescriptor]:
+    def _iterdir(self) -> Iterator[DirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -90,7 +90,7 @@ class VmfsFilesystemEntry(FilesystemEntry):
         for f in self._iterdir():
             yield f.name
 
-    def scandir(self) -> Iterator[FilesystemEntry]:
+    def scandir(self) -> Iterator[VmfsFilesystemEntry]:
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         for f in self._iterdir():
             path = fsutil.join(self.path, f.name, alt_separator=self.fs.alt_separator)
