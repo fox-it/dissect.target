@@ -26,7 +26,7 @@ class ScrapePlugin(Plugin):
 
     def create_streams(
         self, *, encrypted: bool = True, lvm: bool = True, all: bool = False
-    ) -> Iterator[tuple[Container | Volume, MappingStream]]:
+    ) -> Iterator[tuple[Container | Volume, list[tuple[int | MappingStream]]]]:
         """Yields streams for all disks and volumes of a target.
 
         At the basis, each disk of a target is represented as a stream of itself. If the target has volumes, these are
@@ -46,68 +46,170 @@ class ScrapePlugin(Plugin):
             all: Whether to yield all disks and volumes, regardless of their type.
 
         Yields:
-            A tuple containing the disk (or volume, in the case of an LVM volume) and a stream of that disk.
+            A tuple containing the disk (or volume, in the case of an LVM volume), and a list of tuples containing the
+            physical offset and associated stream of contiguous regions on the disk.
         """
         # Create a map of disk regions we want to scrape
         scrape_map = defaultdict(dict)
 
-        # Start off by making a very simple `disk: {(offset, size): volume}` map for every volume
-        # Spaces in between volumes are also added as disk regions
+        # This map tracks where every "available" volume object is located
+        # within the scrape_map structure
+        # Format: {volume_obj: (map_key, region_key)}
+
+        # This can be optimized by creating a graph of volumes, and performing a topological sort
+        volume_region_map = {}
+
+        # Build initial map from physical disks
         offset = 0
         for disk in self.target.disks:
-            for volume in disk.vs.volumes if disk.vs else []:
+            for volume in self._get_disk_vols(disk):
                 if offset != volume.offset:
-                    # There's data between the volumes, so add that from the disk
+                    # We don't add gaps (source=disk) to the volume_region_map
+                    # as they can't be dependencies.
                     scrape_map[disk][(offset, volume.offset - offset)] = (disk, offset)
                     offset = volume.offset
 
-                # Add the volume to the stream
-                scrape_map[disk][(volume.offset, volume.size)] = (volume, 0)
+                # Add the volume to the scrape_map
+                region_key = (volume.offset, volume.size)
+                scrape_map[disk][region_key] = (volume, 0)
+
+                # Add this partition to our index
+                volume_region_map[volume] = (disk, region_key)
+
                 offset += volume.size
 
-            # There's data after the volumes until the end of the disk
-            # Coincidentally this also takes care of disks with no volumes
             if offset != disk.size:
                 scrape_map[disk][(offset, disk.size - offset)] = (disk, offset)
 
-        # Iterate over all volumes and add the decrypted variant of encrypted volumes
+        # Collect all layered volumes
+        encrypted_volumes = []
+        lvm_volumes = []
         for volume in self.target.volumes:
             if encrypted and isinstance(volume.vs, EncryptedVolumeSystem):
-                if not all:
-                    # Decrypted volumes have the encrypted volume as the disk
-                    source_volume: Volume = volume.disk
-                    source_disk = source_volume.disk
+                encrypted_volumes.append(volume)
+            if isinstance(volume.vs, LogicalVolumeSystem):
+                lvm_volumes.append(volume)
 
-                    # Replace the encrypted volume region with the decrypted volume region
-                    scrape_map[source_disk][(source_volume.offset, source_volume.size)] = (volume, 0)
-                else:
-                    # Add the encrypted volume separately to the map
-                    scrape_map[volume][(0, volume.size)] = (volume, 0)
+        # Iteratively process all layered volumes until none remain
+        pending_lvm = lvm_volumes
+        pending_encrypted = encrypted_volumes
+        deleted_scrape_regions = set()
 
-            if lvm and isinstance(volume.vs, LogicalVolumeSystem):
-                if not all:
-                    # Remove the base volumes from the map
-                    for source_volume in volume.disk:
-                        source_disk = source_volume.disk
-                        del scrape_map[source_disk][(source_volume.offset, source_volume.size)]
+        while pending_lvm or pending_encrypted:
+            processed_this_pass = False
 
-                # Add the logical volumes to the map
-                scrape_map[volume][(0, volume.size)] = (volume, 0)
+            # Attempt to process pending LVM volumes
+            for volume in list(pending_lvm):
+                dependencies_met = True
+                backing_regions_info = []  # List of (map_key, region_key)
 
+                try:
+                    for source_dev in volume.vs.fh:
+                        backing_vol_obj = source_dev.fh
+
+                        if backing_vol_obj not in volume_region_map:
+                            dependencies_met = False
+                            break
+
+                        backing_regions_info.append(volume_region_map[backing_vol_obj])
+
+                except (AttributeError, TypeError):
+                    dependencies_met = False
+
+                if dependencies_met:
+                    if not all:
+                        for map_key, region_key in backing_regions_info:
+                            # Only delete the scrape_map region if it hasn't
+                            # been deleted by another LV in this VG.
+                            # This occurs when multiple LVs share the same backing PV.
+                            key_to_delete = (map_key, region_key)
+                            if key_to_delete not in deleted_scrape_regions:
+                                del scrape_map[map_key][region_key]
+                                deleted_scrape_regions.add(key_to_delete)
+
+                    # Add the new LVM volume as a new "disk"
+                    new_region_key = (0, volume.size)
+                    scrape_map[volume][new_region_key] = (volume, 0)
+
+                    # Add this new LV to our index
+                    volume_region_map[volume] = (volume, new_region_key)
+
+                    pending_lvm.remove(volume)
+                    processed_this_pass = True
+
+            # Attempt to process pending Encrypted volumes
+            for volume in list(pending_encrypted):
+                backing_vol_obj = None
+                try:
+                    backing_vol_obj = volume.vs.fh
+                except (AttributeError, TypeError):
+                    continue
+
+                if backing_vol_obj in volume_region_map:
+                    # Dependency is met!
+                    map_key, region_key = volume_region_map[backing_vol_obj]
+
+                    if not all:
+                        # Remove encrypted region from scrape_map
+                        del scrape_map[map_key][region_key]
+
+                        # Reinsert the decrypted volume region
+                        new_region_key = (region_key[0], volume.size)  # Same offset, new size
+                        scrape_map[map_key][new_region_key] = (volume, 0)
+
+                        # Add this new decrypted volume to our index
+                        volume_region_map[volume] = (map_key, new_region_key)
+
+                    else:
+                        # Add the decrypted volume separately
+                        new_region_key = (0, volume.size)
+                        scrape_map[volume][new_region_key] = (volume, 0)
+                        # Add this new decrypted volume to our index
+                        volume_region_map[volume] = (volume, new_region_key)
+
+                    pending_encrypted.remove(volume)
+                    processed_this_pass = True
+
+            #  Stalemate Check
+            if not processed_this_pass and (pending_lvm or pending_encrypted):
+                raise RuntimeError(
+                    f"Could not resolve storage dependencies. "
+                    f"Stuck with {len(pending_lvm)} LVM volumes and "
+                    f"{len(pending_encrypted)} encrypted volumes."
+                )
+
+        # Generate streams from the scrape_map
         for disk, volumes in scrape_map.items():
             # If we ended up removing all regions from the disk, skip it
             # I.e. when a disk is fully occupied by an LVM volume
             if not volumes:
                 continue
 
-            size = 0
-            stream = MappingStream()
-            for (map_offset, map_size), (source, source_offset) in volumes.items():
-                stream.add(map_offset, map_size, source, source_offset)
-                size = max(size, map_offset + map_size)
-            stream.size = size
+            # Create a stream for every contiguous region
+            streams = []
+            current_stream = None
+            current_stream_start = 0
+            current_stream_end = 0
+            for (offset, size), (source, source_offset) in volumes.items():
+                # Check for a break in contiguity or the very first item
+                if not current_stream or offset != current_stream_end:
+                    # If a stream is already being built, add it to the list
+                    if current_stream:
+                        streams.append((current_stream_start, current_stream))
 
-            yield disk, stream
+                    # Start a new stream
+                    current_stream = MappingStream()
+                    current_stream_start = offset
+
+                # Add the current region to the stream and update the end pointer
+                current_stream.add(offset - current_stream_start, size, source, source_offset)
+                current_stream_end = offset + size
+
+            # Add the last remaining stream after the loop
+            if current_stream:
+                streams.append((current_stream_start, current_stream))
+
+            yield disk, streams
 
     @internal
     def find(
@@ -126,17 +228,18 @@ class ScrapePlugin(Plugin):
             block_size: The block size to use for reading from the byte stream.
             progress: A function to call with the current disk, offset and size of the stream.
         """
-        for disk, stream in self.create_streams():
-            for needle, offset, match in find_needles(
-                stream,
-                needles,
-                lock_seek=lock_seek,
-                block_size=block_size,
-                progress=(lambda current, disk=disk, stream=stream: progress(disk, current, stream.size))
-                if progress
-                else None,
-            ):
-                yield disk, stream, needle, offset, match
+        for disk, streams in self.create_streams():
+            for physical_offset, stream in streams:
+                for needle, offset, match in find_needles(
+                    stream,
+                    needles,
+                    lock_seek=lock_seek,
+                    block_size=block_size,
+                    progress=(lambda current, disk=disk, stream=stream: progress(disk, current, stream.size))
+                    if progress
+                    else None,
+                ):
+                    yield disk, stream, needle, physical_offset + offset, match
 
     @internal
     def scrape_chunks_from_disks(
@@ -204,3 +307,20 @@ class ScrapePlugin(Plugin):
             disk.seek(0)
             for needle, offset, match in find_needles(disk, needles=needles, block_size=block_size):
                 yield disk, needle, offset, match
+
+    @internal
+    def _get_disk_vols(self, disk: Container) -> Iterator[Volume]:
+        """Yields all volumes for a given disk container.
+
+        When the disk has an associated volume system, volumes are retrieved from there.
+        When the disk is raw, volumes are retrieved from the target's volume list.
+
+        Args:
+            disk: The disk container to get volumes for.
+        """
+        if disk.vs:
+            yield from sorted(disk.vs.volumes, key=lambda v: v.offset)
+        else:
+            for volume in sorted(self.target.volumes, key=lambda v: v.offset or 0):
+                if volume.disk == disk and not volume.vs:
+                    yield volume
