@@ -22,17 +22,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-SOLARIS_DEV_DIR = Path("/dev/dsk")
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
-
-LINUX_DEV_DIR = Path("/dev")
 LINUX_DRIVE_REGEX = re.compile(r"(([shv]|xv)d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
-VOLATILE_LINUX_PATHS = [
-    Path("/proc"),
-    Path("/sys"),
-]
-
-ESXI_DEV_DIR = Path("/vmfs/devices/disks")
 
 WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
@@ -63,6 +54,7 @@ class LocalLoader(Loader):
         if os_name == "windows":
             map_windows_mounted_drives(target, force_dirfs=force_dirfs, fallback_to_dirfs=fallback_to_dirfs)
         else:
+            root = Path("/")
             if fallback_to_dirfs or force_dirfs:
                 # Where Windows does some sophisticated fallback, for other
                 # operating systems we don't know anything yet about the
@@ -70,30 +62,32 @@ class LocalLoader(Loader):
                 # Temporary solution until we support parsing of /proc/mounts
                 # and can implement OS-specific DirectoryFS fallback /
                 # enforcement.
-                target.filesystems.add(DirectoryFilesystem(Path("/")))
+                target.filesystems.add(DirectoryFilesystem(root))
             elif os_name == "linux":
-                map_linux_drives(target)
+                map_linux_drives(root, target)
             elif os_name == "sunos":
-                map_solaris_drives(target)
+                map_solaris_drives(root, target)
             elif os_name == "vmkernel":
-                map_esxi_drives(target)
+                map_esxi_drives(root, target)
             elif os_name in ["darwin", "osx", "macos"]:
                 # There is currently no way to access raw disk devices in OS-X,
                 # so we always do a simple DirectoryFilesystem fallback.
-                target.filesystems.add(DirectoryFilesystem(Path("/")))
+                target.filesystems.add(DirectoryFilesystem(root))
             else:
                 raise LoaderError(f"Unsupported OS for local target: {os_name}")
 
 
-def map_linux_drives(target: Target) -> None:
-    """Map Linux raw disks and /proc and /sys.
+def map_linux_drives(root: Path, target: Target) -> None:
+    """Map Linux raw disks and ``/proc`` and ``/sys``.
 
-    Iterate through /dev and match raw device names (not partitions).
+    Iterate through ``/dev`` and match raw device names (not partitions).
 
-    /proc and /sys are mounted if they exists, allowing access to volatile files.
+    ``/proc`` and ``/sys`` are mounted if they exists, allowing access to volatile files.
     """
-    for drive in LINUX_DEV_DIR.iterdir():
-        if LINUX_DRIVE_REGEX.match(drive.name):
+    if (path := root.joinpath("dev")).exists() and (
+        drives := [d for d in path.iterdir() if LINUX_DRIVE_REGEX.match(d.name)]
+    ):
+        for drive in drives:
             _add_disk_as_raw_container_to_target(drive, target)
 
     # Volatile filesystems are not present when running on a local target's raw
@@ -102,33 +96,35 @@ def map_linux_drives(target: Target) -> None:
     # Note that when running on a local target using a directory fs (through
     # force-directory-fs or fallback-to-directory-fs), these filesystems are
     # already present as they are usually mounted on the local system.
-    for volatile_path in VOLATILE_LINUX_PATHS:
+    for volatile_path in [root.joinpath("proc"), root.joinpath("sys")]:
         if volatile_path.exists():
             volatile_fs = DirectoryFilesystem(volatile_path)
             target.filesystems.add(volatile_fs)
             target.fs.mount(str(volatile_path), volatile_fs)
 
 
-def map_solaris_drives(target: Target) -> None:
+def map_solaris_drives(root: Path, target: Target) -> None:
     """Map Solaris raw disks.
 
-    Iterate through /dev/dsk and match raw device names (not slices or partitions).
+    Iterate through ``/dev/dsk`` and match raw device names (not slices or partitions).
     """
-    for drive in SOLARIS_DEV_DIR.iterdir():
-        if not SOLARIS_DRIVE_REGEX.match(drive.name):
-            continue
-        _add_disk_as_raw_container_to_target(drive, target)
+    if (path := root.joinpath("dev/dsk")).exists() and (
+        drives := [d for d in path.iterdir() if SOLARIS_DRIVE_REGEX.match(d.name)]
+    ):
+        for drive in drives:
+            _add_disk_as_raw_container_to_target(drive, target)
 
 
-def map_esxi_drives(target: Target) -> None:
+def map_esxi_drives(root: Path, target: Target) -> None:
     """Map ESXi raw disks.
 
-    Get all devices from /vmfs/devices/disks/* (not partitions).
+    Get all devices from ``/vmfs/devices/disks/vml.*`` (not partitions).
     """
-    for drive in ESXI_DEV_DIR.glob("vml.*"):
-        if ":" in drive.name:
-            continue
-        _add_disk_as_raw_container_to_target(drive, target)
+    if (path := root.joinpath("vmfs/devices/disks")).exists() and (
+        drives := [d for d in path.glob("vml.*") if ":" not in d.name]
+    ):
+        for drive in drives:
+            _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_windows_drives(target: Target) -> None:
