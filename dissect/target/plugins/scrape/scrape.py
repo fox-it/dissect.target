@@ -62,7 +62,7 @@ class ScrapePlugin(Plugin):
         # Build initial map from physical disks
         offset = 0
         for disk in self.target.disks:
-            for volume in sorted(disk.vs.volumes, key=lambda v: v.offset) if disk.vs else []:
+            for volume in self._get_disk_vols(disk):
                 if offset != volume.offset:
                     # We don't add gaps (source=disk) to the volume_region_map
                     # as they can't be dependencies.
@@ -307,3 +307,20 @@ class ScrapePlugin(Plugin):
             disk.seek(0)
             for needle, offset, match in find_needles(disk, needles=needles, block_size=block_size):
                 yield disk, needle, offset, match
+
+    @internal
+    def _get_disk_vols(self, disk: Container) -> Iterator[Volume]:
+        """Yields all volumes for a given disk container.
+
+        When the disk has an associated volume system, volumes are retrieved from there.
+        When the disk is raw, volumes are retrieved from the target's volume list.
+
+        Args:
+            disk: The disk container to get volumes for.
+        """
+        if disk.vs:
+            yield from sorted(disk.vs.volumes, key=lambda v: v.offset)
+        else:
+            for volume in sorted(self.target.volumes, key=lambda v: v.offset or 0):
+                if volume.disk == disk and not volume.vs:
+                    yield volume
