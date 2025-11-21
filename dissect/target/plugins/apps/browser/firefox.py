@@ -8,8 +8,8 @@ from hashlib import pbkdf2_hmac, sha1
 from itertools import chain
 from typing import TYPE_CHECKING
 
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -30,8 +30,6 @@ from dissect.target.plugins.apps.browser.browser import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
-
-    from dissect.sql.sqlite3 import SQLite3
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -172,10 +170,10 @@ class FirefoxPlugin(BrowserPlugin):
                 db_file = profile_dir.joinpath(filename)
 
             try:
-                yield user_details, db_file, sqlite3.SQLite3(db_file.open())
+                yield user_details, db_file, SQLite3(db_file.open())
             except FileNotFoundError:
                 self.target.log.info("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -241,7 +239,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -288,7 +286,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing cookie file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -376,7 +374,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -676,7 +674,7 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
     # values we are interested in. Generally the last entry will be the currently active value,
     # which is why we need to iterate every row in the table to get the last entry.
     with key4_file.open("rb") as fh:
-        db = sqlite3.SQLite3(fh)
+        db = SQLite3(fh)
 
         # Get the last ``item`` (global salt) and ``item2`` (password check) values.
         if table := db.table("metadata"):

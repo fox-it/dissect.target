@@ -6,7 +6,7 @@ import struct
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
-from dissect.sql import sqlite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.plist import NSKeyedArchiver
 
 from dissect.target.exceptions import LoaderError
@@ -143,7 +143,7 @@ class ITunesBackup:
 
         self.manifest_db = self._open_manifest_db()
 
-    def _open_manifest_db(self) -> sqlite3.SQLite3:
+    def _open_manifest_db(self) -> SQLite3:
         path = self.root.joinpath("Manifest.db")
         if not self.encrypted or self.manifest["Lockdown"]["ProductVersion"] < "10.2":
             fh = path.open("rb")
@@ -151,7 +151,7 @@ class ITunesBackup:
             key = self.key_bag.unwrap(self.manifest["ManifestKey"])
             fh = BytesIO(aes_decrypt(path.read_bytes(), key))
 
-        return sqlite3.SQLite3(fh)
+        return SQLite3(fh)
 
     def derive_key(self, password: str) -> bytes:
         """Derive the key bag encryption key from a given password."""
