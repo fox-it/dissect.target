@@ -289,15 +289,15 @@ def walk_ext(
 ) -> Iterator[
     tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
 ]:
-    dirs = []
-    files = []
+    dirs: list[filesystem.FilesystemEntry] = []
+    files: list[filesystem.FilesystemEntry] = []
 
     try:
         for entry in path_entry.scandir():
             if entry.is_dir():
-                dirs.append(entry)
+                dirs.append(entry.get())
             else:
-                files.append(entry)
+                files.append(entry.get())
     except Exception as e:
         if onerror is not None and callable(onerror):
             e.entry = path_entry
@@ -316,18 +316,18 @@ def walk_ext(
         yield [path_entry], dirs, files
 
 
-def recurse(path_entry: filesystem.FilesystemEntry) -> Iterator[filesystem.FilesystemEntry]:
-    """Recursively walk the given :class:`FilesystemEntry`, yields :class:`FilesystemEntry` instances."""
-    yield path_entry
+def recurse(entry: filesystem.FilesystemEntry) -> Iterator[filesystem.FilesystemEntry]:
+    """Recursively walk the given :class:`FilesystemEntry`, yields :class:`DirEntry` instances."""
+    yield entry
 
-    if not path_entry.is_dir():
+    if not entry.is_dir():
         return
 
-    for child_entry in path_entry.scandir():
-        if child_entry.is_dir() and not child_entry.is_symlink():
-            yield from recurse(child_entry)
+    for direntry in entry.scandir():
+        if direntry.is_dir(follow_symlinks=False):
+            yield from recurse(direntry.get())
         else:
-            yield child_entry
+            yield direntry.get()
 
 
 def glob_split(pattern: str, alt_separator: str = "") -> tuple[str, str]:
@@ -424,7 +424,7 @@ def glob_ext1(direntry: filesystem.FilesystemEntry, pattern: str) -> Iterator[fi
         name = entry.name if case_sensitive else entry.name.lower()
         pattern = pattern if case_sensitive else pattern.lower()
         if fnmatch.fnmatch(name, pattern):
-            yield entry
+            yield entry.get()
 
 
 def glob_ext0(direntry: filesystem.FilesystemEntry, path: str) -> Iterator[filesystem.FilesystemEntry]:

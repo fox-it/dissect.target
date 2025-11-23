@@ -382,16 +382,16 @@ def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: Vi
 
 
 def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    base_dirs = [
+    base_dirs = (
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Default",
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 1",
-    ]
-    snapshot_dirs = [
+    )
+    snapshot_dirs = (
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Default",
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\119.0.7845.119\\Default",
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Profile 1",
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\119.0.7845.119\\Profile 1",
-    ]
+    )
     profile_dirs = base_dirs + snapshot_dirs
 
     for dir in profile_dirs:
@@ -412,15 +412,14 @@ def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFiles
     for records in records_list:
         assert {"chrome"} == {record.browser for record in records}
 
-        for base_dir in base_dirs:
-            base_path_records = [r for r in records if str(r.source.parent).endswith(base_dir)]
+        base_path_records = [r for r in records if str(r.source.parent).endswith(base_dirs)]
 
-        for snapshot_dir in snapshot_dirs:
-            # Retrieve records that are in the snapshot's directory.
-            snapshot_records = [r for r in records if str(r.source.parent).endswith(snapshot_dir)]
+        # Retrieve records that are in the snapshot's directory.
+        snapshot_records = [r for r in records if str(r.source.parent).endswith(snapshot_dirs)]
 
         # We map the same files in each of the snapshot directories.
-        assert len(base_path_records) == len(snapshot_records)
+        # We have two base directories and four snapshot directories, so we expect twice the amount of records.
+        assert len(base_path_records) == len(snapshot_records) // 2
 
 
 def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win: VirtualFilesystem) -> None:

@@ -11,7 +11,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.logging import get_logger
 
@@ -84,6 +84,29 @@ class SmbFilesystem(Filesystem):
         return result[0]
 
 
+class SmbDirEntry(DirEntry):
+    fs: SmbFilesystem
+    entry: SharedFile
+
+    def get(self) -> SmbFilesystemEntry:
+        return SmbFilesystemEntry(self.fs, self.path, self.entry)
+
+    def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+        if follow_symlinks and self.is_symlink():
+            return super().is_dir(follow_symlinks=follow_symlinks)
+
+        return bool(self.entry.is_directory())
+
+    def is_file(self, *, follow_symlinks: bool = True) -> bool:
+        return not self.is_dir(follow_symlinks=follow_symlinks)
+
+    def is_symlink(self) -> bool:
+        return False
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class SmbFilesystemEntry(FilesystemEntry):
     fs: SmbFilesystem
     entry: SharedFile
@@ -91,30 +114,20 @@ class SmbFilesystemEntry(FilesystemEntry):
     def get(self, path: str) -> FilesystemEntry:
         return self.fs.get(fsutil.join(self.path, path, alt_separator=self.fs.alt_separator))
 
-    def _iterdir(self) -> Iterator[SharedFile]:
+    def scandir(self) -> Iterator[SmbDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
         path = fsutil.join(self.path, "*", alt_separator=self.fs.alt_separator)
         try:
             entry: SharedFile
-
             for entry in self.fs.conn.listPath(self.fs.share_name, path):
-                if entry.get_longname() in (".", ".."):
+                if (name := entry.get_longname()) in (".", ".."):
                     continue
 
-                yield entry
+                yield SmbDirEntry(self.fs, self.path, name, entry)
         except SessionError as e:
             log.error("Failed to list directory '%s' share '%s', error: %s", path, self.fs.share_name, e)  # noqa: TRY400
-
-    def iterdir(self) -> Iterator[str]:
-        for entry in self._iterdir():
-            yield entry.get_longname()
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        for entry in self._iterdir():
-            entry_path = fsutil.join(self.path, entry.get_longname(), alt_separator=self.fs.alt_separator)
-            yield SmbFilesystemEntry(self.fs, entry_path, entry)
 
     def open(self) -> SmbStream:
         log.debug("Attempting to open file: %s", self.path)

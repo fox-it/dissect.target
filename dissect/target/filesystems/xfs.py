@@ -12,7 +12,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.logging import get_logger
 
@@ -51,7 +51,21 @@ class XfsFilesystem(Filesystem):
             raise FileNotFoundError(path) from e
 
 
+class XfsDirEntry(DirEntry):
+    fs: XfsFilesystem
+    entry: xfs.INode
+
+    def get(self) -> XfsFilesystemEntry:
+        return XfsFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class XfsFilesystemEntry(FilesystemEntry):
+    fs: XfsFilesystem
+    entry: xfs.INode
+
     def get(self, path: str) -> FilesystemEntry:
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return XfsFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
@@ -61,35 +75,16 @@ class XfsFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def iterdir(self) -> Iterator[str]:
+    def scandir(self) -> Iterator[XfsDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            for f in self.readlink_ext().iterdir():
-                yield f
-        else:
-            for f in self.entry.listdir():
-                if f in (".", ".."):
-                    continue
-                yield f
+        for name, entry in self._resolve().entry.listdir().items():
+            if name in (None, ".", ".."):
+                continue
 
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        if not self.is_dir():
-            raise NotADirectoryError(self.path)
-
-        if self.is_symlink():
-            for f in self.readlink_ext().scandir():
-                yield f
-        else:
-            for filename, f in self.entry.listdir().items():
-                if filename in (".", ".."):
-                    continue
-
-                if filename is None:
-                    continue
-                path = fsutil.join(self.path, filename, alt_separator=self.fs.alt_separator)
-                yield XfsFilesystemEntry(self.fs, path, f)
+            # TODO: Separate INode and DirEntry in dissect.xfs
+            yield XfsDirEntry(self.fs, self.path, name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

@@ -15,6 +15,7 @@ from dissect.target.exceptions import (
     NotASymlinkError,
 )
 from dissect.target.filesystem import (
+    DirEntry,
     Filesystem,
     FilesystemEntry,
     VirtualDirectory,
@@ -98,25 +99,13 @@ class ZipFilesystemEntry(VirtualDirectory):
         except Exception:
             raise FileNotFoundError(self.path)
 
-    def iterdir(self) -> Iterator[str]:
+    def scandir(self) -> Iterator[DirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        entry = self._resolve()
-        if isinstance(entry, ZipFilesystemEntry):
-            yield from super(ZipFilesystemEntry, entry).iterdir()
-        else:
-            yield from entry.iterdir()
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        if not self.is_dir():
-            raise NotADirectoryError(self.path)
-
-        entry = self._resolve()
-        if isinstance(entry, ZipFilesystemEntry):
-            yield from super(ZipFilesystemEntry, entry).scandir()
-        else:
-            yield from entry.scandir()
+        if isinstance(entry := self._resolve(), ZipFilesystemEntry):
+            return super(ZipFilesystemEntry, entry).scandir()
+        return entry.scandir()
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

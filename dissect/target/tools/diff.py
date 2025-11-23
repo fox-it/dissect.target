@@ -158,21 +158,22 @@ class TargetComparison:
         exists_as_directory_src = self.src_target.fs.exists(path) and self.src_target.fs.get(path).is_dir()
         exists_as_directory_dst = self.dst_target.fs.exists(path) and self.dst_target.fs.get(path).is_dir()
 
+        # TODO: Adjust the following code to deal more efficiently with DirEntry instead of FilesystemEntry
         if not (exists_as_directory_src and exists_as_directory_dst):
             if exists_as_directory_src:
                 # Path only exists on src target, hence all entries can be considered 'deleted'
-                entries = list(self.src_target.fs.scandir(path))
+                entries = [entry.get() for entry in self.src_target.fs.scandir(path)]
                 return DirectoryDifferential(path, deleted=entries)
             if exists_as_directory_dst:
                 # Path only exists on dst target, hence all entries can be considered 'created'
-                entries = list(self.dst_target.fs.scandir(path))
+                entries = [entry.get() for entry in self.dst_target.fs.scandir(path)]
                 return DirectoryDifferential(path, created=entries)
             raise ValueError(f"{path} is not a directory on either the source or destination target!")
 
-        src_target_entries = list(self.src_target.fs.scandir(path))
+        src_target_entries = [entry.get() for entry in self.src_target.fs.scandir(path)]
         src_target_children_paths = {entry.path for entry in src_target_entries}
 
-        dst_target_entries = list(self.dst_target.fs.scandir(path))
+        dst_target_entries = [entry.get() for entry in self.dst_target.fs.scandir(path)]
         dst_target_children_paths = {entry.path for entry in dst_target_entries}
 
         paths_only_on_src_target = src_target_children_paths - dst_target_children_paths
