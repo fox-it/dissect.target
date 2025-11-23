@@ -468,9 +468,9 @@ class Plugin:
     def get_all_paths(self) -> Iterator[Path]:
         """Return all artifact and auxiliary paths.
 
-            The implementation of this function will
-            probably change in the future, but the interface
-            should stay the same.
+        The implementation of this function will
+        probably change in the future, but the interface
+        should stay the same.
         """
         yield from self.get_paths()
         yield from self._get_auxiliary_paths()
