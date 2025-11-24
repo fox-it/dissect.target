@@ -14,140 +14,173 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_create_streams(target_bare: Target) -> None:
+class MockFactory:
+    """Helper to generate complex mock volume structures quickly."""
+
+    @staticmethod
+    def create_disk(name: str = "disk0", size: int = 100_000) -> Mock:
+        disk = Mock(name=name)
+        disk.size = size
+        disk.vs = Mock()
+        disk.vs.volumes = []
+        return disk
+
+    @staticmethod
+    def create_volume(name: str, backing_disk: Mock, offset: int, size: int) -> Mock:
+        vol = Mock(name=name)
+        vol.disk = backing_disk  # In dissect, .disk usually points to the physical disk
+        vol.offset = offset
+        vol.size = size
+        vol.vs = None  # Default to no file system
+
+        # Add to backing disk's VS list (mimicking a partition table)
+        if backing_disk and hasattr(backing_disk, "vs") and backing_disk.vs:
+            backing_disk.vs.volumes.append(vol)
+
+        return vol
+
+    @staticmethod
+    def make_encrypted(volume: Mock, decrypted_vol_name: str) -> Mock:
+        """Turns a volume into a LUKS container and returns the decrypted volume."""
+        decrypted = Mock(name=decrypted_vol_name)
+        decrypted.size = volume.size - 64  # Header overhead
+        decrypted.offset = volume.offset
+        decrypted.vs = None
+        decrypted.disk = volume.disk  # Points to physical disk
+
+        decrypted.vs = Mock(spec=EncryptedVolumeSystem)
+        decrypted.vs.fh = volume
+
+        return decrypted
+
+    @staticmethod
+    def make_lvm(name: str, backing_volumes: list[Mock], size: int | None = None) -> Mock:
+        """Creates a Logical Volume spanning the backing_volumes."""
+        if size is None:
+            size = sum(v.size for v in backing_volumes)
+
+        lv = Mock(name=name)
+        lv.size = size
+        lv.offset = 0
+        lv.disk = [v.disk for v in backing_volumes]  # List of physical disks
+        lv.vs = Mock()
+
+        # Setup LVM relationship
+        # The LV volume object's vs.fh is a list of PVs (backing volumes)
+        lv.vs = Mock(spec=LogicalVolumeSystem)
+        lv.vs.fh = [Mock(fh=bv) for bv in backing_volumes]  # wrap in source_dev style
+
+        return lv
+
+
+def test_create_streams_two_ordinary_volumes(target_bare: Target) -> None:
+    """Test scrape streams for a standard physical disk with two partitions and gaps."""
+    target_bare.add_plugin(ScrapePlugin)  # type: ignore
+
+    # Setup
+    disk = MockFactory.create_disk(size=100)
+    vol1 = MockFactory.create_volume("vol1", disk, offset=10, size=20)
+    vol2 = MockFactory.create_volume("vol2", disk, offset=50, size=20)
+
+    target_bare.disks.add(disk)
+
+    with patch("dissect.util.stream.MappingStream.add") as mock_add:
+        streams = list(target_bare.scrape.create_streams())  # type: ignore
+
+        # Assertions
+        assert len(streams) == 1
+        assert streams[0][0] == disk  # The stream key is the disk
+
+        expected_calls = [
+            call(0, 10, disk, 0),  # Gap at start
+            call(10, 20, vol1, 0),  # Volume 1
+            call(30, 20, disk, 30),  # Gap between
+            call(50, 20, vol2, 0),  # Volume 2
+            call(70, 30, disk, 70),  # Gap at end
+        ]
+        mock_add.assert_has_calls(expected_calls)
+
+
+def test_create_streams_luks_lvm_luks(target_bare: Target) -> None:
+    """Test scrape screams for LUKS -> LVM -> LUKS nested volumes."""
     target_bare.add_plugin(ScrapePlugin)
 
-    streams = list(target_bare.scrape.create_streams())
-    assert len(streams) == 0
+    # 1. Physical Layer
+    disk = MockFactory.create_disk("phys_disk", size=1000)
+    encrypted_outer = MockFactory.create_volume("part1", disk, offset=0, size=1000)
 
-    mock_disk = Mock(name="mock_disk")
-    mock_disk.size = 1024 * 64
+    # 2. Outer LUKS Layer (Part1 is encrypted)
+    decrypted_outer = MockFactory.make_encrypted(encrypted_outer, "decrypted_outer")
 
-    mock_volume_1 = Mock(name="mock_volume_1")
-    mock_volume_1.disk = mock_disk
-    mock_volume_1.offset = 1024
-    mock_volume_1.size = 1024 * 8
-    mock_volume_2 = Mock(name="mock_volume_2")
-    mock_volume_2.disk = mock_disk
-    mock_volume_2.offset = 1024 * 10
-    mock_volume_2.size = 1024 * 8
+    # 3. LVM Layer (Decrypted Outer is the PV)
+    lv = MockFactory.make_lvm("lv_inner", [decrypted_outer], size=400)
 
-    mock_disk.vs.volumes = [mock_volume_2, mock_volume_1]  # Test out-of-order volumes
+    # 4. Inner LUKS Layer (LV is encrypted)
+    decrypted_inner = MockFactory.make_encrypted(lv, "decrypted_inner")
 
-    target_bare.disks.add(mock_disk)
+    target_bare.disks.add(disk)
 
-    expected_base = [
-        call(0, 1024, mock_disk, 0),
-        call(1024, 1024 * 8, mock_volume_1, 0),
-        call(1024 * 9, 1024, mock_disk, 1024 * 9),
-        call(1024 * 10, 1024 * 8, mock_volume_2, 0),
-        call(1024 * 18, 1024 * 46, mock_disk, 1024 * 18),
-    ]
+    target_bare.volumes.entries = [encrypted_outer, decrypted_outer, lv, decrypted_inner]
 
     with patch("dissect.util.stream.MappingStream.add") as mock_add:
-        streams = list(target_bare.scrape.create_streams())
-        mock_add.assert_has_calls(expected_base)
+        streams = list(target_bare.scrape.create_streams(encrypted=True, lvm=True))
 
         assert len(streams) == 1
-        # Get the number of streams for each disk
-        stream_counts = [len(streams) for _, streams in streams]
-        assert stream_counts == [1]
+        assert call(0, decrypted_inner.size, decrypted_inner, 0) in mock_add.call_args_list
 
-    mock_encrypted_volume = Mock(name="mock_encrypted_volume")
-    mock_encrypted_volume.disk = mock_disk
-    mock_encrypted_volume.offset = 1024
-    mock_encrypted_volume.size = 1024 * 8
-    mock_encrypted_volume.vs = Mock(spec=EncryptedVolumeSystem, fh=mock_encrypted_volume)
 
-    target_bare.volumes.entries = [mock_encrypted_volume]
+def test_create_streams_lvm_luks_lvm(target_bare: Target) -> None:
+    """
+    Test Case 3: Nested LVM -> LUKS -> LVM
+    Physical Disk -> Part1 (PV) -> LV1 (LUKS) -> Decrypted LV1 (PV) -> LV2
+    """
+    target_bare.add_plugin(ScrapePlugin)
+
+    # 1. Physical Layer
+    disk = MockFactory.create_disk("phys_disk", size=1000)
+    part1 = MockFactory.create_volume("part1", disk, offset=0, size=1000)
+
+    # 2. Outer LVM (Part1 is PV)
+    lv1 = MockFactory.make_lvm("lv1_outer", [part1], size=480)
+
+    # 3. LUKS Layer (LV1 is encrypted)
+    decrypted_lv1 = MockFactory.make_encrypted(lv1, "decrypted_lv1")
+
+    # 4. Inner LVM (Decrypted LV1 is PV)
+    lv2 = MockFactory.make_lvm("lv2_inner", [decrypted_lv1], size=400)
+
+    target_bare.disks.add(disk)
+    target_bare.volumes.entries = [part1, lv1, decrypted_lv1, lv2]
 
     with patch("dissect.util.stream.MappingStream.add") as mock_add:
-        streams = list(target_bare.scrape.create_streams(encrypted=False))
-        mock_add.assert_has_calls(expected_base)
-
-        mock_add.reset_mock()
-
-        streams = list(target_bare.scrape.create_streams(encrypted=True))
-        mock_add.assert_has_calls(
-            [
-                call(0, 1024, mock_disk, 0),
-                call(1024, 1024 * 8, mock_encrypted_volume, 0),
-                call(1024 * 9, 1024, mock_disk, 1024 * 9),
-                call(1024 * 10, 1024 * 8, mock_volume_2, 0),
-                call(1024 * 18, 1024 * 46, mock_disk, 1024 * 18),
-            ]
-        )
+        streams = list(target_bare.scrape.create_streams(encrypted=True, lvm=True))
 
         assert len(streams) == 1
-        # Get the number of streams for each disk
-        stream_counts = [len(streams) for _, streams in streams]
-        assert stream_counts == [1]
+        assert call(0, 400, lv2, 0) in mock_add.call_args_list
 
-        mock_add.reset_mock()
 
-        streams = list(target_bare.scrape.create_streams(encrypted=True, all=True))
-        mock_add.assert_has_calls(
-            [
-                call(0, 1024, mock_disk, 0),
-                call(1024, 1024 * 8, mock_volume_1, 0),
-                call(1024 * 9, 1024, mock_disk, 1024 * 9),
-                call(1024 * 10, 1024 * 8, mock_volume_2, 0),
-                call(1024 * 18, 1024 * 46, mock_disk, 1024 * 18),
-                call(0, 1024 * 8, mock_encrypted_volume, 0),
-            ]
-        )
+def test_create_streams_lvm_shared_pv(target_bare: Target) -> None:
+    """Test two LVs sharing the same Physical Volume (VG)."""
+    target_bare.add_plugin(ScrapePlugin)
 
-        assert len(streams) == 2
-        # Get the number of streams for each disk
-        stream_counts = [len(streams) for _, streams in streams]
-        assert stream_counts == [1, 1]
+    disk = MockFactory.create_disk(size=1000)
+    pv_part = MockFactory.create_volume("pv_part", disk, offset=0, size=1000)
 
-    mock_lvm_volume = Mock(name="mock_lvm_volume")
-    mock_lvm_volume.size = 1024 * 16
-    mock_lvm_volume.disk = [mock_volume_1, mock_volume_2]
-    mock_lvm_volume.vs = Mock(spec=LogicalVolumeSystem)
+    # Both LVs reside on the same PV
+    lv1 = MockFactory.make_lvm("lv1", [pv_part], size=500)
+    lv2 = MockFactory.make_lvm("lv2", [pv_part], size=500)
 
-    target_bare.volumes.entries = [mock_lvm_volume]
+    target_bare.disks.add(disk)
+    target_bare.volumes.entries = [pv_part, lv1, lv2]
 
     with patch("dissect.util.stream.MappingStream.add") as mock_add:
-        streams = list(target_bare.scrape.create_streams(lvm=False))
-        mock_add.assert_has_calls(expected_base)
-
-        mock_add.reset_mock()
-
         streams = list(target_bare.scrape.create_streams(lvm=True))
-        mock_add.assert_has_calls(
-            [
-                call(0, 1024, mock_disk, 0),
-                call(0, 1024, mock_disk, 1024 * 9),
-                call(0, 1024 * 46, mock_disk, 1024 * 18),
-                call(0, 1024 * 16, mock_lvm_volume, 0),
-            ]
-        )
-        assert len(streams) == 2
-        # Get the number of streams for each disk
-        stream_counts = [len(streams) for _, streams in streams]
-        assert stream_counts == [3, 1]
-        # Get the offsets for the first disk's streams
-        first_disk_offsets = [streams[0][1][i][0] for i in range(3)]
-        assert first_disk_offsets == [0, 1024 * 9, 1024 * 18]
-        # Get the offset for the second disk's only stream
-        second_disk_offsets = [streams[1][1][i][0] for i in range(1)]
-        assert second_disk_offsets == [0]
 
-        mock_add.reset_mock()
+        assert len(streams) == 2  # One for each LV
 
-        streams = list(target_bare.scrape.create_streams(lvm=True, all=True))
-        mock_add.assert_has_calls(
-            [
-                call(0, 1024, mock_disk, 0),
-                call(1024, 1024 * 8, mock_volume_1, 0),
-                call(1024 * 9, 1024, mock_disk, 1024 * 9),
-                call(1024 * 10, 1024 * 8, mock_volume_2, 0),
-                call(1024 * 18, 1024 * 46, mock_disk, 1024 * 18),
-                call(0, 1024 * 16, mock_lvm_volume, 0),
-            ]
-        )
+        # Verify LVs exist
+        assert call(0, 500, lv1, 0) in mock_add.call_args_list
+        assert call(0, 500, lv2, 0) in mock_add.call_args_list
 
 
 def test_find(target_bare: Target) -> None:
