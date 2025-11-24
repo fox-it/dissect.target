@@ -33,9 +33,10 @@ class BsdPlugin(UnixPlugin):
     def hostname(self) -> str | None:
         for name in ("/etc/rc.conf", "/etc/rc.conf.defaults"):
             if (file := self.target.fs.path(name)).is_file():
-                for line in file.open("rt").readlines():
-                    if line.startswith("hostname"):
-                        return line.rstrip().split("=", maxsplit=1)[1].replace('"', "")
+                with file.open("rt") as fh:
+                    for line in fh:
+                        if line.startswith("hostname"):
+                            return line.rstrip().split("=", maxsplit=1)[1].replace('"', "")
 
         return None
 

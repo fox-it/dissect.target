@@ -17,7 +17,7 @@ class CitrixLocalePlugin(LocalePlugin):
 
     @export(property=True)
     def language(self) -> list[str] | None:
-        """Return configured UI language(s)"""
+        """Return configured UI language(s)."""
 
         found_languages = set()
 

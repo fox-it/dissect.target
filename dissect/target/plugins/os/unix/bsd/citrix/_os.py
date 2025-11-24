@@ -97,7 +97,7 @@ class CitrixPlugin(BsdPlugin):
         supports extracting the read-only kernel FFS filesystem from ``/flash/ns-*.gz`` and mounting at ``/``.
         """
 
-        # When the ramdisk is already present within the target's filesystems, mount it accordingly,
+        # When the ramdisk is already present within the target's filesystems, mount it accordingly.
         has_ramdisk = False
         for fs in target.filesystems:
             if fs.exists("/bin/freebsd-version"):
@@ -128,8 +128,7 @@ class CitrixPlugin(BsdPlugin):
                     target.log.warning("Loading compressed kernel filesystem, this can take a while")
 
                     # This is *significantly* faster than decompressing random reads on the fly.
-                    with gzip.open(kernel_gz.open("rb")) as gz:
-                        fh = BytesIO(gz.read())
+                    fh = BytesIO(gzip.decompress(kernel_gz.read_bytes()))
 
                     # Obtain the offset and size of the mfs section.
                     section = ELF(fh).sections.by_name("mfs")[0]
