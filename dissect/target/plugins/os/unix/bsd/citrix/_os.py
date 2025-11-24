@@ -1,11 +1,24 @@
 from __future__ import annotations
 
+import gzip
 import re
+from io import BytesIO
 from typing import TYPE_CHECKING
 
+from dissect.util.stream import RangeStream
+
+from dissect.target.filesystems.ffs import FfsFilesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
+
+try:
+    from dissect.executable import ELF
+
+    HAS_EXECUTABLE = True
+
+except ImportError:
+    HAS_EXECUTABLE = False
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -25,6 +38,8 @@ RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')
 
 
 class CitrixPlugin(BsdPlugin):
+    """Citrix Netscaler OS plugin."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._ips = []
@@ -72,29 +87,84 @@ class CitrixPlugin(BsdPlugin):
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
-        # A disk image of a Citrix Netscaler contains two partitions, that after boot are mounted to /var and /flash.
-        # The rest of the filesystem is recreated at runtime into a 'ramdisk'. Currently, this plugin does not
-        # yet support recreating the ramdisk from a 'clean' state. This might be possible in a future iteration but
-        # requires further research.
+        """Map filesystems as the Citrix Netscaler bootloader would.
 
-        # When the ramdisk is present within the target's filesystems, mount it accordingly,
+        An image of a Citrix Netscaler generally contains two partitions, that after boot are mounted
+        to ``/var``and ``/flash``. The rest of the filesystem is recreated at runtime into a 'ramdisk'.
+        This ramdisk is generally stored read-only in the kernel ELF binary located in ``/flash/ns-*.gz``.
+
+        This implementation supports mapping a live ramdisk which is already mounted at ``/`` and also
+        supports extracting the read-only kernel FFS filesystem from ``/flash/ns-*.gz`` and mounting at ``/``.
+        """
+
+        # When the ramdisk is already present within the target's filesystems, mount it accordingly,
+        has_ramdisk = False
         for fs in target.filesystems:
             if fs.exists("/bin/freebsd-version"):
                 # If available, mount the ramdisk first.
                 target.fs.mount("/", fs)
+                has_ramdisk = True
+
         # The 'disk' filesystem is mounted at '/var'.
         target.fs.mount("/var", sysvol)
 
-        # Enumerate filesystems for flash partition
+        # Enumerate filesystems for flash partition.
+        # Multiple flash partitions could exist, so we look for the one with an actual ns.conf present.
         for fs in target.filesystems:
-            if fs.exists("/nsconfig") and fs.exists("/boot"):
+            if fs.exists("/nsconfig/ns.conf") and fs.exists("/boot"):
                 target.fs.mount("/flash", fs)
+
+        # Reconstruct root filesystem from the 'mfs' segment embedded in the kernel.
+        if (
+            not has_ramdisk
+            and (boot_loader_conf := target.fs.path("/flash/boot/loader.conf")).is_file()
+            and (match := RE_LOADER_CONFIG_KERNEL_VERSION.search(boot_loader_conf.read_text()))
+        ):
+            # Finds the currently active kernel version.
+            kernel_version = match.groupdict()["version"]
+
+            if (kernel_gz := target.fs.path(f"/flash/{kernel_version}.gz")).is_file():
+                if HAS_EXECUTABLE:
+                    target.log.warning("Loading compressed kernel filesystem, this can take a while")
+
+                    # This is *significantly* faster than decompressing random reads on the fly.
+                    with gzip.open(kernel_gz.open("rb")) as gz:
+                        fh = BytesIO(gz.read())
+
+                    # Obtain the offset and size of the mfs section.
+                    section = ELF(fh).sections.by_name("mfs")[0]
+
+                    # Construct a FFS filesystem and add it to the target.
+                    fs = FfsFilesystem(RangeStream(fh, section.offset, section.size))
+                    target.filesystems.add(fs)
+                    target.fs.mount("/", fs)
+
+                else:
+                    target.log.warning("Unable to load kernel filesystem, missing dependency dissect.executable")
+
+            else:
+                target.log.warning("File %s not found, did not load Netscaler kernel in root filesystem", kernel_gz)
 
         return cls(target)
 
     @export(property=True)
     def hostname(self) -> str | None:
-        return self._hostname or super().hostname
+        # Could be set in ns.conf file(s)
+        if self._hostname:
+            return self._hostname
+
+        # Could be found in license file(s)
+        if (dir := self.target.fs.path("/flash/nsconfig/license")).is_dir():
+            hostname = None
+            for lic in dir.glob("*.lic"):
+                for line in lic.open("rt"):
+                    if "HOSTNAME=" in line:
+                        hostname = line.split("HOSTNAME=")[-1].strip()
+            if hostname:
+                return hostname
+
+        # Fallback to BSD hostname file(s)
+        return super().hostname
 
     @export(property=True)
     def version(self) -> str | None:

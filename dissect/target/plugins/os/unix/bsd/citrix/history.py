@@ -52,7 +52,10 @@ CITRIX_NETSCALER_BASH_HISTORY_RE = re.compile(
 class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
     """Citrix command history plugin."""
 
-    COMMAND_HISTORY_ABSOLUTE_PATHS = (("citrix-netscaler-bash", "/var/log/bash.log*"),)
+    COMMAND_HISTORY_ABSOLUTE_PATHS = (
+        ("citrix-netscaler-bash", "/var/log/bash.log*"),
+        ("citrix-netscaler-sh", "/var/log/sh.log*"),
+    )
     COMMAND_HISTORY_RELATIVE_PATHS = (
         *CommandHistoryPlugin.COMMAND_HISTORY_RELATIVE_PATHS,
         ("citrix-netscaler-cli", ".nscli_history"),
