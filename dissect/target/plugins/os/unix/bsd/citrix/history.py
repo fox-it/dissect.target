@@ -92,7 +92,7 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         for shell, history_path, user in self._history_files:
             if shell == "citrix-netscaler-cli":
                 yield from self.parse_netscaler_cli_history(history_path, user)
-            elif shell == "citrix-netscaler-bash":
+            elif shell in ("citrix-netscaler-bash", "citrix-netscaler-sh"):
                 yield from self.parse_netscaler_bash_history(history_path)
 
     def parse_netscaler_bash_history(self, path: TargetPath) -> Iterator[CommandHistoryRecord]:
