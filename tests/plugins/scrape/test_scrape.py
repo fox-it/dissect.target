@@ -4,6 +4,7 @@ import io
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, call, patch
 
+import pytest
 from dissect.volume.lvm.physical import LVM2Device
 
 from dissect.target.containers.raw import RawContainer
@@ -26,15 +27,23 @@ class MockFactory:
         return disk
 
     @staticmethod
+    def create_raw_disk(name: str, volume_name: str, size: int = 100_000) -> tuple[Mock, Mock]:
+        raw_disk = Mock(name=name)
+        raw_disk.size = size
+        raw_disk.vs = None  # No volume system
+        volume = MockFactory.create_volume(volume_name, raw_disk, offset=0, size=size)
+        return raw_disk, volume
+
+    @staticmethod
     def create_volume(name: str, backing_disk: Mock, offset: int, size: int) -> Mock:
         vol = Mock(name=name)
-        vol.disk = backing_disk  # In dissect, .disk usually points to the physical disk
+        vol.disk = backing_disk
         vol.offset = offset
         vol.size = size
         vol.vs = None  # Default to no file system
 
         # Add to backing disk's VS list (mimicking a partition table)
-        if backing_disk and hasattr(backing_disk, "vs") and backing_disk.vs:
+        if getattr(backing_disk, "vs", None):
             backing_disk.vs.volumes.append(vol)
 
         return vol
@@ -44,7 +53,7 @@ class MockFactory:
         """Turns a volume into a LUKS container and returns the decrypted volume."""
         decrypted = Mock(name=decrypted_vol_name)
         decrypted.size = volume.size - 64  # Header overhead
-        decrypted.offset = volume.offset
+        decrypted.offset = 0
         decrypted.vs = None
         decrypted.disk = volume.disk  # Points to physical disk
 
@@ -75,7 +84,7 @@ class MockFactory:
 
 def test_create_streams_two_ordinary_volumes(target_bare: Target) -> None:
     """Test scrape streams for a standard physical disk with two partitions and gaps."""
-    target_bare.add_plugin(ScrapePlugin)  # type: ignore
+    target_bare.add_plugin(ScrapePlugin)
 
     # Setup
     disk = MockFactory.create_disk(size=100)
@@ -85,7 +94,7 @@ def test_create_streams_two_ordinary_volumes(target_bare: Target) -> None:
     target_bare.disks.add(disk)
 
     with patch("dissect.util.stream.MappingStream.add") as mock_add:
-        streams = list(target_bare.scrape.create_streams())  # type: ignore
+        streams = list(target_bare.scrape.create_streams())
 
         # Assertions
         assert len(streams) == 1
@@ -130,10 +139,7 @@ def test_create_streams_luks_lvm_luks(target_bare: Target) -> None:
 
 
 def test_create_streams_lvm_luks_lvm(target_bare: Target) -> None:
-    """
-    Test Case 3: Nested LVM -> LUKS -> LVM
-    Physical Disk -> Part1 (PV) -> LV1 (LUKS) -> Decrypted LV1 (PV) -> LV2
-    """
+    """Test Case 3: Nested LVM -> LUKS -> LVM."""
     target_bare.add_plugin(ScrapePlugin)
 
     # 1. Physical Layer
@@ -181,6 +187,123 @@ def test_create_streams_lvm_shared_pv(target_bare: Target) -> None:
         # Verify LVs exist
         assert call(0, 500, lv1, 0) in mock_add.call_args_list
         assert call(0, 500, lv2, 0) in mock_add.call_args_list
+
+
+@pytest.mark.parametrize(
+    ("encrypted", "all_flag", "expect_raw", "expect_decrypted", "expect_inplace"),
+    [
+        (False, False, True, False, False),  # Case 1: Ignore encryption
+        (True, False, False, True, True),  # Case 2: Standard decryption (Swap)
+        (True, True, True, True, False),  # Case 3: Keep all artifacts
+    ],
+)
+def test_create_streams_encrypted(
+    target_bare: Target, encrypted: bool, all_flag: bool, expect_raw: bool, expect_decrypted: bool, expect_inplace: bool
+) -> None:
+    target_bare.add_plugin(ScrapePlugin)
+
+    disk = MockFactory.create_disk(size=2000)
+    # The raw partition at offset 100
+    partition = MockFactory.create_volume("part_luks", disk, offset=100, size=1000)
+    # The logical decrypted volume
+    decrypted = MockFactory.make_encrypted(partition, "decrypted_vol")
+
+    target_bare.disks.add(disk)
+    target_bare.volumes.entries = [decrypted]
+
+    with patch("dissect.util.stream.MappingStream.add") as mock_add:
+        # Run the method with the parameterized flags
+        list(target_bare.scrape.create_streams(encrypted=encrypted, all=all_flag))
+
+        calls = mock_add.call_args_list
+        # Check for the Raw Partition # It should appear at offset 100 on the disk
+        raw_call = call(100, 1000, partition, 0)
+        if expect_raw:
+            assert raw_call in calls, "Expected raw encrypted partition to be visible."
+        else:
+            assert raw_call not in calls, "Expected raw encrypted partition to be hidden/replaced."
+
+        # Check for the Decrypted Volume
+        found_decrypted = False
+        for call_args in [call.args for call in calls]:
+            # c.args = (offset, size, source, source_offset)
+            if call_args[2] == decrypted:
+                found_decrypted = True
+                mapped_offset = call_args[0]
+
+                if expect_inplace:
+                    # In-place replacement: Must be at partition's offset (100)
+                    assert mapped_offset == 100, "Expected in-place replacement (offset 100)"
+                else:
+                    # New Stream: Must be at offset 0 (start of new stream)
+                    assert mapped_offset == 0, "Expected new stream (offset 0)"
+
+        assert expect_decrypted == found_decrypted
+
+
+@pytest.mark.parametrize(
+    ("lvm", "all_flag", "expect_pv", "expect_lv"),
+    [
+        (False, False, True, False),  # Case 1: Ignore LVM
+        (True, False, False, True),  # Case 2: Standard LVM (Consume PV)
+        (True, True, True, True),  # Case 3: Keep all artifacts
+    ],
+)
+def test_create_streams_lvm(target_bare: Target, lvm: bool, all_flag: bool, expect_pv: bool, expect_lv: bool) -> None:
+    """Test scrape streams for LVM volumes with various flags."""
+    target_bare.add_plugin(ScrapePlugin)
+
+    disk = MockFactory.create_disk(size=2000)
+    # The raw PV partition
+    pv_part = MockFactory.create_volume("part_pv", disk, offset=100, size=1000)
+    # The logical volume residing on that PV
+    lv = MockFactory.make_lvm("lv_root", [pv_part], size=800)
+
+    target_bare.disks.add(disk)
+    target_bare.volumes.entries = [lv]
+
+    with patch("dissect.util.stream.MappingStream.add") as mock_add:
+        list(target_bare.scrape.create_streams(lvm=lvm, all=all_flag))
+
+        calls = mock_add.call_args_list
+
+        # 1. Check for Raw PV Partition
+        pv_call = call(100, 1000, pv_part, 0)
+        if expect_pv:
+            assert pv_call in calls, "Expected Raw PV partition to be visible."
+        else:
+            assert pv_call not in calls, "Expected Raw PV to be consumed (removed)."
+
+        # 2. Check for Logical Volume
+        # LVM volumes are *always* new streams (offset 0), never in-place replacements
+        lv_call = call(0, lv.size, lv, 0)
+        if expect_lv:
+            assert lv_call in calls, "Expected Logical Volume stream to be visible."
+        else:
+            assert lv_call not in calls, "Expected Logical Volume stream to be hidden."
+
+
+def test_create_streams_two_raw_disks(target_bare: Target) -> None:
+    """Test Scenario: Two separate raw disks (no partition table)."""
+
+    target_bare.add_plugin(ScrapePlugin)
+
+    disk_a, vol_a = MockFactory.create_raw_disk("disk_a", "vol_a_whole", size=1000)
+    disk_b, vol_b = MockFactory.create_raw_disk("disk_b", "vol_b_whole", size=2000)
+
+    target_bare.disks = {disk_a, disk_b}
+    target_bare.volumes.entries = [vol_a, vol_b]
+
+    with patch("dissect.util.stream.MappingStream.add") as mock_add:
+        streams = list(target_bare.scrape.create_streams())
+
+        assert len(streams) == 2
+
+        # Inspect calls to MappingStream.add(offset, size, source, source_offset)
+        all_calls = mock_add.call_args_list
+
+        assert call(0, 1000, vol_a, 0) in all_calls
+        assert call(0, 2000, vol_b, 0) in all_calls
 
 
 def test_find(target_bare: Target) -> None:

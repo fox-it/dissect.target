@@ -87,7 +87,7 @@ class ScrapePlugin(Plugin):
         for volume in self.target.volumes:
             if encrypted and isinstance(volume.vs, EncryptedVolumeSystem):
                 encrypted_volumes.append(volume)
-            if isinstance(volume.vs, LogicalVolumeSystem):
+            if lvm and isinstance(volume.vs, LogicalVolumeSystem):
                 lvm_volumes.append(volume)
 
         # Iteratively process all layered volumes until none remain
@@ -172,11 +172,15 @@ class ScrapePlugin(Plugin):
 
             #  Stalemate Check
             if not processed_this_pass and (pending_lvm or pending_encrypted):
-                raise RuntimeError(
-                    f"Could not resolve storage dependencies. "
-                    f"Stuck with {len(pending_lvm)} LVM volumes and "
-                    f"{len(pending_encrypted)} encrypted volumes."
-                )
+                if lvm and encrypted:
+                    raise RuntimeError(
+                        f"Could not resolve storage dependencies. "
+                        f"Stuck with {len(pending_lvm)} LVM volumes and "
+                        f"{len(pending_encrypted)} encrypted volumes."
+                    )
+                else:
+                    self.target.log.warning("Could not resolve storage dependencies, set lvm and encrypted flags.")
+                    break  # This is the best we can do without both `lvm` and `encrypted`, terminate
 
         # Generate streams from the scrape_map
         for disk, volumes in scrape_map.items():
@@ -190,7 +194,7 @@ class ScrapePlugin(Plugin):
             current_stream = None
             current_stream_start = 0
             current_stream_end = 0
-            for (offset, size), (source, source_offset) in volumes.items():
+            for (offset, size), (source, source_offset) in sorted(volumes.items()):
                 # Check for a break in contiguity or the very first item
                 if not current_stream or offset != current_stream_end:
                     # If a stream is already being built, add it to the list
