@@ -173,7 +173,7 @@ def _add_cmds(parser: argparse.ArgumentParser, scope: str) -> None:
 
         cmd_parser = argparse.ArgumentParser(add_help=False)
         cmd_parser.add_argument(
-            "-i", "--index", type=int, default=None, help="index of the item to debug", metavar="INDEX"
+            "-i", "--index", type=int, default=None, help="index of the item to inspect", metavar="INDEX"
         )
         for args, kwargs in getattr(obj, "__args__", []):
             cmd_parser.add_argument(*args, **kwargs)
@@ -190,19 +190,19 @@ def main() -> int:
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
-    scope = parser.add_subparsers(dest="scope", required=True, help="scope to debug")
+    scope = parser.add_subparsers(dest="scope", required=True, help="scope to inspect")
 
     base = argparse.ArgumentParser(add_help=False)
     base.add_argument("target", type=Path, help="Target to load", metavar="TARGET")
     configure_generic_arguments(base)
 
-    parser_disk = scope.add_parser("disk", help="debug disks", parents=[base])
+    parser_disk = scope.add_parser("disk", help="inspect disks", parents=[base])
     _add_cmds(parser_disk, "disk")
 
-    parser_volume = scope.add_parser("volume", help="debug volumes", parents=[base])
+    parser_volume = scope.add_parser("volume", help="inspect volumes", parents=[base])
     _add_cmds(parser_volume, "volume")
 
-    parser_filesystem = scope.add_parser("filesystem", help="debug filesystems", parents=[base])
+    parser_filesystem = scope.add_parser("filesystem", help="inspect filesystems", parents=[base])
     _add_cmds(parser_filesystem, "filesystem")
 
     args, _ = parser.parse_known_args()
