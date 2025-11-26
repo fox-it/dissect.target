@@ -13,7 +13,7 @@ class VmtarFilesystem(TarFilesystem):
 
     def __init__(self, fh: BinaryIO, base: str | None = None, *args, **kwargs):
         """Load a vmtar file (modified tar version used on ESXi).
-        
+
         In most case vmtar files are compressed using zstd, xz or LZMA, and then using gzip.
 
         Args:

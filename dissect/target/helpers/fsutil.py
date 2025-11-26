@@ -38,7 +38,7 @@ try:
 except ImportError:
     HAS_ZSTD = False
 
-from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError, UncompressionError
+from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError
 from dissect.target.helpers.polypath import (
     abspath,
     basename,
@@ -530,7 +530,6 @@ def open_decompress(
         An binary or text IO stream, depending on the mode with which the file was opened.
 
     Raises:
-        UncompressionError: Uncompression failed
         ValueError: path and fileobj are mutually exclusive, but one of them is required
 
     Example:

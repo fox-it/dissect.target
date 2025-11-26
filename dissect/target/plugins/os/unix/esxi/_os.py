@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 from defusedxml import ElementTree
 from dissect.database.sqlite3 import SQLite3
 
-from dissect.target.exceptions import UncompressionError
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.filesystems.vmtar import VmtarFilesystem
 from dissect.target.helpers.sunrpc import client
@@ -285,7 +284,7 @@ def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> N
         elif module_path.suffix.startswith(".v"):
             try:
                 tfs = VmtarFilesystem(module_path.open())
-            except UncompressionError as e:
+            except Exception as e:
                 target.log.warning("%s, skipping file %s", str(e), module_path)
         if tfs:
             target.fs.append_layer().mount("/", tfs)
