@@ -10,7 +10,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -63,6 +63,20 @@ class DirectoryFilesystem(Filesystem):
             raise FileNotFoundError(path)
 
 
+class DirectoryDirEntry(DirEntry):
+    fs: DirectoryFilesystem
+    entry: Path
+
+    def get(self) -> FilesystemEntry:
+        return DirectoryFilesystemEntry(self.fs, self.path, self.entry)
+
+    def is_junction(self) -> bool:
+        return hasattr(self.entry, "is_junction") and self.entry.is_junction()
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.entry.stat(follow_symlinks=follow_symlinks)
+
+
 class DirectoryFilesystemEntry(FilesystemEntry):
     entry: Path
 
@@ -88,16 +102,12 @@ class DirectoryFilesystemEntry(FilesystemEntry):
             for item in self.entry.iterdir():
                 yield item.name
 
-    def scandir(self) -> Iterator[FilesystemEntry]:
+    def scandir(self) -> Iterator[DirectoryDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            yield from self.readlink_ext().scandir()
-        else:
-            for item in self.entry.iterdir():
-                path = fsutil.join(self.path, item.name, alt_separator=self.fs.alt_separator)
-                yield DirectoryFilesystemEntry(self.fs, path, item)
+        for item in self._resolve().entry.iterdir():
+            yield DirectoryDirEntry(self.fs, self.path, item.name, item)
 
     def exists(self) -> bool:
         try:
