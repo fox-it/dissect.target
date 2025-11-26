@@ -21,10 +21,12 @@ def test_filesystems_vmtar() -> None:
 
 def test_filesystems_vmtar_zstd() -> None:
     vmtar_path = Path(absolute_path("_data/filesystems/vmtar/esxi9_zstd_intelgpi.v00"))
+
     with vmtar_path.open("rb") as fh:
         zstd_fh = open_decompress(fileobj=fh)
         vmtar_fh = open_decompress(fileobj=zstd_fh)
         assert vmtar_fh.seek(0, os.SEEK_END) == 30720
+
     with vmtar_path.open("rb") as fh:
         assert VmtarFilesystem.detect(fh)
 

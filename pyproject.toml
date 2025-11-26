@@ -72,7 +72,7 @@ full = [
     "ruamel.yaml",
     "tomli; python_version<'3.11'",
     "zstandard; platform_python_implementation != 'PyPy'",
-    "backports.zstd ; python_version<'3.14' and platform_python_implementation != 'PyPy'" # zstd par of standard lib after 3.14
+    "backports.zstd; python_version < '3.14'"
 ]
 dev = [
     "dissect.target[full,yara]",

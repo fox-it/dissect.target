@@ -571,10 +571,9 @@ def open_decompress(
         # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
         return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    if magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
-        if HAS_ZSTD:
-            return zstd.open(file, mode=mode, encoding=encoding, errors=errors, newline=newline)
-        raise UncompressionError("fail to uncompress zstd file, missing backport.zstd dependency")
+    if HAS_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
+        return zstd.open(file, mode=mode, encoding=encoding, errors=errors, newline=newline)
+
     if path:
         file.close()
         return path.open(mode, encoding=encoding, errors=errors, newline=newline)
