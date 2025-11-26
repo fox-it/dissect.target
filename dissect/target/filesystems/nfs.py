@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, BinaryIO, TypeVar
 from dissect.util.stream import AlignedStream
 
 from dissect.target.exceptions import NotADirectoryError
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.nfs.client.mount import Client as MountClient
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
@@ -134,6 +134,17 @@ class NfsFilesystem(Filesystem):
         return NfsFilesystemEntry(self, path, result.object, result.obj_attributes)
 
 
+class NfsDirEntry(DirEntry):
+    fs: NfsFilesystem
+    entry: EntryPlus
+
+    def get(self) -> NfsFilesystemEntry:
+        return NfsFilesystemEntry(self.fs, self.path, self.entry.handle, self.entry.attributes)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class NfsFilesystemEntry(FilesystemEntry):
     fs: NfsFilesystem
     entry: FileHandle
@@ -179,19 +190,12 @@ class NfsFilesystemEntry(FilesystemEntry):
         target = self.fs._client.readlink(self.entry)
         return self.fs.get(target)  # The target is an absolute path
 
-    def _iterdir(self) -> Iterator[EntryPlus]:
+    def scandir(self) -> Iterator[NfsDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        yield from self.fs._client.readdir(self.entry).entries
-
-    def iterdir(self) -> Iterator[str]:
-        for entry in self._iterdir():
-            yield entry.name
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        for entry in self._iterdir():
-            yield NfsFilesystemEntry(self.fs, entry.name, entry.handle, entry.attributes)
+        for entry in self.fs._client.readdir(self.entry).entries:
+            yield NfsDirEntry(self.fs, self.path, entry.name, entry)
 
     def open(self) -> NfsStream:
         # Pass size if available but don't sweat it

@@ -5,7 +5,7 @@ import textwrap
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
-from dissect.target.filesystem import FilesystemEntry, VirtualFilesystem
+from dissect.target.filesystem import DirEntry, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
 from dissect.target.helpers.logging import get_logger
@@ -129,6 +129,17 @@ class ConfigurationFilesystem(VirtualFilesystem):
             log.debug("Error when parsing %s with message '%s'", entry.path, e)
 
         return ConfigurationEntry(self, entry.path, entry, config_parser)
+
+
+class ConfigurationDirEntry(DirEntry):
+    fs: ConfigurationFilesystem
+    entry: tuple[FilesystemEntry, dict | ConfigurationParser | str | list | None]
+
+    def get(self) -> ConfigurationEntry:
+        return ConfigurationEntry(self.fs, self.path, self.entry[0], self.entry[1])
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
 
 
 class ConfigurationEntry(FilesystemEntry):
@@ -262,22 +273,17 @@ class ConfigurationEntry(FilesystemEntry):
         output_data = self._write_value_mapping(self.parser_items)
         return io.BytesIO(bytes(output_data, "utf-8"))
 
-    def iterdir(self) -> Iterator[str]:
-        for entry in self.scandir():
-            yield entry.name
-
-    def scandir(self) -> Iterator[ConfigurationEntry]:
-        """Return the items inside :attr:`parser_items` as ``ConfigurationEntries``."""
+    def scandir(self) -> Iterator[ConfigurationDirEntry]:
         if self.is_file():
-            raise NotADirectoryError
+            raise NotADirectoryError(self.path)
 
         if self.parser_items is None and self.entry.is_dir():
             for entry in self.entry.scandir():
-                yield ConfigurationEntry(self.fs, entry.name, entry, None)
+                yield ConfigurationDirEntry(self.fs, self.path, entry.name, (entry.get(), None))
             return
 
         for key, values in self.parser_items.items():
-            yield ConfigurationEntry(self.fs, key, self.entry, values)
+            yield ConfigurationDirEntry(self.fs, self.path, key, (self.entry, values))
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         return not self.is_dir(follow_symlinks)
