@@ -31,7 +31,10 @@ except ImportError:
 
 
 try:
-    import zstandard
+    if sys.version_info >= (3, 14):
+        from compression import zstd
+    else:
+        from backports import zstd
 
     HAS_ZSTD = True
 except ImportError:
@@ -602,9 +605,8 @@ def open_path(path: Path, mode: str, compression: Compression | None = None) -> 
         fh = lz4.frame.open(path, mode)
     elif compression == Compression.ZSTD:
         if not HAS_ZSTD:
-            raise ValueError("Python module zstandard is not available")
-        cctx = zstandard.ZstdCompressor()
-        fh = cctx.stream_writer(path.open(mode))
+            raise ValueError("Python module backport.zstd is not available")
+        fh = zstd.open(path, mode)
     elif compression == Compression.NONE:
         fh = path.open(mode)
     else:

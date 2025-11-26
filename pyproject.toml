@@ -71,7 +71,6 @@ full = [
     "pycryptodome",
     "ruamel.yaml",
     "tomli; python_version<'3.11'",
-    "zstandard; platform_python_implementation != 'PyPy'",
     "backports.zstd; python_version < '3.14'"
 ]
 dev = [

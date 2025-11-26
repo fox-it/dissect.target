@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import lzma
+import sys
 from typing import TYPE_CHECKING, Any, BinaryIO
 
-import zstandard
 from dissect.cstruct import cstruct
 from dissect.util import ts
 from dissect.util.compression import lz4
@@ -18,6 +18,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
+
+if sys.version_info >= (3, 14):
+    from compression import zstd
+else:
+    from backports import zstd
 
 
 log = get_logger(__name__)
@@ -401,7 +406,7 @@ class JournalFile:
                     data = lz4.decompress(data[8:])
 
                 elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
-                    data = zstandard.decompress(data)
+                    data = zstd.decompress(data)
 
                 key, value = self.decode_value(data)
                 event[key] = value
