@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import platform
+import os
+import sys
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
-from dissect.util.stream import RangeStream
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -15,11 +15,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 try:
-    from zstandard import (
-        DECOMPRESSION_RECOMMENDED_OUTPUT_SIZE,
-        ZstdCompressionDict,
-        ZstdDecompressor,
-    )
+    if sys.version_info >= (3, 14):
+        from compression import zstd
+    else:
+        from backports import zstd
 
     HAS_ZSTD = True
 except ImportError:
@@ -98,6 +97,8 @@ class PLocateFile:
     NUM_OVERFLOW_SLOTS = 16
     TRIGRAM_SIZE_BYTES = 16
     DOCID_SIZE_BYTES = 8
+    #
+    ZSTD_BUF_READ_SIZE = 4096
 
     def __init__(self, fh: BinaryIO):
         self.fh = fh
@@ -110,43 +111,57 @@ class PLocateFile:
         self.dict_data = None
 
         if self.header.zstd_dictionary_offset_bytes:
-            self.dict_data = ZstdCompressionDict(self.fh.read(self.header.zstd_dictionary_length_bytes))
+            self.dict_data = zstd.ZstdDict(self.fh.read(self.header.zstd_dictionary_length_bytes))
 
         self.compressed_length_bytes = (
             self.header.filename_index_offset_bytes - self.HEADER_SIZE - self.header.zstd_dictionary_length_bytes
         )
-        self.ctx = ZstdDecompressor(dict_data=self.dict_data)
-        self.buf = RangeStream(self.fh, self.fh.tell(), self.compressed_length_bytes)
+        self.ctx = zstd.ZstdDecompressor(zstd_dict=self.dict_data)
+        self.filename_offset = self.fh.tell()
 
     def __iter__(self) -> Iterator[PLocateFile]:
-        # NOTE: This is a workaround for a PyPy bug
-        # We don't know what breaks, but PyPy + zstandard = unhappy times
-        # You just get random garbage data back instead of the decompressed data
-        # This weird dance of using a decompressobj and unused data is the only way that seems to work
-        # It's more expensive on memory, but at least it doesn't break
-        if platform.python_implementation() == "PyPy":
-            buf = self.buf.read()
+        # NOTE: The end of a zstandard frame does not include a final `0x00`.
+        # This causes the c_plocate `file` struct to parse the last path and the first path on the next frame as one
+        # since cstruct will read it across frame boundaries waiting for a `0x00`.
 
-            def reader(ctx: ZstdDecompressor) -> Iterator[bytes]:
-                obj = ctx.decompressobj()
+        # Only way of having information related to frame using backport.zstd is to use ZstdDecompressor object
+        # But this object can only work with strict byte like object (Not range object)
+        # Thus we manually create a
 
-                yield obj.decompress(buf)
-                while unused_data := obj.unused_data:
-                    obj = self.ctx.decompressobj()
-                    yield obj.decompress(unused_data)
+        def read_one_frame(unused_data: bytes | None) -> tuple[bytes, bytes]:
+            """Read on ZSTD frame
 
-            it = reader(self.ctx)
-        else:
-            # NOTE: The end of a zstandard frame does not include a final `0x00`.
-            # This causes the c_plocate `file` struct to parse the last path and the first path on the next frame as one
-            # since cstruct will read it across frame boundaries waiting for a `0x00`.
-            def reader() -> Iterator[bytes]:
-                with self.ctx.stream_reader(self.buf) as reader:
-                    while chunk := reader.read(DECOMPRESSION_RECOMMENDED_OUTPUT_SIZE):
-                        yield chunk
+            Args:
+                unused_data: compressed data already read from fh but not used in any already decompressed frame
 
-            it = reader()
+            Returns:
+                tuple[bytes, bytes]: decompressed_data, unused bytes
+            """
+            ctx = zstd.ZstdDecompressor(zstd_dict=self.dict_data)
+            output_buf = b""
+            while ctx.needs_input and not ctx.eof:
+                if unused_data:
+                    output_buf += ctx.decompress(unused_data)
+                    unused_data = None
+                else:
+                    read_length = min(
+                        self.ZSTD_BUF_READ_SIZE, (self.filename_offset + self.compressed_length_bytes) - self.fh.tell()
+                    )
+                    if read_length == 0:
+                        return output_buf, ctx.unused_data
+                    output_buf += ctx.decompress(self.fh.read(read_length))
 
+            return output_buf, ctx.unused_data
+
+        def reader() -> Iterator[bytes]:
+            unsued_data = None
+            while self.fh.tell() < (self.filename_offset + self.compressed_length_bytes) or unsued_data:
+                output_buf, unsued_data = read_one_frame(unsued_data)
+                yield output_buf
+
+        # Ensure fh offset is at expected position
+        self.fh.seek(self.filename_offset, os.SEEK_SET)
+        it = reader()
         for chunk in it:
             for path in chunk.split(b"\x00"):
                 yield path.decode(errors="surrogateescape")
@@ -178,7 +193,7 @@ class PLocatePlugin(BaseLocatePlugin):
 
         if not HAS_ZSTD:
             raise UnsupportedPluginError(
-                "Please install `python-zstandard` or `pip install zstandard` to use the PLocatePlugin"
+                "Please install `backport.zstd` or `pip install backport.zstd` to use the PLocatePlugin"
             )
 
     @export(record=PLocateRecord)
