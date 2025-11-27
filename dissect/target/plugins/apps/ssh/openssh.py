@@ -78,9 +78,13 @@ class OpenSSHPlugin(SSHPlugin):
                 except ValueError:
                     continue
 
+                public_key_pem = base64.b64decode(public_key)
+                fingerprints = calculate_fingerprints(public_key_pem)
+
                 yield AuthorizedKeysRecord(
                     key_type=keytype,
-                    public_key=public_key,
+                    public_key_pem=public_key_pem,
+                    fingerprint=fingerprints,
                     comment=comment,
                     options=options,
                     path=authorized_keys_file,
@@ -103,12 +107,16 @@ class OpenSSHPlugin(SSHPlugin):
                 except ValueError:
                     continue
 
+                public_key_pem = base64.b64decode(public_key)
+                fingerprints = calculate_fingerprints(public_key_pem)
+
                 for hostname in hostnames:
                     yield KnownHostRecord(
                         host=hostname,
                         port=None,
                         key_type=keytype,
-                        public_key=public_key,
+                        public_key_pem=public_key_pem,
+                        fingerprint=fingerprints,
                         comment=comment,
                         marker=marker,
                         path=known_hosts_file,
@@ -135,11 +143,20 @@ class OpenSSHPlugin(SSHPlugin):
                 self.target.log.debug("", exc_info=e)
                 continue
 
+            # For certain formats, the public key is not parsed from the private keys
+            if private_key.public_key:
+                public_key_pem = base64.b64decode(private_key.public_key)
+                fingerprints = calculate_fingerprints(public_key_pem)
+            else:
+                public_key_pem, fingerprints = None, None
+
             yield PrivateKeyRecord(
                 mtime_ts=file_path.stat().st_mtime,
                 key_format=private_key.format,
                 key_type=private_key.key_type,
-                public_key=private_key.public_key,
+                private_key_pem=buffer,
+                public_key_pem=public_key_pem,
+                fingerprint=fingerprints,
                 comment=private_key.comment,
                 encrypted=private_key.is_encrypted,
                 path=file_path,
@@ -157,7 +174,8 @@ class OpenSSHPlugin(SSHPlugin):
 
             try:
                 key_type, public_key, comment = parse_ssh_public_key_file(file_path)
-                fingerprints = calculate_fingerprints(base64.b64decode(public_key))
+                public_key_pem = base64.b64decode(public_key)
+                fingerprints = calculate_fingerprints(public_key_pem)
             except Exception as e:
                 self.target.log.warning("Failed to parse SSH public key %s: %s", file_path, e)
                 self.target.log.debug("", exc_info=e)
@@ -166,7 +184,7 @@ class OpenSSHPlugin(SSHPlugin):
             yield PublicKeyRecord(
                 mtime_ts=file_path.stat().st_mtime,
                 key_type=key_type,
-                public_key=public_key,
+                public_key_pem=public_key_pem,
                 comment=comment,
                 fingerprint=fingerprints,
                 path=file_path,
