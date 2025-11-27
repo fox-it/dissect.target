@@ -20,19 +20,15 @@ def test_filesystems_vmtar() -> None:
 
 
 def test_filesystems_vmtar_zstd() -> None:
-    vmtar_path = Path(absolute_path("_data/filesystems/vmtar/esxi9_zstd_intelgpi.v00"))
+    vmtar_path = Path(absolute_path("_data/filesystems/vmtar/a.vmtar.zst.gz"))
 
     with vmtar_path.open("rb") as fh:
         zstd_fh = open_decompress(fileobj=fh)
         vmtar_fh = open_decompress(fileobj=zstd_fh)
-        assert vmtar_fh.seek(0, os.SEEK_END) == 30720
+        assert vmtar_fh.seek(0, os.SEEK_END) == 4608
 
     with vmtar_path.open("rb") as fh:
         assert VmtarFilesystem.detect(fh)
 
         fs = VmtarFilesystem(fh)
-        assert [f.name for f in fs.path("/").iterdir()] == ["etc", "usr"]
-        assert (
-            fs.get("etc/vmware/default.map.d/intelgpio_acpi.map").open().read()
-            == b"regtype=native,bus=acpi,id=INTC3000,driver=intelgpio\n"
-        )
+        assert fs.get("a/b/c/test.txt").open().read() == b"test_data\nmultiline.txt\n"
