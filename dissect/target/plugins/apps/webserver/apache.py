@@ -7,10 +7,12 @@ from functools import cached_property
 from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
+from dissect.target.helpers.certificate import parse_x509
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
+    WebserverCertificateRecord,
     WebserverErrorLogRecord,
     WebserverHostRecord,
     WebserverPlugin,
@@ -409,6 +411,7 @@ class ApachePlugin(WebserverPlugin):
 
                 yield WebserverAccessLogRecord(
                     ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
+                    webserver=self.__namespace__,
                     remote_user=clean_value(log["remote_user"]),
                     remote_ip=log["remote_ip"],
                     local_ip=clean_value(log.get("local_ip")),
@@ -458,6 +461,7 @@ class ApachePlugin(WebserverPlugin):
 
                 yield WebserverErrorLogRecord(
                     ts=ts,
+                    webserver=self.__namespace__,
                     pid=log.get("pid"),
                     remote_ip=remote_ip,
                     module=log["module"],
@@ -483,32 +487,64 @@ class ApachePlugin(WebserverPlugin):
 
         for path in self.virtual_hosts:
             # A configuration file can contain multiple VirtualHost directives.
-            current_vhost = {}
+            vhost = {}
             for line in path.open("rt"):
                 line_lower = line.lower()
                 if "<virtualhost" in line_lower:
                     # Currently only supports a single addr:port combination.
                     if match := RE_VIRTUALHOST.match(line.lstrip()):
-                        current_vhost = match.groupdict()
+                        vhost = match.groupdict()
                     else:
                         self.target.log.warning("Unable to parse VirtualHost directive %r in %s", line, path)
-                        current_vhost = {}
+                        vhost = {}
 
                 elif "</virtualhost" in line_lower:
                     yield WebserverHostRecord(
                         ts=path.lstat().st_mtime,
-                        server_name=current_vhost.get("servername") or current_vhost.get("addr"),
-                        server_port=current_vhost.get("port"),
-                        root_path=current_vhost.get("documentroot"),
-                        access_log_config=current_vhost.get("customlog", "").rpartition(" ")[0],
-                        error_log_config=current_vhost.get("errorlog"),
+                        webserver=self.__namespace__,
+                        server_name=vhost.get("servername") or vhost.get("addr"),
+                        server_port=vhost.get("port"),
+                        root_path=vhost.get("documentroot"),
+                        access_log_config=vhost.get("customlog", "").rpartition(" ")[0],
+                        error_log_config=vhost.get("errorlog"),
+                        tls_certificate=vhost.get("sslcertificatefile"),
+                        tls_key=vhost.get("sslcertificatekeyfile"),
                         source=path,
                         _target=self.target,
                     )
 
                 else:
                     key, _, value = line.strip().partition(" ")
-                    current_vhost[key.lower()] = value
+                    vhost[key.lower()] = value
+
+    @export(record=WebserverCertificateRecord)
+    def certificates(self) -> Iterator[WebserverCertificateRecord]:
+        """Return host certificates for found Apache ``VirtualHost`` directives."""
+        certs = set()
+
+        for host in self.hosts():
+            if host.tls_certificate and (cert_path := self.target.fs.path(host.tls_certificate)).is_file():
+                certs.add(cert_path)
+
+        if self.server_root:
+            for cert_path in itertools.chain(self.server_root.glob("**/*.crt"), self.server_root.glob("**/*.pem")):
+                if cert_path not in certs:
+                    certs.add(cert_path)
+
+        for cert_path in certs:
+            try:
+                cert = parse_x509(cert_path)
+                yield WebserverCertificateRecord(
+                    ts=cert_path.lstat().st_mtime,
+                    webserver=self.__namespace__,
+                    **cert._asdict(),
+                    host=host.server_name,
+                    source=cert_path,
+                    _target=self.target,
+                )
+            except Exception as e:  # noqa: PERF203
+                self.target.log.warning("Unable to parse certificate %s :%s", cert_path, e)
+                self.target.log.debug("", exc_info=e)
 
     def _iterate_log_lines(self, paths: list[Path]) -> Iterator[tuple[str, Path]]:
         """Iterate through a list of paths and yield tuples of loglines and the path of the file where they're from."""

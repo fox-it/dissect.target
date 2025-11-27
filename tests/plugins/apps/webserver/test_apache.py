@@ -464,3 +464,45 @@ def test_apache_access_format_malformed_regression(target_unix: Target, fs_unix:
     assert results[1].useragent is None
     assert results[1].response_time_ms is None
     assert results[1].source == "/var/log/apache2/access.log"
+
+
+def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we can parse Apache ``VirtualHost`` certificates."""
+
+    fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(b'ServerRoot "/etc/apache2"\n'))
+
+    site = r"""
+    <VirtualHost *:443>
+        ServerName example.com
+        ServerAlias www.example.com
+        DocumentRoot /var/www/html
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+        SSLEngine on
+        SSLCertificateFile /path/to/cert.crt
+        SSLCertificateKeyFile /path/to/cert.key
+    </VirtualHost>
+    """
+    fs_unix.map_file_fh("/etc/apache2/sites-available/example.conf", BytesIO(textwrap.dedent(site).encode()))
+    fs_unix.map_file("/path/to/cert.crt", absolute_path("_data/plugins/apps/webserver/example.crt"))
+    fs_unix.map_file("/path/to/cert.key", absolute_path("_data/plugins/apps/webserver/example.key"))
+
+    # Map a default location too
+    fs_unix.map_file("/etc/apache2/ssl/example/cert.crt", absolute_path("_data/plugins/apps/webserver/example.crt"))
+    fs_unix.map_file("/etc/apache2/ssl/example/cert.key", absolute_path("_data/plugins/apps/webserver/example.key"))
+
+    target_unix.add_plugin(ApachePlugin)
+
+    records = list(target_unix.apache.certificates())
+    assert len(records) == 2
+
+    assert records[0].webserver == "apache"
+    assert records[0].fingerprint.md5 == "a218ac9b6dbdaa8b23658c4d18c1cfc1"
+    assert records[0].fingerprint.sha1 == "6566d8ebea1feb4eb3d12d9486cddb69e4e9e827"
+    assert records[0].fingerprint.sha256 == "7221d881743505f13b7bfe854bdf800d7f0cd22d34307ed7157808a295299471"
+    assert records[0].serial_number == 21067204948278457910649605551283467908287726794
+    assert records[0].not_valid_before == datetime(2025, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
+    assert records[0].not_valid_after == datetime(2026, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
+    assert records[0].issuer_dn == "C=AU,ST=Some-State,O=Internet Widgits Pty Ltd,CN=example.com"
+    assert records[0].host == "example.com"
+    assert records[0].source == "/etc/apache2/ssl/example/cert.crt"
