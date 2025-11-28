@@ -1750,67 +1750,30 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
             )
 
 
-def test_plugin_record_name_consistency() -> None:
-    """Ensure all exported plugin functions that yield records define unique record names.
+def test_plugin_record_field_and_name_consistency() -> None:
+    """Test that ensures that record fields with the same name across different plugins translate to the
+    same normalized type, and that no two records share the same name.
 
-    This test checks that no two `TargetRecordDescriptor` objects share the same `name`
-    across all discovered plugin functions. Record names must be unique across the entire
-    plugin ecosystem to prevent ambiguity during data parsing and export.
+    Consider the following TargetRecordDescriptors for plugins X, Y, Z, A and B::
 
-    Example:
-        Suppose two plugins (or two functions within the same plugin) define:
+        # Field consistency example
+        RecordX = TargetRecordDescriptor("record/x", [("varint", "shared_field")])
+        RecordY = TargetRecordDescriptor("record/y", [("path", "shared_field")])
+        RecordZ = TargetRecordDescriptor("record/z", [("string", "shared_field")])
 
-            RecordX = TargetRecordDescriptor("record/x", [("varint", "my_field_1")])
-            RecordY = TargetRecordDescriptor("record/x", [("path", "my_field_2")])
+        # Record name consistency example
+        RecordA = TargetRecordDescriptor("record/a", [("string", "field1")])
+        RecordB = TargetRecordDescriptor("record/a", [("varint", "field2")])
 
-        Both share the same name ("record/x"), which will cause this test to fail.
+    In the first example, ``RecordX`` will fail the test, as the field ``shared_field`` cannot be ``varint`` in
+    one record also being used as ``string``/``path`` in others. ``RecordY`` and ``RecordZ`` do
+    not conflict, as both translate to the same ``wildcard`` type.
 
-    Failing this test indicates that multiple record descriptors use identical names,
-    which can lead to incorrect data handling downstream.
-    """
-    all_records: set[RecordDescriptor] = set()
+    In the second example, ``RecordA`` and ``RecordB`` will fail the test because they both define the name
+    ``record/a``. Duplicate record names may cause collisions in export formats or downstream processing.
 
-    # Collect all record descriptors from plugin functions
-    for descriptor in find_functions("*")[0]:
-        if descriptor.output == "record" and hasattr(descriptor, "record"):
-            # Some plugin functions return a single record, others a list of records
-            records = descriptor.record
-            if isinstance(records, list):
-                all_records.update(records)
-            else:
-                all_records.add(records)
-
-    seen_names: set[str] = set()
-    duplicate_names: set[str] = set()
-
-    # Identify duplicates
-    for record in all_records:
-        if record.name in seen_names:
-            duplicate_names.add(record.name)
-        else:
-            seen_names.add(record.name)
-
-    if duplicate_names:
-        pytest.fail(
-            f"Found {len(duplicate_names)} duplicate record names in TargetRecordDescriptors:\n"
-            + "\n".join(sorted(duplicate_names))
-        )
-
-
-def test_plugin_record_field_consistency() -> None:
-    """Test if exported plugin functions yielding records do not have conflicting field names and types.
-
-    For example, take the following TargetRecordDescriptors for plugin X, Y and Z:
-
-        RecordX = TargetRecordDescriptor("record/x", [("varint", "my_field")])
-        RecordY = TargetRecordDescriptor("record/y", [("path", "my_field")])
-        RecordZ = TargetRecordDescriptor("record/y", [("string", "my_field")])
-
-    The ``RecordX`` descriptor will fail in this test, since the field ``my_field`` cannot be of type ``varint``
-    while also being used as ``string`` (and ``path``). The ``RecordY`` and ``RecordZ`` descriptors do not conflict,
-    since the types ``path`` and ``string`` translate to the same ``wildcard`` type.
-
-    Uses ``FIELD_TYPES_MAP`` which is loosely based on flow.record and ElasticSearch field types.
+    Field type normalization is based on ``FIELD_TYPES_MAP``, loosely aligned with flow.record and
+    ElasticSearch type mappings.
 
     References:
         - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
@@ -1821,6 +1784,9 @@ def test_plugin_record_field_consistency() -> None:
     seen_field_names: set[str] = set()
     seen_field_types: dict[str, tuple[str | None, RecordDescriptor]] = {}
     inconsistencies: set[str] = set()
+
+    all_records: set[RecordDescriptor] = set()
+    seen_names: set[str] = set()
 
     FIELD_TYPES_MAP = {
         # strings
@@ -1854,6 +1820,7 @@ def test_plugin_record_field_consistency() -> None:
         if descriptor.output == "record" and hasattr(descriptor, "record"):
             # Functions can yield a single record or a list of records.
             records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+            all_records.update(records)
 
             for record in records:
                 assert isinstance(record, RecordDescriptor), (
@@ -1883,6 +1850,13 @@ def test_plugin_record_field_consistency() -> None:
                     else:
                         seen_field_names.add(name)
                         seen_field_types[name] = (field_typename, record)
+
+    # Detect duplicate record names
+    for record in all_records:
+        if record.name in seen_names:
+            inconsistencies.add(f"<Duplicate record name: {record.name}>")
+        else:
+            seen_names.add(record.name)
 
     if inconsistencies:
         pytest.fail(
