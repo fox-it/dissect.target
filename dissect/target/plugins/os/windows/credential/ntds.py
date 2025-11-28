@@ -6,7 +6,7 @@ from hashlib import md5
 from struct import unpack
 from typing import TYPE_CHECKING, Any
 
-from Cryptodome.Cipher import AES, ARC4, DES
+from Crypto.Cipher import AES, ARC4, DES
 from dissect.cstruct import cstruct
 from dissect.database.ese.ntds import NTDS
 from dissect.database.ese.ntds.utils import format_GUID
