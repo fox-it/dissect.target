@@ -11,8 +11,8 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 from defusedxml import ElementTree
+from dissect.database.sqlite3 import SQLite3
 from dissect.hypervisor.util import vmtar
-from dissect.sql import sqlite3
 
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.sunrpc import client
@@ -557,7 +557,7 @@ def _traverse(path: str, obj: dict[str, Any], create: bool = False) -> dict[str,
 
 
 def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
-    db = sqlite3.SQLite3(fh)
+    db = SQLite3(fh)
 
     store = {}
 
