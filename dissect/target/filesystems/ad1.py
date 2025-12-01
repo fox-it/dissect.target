@@ -11,7 +11,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -39,6 +39,17 @@ class AD1Filesystem(Filesystem):
             raise FileNotFoundError(path)
 
 
+class AD1DirEntry(DirEntry):
+    fs: AD1Filesystem
+    entry: ad1.FileEntry
+
+    def get(self) -> AD1FilesystemEntry:
+        return AD1FilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class AD1FilesystemEntry(FilesystemEntry):
     def get(self, path: str) -> AD1FilesystemEntry:
         path = fsutil.join(self.path, path, alt_separator=self.alt_separator)
@@ -49,19 +60,12 @@ class AD1FilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self.entry.open()
 
-    def iterdir(self) -> Iterator[str]:
-        if not self.is_dir():
-            raise NotADirectoryError(self.path)
-
-        yield from self.entry.listdir().keys()
-
     def scandir(self) -> Iterator[AD1FilesystemEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        for fname, file_ in self.entry.listdir().items():
-            path = fsutil.join(self.path, fname, alt_separator=self.alt_separator)
-            yield AD1FilesystemEntry(self.fs, path, file_)
+        for name, entry in self.entry.listdir().items():
+            yield AD1DirEntry(self.fs, self.path, name, entry)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         return self.entry.is_file()
