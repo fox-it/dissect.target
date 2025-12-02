@@ -277,6 +277,7 @@ class Target:
                   If the path is a ``os.PathLike`` object, it will be used as-is.
                   If the path is a string and looks like a URI, it will be parsed as such.
                   If the path is a string and does not like like a URI, it will be treated as a local path.
+            loader_args: Additional arguments for the loader.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
