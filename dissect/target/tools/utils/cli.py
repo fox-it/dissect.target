@@ -233,13 +233,13 @@ def open_target(args: argparse.Namespace) -> Target:
     return target
 
 
-def open_targets(args: argparse.Namespace) -> Iterator[Target]:
+def open_targets(args: argparse.Namespace, loader_args: list[str] | None = None) -> Iterator[Target]:
     direct: bool = getattr(args, "direct", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
 
     targets: Iterable[Target] = (
-        [Target.open_direct(args.targets)] if direct else Target.open_all(args.targets, children)
+        [Target.open_direct(args.targets)] if direct else Target.open_all(args.targets, children, loader_args)
     )
 
     for target in targets:
