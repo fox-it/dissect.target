@@ -1,6 +1,8 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.esxi._os import (
     ESXiPlugin,
@@ -8,7 +10,10 @@ from dissect.target.plugins.os.unix.esxi._os import (
     _decrypt_crypto_util,
     esxi_hash,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test__create_tar_fs_no_envelope(target_linux: Target, fs_unix: VirtualFilesystem) -> None:

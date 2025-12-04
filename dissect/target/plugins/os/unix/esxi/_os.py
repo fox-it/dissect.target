@@ -184,16 +184,28 @@ class ESXiPlugin(UnixPlugin):
 
     @export(record=VirtualMachineRecord)
     def vm_inventory(self) -> Iterator[VirtualMachineRecord]:
-        inv_file = self.target.fs.path("/etc/vmware/hostd/vmInventory.xml")
-        if not inv_file.exists():
-            return []
+        """Yield found virtual machines from the ESXi host."""
+        seen = set()
 
-        root = ElementTree.fromstring(inv_file.read_text())
-        for entry in root.iter("ConfigEntry"):
-            yield VirtualMachineRecord(
-                path=self.target.fs.path(entry.findtext("vmxCfgPath")),
-                _target=self.target,
-            )
+        # Yield from vmInventory.xml
+        if (inv_file := self.target.fs.path("/etc/vmware/hostd/vmInventory.xml")).is_file():
+            root = ElementTree.fromstring(inv_file.read_text())
+            for entry in root.iter("ConfigEntry"):
+                vmx_path = self.target.fs.path(entry.findtext("vmxCfgPath"))
+                seen.add(vmx_path)
+                yield VirtualMachineRecord(
+                    path=vmx_path,
+                    _target=self.target,
+                )
+
+        # Yield from /vmfs/volumes/*/*/*.vmx
+        for vmx_path in self.target.fs.path("/vmfs/volumes").glob("*/*/*.vmx"):
+            if vmx_path not in seen:
+                seen.add(vmx_path)
+                yield VirtualMachineRecord(
+                    path=vmx_path,
+                    _target=self.target,
+                )
 
     @export(output="none")
     @arg("path", help="config path")
