@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from dissect.target.filesystems.vmtar import VmtarFilesystem
 from dissect.target.helpers.fsutil import open_decompress
@@ -9,7 +8,7 @@ from tests._utils import absolute_path
 
 
 def test_filesystems_vmtar() -> None:
-    vmtar_path = Path(absolute_path("_data/filesystems/vmtar/simple.vmtar"))
+    vmtar_path = absolute_path("_data/filesystems/vmtar/simple.vmtar")
 
     with vmtar_path.open("rb") as fh:
         assert VmtarFilesystem.detect(fh)
@@ -20,7 +19,7 @@ def test_filesystems_vmtar() -> None:
 
 
 def test_filesystems_vmtar_zstd() -> None:
-    vmtar_path = Path(absolute_path("_data/filesystems/vmtar/a.vmtar.zst.gz"))
+    vmtar_path = absolute_path("_data/filesystems/vmtar/a.vmtar.zst.gz")
 
     with vmtar_path.open("rb") as fh:
         zstd_fh = open_decompress(fileobj=fh)
