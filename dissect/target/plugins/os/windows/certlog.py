@@ -19,12 +19,68 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 RequestAttributesRecord = TargetRecordDescriptor(
-    "filesystem/windows/certlog/attributes",
+    "filesystem/windows/certlog/request_attributes",
     [
-        ("string", "table_name"),
-        ("varint", "request_id"),
+        ("path", "source"),
         ("string", "attribute_name"),
         ("string", "common_name"),
+        ("string", "table_name"),
+        ("varint", "request_id"),
+    ],
+)
+
+CertificateExtensionsRecord = TargetRecordDescriptor(
+    "filesystem/windows/certlog/certificate_extensions",
+    [
+        ("path", "source"),
+        ("string", "extension_raw_value"),
+        ("varint", "extension_flags"),
+        ("string", "extension_name"),
+        ("string", "table_name"),
+        ("varint", "request_id"),
+    ],
+)
+
+CertificatesRecord = TargetRecordDescriptor(
+    "filesystem/windows/certlog/certificates",
+    [
+        ("string", "certificate_hash2"),
+        ("string", "certificate_template"),
+        ("string", "common_name"),
+        ("string", "country"),
+        ("string", "device_serial_number"),
+        ("string", "distinguished_name"),
+        ("string", "domain_component"),
+        ("string", "email"),
+        ("string", "given_name"),
+        ("string", "initials"),
+        ("string", "locality"),
+        ("string", "organization"),
+        ("string", "organizational_unit"),
+        ("string", "public_key_algorithm"),
+        ("string", "serial_number"),
+        ("string", "state_or_province"),
+        ("string", "street_address"),
+        ("string", "subject_key_identifier"),
+        ("string", "sur_name"),
+        ("string", "title"),
+        ("string", "unstructured_address"),
+        ("string", "unstructured_name"),
+        ("string", "upn"),
+        ("string", "enrollment_flags"),
+        ("string", "general_flags"),
+        ("string", "issuer_name_id"),
+        ("datetime", "not_after"),
+        ("datetime", "not_before"),
+        ("string", "private_key_flags"),
+        ("string", "public_key"),
+        ("varint", "public_key_length"),
+        ("string", "public_key_params"),
+        ("string", "publish_expired_cert_in_crl"),
+        ("string", "raw_certificate"),
+        ("string", "raw_name"),
+        ("varint", "request_id"),
+        ("string", "table_name"),
         ("path", "source"),
     ],
 )
@@ -32,10 +88,16 @@ RequestAttributesRecord = TargetRecordDescriptor(
 RequestsRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/request",
     [
+        ("datetime", "resolved_when"),
+        ("datetime", "revoked_when"),
+        ("datetime", "submitted_when"),
+        ("path", "source"),
+        ("string", "attestation_challenge"),
         ("string", "caller_name"),
         ("string", "common_name"),
         ("string", "country"),
         ("string", "device_serial_number"),
+        ("string", "disposition"),
         ("string", "disposition_message"),
         ("string", "distinguished_name"),
         ("string", "domain_component"),
@@ -48,64 +110,58 @@ RequestsRecord = TargetRecordDescriptor(
         ("string", "locality"),
         ("string", "organization"),
         ("string", "organizational_unit"),
-        ("string", "request_attributes"),
-        ("string", "requester_name"),
-        ("string", "signer_application_policies"),
-        ("string", "signer_policies"),
-        ("string", "state_or_province"),
-        ("string", "street_address"),
-        ("string", "sur_name"),
-        ("string", "title"),
-        ("string", "unstructured_address"),
-        ("string", "unstructured_name"),
-        ("string", "attestation_challenge"),
-        ("string", "disposition"),
         ("string", "raw_archived_key"),
         ("string", "raw_name"),
         ("string", "raw_old_certificate"),
         ("string", "raw_precertificate"),
         ("string", "raw_request"),
+        ("string", "request_attributes"),
         ("string", "request_flags"),
-        ("varint", "request_id"),
         ("string", "request_type"),
-        ("datetime", "resolved_when"),
+        ("string", "requester_name"),
         ("string", "revoked_effective_when"),
         ("string", "revoked_reason"),
-        ("datetime", "revoked_when"),
+        ("string", "signer_application_policies"),
+        ("string", "signer_policies"),
+        ("string", "state_or_province"),
         ("string", "status_code"),
-        ("datetime", "submitted_when"),
+        ("string", "street_address"),
+        ("string", "sur_name"),
         ("string", "table_name"),
-        ("path", "source"),
+        ("string", "title"),
+        ("string", "unstructured_address"),
+        ("string", "unstructured_name"),
+        ("varint", "request_id"),
     ],
 )
 
 CRLsRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/crls",
     [
-        ('string', 'crl_publish_error'),
-        ('varint', 'count'),
-        ('datetime', 'crl_last_published'),
-        ('varint', 'crl_publish_attempts'),
-        ('varint', 'crl_publish_flags'),
-        ('varint', 'crl_publish_status_code'),
-        ('datetime', 'effective'),
-        ('string', 'min_base'),
-        ('varint', 'name_id'),
-        ('datetime', 'next_publish'),
-        ('datetime', 'next_update'),
-        ('varint', 'number'),
-        ('datetime', 'propagation_complete'),
-        ('string', 'raw_crl'),
-        ('varint', 'row_id'),
-        ('string', 'table_name'),
-        ('string', 'this_publish'),
-        ('datetime', 'this_update'),
+        ("datetime", "crl_last_published"),
+        ("datetime", "effective"),
+        ("datetime", "next_publish"),
+        ("datetime", "next_update"),
+        ("datetime", "propagation_complete"),
+        ("datetime", "this_update"),
         ("path", "source"),
+        ("string", "crl_publish_error"),
+        ("string", "min_base"),
+        ("string", "raw_crl"),
+        ("string", "table_name"),
+        ("string", "this_publish"),
+        ("varint", "count"),
+        ("varint", "crl_publish_attempts"),
+        ("varint", "crl_publish_flags"),
+        ("varint", "crl_publish_status_code"),
+        ("varint", "name_id"),
+        ("varint", "number"),
+        ("varint", "row_id"),
     ],
 )
 
 CertLogRecord = Union[  # noqa: UP007
-    RequestsRecord, RequestAttributesRecord
+    RequestsRecord, RequestAttributesRecord, CertificatesRecord, CRLsRecord, CertificateExtensionsRecord
 ]
 
 TRANSFORMS = {}
@@ -115,6 +171,8 @@ FIELD_MAPPINGS = {
     "$AttributeValue": "common_name",
     "$CRLPublishError": "crl_publish_error",
     "$CallerName": "caller_name",
+    "$CertificateHash2": "certificate_hash2",
+    "$CertificateTemplate": "certificate_template",
     "$CommonName": "common_name",
     "$Country": "country",
     "$DeviceSerialNumber": "device_serial_number",
@@ -124,20 +182,25 @@ FIELD_MAPPINGS = {
     "$EMail": "email",
     "$EndorsementCertificateHash": "endorsement_certificate_hash",
     "$EndorsementKeyHash": "endorsement_key_hash",
+    "$ExtensionName": "extension_name",
     "$GivenName": "given_name",
     "$Initials": "initials",
     "$KeyRecoveryHashes": "key_recovery_hashes",
     "$Locality": "locality",
     "$Organization": "organization",
     "$OrganizationalUnit": "organizational_unit",
+    "$PublicKeyAlgorithm": "public_key_algorithm",
     "$RequestAttributes": "request_attributes",
     "$RequesterName": "requester_name",
+    "$SerialNumber": "serial_number",
     "$SignerApplicationPolicies": "signer_application_policies",
     "$SignerPolicies": "signer_policies",
     "$StateOrProvince": "state_or_province",
     "$StreetAddress": "street_address",
+    "$SubjectKeyIdentifier": "subject_key_identifier",
     "$SurName": "sur_name",
     "$Title": "title",
+    "$UPN": "upn",
     "$UnstructuredAddress": "unstructured_address",
     "$UnstructuredName": "unstructured_name",
     "AttestationChallenge": "attestation_challenge",
@@ -148,14 +211,28 @@ FIELD_MAPPINGS = {
     "Count": "count",
     "Disposition": "disposition",
     "Effective": "effective",
+    "EnrollmentFlags": "enrollment_flags",
+    "ExtensionFlags": "extension_flags",
+    "ExtensionRawValue": "extension_raw_value",
+    "GeneralFlags": "general_flags",
+    "IssuerNameID": "issuer_name_id",
     "MinBase": "min_base",
     "NameId": "name_id",
     "NextPublish": "next_publish",
     "NextUpdate": "next_update",
+    "NotAfter": "not_after",
+    "NotBefore": "not_before",
     "Number": "number",
-    "PropgationComplete": "propagation_complete",
+    "PrivateKeyFlags": "private_key_flags",
+    "PropagationComplete": "propagation_complete",
+    "PropgationComplete": "propagation_complete",  # typo in some Windows versions
+    "PublicKey": "public_key",
+    "PublicKeyLength": "public_key_length",
+    "PublicKeyParams": "public_key_params",
+    "PublishExpiredCertInCRL": "publish_expired_cert_in_crl",
     "RawArchivedKey": "raw_archived_key",
     "RawCRL": "raw_crl",
+    "RawCertificate": "raw_certificate",
     "RawName": "raw_name",
     "RawOldCertificate": "raw_old_certificate",
     "RawPrecertificate": "raw_precertificate",
@@ -183,8 +260,7 @@ class CertLogPlugin(Plugin):
     contains data about resource usage, such as network and memory usage by applications.
 
     References:
-        - https://docs.microsoft.com/en-us/sql/relational-databases/performance-monitor/monitor-resource-usage-system-monitor?view=sql-server-ver15
-        - https://blog.1234n6.com/2019/01/
+        - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-csra/5f06c74c-1a29-4fdf-b8dd-ae3300d1b90d
     """
 
     __namespace__ = "certlog"
@@ -234,6 +310,7 @@ class CertLogPlugin(Plugin):
                 yield record_type(
                     _target=self.target,
                     source=path,
+                    table_name=table_name,
                     **record_values,
                 )
 
@@ -253,7 +330,7 @@ class CertLogPlugin(Plugin):
         """
         yield from self.read_records("RequestAttributes", RequestAttributesRecord)
 
-    @export(record=RequestsRecord)
+    @export(record=CRLsRecord)
     def crls(self) -> Iterator[CRLsRecord]:
         """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
 
@@ -261,20 +338,18 @@ class CertLogPlugin(Plugin):
         """
         yield from self.read_records("CRLs", CRLsRecord)
 
+    @export(record=CertificatesRecord)
+    def certificates(self) -> Iterator[CertificatesRecord]:
+        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
 
-#
-# @export(record=RequestsRecord)
-# def certificates(self) -> Iterator[RequestsRecord]:
-#    """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
-#
-#    Gives insight into the network usage of the system.
-#    """
-#    yield from self.read_records("Certificates", RequestsRecord)
-#
-# @export(record=RequestsRecord)
-# def certificate_extension(self) -> Iterator[RequestsRecord]:
-#    """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
-#
-#    Gives insight into the network usage of the system.
-#    """
-#    yield from self.read_records("CertificateExtensions", RequestsRecord)
+        Gives insight into the network usage of the system.
+        """
+        yield from self.read_records("Certificates", CertificatesRecord)
+
+    @export(record=CertificateExtensionsRecord)
+    def certificate_extension(self) -> Iterator[CertificateExtensionsRecord]:
+        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+
+        Gives insight into the network usage of the system.
+        """
+        yield from self.read_records("CertificateExtensions", CertificateExtensionsRecord)
