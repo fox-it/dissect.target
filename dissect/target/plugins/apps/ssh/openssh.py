@@ -79,8 +79,14 @@ class OpenSSHPlugin(SSHPlugin):
                 except ValueError:
                     continue
 
-                public_key_pem = base64.b64decode(public_key)
-                fingerprints = calculate_fingerprints(public_key_pem)
+                public_key_pem = None
+                fingerprints = None
+                try:
+                    public_key_pem = base64.b64decode(public_key)
+                    fingerprints = calculate_fingerprints(public_key_pem)
+                except (TypeError, ValueError, binascii.Error) as e:
+                    self.target.log.warning("Unable to parse public key %r in %s: %s", line, authorized_keys_file, e)
+                    self.target.log.debug("", exc_info=e)
 
                 yield AuthorizedKeysRecord(
                     key_type=keytype,
@@ -113,7 +119,7 @@ class OpenSSHPlugin(SSHPlugin):
                 try:
                     public_key_pem = base64.b64decode(public_key)
                     fingerprints = calculate_fingerprints(public_key_pem)
-                except (ValueError, TypeError, binascii.Error) as e:
+                except (TypeError, ValueError, binascii.Error) as e:
                     self.target.log.warning("Unable to parse public key %r in %s: %s", line, known_hosts_file, e)
                     self.target.log.debug("", exc_info=e)
 
@@ -151,11 +157,17 @@ class OpenSSHPlugin(SSHPlugin):
                 continue
 
             # For certain formats, the public key is not parsed from the private keys
+            public_key_pem = None
+            fingerprints = None
             if private_key.public_key:
-                public_key_pem = base64.b64decode(private_key.public_key)
-                fingerprints = calculate_fingerprints(public_key_pem)
-            else:
-                public_key_pem, fingerprints = None, None
+                try:
+                    public_key_pem = base64.b64decode(private_key.public_key)
+                    fingerprints = calculate_fingerprints(public_key_pem)
+                except (TypeError, ValueError, binascii.Error) as e:
+                    self.target.log.warning(
+                        "Unable to parse public key %r in %s: %s", private_key.public_key, file_path, e
+                    )
+                    self.target.log.debug("", exc_info=e)
 
             yield PrivateKeyRecord(
                 mtime_ts=file_path.stat().st_mtime,
@@ -183,7 +195,7 @@ class OpenSSHPlugin(SSHPlugin):
                 key_type, public_key, comment = parse_ssh_public_key_file(file_path)
                 public_key_pem = base64.b64decode(public_key)
                 fingerprints = calculate_fingerprints(public_key_pem)
-            except Exception as e:
+            except (TypeError, ValueError, binascii.Error) as e:
                 self.target.log.warning("Failed to parse SSH public key %s: %s", file_path, e)
                 self.target.log.debug("", exc_info=e)
                 continue
