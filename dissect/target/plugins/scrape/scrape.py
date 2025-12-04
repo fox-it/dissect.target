@@ -50,14 +50,46 @@ class ScrapePlugin(Plugin):
             physical offset and associated stream of contiguous regions on the disk.
         """
         # Create a map of disk regions we want to scrape
+        # Format: {disk_obj: {(offset, size): (source_obj, source_offset)}}
         scrape_map = defaultdict(dict)
 
-        # This map tracks where every "available" volume object is located
-        # within the scrape_map structure
+        # This map tracks where every "available" volume object is located within the scrape_map structure
         # Format: {volume_obj: (map_key, region_key)}
-
-        # This can be optimized by creating a graph of volumes, and performing a topological sort
         volume_region_map = {}
+
+        # We execute a iterative dependency resolution algorithm to ensure that all layered volumes
+        # are properly handled.
+        #
+        # --- Optimization Candidates & Alternatives ---
+
+        # I. Topological sorting
+        # Construct a Directed Acyclic Graph (DAG) where edges represent "is backed by" relationships.
+        # Perform a topological sort (e.g., Kahn's Algorithm) to yield a linear processing order.
+
+        # II. "Transformation chains"
+        #
+        # 1. Start with an empty scrape map.
+        # 2. Identify "Stream Origins": These are the roots of our data streams.
+        #    - Physical Disks are always origins.
+        #    - LVM Logical Volumes are added as new origins.
+        #    - (If `all=True`, Decrypted Volumes are also added as new origins).
+        # 3. Build a "Transformation Map": This tracks dependencies to hide or swap data.
+        #    - LVM Backing Volumes are marked as "Consumed" (creating holes in the parent).
+        #    - Encrypted Backing Volumes are marked as "Swapped" (replaced in-place).
+        # 4. Populate Map: Iterate through the Stream Origins. For every chunk of data,
+        #    resolve the Transformation chain to decide if it should be mapped,
+        #    swapped, or skipped (consumed).
+
+        # Compared to the implemented solution, which has O(V*V), this has complexity O(V*D), where
+        # D is the depth of the stack. However, the logic is more abstract, and V is generally small in practice.
+
+        # III. Physical region mapping
+        # Start off by filling the scrape map with the gaps between volumes to the scrape map.
+        # Implement a `physical_region` to recursively calculate the physical regions on disk (offset, size, source)
+        # for all subclasses of volume. Note that LVMs may have multiple of such regions.
+        # Then, for the case that `all` is false, only process the leaf volumes, those which are not a parent of another
+        # volume. Use the `physical region` to add decrypted volumes to the scrape map, and add lvm volumes as separate
+        # disks. In the case that `all` is true, all physical regions need to be somehow dedupicated.
 
         # Build initial map from physical disks
         offset = 0
