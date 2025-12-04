@@ -78,6 +78,18 @@ class MssqlPlugin(Plugin):
             for errorlog in log_path.glob(self.FILE_GLOB):
                 # The errorlog includes a BOM, so endianess gets determined automatically
                 fh = errorlog.open(mode="rt", encoding="utf-16", errors="surrogateescape")
+                first = fh.readline()
+
+                if RE_TIMESTAMP_PATTERN.match(first):
+                    pass
+                else:
+                    self.target.log.error(
+                        "Logfile %s does not start with a timestamp. Skipping.",
+                        errorlog,
+                    )
+                    continue
+
+                fh.seek(0)
                 buf = ""
 
                 for line in fh:
@@ -102,7 +114,7 @@ class MssqlPlugin(Plugin):
 
                 # For the last line
                 if buf:
-                    if current_ts := RE_TIMESTAMP_PATTERN.match(line):
+                    if current_ts := RE_TIMESTAMP_PATTERN.match(buf):
                         yield MssqlErrorlogRecord(
                             ts=datetime.strptime(current_ts.group(), "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
                             instance=instance,
