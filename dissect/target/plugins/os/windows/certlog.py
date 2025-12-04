@@ -18,50 +18,14 @@ if TYPE_CHECKING:
 
 log = get_logger(__name__)
 
-CertificateExtensionsRecord = TargetRecordDescriptor(
-    "filesystem/windows/certlog/certificate_extension",
-    [("datetime", "ts_submittedWhen"), ("path", "path")],
-)
-
-CertificatesRecord = TargetRecordDescriptor(
-    "filesystem/windows/certlog/certificates",
-    [
-        ("datetime", "ts"),
-        ("path", "app"),
-        ("string", "user"),
-        ("varint", "interface_luid"),
-        ("varint", "l2_profile_id"),
-        ("varint", "connected_time"),
-        ("datetime", "connect_start_time"),
-        ("varint", "l2_profile_flags"),
-    ],
-)
-
-CRLsRecord = TargetRecordDescriptor(
-    "filesystem/windows/sru/energy_estimator",
-    [
-        ("datetime", "ts"),
-        ("path", "app"),
-        ("string", "user"),
-        ("bytes", "binary_data"),
-    ],
-)
-
 RequestAttributesRecord = TargetRecordDescriptor(
-    "filesystem/windows/sru/energy_usage",
+    "filesystem/windows/certlog/attributes",
     [
-        ("datetime", "ts"),
-        ("path", "app"),
-        ("string", "user"),
-        ("varint", "event_timestamp"),
-        ("varint", "state_transition"),
-        ("varint", "designed_capacity"),
-        ("varint", "full_charged_capacity"),
-        ("varint", "charge_level"),
-        ("varint", "cycle_count"),
-        ("varint", "configuration_hash"),
-        ("varint", "battery_count"),
-        ("varint", "battery_charge_limited"),
+        ("string", "table_name"),
+        ("varint", "request_id"),
+        ("string", "attribute_name"),
+        ("string", "common_name"),
+        ("path", "source"),
     ],
 )
 
@@ -115,13 +79,41 @@ RequestsRecord = TargetRecordDescriptor(
     ],
 )
 
+CRLsRecord = TargetRecordDescriptor(
+    "filesystem/windows/certlog/crls",
+    [
+        ('string', 'crl_publish_error'),
+        ('varint', 'count'),
+        ('datetime', 'crl_last_published'),
+        ('varint', 'crl_publish_attempts'),
+        ('varint', 'crl_publish_flags'),
+        ('varint', 'crl_publish_status_code'),
+        ('datetime', 'effective'),
+        ('string', 'min_base'),
+        ('varint', 'name_id'),
+        ('datetime', 'next_publish'),
+        ('datetime', 'next_update'),
+        ('varint', 'number'),
+        ('datetime', 'propagation_complete'),
+        ('string', 'raw_crl'),
+        ('varint', 'row_id'),
+        ('string', 'table_name'),
+        ('string', 'this_publish'),
+        ('datetime', 'this_update'),
+        ("path", "source"),
+    ],
+)
+
 CertLogRecord = Union[  # noqa: UP007
-    RequestsRecord, RequestAttributesRecord, CRLsRecord, CertificatesRecord, CertificateExtensionsRecord
+    RequestsRecord, RequestAttributesRecord
 ]
 
 TRANSFORMS = {}
 # {i: "".join("_" + c.lower() if c.isupper() else c for c in i.replace('$', ''))[1:] for i in a}
 FIELD_MAPPINGS = {
+    "$AttributeName": "attribute_name",
+    "$AttributeValue": "common_name",
+    "$CRLPublishError": "crl_publish_error",
     "$CallerName": "caller_name",
     "$CommonName": "common_name",
     "$Country": "country",
@@ -129,7 +121,7 @@ FIELD_MAPPINGS = {
     "$DispositionMessage": "disposition_message",
     "$DistinguishedName": "distinguished_name",
     "$DomainComponent": "domain_component",
-    "$EMail": "e_mail",
+    "$EMail": "email",
     "$EndorsementCertificateHash": "endorsement_certificate_hash",
     "$EndorsementKeyHash": "endorsement_key_hash",
     "$GivenName": "given_name",
@@ -149,8 +141,21 @@ FIELD_MAPPINGS = {
     "$UnstructuredAddress": "unstructured_address",
     "$UnstructuredName": "unstructured_name",
     "AttestationChallenge": "attestation_challenge",
+    "CRLLastPublished": "crl_last_published",
+    "CRLPublishAttempts": "crl_publish_attempts",
+    "CRLPublishFlags": "crl_publish_flags",
+    "CRLPublishStatusCode": "crl_publish_status_code",
+    "Count": "count",
     "Disposition": "disposition",
+    "Effective": "effective",
+    "MinBase": "min_base",
+    "NameId": "name_id",
+    "NextPublish": "next_publish",
+    "NextUpdate": "next_update",
+    "Number": "number",
+    "PropgationComplete": "propagation_complete",
     "RawArchivedKey": "raw_archived_key",
+    "RawCRL": "raw_crl",
     "RawName": "raw_name",
     "RawOldCertificate": "raw_old_certificate",
     "RawPrecertificate": "raw_precertificate",
@@ -162,9 +167,12 @@ FIELD_MAPPINGS = {
     "RevokedEffectiveWhen": "revoked_effective_when",
     "RevokedReason": "revoked_reason",
     "RevokedWhen": "revoked_when",
+    "RowId": "row_id",
     "StatusCode": "status_code",
     "SubmittedWhen": "submitted_when",
     "TableName": "table_name",
+    "ThisPublish": "this_publish",
+    "ThisUpdate": "this_update",
 }
 
 
@@ -236,3 +244,37 @@ class CertLogPlugin(Plugin):
         Gives insight into the network usage of the system.
         """
         yield from self.read_records("Requests", RequestsRecord)
+
+    @export(record=RequestAttributesRecord)
+    def request_attributes(self) -> Iterator[RequestAttributesRecord]:
+        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+
+        Gives insight into the network usage of the system.
+        """
+        yield from self.read_records("RequestAttributes", RequestAttributesRecord)
+
+    @export(record=RequestsRecord)
+    def crls(self) -> Iterator[CRLsRecord]:
+        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+
+        Gives insight into the network usage of the system.
+        """
+        yield from self.read_records("CRLs", CRLsRecord)
+
+
+#
+# @export(record=RequestsRecord)
+# def certificates(self) -> Iterator[RequestsRecord]:
+#    """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+#
+#    Gives insight into the network usage of the system.
+#    """
+#    yield from self.read_records("Certificates", RequestsRecord)
+#
+# @export(record=RequestsRecord)
+# def certificate_extension(self) -> Iterator[RequestsRecord]:
+#    """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+#
+#    Gives insight into the network usage of the system.
+#    """
+#    yield from self.read_records("CertificateExtensions", RequestsRecord)
