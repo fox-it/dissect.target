@@ -66,8 +66,8 @@ def test_apfs_mounts(target_bare: Target) -> None:
     mock_data_volume.apfs = Mock()
     mock_data_volume.apfs.role = Mock()
     mock_data_volume.apfs.role.name = "DATA"
-    mock_system_volume.makedirs("/Library/something")
-    mock_system_volume.makedirs("/Applications/Some.app")
+    mock_data_volume.makedirs("/Library/something")
+    mock_data_volume.makedirs("/Applications/Some.app")
 
     target_bare.filesystems.add(mock_system_volume)
     target_bare.filesystems.add(mock_data_volume)

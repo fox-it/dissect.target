@@ -197,7 +197,6 @@ class ApfsFilesystemEntry(FilesystemEntry):
 
     def lstat(self) -> fsutil.stat_result:
         entry = self.entry
-        node = self.entry.inode
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         st_info = fsutil.stat_result(
@@ -205,7 +204,7 @@ class ApfsFilesystemEntry(FilesystemEntry):
                 entry.mode,
                 entry.oid,
                 0,
-                node.nlink,
+                entry.inode.nlink,
                 entry.uid,
                 entry.gid,
                 entry.size,
