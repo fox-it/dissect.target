@@ -8,9 +8,6 @@ from typing import TYPE_CHECKING, Any, TextIO
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
-from dissect.target.plugins.os.windows.defender.mpcmdrun import (
-    DefenderMpCmdRunLogRecord,
-)
 from dissect.target.plugins.os.windows.defender.mplog import (
     DEFENDER_MPLOG_BLOCK_PATTERNS,
     DEFENDER_MPLOG_LINE,
@@ -128,6 +125,16 @@ DefenderExclusionRecord = TargetRecordDescriptor(
         ("datetime", "regf_mtime"),
         ("string", "type"),
         ("string", "value"),
+    ],
+)
+
+DefenderMpCmdRunLogRecord = TargetRecordDescriptor(
+    "filesystem/windows/defender/mpcmdrunlog",
+    [
+        ("datetime", "ts_start"),
+        ("datetime", "ts_end"),
+        ("string", "command"),
+        ("path", "source"),
     ],
 )
 
