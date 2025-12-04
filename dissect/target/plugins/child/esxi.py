@@ -26,7 +26,7 @@ class ESXiChildTargetPlugin(ChildTargetPlugin):
             try:
                 name = vmx.VMX.parse(self.target.fs.path(vm.path).read_text()).attr.get("displayname")
             except Exception as e:
-                self.target.log.exception("Failed parsing displayname from VMX: %s", vm.path)
+                self.target.log.error("Failed parsing displayname from VMX: %s", vm.path)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
 
                 name = None
