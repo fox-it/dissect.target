@@ -108,7 +108,6 @@ class PLocateFile:
         self.compressed_length_bytes = (
             self.header.filename_index_offset_bytes - self.HEADER_SIZE - self.header.zstd_dictionary_length_bytes
         )
-        self.filename_offset = self.fh.tell()
 
     def __iter__(self) -> Iterator[str]:
         offsets = self.filename_index()
