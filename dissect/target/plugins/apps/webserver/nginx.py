@@ -311,7 +311,7 @@ class NginxPlugin(WebserverPlugin):
             for line in host_path.open("rt"):
                 if "server {" in line:
                     if server:
-                        yield from self.yield_hosts_record(host_path, server)
+                        yield construct_hosts_record(self.target, host_path, server)
                     server = {}
                     seen_server_directive = True
 
@@ -320,22 +320,7 @@ class NginxPlugin(WebserverPlugin):
                     server[key] = value.rstrip(";").strip()
 
             if server:
-                yield from self.yield_hosts_record(host_path, server)
-
-    def yield_hosts_record(self, host_path: Path, server: dict) -> Iterator[WebserverHostRecord]:
-        yield WebserverHostRecord(
-            ts=host_path.lstat().st_mtime,
-            webserver="nginx",
-            server_name=server.get("server_name") or server.get("listen"),
-            server_port=server.get("listen", "").replace(" ssl", "") or None,
-            root_path=server.get("root"),
-            access_log_config=server.get("access_log"),
-            error_log_config=server.get("error_log"),
-            tls_certificate=server.get("ssl_certificate"),
-            tls_key=server.get("ssl_certificate_key"),
-            source=host_path,
-            _target=self.target,
-        )
+                yield construct_hosts_record(self.target, host_path, server)
 
     @export(record=WebserverCertificateRecord)
     def certificates(self) -> Iterator[WebserverCertificateRecord]:
@@ -366,6 +351,22 @@ class NginxPlugin(WebserverPlugin):
             except Exception as e:  # noqa: PERF203
                 self.target.log.warning("Unable to parse certificate %s :%s", cert_path, e)
                 self.target.log.debug("", exc_info=e)
+
+
+def construct_hosts_record(target: Target, host_path: Path, server: dict) -> WebserverHostRecord:
+    return WebserverHostRecord(
+        ts=host_path.lstat().st_mtime,
+        webserver="nginx",
+        server_name=server.get("server_name") or server.get("listen"),
+        server_port=server.get("listen", "").replace(" ssl", "") or None,
+        root_path=server.get("root"),
+        access_log_config=server.get("access_log"),
+        error_log_config=server.get("error_log"),
+        tls_certificate=server.get("ssl_certificate"),
+        tls_key=server.get("ssl_certificate_key"),
+        source=host_path,
+        _target=target,
+    )
 
 
 def parse_json_line(line: str) -> dict[str, str] | None:

@@ -493,7 +493,7 @@ def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesyst
 
     target_unix.add_plugin(ApachePlugin)
 
-    records = list(target_unix.apache.certificates())
+    records = sorted(target_unix.apache.certificates(), key=lambda r: r.source)
     assert len(records) == 2
 
     assert records[0].webserver == "apache"
