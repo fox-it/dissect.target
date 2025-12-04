@@ -13,13 +13,16 @@ from dissect.target.exceptions import (
     NotASymlinkError,
 )
 from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry, VirtualFilesystem
-from dissect.target.helpers import fsutil
+from dissect.target.helpers import fsutil, keychain
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from uuid import UUID
 
     from dissect.apfs.objects.fs import DirectoryEntry, INode
+
+log = get_logger(__name__)
 
 
 class ApfsFilesystem(Filesystem):
@@ -28,12 +31,18 @@ class ApfsFilesystem(Filesystem):
     def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.container = apfs.APFS(fh)
-        self._volumes = [ApfsVolumeFilesystem(self, uuid=vol.uuid) for vol in self.container.volumes]
-
         self.vfs = VirtualFilesystem()
+        self._volumes = []
 
-        for vol in self._volumes:
-            self.vfs.map_file_entry(vol.volume.name, vol.get("/"))
+        for vol in self.container.volumes:
+            try:
+                vol = ApfsVolumeFilesystem(self, uuid=vol.uuid)
+            except FilesystemError as e:  # noqa: PERF203
+                log.error("Failed to open APFS volume %r (%s): %s", vol.name, vol.uuid, str(e))  # noqa: TRY400
+                log.debug("", exc_info=e)
+            else:
+                self._volumes.append(vol)
+                self.vfs.map_file_entry(vol.volume.name, vol.get("/"))
 
     def __repr__(self) -> str:
         return f"<Filesystem type={self.__type__} volumes={len(self._volumes)}>"
@@ -53,11 +62,11 @@ class ApfsFilesystem(Filesystem):
 class ApfsVolumeFilesystem(Filesystem):
     __type__ = "apfs"
 
-    def __init__(self, fs: ApfsFilesystem, name: str | None = None, uuid: UUID | None = None):
+    def __init__(self, container: ApfsFilesystem, name: str | None = None, uuid: UUID | None = None):
         if name is not None and uuid is not None:
             raise ValueError("Only one of name or uuid is allowed")
 
-        self.container = fs
+        self.container = container
 
         if name:
             self.apfs = next((vol for vol in self.container.container.volumes if vol.name == name), None)
@@ -66,7 +75,32 @@ class ApfsVolumeFilesystem(Filesystem):
         else:
             raise ValueError("Either name or uuid must be provided")
 
-        super().__init__(fs.volume, alt_separator=fs.alt_separator, case_sensitive=not self.apfs.is_case_insensitive)
+        if not self.apfs:
+            raise ValueError("No APFS volume found with the specified identifier")
+
+        if self.apfs.is_encrypted:
+            kek_uuids = [str(kek.uuid) for kek in self.apfs.keybag.keks()]
+            for key in keychain.get_keys_for_provider(self.__type__) + keychain.get_keys_without_provider():
+                # Allow unlocking with keys that have no identifier or match the volume UUID or KEK UUIDs
+                if key.identifier and (
+                    key.identifier.lower() != str(self.apfs.uuid).lower() or key.identifier not in kek_uuids
+                ):
+                    continue
+
+                try:
+                    # But only pass the key identifier if it's a KEK UUID
+                    self.apfs.unlock(key.value, key.identifier if key.identifier in kek_uuids else None)
+                    break
+                except apfs.Error:
+                    continue
+            else:
+                raise FilesystemError("No valid decryption key found")
+
+        super().__init__(
+            container.volume,
+            alt_separator=container.alt_separator,
+            case_sensitive=not self.apfs.is_case_insensitive,
+        )
 
     def __repr__(self) -> str:
         return f"<Filesystem type={self.__type__} name={self.apfs.name} uuid={self.apfs.uuid}>"
