@@ -112,7 +112,7 @@ def test_office_com_addin(
         assert item.codebases == ["c:\\payload.exe"]
     else:
         assert item.codebases == []
-        assert caplog.messages == f"Could not find prog id {addin_prog_id} of com executable in registry"
+        assert caplog.messages == f"Could not find ProgID {addin_prog_id} of COM executable in registry"
 
 
 def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive) -> None:

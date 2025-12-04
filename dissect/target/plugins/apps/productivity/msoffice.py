@@ -336,7 +336,7 @@ class MSOffice(Plugin):
                 inproc_key = f"{classes_root}\\CLSID\\{cls_id}\\InprocServer32"
                 return self.target.registry.value(inproc_key, "(Default)").value
             except RegistryError:  # noqa: PERF203
-                self.target.log.warning("Could not find prog id %s of com executable in registry", prog_id)
+                self.target.log.warning("Could not find ProgID %s of COM executable in registry", prog_id)
 
         return None
 
