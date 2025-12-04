@@ -80,6 +80,7 @@ class MssqlPlugin(Plugin):
                 fh = errorlog.open(mode="rt", encoding="utf-16", errors="surrogateescape")
                 first = fh.readline()
 
+                # MSSQL ERRORLOG files should always start with a timestamp.
                 if RE_TIMESTAMP_PATTERN.match(first):
                     pass
                 else:
