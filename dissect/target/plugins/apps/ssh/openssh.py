@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import re
 from itertools import product
 from typing import TYPE_CHECKING
@@ -107,8 +108,14 @@ class OpenSSHPlugin(SSHPlugin):
                 except ValueError:
                     continue
 
-                public_key_pem = base64.b64decode(public_key)
-                fingerprints = calculate_fingerprints(public_key_pem)
+                public_key_pem = None
+                fingerprints = None
+                try:
+                    public_key_pem = base64.b64decode(public_key)
+                    fingerprints = calculate_fingerprints(public_key_pem)
+                except (ValueError, TypeError, binascii.Error) as e:
+                    self.target.log.warning("Unable to parse public key %r in %s: %s", line, known_hosts_file, e)
+                    self.target.log.debug("", exc_info=e)
 
                 for hostname in hostnames:
                     yield KnownHostRecord(
