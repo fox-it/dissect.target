@@ -41,7 +41,7 @@ def test_apfs_encrypted(caplog: pytest.LogCaptureFixture) -> None:
 
 
 def test_apfs_direntry() -> None:
-    """Test that encrypted APFS filesystems are correctly detected."""
+    """Test APFS directory entries and symlink behavior."""
     with gzip.open(absolute_path("_data/filesystems/apfs/encrypted.bin.gz"), "rb") as fh:
         assert ApfsFilesystem.detect(fh)
 
