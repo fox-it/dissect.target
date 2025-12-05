@@ -16,7 +16,6 @@ def test_certlog_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     fs_win.map_file("Windows/System32/Certlog/SEVENKINGDOMS-CA.edb", ca_edb)
 
     target_win.add_plugin(certlog.CertLogPlugin)
-
     assert len(list(target_win.certlog())) == 142
     assert len(list(target_win.certlog.requests())) == 11
     assert len(list(target_win.certlog.request_attributes())) == 26
