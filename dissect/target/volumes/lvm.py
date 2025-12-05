@@ -50,7 +50,7 @@ class LvmVolumeSystem(LogicalVolumeSystem):
 
         for pvs in devices.values():
             try:
-                yield cls(pvs, disk=[pv.fh for pv in pvs])
+                yield cls(pvs)
             except Exception:  # noqa: PERF203
                 continue
 
