@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-RequestAttributesRecord = TargetRecordDescriptor(
-    "filesystem/windows/certlog/request_attributes",
+RequestAttributeRecord = TargetRecordDescriptor(
+    "filesystem/windows/certlog/request_attribute",
     [
         ("string", "attribute_name"),
         ("string", "common_name"),
@@ -27,8 +27,8 @@ RequestAttributesRecord = TargetRecordDescriptor(
     ],
 )
 
-CertificateExtensionsRecord = TargetRecordDescriptor(
-    "filesystem/windows/certlog/certificate_extensions",
+CertificateExtensionRecord = TargetRecordDescriptor(
+    "filesystem/windows/certlog/certificate_extension",
     [
         ("varint", "extension_flags"),
         ("string", "extension_name"),
@@ -40,8 +40,8 @@ CertificateExtensionsRecord = TargetRecordDescriptor(
     ],
 )
 
-CertificatesRecord = TargetRecordDescriptor(
-    "filesystem/windows/certlog/certificates",
+CertificateRecord = TargetRecordDescriptor(
+    "filesystem/windows/certlog/certificate",
     [
         ("string", "certificate_hash2"),
         ("string", "certificate_template"),
@@ -85,7 +85,7 @@ CertificatesRecord = TargetRecordDescriptor(
     ],
 )
 
-RequestsRecord = TargetRecordDescriptor(
+RequestRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/request",
     [
         ("string", "attestation_challenge"),
@@ -136,8 +136,8 @@ RequestsRecord = TargetRecordDescriptor(
     ],
 )
 
-CRLsRecord = TargetRecordDescriptor(
-    "filesystem/windows/certlog/crls",
+CRLRecord = TargetRecordDescriptor(
+    "filesystem/windows/certlog/crl",
     [
         ("varint", "count"),
         ("datetime", "crl_last_published"),
@@ -163,7 +163,7 @@ CRLsRecord = TargetRecordDescriptor(
 )
 
 CertLogRecord = Union[  # noqa: UP007
-    RequestsRecord, RequestAttributesRecord, CertificatesRecord, CRLsRecord, CertificateExtensionsRecord
+    RequestRecord, RequestAttributeRecord, CertificateRecord, CRLRecord, CertificateExtensionRecord
 ]
 
 # {i: "".join("_" + c.lower() if c.isupper() else c for c in i.replace('$', ''))[1:] for i in a}
@@ -290,10 +290,10 @@ class CertLogPlugin(Plugin):
     def read_records(self, table_name: str, record_type: CertLogRecord) -> Iterator[CertLogRecord]:
         for db, path in self._certlog_dbs:
             ca_name = path.stem
-            table = [table for table in db.tables() if table.name == table_name]
+            table = next(table for table in db.tables() if table.name == table_name, None)
             if not table:
                 self.target.log.warning("Table not found for ca %s: %s", ca_name, table_name)
-            columns = [c.name for c in table[0].columns]
+            columns = [c.name for c in table.columns]
             for entry in db.records(table_name=table_name):
                 values = (entry[name] for name in columns)
                 column_values = zip(columns, values, strict=False)
@@ -305,7 +305,7 @@ class CertLogPlugin(Plugin):
                         record_values[new_column] = value
                     else:
                         self.target.log.debug(
-                            "Unexpected columns for table %s in ca %s: %s", table_name, ca_name, column
+                            "Unexpected column for table %s in CA %s: %s", table_name, ca_name, column
                         )
 
                 yield record_type(
@@ -318,41 +318,41 @@ class CertLogPlugin(Plugin):
 
     @export(record=RequestsRecord)
     def requests(self) -> Iterator[RequestsRecord]:
-        """Return the contents of Requests table from all Certificate Authority databases.
+        """Return the contents of the ``Requests`` table from all Certificate Authority databases.
 
-        Gives insight into certificates requested (caller_name, request_id, request_attributes)
+        Gives insight into certificates requested (caller name, request ID, request attributes).
         """
         yield from self.read_records("Requests", RequestsRecord)
 
     @export(record=RequestAttributesRecord)
     def request_attributes(self) -> Iterator[RequestAttributesRecord]:
-        """Return the contents of RequestAttributes table from all Certificate Authority databases.
+        """Return the contents of the ``RequestAttributes`` table from all Certificate Authority databases.
 
-        Gives insight into attributes of requested certificates (Same information as in request_attributes field
-            of requests table)
+        Gives insight into attributes of requested certificates (same information as in ``request_attributes`` field
+        of ``Requests`` table).
         """
         yield from self.read_records("RequestAttributes", RequestAttributesRecord)
 
     @export(record=CRLsRecord)
     def crls(self) -> Iterator[CRLsRecord]:
-        """Return the contents of CRLs table from all Certificate Authority databases.
+        """Return the contents of the ``CRLs`` table from all Certificate Authority databases.
 
-        Gives insight into the Certificate Revocation List of a Certificate authority.
+        Gives insight into the Certificate Revocation List of a Certificate Authority.
         """
         yield from self.read_records("CRLs", CRLsRecord)
 
     @export(record=CertificatesRecord)
     def certificates(self) -> Iterator[CertificatesRecord]:
-        """Return the contents of Certificates table from all Certificate Authority databases.
+        """Return the contents of ``Certificates`` table from all Certificate Authority databases.
 
-        Gives insight into issued certificates for a Certificate authority (public key, validity date)
+        Gives insight into issued certificates for a Certificate authority (public key, validity date).
         """
         yield from self.read_records("Certificates", CertificatesRecord)
 
     @export(record=CertificateExtensionsRecord)
     def certificate_extensions(self) -> Iterator[CertificateExtensionsRecord]:
-        """Return the contents of CertificateExtensions table from all Certificate Authority databases.
+        """Return the contents of ``CertificateExtensions`` table from all Certificate Authority databases.
 
-        Gives insight into CertificateExtensions for a CA
+        Gives insight into certificate extensions for a CA.
         """
         yield from self.read_records("CertificateExtensions", CertificateExtensionsRecord)
