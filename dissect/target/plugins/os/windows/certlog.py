@@ -290,9 +290,10 @@ class CertLogPlugin(Plugin):
     def read_records(self, table_name: str, record_type: CertLogRecord) -> Iterator[CertLogRecord]:
         for db, path in self._certlog_dbs:
             ca_name = path.stem
-            table = next(table for table in db.tables() if table.name == table_name, None)
+            table = next((table for table in db.tables() if table.name == table_name), None)
             if not table:
                 self.target.log.warning("Table not found for ca %s: %s", ca_name, table_name)
+                continue
             columns = [c.name for c in table.columns]
             for entry in db.records(table_name=table_name):
                 values = (entry[name] for name in columns)
@@ -316,43 +317,43 @@ class CertLogPlugin(Plugin):
                     **record_values,
                 )
 
-    @export(record=RequestsRecord)
-    def requests(self) -> Iterator[RequestsRecord]:
+    @export(record=RequestRecord)
+    def requests(self) -> Iterator[RequestRecord]:
         """Return the contents of the ``Requests`` table from all Certificate Authority databases.
 
         Gives insight into certificates requested (caller name, request ID, request attributes).
         """
-        yield from self.read_records("Requests", RequestsRecord)
+        yield from self.read_records("Requests", RequestRecord)
 
-    @export(record=RequestAttributesRecord)
-    def request_attributes(self) -> Iterator[RequestAttributesRecord]:
+    @export(record=RequestAttributeRecord)
+    def request_attributes(self) -> Iterator[RequestAttributeRecord]:
         """Return the contents of the ``RequestAttributes`` table from all Certificate Authority databases.
 
         Gives insight into attributes of requested certificates (same information as in ``request_attributes`` field
         of ``Requests`` table).
         """
-        yield from self.read_records("RequestAttributes", RequestAttributesRecord)
+        yield from self.read_records("RequestAttributes", RequestAttributeRecord)
 
-    @export(record=CRLsRecord)
-    def crls(self) -> Iterator[CRLsRecord]:
+    @export(record=CRLRecord)
+    def crls(self) -> Iterator[CRLRecord]:
         """Return the contents of the ``CRLs`` table from all Certificate Authority databases.
 
         Gives insight into the Certificate Revocation List of a Certificate Authority.
         """
-        yield from self.read_records("CRLs", CRLsRecord)
+        yield from self.read_records("CRLs", CRLRecord)
 
-    @export(record=CertificatesRecord)
-    def certificates(self) -> Iterator[CertificatesRecord]:
+    @export(record=CertificateRecord)
+    def certificates(self) -> Iterator[CertificateRecord]:
         """Return the contents of ``Certificates`` table from all Certificate Authority databases.
 
         Gives insight into issued certificates for a Certificate authority (public key, validity date).
         """
-        yield from self.read_records("Certificates", CertificatesRecord)
+        yield from self.read_records("Certificates", CertificateRecord)
 
-    @export(record=CertificateExtensionsRecord)
-    def certificate_extensions(self) -> Iterator[CertificateExtensionsRecord]:
+    @export(record=CertificateExtensionRecord)
+    def certificate_extensions(self) -> Iterator[CertificateExtensionRecord]:
         """Return the contents of ``CertificateExtensions`` table from all Certificate Authority databases.
 
         Gives insight into certificate extensions for a CA.
         """
-        yield from self.read_records("CertificateExtensions", CertificateExtensionsRecord)
+        yield from self.read_records("CertificateExtensions", CertificateExtensionRecord)
