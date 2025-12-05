@@ -142,4 +142,4 @@ def try_idna(url: str) -> bytes:
     try:
         return url.encode("idna")
     except Exception:
-        return url
+        return url.encode()
