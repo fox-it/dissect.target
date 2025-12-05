@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json as jsonlib
 import struct
 import subprocess
 from configparser import ConfigParser
@@ -8,8 +7,7 @@ from configparser import Error as ConfigParserError
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
-from defusedxml import ElementTree
-from dissect.database.sqlite3 import SQLite3
+from dissect.util.hash.jenkins import lookup8
 
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.filesystems.vmtar import VmtarFilesystem
@@ -29,25 +27,15 @@ except ImportError:
     HAS_ENVELOPE = False
 
 from dissect.target.filesystems import tar
-from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import OperatingSystem, arg, export, internal
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
-
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem, VirtualFilesystem
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
-
-VirtualMachineRecord = TargetRecordDescriptor(
-    "esxi/vm",
-    [
-        ("path", "path"),
-    ],
-)
 
 
 class ESXiPlugin(UnixPlugin):
@@ -66,37 +54,7 @@ class ESXiPlugin(UnixPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self._config = None
-        self._configstore = None
-
-        esx_conf = target.fs.path("/etc/vmware/esx.conf")
-        if esx_conf.exists():
-            self._config = parse_esx_conf(esx_conf.open("rt", encoding="utf-8"))
-
-        # ESXi 7 introduced the configstore
-        # It's made available at /etc/vmware/configstore/current-store-1 during boot, but stored at
-        # the path used below in local.tgz
-        configstore = target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")
-        if configstore.exists():
-            self._configstore = parse_config_store(configstore.open())
-            self._mount_nfs_shares()
-        else:
-            self.target.log.warning(
-                "No configstore found, some functionality may not work (such as mounting NFS shares)"
-            )
-
-    def _cfg(self, path: str) -> str | None:
-        if not self._config:
-            self.target.log.warning("No ESXi config!")
-            return None
-
-        value_name = path.strip("/").split("/")[-1]
-        obj = _traverse(path, self._config)
-
-        if not value_name and obj:
-            return obj
-
-        return obj.get(value_name) if obj else None
+        self._mount_nfs_shares()
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
@@ -144,21 +102,21 @@ class ESXiPlugin(UnixPlugin):
 
     @export(property=True)
     def hostname(self) -> str:
-        if hostname := self._cfg("/adv/Misc/HostName"):
+        if hostname := self.target.esxconf.get("/adv/Misc/HostName"):
             return hostname.split(".", 1)[0]
         return "localhost"
 
     @export(property=True)
     def domain(self) -> str | None:
-        if hostname := self._cfg("/adv/Misc/HostName"):
+        if hostname := self.target.esxconf.get("/adv/Misc/HostName"):
             return hostname.partition(".")[2]
         return None
 
     @export(property=True)
     def ips(self) -> list[str]:
         result = set()
-        host_ip = self._cfg("/adv/Misc/HostIPAddr")
-        mgmt_ip = self._cfg("/adv/Net/ManagementAddr")
+        host_ip = self.target.esxconf.get("/adv/Misc/HostIPAddr")
+        mgmt_ip = self.target.esxconf.get("/adv/Net/ManagementAddr")
 
         if host_ip:
             result.add(host_ip)
@@ -172,7 +130,7 @@ class ESXiPlugin(UnixPlugin):
         boot_cfg = self.target.fs.path("/bootbank/boot.cfg")
         if not boot_cfg.exists():
             # Default to retrieve version, but without build number
-            return self._cfg("/resourceGroups/version")
+            return self.target.esxconf.get("/resourceGroups/version")
 
         for line in boot_cfg.read_text().splitlines():
             if not line.startswith("build="):
@@ -182,56 +140,19 @@ class ESXiPlugin(UnixPlugin):
             return f"VMware ESXi {version.strip()}"
         return None
 
-    @export(record=VirtualMachineRecord)
-    def vm_inventory(self) -> Iterator[VirtualMachineRecord]:
-        """Yield found virtual machines from the ESXi host."""
-        seen = set()
-
-        # Yield from vmInventory.xml
-        if (inv_file := self.target.fs.path("/etc/vmware/hostd/vmInventory.xml")).is_file():
-            root = ElementTree.fromstring(inv_file.read_text())
-            for entry in root.iter("ConfigEntry"):
-                vmx_path = self.target.fs.path(entry.findtext("vmxCfgPath"))
-                seen.add(vmx_path)
-                yield VirtualMachineRecord(
-                    path=vmx_path,
-                    _target=self.target,
-                )
-
-        # Yield from /vmfs/volumes/*/*/*.vmx
-        for vmx_path in self.target.fs.path("/vmfs/volumes").glob("*/*/*.vmx"):
-            if vmx_path not in seen:
-                seen.add(vmx_path)
-                yield VirtualMachineRecord(
-                    path=vmx_path,
-                    _target=self.target,
-                )
-
-    @export(output="none")
-    @arg("path", help="config path")
-    @arg("-j", "--json", action="store_true", help="output in JSON format")
-    def esxconf(self, path: str, json: bool) -> None:
-        obj = self._cfg(path)
-
-        if json:
-            print(jsonlib.dumps(obj, indent=4, sort_keys=True))
-        else:
-            print(obj)
-
-    @internal
-    def configstore(self) -> dict[str, Any]:
-        return self._configstore
-
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.ESXI.value
 
     def _mount_nfs_shares(self) -> None:
         """Mount NFS shares found in the configstore."""
-        if not self._configstore:
+        if not self.target.has_function("configstore.get"):
+            self.target.log.warning("No configstore found, unable to mount NFS shares")
             return
 
-        nfs_shares: dict[str, Any] = self._configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
+        nfs_shares: dict[str, Any] = (
+            self.target.configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
+        )
         if not nfs_shares:
             if self._is_nfs_enabled:
                 self.target.log.info("No NFS shares found in datastore")
@@ -508,167 +429,14 @@ def parse_boot_cfg(fh: TextIO) -> dict[str, str]:
     return cfg
 
 
-def parse_esx_conf(fh: TextIO) -> dict[str, Any]:
-    config = {}
-    for line in fh:
-        line = line.strip()
-        if not line:
-            continue
-
-        key, _, value = line.partition("=")
-        key = key.strip().strip("/")
-        value = value.strip().strip('"')
-
-        if value == "true":
-            value = True
-        elif value == "false":
-            value = False
-        elif value.isnumeric():
-            value = int(value)
-
-        value_name = key.split("/")[-1]
-        obj = _traverse(key, config, create=True)
-        obj[value_name] = value
-
-    return config
-
-
-def _traverse(path: str, obj: dict[str, Any], create: bool = False) -> dict[str, Any] | None:
-    parts = path.strip("/").split("/")
-    path_parts = parts[:-1]
-    for part in path_parts:
-        array_idx = None
-        if part.endswith("]"):
-            part, _, rest = part.partition("[")
-            array_idx = rest.strip("]")
-
-        if part not in obj:
-            if create:
-                obj[part] = {}
-            else:
-                return None
-
-        obj = obj[part]
-        if array_idx:
-            if array_idx not in obj:
-                if create:
-                    obj[array_idx] = {}
-                else:
-                    return None
-            obj = obj[array_idx]
-
-    return obj
-
-
-def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
-    db = SQLite3(fh)
-
-    store = {}
-
-    if table := db.table("Config"):
-        for row in table.rows():
-            component_name = row.Component
-            config_group_name = row.ConfigGroup
-            value_group_name = row.Name
-            identifier_name = row.Identifier
-
-            if component_name not in store:
-                store[component_name] = {}
-            component = store[component_name]
-
-            if config_group_name not in component:
-                component[config_group_name] = {}
-            config_group = component[config_group_name]
-
-            if value_group_name not in config_group:
-                config_group[value_group_name] = {}
-            value_group = config_group[value_group_name]
-
-            if identifier_name not in value_group:
-                value_group[identifier_name] = {}
-            identifier = value_group[identifier_name]
-
-            identifier["modified_time"] = row.ModifiedTime
-            identifier["creation_time"] = row.CreationTime
-            identifier["version"] = row.Version
-            identifier["success"] = row.Success
-            identifier["auto_conf_value"] = jsonlib.loads(row.AutoConfValue) if row.AutoConfValue else None
-            identifier["user_value"] = jsonlib.loads(row.UserValue) if row.UserValue else None
-            identifier["vital_value"] = jsonlib.loads(row.VitalValue) if row.VitalValue else None
-            identifier["cached_value"] = jsonlib.loads(row.CachedValue) if row.CachedValue else None
-            identifier["desired_value"] = jsonlib.loads(row.DesiredValue) if row.DesiredValue else None
-            identifier["revision"] = row.Revision
-
-    return store
-
-
-def mix64(a: int, b: int, c: int) -> int:
-    """
-    Mixes three 64-bit values reversibly.
-    """
-    # Implement logical right shift by masking first
-    a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 43)
-    b = (b - c - a) ^ (a << 9)
-    c = (c - a - b) ^ ((b & 0xFFFFFFFFFFFFFFFF) >> 8)
-    a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 38)
-    b = (b - c - a) ^ (a << 23)
-    c = (c - a - b) ^ ((b & 0xFFFFFFFFFFFFFFFF) >> 5)
-    a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 35)
-    b = (b - c - a) ^ (a << 49)
-    c = (c - a - b) ^ ((b & 0xFFFFFFFFFFFFFFFF) >> 11)
-    a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 12)
-    b = (b - c - a) ^ (a << 18)
-    c = (c - a - b) ^ ((b & 0xFFFFFFFFFFFFFFFF) >> 22)
-    # Normalize to 64 bits
-    return a & 0xFFFFFFFFFFFFFFFF, b & 0xFFFFFFFFFFFFFFFF, c & 0xFFFFFFFFFFFFFFFF
-
-
-def esxi_hash(key: bytes, level: int) -> int:
-    """
-    Hashes a variable-length key into a 64-bit value.
-
-    This hash function is used in the ESXi kernel.
-    It is an exact implementation of the hash3 function defined here: http://burtleburtle.net/bob/c/lookup8.c
-    """
-    a: int = level
-    b: int = level
-    c: int = 0x9E3779B97F4A7C13  # Golden ratio, arbitrary value
-    bytes_left: int = len(key)
-    i: int = 0
-
-    # Process the key in 24-byte chunks
-    while bytes_left >= 24:
-        a += int.from_bytes(key[i : i + 8], "little")
-        b += int.from_bytes(key[i + 8 : i + 16], "little")
-        c += int.from_bytes(key[i + 16 : i + 24], "little")
-        a, b, c = mix64(a, b, c)
-        i += 24
-        bytes_left -= 24
-
-    # Handle the last 23 bytes
-    c = c + len(key)
-    if bytes_left > 0:
-        for shift, byte in enumerate(key[i:]):
-            if shift < 8:
-                a += byte << (shift * 8)
-            elif shift < 16:
-                b += byte << ((shift - 8) * 8)
-            else:
-                # c takes 23 - 8 - 8 = 7 bytes (length is added to LSB)
-                c += byte << ((shift - 15) * 8)
-
-    _, _, c = mix64(a, b, c)
-    return c
-
-
 def nfs_volume_uuid(host: str, path: str) -> str:
     """Generate a UUID for an NFS volume based on the host and path.
 
     This is used to create a unique identifier for NFS volumes in ESXi.
     """
 
-    h1 = esxi_hash(host.encode(), 42)  # 42 is starting value
-    h2 = esxi_hash(path.encode(), h1)
+    h1 = lookup8(host.encode(), 42)  # 42 is starting value
+    h2 = lookup8(path.encode(), h1)
 
     low, high = h2 & 0xFFFFFFFF, ((h2 >> 32) & 0xFFFFFFFF)
     return f"{low:8x}-{high:8x}"

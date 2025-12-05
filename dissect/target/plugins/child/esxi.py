@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import chain
 from typing import TYPE_CHECKING
 
 from dissect.hypervisor import vmx
@@ -22,11 +23,19 @@ class ESXiChildTargetPlugin(ChildTargetPlugin):
             raise UnsupportedPluginError("Not an ESXi operating system")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
-        for vm in self.target.vm_inventory():
+        seen = set()
+
+        for path in chain(
+            (vm.path for vm in self.target.vm_inventory()), self.target.fs.path("/vmfs/volumes").glob("*/*/*.vmx")
+        ):
+            if str(path) in seen:
+                continue
+            seen.add(str(path))
+
             try:
-                name = vmx.VMX.parse(self.target.fs.path(vm.path).read_text()).attr.get("displayname")
+                name = vmx.VMX.parse(self.target.fs.path(path).read_text()).attr.get("displayname")
             except Exception as e:
-                self.target.log.error("Failed parsing displayname from VMX: %s", vm.path)  # noqa: TRY400
+                self.target.log.error("Failed parsing displayname from VMX: %s", path)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
 
                 name = None
@@ -34,6 +43,6 @@ class ESXiChildTargetPlugin(ChildTargetPlugin):
             yield ChildTargetRecord(
                 type=self.__type__,
                 name=name,
-                path=vm.path,
+                path=path,
                 _target=self.target,
             )
