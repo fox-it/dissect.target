@@ -20,7 +20,7 @@ class DirectLoader(Loader):
         return False
 
     def map(self, target: Target) -> None:
-        vfs = VirtualFilesystem()
+        vfs = VirtualFilesystem(case_sensitive=False)
         for path in self.paths:
             if path.is_file():
                 vfs.map_file(str(path), str(path))
