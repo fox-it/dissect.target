@@ -1,33 +1,37 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from dissect.target.plugins.os.windows import certlog
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    import pytest
-
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
-def test_sru_plugin(target_win: Target, fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:
-    seven_kingdom_ca = absolute_path("_data/plugins/os/windows/certlog/SEVENKINGDOMS-CA.edb")
+def test_certlog_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    ca_edb = absolute_path("_data/plugins/os/windows/certlog/SEVENKINGDOMS-CA.edb")
 
-    fs_win.map_file("Windows/System32/CertLog/SEVENKINGDOMS-CA.edb", seven_kingdom_ca)
+    fs_win.map_file("Windows/System32/Certlog/SEVENKINGDOMS-CA.edb", ca_edb)
 
     target_win.add_plugin(certlog.CertLogPlugin)
 
-    assert len(list(target_win.sru())) == 220
-    assert len(list(target_win.sru.application())) == 203
-    assert len(list(target_win.sru.network_connectivity())) == 3
-    assert len(list(target_win.sru.sdp_volume_provider())) == 6
-    assert len(list(target_win.sru.sdp_physical_disk_provider())) == 3
-    assert len(list(target_win.sru.sdp_cpu_provider())) == 3
+    assert len(list(target_win.certlog())) == 142
+    assert len(list(target_win.certlog.requests())) == 11
+    assert len(list(target_win.certlog.request_attributes())) == 26
+    assert len(list(target_win.certlog.crls())) == 2
+    assert len(list(target_win.certlog.certificates())) == 11
+    assert len(list(target_win.certlog.certificate_extensions())) == 92
 
-    caplog.clear()
-    with caplog.at_level(logging.WARNING, target_win.log.name):
-        assert list(target_win.sru.vfu()) == []
-        assert "Table not found: vfu" in caplog.text
+
+def test_certlog_plugin_direct() -> None:
+    ca_edb = absolute_path("_data/plugins/os/windows/certlog/SEVENKINGDOMS-CA.edb")
+
+    target = Target.open_direct([ca_edb])
+    assert len(list(target.certlog())) == 142
+    assert len(list(target.certlog.requests())) == 11
+    assert len(list(target.certlog.request_attributes())) == 26
+    assert len(list(target.certlog.crls())) == 2
+    assert len(list(target.certlog.certificates())) == 11
+    assert len(list(target.certlog.certificate_extensions())) == 92

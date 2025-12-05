@@ -6,7 +6,6 @@ from dissect.database.ese.tools import certlog
 from dissect.database.exception import Error
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -16,28 +15,28 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = get_logger(__name__)
-
 RequestAttributesRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/request_attributes",
     [
-        ("path", "source"),
         ("string", "attribute_name"),
         ("string", "common_name"),
-        ("string", "table_name"),
         ("varint", "request_id"),
+        ("string", "table_name"),
+        ("string", "ca"),
+        ("path", "source"),
     ],
 )
 
 CertificateExtensionsRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/certificate_extensions",
     [
-        ("path", "source"),
-        ("string", "extension_raw_value"),
         ("varint", "extension_flags"),
         ("string", "extension_name"),
-        ("string", "table_name"),
+        ("bytes", "extension_raw_value"),
         ("varint", "request_id"),
+        ("string", "table_name"),
+        ("string", "ca"),
+        ("path", "source"),
     ],
 )
 
@@ -77,10 +76,11 @@ CertificatesRecord = TargetRecordDescriptor(
         ("varint", "public_key_length"),
         ("string", "public_key_params"),
         ("string", "publish_expired_cert_in_crl"),
-        ("string", "raw_certificate"),
-        ("string", "raw_name"),
+        ("bytes", "raw_certificate"),
+        ("bytes", "raw_name"),
         ("varint", "request_id"),
         ("string", "table_name"),
+        ("string", "ca"),
         ("path", "source"),
     ],
 )
@@ -88,10 +88,6 @@ CertificatesRecord = TargetRecordDescriptor(
 RequestsRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/request",
     [
-        ("datetime", "resolved_when"),
-        ("datetime", "revoked_when"),
-        ("datetime", "submitted_when"),
-        ("path", "source"),
         ("string", "attestation_challenge"),
         ("string", "caller_name"),
         ("string", "common_name"),
@@ -101,7 +97,7 @@ RequestsRecord = TargetRecordDescriptor(
         ("string", "disposition_message"),
         ("string", "distinguished_name"),
         ("string", "domain_component"),
-        ("string", "e_mail"),
+        ("string", "email"),
         ("string", "endorsement_certificate_hash"),
         ("string", "endorsement_key_hash"),
         ("string", "given_name"),
@@ -111,52 +107,58 @@ RequestsRecord = TargetRecordDescriptor(
         ("string", "organization"),
         ("string", "organizational_unit"),
         ("string", "raw_archived_key"),
-        ("string", "raw_name"),
-        ("string", "raw_old_certificate"),
-        ("string", "raw_precertificate"),
-        ("string", "raw_request"),
+        ("bytes", "raw_name"),
+        ("bytes", "raw_old_certificate"),
+        ("bytes", "raw_precertificate"),
+        ("bytes", "raw_request"),
         ("string", "request_attributes"),
-        ("string", "request_flags"),
-        ("string", "request_type"),
         ("string", "requester_name"),
+        ("string", "request_flags"),
+        ("varint", "request_id"),
+        ("string", "request_type"),
+        ("datetime", "resolved_when"),
         ("string", "revoked_effective_when"),
         ("string", "revoked_reason"),
+        ("datetime", "revoked_when"),
         ("string", "signer_application_policies"),
         ("string", "signer_policies"),
         ("string", "state_or_province"),
         ("string", "status_code"),
         ("string", "street_address"),
+        ("datetime", "submitted_when"),
         ("string", "sur_name"),
         ("string", "table_name"),
         ("string", "title"),
         ("string", "unstructured_address"),
         ("string", "unstructured_name"),
-        ("varint", "request_id"),
+        ("string", "ca"),
+        ("path", "source"),
     ],
 )
 
 CRLsRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/crls",
     [
-        ("datetime", "crl_last_published"),
-        ("datetime", "effective"),
-        ("datetime", "next_publish"),
-        ("datetime", "next_update"),
-        ("datetime", "propagation_complete"),
-        ("datetime", "this_update"),
-        ("path", "source"),
-        ("string", "crl_publish_error"),
-        ("string", "min_base"),
-        ("string", "raw_crl"),
-        ("string", "table_name"),
-        ("string", "this_publish"),
         ("varint", "count"),
+        ("datetime", "crl_last_published"),
         ("varint", "crl_publish_attempts"),
+        ("string", "crl_publish_error"),
         ("varint", "crl_publish_flags"),
         ("varint", "crl_publish_status_code"),
+        ("datetime", "effective"),
+        ("string", "min_base"),
         ("varint", "name_id"),
+        ("datetime", "next_publish"),
+        ("datetime", "next_update"),
         ("varint", "number"),
+        ("datetime", "propagation_complete"),
+        ("bytes", "raw_crl"),
         ("varint", "row_id"),
+        ("string", "table_name"),
+        ("string", "this_publish"),
+        ("datetime", "this_update"),
+        ("string", "ca"),
+        ("path", "source"),
     ],
 )
 
@@ -164,7 +166,6 @@ CertLogRecord = Union[  # noqa: UP007
     RequestsRecord, RequestAttributesRecord, CertificatesRecord, CRLsRecord, CertificateExtensionsRecord
 ]
 
-TRANSFORMS = {}
 # {i: "".join("_" + c.lower() if c.isupper() else c for c in i.replace('$', ''))[1:] for i in a}
 FIELD_MAPPINGS = {
     "$AttributeName": "attribute_name",
@@ -254,46 +255,44 @@ FIELD_MAPPINGS = {
 
 
 class CertLogPlugin(Plugin):
-    """Return all available SRUM data stored in the SRUDB.dat.
+    """Return all available data stored in CertLog databases.
 
-    The System Resource Usage Monitor (SRUM) stores its information in a SRUDB.dat file. As the names suggests, it
-    contains data about resource usage, such as network and memory usage by applications.
+    Certificate Authority databases are databases related to the Active Directory Certificate Services (AD CS) feature.
 
     References:
         - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-csra/5f06c74c-1a29-4fdf-b8dd-ae3300d1b90d
+        - https://assets.crowdstrike.com/is/content/crowdstrikeinc/investigating-active-directory-certificate-abusepdf
+        - https://learn.microsoft.com/en-gb/troubleshoot/windows-server/certificates-and-public-key-infrastructure-pki/move-certificate-server-database-log-files
     """
 
     __namespace__ = "certlog"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self._certlog_dbs: list[certlog.CertLog, Path] = []
+        self._certlog_dbs: list[tuple[certlog.CertLog, Path]] = []
         for path in self.get_paths():
             try:
-                self._certlog_dbs.append((certlog.CertLog(path.open()), path))
-            except Error as e:
+                self._certlog_dbs.append((certlog.CertLog(path.open(mode="rb")), path))
+            except Error as e:  # noqa: PERF203
                 self.target.log.warning("Error opening Certlog database")
                 self.target.log.debug("", exc_info=e)
 
     def _get_paths(self) -> Iterator[Path]:
-        """Return all artifact files of interest to the plugin.
-
-        To be implemented by the plugin subclass.
-        """
+        """Return all artifact files of interest to the plugin."""
         certlog_dir = self.target.resolve("%windir%/System32/CertLog")
         if certlog_dir.exists():
             yield from certlog_dir.glob("*.edb")
 
     def check_compatible(self) -> None:
         if not self._certlog_dbs:
-            raise UnsupportedPluginError("No Certlog Databases found")
+            raise UnsupportedPluginError("No Certificate Authority Databases found")
 
     def read_records(self, table_name: str, record_type: CertLogRecord) -> Iterator[CertLogRecord]:
         for db, path in self._certlog_dbs:
+            ca_name = path.stem
             table = [table for table in db.tables() if table.name == table_name]
             if not table:
-                self.target.log.warning("Table not found: %s", table_name)
-                return iter(())
+                self.target.log.warning("Table not found for ca %s: %s", ca_name, table_name)
             columns = [c.name for c in table[0].columns]
             for entry in db.records(table_name=table_name):
                 values = (entry[name] for name in columns)
@@ -305,51 +304,55 @@ class CertLogPlugin(Plugin):
                     if new_column:
                         record_values[new_column] = value
                     else:
-                        self.target.log.debug("Unexpected columns for table %s : %s", table_name, column)
+                        self.target.log.debug(
+                            "Unexpected columns for table %s in ca %s: %s", table_name, ca_name, column
+                        )
 
                 yield record_type(
                     _target=self.target,
                     source=path,
                     table_name=table_name,
+                    ca=ca_name,
                     **record_values,
                 )
 
     @export(record=RequestsRecord)
     def requests(self) -> Iterator[RequestsRecord]:
-        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+        """Return the contents of Requests table from all Certificate Authority databases.
 
-        Gives insight into the network usage of the system.
+        Gives insight into certificates requested (caller_name, request_id, request_attributes)
         """
         yield from self.read_records("Requests", RequestsRecord)
 
     @export(record=RequestAttributesRecord)
     def request_attributes(self) -> Iterator[RequestAttributesRecord]:
-        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+        """Return the contents of RequestAttributes table from all Certificate Authority databases.
 
-        Gives insight into the network usage of the system.
+        Gives insight into attributes of requested certificates (Same information as in request_attributes field
+            of requests table)
         """
         yield from self.read_records("RequestAttributes", RequestAttributesRecord)
 
     @export(record=CRLsRecord)
     def crls(self) -> Iterator[CRLsRecord]:
-        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+        """Return the contents of CRLs table from all Certificate Authority databases.
 
-        Gives insight into the network usage of the system.
+        Gives insight into the Certificate Revocation List of a Certificate authority.
         """
         yield from self.read_records("CRLs", CRLsRecord)
 
     @export(record=CertificatesRecord)
     def certificates(self) -> Iterator[CertificatesRecord]:
-        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+        """Return the contents of Certificates table from all Certificate Authority databases.
 
-        Gives insight into the network usage of the system.
+        Gives insight into issued certificates for a Certificate authority (public key, validity date)
         """
         yield from self.read_records("Certificates", CertificatesRecord)
 
     @export(record=CertificateExtensionsRecord)
-    def certificate_extension(self) -> Iterator[CertificateExtensionsRecord]:
-        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+    def certificate_extensions(self) -> Iterator[CertificateExtensionsRecord]:
+        """Return the contents of CertificateExtensions table from all Certificate Authority databases.
 
-        Gives insight into the network usage of the system.
+        Gives insight into CertificateExtensions for a CA
         """
         yield from self.read_records("CertificateExtensions", CertificateExtensionsRecord)
