@@ -78,12 +78,50 @@ class MssqlPlugin(Plugin):
             for errorlog in log_path.glob(self.FILE_GLOB):
                 # The errorlog includes a BOM, so endianess gets determined automatically
                 fh = errorlog.open(mode="rt", encoding="utf-16", errors="surrogateescape")
+                first = fh.readline()
+
+                # MSSQL ERRORLOG files should always start with a timestamp.
+                if RE_TIMESTAMP_PATTERN.match(first):
+                    pass
+                else:
+                    self.target.log.error(
+                        "Logfile %s does not start with a timestamp. Skipping.",
+                        errorlog,
+                    )
+                    continue
+
+                fh.seek(0)
                 buf = ""
 
                 for line in fh:
-                    if ts := RE_TIMESTAMP_PATTERN.match(line):
+                    # If we have a buffer with a timestamp and
+                    # our current line also has a timestamp,
+                    # we should have a complete record in our buffer.
+                    if previous_ts := RE_TIMESTAMP_PATTERN.match(buf):
+                        if current_ts := RE_TIMESTAMP_PATTERN.match(line):
+                            yield MssqlErrorlogRecord(
+                                ts=datetime.strptime(previous_ts.group(), "%Y-%m-%d %H:%M:%S.%f").replace(
+                                    tzinfo=timezone.utc
+                                ),
+                                instance=instance,
+                                # The process name is a fixed-width field and is always 12 characters long.
+                                process=buf[23:35].strip(),
+                                message=buf[35:].strip(),
+                                path=errorlog,
+                                _target=self.target,
+                            )
+
+                            buf = ""
+
+                    buf += line
+
+                # For the last line
+                if buf:
+                    if current_ts := RE_TIMESTAMP_PATTERN.match(buf):
                         yield MssqlErrorlogRecord(
-                            ts=datetime.strptime(ts.group(), "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
+                            ts=datetime.strptime(current_ts.group(), "%Y-%m-%d %H:%M:%S.%f").replace(
+                                tzinfo=timezone.utc
+                            ),
                             instance=instance,
                             # The process name is a fixed-width field and is always 12 characters long.
                             process=buf[23:35].strip(),
@@ -91,9 +129,6 @@ class MssqlPlugin(Plugin):
                             path=errorlog,
                             _target=self.target,
                         )
-                        buf = ""
-
-                    buf += line
 
     def _find_instances(self) -> set[str, TargetPath]:
         return {
