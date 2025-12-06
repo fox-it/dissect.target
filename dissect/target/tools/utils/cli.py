@@ -213,16 +213,16 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
     return {func.output for func in funcs if func.path not in args.excluded_functions}
 
 
-def open_target(args: argparse.Namespace) -> Target:
+def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
     direct: bool = getattr(args, "direct", False)
     child: str | None = getattr(args, "child", None)
 
-    target = Target.open_direct(args.target) if direct else Target.open(args.target)
+    target = Target.open_direct(args.target) if direct else Target.open(args.target, apply=apply)
 
     if child:
         try:
             target.log.warning("Switching to --child %s", child)
-            target = target.open_child(child)
+            target = target.open_child(child, apply=apply)
         except Exception as e:
             target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
             target.log.debug("", exc_info=e)
@@ -233,20 +233,22 @@ def open_target(args: argparse.Namespace) -> Target:
     return target
 
 
-def open_targets(args: argparse.Namespace) -> Iterator[Target]:
+def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Target]:
     direct: bool = getattr(args, "direct", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
 
     targets: Iterable[Target] = (
-        [Target.open_direct(args.targets)] if direct else Target.open_all(args.targets, children)
+        [Target.open_direct(args.targets)]
+        if direct
+        else Target.open_all(args.targets, include_children=children, apply=apply)
     )
 
     for target in targets:
         if child:
             try:
                 target.log.warning("Switching to --child %s", child)
-                target = target.open_child(child)
+                target = target.open_child(child, apply=apply)
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
                 target.log.debug("", exc_info=e)
