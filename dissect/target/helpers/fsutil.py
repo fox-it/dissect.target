@@ -29,7 +29,10 @@ except ImportError:
     HAS_BZ2 = False
 
 try:
-    import zstandard
+    if sys.version_info >= (3, 14):
+        from compression import zstd  # novermin
+    else:
+        from backports import zstd
 
     HAS_ZSTD = True
 except ImportError:
@@ -526,6 +529,9 @@ def open_decompress(
     Returns:
         An binary or text IO stream, depending on the mode with which the file was opened.
 
+    Raises:
+        ValueError: path and fileobj are mutually exclusive, but one of them is required
+
     Example:
         .. code-block:: python
 
@@ -565,9 +571,7 @@ def open_decompress(
         return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
     if HAS_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
-        # stream_reader is not seekable, so we have to resort to the less
-        # efficient decompressor which returns bytes.
-        return io.BytesIO(zstandard.decompress(file.read()))
+        return zstd.open(file, mode=mode, encoding=encoding, errors=errors, newline=newline)
 
     if path:
         file.close()
