@@ -1,10 +1,23 @@
 from __future__ import annotations
 
-from typing import BinaryIO
+from io import BytesIO
+from typing import TYPE_CHECKING, BinaryIO
 
 import pytest
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import magic
+from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.filesystem import FilesystemEntry
+
+
+fs = VirtualFilesystem()
+fs.map_file_fh("example.png", BytesIO(b""))
+entry = fs.get("example.png")
 
 
 @pytest.mark.parametrize(
@@ -153,9 +166,16 @@ from dissect.target.helpers import magic
         # Negatives
         ("from_buffer", b"unknown_file", None, None),
         ("from_buffer", b"", None, None),
+        # Other methods
+        ("from_file", absolute_path("_data/filesystems/cpio/initrd.img-6.1.0-15-amd64"), True, "application/zstd"),
+        ("from_entry", entry, True, "image/png"),
+        ("from_descriptor", BytesIO(b"ElfFile"), True, "application/x-win-evtx"),
+        ("from_fh", BytesIO(b"regf"), True, "application/x-win-regf"),
     ],
 )
-def test_magic_detection(func: str, input: bytes | BinaryIO | None, mime_out: bool, expected_output: str) -> None:
+def test_magic_detection(
+    func: str, input: bytes | BinaryIO | Path | FilesystemEntry | None, mime_out: bool, expected_output: str
+) -> None:
     """Test if we correctly identify common files.
 
     Relevant examples taken from referenced wikipedia page, grouped by types.
@@ -170,7 +190,7 @@ def test_magic_detection(func: str, input: bytes | BinaryIO | None, mime_out: bo
 def test_magic_exception_handling() -> None:
     """Test if we throw sensible exception messages."""
 
-    with pytest.raises(TypeError, match="Provided path is not a TargetPath or FilesystemEntry"):
+    with pytest.raises(TypeError, match="Provided path is not a Path instance"):
         magic.from_file("not a Path")
 
     with pytest.raises(TypeError, match="Provided buf is not bytes or a buffer"):

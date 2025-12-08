@@ -74,13 +74,22 @@ class Magic:
         return None
 
 
-def from_file(path: Path | FilesystemEntry, *, mime: bool = False) -> MagicResult:
-    """Detect file type from a :class:`Path` or :class:`FilesystemEntry` instance."""
+def from_file(path: Path, *, mime: bool = False) -> MagicResult:
+    """Detect file type from a :class:`Path` instance."""
 
-    if not isinstance(path, (Path, FilesystemEntry)):
-        raise TypeError("Provided path is not a Path or FilesystemEntry")
+    if not isinstance(path, Path):
+        raise TypeError("Provided path is not a Path instance")
 
-    return from_descriptor(path.open(), Path(path.name).suffix, mime=mime)
+    return from_descriptor(path.open("rb"), path.suffix, mime=mime)
+
+
+def from_entry(entry: FilesystemEntry, *, mime: bool = False) -> MagicResult:
+    """Detect file type from a :class:`FilesystemEntry` instance."""
+
+    if not isinstance(entry, FilesystemEntry):
+        raise TypeError("Provided entry is not a FilesystemEntry instance")
+
+    return from_descriptor(entry.open(), Path(entry.name).suffix, mime=mime)
 
 
 def from_descriptor(fh: BinaryIO, suffix: str | None = None, *, mime: bool = False) -> MagicResult:
