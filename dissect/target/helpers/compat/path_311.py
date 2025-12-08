@@ -151,7 +151,7 @@ class PureDissectPath(PurePath):
 
 
 class TargetPath(Path, PureDissectPath):
-    __slots__ = ("_entry",)
+    __slots__ = ("_direntry", "_entry")
 
     def _make_child_relpath(self, part: str) -> Self:
         child = super()._make_child_relpath(part)
@@ -160,11 +160,10 @@ class TargetPath(Path, PureDissectPath):
         return child
 
     def get(self) -> FilesystemEntry:
-        try:
-            return self._entry
-        except AttributeError:
-            self._entry = self._fs.get(str(self))
-            return self._entry
+        """Return the :class:`FilesystemEntry` for this path."""
+        if not hasattr(self, "_entry"):
+            self._entry = self._direntry.get() if hasattr(self, "_direntry") else self._fs.get(str(self))
+        return self._entry
 
     @classmethod
     def cwd(cls) -> Self:
@@ -189,7 +188,7 @@ class TargetPath(Path, PureDissectPath):
                 # Yielding a path object for these makes little sense
                 continue
             child_path = self._make_child_relpath(entry.name)
-            child_path._entry = entry
+            child_path._direntry = entry
             yield child_path
 
     def _scandir(self) -> path_common._DissectScandirIterator:

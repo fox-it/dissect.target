@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import gzip
 import json as jsonlib
-import lzma
 import struct
 import subprocess
 from configparser import ConfigParser
@@ -11,10 +9,10 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 from defusedxml import ElementTree
-from dissect.hypervisor.util import vmtar
-from dissect.sql import sqlite3
+from dissect.database.sqlite3 import SQLite3
 
 from dissect.target.filesystems.nfs import NfsFilesystem
+from dissect.target.filesystems.vmtar import VmtarFilesystem
 from dissect.target.helpers.sunrpc import client
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 
@@ -284,16 +282,10 @@ def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> N
         if module_path.name.endswith((".tar.gz", ".tgz")):
             tfs = tar.TarFilesystem(module_path.open())
         elif module_path.suffix.startswith(".v"):
-            # Visor tar files are always gzipped
-            cfile = gzip.GzipFile(fileobj=module_path.open())
-            # Sometimes they are also xz compressed, check for XZ magic
-            # NOTE: The XZ layer may also contain file signatures
-            # Could be interesting to check.
-            if cfile.peek(6)[:6] == b"\xfd7zXZ\x00":
-                cfile = lzma.LZMAFile(cfile)  # noqa: SIM115
-
-            tfs = tar.TarFilesystem(cfile, tarinfo=vmtar.VisorTarInfo)
-
+            try:
+                tfs = VmtarFilesystem(module_path.open())
+            except Exception as e:
+                target.log.warning("%s, skipping file %s", str(e), module_path)
         if tfs:
             target.fs.append_layer().mount("/", tfs)
 
@@ -557,7 +549,7 @@ def _traverse(path: str, obj: dict[str, Any], create: bool = False) -> dict[str,
 
 
 def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
-    db = sqlite3.SQLite3(fh)
+    db = SQLite3(fh)
 
     store = {}
 
