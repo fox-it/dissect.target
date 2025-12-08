@@ -97,8 +97,11 @@ def parse_freedesktop_xml(path: Path) -> str:
             value = magic_match.get("value")
             type = magic_match.get("type")
 
-            assert value, f"Missing value in {magic_match!r}"
-            assert type, f"Missing type in {magic_match!r}"
+            if not value:
+                raise ValueError(f"Missing value in {magic_match!r}")
+
+            if not type:
+                raise ValueError(f"Missing type in {magic_match!r}")
 
             try:
                 value = convert_value(type, value)
@@ -177,7 +180,9 @@ def main() -> int:
         formatter_class=help_formatter,
     )
     parser.add_argument("path", metavar="PATH", type=Path, help="path to freedesktop.org.xml.in file")
-    parser.add_argument("--output", "-o", type=Path, help="optional alternative output path for generated types document")
+    parser.add_argument(
+        "--output", "-o", type=Path, help="optional alternative output path for generated types document"
+    )
     parser.add_argument("--format", action="store_true", default=False, help="format output using ruff")
     args = parser.parse_args()
 
@@ -185,7 +190,11 @@ def main() -> int:
         print(f"Provided file does not exist: {args.path}")
         return 1
 
-    output = (args.output or Path("dissect/target/helpers/magic/mimetypes/freedesktop.py")).resolve()
+    output = (args.output or Path(__file__).parents[1].joinpath("helpers/magic/mimetypes/freedesktop.py")).resolve()
+
+    if not output.parent.is_dir():
+        print(f"Output path parent directory {output.parent} does not exist")
+        return 1
 
     try:
         content = parse_freedesktop_xml(args.path)

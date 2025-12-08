@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import BinaryIO, TypeAlias
 
 from dissect.target.filesystem import FilesystemEntry
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.magic import mimetypes
 
 MagicSignature: TypeAlias = tuple[str, str, bytes]
@@ -75,11 +74,11 @@ class Magic:
         return None
 
 
-def from_file(path: TargetPath | FilesystemEntry, *, mime: bool = False) -> MagicResult:
-    """Detect file type from a :class:`TargetPath` or :class:`FilesystemEntry` instance."""
+def from_file(path: Path | FilesystemEntry, *, mime: bool = False) -> MagicResult:
+    """Detect file type from a :class:`Path` or :class:`FilesystemEntry` instance."""
 
-    if not isinstance(path, (TargetPath, FilesystemEntry)):
-        raise TypeError("Provided path is not a TargetPath or FilesystemEntry")
+    if not isinstance(path, (Path, FilesystemEntry)):
+        raise TypeError("Provided path is not a Path or FilesystemEntry")
 
     return from_descriptor(path.open(), Path(path.name).suffix, mime=mime)
 
@@ -91,6 +90,10 @@ def from_descriptor(fh: BinaryIO, suffix: str | None = None, *, mime: bool = Fal
         raise TypeError("Provided fh does not have a read or seek method")
 
     return from_buffer(fh, suffix, mime=mime)
+
+
+# Convenience alias, not present in python-magic.
+from_fh = from_descriptor
 
 
 def from_buffer(buf: bytes | BinaryIO, suffix: str | None = None, *, mime: bool = False) -> MagicResult:
