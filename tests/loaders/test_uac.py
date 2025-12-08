@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +13,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path, mkdirs
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from pytest_benchmark.fixture import BenchmarkFixture

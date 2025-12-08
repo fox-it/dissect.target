@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dissect.esedb.exceptions import Error
-from dissect.esedb.tools import ual
+from dissect.database.ese.tools import ual
+from dissect.database.exception import Error
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor

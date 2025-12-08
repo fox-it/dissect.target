@@ -8,7 +8,7 @@ import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -25,7 +25,7 @@ from dissect.target.filesystems.ntfs import NtfsFilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 
@@ -413,6 +413,13 @@ def test_target_path_rglob(path_fs: VirtualFilesystem) -> None:
     ]
     assert list(path_fs.path("/some").rglob("*.TXT")) == []
     assert list(path_fs.path("/some").rglob("*.csv")) == []
+    assert list(map(str, path_fs.path("/").rglob("*.*"))) == [
+        "/some/symlink.txt",
+        "/some/file.txt",
+        "/some/dir/link.txt",
+        "/some/dir/file.txt",
+        "/some/dir/nested/file.txt",
+    ]
 
     with patch.object(path_fs, "case_sensitive", False):
         assert list(map(str, path_fs.path("/some").rglob("*.TXT"))) == [
@@ -476,8 +483,9 @@ def test_target_path_is_symlink(path_fs: VirtualFilesystem) -> None:
 def test_target_path_is_junction(path_fs: VirtualFilesystem) -> None:
     assert not path_fs.path("/some").is_junction()
 
-    mock_entry = Mock(spec=NtfsFilesystemEntry)
-    mock_entry.dereference.return_value.is_mount_point.return_value = True
+    mock_entry = Mock()
+    mock_entry.__class__ = NtfsFilesystemEntry
+    mock_entry.entry.is_mount_point.return_value = True
 
     path_fs.map_file_entry("/junction", mock_entry)
     assert path_fs.path("/junction").is_junction()
@@ -563,39 +571,47 @@ def test_target_path_errors(path_fs: VirtualFilesystem) -> None:
         path_fs.path("symlink1/symlink2/symlink1").resolve()
 
     # This should raise from the final stat() call
-    if sys.version_info >= (3, 10):
-        assert [tb.name for tb in e.traceback[1:3]] == [
-            "resolve",
-            "stat",
-        ]
-    else:
-        # In 3.9 there's no difference between these two
-        assert [tb.name for tb in e.traceback[1:3]] == [
-            "resolve",
-            "resolve",
-        ]
+    assert [tb.name for tb in e.traceback[1:3]] == [
+        "resolve",
+        "stat",
+    ]
 
     with pytest.raises(SymlinkRecursionError) as e:
         path_fs.path("symlink1/symlink2/symlink1").resolve(strict=True)
 
     # This should raise from the inner realpath() call
-    if sys.version_info >= (3, 10):
-        assert [tb.frame.code.name for tb in e.traceback[1:3]] == [
-            "resolve",
-            "realpath",
-        ]
-    else:
-        # In 3.9 there's no difference between these two
-        assert [tb.frame.code.name for tb in e.traceback[1:3]] == [
-            "resolve",
-            "resolve",
-        ]
+    assert [tb.frame.code.name for tb in e.traceback[1:3]] == [
+        "resolve",
+        "realpath",
+    ]
 
     with pytest.raises(NotASymlinkError):
         path_fs.path("some/file.txt").readlink()
 
     with pytest.raises(NotADirectoryError):
         path_fs.path("some/file.txt/dir").stat()
+
+
+def test_target_path_get(path_fs: VirtualFilesystem) -> None:
+    # Ensure that TargetPath.get() works as expected
+    p = path_fs.path("/some/file.txt")
+    assert not hasattr(p, "_entry")
+
+    entry = p.get()
+    assert entry is p._entry
+
+    p = next(path_fs.path("/some").iterdir())
+    assert not hasattr(p, "_entry")
+    assert hasattr(p, "_direntry")
+
+    entry = p.get()
+    assert entry is p._entry
+
+    with (
+        patch.object(path_fs, "get", side_effect=Exception("Test exception")),
+        pytest.raises(Exception, match="Test exception"),
+    ):
+        path_fs.path("/some/file.txt").get()
 
 
 def test_target_path_not_implemented(path_fs: VirtualFilesystem) -> None:
@@ -634,12 +650,8 @@ def test_target_path_not_implemented(path_fs: VirtualFilesystem) -> None:
     with pytest.raises(NotImplementedError):
         assert path_fs.path().symlink_to("foo")
 
-    if sys.version_info >= (3, 10):
-        with pytest.raises(NotImplementedError):
-            assert path_fs.path().hardlink_to("foo")
-    else:
-        with pytest.raises(NotImplementedError):
-            assert path_fs.path().link_to("foo")
+    with pytest.raises(NotImplementedError):
+        assert path_fs.path().hardlink_to("foo")
 
     with pytest.raises(NotImplementedError):
         assert path_fs.path().mkdir()

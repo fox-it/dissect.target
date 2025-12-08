@@ -4,6 +4,7 @@ import itertools
 import re
 from datetime import datetime
 from functools import cached_property
+from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -18,7 +19,6 @@ from dissect.target.plugins.apps.webserver.webserver import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -240,6 +240,7 @@ class ApachePlugin(WebserverPlugin):
         self.access_paths = set()
         self.error_paths = set()
         self.virtual_hosts = set()
+        self.resolved_config_paths = set()
         self.find_logs()
 
     def check_compatible(self) -> None:
@@ -251,7 +252,8 @@ class ApachePlugin(WebserverPlugin):
 
     def find_logs(self) -> None:
         """Discover any present Apache log paths on the target system.
-        Populates ``self.access_paths``, ``self.error_paths`` and ``self.virtual_hosts``.
+        Populates ``self.access_paths``, ``self.error_paths``,
+        ``self.virtual_hosts`` and ``self.resolved_config_paths``.
 
         References:
             - https://httpd.apache.org/docs/2.4/logs.html
@@ -279,6 +281,18 @@ class ApachePlugin(WebserverPlugin):
             for path in self.server_root.rglob("*.conf"):
                 if path not in seen:
                     self._process_conf_file(path, seen)
+
+    def _get_paths(self) -> Iterator[Path]:
+        yield from self.access_paths | self.error_paths
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        config_paths = set()
+        for path in self.DEFAULT_CONFIG_PATHS:
+            config_paths.add(Path(path))
+
+        config_paths.update(self.resolved_config_paths)
+
+        yield from config_paths
 
     def _process_conf_file(self, path: Path, seen: set[Path] | None = None) -> None:
         """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
@@ -442,7 +456,7 @@ class ApachePlugin(WebserverPlugin):
                 log = match.groupdict()
                 remote_ip = log.get("client")
                 if remote_ip and ":" in remote_ip:
-                    remote_ip, _, port = remote_ip.rpartition(":")
+                    remote_ip, _, _ = remote_ip.rpartition(":")
                 error_source = log.get("error_source")
                 error_code = log.get("error_code")
 

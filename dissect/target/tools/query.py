@@ -17,13 +17,13 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
+from dissect.target.helpers.logging import get_logger
 from dissect.target.plugin import (
     PLUGINS,
     FunctionDescriptor,
 )
 from dissect.target.target import Target
-from dissect.target.tools.report import ExecutionReport
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     configure_plugin_arguments,
@@ -34,13 +34,15 @@ from dissect.target.tools.utils import (
     process_generic_arguments,
     process_plugin_arguments,
 )
+from dissect.target.tools.utils.report import ExecutionReport
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from flow.record.adapter import AbstractWriter
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -67,8 +69,6 @@ def main() -> int:
         add_help=False,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("--child", help="load a specific child path or index")
-    parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument("--direct", action="store_true", help="treat TARGETS as paths to pass to plugins directly")
 
     configure_plugin_arguments(parser)
@@ -108,7 +108,7 @@ def main() -> int:
         parser.print_help()
         return 0
 
-    process_generic_arguments(args)
+    process_generic_arguments(parser, args)
 
     if args.no_cache:
         cache.IGNORE_CACHE = True
@@ -125,10 +125,11 @@ def main() -> int:
                 "The --rewrite-cache option will be ignored as --no-cache or --only-read-cache are specified",
             )
 
+    # Process plugin arguments after host and child args are checked
     different_output_types = process_plugin_arguments(parser, args, rest)
 
     if not args.targets:
-        parser.error("too few arguments")
+        parser.error("too few arguments - missing targets")
 
     if args.report_dir and not args.report_dir.is_dir():
         parser.error(f"--report-dir {args.report_dir} is not a valid directory")
@@ -147,6 +148,9 @@ def main() -> int:
             record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []
+
+            if args.dry_run:
+                print("Dry run on:", target)
 
             first_seen_output_type = default_output_type
 
@@ -274,7 +278,7 @@ def main() -> int:
     timestamp = datetime.now(tz=timezone.utc)
 
     execution_report.set_plugin_stats(PLUGINS)
-    log.debug("%s", execution_report.get_formatted_report())
+    log.trace("%s", execution_report.get_formatted_report())
     if args.report_dir:
         persist_execution_report(
             args.report_dir,

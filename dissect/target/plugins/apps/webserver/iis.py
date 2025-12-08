@@ -81,7 +81,7 @@ class IISLogsPlugin(WebserverPlugin):
         self.config = self.target.resolve(self.APPLICATION_HOST_CONFIG)
 
     def check_compatible(self) -> None:
-        if not self.log_dirs:
+        if not any(self.log_dirs.values()):
             raise UnsupportedPluginError("No IIS log files found")
 
     @cached_property
@@ -125,6 +125,13 @@ class IISLogsPlugin(WebserverPlugin):
 
         return dirs
 
+    def _get_paths(self) -> Iterator[Path]:
+        for path in self.log_dirs.values():
+            yield from path
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        yield from {self.config}
+
     @export(record=BasicRecordDescriptor)
     def logs(self) -> Iterator[TargetRecordDescriptor]:
         """Return contents of IIS (v7 and above) log files.
@@ -147,8 +154,7 @@ class IISLogsPlugin(WebserverPlugin):
                     self.target.log.info("Processing IIS log file %s in %s format", log_file, format)
                     yield from parsers[format](self.target, log_file)
 
-        # We don't implement _get_paths() in the IIS plugin because there's little use for it for the way the plugin
-        # is currently implemented. So handle direct files here.
+        # We handle direct files here because _get_paths cannot select (filter) on the type of logfile.
         if self.target.is_direct:
             for log_file in self.get_paths():
                 yield from parse_autodetect_format_log(self.target, log_file)
@@ -239,7 +245,7 @@ def parse_w3c_format_log(target: Target, path: Path) -> Iterator[TargetRecordDes
         if not record_descriptor:
             target.log.warning("Comment line with the fields defined should come before the values, skipping: %r", line)
 
-        raw = replace_dash_with_none(dict(zip(fields, values)))
+        raw = replace_dash_with_none(dict(zip(fields, values, strict=False)))
 
         # Example:
         # {

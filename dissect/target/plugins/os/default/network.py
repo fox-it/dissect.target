@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from operator import attrgetter
-from typing import TYPE_CHECKING, Any, Callable, Union, get_args
+from typing import TYPE_CHECKING, Any, Union, get_args
 
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
 
@@ -13,10 +13,11 @@ from dissect.target.helpers.record import (
 from dissect.target.plugin import Plugin, export, internal
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
-InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]
+
+InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]  # noqa: UP007
 
 
 class NetworkPlugin(Plugin):
@@ -31,7 +32,7 @@ class NetworkPlugin(Plugin):
     def check_compatible(self) -> None:
         pass
 
-    def _interfaces(self) -> Iterator[InterfaceRecord]:
+    def _interfaces(self, *args, **kwargs) -> Iterator[InterfaceRecord]:
         yield from ()
 
     def _get_record_type(self, field_name: str, func: Callable[[Any], Any] | None = None) -> Iterator[Any]:
@@ -45,11 +46,11 @@ class NetworkPlugin(Plugin):
             yield from (map(func, output) if func else output)
 
     @export(record=get_args(InterfaceRecord))
-    def interfaces(self) -> Iterator[InterfaceRecord]:
+    def interfaces(self, *args, **kwargs) -> Iterator[InterfaceRecord]:
         """Yield interfaces."""
         # Only search for the interfaces once
         if self._interface_list is None:
-            self._interface_list = list(self._interfaces())
+            self._interface_list = list(self._interfaces(*args, **kwargs))
 
         yield from self._interface_list
 

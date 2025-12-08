@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 from flow.record import GroupedRecord
@@ -12,6 +12,8 @@ from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord, TasksPlu
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 

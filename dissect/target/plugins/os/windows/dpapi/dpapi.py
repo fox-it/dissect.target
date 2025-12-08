@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import re
 from functools import cache, cached_property
 from typing import TYPE_CHECKING
@@ -34,6 +35,7 @@ class DPAPIPlugin(InternalPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
+        self._seen_mks = set()
         self.keychain = cache(self.keychain)
 
     def check_compatible(self) -> None:
@@ -88,6 +90,11 @@ class DPAPIPlugin(InternalPlugin):
             if not self.RE_MASTER_KEY.findall(file.name):
                 continue
 
+            if (file.name, sid) in self._seen_mks:
+                continue
+
+            self._seen_mks.add((file.name, sid))
+
             with file.open() as fh:
                 mkf = MasterKeyFile(fh)
 
@@ -118,16 +125,30 @@ class DPAPIPlugin(InternalPlugin):
                     try:
                         if mkf.decrypt_with_password(sid, mk_pass):
                             self.target.log.info(
-                                "Decrypted user master key with password '%s' from provider %s", mk_pass, provider
+                                "Decrypted SID %s master key %s with password '%s' from provider %s",
+                                sid,
+                                file,
+                                mk_pass,
+                                provider,
                             )
                             break
                     except ValueError:
                         pass
 
                     try:
+                        # NOTE: This is a workaround for a PyPy bug
+                        # `bytes.fromhex` errors on subclasses of `str`
+                        # (see https://github.com/pypy/pypy/issues/5327)
+                        if platform.python_implementation() == "PyPy":
+                            mk_pass = str(mk_pass)
+
                         if mkf.decrypt_with_hash(sid, bytes.fromhex(mk_pass)):
                             self.target.log.info(
-                                "Decrypted SID %s master key with hash '%s' from provider %s", sid, mk_pass, provider
+                                "Decrypted SID %s master key %s with hash '%s' from provider %s",
+                                sid,
+                                file,
+                                mk_pass,
+                                provider,
                             )
                             break
                     except ValueError:

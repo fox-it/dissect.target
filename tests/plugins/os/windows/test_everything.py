@@ -19,19 +19,22 @@ def test_everything_1_7_20_ntfs_only(target_win: Target, fs_win: VirtualFilesyst
     )
     target_win.add_plugin(EverythingPlugin)
 
-    records = list(target_win.everything.locate())
-    assert len(records) == 126828
+    records = []
+    idx = 0
+    for idx, record in enumerate(target_win.everything.locate()):
+        if idx not in [0, 86828]:
+            continue
+        records.append(record)
 
-    recycle_bin = records[0]
-    assert recycle_bin.type == DIRECTORY
-    assert recycle_bin.path == "C:\\$Recycle.Bin"
-    assert recycle_bin.date_modified == datetime(2023, 12, 16, 9, 8, 42, 726189, tzinfo=timezone.utc)
+    length = idx + 1
+    assert length == 126828
 
-    entry = records[-40000]
-    assert entry.type == FILE
-    assert entry.path == "C:\\Windows\\System32\\msidntld.dll"
-
-    assert entry.date_modified == datetime(2021, 5, 8, 8, 14, 34, 642525, tzinfo=timezone.utc)
+    assert records[0].type == DIRECTORY
+    assert records[0].path == "C:\\$Recycle.Bin"
+    assert records[0].date_modified == datetime(2023, 12, 16, 9, 8, 42, 726189, tzinfo=timezone.utc)
+    assert records[1].type == FILE
+    assert records[1].path == "C:\\Windows\\System32\\msidntld.dll"
+    assert records[1].date_modified == datetime(2021, 5, 8, 8, 14, 34, 642525, tzinfo=timezone.utc)
 
 
 def test_everything_1_7_20_ntfs_and_folder(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -42,22 +45,28 @@ def test_everything_1_7_20_ntfs_and_folder(target_win: Target, fs_win: VirtualFi
     )
     target_win.add_plugin(EverythingPlugin)
 
-    records = list(target_win.everything.locate())
-    assert len(records) == 127042
-    recycle_bin_c = records[0]
-    assert recycle_bin_c.type == DIRECTORY
-    assert recycle_bin_c.path == "C:\\$Recycle.Bin"
-    assert recycle_bin_c.date_modified == datetime(2023, 12, 16, 9, 8, 42, 726189, tzinfo=timezone.utc)
+    records = []
 
-    recycle_bin_e = records[1]
-    assert recycle_bin_e.type == DIRECTORY
-    assert recycle_bin_e.path == "E:\\$RECYCLE.BIN"
-    assert recycle_bin_e.date_modified == datetime(2024, 1, 27, 9, 54, 32, tzinfo=timezone.utc)
+    idx = 0
+    for idx, record in enumerate(target_win.everything.locate()):
+        if idx not in [0, 1, 94783]:
+            continue
+        records.append(record)
 
-    entry = records[94783]
-    assert entry.type == FILE
-    assert entry.path == "E:\\potato.txt"
-    assert entry.date_modified == datetime(2024, 1, 27, 9, 54, 32, tzinfo=timezone.utc)
+    length = idx + 1
+    assert length == 127042
+
+    assert records[0].type == DIRECTORY
+    assert records[0].path == "C:\\$Recycle.Bin"
+    assert records[0].date_modified == datetime(2023, 12, 16, 9, 8, 42, 726189, tzinfo=timezone.utc)
+
+    assert records[1].type == DIRECTORY
+    assert records[1].path == "E:\\$RECYCLE.BIN"
+    assert records[1].date_modified == datetime(2024, 1, 27, 9, 54, 32, tzinfo=timezone.utc)
+
+    assert records[2].type == FILE
+    assert records[2].path == "E:\\potato.txt"
+    assert records[2].date_modified == datetime(2024, 1, 27, 9, 54, 32, tzinfo=timezone.utc)
 
 
 def test_everything_1_7_20_ntfs_and_refs(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -68,27 +77,32 @@ def test_everything_1_7_20_ntfs_and_refs(target_win: Target, fs_win: VirtualFile
     )
     target_win.add_plugin(EverythingPlugin)
 
-    records = list(target_win.everything.locate())
-    assert len(records) == 127227
-    recycle_bin_c = records[0]
-    assert recycle_bin_c.type == DIRECTORY
-    assert recycle_bin_c.path == "C:\\$Recycle.Bin"
-    assert recycle_bin_c.date_modified == datetime(2023, 12, 16, 9, 8, 42, 726189, tzinfo=timezone.utc)
+    records = []
+    idx = 0
+    for idx, record in enumerate(target_win.everything.locate()):
+        if idx not in [0, 1, 94937, 108011]:
+            continue
 
-    recycle_bin_e = records[1]
-    assert recycle_bin_e.type == DIRECTORY
-    assert recycle_bin_e.path == "E:\\$RECYCLE.BIN"
-    assert recycle_bin_e.date_modified == datetime(2024, 1, 27, 21, 37, 6, 675776, tzinfo=timezone.utc)
+        records.append(record)
 
-    entry = records[94937]
-    assert entry.type == FILE
-    assert entry.path == "E:\\potato.txt"
-    assert entry.date_modified == datetime(2024, 1, 27, 21, 37, 13, 425810, tzinfo=timezone.utc)
+    length = idx + 1
+    assert length == 127227
 
-    entry = records[108011]
-    assert entry.type == FILE
-    assert entry.path == "E:\\test.txt"
-    assert entry.date_modified == datetime(2024, 1, 27, 21, 56, 57, 597593, tzinfo=timezone.utc)
+    assert records[0].type == DIRECTORY
+    assert records[0].path == "C:\\$Recycle.Bin"
+    assert records[0].date_modified == datetime(2023, 12, 16, 9, 8, 42, 726189, tzinfo=timezone.utc)
+
+    assert records[1].type == DIRECTORY
+    assert records[1].path == "E:\\$RECYCLE.BIN"
+    assert records[1].date_modified == datetime(2024, 1, 27, 21, 37, 6, 675776, tzinfo=timezone.utc)
+
+    assert records[2].type == FILE
+    assert records[2].path == "E:\\potato.txt"
+    assert records[2].date_modified == datetime(2024, 1, 27, 21, 37, 13, 425810, tzinfo=timezone.utc)
+
+    assert records[3].type == FILE
+    assert records[3].path == "E:\\test.txt"
+    assert records[3].date_modified == datetime(2024, 1, 27, 21, 56, 57, 597593, tzinfo=timezone.utc)
 
 
 def test_everything_1_7_20_refs_with_disabled_ntfs(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -102,15 +116,15 @@ def test_everything_1_7_20_refs_with_disabled_ntfs(target_win: Target, fs_win: V
 
     records = list(target_win.everything.locate())
     assert len(records) == 7
-    recycle_bin_e = records[0]
-    assert recycle_bin_e.type == DIRECTORY
-    assert recycle_bin_e.path == "E:\\$RECYCLE.BIN"
-    assert recycle_bin_e.date_modified == datetime(2024, 1, 27, 21, 37, 6, 675776, tzinfo=timezone.utc)
+    record = records[0]
+    assert record.type == DIRECTORY
+    assert record.path == "E:\\$RECYCLE.BIN"
+    assert record.date_modified == datetime(2024, 1, 27, 21, 37, 6, 675776, tzinfo=timezone.utc)
 
-    entry = records[5]
-    assert entry.type == FILE
-    assert entry.path == "E:\\potato.txt"
-    assert entry.date_modified == datetime(2024, 1, 27, 21, 37, 13, 425810, tzinfo=timezone.utc)
+    record = records[5]
+    assert record.type == FILE
+    assert record.path == "E:\\potato.txt"
+    assert record.date_modified == datetime(2024, 1, 27, 21, 37, 13, 425810, tzinfo=timezone.utc)
 
 
 def test_everything_1_7_20_refs_include_only(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -124,15 +138,15 @@ def test_everything_1_7_20_refs_include_only(target_win: Target, fs_win: Virtual
 
     records = list(target_win.everything.locate())
     assert len(records) == 4
-    recycle_bin_e = records[0]
-    assert recycle_bin_e.type == DIRECTORY
-    assert recycle_bin_e.path == "E:\\test"
-    assert recycle_bin_e.date_modified == datetime(2024, 1, 27, 22, 6, 9, 597820, tzinfo=timezone.utc)
+    record = records[0]
+    assert record.type == DIRECTORY
+    assert record.path == "E:\\test"
+    assert record.date_modified == datetime(2024, 1, 27, 22, 6, 9, 597820, tzinfo=timezone.utc)
 
-    entry = records[3]
-    assert entry.type == FILE
-    assert entry.path == "E:\\test\\test.txt"
-    assert entry.date_modified == datetime(2024, 1, 27, 21, 56, 57, 597593, tzinfo=timezone.utc)
+    record = records[3]
+    assert record.type == FILE
+    assert record.path == "E:\\test\\test.txt"
+    assert record.date_modified == datetime(2024, 1, 27, 21, 56, 57, 597593, tzinfo=timezone.utc)
 
 
 def test_everything_1_7_20_efu(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -145,15 +159,15 @@ def test_everything_1_7_20_efu(target_win: Target, fs_win: VirtualFilesystem) ->
 
     records = list(target_win.everything.locate())
     assert len(records) == 5
-    entry = records[0]
-    assert entry.type == DIRECTORY
-    assert entry.path == "E:"
-    assert entry.date_modified is None
+    record = records[0]
+    assert record.type == DIRECTORY
+    assert record.path == "E:"
+    assert record.date_modified is None
 
-    entry = records[1]
-    assert entry.type == DIRECTORY
-    assert entry.path == "E:\\test"
-    assert entry.date_modified == datetime(2024, 1, 27, 22, 6, 9, 597820, tzinfo=timezone.utc)
+    record = records[1]
+    assert record.type == DIRECTORY
+    assert record.path == "E:\\test"
+    assert record.date_modified == datetime(2024, 1, 27, 22, 6, 9, 597820, tzinfo=timezone.utc)
 
 
 def test_everything_1_7_17_ntfs_refs_efu_folder(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -164,18 +178,24 @@ def test_everything_1_7_17_ntfs_refs_efu_folder(target_win: Target, fs_win: Virt
     )
     target_win.add_plugin(EverythingPlugin)
 
-    records = list(target_win.everything.locate())
-    assert len(records) == 127577
-    entry = records[0]
-    assert entry.type == DIRECTORY
-    assert entry.path == "C:\\$Recycle.Bin"
-    assert entry.date_modified == datetime(2023, 12, 16, 9, 8, 42, 726189, tzinfo=timezone.utc)
-    assert entry.date_created is None
+    records = []
+    idx = 0
+    for idx, record in enumerate(target_win.everything.locate()):
+        if idx not in [0, 1]:
+            continue
+        records.append(record)
 
-    entry = records[1]
-    assert entry.type == DIRECTORY
-    assert entry.path == "C:\\$WinREAgent"
-    assert entry.date_modified == datetime(2024, 1, 26, 20, 49, 55, 41714, tzinfo=timezone.utc)
+    length = idx + 1
+    assert length == 127577
+
+    assert records[0].type == DIRECTORY
+    assert records[0].path == "C:\\$Recycle.Bin"
+    assert records[0].date_modified == datetime(2023, 12, 16, 9, 8, 42, 726189, tzinfo=timezone.utc)
+    assert records[0].date_created is None
+
+    assert records[1].type == DIRECTORY
+    assert records[1].path == "C:\\$WinREAgent"
+    assert records[1].date_modified == datetime(2024, 1, 26, 20, 49, 55, 41714, tzinfo=timezone.utc)
 
 
 @pytest.mark.parametrize(

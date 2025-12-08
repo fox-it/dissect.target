@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import logging
 import os
 import traceback
 import urllib.parse
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import (
@@ -21,20 +20,22 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import config
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import parse_path_uri
+from dissect.target.helpers.logging import TargetLogAdapter, get_logger
 from dissect.target.helpers.utils import StrEnum, slugify
 from dissect.target.loaders.direct import DirectLoader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from typing_extensions import Self
 
     from dissect.target.helpers.record import ChildTargetRecord
 
-log = logging.getLogger(__name__)
 
-FunctionTuple = tuple[plugin.Plugin, Union[plugin.Plugin, property, None]]
+log = get_logger(__name__)
+
+FunctionTuple = tuple[plugin.Plugin, plugin.Plugin | property | None]
 
 
 class Event(StrEnum):
@@ -44,15 +45,10 @@ class Event(StrEnum):
     FUNC_EXEC_ERROR = "function-execution-error"
 
 
-def getlogger(target: Target) -> TargetLogAdapter:
+def get_target_logger(target: Target) -> TargetLogAdapter:
     if not log.root.handlers:
         log.setLevel(os.getenv("DISSECT_LOG_TARGET", "CRITICAL"))
     return TargetLogAdapter(log, {"target": target})
-
-
-class TargetLogAdapter(logging.LoggerAdapter):
-    def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        return f"{self.extra['target']}: {msg}", kwargs
 
 
 class Target:
@@ -88,7 +84,7 @@ class Target:
             self.path_query = dict(urllib.parse.parse_qsl(self.parsed_path.query, keep_blank_values=True))
 
         self.props: dict[Any, Any] = {}
-        self.log = getlogger(self)
+        self.log = get_target_logger(self)
 
         self._name = None
         self._plugins: list[plugin.Plugin] = []
@@ -359,7 +355,7 @@ class Target:
                 # Couldn't find a loader
                 return
 
-            getlogger(spec).debug("Attempting to use loader: %s", loader_cls)
+            get_target_logger(spec).debug("Attempting to use loader: %s", loader_cls)
             # See if the loader provides any additional paths to load
             # This is useful for URI-like paths that have wildcard components
             for sub_path in loader_cls.find_all(found_path, parsed_path=parsed_path):
@@ -385,8 +381,8 @@ class Target:
                     ldr = loader_cls(load_path, parsed_path=load_parsed_path)
                 except Exception as e:
                     message = "%s" if isinstance(e, TargetPathNotFoundError) else "Failed to initiate loader: %s"
-                    getlogger(load_spec).error(message, e)
-                    getlogger(load_spec).debug("", exc_info=e)
+                    get_target_logger(load_spec).error(message, e)
+                    get_target_logger(load_spec).debug("", exc_info=e)
                     continue
 
                 try:
@@ -396,7 +392,8 @@ class Target:
                     # For file/dir-like paths it's a Path object
                     target = cls._load(load_spec, ldr)
                 except Exception as e:
-                    getlogger(load_spec).error("Failed to load target with loader %s", ldr, exc_info=e)
+                    get_target_logger(load_spec).error("Failed to load target with loader %s", ldr)
+                    get_target_logger(load_spec).debug("", exc_info=e)
                     continue
                 else:
                     yield target
@@ -405,7 +402,7 @@ class Target:
                     try:
                         yield from target.open_children()
                     except Exception as e:
-                        getlogger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
+                        get_target_logger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
 
         at_least_one_loaded = False
 
@@ -431,6 +428,11 @@ class Target:
             _, parsed_path = parse_path_uri(spec)
             if parsed_path is None or isinstance(spec, os.PathLike):
                 path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+                if not path.exists():
+                    raise TargetError(f"Failed to find loader for {path}: path does not exist")
+                elif not path.is_dir():
+                    raise TargetError(f"Failed to find loader for {path}: path is not a directory")
 
                 for entry in path.iterdir():
                     for target in _open_all(entry, include_children=include_children):
@@ -469,41 +471,61 @@ class Target:
             try:
                 plugin_cls: type[plugin.ChildTargetPlugin] = plugin.load(plugin_desc)
                 child_plugin = plugin_cls(self)
-            except PluginError:
-                self.log.exception("Failed to load child plugin: %s", plugin_desc.qualname)
+            except PluginError as e:
+                self.log.error("Failed to load child plugin: %s (%s)", plugin_desc.qualname, e)  # noqa: TRY400
+                self.log.debug("", exc_info=e)
                 continue
-            except Exception:
-                self.log.exception("Broken child plugin: %s", plugin_desc.qualname)
+            except Exception as e:
+                self.log.error("Broken child plugin: %s (%s)", plugin_desc.qualname, e)  # noqa: TRY400
+                self.log.debug("", exc_info=e)
                 continue
 
             try:
                 child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
-            except PluginError as e:
-                self.log.info("Child plugin reported itself as incompatible: %s", plugin_desc.qualname)
-                self.log.debug("", exc_info=e)
-            except Exception:
-                self.log.exception(
-                    "An exception occurred while checking for child plugin compatibility: %s", plugin_desc.qualname
+            except UnsupportedPluginError as e:
+                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc.qualname, e)
+            except Exception as e:
+                self.log.error(  # noqa: TRY400
+                    "An exception occurred while checking for child plugin compatibility: %s (%s)",
+                    plugin_desc.qualname,
+                    e,
                 )
+                self.log.debug("", exc_info=e)
 
-    def open_child(self, child: str | Path) -> Target:
+    def open_child(self, child: int | str | Path) -> Target:
         """Open a child target.
 
+        Allows opening a nested child target by path, index or child pattern.
+        Paths will simply attempt to open the path as a child target.
+        Indexes are zero-based, so the first child is 0, the second is 1, etc.
+        If the child is a pattern, such as ``4.2``, it will open the 2nd child of the 4th child target of this target.
+
         Args:
-            child: The location of a target within the current ``Target``.
+            child: The location of a target within the current ``Target``, or a child pattern.
 
         Returns:
             An opened ``Target`` object of the child target.
         """
-        if isinstance(child, str) and child.isdecimal():
-            child_num = int(child)
-            for child_record in self.list_children():
-                if child_num == 0:
-                    return Target.open(self.fs.path(child_record.path))
-                child_num -= 1
-            raise IndexError("Child target index out of range")
+        # Open child identified by its single digit index (from list_children), int or str
+        # OR
+        # Open sub-child (grandchild?) uing a sub-child pattern string such as "4.2":
+        # - open the 4th child of the current target
+        # - open the 2nd child of this new target
+        if isinstance(child, int) or (isinstance(child, str) and all(part.isdecimal() for part in child.split("."))):
+            current_target = self
+            for child_idx in map(int, str(child).split(".")):
+                for _, child in current_target.list_children():
+                    if child_idx == 0:
+                        current_target = Target.open(current_target.fs.path(child.path))
+                        break
+                    child_idx -= 1
+                else:
+                    raise IndexError("Child target index out of range")
 
+            return current_target
+
+        # Open child by path
         return Target.open(self.fs.path(child))
 
     def open_children(self, recursive: bool = False) -> Iterator[Target]:
@@ -517,7 +539,7 @@ class Target:
         Returns:
             An iterator of ``Targets``.
         """
-        for child in self.list_children():
+        for _, child in self.list_children():
             try:
                 target = self.open_child(child.path)
             except TargetError:
@@ -529,13 +551,24 @@ class Target:
             if recursive:
                 yield from target.open_children(recursive=recursive)
 
-    def list_children(self) -> Iterator[ChildTargetRecord]:
-        """Lists all child targets that compatible :class:`~dissect.target.plugin.ChildTargetPlugin` classes
-        can discover.
-        """
+    def list_children(self, recursive: bool = False) -> Iterator[tuple[str, ChildTargetRecord]]:
+        """Lists all discovered child targets."""
         self._load_child_plugins()
-        for child_plugin in self._child_plugins.values():
-            yield from child_plugin.list_children()
+
+        idx = 0
+        for child_plugin_type in sorted(self._child_plugins):
+            for child in self._child_plugins[child_plugin_type].list_children():
+                yield str(idx), child
+
+                if recursive:
+                    try:
+                        target = self.open_child(child.path)
+                        for sub_idx, sub_child in target.list_children(recursive=recursive):
+                            yield f"{idx}.{sub_idx}", sub_child
+                    except TargetError:
+                        self.log.warning("Failed to open child target %s", child.path)
+
+                idx += 1
 
     def reload(self) -> Target:
         """Reload the current target.
@@ -616,7 +649,7 @@ class Target:
             # Now subclassed OS Plugins are on the same detection "layer" as
             # regular OS Plugins, but can still inherit functions.
             qualname = plugin_desc.qualname
-            self.log.debug("Loading OS plugin: %s", qualname)
+            self.log.trace("Loading OS plugin: %s", qualname)
             try:
                 os_plugin: type[plugin.OSPlugin] = plugin.load(plugin_desc)
                 fs = os_plugin.detect(self)
@@ -684,7 +717,7 @@ class Target:
             UnsupportedPluginError: Raised when plugins were found, but they were incompatible
             PluginError: Raised when any other exception occurs while trying to load the plugin.
         """
-        self.log.debug("Adding plugin: %s", plugin_cls)
+        self.log.trace("Adding plugin: %s", plugin_cls)
 
         if not isinstance(plugin_cls, plugin.Plugin):
             try:
@@ -785,7 +818,7 @@ class Target:
                 for descriptor in plugin.lookup(function, self._os_plugin):
                     try:
                         self.load_plugin(descriptor)
-                        self.log.debug("Found compatible plugin '%s' for function '%s'", descriptor.qualname, function)
+                        self.log.trace("Found compatible plugin '%s' for function '%s'", descriptor.qualname, function)
                         break
                     except UnsupportedPluginError as e:
                         self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_desc=descriptor)

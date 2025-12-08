@@ -22,7 +22,7 @@ COMMON_CONTAINER_FIELDS = [
     ("datetime", "started"),
     ("datetime", "finished"),
     ("string[]", "ports"),
-    ("string", "names"),
+    ("string", "name"),
     ("string[]", "volumes"),
     ("string[]", "environment"),
     ("path", "mount_path"),

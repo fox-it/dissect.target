@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+import textwrap
 from datetime import datetime
+from io import BytesIO
 from ipaddress import ip_address, ip_interface
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from dissect.target.plugins.os.default.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
+    DhclientLeaseParser,
     LinuxNetworkConfigParser,
     LinuxNetworkPlugin,
     NetworkManagerConfigParser,
+    NetworkManagerLeaseParser,
     ProcConfigParser,
+    SyslogConfigParser,
     SystemdNetworkConfigParser,
 )
 from tests._utils import absolute_path
@@ -221,6 +228,81 @@ def test_linux_network_plugin_interfaces(target_linux: Target) -> None:
         MockLinuxConfigParser2.return_value.interfaces.assert_called_once()
 
 
+def test_linux_network_dhclient_leases_file(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    lease_dhcp_dhclient = r"""
+    default-duid "\000\001\000\001\037\305\371\341\001\002\003\004\005\006"
+    lease {
+        interface "eth0";  # some comment
+        fixed-address 1.2.3.4;
+        option dhcp-lease-time 13337;
+        option routers 0.0.0.0;
+        option host-name "hostname";
+        option subnet-mask 255.255.255.0;
+        renew 1 2023/12/31 13:37:00;
+        rebind 2 2023/01/01 01:00:00;
+        expire 3 2024/01/01 13:37:00;
+    }
+    lease {
+        interface "eth0";
+        fixed-address 2001:db8::2:1;
+        option dhcp-lease-time 13338;
+        option routers 1.1.1.1;
+        option host-name "hostname";
+        renew 4 2024/12/31 14:37:00;
+        rebind 5 2024/01/01 02:00:00;
+        expire 6 2025/01/01 15:37:00;
+        # some more comments
+    }
+    """
+
+    fs_linux.map_file_fh("/var/lib/dhcp/dhclient.leases", BytesIO(textwrap.dedent(lease_dhcp_dhclient).encode()))
+    fs_linux.map_file_fh(
+        "/var/lib/dhclient/dhclient.eth0.leases", BytesIO(textwrap.dedent(lease_dhcp_dhclient).encode())
+    )
+
+    dhclient = DhclientLeaseParser(target_linux)
+
+    leases = list(dhclient.interfaces())
+
+    assert len(leases) == 4
+    assert leases[0].name == "eth0"
+    assert leases[0].type == "dhcp"
+    assert leases[0].cidr == [ip_interface("1.2.3.4/24")]
+    assert leases[0].gateway == [ip_address("0.0.0.0")]
+    assert leases[0].dhcp_ipv4
+    assert not leases[0].dhcp_ipv6
+    assert leases[0].configurator == "dhclient"
+
+    assert leases[3].name == "eth0"
+    assert leases[3].type == "dhcp"
+    assert leases[3].cidr == [ip_interface("2001:db8::2:1/128")]
+    assert leases[3].gateway == [ip_address("1.1.1.1")]
+    assert not leases[3].dhcp_ipv4
+    assert leases[3].dhcp_ipv6
+    assert leases[0].configurator == "dhclient"
+
+
+def test_linux_network_networkmanager_leases_file(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    lease_networkmanager = """
+    # This is private data. Do not parse.
+    ADDRESS=1.3.3.7
+    """
+
+    fs_linux.map_file_fh(
+        "/var/lib/NetworkManager/internal-d6b936ad-d73f-4898-a826-edbb61d6155a-eth0.lease",
+        BytesIO(textwrap.dedent(lease_networkmanager).encode()),
+    )
+
+    networkmanager = NetworkManagerLeaseParser(target_linux)
+    leases = list(networkmanager.interfaces())
+
+    assert len(leases) == 1
+    assert leases[0].name == "eth0"
+    assert leases[0].type == "dhcp"
+    assert leases[0].configurator == "NetworkManager"
+    assert leases[0].cidr == [ip_interface("1.3.3.7/32")]
+
+
 def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     fixture_dir = absolute_path("_data/plugins/os/unix/linux/proc")
     fs_linux.map_file("/proc/net/route", fixture_dir.joinpath("route"))
@@ -246,3 +328,116 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
     assert lo.cidr == [ip_interface("::1/128")]
     assert docker.cidr == [ip_interface("172.17.0.1/16")]
     assert vir.cidr == [ip_interface("192.168.122.1/24")]
+
+
+@pytest.mark.parametrize(
+    ("expected_record", "messages"),
+    [
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("10.13.37.1/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'",  # noqa: E501
+        ),
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("10.13.37.1/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Jan  1 13:37:01 hostname NetworkManager[2]: <info>  [1600000000.0000] dhcp4 (eth0): state changed new lease, address=10.13.37.1",  # noqa: E501
+        ),
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("10.13.37.1/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Jan  1 13:37:01 hostname NetworkManager[2]: <info>  [1600000000.0000] dhcp4 (eth0): state changed new lease, address=10.13.37.1, acd pending",  # noqa: E501
+        ),
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("10.13.37.2/24")],
+                "gateway": [ip_address("10.13.37.0")],
+                "source": "syslog",
+            },
+            "Feb  2 13:37:02 test systemd-networkd[3]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0",
+        ),
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("10.13.37.3/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Mar  3 13:37:03 localhost NetworkManager[4]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3",
+        ),
+        (
+            {
+                "name": None,
+                "cidr": [ip_interface("10.13.37.4/32")],
+                "gateway": [],
+                "source": "syslog",
+            },
+            "Apr  4 13:37:04 localhost dhclient[5]: bound to 10.13.37.4 -- renewal in 1337 seconds.",
+        ),
+        (
+            {
+                "name": "eth0",
+                "cidr": [ip_interface("2001:db8::/64")],
+                "gateway": [ip_address("2001:db8:ffff:ffff:ffff:ffff:ffff:ffff")],
+                "source": "syslog",
+            },
+            (
+                "Jun  6 13:37:06 test systemd-networkd[6]: eth0: DHCPv6 address 2001:db8::/64 via 2001:db8:ffff:ffff:ffff:ffff:ffff:ffff\n"  # noqa: E501
+                "May  5 13:37:05 test systemd-networkd[6]: eth0: DHCPv6 lease lost\n"
+            ),
+        ),
+    ],
+)
+def test_ips_dhcp(target_unix_users: Target, fs_unix: VirtualFilesystem, expected_record: dict, messages: str) -> None:
+    """Test DHCP lease messages from /var/log/syslog."""
+
+    fs_unix.map_file_fh(
+        "/var/log/syslog",
+        BytesIO(textwrap.dedent(messages).encode()),
+    )
+
+    syslog_config_parser = SyslogConfigParser(target_unix_users, 5)
+    results = list(syslog_config_parser.interfaces())
+
+    assert len(results) == 1
+    result = results[0]
+    assert result.name == expected_record["name"]
+    assert result.cidr == expected_record["cidr"]
+    assert result.gateway == expected_record["gateway"]
+    assert result.source == expected_record["source"]
+
+
+def test_syslog_config_parser_multiple_lines(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test that SyslogConfigParser can parse multiple DHCP lease messages from syslog."""
+    messages = """
+    Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'
+    Feb  2 13:37:02 test systemd-networkd[2]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0
+    Mar  3 13:37:03 localhost NetworkManager[3]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3
+    """  # noqa: E501
+
+    fs_unix.map_file_fh(
+        "/var/log/syslog",
+        BytesIO(textwrap.dedent(messages).encode()),
+    )
+
+    syslog_config_parser = SyslogConfigParser(target_unix_users, 5)
+    results = list(syslog_config_parser.interfaces())
+
+    # Should parse 3 records, one for each line
+    assert len(results) == 3
+    assert results[2].cidr == [ip_interface("10.13.37.1/32")]
+    assert results[1].cidr == [ip_interface("10.13.37.2/24")]
+    assert results[0].cidr == [ip_interface("10.13.37.3/32")]

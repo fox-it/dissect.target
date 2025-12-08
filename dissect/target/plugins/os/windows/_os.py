@@ -4,6 +4,7 @@ import operator
 import struct
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
@@ -76,7 +77,7 @@ class WindowsPlugin(OSPlugin):
                         drive = p[1]
 
                         if value.startswith(b"DMIO:ID:"):
-                            guid = value[8:]
+                            guid = str(UUID(bytes_le=value[8:]))
 
                             for volume in self.target.volumes:
                                 if volume.guid == guid and volume.fs:
