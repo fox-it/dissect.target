@@ -68,7 +68,8 @@ IGNORED_SUB_TYPES = (
 def parse_freedesktop_xml(path: Path) -> str:
     """Attempt to parse a FreeDesktop shared-mime-info document.
 
-    Does not yet parse nested magic values."""
+    Does not yet parse nested magic values.
+    """
 
     ns = {"mime": "http://www.freedesktop.org/standards/shared-mime-info"}
     types = []
@@ -175,9 +176,9 @@ def main() -> int:
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
-    parser.add_argument("path", metavar="PATH", type=Path, help="Path to freedesktop.org.xml.in file")
-    parser.add_argument("--output", "-o", type=Path, help="Optional output path for generated types document")
-    parser.add_argument("--format", action="store_true", default=False, help="Format output using ruff")
+    parser.add_argument("path", metavar="PATH", type=Path, help="path to freedesktop.org.xml.in file")
+    parser.add_argument("--output", "-o", type=Path, help="optional alternative output path for generated types document")
+    parser.add_argument("--format", action="store_true", default=False, help="format output using ruff")
     args = parser.parse_args()
 
     if not args.path.is_file():
@@ -192,12 +193,11 @@ def main() -> int:
         print(f"Exception while generating output: {e!s}")
         return 1
 
-    with output.open("wt") as fh:
-        try:
-            fh.write(content)
-        except Exception as e:
-            print(f"Exception while writing output to {output!s}: {e!s}")
-            return 1
+    try:
+        output.write_text(content)
+    except Exception as e:
+        print(f"Exception while writing output to {output!s}: {e!s}")
+        return 1
 
     if args.format:
         subprocess.run(["ruff", "format", output], capture_output=True)
