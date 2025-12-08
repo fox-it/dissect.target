@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import stat
+from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.evidence import ad1
@@ -13,7 +14,7 @@ from dissect.target.exceptions import (
     NotASymlinkError,
 )
 from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
-from dissect.target.helpers import fsutil
+from dissect.target.helpers import fsutil, keychain
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -25,6 +26,24 @@ class AD1Filesystem(Filesystem):
     def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.ad1 = ad1.AD1(fh)
+
+        if self.ad1.is_adcrypt():
+            keys = keychain.get_keys_for_provider(self.__type__) + keychain.get_keys_without_provider()
+
+            if not keys:
+                raise ValueError("Failed to unlock ADCRYPT: no key(s) provided")
+
+            for key in keys:
+                try:
+                    if key.key_type == keychain.KeyType.PASSPHRASE:
+                        self.ad1.unlock(passphrase=key.value)
+                    elif key.key_type == keychain.KeyType.FILE and (path := Path(key.value)).is_file():
+                        self.ad1.unlock(private_key=path)
+                except ValueError:  # noqa: PERF203
+                    pass
+
+            if self.ad1.is_locked():
+                raise ValueError("Failed to unlock ADCRYPT using provided key(s)")
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
@@ -74,8 +93,8 @@ class AD1FilesystemEntry(FilesystemEntry):
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        for name, entry in self.entry.listdir().items():
-            yield AD1DirEntry(self.fs, self.path, name, entry)
+        for entry in self.entry.iterdir():
+            yield AD1DirEntry(self.fs, self.path, entry.name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

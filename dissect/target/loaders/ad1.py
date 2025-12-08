@@ -25,7 +25,15 @@ class AD1Loader(Loader):
         return path.suffix.lower() == ".ad1"
 
     def map(self, target: Target) -> None:
-        fs = AD1Filesystem([segment.open("rb") for segment in self.segment_files])
-        target.filesystems.add(fs)
-        # TODO: Detect NTFS
-        # TODO: Handle custom content images with multiple sources
+        """Map the detected segment files as an :class:`AD1Filesystem` to the target.
+
+        Currently does not detect NTFS / case-insensitive filesystems or custom content
+        images with multiple sources.
+        """
+        try:
+            segments = [segment.open("rb") for segment in self.segment_files]
+            fs = AD1Filesystem(segments)
+            target.filesystems.add(fs)
+
+        except ValueError as e:
+            target.log.error("Unable to map AD1: %s", e)  # noqa: TRY400
