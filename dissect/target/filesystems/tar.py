@@ -13,7 +13,6 @@ from dissect.target.exceptions import (
     NotASymlinkError,
 )
 from dissect.target.filesystem import (
-    DirEntry,
     Filesystem,
     FilesystemEntry,
     VirtualDirectory,

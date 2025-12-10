@@ -22,11 +22,10 @@ Notes:
 from __future__ import annotations
 
 import posixpath
-import sys
-from glob import _GlobberBase, _no_recurse_symlinks, _PathGlobber
+from glob import _no_recurse_symlinks, _PathGlobber
 from pathlib import Path, PurePath, UnsupportedOperation
 from pathlib._os import DirEntryInfo, _PosixPathInfo
-from pathlib.types import PathInfo, _ReadablePath
+from pathlib.types import _ReadablePath
 from stat import S_ISDIR, S_ISLNK, S_ISREG
 from typing import IO, TYPE_CHECKING, ClassVar
 
@@ -381,13 +380,13 @@ class TargetPath(Path, PureDissectPath):
                     raise
         return p
 
-    def owner(self, *, follow_symlinks=True) -> str:
+    def owner(self, *, follow_symlinks: bool = True) -> str:
         """
         Return the login name of the file owner.
         """
         raise UnsupportedOperation(self._unsupported_msg("owner()"))
 
-    def group(self, *, follow_symlinks=True) -> str:
+    def group(self, *, follow_symlinks: bool = True) -> str:
         """
         Return the group name of the file gid.
         """
@@ -479,7 +478,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise UnsupportedOperation(self._unsupported_msg("copy_into()"))
 
-    def _copy_from(self, source: Path, follow_symlinks: bool = True, preserve_metadata: bool = False):
+    def _copy_from(self, source: Path, follow_symlinks: bool = True, preserve_metadata: bool = False) -> None:
         """
         Recursively copy the given path to this path.
         """
