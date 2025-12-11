@@ -16,10 +16,6 @@ if TYPE_CHECKING:
 class AD1Loader(Loader):
     """Access Data ``.ad`` loader."""
 
-    def __init__(self, path: Path, **kwargs):
-        super().__init__(path, **kwargs)
-        self.segment_files = find_files(path)
-
     @staticmethod
     def detect(path: Path) -> bool:
         return path.suffix.lower() == ".ad1"
