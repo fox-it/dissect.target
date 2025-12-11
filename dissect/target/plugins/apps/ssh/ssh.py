@@ -64,7 +64,8 @@ AuthorizedKeysRecord = OpenSSHUserRecordDescriptor(
     "application/openssh/authorized_keys",
     [
         *COMMON_ELLEMENTS,
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
+        ("digest", "fingerprint"),
         ("string", "options"),
     ],
 )
@@ -77,7 +78,7 @@ KnownHostRecord = OpenSSHUserRecordDescriptor(
         *COMMON_ELLEMENTS,
         ("string", "host"),
         ("varint", "port"),
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
         ("string", "marker"),
         ("digest", "fingerprint"),
     ],
@@ -90,7 +91,9 @@ PrivateKeyRecord = OpenSSHUserRecordDescriptor(
         ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
         ("string", "key_format"),
-        ("string", "public_key"),
+        ("bytes", "private_key_pem"),
+        ("bytes", "public_key_pem"),
+        ("digest", "fingerprint"),
         ("boolean", "encrypted"),
     ],
 )
@@ -100,7 +103,7 @@ PublicKeyRecord = OpenSSHUserRecordDescriptor(
     [
         ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
         ("digest", "fingerprint"),
     ],
 )
