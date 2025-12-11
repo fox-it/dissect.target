@@ -20,8 +20,13 @@ def test_certlog_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert len(list(target_win.certlog.requests())) == 11
     assert len(list(target_win.certlog.request_attributes())) == 26
     assert len(list(target_win.certlog.crls())) == 2
-    assert len(list(target_win.certlog.certificates())) == 11
+    certificates = list(target_win.certlog.certificates())
+    assert len(certificates) == 11
     assert len(list(target_win.certlog.certificate_extensions())) == 92
+
+    assert certificates[0].serial_number_hex == "1169f0517d9b598e4ba7af46e4674066"
+    assert int(certificates[0].serial_number_hex, 16) == 23146941333149199441888068127529844838
+    # TODO: Further certificate normalization, see https://github.com/fox-it/dissect.target/issues/1452
 
 
 def test_certlog_plugin_direct() -> None:
