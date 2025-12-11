@@ -9,7 +9,7 @@ from tests._utils import absolute_path
 
 
 def test_ad1_encrypted() -> None:
-    """Test if we can mount and AD1 ADCRYPT encrypted image using the keychain."""
+    """Test if we can open an AD1 ADCRYPT encrypted image using the keychain."""
 
     path = absolute_path("_data/filesystems/ad1/encrypted-small.ad1")
     segments = find_files(path)

@@ -31,8 +31,7 @@ class AD1Loader(Loader):
         images with multiple sources.
         """
         try:
-            segments = [segment.open("rb") for segment in self.segment_files]
-            fs = AD1Filesystem(segments)
+            fs = AD1Filesystem(find_files(self.path))
             target.filesystems.add(fs)
 
         except ValueError as e:

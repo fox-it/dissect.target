@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class AD1Filesystem(Filesystem):
     __type__ = "ad1"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | list[BinaryIO] | Path | list[Path], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.ad1 = ad1.AD1(fh)
 
@@ -52,9 +52,9 @@ class AD1Filesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return AD1FilesystemEntry(self, path, self._get_entry(path))
 
-    def _get_entry(self, path: str) -> ad1.FileEntry:
+    def _get_entry(self, path: str, entry: ad1.FileEntry | None = None) -> ad1.FileEntry:
         try:
-            return self.ad1.get(path)
+            return self.ad1.entry(path, entry)
         except ad1.FileNotFoundError as e:
             raise FileNotFoundError(path) from e
         except ad1.NotADirectoryError as e:
@@ -81,15 +81,16 @@ class AD1FilesystemEntry(FilesystemEntry):
     entry: ad1.FileEntry
 
     def get(self, path: str) -> FilesystemEntry:
-        full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
-        return AD1FilesystemEntry(self.fs, full_path, self.fs._get_entry(full_path))
+        entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        entry = self.fs._get_entry(path, self.entry)
+        return AD1FilesystemEntry(self.fs, entry_path, entry)
 
     def open(self) -> BinaryIO:
         if self.is_dir():
             raise IsADirectoryError(self.path)
         return self.entry.open()
 
-    def scandir(self) -> Iterator[FilesystemEntry]:
+    def scandir(self) -> Iterator[AD1DirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -130,7 +131,7 @@ class AD1FilesystemEntry(FilesystemEntry):
         st_info = fsutil.stat_result(
             [
                 mode | 0o777,
-                fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),  # inum
+                self.entry.offset,
                 id(self.fs),
                 1,  # nlink
                 0,  # uid
