@@ -59,7 +59,7 @@ VirtualMachineRecord = TargetRecordDescriptor(
 )
 
 DomainSeenRecord = TargetRecordDescriptor(
-    "filesystem/windows/ual/virtual_machines",
+    "filesystem/windows/ual/domain",
     [
         ("datetime", "last_seen_date"),
         ("net.ipaddress", "address"),
