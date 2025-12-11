@@ -168,6 +168,7 @@ class IISLogsPlugin(WebserverPlugin):
         for iis_record in self.logs():
             yield WebserverAccessLogRecord(
                 ts=iis_record.ts,
+                webserver="iis",
                 remote_user=iis_record.username,
                 remote_ip=iis_record.client_ip,
                 method=iis_record.request_method,
