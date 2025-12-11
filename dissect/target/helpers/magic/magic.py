@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO, TypeAlias
 
@@ -44,23 +45,16 @@ class Magic:
     """
 
     @staticmethod
-    def detect(buf: bytes | BinaryIO, suffix: str | None = None, *, mime: bool = False) -> MagicResult:
+    def detect(buf: BinaryIO, suffix: str | None = None, *, mime: bool = False) -> MagicResult:
         """Searches ``mimetypes.MAP`` for the given bytes."""
-
-        is_buffer = hasattr(buf, "read") and hasattr(buf, "seek")
-        res_attr = "type" if mime else "name"
-
         if suffix is not None and not isinstance(suffix, str):
             raise TypeError("Provided suffix is not a string")
 
+        res_attr = "type" if mime else "name"
         for index, offset, magic in mimetypes.MAP:
-            if is_buffer:
-                buf.seek(offset)
-                if buf.read(len(magic)) == magic:
-                    return mimetypes.TYPES[index][res_attr]
-            else:
-                if buf[offset : offset + len(magic)] == magic:
-                    return mimetypes.TYPES[index][res_attr]
+            buf.seek(offset)
+            if buf.read(len(magic)) == magic:
+                return mimetypes.TYPES[index][res_attr]
 
         if suffix:
             for index, patterns in mimetypes.PATTERNS:
@@ -96,6 +90,7 @@ def from_descriptor(fh: BinaryIO, suffix: str | None = None, *, mime: bool = Fal
     if not hasattr(fh, "read") or not hasattr(fh, "seek"):
         raise TypeError("Provided fh does not have a read or seek method")
 
+    return Magic().detect(fh, suffix, mime=mime)
     return from_buffer(fh, suffix, mime=mime)
 
 
@@ -103,10 +98,10 @@ def from_descriptor(fh: BinaryIO, suffix: str | None = None, *, mime: bool = Fal
 from_fh = from_descriptor
 
 
-def from_buffer(buf: bytes | BinaryIO, suffix: str | None = None, *, mime: bool = False) -> MagicResult:
+def from_buffer(buf: bytes, suffix: str | None = None, *, mime: bool = False) -> MagicResult:
     """Detect file type from provided bytes or buffer of bytes."""
 
-    if not isinstance(buf, bytes) and not hasattr(buf, "read"):
-        raise TypeError("Provided buf is not bytes or a buffer")
+    if not isinstance(buf, bytes):
+        raise TypeError("Provided buf is not bytes")
 
-    return Magic().detect(buf, suffix, mime=mime)
+    return from_descriptor(BytesIO(buf), suffix, mime=mime)

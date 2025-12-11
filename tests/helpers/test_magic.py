@@ -193,7 +193,7 @@ def test_magic_exception_handling() -> None:
     with pytest.raises(TypeError, match="Provided path is not a Path instance"):
         magic.from_file("not a Path")
 
-    with pytest.raises(TypeError, match="Provided buf is not bytes or a buffer"):
+    with pytest.raises(TypeError, match="Provided buf is not bytes"):
         magic.from_buffer("string")
 
     with pytest.raises(TypeError, match="Provided fh does not have a read or seek method"):
