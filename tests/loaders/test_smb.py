@@ -61,6 +61,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_connection: Ma
 
 
 def test_loader(mock_impacket: MagicMock, mock_connection: MagicMock) -> None:
+    """Test the SMB loader."""
     from dissect.target.filesystems.smb import SmbFilesystem
     from dissect.target.loader import open as loader_open
     from dissect.target.loaders.smb import SmbLoader, SmbRegistry
