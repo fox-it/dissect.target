@@ -54,17 +54,13 @@ class Magic:
             raise TypeError("Provided suffix is not a string")
 
         for index, offset, magic in mimetypes.MAP:
-            try:
-                if is_buffer:
-                    buf.seek(offset)
-                    if buf.read(len(magic)) == magic:
-                        return mimetypes.TYPES[index][res_attr]
-                else:
-                    if buf[offset : offset + len(magic)] == magic:
-                        return mimetypes.TYPES[index][res_attr]
-
-            except EOFError:  # noqa: PERF203
-                continue
+            if is_buffer:
+                buf.seek(offset)
+                if buf.read(len(magic)) == magic:
+                    return mimetypes.TYPES[index][res_attr]
+            else:
+                if buf[offset : offset + len(magic)] == magic:
+                    return mimetypes.TYPES[index][res_attr]
 
         if suffix:
             for index, patterns in mimetypes.PATTERNS:
