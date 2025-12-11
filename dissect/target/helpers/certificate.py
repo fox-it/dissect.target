@@ -5,8 +5,16 @@ import binascii
 import hashlib
 from pathlib import Path
 
-from asn1crypto import pem, x509
 from flow.record import RecordDescriptor
+
+try:
+    from asn1crypto import pem, x509
+
+    HAS_ASN1 = True
+
+except ImportError:
+    HAS_ASN1 = False
+
 
 COMMON_CERTIFICATE_FIELDS = [
     ("digest", "fingerprint"),
@@ -81,6 +89,9 @@ def parse_x509(file: str | bytes | Path) -> CertificateRecord:
 
     else:
         raise TypeError("Parameter file is not of type str, bytes or Path")
+
+    if not HAS_ASN1:
+        raise ValueError("Missing asn1crypto dependency")
 
     md5, _, _ = compute_pem_fingerprints(content.decode())
     _, _, der = pem.unarmor(content)
