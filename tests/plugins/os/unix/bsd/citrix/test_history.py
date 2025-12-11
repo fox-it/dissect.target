@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-commandhistory_data = """\
+COMMANDHISTORY_DATA = """\
 Aug  9 12:56:00 <local7.notice> ns bash[23841]: root on /dev/pts/0 shell_command="find . -name '*ci.php*'"
 Aug 10 11:57:39 <local7.notice> ns bash[56440]: (null) on /dev/pts/1 shell_command="debug "hello world""
 """
@@ -29,7 +29,7 @@ Aug 10 11:57:39 <local7.notice> ns bash[56440]: (null) on /dev/pts/1 shell_comma
     ],
 )
 def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd: VirtualFilesystem, path: str) -> None:
-    fs_bsd.map_file_fh(path, BytesIO(textwrap.dedent(commandhistory_data).encode()))
+    fs_bsd.map_file_fh(path, BytesIO(textwrap.dedent(COMMANDHISTORY_DATA).encode()))
     target_citrix.add_plugin(CitrixCommandHistoryPlugin)
 
     results = list(target_citrix.commandhistory())
@@ -57,7 +57,7 @@ def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd
     ],
 )
 def test_netscaler_commandhistory_decompress(target_citrix: Target, fs_bsd: VirtualFilesystem, path: str) -> None:
-    fs_bsd.map_file_fh(path, BytesIO(gzip.compress(textwrap.dedent(commandhistory_data).encode())))
+    fs_bsd.map_file_fh(path, BytesIO(gzip.compress(textwrap.dedent(COMMANDHISTORY_DATA).encode())))
     target_citrix.add_plugin(CitrixCommandHistoryPlugin)
 
     results = list(target_citrix.commandhistory())
