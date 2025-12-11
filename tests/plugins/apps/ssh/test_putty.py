@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -29,7 +30,9 @@ def test_putty_plugin_ssh_host_keys_unix(target_unix_users: Target, fs_unix: Vir
     assert records[0].port == 22
 
     assert records[0].key_type == "ssh-ed25519"
-    assert records[0].public_key == "AAAAC3NzaC1lZDI1NTE5AAAAIHUl23i/4p/7xcZnNPDK+Dr+A539zpEEXutrm/tESFYq"
+    assert records[0].public_key_pem == base64.b64decode(
+        "AAAAC3NzaC1lZDI1NTE5AAAAIHUl23i/4p/7xcZnNPDK+Dr+A539zpEEXutrm/tESFYq"
+    )
     assert records[0].fingerprint.md5 == "16da68cfc0e1b7954c84147a385be2b6"
     assert records[0].fingerprint.sha1 == "11e647366ef9b74feb55da7f8507a7180123eed0"
     assert records[0].fingerprint.sha256 == "0ecaca9db7d166fd55f84ad775074bd6c743ae2d26e6dac10e60e88efbfcc01d"
@@ -42,9 +45,8 @@ def test_putty_plugin_ssh_host_keys_unix(target_unix_users: Target, fs_unix: Vir
     assert records[1].port == 22
 
     assert records[1].key_type == "ecdsa-sha2-nistp256"
-    assert (
-        records[1].public_key
-        == "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNhJOmUcnvcVIizc67M3bS0/2Gz43YPHYCRaogqAgHvgVUartyfsl5nZBoFR3FiUc9kTJJUPybWbqXaGLEthjfM="  # noqa E501
+    assert records[1].public_key_pem == base64.b64decode(
+        "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNhJOmUcnvcVIizc67M3bS0/2Gz43YPHYCRaogqAgHvgVUartyfsl5nZBoFR3FiUc9kTJJUPybWbqXaGLEthjfM="
     )
     assert records[1].fingerprint.md5 == "e23736ef80f12b672cf217c390a1acfb"
     assert records[1].fingerprint.sha1 == "93a03a809a02091aab194b04c836c37298c0602a"
@@ -58,9 +60,8 @@ def test_putty_plugin_ssh_host_keys_unix(target_unix_users: Target, fs_unix: Vir
     assert records[2].port == 1234
 
     assert records[2].key_type == "rsa2"
-    assert (
-        records[2].public_key
-        == "AAAAB3NzaC1yc2EAAAADAQABAAABgQCmYvCKueiA3lyhZuW0OAObOZvf0g957H0wGhGi3BruZSDpa9UQhsVNtgPZfuyx/yYWUIhQ4VSz+qw00IhZJt9myRNrXCxIABM/qubTghrdjRU+ydb0J9uTBIRz+ys/0dr0dg2Gc7C5w9+E3EpRit6VCZfTi8mNYZi+/GC12VYIDsqY9/4D4xloHJP+fs1mCNnY12VtJuIWw281fKaTCxm3H95NOBbAE6sAwr8H5lMLU34D4DcA5ZIG5F48yDmYUkILtN4qLAZMl4ZlQ6KpcxMYCN6DPj2NwR8JHzr+mkwjmGqbs8tjYD/KRYL2sYhK6Fdx7wvw5djQeVTEnhjxoeiCYNFAGkzB9BfeP4N0K2rp6F3NktFU4WIc6nLsX5G1LEWuAvAxwg+v6y4YzmpXHP+WrRHKyhS+B64aLpmD7AAJzPwSyqtt5+8SY3z7EMCpYBGz8uhdYzaY0U+qWFHtIfI5GLrl2akYBzH9t/YPAF6wdTuSh4jxVe2IVrd1x7g23Zs="  # noqa E501
+    assert records[2].public_key_pem == base64.b64decode(
+        "AAAAB3NzaC1yc2EAAAADAQABAAABgQCmYvCKueiA3lyhZuW0OAObOZvf0g957H0wGhGi3BruZSDpa9UQhsVNtgPZfuyx/yYWUIhQ4VSz+qw00IhZJt9myRNrXCxIABM/qubTghrdjRU+ydb0J9uTBIRz+ys/0dr0dg2Gc7C5w9+E3EpRit6VCZfTi8mNYZi+/GC12VYIDsqY9/4D4xloHJP+fs1mCNnY12VtJuIWw281fKaTCxm3H95NOBbAE6sAwr8H5lMLU34D4DcA5ZIG5F48yDmYUkILtN4qLAZMl4ZlQ6KpcxMYCN6DPj2NwR8JHzr+mkwjmGqbs8tjYD/KRYL2sYhK6Fdx7wvw5djQeVTEnhjxoeiCYNFAGkzB9BfeP4N0K2rp6F3NktFU4WIc6nLsX5G1LEWuAvAxwg+v6y4YzmpXHP+WrRHKyhS+B64aLpmD7AAJzPwSyqtt5+8SY3z7EMCpYBGz8uhdYzaY0U+qWFHtIfI5GLrl2akYBzH9t/YPAF6wdTuSh4jxVe2IVrd1x7g23Zs="
     )
     assert records[2].fingerprint.md5 == "539539a9dec6afa0c8d9cdbb9357ed5e"
     assert records[2].fingerprint.sha1 == "c0f0c0a51ed7ae4c2b271f0426554f837f9508d0"
@@ -93,7 +94,9 @@ def test_putty_plugin_ssh_host_keys_windows(
     assert records[0].host == "192.168.123.130"
     assert records[0].port == 22
     assert records[0].key_type == "ssh-ed25519"
-    assert records[0].public_key == "AAAAC3NzaC1lZDI1NTE5AAAAIHUl23i/4p/7xcZnNPDK+Dr+A539zpEEXutrm/tESFYq"
+    assert records[0].public_key_pem == base64.b64decode(
+        "AAAAC3NzaC1lZDI1NTE5AAAAIHUl23i/4p/7xcZnNPDK+Dr+A539zpEEXutrm/tESFYq"
+    )
     assert records[0].path == path.from_windows("Software\\SimonTatham\\PuTTY\\SshHostKeys")
 
 
