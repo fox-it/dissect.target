@@ -61,9 +61,6 @@ class CitrixPlugin(BsdPlugin):
                     # Current configuration of the netscaler
                     if hostname_match := RE_CONFIG_HOSTNAME.search(config):
                         self._hostname = hostname_match.groupdict()["hostname"]
-                    if timezone_match := RE_CONFIG_TIMEZONE.search(config):
-                        tzinfo = timezone_match.groupdict()
-                        self.target.timezone = tzinfo["zone_name"]
 
         self._config_usernames = list(usernames)
         self._ips = list(ips)
@@ -105,8 +102,12 @@ class CitrixPlugin(BsdPlugin):
                 target.fs.mount("/", fs)
                 has_ramdisk = True
 
-        # The 'disk' filesystem is mounted at '/var'.
-        target.fs.mount("/var", sysvol)
+        # Check if we are dealing with netscaler-collector filesystem (/shell exists) or full image
+        if sysvol.exists("/shell"):
+            target.fs.mount("/", sysvol)
+        else:
+            # The 'disk' filesystem is mounted at '/var'.
+            target.fs.mount("/var", sysvol)
 
         # Enumerate filesystems for flash partition.
         # Multiple flash partitions could exist, so we look for the one with an actual ns.conf present.
@@ -178,10 +179,13 @@ class CitrixPlugin(BsdPlugin):
         if version_path.is_file():
             version = version_path.read_text().strip()
 
-        loader_conf_path = self.target.fs.path("/flash/boot/loader.conf")
-        if loader_conf_path.is_file():
-            loader_conf = loader_conf_path.read_text()
-            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(loader_conf):
+        # loader.conf exists in different location for NS image vs Techsupport Collection
+        for config_path in ["/flash/boot/loader.conf", "/nsconfig/loader.conf"]:
+            config = self.target.fs.path(config_path)
+            if not config.is_file():
+                continue
+
+            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(config.read_text()):
                 kernel_version = match.groupdict()["version"]
                 version = f"{version} ({kernel_version})" if version else kernel_version
 

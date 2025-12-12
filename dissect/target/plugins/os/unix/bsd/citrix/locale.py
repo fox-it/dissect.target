@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+import re
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.localeutil import normalize_language
 from dissect.target.plugin import export
 from dissect.target.plugins.os.default.locale import LocalePlugin
+
+RE_CONFIG_TIMEZONE = re.compile(
+    r'set ns param.* -timezone "GMT\+(?P<hours>[0-9]+):(?P<minutes>[0-9]+)-.*-(?P<zone_name>.+)"'
+)
 
 
 class CitrixLocalePlugin(LocalePlugin):
@@ -14,6 +19,24 @@ class CitrixLocalePlugin(LocalePlugin):
     def check_compatible(self) -> None:
         if self.target.os != "citrix-netscaler":
             raise UnsupportedPluginError("Citrix Netscaler specific plugin loaded on non-Citrix target")
+
+    @export(property=True)
+    def timezone(self) -> str | None:
+        """Return configured timezone."""
+        # Collect timezone from nsconfig/ns.conf or from shell/date.out if exists
+        for config_path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
+            with config_path.open("rt") as config_file:
+                config = config_file.read()
+
+                if timezone_match := RE_CONFIG_TIMEZONE.search(config):
+                    tzinfo = timezone_match.groupdict()
+                    return tzinfo["zone_name"]
+
+        # Netscaler collector specific check:
+        # If timezone not set in ns.conf it is often UTC, lets check for that.
+        if (date_out := self.target.fs.path("/shell/date.out")).exists() and "UTC" in date_out.read_text():
+            return "UTC"
+        return None
 
     @export(property=True)
     def language(self) -> list[str] | None:
