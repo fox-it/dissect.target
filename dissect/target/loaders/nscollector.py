@@ -33,9 +33,8 @@ class NsCollectorTarSubLoader(TarSubLoader):
         return required_paths.issubset(members)
 
     def map(self, target: Target) -> None:
-        filesystem_root = self.tar.getmembers()[0].name
-        vol = TarFilesystem(tarfile=self.tar, base=filesystem_root, fh=self.tar.fileobj)
-        target.filesystems.add(vol)
+        fs = TarFilesystem(tarfile=self.tar, base=self.tar.getnames()[0], fh=self.tar.fileobj)
+        target.filesystems.add(fs)
 
         # Symlink /nsconfig to /flash/nsconfig to make Citrix parsers compatible
         target.fs.symlink("/nsconfig", "/flash/nsconfig")
