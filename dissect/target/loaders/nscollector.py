@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-class NSCollectorTarSubLoader(TarSubLoader):
+class NsCollectorTarSubLoader(TarSubLoader):
     """Loader for tar-based Netscaler Techsupport Collector files.
 
     References:
