@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 class NSCollectorTarSubLoader(TarSubLoader):
-    """Loader for tar-based Netscaler Techsupport Collector file
+    """Loader for tar-based Netscaler Techsupport Collector files.
 
     References:
         - https://developer-docs.netscaler.com/en-us/adc-command-reference-int/current-release/utility/techsupport.html
