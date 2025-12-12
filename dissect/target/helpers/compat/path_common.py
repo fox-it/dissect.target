@@ -97,7 +97,7 @@ def isjunction(path: TargetPath) -> bool:
 
     entry = path.get()
     # Python's ntpath isjunction() only checks for mount point reparse tags
-    return isinstance(entry, NtfsFilesystemEntry) and entry.dereference().is_mount_point()
+    return isinstance(entry, NtfsFilesystemEntry) and entry.is_mount_point()
 
 
 # Join two paths, normalizing and eliminating any symbolic links

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
@@ -13,6 +12,7 @@ from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -20,7 +20,8 @@ if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 try:
     from ruamel.yaml import YAML

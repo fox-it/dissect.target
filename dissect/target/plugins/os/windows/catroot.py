@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.esedb import EseDB
+from dissect.database.ese import ESE
 from flow.record.fieldtypes import digest
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -225,7 +225,7 @@ class CatrootPlugin(Plugin):
         """
         for ese_file in self.catroot2_dir.rglob("catdb"):
             with ese_file.open("rb") as fh:
-                ese_db = EseDB(fh)
+                ese_db = ESE(fh)
 
                 for hash_type, table_name in [("sha256", "HashCatNameTableSHA256"), ("sha1", "HashCatNameTableSHA1")]:
                     try:

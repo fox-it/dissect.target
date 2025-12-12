@@ -20,12 +20,12 @@ def test_cache_namespace(target_bare: Target) -> None:
 
     target_bare._config.CACHE_DIR = "/tmp"
     assert (
-        cache1.cache_path(target_bare, ("a", 1234)).name
-        == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.__call__.KCdhJywgMTIzNCk=.zstd"
+        cache1.cache_path(target_bare, ("a", 1234)).stem
+        == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.__call__.KCdhJywgMTIzNCk="
     )
     assert (
-        cache2.cache_path(target_bare, ("b", 5678)).name
-        == "dissect.target.plugins.os.windows.ual.UalPlugin.__call__.KCdiJywgNTY3OCk=.zstd"
+        cache2.cache_path(target_bare, ("b", 5678)).stem
+        == "dissect.target.plugins.os.windows.ual.UalPlugin.__call__.KCdiJywgNTY3OCk="
     )
 
 
@@ -43,18 +43,16 @@ def test_cache_filename(target_win: Target) -> None:
 
     target_win._config.CACHE_DIR = "/tmp"
     assert (
-        cache1.cache_path(target_win, ()).name
-        == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.applications.KCk=.zstd"
+        cache1.cache_path(target_win, ()).stem
+        == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.applications.KCk="
     )
     assert (
-        cache2.cache_path(target_win, ()).name
-        == "dissect.target.plugins.os.windows.ual.UalPlugin.client_access.KCk=.zstd"
+        cache2.cache_path(target_win, ()).stem == "dissect.target.plugins.os.windows.ual.UalPlugin.client_access.KCk="
     )
     assert (
-        cache3.cache_path(target_win, ()).name
-        == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.applications.KCk=.zstd"
+        cache3.cache_path(target_win, ()).stem
+        == "dissect.target.plugins.os.windows.amcache.AmcachePlugin.applications.KCk="
     )
     assert (
-        cache4.cache_path(target_win, ()).name
-        == "dissect.target.plugins.os.windows.ual.UalPlugin.client_access.KCk=.zstd"
+        cache4.cache_path(target_win, ()).stem == "dissect.target.plugins.os.windows.ual.UalPlugin.client_access.KCk="
     )

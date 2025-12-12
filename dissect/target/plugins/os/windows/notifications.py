@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from dissect.cstruct import cstruct
-from dissect.sql import sqlite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import wintimestamp
 from flow.record import GroupedRecord
 
@@ -444,7 +444,7 @@ class NotificationsPlugin(Plugin):
         target_tz = self.target.datetime.tzinfo
 
         for user, wpndatabase in self.wpndb_files:
-            db = sqlite3.SQLite3(wpndatabase.open())
+            db = SQLite3(wpndatabase.open())
             handlers = {}
 
             if table := db.table("NotificationHandler"):

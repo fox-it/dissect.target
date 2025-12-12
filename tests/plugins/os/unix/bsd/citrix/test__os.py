@@ -1,11 +1,18 @@
+from __future__ import annotations
+
 import textwrap
+from datetime import datetime, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from flow.record.fieldtypes import posix_path
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
@@ -37,6 +44,18 @@ def test_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     assert ips == ["10.0.0.68", "10.0.0.69"]
 
     assert target_citrix.timezone == "Europe/Amsterdam"
+
+    entry = target_citrix.filesystems[2].get(".version")
+    stat_result = entry.stat()
+    stat_result.st_birthtime = 1234567890
+    with patch.object(entry, "stat") as mock_stat:
+        mock_stat.return_value = stat_result
+        assert target_citrix.install_date == datetime(2009, 2, 13, 23, 31, 30, tzinfo=timezone.utc)
+
+    target_citrix.filesystems[1].map_file_fh(
+        "netscaler/logon/themes/SomeThemeName/SomeFile.json", BytesIO(b'{"locale": "en"}')
+    )
+    assert target_citrix.language == ["en_US"]
 
     assert len(users) == 8
 

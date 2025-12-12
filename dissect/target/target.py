@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import traceback
 import urllib.parse
@@ -21,6 +20,7 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import config
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import parse_path_uri
+from dissect.target.helpers.logging import TargetLogAdapter, get_logger
 from dissect.target.helpers.utils import StrEnum, slugify
 from dissect.target.loaders.direct import DirectLoader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
@@ -32,7 +32,8 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.record import ChildTargetRecord
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 FunctionTuple = tuple[plugin.Plugin, plugin.Plugin | property | None]
 
@@ -44,15 +45,10 @@ class Event(StrEnum):
     FUNC_EXEC_ERROR = "function-execution-error"
 
 
-def getlogger(target: Target) -> TargetLogAdapter:
+def get_target_logger(target: Target) -> TargetLogAdapter:
     if not log.root.handlers:
         log.setLevel(os.getenv("DISSECT_LOG_TARGET", "CRITICAL"))
     return TargetLogAdapter(log, {"target": target})
-
-
-class TargetLogAdapter(logging.LoggerAdapter):
-    def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        return f"{self.extra['target']}: {msg}", kwargs
 
 
 class Target:
@@ -88,7 +84,7 @@ class Target:
             self.path_query = dict(urllib.parse.parse_qsl(self.parsed_path.query, keep_blank_values=True))
 
         self.props: dict[Any, Any] = {}
-        self.log = getlogger(self)
+        self.log = get_target_logger(self)
 
         self._name = None
         self._plugins: list[plugin.Plugin] = []
@@ -359,7 +355,7 @@ class Target:
                 # Couldn't find a loader
                 return
 
-            getlogger(spec).debug("Attempting to use loader: %s", loader_cls)
+            get_target_logger(spec).debug("Attempting to use loader: %s", loader_cls)
             # See if the loader provides any additional paths to load
             # This is useful for URI-like paths that have wildcard components
             for sub_path in loader_cls.find_all(found_path, parsed_path=parsed_path):
@@ -385,8 +381,8 @@ class Target:
                     ldr = loader_cls(load_path, parsed_path=load_parsed_path)
                 except Exception as e:
                     message = "%s" if isinstance(e, TargetPathNotFoundError) else "Failed to initiate loader: %s"
-                    getlogger(load_spec).error(message, e)
-                    getlogger(load_spec).debug("", exc_info=e)
+                    get_target_logger(load_spec).error(message, e)
+                    get_target_logger(load_spec).debug("", exc_info=e)
                     continue
 
                 try:
@@ -396,8 +392,8 @@ class Target:
                     # For file/dir-like paths it's a Path object
                     target = cls._load(load_spec, ldr)
                 except Exception as e:
-                    getlogger(load_spec).error("Failed to load target with loader %s", ldr)
-                    getlogger(load_spec).debug("", exc_info=e)
+                    get_target_logger(load_spec).error("Failed to load target with loader %s", ldr)
+                    get_target_logger(load_spec).debug("", exc_info=e)
                     continue
                 else:
                     yield target
@@ -406,7 +402,7 @@ class Target:
                     try:
                         yield from target.open_children()
                     except Exception as e:
-                        getlogger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
+                        get_target_logger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
 
         at_least_one_loaded = False
 
@@ -435,13 +431,12 @@ class Target:
 
                 if not path.exists():
                     raise TargetError(f"Failed to find loader for {path}: path does not exist")
-                elif not path.is_dir():
-                    raise TargetError(f"Failed to find loader for {path}: path is not a directory")
 
-                for entry in path.iterdir():
-                    for target in _open_all(entry, include_children=include_children):
-                        at_least_one_loaded = True
-                        yield target
+                if path.is_dir():
+                    for entry in path.iterdir():
+                        for target in _open_all(entry, include_children=include_children):
+                            at_least_one_loaded = True
+                            yield target
 
         if not at_least_one_loaded:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
@@ -475,23 +470,27 @@ class Target:
             try:
                 plugin_cls: type[plugin.ChildTargetPlugin] = plugin.load(plugin_desc)
                 child_plugin = plugin_cls(self)
-            except PluginError:
-                self.log.exception("Failed to load child plugin: %s", plugin_desc.qualname)
+            except PluginError as e:
+                self.log.error("Failed to load child plugin: %s (%s)", plugin_desc.qualname, e)  # noqa: TRY400
+                self.log.debug("", exc_info=e)
                 continue
-            except Exception:
-                self.log.exception("Broken child plugin: %s", plugin_desc.qualname)
+            except Exception as e:
+                self.log.error("Broken child plugin: %s (%s)", plugin_desc.qualname, e)  # noqa: TRY400
+                self.log.debug("", exc_info=e)
                 continue
 
             try:
                 child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
-            except PluginError as e:
-                self.log.info("Child plugin reported itself as incompatible: %s", plugin_desc.qualname)
-                self.log.debug("", exc_info=e)
-            except Exception:
-                self.log.exception(
-                    "An exception occurred while checking for child plugin compatibility: %s", plugin_desc.qualname
+            except UnsupportedPluginError as e:
+                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc.qualname, e)
+            except Exception as e:
+                self.log.error(  # noqa: TRY400
+                    "An exception occurred while checking for child plugin compatibility: %s (%s)",
+                    plugin_desc.qualname,
+                    e,
                 )
+                self.log.debug("", exc_info=e)
 
     def open_child(self, child: int | str | Path) -> Target:
         """Open a child target.
@@ -649,7 +648,7 @@ class Target:
             # Now subclassed OS Plugins are on the same detection "layer" as
             # regular OS Plugins, but can still inherit functions.
             qualname = plugin_desc.qualname
-            self.log.debug("Loading OS plugin: %s", qualname)
+            self.log.trace("Loading OS plugin: %s", qualname)
             try:
                 os_plugin: type[plugin.OSPlugin] = plugin.load(plugin_desc)
                 fs = os_plugin.detect(self)
@@ -717,7 +716,7 @@ class Target:
             UnsupportedPluginError: Raised when plugins were found, but they were incompatible
             PluginError: Raised when any other exception occurs while trying to load the plugin.
         """
-        self.log.debug("Adding plugin: %s", plugin_cls)
+        self.log.trace("Adding plugin: %s", plugin_cls)
 
         if not isinstance(plugin_cls, plugin.Plugin):
             try:
@@ -818,7 +817,7 @@ class Target:
                 for descriptor in plugin.lookup(function, self._os_plugin):
                     try:
                         self.load_plugin(descriptor)
-                        self.log.debug("Found compatible plugin '%s' for function '%s'", descriptor.qualname, function)
+                        self.log.trace("Found compatible plugin '%s' for function '%s'", descriptor.qualname, function)
                         break
                     except UnsupportedPluginError as e:
                         self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_desc=descriptor)

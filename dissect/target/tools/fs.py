@@ -9,18 +9,20 @@ import sys
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.target import Target
-from dissect.target.tools.fsutils import print_ls, print_stat
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
+from dissect.target.tools.utils.fs import print_ls, print_stat
 
 if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import TargetPath
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 

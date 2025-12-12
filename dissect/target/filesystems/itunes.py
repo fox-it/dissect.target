@@ -7,6 +7,7 @@ from dissect.util.stream import AlignedStream
 
 from dissect.target.exceptions import FilesystemError, NotASymlinkError
 from dissect.target.filesystem import (
+    DirEntry,
     Filesystem,
     FilesystemEntry,
     VirtualDirectory,
@@ -50,6 +51,9 @@ class ITunesFilesystem(Filesystem):
 
 
 class ITunesFilesystemEntry(VirtualFile):
+    fs: ITunesFilesystem
+    entry: FileInfo
+
     def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
         if self.is_dir():
@@ -59,12 +63,7 @@ class ITunesFilesystemEntry(VirtualFile):
             return EncryptedFileStream(self.entry)
         return self.entry.get().open("rb")
 
-    def iterdir(self) -> Iterator[str]:
-        if self.is_dir():
-            return self._resolve().iterdir()
-        return super().iterdir()
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
+    def scandir(self) -> Iterator[DirEntry]:
         if self.is_dir():
             return self._resolve().scandir()
         return super().scandir()
