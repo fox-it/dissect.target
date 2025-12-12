@@ -69,7 +69,7 @@ class CitrixPlugin(BsdPlugin):
                     elif self.target.fs.path("/shell/date.out").exists():
                         # If timezone not set in ns.conf it is often UTC, lets check for that.
                         if "UTC" in self.target.fs.path("/shell/date.out").open("rt").read():
-                            self.target.timezone = "Etc/UTC"
+                            self.target.timezone = "UTC"
 
         self._config_usernames = list(usernames)
         self._ips = list(ips)
