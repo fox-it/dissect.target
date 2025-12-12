@@ -188,7 +188,7 @@ class CitrixPlugin(BsdPlugin):
         if version_path.is_file():
             version = version_path.read_text().strip()
 
-        # Loader.conf exists in different location for NS image vs Techsupport Collection
+        # loader.conf exists in different location for NS image vs Techsupport Collection
         for config_path in ["/flash/boot/loader.conf", "/nsconfig/loader.conf"]:
             config = self.target.fs.path(config_path)
             if not config.is_file():
