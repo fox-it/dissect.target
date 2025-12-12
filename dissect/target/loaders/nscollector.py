@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystems.tar import TarFilesystem
@@ -11,8 +10,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.target import Target
-
-log = logging.getLogger(__name__)
 
 
 class NsCollectorTarSubLoader(TarSubLoader):
@@ -25,12 +22,17 @@ class NsCollectorTarSubLoader(TarSubLoader):
 
     @staticmethod
     def detect(path: Path, tarfile: tf.TarFile) -> bool:
-        members = (member.name for member in tarfile.getmembers())
-        filesystem_root = next(iter(members))
+        # members = (member.name for member in tarfile.getmembers())
+        # filesystem_root = next(iter(members))
 
-        required_paths = {f"{filesystem_root}/nsconfig/ns.conf", f"{filesystem_root}/shell"}
+        # required_paths = {f"{filesystem_root}/nsconfig/ns.conf", f"{filesystem_root}/shell"}
+        if not (names := tarfile.getnames()):
+            return False
 
-        return required_paths.issubset(members)
+        root = names[0]
+        required_paths = {f"{root}/nsconfig/ns.conf", f"{root}/shell"}
+
+        return required_paths.issubset(names)
 
     def map(self, target: Target) -> None:
         fs = TarFilesystem(tarfile=self.tar, base=self.tar.getnames()[0], fh=self.tar.fileobj)

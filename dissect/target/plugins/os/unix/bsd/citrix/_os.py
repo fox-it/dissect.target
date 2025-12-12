@@ -61,15 +61,6 @@ class CitrixPlugin(BsdPlugin):
                     # Current configuration of the netscaler
                     if hostname_match := RE_CONFIG_HOSTNAME.search(config):
                         self._hostname = hostname_match.groupdict()["hostname"]
-                    # Collect timezone from nsconfig/ns.conf or from shell/date.out if exists
-                    if timezone_match := RE_CONFIG_TIMEZONE.search(config):
-                        tzinfo = timezone_match.groupdict()
-                        self.target.timezone = tzinfo["zone_name"]
-                    # Netscaler collector specific check:
-                    elif self.target.fs.path("/shell/date.out").exists():
-                        # If timezone not set in ns.conf it is often UTC, lets check for that.
-                        if "UTC" in self.target.fs.path("/shell/date.out").open("rt").read():
-                            self.target.timezone = "UTC"
 
         self._config_usernames = list(usernames)
         self._ips = list(ips)
