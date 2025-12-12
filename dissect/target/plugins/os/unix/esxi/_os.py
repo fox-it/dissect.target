@@ -27,7 +27,7 @@ except ImportError:
     HAS_ENVELOPE = False
 
 from dissect.target.filesystems import tar
-from dissect.target.plugin import OperatingSystem, export
+from dissect.target.plugin import OperatingSystem, export, internal
 from dissect.target.plugins.os.unix._os import UnixPlugin
 
 if TYPE_CHECKING:
@@ -143,6 +143,16 @@ class ESXiPlugin(UnixPlugin):
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.ESXI.value
+
+    @internal
+    def osdata_fs(self) -> TargetPath | None:
+        """
+        return path to osdata vmfs, present in esxi 7+
+        """
+        os_data = list(self.target.fs.path("/vmfs/volumes/").glob("OSDATA-*"))
+        if os_data:
+            return os_data[0]
+        return None
 
     def _mount_nfs_shares(self) -> None:
         """Mount NFS shares found in the configstore."""
