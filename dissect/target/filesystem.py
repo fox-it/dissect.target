@@ -1058,7 +1058,7 @@ class VirtualFile(FilesystemEntry):
     def scandir(self) -> Iterator[DirEntry]:
         raise NotADirectoryError(f"'{self.path}' is not a directory")
 
-    def open(self) -> BinaryIO:
+    def open(self, *args, **kwargs) -> BinaryIO:
         return VirtualFileHandle(self.entry)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
@@ -1118,7 +1118,7 @@ class MappedCompressedFile(MappedFile):
         if self._compressor is None:
             raise ValueError(f"Unsupported compression algorithm {algo}")
 
-    def open(self) -> BinaryIO:
+    def open(self, *args, **kwargs) -> BinaryIO:
         return self._compressor.open(self.entry, "rb")
 
 
