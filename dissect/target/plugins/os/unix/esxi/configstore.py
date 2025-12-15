@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json as jsonlib
-from typing import TYPE_CHECKING, Any, BinaryIO
+from typing import TYPE_CHECKING, Any
 
 from dissect.database.sqlite3 import SQLite3
 
@@ -9,6 +9,8 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, internal
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dissect.target.target import Target
 
 
@@ -25,8 +27,7 @@ class ConfigstorePlugin(Plugin):
         # It's made available at /etc/vmware/configstore/current-store-1 during boot, but stored at
         # the path used below in local.tgz
         if (path := target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")).exists():
-            with path.open("rb") as fh:
-                self._configstore = parse_config_store(fh)
+            self._configstore = parse_config_store(path)
 
     def check_compatible(self) -> None:
         if self.target.os != "esxi":
@@ -41,7 +42,7 @@ class ConfigstorePlugin(Plugin):
         return self._configstore.get(key, default)
 
 
-def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
+def parse_config_store(fh: Path) -> dict[str, Any]:
     db = SQLite3(fh)
 
     store = {}
