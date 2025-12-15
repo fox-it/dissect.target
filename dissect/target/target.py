@@ -431,13 +431,12 @@ class Target:
 
                 if not path.exists():
                     raise TargetError(f"Failed to find loader for {path}: path does not exist")
-                elif not path.is_dir():
-                    raise TargetError(f"Failed to find loader for {path}: path is not a directory")
 
-                for entry in path.iterdir():
-                    for target in _open_all(entry, include_children=include_children):
-                        at_least_one_loaded = True
-                        yield target
+                if path.is_dir():
+                    for entry in path.iterdir():
+                        for target in _open_all(entry, include_children=include_children):
+                            at_least_one_loaded = True
+                            yield target
 
         if not at_least_one_loaded:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
