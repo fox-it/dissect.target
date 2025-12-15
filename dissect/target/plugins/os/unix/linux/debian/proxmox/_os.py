@@ -18,6 +18,8 @@ from dissect.target.plugins.os.unix._os import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from typing_extensions import Self
 
     from dissect.target.target import Target
@@ -37,8 +39,7 @@ class ProxmoxPlugin(DebianPlugin):
         obj = super().create(target, sysvol)
 
         if (config_db := target.fs.path("/var/lib/pve-cluster/config.db")).exists():
-            with config_db.open("rb") as fh:
-                vfs = _create_pmxcfs(fh, obj.hostname)
+            vfs = _create_pmxcfs(config_db, obj.hostname)
 
             target.fs.mount("/etc/pve", vfs)
 
@@ -63,7 +64,7 @@ DT_DIR = 4
 DT_REG = 8
 
 
-def _create_pmxcfs(fh: BinaryIO, hostname: str | None = None) -> VirtualFilesystem:
+def _create_pmxcfs(fh: Path, hostname: str | None = None) -> VirtualFilesystem:
     # https://pve.proxmox.com/wiki/Proxmox_Cluster_File_System_(pmxcfs)
     db = SQLite3(fh)
 
