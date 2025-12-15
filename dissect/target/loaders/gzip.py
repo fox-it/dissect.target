@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.loader import Loader, LOADERS
+from dissect.target.loader import LOADERS, Loader
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -36,6 +36,6 @@ class GzipLoader(Loader):
                     self.subloader = candidate(path)
                     self.subloader.map(target)
                     break
-            except Exception as e:  # noqa: PERF203
+            except Exception as e:
                 target.log.debug("Failed to use loader %s", candidate)
                 target.log.debug("", exc_info=e)
