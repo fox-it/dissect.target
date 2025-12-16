@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import MappingStream
@@ -26,7 +26,6 @@ class ScrapeContext:
     all_flag: bool
     lvm_flag: bool
     encrypted_flag: bool
-    deleted_scrape_regions: set = field(default_factory=set)
 
 
 class ScrapePlugin(Plugin):
@@ -138,11 +137,7 @@ class ScrapePlugin(Plugin):
             processed_this_pass = False
 
             for volume in list(pending_layered):
-                if process_lvm_layer(context, volume):
-                    pending_layered.remove(volume)
-                    processed_this_pass = True
-                    continue
-                if process_encrypted_layer(context, volume):
+                if process_lvm_layer(context, volume) or process_encrypted_layer(context, volume):
                     pending_layered.remove(volume)
                     processed_this_pass = True
                     continue
@@ -325,25 +320,24 @@ def process_lvm_layer(context: ScrapeContext, volume: Volume) -> bool:
     except (AttributeError, TypeError):
         dependencies_met = False
 
-    if dependencies_met:
-        if not context.all_flag:
-            for map_key, region_key in backing_regions_info:
-                # Only delete the scrape_map region if it hasn't
-                # been deleted by another LV in this VG.
-                # This occurs when multiple LVs share the same backing PV.
-                key_to_delete = (map_key, region_key)
-                if key_to_delete not in context.deleted_scrape_regions:
-                    del context.scrape_map[map_key][region_key]
-                    context.deleted_scrape_regions.add(key_to_delete)
+    if not dependencies_met:
+        return False
 
-        # Add the new LVM volume as a new "disk"
-        new_region_key = (0, volume.size)
-        context.scrape_map[volume][new_region_key] = (volume, 0)
+    if not context.all_flag:
+        for map_key, region_key in backing_regions_info:
+            # Use idempotent delete operation because multiple LVs can share the same backing PV
+            # Note this is rather crude, because the backing volume is not necessarily fully consumed by the LV.
+            # However, our scrape map would become swiss cheese if we attempts to remove all extents.
+            # Besides, users can set the `all` flag to ensure no forensic evidence is missed.
+            context.scrape_map[map_key].pop(region_key, None)
 
-        # Add this new LV to our index
-        context.volume_region_map[volume] = (volume, new_region_key)
-        return True
-    return False
+    # Add the new LVM volume as a new "disk"
+    new_region_key = (0, volume.size)
+    context.scrape_map[volume][new_region_key] = (volume, 0)
+
+    # Add this new LV to our index
+    context.volume_region_map[volume] = (volume, new_region_key)
+    return True
 
 
 def process_encrypted_layer(context: ScrapeContext, volume: Volume) -> bool:
@@ -356,26 +350,27 @@ def process_encrypted_layer(context: ScrapeContext, volume: Volume) -> bool:
     except (AttributeError, TypeError):
         return False
 
-    if backing_vol_obj in context.volume_region_map:
+    if backing_vol_obj not in context.volume_region_map:
+        return False
+
+    if not context.all_flag:
         map_key, region_key = context.volume_region_map[backing_vol_obj]
 
-        if not context.all_flag:
-            # Remove encrypted region from scrape_map
-            del context.scrape_map[map_key][region_key]
+        # Remove encrypted region from scrape_map
+        del context.scrape_map[map_key][region_key]
 
-            # Reinsert the decrypted volume region
-            new_region_key = (region_key[0], volume.size)  # Same offset, new size
-            context.scrape_map[map_key][new_region_key] = (volume, 0)
+        # Reinsert the decrypted volume region
+        new_region_key = (region_key[0], volume.size)  # Same offset, new size
+        context.scrape_map[map_key][new_region_key] = (volume, 0)
 
-            # Add this new decrypted volume to our index
-            context.volume_region_map[volume] = (map_key, new_region_key)
+        # Add this new decrypted volume to our index
+        context.volume_region_map[volume] = (map_key, new_region_key)
 
-        else:
-            # Add the decrypted volume separately
-            new_region_key = (0, volume.size)
-            context.scrape_map[volume][new_region_key] = (volume, 0)
-            # Add this new decrypted volume to our index
-            context.volume_region_map[volume] = (volume, new_region_key)
+    else:
+        # Add the decrypted volume separately
+        new_region_key = (0, volume.size)
+        context.scrape_map[volume][new_region_key] = (volume, 0)
+        # Add this new decrypted volume to our index
+        context.volume_region_map[volume] = (volume, new_region_key)
 
-        return True
-    return False
+    return True
