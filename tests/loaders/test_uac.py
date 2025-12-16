@@ -67,7 +67,7 @@ def test_target_open(
     "data_path",
     [
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz"),
-        # this on start with ./[root]
+        # this one start with ./[root]
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143112.tar.gz"),
     ],
 )
