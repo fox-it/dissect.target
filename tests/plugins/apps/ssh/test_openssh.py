@@ -105,22 +105,37 @@ def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFile
     assert results[0].key_type == "ssh-ed25519"
     assert results[0].options is None
     assert results[0].comment == ""
+    assert results[0].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
+    assert results[0].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
+    assert results[0].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
     assert results[1].key_type == "ssh-ed25519"
     assert results[1].options is None
     assert results[1].comment == "comment"
+    assert results[1].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
+    assert results[1].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
+    assert results[1].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
     assert results[2].key_type == "ssh-ed25519"
     assert results[2].options is None
     assert results[2].comment == "long comment with spaces"
+    assert results[2].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
+    assert results[2].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
+    assert results[2].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
     assert results[3].key_type == "ssh-ed25519"
     assert results[3].options == 'command="foo bar"'
     assert results[3].comment == ""
+    assert results[3].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
+    assert results[3].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
+    assert results[3].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
     assert results[4].key_type == "ssh-ed25519"
     assert results[4].options == 'command="foo bar"'
     assert results[4].comment == "with a comment"
+    assert results[4].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
+    assert results[4].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
+    assert results[4].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
 
 def test_known_hosts_plugin(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
@@ -216,11 +231,14 @@ def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem: tuple[Target
     assert private_key.key_format == "RFC4716"
     assert private_key.key_type == "ssh-ed25519"
     assert private_key.comment == "long comment here"
-    assert private_key.public_key == public_key_data
+    assert private_key.public_key_pem == base64.b64decode(public_key_data)
     assert not private_key.encrypted
     assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(
         "ssh_host_ed25519_key", TargetDir.SSHD
     ).replace(target_system.label, "\\sysvol\\").replace("\\", "/")
+    assert private_key.fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
+    assert private_key.fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
+    assert private_key.fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
 
 def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
@@ -290,12 +308,15 @@ def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem: tuple[
     assert len(results) == 1
     assert private_key.key_format == "RFC4716"
     assert private_key.key_type == "ssh-rsa"
-    assert private_key.public_key == public_key_data
+    assert private_key.public_key_pem == base64.b64decode(public_key_data)
     assert private_key.comment == ""
     assert private_key.encrypted
     assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(
         ".ssh/id_rsa", TargetDir.HOME
     ).replace("\\", "/")
+    assert private_key.fingerprint.md5 == "fd5c8ec37b91d356bba27a12639ef414"
+    assert private_key.fingerprint.sha1 == "f9aa4500bb49a27c0274e29e192696af2ae34ab3"
+    assert private_key.fingerprint.sha256 == "86f3cdff3ccb04cee5f0093408ba581b09018777a99feb1a77c37b11d30972ba"
 
 
 def test_private_keys_plugin_pem_ecdsa(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
@@ -400,7 +421,7 @@ def test_public_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesyst
     host_public_key = results[1]
 
     assert user_public_key.key_type == user_public_key_data.split(" ", 2)[0]
-    assert user_public_key.public_key == user_public_key_data.split(" ", 2)[1]
+    assert user_public_key.public_key_pem == base64.b64decode(user_public_key_data.split(" ", 2)[1])
     assert user_public_key.comment == user_public_key_data.split(" ", 2)[2]
     assert user_public_key.fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
     assert user_public_key.fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
@@ -410,7 +431,7 @@ def test_public_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesyst
     ).replace("\\", "/")
 
     assert host_public_key.key_type == host_public_key_data.split(" ", 2)[0]
-    assert host_public_key.public_key == host_public_key_data.split(" ", 2)[1]
+    assert host_public_key.public_key_pem == base64.b64decode(host_public_key_data.split(" ", 2)[1])
     assert host_public_key.comment == host_public_key_data.split(" ", 2)[2]
     assert host_public_key.fingerprint.md5 == "a3f2ebfa8d16efd321015e1618fd281b"
     assert host_public_key.fingerprint.sha1 == "f6656cc642fb08f53a1df77d0acff9852a649989"

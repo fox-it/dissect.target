@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import logging
 import uuid
 from datetime import timezone
 from typing import TYPE_CHECKING, Any, Final
@@ -16,6 +15,7 @@ from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 
@@ -26,7 +26,8 @@ if TYPE_CHECKING:
     from dissect.target.helpers.regutil import RegistryKey
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 bag_def = """
 enum ROOTFOLDER_ID : uint8 {

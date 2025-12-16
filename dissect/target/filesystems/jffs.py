@@ -12,7 +12,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -49,6 +49,17 @@ class JffsFilesystem(Filesystem):
             raise FileNotFoundError(path) from e
 
 
+class JffsDirEntry(DirEntry):
+    fs: JffsFilesystem
+    entry: jffs2.INode
+
+    def get(self) -> JffsFilesystemEntry:
+        return JffsFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class JffsFilesystemEntry(FilesystemEntry):
     fs: JffsFilesystem
     entry: jffs2.INode
@@ -63,23 +74,13 @@ class JffsFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def _iterdir(self) -> Iterator[tuple[str, jffs2.INode]]:
+    def scandir(self) -> Iterator[JffsDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            yield from self.readlink_ext().iterdir()
-        else:
-            yield from self.entry.iterdir()
-
-    def iterdir(self) -> Iterator[str]:
-        for name, _ in self._iterdir():
-            yield name
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        for name, entry in self._iterdir():
-            entry_path = fsutil.join(self.path, name, alt_separator=self.fs.alt_separator)
-            yield JffsFilesystemEntry(self.fs, entry_path, entry)
+        for name, entry in self._resolve().entry.iterdir():
+            # TODO: Separate INode and DirEntry in dissect.jffs
+            yield JffsDirEntry(self.fs, self.path, name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

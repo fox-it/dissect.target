@@ -18,10 +18,10 @@ from flow.record import Record, RecordOutput, ignore_fields_for_comparison
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import alias, arg
 from dissect.target.target import Target
-from dissect.target.tools.fsutils import print_extensive_file_stat_listing
 from dissect.target.tools.query import record_output
 from dissect.target.tools.shell import (
     ANSI_COLORS,
@@ -34,19 +34,21 @@ from dissect.target.tools.shell import (
     python_shell,
     run_cli,
 )
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     generate_argparse_for_method,
     process_generic_arguments,
 )
+from dissect.target.tools.utils.fs import print_extensive_file_stat_listing
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.filesystem import FilesystemEntry
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -156,21 +158,22 @@ class TargetComparison:
         exists_as_directory_src = self.src_target.fs.exists(path) and self.src_target.fs.get(path).is_dir()
         exists_as_directory_dst = self.dst_target.fs.exists(path) and self.dst_target.fs.get(path).is_dir()
 
+        # TODO: Adjust the following code to deal more efficiently with DirEntry instead of FilesystemEntry
         if not (exists_as_directory_src and exists_as_directory_dst):
             if exists_as_directory_src:
                 # Path only exists on src target, hence all entries can be considered 'deleted'
-                entries = list(self.src_target.fs.scandir(path))
+                entries = [entry.get() for entry in self.src_target.fs.scandir(path)]
                 return DirectoryDifferential(path, deleted=entries)
             if exists_as_directory_dst:
                 # Path only exists on dst target, hence all entries can be considered 'created'
-                entries = list(self.dst_target.fs.scandir(path))
+                entries = [entry.get() for entry in self.dst_target.fs.scandir(path)]
                 return DirectoryDifferential(path, created=entries)
             raise ValueError(f"{path} is not a directory on either the source or destination target!")
 
-        src_target_entries = list(self.src_target.fs.scandir(path))
+        src_target_entries = [entry.get() for entry in self.src_target.fs.scandir(path)]
         src_target_children_paths = {entry.path for entry in src_target_entries}
 
-        dst_target_entries = list(self.dst_target.fs.scandir(path))
+        dst_target_entries = [entry.get() for entry in self.dst_target.fs.scandir(path)]
         dst_target_children_paths = {entry.path for entry in dst_target_entries}
 
         paths_only_on_src_target = src_target_children_paths - dst_target_children_paths

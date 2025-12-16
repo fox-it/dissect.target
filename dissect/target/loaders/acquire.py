@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import logging
 import re
 from typing import TYPE_CHECKING
 
 from dissect.target import filesystem
 from dissect.target.filesystems.tar import TarFilesystemDirectoryEntry, TarFilesystemEntry
 from dissect.target.helpers import fsutil, loaderutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loaders.dir import find_and_map_dirs
 from dissect.target.loaders.tar import TarSubLoader
 from dissect.target.loaders.zip import ZipSubLoader
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 FILESYSTEMS_ROOT = "fs"
 FILESYSTEMS_LEGACY_ROOT = "sysvol"

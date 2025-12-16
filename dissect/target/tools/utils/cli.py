@@ -18,7 +18,6 @@ from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
-    FunctionDescriptor,
     OSPlugin,
     Plugin,
     find_functions,
@@ -32,11 +31,13 @@ from dissect.target.plugins.general.plugins import (
     generate_functions_overview,
 )
 from dissect.target.target import Target
-from dissect.target.tools.logging import configure_logging
+from dissect.target.tools.utils.logging import configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from datetime import datetime
+
+    from dissect.target.plugin import FunctionDescriptor
 
 
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"

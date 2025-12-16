@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.sql import sqlite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -121,7 +121,7 @@ class ActivitiesCachePlugin(Plugin):
         """
         for user, cache_file in self.cachefiles:
             fh = cache_file.open()
-            db = sqlite3.SQLite3(fh)
+            db = SQLite3(fh)
 
             if table := db.table("Activity"):
                 for r in table.rows():

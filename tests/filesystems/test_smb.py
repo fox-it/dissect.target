@@ -58,7 +58,7 @@ def test_smb_filesystem_windows(monkeypatch: pytest.MonkeyPatch) -> None:
 
         mock_conn.listPath.return_value = [mock_file]
 
-        entries = list(entry.scandir())
+        entries = list(entry.listdir_ext())
         mock_conn.listPath.assert_called_with("C$", "testdir/*")
 
         assert len(entries) == 1

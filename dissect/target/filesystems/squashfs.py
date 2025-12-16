@@ -12,7 +12,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -46,7 +46,21 @@ class SquashFSFilesystem(Filesystem):
             raise FileNotFoundError(path) from e
 
 
+class SquashFSDirEntry(DirEntry):
+    fs: SquashFSFilesystem
+    entry: INode
+
+    def get(self) -> SquashFSFilesystemEntry:
+        return SquashFSFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class SquashFSFilesystemEntry(FilesystemEntry):
+    fs: SquashFSFilesystem
+    entry: INode
+
     def get(self, path: str) -> FilesystemEntry:
         entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         entry = self.fs._get_node(path, self.entry)
@@ -57,28 +71,15 @@ class SquashFSFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def _iterdir(self) -> Iterator[INode]:
+    def scandir(self) -> Iterator[SquashFSDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            for entry in self.readlink_ext().iterdir():
-                yield entry
-        else:
-            for entry in self.entry.iterdir():
-                if entry.name in (".", ".."):
-                    continue
+        for entry in self._resolve().entry.iterdir():
+            if entry.name in (".", ".."):
+                continue
 
-                yield entry
-
-    def iterdir(self) -> Iterator[str]:
-        for entry in self._iterdir():
-            yield entry.name
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        for entry in self._iterdir():
-            entry_path = fsutil.join(self.path, entry.name, alt_separator=self.fs.alt_separator)
-            yield SquashFSFilesystemEntry(self.fs, entry_path, entry)
+            yield SquashFSDirEntry(self.fs, self.path, entry.name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:
