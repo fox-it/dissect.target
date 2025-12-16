@@ -60,10 +60,8 @@ TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 WINDOWS_MEMBERS = (
     "windows/system32",
     "/windows/system32",
-    "./windows/system32",
     "winnt",
     "/winnt",
-    "./winnt",
 )
 
 
