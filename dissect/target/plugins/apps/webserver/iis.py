@@ -136,6 +136,12 @@ class IISLogsPlugin(WebserverPlugin):
         Supported log formats: IIS, W3C.
         """
 
+        if self.target.is_direct:
+            for log_file in self.get_paths():
+                yield from parse_autodetect_format_log(self.target, log_file)
+            # If we use the direct loader, there are no other files available.
+            return
+
         parsers = {
             "W3C": parse_w3c_format_log,
             "IIS": parse_iis_format_log,
@@ -147,11 +153,6 @@ class IISLogsPlugin(WebserverPlugin):
                 for log_file in log_dir.rglob("*.log"):
                     self.target.log.info("Processing IIS log file %s in %s format", log_file, format)
                     yield from parsers[format](self.target, log_file)
-
-        # We handle direct files here because _get_paths cannot select (filter) on the type of logfile.
-        if self.target.is_direct:
-            for log_file in self.get_paths():
-                yield from parse_autodetect_format_log(self.target, log_file)
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
