@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.loader import Loader
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.nscollector import NsCollectorTarSubLoader
 from dissect.target.loaders.tar import TarLoader
