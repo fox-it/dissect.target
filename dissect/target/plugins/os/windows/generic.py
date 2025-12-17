@@ -581,7 +581,7 @@ class GenericPlugin(Plugin):
         except (RegistryError, struct.error) as e:
             self.target.log.error("Cannot read machine SID from registry")  # noqa: TRY400
             self.target.log.debug("", exc_info=e)
-            return None
+            return
 
     @export(record=ComputerSidRecord)
     def domain_sid(self) -> Iterator[ComputerSidRecord]:
