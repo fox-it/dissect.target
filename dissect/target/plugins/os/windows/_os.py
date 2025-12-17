@@ -325,14 +325,14 @@ class WindowsPlugin(OSPlugin):
                 except RegistryValueNotFoundError:
                     pass
                 else:
-                    home = profile_image_path.value
+                    home = self.target.resolve(profile_image_path.value)
                     # Use SAM username if available
-                    name = self._sam_by_sid[sid].username if sid in self._sam_by_sid else home.split("\\")[-1]
+                    name = self._sam_by_sid[sid].username if sid in self._sam_by_sid else home.name
 
                 yield WindowsUserRecord(
-                    sid=subkey.name,
+                    sid=sid,
                     name=name,
-                    home=self.target.resolve(home),
+                    home=home,
                     _target=self.target,
                 )
 
