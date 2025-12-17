@@ -30,7 +30,7 @@ class CitrixLocalePlugin(LocalePlugin):
 
         # Netscaler collector specific check:
         # If timezone not set in ns.conf it is often UTC, lets check for that.
-        if (date_out := self.target.fs.path("/shell/date.out")).exists() and "UTC" in date_out.read_text():
+        if (path := self.target.fs.path("/shell/date.out")).exists() and "UTC" in path.read_text():
             return "UTC"
 
         return None
