@@ -22,10 +22,6 @@ class NsCollectorTarSubLoader(TarSubLoader):
 
     @staticmethod
     def detect(path: Path, tarfile: tf.TarFile) -> bool:
-        # members = (member.name for member in tarfile.getmembers())
-        # filesystem_root = next(iter(members))
-
-        # required_paths = {f"{filesystem_root}/nsconfig/ns.conf", f"{filesystem_root}/shell"}
         if not (names := tarfile.getnames()):
             return False
 
