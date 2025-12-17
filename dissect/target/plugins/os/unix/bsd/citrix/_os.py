@@ -47,16 +47,19 @@ class CitrixPlugin(BsdPlugin):
     def _parse_netscaler_configs(self) -> None:
         ips = set()
         usernames = set()
-        for config_path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
-            with config_path.open("rt") as config_file:
-                config = config_file.read()
-                for match in RE_CONFIG_IP.finditer(config):
-                    ips.add(match.groupdict()["ip"])
-                for match in RE_CONFIG_USER.finditer(config):
-                    usernames.add(match.groupdict()["user"])
-                if config_path.name == "ns.conf" and (hostname_match := RE_CONFIG_HOSTNAME.search(config)):
-                    # Current configuration of the netscaler
-                    self._hostname = hostname_match.groupdict()["hostname"]
+
+        for path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
+            config = path.read_text()
+
+            for match in RE_CONFIG_IP.finditer(config):
+                ips.add(match.groupdict()["ip"])
+
+            for match in RE_CONFIG_USER.finditer(config):
+                usernames.add(match.groupdict()["user"])
+
+            if path.name == "ns.conf" and (match := RE_CONFIG_HOSTNAME.search(config)):
+                # Current configuration of the netscaler
+                self._hostname = match.groupdict()["hostname"]
 
         self._config_usernames = list(usernames)
         self._ips = list(ips)

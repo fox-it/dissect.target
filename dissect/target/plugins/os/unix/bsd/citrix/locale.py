@@ -24,13 +24,9 @@ class CitrixLocalePlugin(LocalePlugin):
     def timezone(self) -> str | None:
         """Return configured timezone."""
         # Collect timezone from nsconfig/ns.conf or from shell/date.out if exists
-        for config_path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
-            with config_path.open("rt") as config_file:
-                config = config_file.read()
-
-                if timezone_match := RE_CONFIG_TIMEZONE.search(config):
-                    tzinfo = timezone_match.groupdict()
-                    return tzinfo["zone_name"]
+        for path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
+            if match := RE_CONFIG_TIMEZONE.search(path.read_text()):
+                return match.groupdict()["zone_name"]
 
         # Netscaler collector specific check:
         # If timezone not set in ns.conf it is often UTC, lets check for that.
@@ -46,13 +42,13 @@ class CitrixLocalePlugin(LocalePlugin):
         found_languages = set()
 
         # Iterate logon theme languages
-        for file in self.target.fs.path("/var/netscaler/logon/themes/").glob("*/*.json"):
+        for path in self.target.fs.path("/var/netscaler/logon/themes/").glob("*/*.json"):
             try:
-                theme = json.loads(file.read_text())
+                theme = json.loads(path.read_text())
                 if locale := theme.get("locale"):
                     found_languages.add(normalize_language(locale))
             except (json.JSONDecodeError, UnicodeDecodeError) as e:  # noqa: PERF203
-                self.target.log.warning("Unable to parse %s: %s", file, e)
+                self.target.log.warning("Unable to parse %s: %s", path, e)
                 self.target.log.debug("", exc_info=e)
 
         # Find using regular BSD locations
