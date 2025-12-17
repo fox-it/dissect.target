@@ -30,9 +30,6 @@ if TYPE_CHECKING:
 
 RE_CONFIG_IP = re.compile(r"-IPAddress (?P<ip>[^ ]+) ")
 RE_CONFIG_HOSTNAME = re.compile(r"set ns hostName (?P<hostname>[^\n]+)\n")
-RE_CONFIG_TIMEZONE = re.compile(
-    r'set ns param.* -timezone "GMT\+(?P<hours>[0-9]+):(?P<minutes>[0-9]+)-.*-(?P<zone_name>.+)"'
-)
 RE_CONFIG_USER = re.compile(r"bind system user (?P<user>[^ ]+) ")
 RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')
 
@@ -57,10 +54,9 @@ class CitrixPlugin(BsdPlugin):
                     ips.add(match.groupdict()["ip"])
                 for match in RE_CONFIG_USER.finditer(config):
                     usernames.add(match.groupdict()["user"])
-                if config_path.name == "ns.conf":
+                if config_path.name == "ns.conf" and (hostname_match := RE_CONFIG_HOSTNAME.search(config)):
                     # Current configuration of the netscaler
-                    if hostname_match := RE_CONFIG_HOSTNAME.search(config):
-                        self._hostname = hostname_match.groupdict()["hostname"]
+                    self._hostname = hostname_match.groupdict()["hostname"]
 
         self._config_usernames = list(usernames)
         self._ips = list(ips)
