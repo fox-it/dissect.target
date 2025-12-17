@@ -66,12 +66,11 @@ class IISLogsPlugin(WebserverPlugin):
 
     APPLICATION_HOST_CONFIG = "%windir%/system32/inetsrv/config/applicationHost.config"
 
-    DEFAULT_LOG_PATHS = (
-        "%windir%\\System32\\LogFiles\\W3SVC*\\*.log",
-        "sysvol\\Windows.old\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
-        "sysvol\\inetpub\\logs\\LogFiles\\*.log",
-        "sysvol\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log",
-        "sysvol\\Resources\\Directory\\*\\LogFiles\\Web\\W3SVC*\\*.log",
+    DEFAULT_LOG_DIRS = (
+        "%windir%\\System32\\LogFiles\\W3SVC*",
+        "sysvol\\Windows.old\\Windows\\System32\\LogFiles\\W3SVC*",
+        "sysvol\\inetpub\\logs\\LogFiles",
+        "sysvol\\Resources\\Directory\\*\\LogFiles\\Web\\W3SVC*",
     )
 
     __namespace__ = "iis"
@@ -105,14 +104,9 @@ class IISLogsPlugin(WebserverPlugin):
             self.target.log.warning("Error while parsing %s", self.config)
             self.target.log.debug("", exc_info=e)
 
-        for log_path in self.DEFAULT_LOG_PATHS:
-            try:
-                # later on we use */*.log to collect the files, so we need to move up 2 levels
-                log_path = self.target.expand_env(log_path)
-                log_dir = self.target.fs.path(log_path).parents[1]
-            except IndexError:
-                self.target.log.info("Incompatible path found: %s", log_path)
-                continue
+        for log_dir in self.DEFAULT_LOG_DIRS:
+            log_dir = self.target.expand_env(log_dir)
+            log_dir = self.target.fs.path(log_dir)
 
             if not has_glob_magic(str(log_dir)) and log_dir.exists():
                 dirs["auto"].add(log_dir)
@@ -150,7 +144,7 @@ class IISLogsPlugin(WebserverPlugin):
 
         for format in ("IIS", "W3C", "auto"):
             for log_dir in self.log_dirs.get(format, ()):
-                for log_file in log_dir.glob("*/*.log"):
+                for log_file in log_dir.rglob("*.log"):
                     self.target.log.info("Processing IIS log file %s in %s format", log_file, format)
                     yield from parsers[format](self.target, log_file)
 
