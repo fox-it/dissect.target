@@ -38,7 +38,7 @@ class BsdPlugin(UnixPlugin):
                         if line.startswith("hostname"):
                             return line.rstrip().split("=", maxsplit=1)[1].replace('"', "")
 
-        return None
+        return super().hostname
 
     @export(property=True)
     def ips(self) -> list[str] | None:
