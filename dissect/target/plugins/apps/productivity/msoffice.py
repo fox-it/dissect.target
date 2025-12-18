@@ -252,7 +252,7 @@ class MSOffice(Plugin):
                 else:
                     addin_type = "com"
                     dll_str = self._lookup_com_executable(addin.name)
-                    executables = to_list(self.target.resolve(dll_str, sid))
+                    executables = to_list(self.target.resolve(dll_str, sid)) if dll_str else []
 
                 native_plugin_status = self._parse_plugin_status(addin)
                 yield OfficeNativeAddinRecord(
@@ -336,7 +336,7 @@ class MSOffice(Plugin):
                 inproc_key = f"{classes_root}\\CLSID\\{cls_id}\\InprocServer32"
                 return self.target.registry.value(inproc_key, "(Default)").value
             except RegistryError:  # noqa: PERF203
-                pass
+                self.target.log.warning("Could not find ProgID %s of COM executable in registry", prog_id)
 
         return None
 
