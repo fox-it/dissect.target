@@ -1780,7 +1780,7 @@ def test_plugin_record_field_and_name_consistency() -> None:
         - https://github.com/fox-it/flow.record/tree/main/flow/record/fieldtypes
         - https://github.com/JSCU-NL/dissect-elastic
     """
-    seen_records: set[str] = set()
+    seen_records: set[RecordDescriptor] = set()
     seen_field_names: set[str] = set()
     seen_field_types: dict[str, tuple[str | None, RecordDescriptor]] = {}
     seen_record_names: set[str] = set()
