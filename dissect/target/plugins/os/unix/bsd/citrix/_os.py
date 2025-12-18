@@ -30,9 +30,6 @@ if TYPE_CHECKING:
 
 RE_CONFIG_IP = re.compile(r"-IPAddress (?P<ip>[^ ]+) ")
 RE_CONFIG_HOSTNAME = re.compile(r"set ns hostName (?P<hostname>[^\n]+)\n")
-RE_CONFIG_TIMEZONE = re.compile(
-    r'set ns param.* -timezone "GMT\+(?P<hours>[0-9]+):(?P<minutes>[0-9]+)-.*-(?P<zone_name>.+)"'
-)
 RE_CONFIG_USER = re.compile(r"bind system user (?P<user>[^ ]+) ")
 RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')
 
@@ -50,20 +47,19 @@ class CitrixPlugin(BsdPlugin):
     def _parse_netscaler_configs(self) -> None:
         ips = set()
         usernames = set()
-        for config_path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
-            with config_path.open("rt") as config_file:
-                config = config_file.read()
-                for match in RE_CONFIG_IP.finditer(config):
-                    ips.add(match.groupdict()["ip"])
-                for match in RE_CONFIG_USER.finditer(config):
-                    usernames.add(match.groupdict()["user"])
-                if config_path.name == "ns.conf":
-                    # Current configuration of the netscaler
-                    if hostname_match := RE_CONFIG_HOSTNAME.search(config):
-                        self._hostname = hostname_match.groupdict()["hostname"]
-                    if timezone_match := RE_CONFIG_TIMEZONE.search(config):
-                        tzinfo = timezone_match.groupdict()
-                        self.target.timezone = tzinfo["zone_name"]
+
+        for path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
+            config = path.read_text()
+
+            for match in RE_CONFIG_IP.finditer(config):
+                ips.add(match.groupdict()["ip"])
+
+            for match in RE_CONFIG_USER.finditer(config):
+                usernames.add(match.groupdict()["user"])
+
+            if path.name == "ns.conf" and (match := RE_CONFIG_HOSTNAME.search(config)):
+                # Current configuration of the netscaler
+                self._hostname = match.groupdict()["hostname"]
 
         self._config_usernames = list(usernames)
         self._ips = list(ips)
@@ -105,8 +101,12 @@ class CitrixPlugin(BsdPlugin):
                 target.fs.mount("/", fs)
                 has_ramdisk = True
 
-        # The 'disk' filesystem is mounted at '/var'.
-        target.fs.mount("/var", sysvol)
+        # Check if we are dealing with netscaler-collector filesystem (/shell exists) or full image
+        if sysvol.exists("/shell"):
+            target.fs.mount("/", sysvol)
+        else:
+            # The 'disk' filesystem is mounted at '/var'.
+            target.fs.mount("/var", sysvol)
 
         # Enumerate filesystems for flash partition.
         # Multiple flash partitions could exist, so we look for the one with an actual ns.conf present.
@@ -178,10 +178,13 @@ class CitrixPlugin(BsdPlugin):
         if version_path.is_file():
             version = version_path.read_text().strip()
 
-        loader_conf_path = self.target.fs.path("/flash/boot/loader.conf")
-        if loader_conf_path.is_file():
-            loader_conf = loader_conf_path.read_text()
-            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(loader_conf):
+        # loader.conf exists in different location for NS image vs Techsupport Collection
+        for config_path in ["/flash/boot/loader.conf", "/nsconfig/loader.conf"]:
+            config = self.target.fs.path(config_path)
+            if not config.is_file():
+                continue
+
+            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(config.read_text()):
                 kernel_version = match.groupdict()["version"]
                 version = f"{version} ({kernel_version})" if version else kernel_version
 
