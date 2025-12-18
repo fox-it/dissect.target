@@ -694,14 +694,17 @@ class Target:
         counter = 0
         path = "/$fs$/fs0"
 
+        mounted_fs = {getattr(mnt, "ntfs", mnt) for mnt in root_fs.mounts.values()}
         for fs in self.filesystems:
-            if fs not in root_fs.mounts.values():
+            fs_obj = getattr(fs, "ntfs", fs)
+            if fs_obj not in mounted_fs:
                 # determine mount point
                 while root_fs.path(path).exists():
                     counter += 1
                     path = f"/$fs$/fs{counter}"
 
                 root_fs.mount(path, fs)
+                mounted_fs.add(fs_obj)
 
     def add_plugin(
         self,
