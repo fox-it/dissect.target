@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from base64 import b64decode
 from typing import TYPE_CHECKING
 
@@ -120,6 +121,7 @@ class PuTTYPlugin(SSHPlugin):
 
             try:
                 public_key, fingerprints = construct_public_key(key_type, entry.value)
+                public_key_pem = base64.b64decode(public_key)
             except Exception as e:
                 self.target.log.warning("Failed to parse PuTTY public key %r in registry %s: %s", entry.value, entry, e)
                 self.target.log.debug("", exc_info=e)
@@ -130,7 +132,7 @@ class PuTTYPlugin(SSHPlugin):
                 host=host,
                 port=port,
                 key_type=key_type,
-                public_key=public_key,
+                public_key_pem=public_key_pem,
                 fingerprint=fingerprints,
                 comment="",
                 marker=None,
@@ -153,6 +155,7 @@ class PuTTYPlugin(SSHPlugin):
 
                 try:
                     public_key, fingerprints = construct_public_key(key_type, parts[1])
+                    public_key_pem = base64.b64decode(public_key)
                 except Exception as e:
                     self.target.log.warning(
                         "Failed to parse PuTTY public key %r in file %s: %s", line, ssh_host_keys_path, e
@@ -165,7 +168,7 @@ class PuTTYPlugin(SSHPlugin):
                     host=host,
                     port=port,
                     key_type=key_type,
-                    public_key=public_key,
+                    public_key_pem=public_key_pem,
                     fingerprint=fingerprints,
                     comment="",
                     marker=None,
