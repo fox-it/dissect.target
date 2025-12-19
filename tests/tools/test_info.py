@@ -49,3 +49,49 @@ def test_target_info(
 
         else:
             raise ValueError("unknown output_type %s", output_type)
+
+
+@pytest.mark.parametrize(
+    ("output_type", "options"),
+    [("json", ["-j"]), ("json", ["-J", "-L", "tar"]), ("record", ["-r", "-s"])],
+)
+def test_target_info_with_exception(
+    capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, output_type: str, options: list
+) -> None:
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            ["target-info", *options, str(absolute_path("_data/loaders/acquire/test-windows-fs-c-absolute.tar"))],
+        )
+
+        target_info()
+        stdout, stderr = capsys.readouterr()
+
+        assert "error" not in stderr
+
+        if output_type == "json":
+            assert json.loads(stdout) == {
+                "disks": [],
+                "volumes": [],
+                "children": [],
+                "hostname": None,
+                "domain": None,
+                "ips": None,
+                "os_family": "windows",
+                "os_version": None,
+                "architecture": None,
+                "language": None,
+                "timezone": None,
+                "install_date": None,
+                "last_activity": None,
+                "mounts": [{"fs": "virtual", "path": "c:"}, {"fs": "virtual", "path": "sysvol"}],
+            }
+
+        elif output_type == "record":
+            assert (
+                stdout
+                == "<target/info hostname=None domain=None last_activity=None install_date=None ips=[] os_family='windows' os_version=None architecture=None language=[] timezone=None disks=[] volumes=[] mounts=[\"{'fs': 'virtual', 'path': 'c:'}\", \"{'fs': 'virtual', 'path': 'sysvol'}\"] children=[]>\n"  # noqa: E501
+            )
+
+        else:
+            raise ValueError("unknown output_type %s", output_type)
