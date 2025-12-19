@@ -119,7 +119,7 @@ class FortiOSPlugin(LinuxPlugin):
                 kernel_hash = get_kernel_hash(sysvol)
                 target.log.info("Kernel hash: %s", kernel_hash)
 
-                keys: list[ChaCha20Seed | AesKey] = []
+                keys: list[ChaCha20Key | AesKey] = []
 
                 # Loads known key from built-in map
                 try:
@@ -557,8 +557,8 @@ def key_iv_for_kernel_hash(kernel_hash: str) -> AesKey | ChaCha20Key:
     raise ValueError(f"No known decryption keys for kernel hash: {kernel_hash}")
 
 
-def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Seed | ChaCha20Key | AesKey]:
-    """Return list of ChaCha20Seed, ChaCha20Key and AesKey from keychain.
+def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key | AesKey]:
+    """Return list of ChaCha20Key and AesKey from keychain.
 
     When using the ``--keychain-file`` option, the CSV format is:
 
@@ -573,28 +573,29 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Seed 
         target: Target instance.
 
     Returns:
-        List of ChaCha20Seed, ChaCha20Key or AesKey.
+        List of ChaCha20Key or AesKey.
     """
-    keys: list[ChaCha20Seed | ChaCha20Key | AesKey] = []
+    keys: list[ChaCha20Key | AesKey] = []
     keychain_keys = keychain.get_all_keys()
 
     # We prioritize keys with matching identifier (kernel hash)
     identifier_keys = [key for key in keychain_keys if key.identifier == kernel_hash]
     other_keys = [key for key in keychain_keys if key.identifier is None]
 
-    for key_entry in identifier_keys + other_keys:
-        if not isinstance(key_entry.value, str):
+    for key in identifier_keys + other_keys:
+        if not isinstance(key.value, str):
             continue
-        if key_entry.provider in ("ChaCha20Seed", None) and len(key_entry.value) == 64:
+        if key.provider in ("ChaCha20Seed", None) and len(key.value) == 64:
             # 32 bytes hex string
-            keys.append(ChaCha20Seed(key_entry.value))
-        elif key_entry.provider in ("AesKey", None) and len(key_entry.value) == 97:
+            key_data, key_iv = _kdf_7_4_x(key.value)
+            keys.append(ChaCha20Key(key_data, key_iv))
+        elif key.provider in ("AesKey", None) and len(key.value) == 97:
             # 48 bytes hex string with colon separator
-            key_data, _, key_iv = key_entry.value.partition(":")
+            key_data, _, key_iv = key.value.partition(":")
             keys.append(AesKey(key_data, key_iv))
-        elif key_entry.provider in ("ChaCha20Key", None) and len(key_entry.value) == 97:
+        elif key.provider in ("ChaCha20Key", None) and len(key.value) == 97:
             # 48 bytes hex string with colon separator
-            key_data, _, key_iv = key_entry.value.partition(":")
+            key_data, _, key_iv = key.value.partition(":")
             keys.append(ChaCha20Key(key_data, key_iv))
     return keys
 
