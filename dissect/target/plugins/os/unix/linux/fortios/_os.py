@@ -13,6 +13,7 @@ from dissect.util import cpio
 from dissect.util.compression import xz
 
 from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor, UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
@@ -117,9 +118,37 @@ class FortiOSPlugin(LinuxPlugin):
             try:
                 kernel_hash = get_kernel_hash(sysvol)
                 target.log.info("Kernel hash: %s", kernel_hash)
-                key = key_iv_for_kernel_hash(kernel_hash)
-                target.log.info("Trying to decrypt_rootfs using key: %r", key)
-                rfs_fh = decrypt_rootfs(rootfs.open(), key)
+
+                keys: list[ChaCha20Seed | AesKey] = []
+
+                # Loads known key from built-in map
+                try:
+                    keys.append(key_iv_for_kernel_hash(kernel_hash))
+                except ValueError:
+                    target.log.warning("No known decryption key for kernel hash (%s)", kernel_hash)
+
+                # Load keys from keychain
+                keychain_keys = key_iv_from_keychain(target, kernel_hash=kernel_hash)
+                keys.extend(keychain_keys)
+                target.log.warning("Found %d key(s) in keychain", len(keychain_keys))
+
+                if not keys:
+                    raise ValueError("No decryption keys available")  # noqa: TRY301
+
+                # Try to decrypt with all available keys
+                rfs_fh = None
+                for key in keys:
+                    target.log.warning("Trying to decrypt_rootfs using key: %r", key)
+                    try:
+                        rfs_fh = decrypt_rootfs(rootfs.open(), key)
+                        break
+                    except ValueError:
+                        target.log.info("Decryption with key %r failed", key)
+                        continue
+
+                if not rfs_fh:
+                    raise ValueError("All decryption attempts failed")  # noqa: TRY301
+
                 target.log.info("Decrypted fh: %r", rfs_fh)
                 vfs = create_tar_filesystem(rfs_fh)
             except RuntimeError:
@@ -526,6 +555,48 @@ def key_iv_for_kernel_hash(kernel_hash: str) -> AesKey | ChaCha20Key:
         # FortiOS 7.0.16, 7.2.9, 7.4.4, 7.6.0 and higher uses AES-CTR with a custom CTR increment
         return key
     raise ValueError(f"No known decryption keys for kernel hash: {kernel_hash}")
+
+
+def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Seed | ChaCha20Key | AesKey]:
+    """Return list of ChaCha20Seed, ChaCha20Key and AesKey from keychain.
+
+    When using the ``--keychain-file`` option, the CSV format is:
+
+        provider,key_type,identifier,value
+        ChaCha20Seed,passphrase,<kernel_hash>,<chacha20_seed>
+        ChaCha20Key,passphrase,<kernel_hash>,<chacha20_key>:<chacha20_iv>
+        AesKey,passphrase,<kernel_hash>,<aes_key>:<aes_iv>
+
+    When using the ``--keychain-value`` option, multiple keys are returned due to missing provider.
+
+    Args:
+        target: Target instance.
+
+    Returns:
+        List of ChaCha20Seed, ChaCha20Key or AesKey.
+    """
+    keys: list[ChaCha20Seed | ChaCha20Key | AesKey] = []
+    keychain_keys = keychain.get_all_keys()
+
+    # We prioritize keys with matching identifier (kernel hash)
+    identifier_keys = [key for key in keychain_keys if key.identifier == kernel_hash]
+    other_keys = [key for key in keychain_keys if key.identifier is None]
+
+    for key_entry in identifier_keys + other_keys:
+        if not isinstance(key_entry.value, str):
+            continue
+        if key_entry.provider in ("ChaCha20Seed", None) and len(key_entry.value) == 64:
+            # 32 bytes hex string
+            keys.append(ChaCha20Seed(key_entry.value))
+        elif key_entry.provider in ("AesKey", None) and len(key_entry.value) == 97:
+            # 48 bytes hex string with colon separator
+            key_data, _, key_iv = key_entry.value.partition(":")
+            keys.append(AesKey(key_data, key_iv))
+        elif key_entry.provider in ("ChaCha20Key", None) and len(key_entry.value) == 97:
+            # 48 bytes hex string with colon separator
+            key_data, _, key_iv = key_entry.value.partition(":")
+            keys.append(ChaCha20Key(key_data, key_iv))
+    return keys
 
 
 def chacha20_decrypt(fh: BinaryIO, key: ChaCha20Key) -> bytes:
