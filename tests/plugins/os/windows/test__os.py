@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import PureWindowsPath
 from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
@@ -306,6 +307,55 @@ def test_windows_user_from_sam(target_win_users: Target) -> None:
     assert users[1].sid == "S-1-5-21-3263113198-3007035898-945866154-1002"
     assert users[1].name == "Jane"
     assert users[1].home == windows_path("C:\\Users\\John")
+
+
+def test_windows_user_registry_parsing(target_win_users: Target) -> None:
+    """Verify ProfileList parsing relies on resolved path objects."""
+
+    # 1. Setup the Registry Mock Structure
+    sid_str = "S-1-5-21-99999-88888-77777-1001"
+    raw_path_str = "C:\\Users\\DuaLipa"
+
+    # Create the subkey (The user SID)
+    subkey_mock = Mock()
+    subkey_mock.name = sid_str
+
+    # Create the value for ProfileImagePath
+    value_mock = Mock()
+    value_mock.value = raw_path_str
+    subkey_mock.value.return_value = value_mock
+
+    # Create the registry key
+    key_mock = Mock()
+    key_mock.subkeys.return_value = [subkey_mock]
+
+    # We must overwrite the real .registry attribute with a Mock object first
+    target_win_users.registry = Mock()
+    # Now we can configure the .keys() method on that mock
+    target_win_users.registry.keys.return_value = [key_mock]
+
+    # 2. Setup the Resolve Mock
+    resolved_path = PureWindowsPath("C:/Users/DuaLipa")
+
+    # Overwrite the real .resolve method with a Mock
+    target_win_users.resolve = Mock(return_value=resolved_path)
+
+    # Disable SAM and Machine SID
+    target_win_users.sam = Mock(return_value=[])
+    target_win_users.machine_sid = Mock(return_value=iter([]))
+
+    # 4. Run the function
+    users = list(target_win_users.users())
+
+    assert len(users) == 1
+    record = users[0]
+
+    assert record.sid == sid_str
+    assert record.name == "DuaLipa"
+    assert record.home == resolved_path
+
+    # Verify resolve was called correctly
+    target_win_users.resolve.assert_called_with(raw_path_str)
 
 
 @pytest.mark.parametrize(
