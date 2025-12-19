@@ -5,8 +5,8 @@ import math
 import stat
 from typing import TYPE_CHECKING, BinaryIO
 
+from dissect.fat import FATFS, fat
 from dissect.fat import exceptions as fat_exc
-from dissect.fat import fat
 
 from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
@@ -21,7 +21,7 @@ class FatFilesystem(Filesystem):
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
-        self.fatfs = fat.FATFS(fh)
+        self.fatfs = FATFS(fh)
         # FAT timestamps are in local time, so to prevent skewing them even more, we specify UTC by default.
         # However, it should be noted that they are not actual UTC timestamps!
         # Implementers can optionally set the tzinfo attribute of this class to get correct UTC timestamps.
@@ -29,13 +29,8 @@ class FatFilesystem(Filesystem):
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
-        """Detect a FAT filesystem on a given file-like object."""
-        try:
-            fat.validate_bpb(fh.read(512))
-        except fat_exc.InvalidBPB:
-            return False
-        else:
-            return True
+        """Detect a FAT file system on a given file-like object."""
+        return fat.is_fatfs(fh)
 
     def get(self, path: str) -> FilesystemEntry:
         return FatFilesystemEntry(self, path, self._get_entry(path))
@@ -70,7 +65,7 @@ class FatFilesystemEntry(FilesystemEntry):
     entry: fat.RootDirectory | fat.DirectoryEntry
 
     def get(self, path: str) -> FilesystemEntry:
-        """Get a filesystem entry relative from the current one."""
+        """Get a file system entry relative from the current one."""
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return FatFilesystemEntry(self.fs, full_path, self.fs._get_entry(path, self.entry))
 
@@ -80,7 +75,7 @@ class FatFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self.entry.open()
 
-    def scandir(self) -> Iterator[FilesystemEntry]:
+    def scandir(self) -> Iterator[FatDirEntry]:
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         if not self.is_dir():
             raise NotADirectoryError(self.path)
