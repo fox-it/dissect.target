@@ -571,6 +571,7 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key |
 
     Args:
         target: Target instance.
+        kernel_hash: SHA256 hash of the kernel file used to match key identifiers in the keychain.
 
     Returns:
         List of ChaCha20Key or AesKey.
