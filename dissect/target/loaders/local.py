@@ -15,6 +15,7 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.loader import Loader
+from dissect.target.plugin import arg
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -38,6 +39,12 @@ WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
 
 
+@arg("--force-directory-fs", action="store_true", help="Force the use of DirectoryFilesystem on all drives.")
+@arg(
+    "--fallback-to-directory-fs",
+    action="store_true",
+    help="Fallback to DirectoryFilesystem if a filesystem cannot be opened.",
+)
 class LocalLoader(Loader):
     """Load local filesystem."""
 
@@ -49,7 +56,7 @@ class LocalLoader(Loader):
     def detect(path: Path) -> bool:
         return urllib.parse.urlparse(str(path)).path == "local"
 
-    def map(self, target: Target) -> None:
+    def _map(self, target: Target, force_directory_fs: bool = False, fallback_to_directory_fs: bool = False) -> None:
         # For the local loader we abuse the path/URI parsing a bit, so fix it up here
         target.parsed_path = urllib.parse.urlparse(str(target.path))
         target.path_query = self.parsed_query
@@ -57,13 +64,10 @@ class LocalLoader(Loader):
 
         os_name = _get_os_name()
 
-        force_dirfs = "force-directory-fs" in self.parsed_query
-        fallback_to_dirfs = "fallback-to-directory-fs" in self.parsed_query
-
         if os_name == "windows":
-            map_windows_mounted_drives(target, force_dirfs=force_dirfs, fallback_to_dirfs=fallback_to_dirfs)
+            map_windows_mounted_drives(target, force_dirfs=force_directory_fs, fallback_to_dirfs=fallback_to_directory_fs)
         else:
-            if fallback_to_dirfs or force_dirfs:
+            if fallback_to_directory_fs or force_directory_fs:
                 # Where Windows does some sophisticated fallback, for other
                 # operating systems we don't know anything yet about the
                 # relation between disks and mount points.

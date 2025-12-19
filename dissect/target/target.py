@@ -269,7 +269,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path: str | Path) -> Self:
+    def open(cls, path: str | Path, loader_args: list[str] | None = None) -> Self:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
@@ -277,6 +277,7 @@ class Target:
                   If the path is a ``os.PathLike`` object, it will be used as-is.
                   If the path is a string and looks like a URI, it will be parsed as such.
                   If the path is a string and does not like like a URI, it will be treated as a local path.
+            loader_args: Additional arguments for the loader.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
@@ -303,7 +304,8 @@ class Target:
             return cls.open_raw(spec)
 
         try:
-            loader_instance = loader_cls(found_path, parsed_path=parsed_path)
+            # Pass loader_args to the loader's constructor
+            loader_instance = loader_cls(found_path, parsed_path=parsed_path, loader_args=loader_args)
         except Exception as e:
             raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {spec}: {e}") from e
 
@@ -320,7 +322,7 @@ class Target:
         return cls._load(path, loader.RawLoader(adjusted_path))
 
     @classmethod
-    def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False) -> Iterator[Self]:
+    def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False, loader_args: list[str] | None = None) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
 
         If the path is a directory, iterate files one directory deep.
@@ -378,7 +380,7 @@ class Target:
                     # Try to instantiate the loader
                     # For file/dir-like specs, load_path is that file/dir, and parsed_path is None
                     # For URI-like specs, load_path is the path component of the URI, and parsed_path is the parsed URI
-                    ldr = loader_cls(load_path, parsed_path=load_parsed_path)
+                    ldr = loader_cls(load_path, parsed_path=load_parsed_path, loader_args=loader_args)
                 except Exception as e:
                     message = "%s" if isinstance(e, TargetPathNotFoundError) else "Failed to initiate loader: %s"
                     get_target_logger(load_spec).error(message, e)
