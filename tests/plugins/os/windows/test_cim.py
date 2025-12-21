@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import pytest
+
+
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 from dissect.target.plugins.os.windows import cim
-from dissect.target.plugins.os.windows.cim import ActiveScriptEventConsumerRecord, CommandLineEventConsumerRecord
+from dissect.target.plugins.os.windows.cim import ActiveScriptEventConsumerRecord, CommandLineEventConsumerRecord, CimPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -12,7 +16,7 @@ if TYPE_CHECKING:
 
 
 def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
-    wbem_repository = absolute_path("_data/plugins/os/windows/cim")
+    wbem_repository = absolute_path("_data/plugins/os/windows/cim/default-namespace")
     fs_win.map_dir("Windows/System32/wbem/repository", wbem_repository)
 
     target_win.add_plugin(cim.CimPlugin)
@@ -261,3 +265,13 @@ UNCServerName            :
 PSComputerName           : DESKTOP-O8964S4
 ```
 """  # noqa: E501
+
+def test_consumerbindings_all_namespaces(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    wbem_repository = absolute_path("_data/plugins/os/windows/cim/non-default-namespace")
+    fs_win.map_dir("Windows/System32/wbem/repository", wbem_repository)
+    target_win.add_plugin(cim.CimPlugin)
+    consumer_records = list(target_win.cim.consumerbindings())
+    binding_names = [r.filter_name for r in consumer_records]
+    assert "Pentestlab-WMI" in binding_names
+
+
