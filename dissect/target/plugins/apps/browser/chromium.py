@@ -158,7 +158,7 @@ class ChromiumMixin:
             seen.add(db_file)
 
             try:
-                yield user, db_file, SQLite3(db_file.open())
+                yield user, db_file, SQLite3(db_file)
             except FileNotFoundError:
                 self.target.log.warning("Could not find %s file: %s", filename, db_file)
             except DBError as e:

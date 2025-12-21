@@ -120,8 +120,7 @@ class ActivitiesCachePlugin(Plugin):
             clipboard_payload (string): ClipboardPayload field.
         """
         for user, cache_file in self.cachefiles:
-            fh = cache_file.open()
-            db = SQLite3(fh)
+            db = SQLite3(cache_file)
 
             if table := db.table("Activity"):
                 for r in table.rows():

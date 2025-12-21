@@ -175,7 +175,7 @@ class PodmanPlugin(ContainerPlugin):
         """
 
         try:
-            db = SQLite3(path.open("rb"))
+            db = SQLite3(path)
         except (ValueError, DBError) as e:
             self.target.log.warning("Unable to read Podman database %s: %s", path, e)
             self.target.log.debug("", exc_info=e)

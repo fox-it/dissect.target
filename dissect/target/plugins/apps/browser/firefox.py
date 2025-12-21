@@ -170,7 +170,7 @@ class FirefoxPlugin(BrowserPlugin):
                 db_file = profile_dir.joinpath(filename)
 
             try:
-                yield user_details, db_file, SQLite3(db_file.open())
+                yield user_details, db_file, SQLite3(db_file)
             except FileNotFoundError:
                 self.target.log.info("Could not find %s file: %s", filename, db_file)
             except DBError as e:
@@ -673,25 +673,24 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
     # Extract neccesary information from the key4.db file. Multiple values might exist for the
     # values we are interested in. Generally the last entry will be the currently active value,
     # which is why we need to iterate every row in the table to get the last entry.
-    with key4_file.open("rb") as fh:
-        db = SQLite3(fh)
+    db = SQLite3(key4_file)
 
-        # Get the last ``item`` (global salt) and ``item2`` (password check) values.
-        if table := db.table("metadata"):
-            for row in table.rows():
-                if row.get("id") == "password":
-                    global_salt = row.get("item1", b"")
-                    password_check = row.get("item2", b"")
-        else:
-            raise ValueError(f"Missing table 'metadata' in key4.db {key4_file}")
+    # Get the last ``item`` (global salt) and ``item2`` (password check) values.
+    if table := db.table("metadata"):
+        for row in table.rows():
+            if row.get("id") == "password":
+                global_salt = row.get("item1", b"")
+                password_check = row.get("item2", b"")
+    else:
+        raise ValueError(f"Missing table 'metadata' in key4.db {key4_file}")
 
-        # Get the last ``a11`` (master key) and ``a102`` (cka) values.
-        if table := db.table("nssPrivate"):
-            *_, last_row = table.rows()
-            master_key = last_row.get("a11")
-            master_key_cka = last_row.get("a102")
-        else:
-            raise ValueError(f"Missing table 'nssPrivate' in key4.db {key4_file}")
+    # Get the last ``a11`` (master key) and ``a102`` (cka) values.
+    if table := db.table("nssPrivate"):
+        *_, last_row = table.rows()
+        master_key = last_row.get("a11")
+        master_key_cka = last_row.get("a102")
+    else:
+        raise ValueError(f"Missing table 'nssPrivate' in key4.db {key4_file}")
 
     if not master_key:
         raise ValueError(f"Password master key is not defined in key4.db {key4_file}")
