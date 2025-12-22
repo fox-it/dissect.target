@@ -99,6 +99,12 @@ def main() -> int:
         type=pathlib.Path,
         help="write the query report file to the given directory",
     )
+
+    advanced_group = parser.add_argument_group("Advanced options")
+    advanced_group.add_argument(
+        "--direct-sensitive", action="store_true", help="Same as --direct, but paths will be case sensitive"
+    )
+
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()

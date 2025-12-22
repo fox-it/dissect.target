@@ -214,10 +214,14 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
 
 
 def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
-    direct: bool = getattr(args, "direct", False)
+    direct: bool = getattr(args, "direct", False) or getattr(args, "direct_sensitive", False)
     child: str | None = getattr(args, "child", None)
 
-    target = Target.open_direct(args.target) if direct else Target.open(args.target, apply=apply)
+    target = (
+        Target.open_direct(args.targets, getattr(args, "direct_sensitive", False))
+        if direct
+        else Target.open(args.target, apply=apply)
+    )
 
     if child:
         try:
@@ -234,12 +238,12 @@ def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
 
 
 def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Target]:
-    direct: bool = getattr(args, "direct", False)
+    direct: bool = getattr(args, "direct", False) or getattr(args, "direct_sensitive", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
 
     targets: Iterable[Target] = (
-        [Target.open_direct(args.targets)]
+        [Target.open_direct(args.targets, getattr(args, "direct_sensitive", False))]
         if direct
         else Target.open_all(args.targets, include_children=children, apply=apply)
     )
