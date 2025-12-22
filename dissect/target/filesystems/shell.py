@@ -16,7 +16,7 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -433,6 +433,21 @@ def _stderr_to_exception(stderr: str) -> tuple[type[FilesystemError], str]:
     return FilesystemError, f"Filesystem error: {err_msg}"
 
 
+class ShellDirEntry(DirEntry):
+    """A directory entry for shell-based filesystems."""
+
+    fs: ShellFilesystem
+    entry: fsutil.stat_result
+
+    def get(self) -> FilesystemEntry:
+        return ShellFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        if not follow_symlinks:
+            return self.entry
+        return self.get().stat(follow_symlinks=True)
+
+
 class ShellFilesystemEntry(FilesystemEntry):
     """A filesystem entry for shell-based filesystems."""
 
@@ -447,8 +462,7 @@ class ShellFilesystemEntry(FilesystemEntry):
 
     def scandir(self) -> Iterator[FilesystemEntry]:
         for name, stat_result in self.fs.dialect.scandir(self.path):
-            entry_path = fsutil.join(self.path, name, alt_separator=self.fs.alt_separator)
-            yield ShellFilesystemEntry(self.fs, entry_path, stat_result)
+            yield ShellDirEntry(self.fs, self.path, name, stat_result)
 
     def open(self) -> BinaryIO:
         if self.is_dir():
