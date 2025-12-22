@@ -284,6 +284,8 @@ register("zip", "ZipLoader")
 # These are URI based loaders, so just put them low down the list since they don't do any detection anyway
 register("smb", "SmbLoader")
 register("cb", "CbLoader")
+register("ssh", "SshLoader")
+register("nc", "NetcatListenerLoader")
 register("cyber", "CyberLoader")
 register("log", "LogLoader")
 register("remote", "RemoteLoader")
