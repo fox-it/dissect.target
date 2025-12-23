@@ -101,7 +101,7 @@ class SurgeLoader(Loader):
 
     @staticmethod
     def detect(path: Path) -> bool:
-      """Detect whether a Surge image is provided."""
+        """Detect whether a Surge image is provided."""
         if not path.exists():
             return False
 
@@ -154,17 +154,17 @@ class SurgeLoader(Loader):
 
     def map(self, target: Target) -> None:
         """Map the data such as volumes and filesystems.
-        
+
         For Windows, first iterate through first level children of the files/ directory.
         These represent the volumes on the system, indicated by a driveletter, without the colon.
-        
+
         For every iteration we build a filesystem of all the volume content, and set a
         classtype for a FilesystemEntry of the appropriate filesystem type.
 
         Not all filesystems allow us to add a FilesystemEntry, so create a
         VirtualFileSystem around it which would allow adding entries.
 
-        If the usnjrnl exists, then create an actual FilesystemEntry of the appropriate 
+        If the usnjrnl exists, then create an actual FilesystemEntry of the appropriate
         class and add it to file VirtualFilesystem. Use a distinct name to make sure it
         does not interfere with the actual data.
 
