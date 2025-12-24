@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
-    from dissect.target.plugins.os.windows.credential.sam import SamRecord
+    from dissect.target.plugins.os.windows.credential.sam import SamUserRecord
     from dissect.target.target import Target
 
 ARCH_MAP = {
@@ -287,11 +287,11 @@ class WindowsPlugin(OSPlugin):
             pass
 
     @cached_property
-    def _sam_by_sid(self) -> dict[str, SamRecord]:
+    def _sam_by_sid(self) -> dict[str, SamUserRecord]:
         if not (machine_sid := next(self.target.machine_sid(), None)):
             return {}
 
-        sam_users: dict[str, SamRecord] = {}
+        sam_users: dict[str, SamUserRecord] = {}
         try:
             for sam_record in self.target.sam():
                 # Compose SID from domain_sid and RID
