@@ -262,7 +262,7 @@ SamUserRecord = TargetRecordDescriptor(
 SamGroupRecord = TargetRecordDescriptor(
     "windows/sam/group/member",
     [
-        ("string", "group_rid"),
+        ("uint32", "group_rid"),
         ("string", "group_name"),
         ("string", "group_description"),
         ("string", "member_sid"),
