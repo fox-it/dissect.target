@@ -158,6 +158,7 @@ def test_sam_plugin_rev1(target_win_users: Target, hive_hklm: VirtualHive) -> No
     assert results[2].logins == 8
     assert results[2].lm == "b0e5df88ef1c16f1dde347abf49e1d97"
     assert results[2].nt == MD4.new("L0ngLiv3LM!".encode("utf-16-le")).digest().hex()
+    assert not results[2].local_admin
 
 
 @pytest.mark.skipif(not HAS_CRYPTO, reason="requires pycryptodome")
@@ -343,7 +344,7 @@ def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> No
     )
 
     target_win_users.add_plugin(SamPlugin)
-    results = list(target_win_users.sam())
+    results = list(target_win_users.sam.users())
 
     assert len(results) == 5
 
@@ -365,6 +366,7 @@ def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> No
     assert results[3].logins == 0
     assert results[3].lm == ""
     assert results[3].nt == "2f4bbedb0aa738ae7ce3d9846692d3e4"
+    assert not results[3].local_admin
 
     assert results[4].ts == dt("2023-01-05 15:56:51.654921+00:00")
     assert results[4].rid == 1000
@@ -381,3 +383,4 @@ def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> No
     assert results[4].logins == 4
     assert results[4].lm == ""
     assert results[4].nt == MD4.new("MD4St1llGo1ngStr0ng!".encode("utf-16-le")).digest().hex()
+    assert not results[4].local_admin

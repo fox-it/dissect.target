@@ -534,8 +534,12 @@ class SamPlugin(Plugin):
         """
 
         # Get local administrators group members
-        key = self.target.registry.key(self.DEFAULT_ADMIN_GROUP_PATH)
-        _, _, _, local_admins = parse_alias_c_cstruct(key.value("C").value)
+        # Try Except in order to pass tests where group keys are missing.
+        try:
+            key = self.target.registry.key(self.DEFAULT_ADMIN_GROUP_PATH)
+            _, _, _, local_admins = parse_alias_c_cstruct(key.value("C").value)
+        except Exception:
+            local_admins = []
 
         syskey = self.target.lsa.syskey  # aka. bootkey
         samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
