@@ -1,18 +1,23 @@
 from __future__ import annotations
 
-import struct
+import typing
 import uuid
-from pathlib import Path
-from typing import Iterator
-from dissect.database.ese import ESE, Table as EseTable, Record as EseRecord
+
+from dissect.database.ese import ESE
+from dissect.database.ese import Table as EseTable
 from dissect.util.ts import wintimestamp
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import create_extended_descriptor, WindowsUserRecord
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.bits.c_bits import c_bits
+
+if typing.TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target import Target
 
 BitsRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/filesystem/bits",
@@ -84,12 +89,10 @@ class BitsPlugin(Plugin):
             files_dict = self.build_files_dict(db.table("Files"))
             print(files_dict)
             for record in table.records():
-                notify_flag = None
                 ctime = None
                 mtime = None
                 mtime_bis = None
                 last_job_transferred_end = None
-                row_id = record["Id"]
                 a = record["Blob"]
                 entry = c_bits.BitsJobsHeader(a)
                 # Jobs header is followed by a security descriptor section. Section total length depends on header guid,

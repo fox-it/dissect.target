@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from dissect.cstruct import cstruct
-
-if TYPE_CHECKING:
-    pass
 
 bits_def = """
     // https://learn.microsoft.com/en-us/windows/win32/api/bits/ne-bits-bg_job_type
@@ -14,7 +9,7 @@ bits_def = """
         UPLOAD       = 0x1,
         UPLOAD_REPLY = 0x2
     };
-    
+
     // https://learn.microsoft.com/en-us/windows/win32/api/bits/ne-bits-bg_job_priority
     enum BG_JOB_PRIORITY : uint32 {
         FOREGROUND = 0x0,
@@ -22,7 +17,7 @@ bits_def = """
         NORMAL     = 0x2,
         LOW        = 0x3
     };
-    
+
     // https://learn.microsoft.com/en-us/windows/win32/api/bits/nf-bits-ibackgroundcopyjob-setnotifyflags
     flag BG_NOTIFY : uint32 {
         JOB_TRANSFERRED                                       = 0x1,
@@ -44,7 +39,7 @@ bits_def = """
         ACKNOWLEDGED    = 0X07,
         CANCELLED       = 0X08,
     };
-    
+
     struct BitsFile {
         char guid[16];
         uint32 dst_len;
@@ -65,14 +60,9 @@ bits_def = """
         uint64 unk3;
         uint32 unk4;
     };
-    
-    // a1 56 09 e1 43 af c9 42 92 e6 6f 98 56 eb a7 f6 -> DownloadJobGuid 10.3.2
-    // d0 57 56 8f 2c 01 3e 4e ad 2c f4 a5 d7 65 6f af -> UploadJobGuid 10.3.2
-    // 38 5c 71 03 1f 28 ca 40 98 13 9d e9 1a 5a 84 d1 -> DownloadJobGuid 10.3.1
-    // d8 1e d3 68 d5 34 e1 4f 89 23 94 ab cb f4 c1 cf -> UploadJobGuid 10.3.0
-    
+
     struct BitsJobsHeader {
-        char guid[16]; // Indicate version and type (Upload/Download Job 
+        char guid[16]; // Indicate version and type (Upload/Download Job)
             // a1 56 09 e1 43 af c9 42 92 e6 6f 98 56 eb a7 f6 -> DownloadJobGuid 10.3.2
             // d0 57 56 8f 2c 01 3e 4e ad 2c f4 a5 d7 65 6f af -> UploadJobGuid 10.3.2
             // 38 5c 71 03 1f 28 ca 40 98 13 9d e9 1a 5a 84 d1 -> DownloadJobGuid 10.3.1
@@ -92,13 +82,13 @@ bits_def = """
         WCHAR callback_args[callback_args_len];
         uint32 sid_len;
         WCHAR sid[sid_len];
-        BG_NOTIFY notify_flag; 
+        BG_NOTIFY notify_flag;
     };
     struct BitsJobsFileGuidList{
         uint32 entry_count;
         char files_guid[entry_count][16];
     };
-    
+
     struct BitsMetadata {
            uint32 transient_error_count;
            uint32 retry_delay;
