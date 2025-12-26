@@ -499,6 +499,7 @@ class SamPlugin(Plugin):
                         group_name=name,
                         group_description=desc,
                         member_sid=sid,
+                        _target=self.target,
                     )
 
     @export(record=SamUserRecord)
