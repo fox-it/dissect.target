@@ -29,21 +29,23 @@ BitsRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         ("string", "job_id"),
         ("string", "name"),
         ("string", "desc"),
-        ("string", "callback_cmd"),
+        ("string", "callback_cmd"),  # Command executed when "notify_flag" event occur (mainly download complete/error)
         ("string", "callback_args"),
         ("string", "notify_flag"),
         ("boolean", "has_error"),
-        ("datetime", "job_ctime"),  # Uploaded file mtime
-        ("datetime", "job_mtime"),
-        ("datetime", "job_mtime_bis"),
+        ("datetime", "job_ctime"),  # Job creation time
+        ("datetime", "job_mtime"),  # Job modification time (E.g file added)
+        ("datetime", "job_mtime_bis"),  # Another job modification time, but different that job mtime.
+        # E.g this ts is also modified on transfer completed
         ("datetime", "job_completion_time"),  # Transfer completion time
         ("datetime", "transferred_file_mtime"),  # mtime of file from source for download, or from fs for uploads
-        ("string", "file_guid"),
+        ("string", "file_guid"),  # technical internal information,
+        # file guid is mentioned in jobs and allows to map jobs with file
         ("string", "file_dst"),
         ("string", "file_src"),
         ("string", "file_tmp"),
-        ("varint", "file_dl_size"),
-        ("varint", "file_transfer_size"),
+        ("varint", "file_dl_size"),  # size effectively downloaded/uploaded
+        ("varint", "file_transfer_size"),  # File size
         ("string", "file_drive"),
         ("string", "file_volume"),
         ("path", "source"),

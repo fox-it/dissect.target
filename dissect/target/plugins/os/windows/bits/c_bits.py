@@ -67,7 +67,7 @@ bits_def = """
         uint64 file_mtime;
     };
 
-    // For upload, structure source file modification time at the beginning of the structure
+    // For upload, source file modification time is located at the beginning of the structure
     // We need to read less data that in the Download type
     struct UploadBitsFile {
         char guid[16];

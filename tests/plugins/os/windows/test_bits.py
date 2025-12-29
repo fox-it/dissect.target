@@ -360,7 +360,7 @@ def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None
 {283C8E6B-CC77-473A-8607-19C4880F09DA} 'CallbackMulti_20251226_072003' TRANSFERRED 3 / 3 3501 / 3501
 """
 
-# Powershell script used to generate datas
+# PowerShell script used to generate data
 """
 <#
 .SYNOPSIS
@@ -368,9 +368,8 @@ def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None
 .DESCRIPTION
     Tests multiple BITS features including downloads, uploads, range downloads,
     credentials, custom headers, priority levels, and callbacks.
-    ALL JOBS ARE PRESERVED FOR INSPECTION - NOT DELETED
 .NOTES
-    Server Address: 10.0.2.2:8080
+    Upload server Address: 10.0.2.2:8080
     Requires: PowerShell 3.0+, BITS PowerShell module
 #>
 
