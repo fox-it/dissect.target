@@ -563,9 +563,9 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key |
     When using the ``--keychain-file`` option, the CSV format is:
 
         provider,key_type,identifier,value
-        ChaCha20Seed,passphrase,<kernel_hash>,<chacha20_seed>
-        ChaCha20Key,passphrase,<kernel_hash>,<chacha20_key>:<chacha20_iv>
-        AesKey,passphrase,<kernel_hash>,<aes_key>:<aes_iv>
+        fortios-chacha20seed,,<kernel_hash>,<chacha20_seed>
+        fortios-chacha20key,,<kernel_hash>,<chacha20_key>:<chacha20_iv>
+        fortios-aeskey,,<kernel_hash>,<aes_key>:<aes_iv>
 
     When using the ``--keychain-value`` option, multiple keys are returned due to missing provider.
 
@@ -586,15 +586,15 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key |
     for key in identifier_keys + other_keys:
         if not isinstance(key.value, str):
             continue
-        if key.provider in ("ChaCha20Seed", None) and len(key.value) == 64:
+        if key.provider in ("fortios-chacha20seed", None) and len(key.value) == 64:
             # 32 bytes hex string
             key_data, key_iv = _kdf_7_4_x(key.value)
             keys.append(ChaCha20Key(key_data, key_iv))
-        elif key.provider in ("AesKey", None) and len(key.value) == 97:
+        elif key.provider in ("fortios-aeskey", None) and len(key.value) == 97:
             # 48 bytes hex string with colon separator
             key_data, _, key_iv = key.value.partition(":")
             keys.append(AesKey(key_data, key_iv))
-        elif key.provider in ("ChaCha20Key", None) and len(key.value) == 97:
+        elif key.provider in ("fortios-chacha20key", None) and len(key.value) == 97:
             # 48 bytes hex string with colon separator
             key_data, _, key_iv = key.value.partition(":")
             keys.append(ChaCha20Key(key_data, key_iv))
@@ -709,7 +709,8 @@ def decrypt_rootfs(fh: BinaryIO, key: ChaCha20Key | AesKey) -> BinaryIO:
         result = chacha20_decrypt(fh, key)
     elif isinstance(key, AesKey):
         result = aes_decrypt(fh, key)
-        result = result[:-256]  # strip off the 256 byte footer
+        if len(result) > 256:
+            result = result[:-256]  # strip off the 256 byte footer
 
     if result[0:2] != b"\x1f\x8b":
         raise ValueError("Failed to decrypt: No gzip magic header found.")
