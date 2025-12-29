@@ -56,19 +56,19 @@ FILE_LIST_STORAGE_GUID = b"\x36\xda\x56\x77\x6f\x51\x5a\x43\xac\xac\x44\xa2\x48\
 
 
 class BitsPlugin(Plugin):
-    """Windows Bits (Background Intelligent Transfer Service) plugin. Support pre Win10 and post Win 10 format"""
+    """Windows Bits (Background Intelligent Transfer Service) plugin. Only support post Win 10 format"""
 
     def __init__(self, target: Target):
         super().__init__(target)
         self.qmgr_db_paths = self.get_paths()
 
     def _get_paths(self) -> Iterator[Path]:
-        qmgr_db_path = self.target.path("sysvol/ProgramData/Microsoft/Network/Downloader/qmgr.db")
+        qmgr_db_path = self.target.fs.path("sysvol/ProgramData/Microsoft/Network/Downloader/qmgr.db")
         if qmgr_db_path.exists():
             yield qmgr_db_path
 
     def check_compatible(self) -> None:
-        if not self.qmgr_db_path:
+        if not self.qmgr_db_paths:
             raise UnsupportedPluginError("No qmgr ESE database found")
 
     def build_files_dict(self, file_table: EseTable) -> dict[str, bytes]:
@@ -107,10 +107,11 @@ class BitsPlugin(Plugin):
         return 21 + struct.unpack("<L", blob[4 * 5 + 2 : 4 * 5 + 6])[0] + 2
 
     @export(record=[BitsRecord])
-    def qmgr(self) -> Iterator[BitsRecord]:
+    def qmgr_ese(self) -> Iterator[BitsRecord]:
         """Return entries found in the qmgr.db file (background intelligent transfer service). Only works for win10+
 
         Version pre windows 10 use a different format
+
         References:
             - https://github.com/fireeye/BitsParser
             - https://github.com/ANSSI-FR/bits_parser

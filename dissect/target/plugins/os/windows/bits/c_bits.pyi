@@ -203,4 +203,4 @@ class _c_bits(__cs__.cstruct):
         def __init__(self, fh: bytes | memoryview | bytearray | BinaryIO, /): ...
 
 # Technically `c_bits` is an instance of `_c_bits`, but then we can't use it in type hints
-c_bits: TypeAlias = _c_bits # noqa: PYI042
+c_bits: TypeAlias = _c_bits  # noqa: PYI042
