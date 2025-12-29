@@ -178,15 +178,15 @@ class BitsPlugin(Plugin):
                             )
                             transferred_file_mtime = wintimestamp(f.file_mtime) if f.file_mtime != 0 else None
                             yield BitsRecord(
-                                job_type=entry.type.name,
-                                state=entry.state.name,
-                                priority=entry.priority.name,
+                                job_type=entry.type,
+                                state=entry.state,
+                                priority=entry.priority,
                                 job_id=uuid.UUID(bytes_le=entry.job_id),
                                 name=entry.name.strip("\x00"),
                                 desc=entry.desc.strip("\x00"),
                                 callback_cmd=entry.callback_cmd.strip("\x00"),
                                 callback_args=entry.callback_args.strip("\x00"),
-                                notify_flag=entry.notify_flag.name,
+                                notify_flag=entry.notify_flag,
                                 has_error=has_error,
                                 job_ctime=ctime,
                                 job_mtime=mtime,
@@ -211,15 +211,15 @@ class BitsPlugin(Plugin):
                     # if not files related or not found, we yield data that we have
                     if not entry_yielded:
                         yield BitsRecord(
-                            job_type=entry.type.name,
-                            state=entry.state.name,
-                            priority=entry.priority.name,
+                            job_type=entry.type,
+                            state=entry.state,
+                            priority=entry.priority,
                             job_id=uuid.UUID(bytes_le=entry.job_id),
                             name=entry.name.strip("\x00"),
                             desc=entry.desc.strip("\x00"),
                             callback_cmd=entry.callback_cmd.strip("\x00"),
                             callback_args=entry.callback_args.strip("\x00"),
-                            notify_flag=entry.notify_flag.name,
+                            notify_flag=entry.notify_flag,
                             has_error=has_error,
                             job_ctime=ctime,
                             job_mtime=mtime,

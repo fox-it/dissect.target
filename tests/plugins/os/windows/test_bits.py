@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from flow.record.fieldtypes import datetime as dt
+
 from dissect.target.plugins.os.windows.bits._plugin import BitsPlugin
+from dissect.target.plugins.os.windows.bits.c_bits import c_bits
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+
+JobState = c_bits.JobState
+BG_JOB_TYPE = c_bits.BG_JOB_TYPE
+BG_NOTIFY = c_bits.BG_NOTIFY
+BG_JOB_PRIORITY = c_bits.BG_JOB_PRIORITY
 
 
 def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -31,6 +38,7 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
         ("CallbackUpload_20251226_072002", "a46a6c5e-6606-442c-a63c-c6c54ff9ea2d"): 1,
         ("CallbackDownload_20251226_072002", "896bc393-b278-4166-98a1-dcbc9903b090"): 1,
     }
+    # assert type(records[0].job_mtime) == datetime
     assert {
         r.file_guid: (
             r.file_transfer_size,
@@ -40,20 +48,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             r.file_src,
             r.file_tmp,
             r.has_error,
-            r.state,
             r.desc,
             r.callback_cmd,
             r.callback_args,
-            r.notify_flag,
             r.user_id,
-            r.priority,
             r.file_drive,
             r.job_mtime,
             r.job_mtime_bis,
             r.job_completion_time,
             r.job_ctime,
             r.job_id,
-            r.job_type,
         )
         for r in records
     } == {
@@ -65,20 +69,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/basic-auth/testuser/testpass",
             "C:\\BITSTest\\BITA67F.tmp",
             False,
-            "TRANSFERRED",
             "This is a file transfer that uses the Background Intelligent Transfer Service (BITS).",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "FOREGROUND",
             "C:\\",
-            datetime(2025, 12, 26, 15, 20, 27, 767214, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 56, 530785, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 56, 530785, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 55, 827888, timezone.utc),
+            dt("2025-12-26 15:20:27.767214+00:00"),
+            dt("2025-12-26 15:19:56.530785+00:00"),
+            dt("2025-12-26 15:19:56.530785+00:00"),
+            dt("2025-12-26 15:19:55.827888+00:00"),
             "06f4edf0-4fc9-47dd-97fd-1a873ccb6ff6",
-            "DOWNLOAD",
         ),
         "0864c6bb-3225-423e-9751-9e291577472f": (
             None,
@@ -88,20 +88,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/status/404",
             "C:\\BITSTest\\BITA76B.tmp",
             True,
-            "ERROR",
             "This is a file transfer that uses the Background Intelligent Transfer Service (BITS).",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "FOREGROUND",
             "C:\\",
-            datetime(2025, 12, 26, 15, 19, 56, 172602, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 56, 172602, timezone.utc),
+            dt("2025-12-26 15:19:56.172602+00:00"),
+            dt("2025-12-26 15:19:56.172602+00:00"),
             None,
-            datetime(2025, 12, 26, 15, 19, 56, 62199, timezone.utc),
+            dt("2025-12-26 15:19:56.062199+00:00"),
             "da426582-2868-48d8-8389-956d783bc71a",
-            "DOWNLOAD",
         ),
         "1923e2fa-7469-4c08-aa97-95c72bf8786c": (
             2048,
@@ -111,20 +107,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/bytes/2048",
             "C:\\BITSTest\\BITC45F.tmp",
             False,
-            "TRANSFERRED",
             "",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "NORMAL",
             "C:\\",
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 20, 3, 296831, timezone.utc),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:20:03.296831+00:00"),
             "283c8e6b-cc77-473a-8607-19c4880f09da",
-            "DOWNLOAD",
         ),
         "2a3089d0-2546-46a4-ba56-838cd0d8b1c4": (
             1024,
@@ -134,20 +126,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/bytes/1024",
             "C:\\BITSTest\\BITC41F.tmp",
             False,
-            "TRANSFERRED",
             "",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "NORMAL",
             "C:\\",
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 20, 3, 296831, timezone.utc),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:20:03.296831+00:00"),
             "283c8e6b-cc77-473a-8607-19c4880f09da",
-            "DOWNLOAD",
         ),
         "2dbef63d-1d86-487d-be32-1a519dbe5267": (
             2048,
@@ -157,20 +145,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/bytes/2048",
             "C:\\BITSTest\\BITC14F.tmp",
             False,
-            "TRANSFERRED",
             "",
             "notepad.exe",
             "C:\\BITSTest\\callback_download.bin",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "NORMAL",
             "C:\\",
-            datetime(2025, 12, 26, 15, 20, 27, 782486, timezone.utc),
-            datetime(2025, 12, 26, 15, 20, 5, 93918, timezone.utc),
-            datetime(2025, 12, 26, 15, 20, 5, 93918, timezone.utc),
-            datetime(2025, 12, 26, 15, 20, 2, 624641, timezone.utc),
+            dt("2025-12-26 15:20:27.782486+00:00"),
+            dt("2025-12-26 15:20:05.093918+00:00"),
+            dt("2025-12-26 15:20:05.093918+00:00"),
+            dt("2025-12-26 15:20:02.624641+00:00"),
             "896bc393-b278-4166-98a1-dcbc9903b090",
-            "DOWNLOAD",
         ),
         "322b2804-e35a-449a-8120-95be318d8c7c": (
             None,
@@ -180,20 +164,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://invalid-nonexistent-domain-12345.com/file.txt",
             "C:\\BITSTest\\BITA6ED.tmp",
             True,
-            "QUEUED",
             "This is a file transfer that uses the Background Intelligent Transfer Service (BITS).",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "FOREGROUND",
             "C:\\",
-            datetime(2025, 12, 26, 15, 19, 55, 984718, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 55, 984718, timezone.utc),
+            dt("2025-12-26 15:19:55.984718+00:00"),
+            dt("2025-12-26 15:19:55.984718+00:00"),
             None,
-            datetime(2025, 12, 26, 15, 19, 55, 936983, timezone.utc),
+            dt("2025-12-26 15:19:55.936983+00:00"),
             "1fb879dc-0a45-4aa5-9246-9f8aef9ab065",
-            "DOWNLOAD",
         ),
         "3b02d70f-4d33-4be6-af5d-d8e6397a12ee": (
             76799,
@@ -203,43 +183,35 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/bytes/102400",
             "C:\\BITSTest\\BIT8AD8.tmp",
             True,
-            "ERROR",
             "",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "HIGH",
             "C:\\",
-            datetime(2025, 12, 26, 15, 19, 52, 406492, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 52, 406492, timezone.utc),
+            dt("2025-12-26 15:19:52.406492+00:00"),
+            dt("2025-12-26 15:19:52.406492+00:00"),
             None,
-            datetime(2025, 12, 26, 15, 19, 48, 515322, timezone.utc),
+            dt("2025-12-26 15:19:48.515322+00:00"),
             "7318a4ab-866f-48e0-a411-f485d786ea30",
-            "DOWNLOAD",
         ),
         "4c36804b-eb2e-42c6-926b-5a981df3f3dc": (
             106,
             106,
-            datetime(2025, 12, 26, 15, 20, 2, 906315, timezone.utc),
+            dt("2025-12-26 15:20:02.906315+00:00"),
             "C:\\BITSTest\\upload_callback.txt",
             "http://10.0.2.2:8080/callback_test.txt",
             "",
             False,
-            "TRANSFERRED",
             "",
             "notepad.exe",
             "C:\\BITSTest\\upload_callback.txt",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "NORMAL",
             "C:\\",
-            datetime(2025, 12, 26, 15, 21, 19, 110544, timezone.utc),
-            datetime(2025, 12, 26, 15, 21, 19, 110544, timezone.utc),
-            datetime(2025, 12, 26, 15, 21, 19, 110544, timezone.utc),
-            datetime(2025, 12, 26, 15, 20, 2, 969839, timezone.utc),
+            dt("2025-12-26 15:21:19.110544+00:00"),
+            dt("2025-12-26 15:21:19.110544+00:00"),
+            dt("2025-12-26 15:21:19.110544+00:00"),
+            dt("2025-12-26 15:20:02.969839+00:00"),
             "a46a6c5e-6606-442c-a63c-c6c54ff9ea2d",
-            "UPLOAD",
         ),
         "51113ce6-a2c9-4843-8c7e-7290552617f8": (
             None,
@@ -249,20 +221,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/status/500",
             "C:\\BITSTest\\BITB3E0.tmp",
             True,
-            "QUEUED",
             "This is a file transfer that uses the Background Intelligent Transfer Service (BITS).",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "FOREGROUND",
             "C:\\",
-            datetime(2025, 12, 26, 15, 20, 1, 375772, timezone.utc),
-            datetime(2025, 12, 26, 15, 20, 1, 375772, timezone.utc),
+            dt("2025-12-26 15:20:01.375772+00:00"),
+            dt("2025-12-26 15:20:01.375772+00:00"),
             None,
-            datetime(2025, 12, 26, 15, 19, 59, 249641, timezone.utc),
+            dt("2025-12-26 15:19:59.249641+00:00"),
             "4bcdd8ac-9910-4e80-94f7-8f7be0b937cb",
-            "DOWNLOAD",
         ),
         "a044dcbc-be34-4f8e-963e-0e1391c37a77": (
             7166,
@@ -272,20 +240,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/bytes/10240",
             "C:\\BITSTest\\BIT8A79.tmp",
             True,
-            "ERROR",
             "",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "HIGH",
             "C:\\",
-            datetime(2025, 12, 26, 15, 19, 52, 406492, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 52, 406492, timezone.utc),
+            dt("2025-12-26 15:19:52.406492+00:00"),
+            dt("2025-12-26 15:19:52.406492+00:00"),
             None,
-            datetime(2025, 12, 26, 15, 19, 48, 515322, timezone.utc),
+            dt("2025-12-26 15:19:48.515322+00:00"),
             "7318a4ab-866f-48e0-a411-f485d786ea30",
-            "DOWNLOAD",
         ),
         "bcd97ef6-5f4b-4b68-98d3-9853f7633ebc": (
             1023,
@@ -295,20 +259,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/bytes/10240",
             "C:\\BITSTest\\BIT8A2A.tmp",
             True,
-            "ERROR",
             "",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "HIGH",
             "C:\\",
-            datetime(2025, 12, 26, 15, 19, 52, 406492, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 52, 406492, timezone.utc),
+            dt("2025-12-26 15:19:52.406492+00:00"),
+            dt("2025-12-26 15:19:52.406492+00:00"),
             None,
-            datetime(2025, 12, 26, 15, 19, 48, 515322, timezone.utc),
+            dt("2025-12-26 15:19:48.515322+00:00"),
             "7318a4ab-866f-48e0-a411-f485d786ea30",
-            "DOWNLOAD",
         ),
         "c7493c83-41b1-416e-994f-f23f3332788b": (
             1024,
@@ -318,20 +278,16 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/bytes/1024",
             "C:\\BITSTest\\BIT3927.tmp",
             False,
-            "TRANSFERRED",
             "This is a file transfer that uses the Background Intelligent Transfer Service (BITS).",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "FOREGROUND",
             "C:\\",
-            datetime(2025, 12, 26, 15, 20, 27, 767214, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 28, 353626, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 28, 353626, timezone.utc),
-            datetime(2025, 12, 26, 15, 19, 27, 821503, timezone.utc),
+            dt("2025-12-26 15:20:27.767214+00:00"),
+            dt("2025-12-26 15:19:28.353626+00:00"),
+            dt("2025-12-26 15:19:28.353626+00:00"),
+            dt("2025-12-26 15:19:27.821503+00:00"),
             "70b45dd7-2a8b-4476-b67e-393821bfe542",
-            "DOWNLOAD",
         ),
         "fe2136a8-68c3-4daf-b35b-5297d9d2af70": (
             429,
@@ -341,22 +297,39 @@ def test_bits_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
             "http://httpbin.org/json",
             "C:\\BITSTest\\BITC50C.tmp",
             False,
-            "TRANSFERRED",
             "",
             "",
             "",
-            "JOB_TRANSFERRED|JOB_ERROR",
             "S-1-5-21-3326717675-894959027-842342618-1000",
-            "NORMAL",
             "C:\\",
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 21, 20, 828646, timezone.utc),
-            datetime(2025, 12, 26, 15, 20, 3, 296831, timezone.utc),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:21:20.828646+00:00"),
+            dt("2025-12-26 15:20:03.296831+00:00"),
             "283c8e6b-cc77-473a-8607-19c4880f09da",
-            "DOWNLOAD",
         ),
     }
+    assert str(records[0].job_type) == str(BG_JOB_TYPE.DOWNLOAD)
+    assert str(records[0].notify_flag) == str(BG_NOTIFY.JOB_TRANSFERRED | BG_NOTIFY.JOB_ERROR)
+    assert str(records[0].state) == str(JobState.TRANSFERRED)
+    assert str(records[0].priority) == str(BG_JOB_PRIORITY.NORMAL)
+
+    assert str(records[4].job_type) == str(BG_JOB_TYPE.DOWNLOAD)
+    assert str(records[4].priority) == str(BG_JOB_PRIORITY.FOREGROUND)
+    assert str(records[4].state) == str(JobState.TRANSFERRED)
+
+    assert str(records[5].job_type) == str(BG_JOB_TYPE.DOWNLOAD)
+    assert str(records[5].priority) == str(BG_JOB_PRIORITY.FOREGROUND)
+    assert str(records[5].state) == str(JobState.QUEUED)
+
+    assert str(records[8].job_type) == str(BG_JOB_TYPE.UPLOAD)
+    assert str(records[8].notify_flag) == str(BG_NOTIFY.JOB_TRANSFERRED | BG_NOTIFY.JOB_ERROR)
+    assert str(records[8].state) == str(JobState.TRANSFERRED)
+    assert str(records[8].priority) == str(BG_JOB_PRIORITY.NORMAL)
+
+    assert str(records[10].job_type) == str(BG_JOB_TYPE.DOWNLOAD)
+    assert str(records[10].priority) == str(BG_JOB_PRIORITY.HIGH)
+    assert str(records[10].state) == str(JobState.ERROR)
 
 
 def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -372,6 +345,7 @@ def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None
     records = list(target.qmgr_ese())
 
     assert len(records) == 13
+
 
 # output of bitsadmin /list on collected machine
 """
@@ -483,7 +457,7 @@ function Test-BasicDownload {
             Write-Log "Job State: $($job.JobState), Progress: $($job.BytesTransferred)/$($job.BytesTotal)"
         }
 
-        if ($job.JobState -eq "Transferred") {
+        if ($job.JobState -eq 'JobState.TRANSFERRED') {
             Complete-BitsTransfer -BitsJob $job
             Write-Log "Basic download completed successfully - JOB PRESERVED"
         } else {
@@ -499,7 +473,7 @@ function Test-BasicDownload {
 function Test-PriorityLevels {
     Write-Log "=== Test 2: Priority Levels Test ==="
 
-    $priorities = @("Foreground", "High", "Normal", "Low")
+    $priorities = @('BG_JOB_PRIORITY.FOREGROUND', 'BG_JOB_PRIORITY.HIGH', 'BG_JOB_PRIORITY.NORMAL', "Low")
 
     foreach ($priority in $priorities) {
         try {
@@ -514,7 +488,7 @@ function Test-PriorityLevels {
             $job = Get-BitsTransfer -JobId $job.JobId
             Write-Log "Priority $priority job state: $($job.JobState) - JOB PRESERVED"
 
-            if ($job.JobState -eq "Transferred") {
+            if ($job.JobState -eq 'JobState.TRANSFERRED') {
                 Complete-BitsTransfer -BitsJob $job
             }
         }
@@ -641,7 +615,7 @@ function Test-UploadJobs {
                 Write-Log "Upload progress for $file`: $($job.JobState), $($job.BytesTransferred)/$($job.BytesTotal) ($progress%)"
             }
 
-            if ($job.JobState -eq "Transferred") {
+            if ($job.JobState -eq 'JobState.TRANSFERRED') {
                 Complete-BitsTransfer -BitsJob $job
                 Write-Log "Upload of $file completed successfully - JOB PRESERVED"
             } else {
@@ -742,7 +716,7 @@ function Test-Credentials {
             $job = Get-BitsTransfer -JobId $job.JobId
         }
 
-        if ($job.JobState -eq "Transferred") {
+        if ($job.JobState -eq 'JobState.TRANSFERRED') {
             Complete-BitsTransfer -BitsJob $job
             Write-Log "Credentials test completed successfully - JOB PRESERVED"
         } else {
@@ -787,7 +761,7 @@ function Test-ConcurrentJobs {
                 $currentJob = Get-BitsTransfer -JobId $job.JobId -ErrorAction SilentlyContinue
                 if ($currentJob) {
                     switch ($currentJob.JobState) {
-                        "Transferred" {
+                        'JobState.TRANSFERRED' {
                             $completedCount++
                             Complete-BitsTransfer -BitsJob $currentJob -ErrorAction SilentlyContinue
                         }
