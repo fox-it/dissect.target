@@ -368,16 +368,17 @@ def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None
 .DESCRIPTION
     Tests multiple BITS features including downloads, uploads, range downloads,
     credentials, custom headers, priority levels, and callbacks.
+    ALL JOBS ARE PRESERVED FOR INSPECTION - NOT DELETED
 .NOTES
-    Upload server Address: 10.0.2.2:8080
+    Server Address: 10.0.2.2:8080
     Requires: PowerShell 3.0+, BITS PowerShell module
 #>
 
 # Configuration
 $ServerAddress = "10.0.2.2:8080"
-$TestDirectory = "C:\\BITSTest"
-$LogFile = "$TestDirectory\\BITSTest.log"
-$JobsLogFile = "$TestDirectory\\BITSJobs.log"
+$TestDirectory = "C:\BITSTest"
+$LogFile = "$TestDirectory\BITSTest.log"
+$JobsLogFile = "$TestDirectory\BITSJobs.log"
 
 # Global job tracking
 $global:CreatedJobs = @()
@@ -419,15 +420,15 @@ function Create-TestFiles {
     Write-Log "Creating test files..."
 
     # Small text file
-    "This is a small test file for BITS upload testing.`nCreated at: $(Get-Date)" | Out-File "$TestDirectory\\small_test.txt"
+    "This is a small test file for BITS upload testing.`nCreated at: $(Get-Date)" | Out-File "$TestDirectory\small_test.txt"
 
     # Medium file (1MB)
     $content = "A" * 1024
-    1..1024 | ForEach-Object { $content } | Out-File "$TestDirectory\\medium_test.txt"
+    1..1024 | ForEach-Object { $content } | Out-File "$TestDirectory\medium_test.txt"
 
     # Large file (5MB) - reduced size for faster testing
     $largeContent = "B" * (5 * 1024 * 1024)
-    [System.IO.File]::WriteAllText("$TestDirectory\\large_test.txt", $largeContent)
+    [System.IO.File]::WriteAllText("$TestDirectory\large_test.txt", $largeContent)
 
     # Binary test file
     $binaryData = 1..1024 | ForEach-Object { [byte]($_ % 256) }
@@ -456,7 +457,7 @@ function Test-BasicDownload {
             Write-Log "Job State: $($job.JobState), Progress: $($job.BytesTransferred)/$($job.BytesTotal)"
         }
 
-        if ($job.JobState -eq 'JobState.TRANSFERRED') {
+        if ($job.JobState -eq "Transferred") {
             Complete-BitsTransfer -BitsJob $job
             Write-Log "Basic download completed successfully - JOB PRESERVED"
         } else {
@@ -472,12 +473,12 @@ function Test-BasicDownload {
 function Test-PriorityLevels {
     Write-Log "=== Test 2: Priority Levels Test ==="
 
-    $priorities = @('BG_JOB_PRIORITY.FOREGROUND', 'BG_JOB_PRIORITY.HIGH', 'BG_JOB_PRIORITY.NORMAL', "Low")
+    $priorities = @("Foreground", "High", "Normal", "Low")
 
     foreach ($priority in $priorities) {
         try {
             Write-Log "Testing priority: $priority"
-            $job = Start-BitsTransfer -Source "http://httpbin.org/bytes/2048" -Destination "$TestDirectory\\priority_$priority.bin" -Priority $priority -DisplayName "Priority Test - $priority" -Asynchronous
+            $job = Start-BitsTransfer -Source "http://httpbin.org/bytes/2048" -Destination "$TestDirectory\priority_$priority.bin" -Priority $priority -DisplayName "Priority Test - $priority" -Asynchronous
             Add-JobToTracking -Job $job -TestName "PriorityLevels"
 
             Write-Log "Job created with priority $priority, ID: $($job.JobId)"
@@ -487,8 +488,12 @@ function Test-PriorityLevels {
             $job = Get-BitsTransfer -JobId $job.JobId
             Write-Log "Priority $priority job state: $($job.JobState) - JOB PRESERVED"
 
-            if ($job.JobState -eq 'JobState.TRANSFERRED') {
+
+            if ($job.JobState -eq "Transferred") {
                 Complete-BitsTransfer -BitsJob $job
+                Write-Log "Basic download completed successfully - JOB PRESERVED"
+            } else {
+                Write-Log "Basic download job state: $($job.JobState) - JOB PRESERVED"
             }
         }
         catch {
@@ -498,87 +503,70 @@ function Test-PriorityLevels {
 }
 
 # Test 3: Range Download using Add-BitsFile with ranges
+# Test 3: Range Download using bitsadmin.exe
 function Test-RangeDownload {
-    Write-Log "=== Test 3: Range Download Test (Using Add-BitsFile with Ranges) ==="
+    Write-Log "=== Test 3: Range Download Test (Using bitsadmin.exe with Ranges) ==="
     try {
-        # Create an empty BITS job first
-        $job = New-Object -ComObject Microsoft.BackgroundIntelligentTransfer.Manager
-        $bitsJob = $job.CreateJob("Range Download Test", 0) # 0 = BG_JOB_TYPE_DOWNLOAD
+        # Test 1: Single Range Download
+        Write-Log "--- Single Range Download Test ---"
+        $jobName = "RangeDownload_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        $sourceUrl = "https://files.pythonhosted.org/packages/c3/d9/e71852555f039fb58628863e8266c73d3fbe281d2e74d6883f20cf28b6c7/dissect_target-3.24.tar.gz"  # 1.2Mb file
+        $destPath1 = "$TestDirectory\range_download_single.bin"
+        
+        # Create BITS job using bitsadmin
+        Write-Log "Creating BITS job: $jobName"
+        $result = & bitsadmin.exe /create /download $jobName
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log "Job created successfully: $($result -join ' ')"
+            
+            # Add file with range using bitsadmin
+            Write-Log "Adding file with range 0:1023 (first 1KB)"
+            $result = & bitsadmin.exe /addfilewithranges $jobName $sourceUrl $destPath1 "0:1023"
+            Write-Log "Resuming job..."
+        }
 
-        # Add file with specific byte ranges
-        $sourceUrl = "http://httpbin.org/bytes/10240"  # 10KB file
-        $destPath = "$TestDirectory\range_download_1.bin"
-
-        # Add first range: bytes 0-1023 (first 1KB)
-        $bitsJob.AddFileWithRanges($sourceUrl, $destPath, "0:1023")
-        Write-Log "Added range 0:1023 to job"
-
-        # Get the PowerShell BITS job object
-        $psJob = Get-BitsTransfer | Where-Object { $_.JobId -eq $bitsJob.Id }
-        if ($psJob) {
-            Add-JobToTracking -Job $psJob -TestName "RangeDownload"
-
+        # Test 2: Multiple Ranges Download
+        Write-Log "--- Multiple Ranges Download Test ---"
+        $destPath2 = "$TestDirectory\range_download_multiple.bin"
+        
+        Write-Log "Adding file with multiple ranges: 1024:2047,4096:5119"
+        $result = & bitsadmin.exe /addfilewithranges $jobName $sourceUrl $destPath2 "1024:2047,4096:5119"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log "File with multiple ranges added successfully"
+            
+            Write-Log "Resuming job..."
+            & bitsadmin.exe /resume $jobName
+        }
+        
+        # Test 3: Fulll Range Download
+        Write-Log "--- Full Range Download Test ---"
+        $destPath3 = "$TestDirectory\range_download_large.bin"
+                    
+        Write-Log "Adding file with large range: 25600:76799 (50KB from middle of 100KB file)"
+        $result = & bitsadmin.exe /addfilewithranges $jobName $sourceUrl $destPath3 "0:1023,1024:2047,2047:eof"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log "File with large range added successfully"
+            
+            # Set priority
+            & bitsadmin.exe /setpriority $jobName HIGH
+            Write-Log "Set job priority to HIGH"
+            
             # Resume the job
-            $bitsJob.Resume()
-            Write-Log "Range download job started, ID: $($bitsJob.Id)"
-
-            # Monitor the job
-            $timeout = 60
-            $elapsed = 0
-            do {
-                Start-Sleep -Seconds 2
-                $elapsed += 2
-                $state = $bitsJob.GetState()
-                $progress = $bitsJob.GetProgress()
-                Write-Log "Range job state: $state, Progress: $($progress.BytesTransferred)/$($progress.BytesTotal)"
-            } while ($state -eq 4 -and $elapsed -lt $timeout) # 4 = BG_JOB_STATE_TRANSFERRING
-
-            if ($state -eq 5) { # 5 = BG_JOB_STATE_TRANSFERRED
-                $bitsJob.Complete()
-                Write-Log "Range download completed successfully - JOB PRESERVED"
-            } else {
-                Write-Log "Range download final state: $state - JOB PRESERVED"
-            }
+            Write-Log "Resuming job..."
+            & bitsadmin.exe /resume $jobName
+            
         }
 
-        # Test multiple ranges
-        Write-Log "Testing multiple ranges..."
-        $bitsJob2 = $job.CreateJob("Multiple Range Download Test", 0)
-        $destPath2 = "$TestDirectory\range_download_multi.bin"
-
-        # Add multiple ranges: bytes 1024-2047 and 4096-5119
-        $bitsJob2.AddFileWithRanges($sourceUrl, $destPath2, "1024:2047,4096:5119")
-        Write-Log "Added multiple ranges 1024:2047,4096:5119 to job"
-
-        $psJob2 = Get-BitsTransfer | Where-Object { $_.JobId -eq $bitsJob2.Id }
-        if ($psJob2) {
-            Add-JobToTracking -Job $psJob2 -TestName "RangeDownloadMultiple"
-            $bitsJob2.Resume()
-
-            $timeout = 60
-            $elapsed = 0
-            do {
-                Start-Sleep -Seconds 2
-                $elapsed += 2
-                $state = $bitsJob2.GetState()
-                $progress = $bitsJob2.GetProgress()
-                Write-Log "Multiple range job state: $state, Progress: $($progress.BytesTransferred)/$($progress.BytesTotal)"
-            } while ($state -eq 4 -and $elapsed -lt $timeout)
-
-            if ($state -eq 5) {
-                $bitsJob2.Complete()
-                Write-Log "Multiple range download completed successfully - JOB PRESERVED"
-            } else {
-                Write-Log "Multiple range download final state: $state - JOB PRESERVED"
-            }
-        }
-
+        
+        Write-Log "Range download tests completed using bitsadmin.exe"
+        
     }
     catch {
-        Write-Log "Range download failed: $($_.Exception.Message)"
+        Write-Log "Range download test failed: $($_.Exception.Message)"
         Write-Log "Stack trace: $($_.ScriptStackTrace)"
     }
 }
+
 
 # Test 4: Upload Jobs to Test Server
 function Test-UploadJobs {
@@ -588,13 +576,13 @@ function Test-UploadJobs {
 
     foreach ($file in $testFiles) {
         try {
-            $sourcePath = "$TestDirectory\\$file"
+            $sourcePath = "$TestDirectory\$file"
             if (!(Test-Path $sourcePath)) {
                 Write-Log "Source file $sourcePath not found, skipping"
                 continue
             }
 
-            $uploadUrl = "http://$ServerAddress/upload/$file"
+            $uploadUrl = "http://$ServerAddress/$file"
 
             Write-Log "Uploading $file to $uploadUrl"
 
@@ -614,7 +602,7 @@ function Test-UploadJobs {
                 Write-Log "Upload progress for $file`: $($job.JobState), $($job.BytesTransferred)/$($job.BytesTotal) ($progress%)"
             }
 
-            if ($job.JobState -eq 'JobState.TRANSFERRED') {
+            if ($job.JobState -eq "Transferred") {
                 Complete-BitsTransfer -BitsJob $job
                 Write-Log "Upload of $file completed successfully - JOB PRESERVED"
             } else {
@@ -630,70 +618,97 @@ function Test-UploadJobs {
     }
 }
 
-# Test 5: Custom Headers and Authentication Headers
-function Test-CustomHeaders {
-    Write-Log "=== Test 5: Custom Headers Test ==="
-    try {
-        # Using COM interface for more control over headers
-        $job = New-Object -ComObject Microsoft.BackgroundIntelligentTransfer.Manager
-        $bitsJob = $job.CreateJob("Custom Headers Test", 0)
 
-        # Add file
-        $sourceUrl = "http://httpbin.org/headers"
-        $destPath = "$TestDirectory\\headers_test.json"
-        $bitsJob.AddFile($sourceUrl, $destPath)
-
-        # Set custom headers using IBackgroundCopyJobHttpOptions
+# Test 5: Upload Jobs to Test Server
+function Test-UploadJobs-Error {
+        Write-Log "=== Test 5: Failed Upload Jobs Test ==="
         try {
-            $httpOptions = $bitsJob.QueryInterface([System.Runtime.InteropServices.Marshal]::GenerateGuidForType([type]"IBackgroundCopyJobHttpOptions"))
-            if ($httpOptions) {
-                # Set custom headers
-                $customHeaders = "X-Custom-Header: TestValue`r`nX-Test-Client: PowerShell-BITS`r`nX-Session-ID: 12345"
-                $httpOptions.SetCustomHeaders($customHeaders)
-                Write-Log "Custom headers set: $customHeaders"
+            $sourcePath = "$TestDirectory\medium_test.txt"
+            if (!(Test-Path $sourcePath)) {
+                Write-Log "Source file $sourcePath not found, skipping"
+                continue
             }
-        }
-        catch {
-            Write-Log "Could not set custom headers (may not be supported): $($_.Exception.Message)"
-        }
 
-        $psJob = Get-BitsTransfer | Where-Object { $_.JobId -eq $bitsJob.Id }
-        if ($psJob) {
-            Add-JobToTracking -Job $psJob -TestName "CustomHeaders"
-            $bitsJob.Resume()
+            $uploadUrl = "http://$ServerAddress/not_existing_folder/medium_test.txt"
 
-            $timeout = 60
+            Write-Log "Uploading $file to $uploadUrl"
+
+            $job = Start-BitsTransfer -Source $sourcePath -Destination $uploadUrl -TransferType Upload -DisplayName "Failed Upload Test - medium_test.txt" -Asynchronous
+            Add-JobToTracking -Job $job -TestName "UploadJobs"
+
+            Write-Log "Upload job created, ID: $($job.JobId)"
+
+            # Monitor upload progress but don't delete
+            $timeout = 120
             $elapsed = 0
-            do {
-                Start-Sleep -Seconds 2
-                $elapsed += 2
-                $state = $bitsJob.GetState()
-            } while ($state -eq 4 -and $elapsed -lt $timeout)
+            while (($job.JobState -eq "Transferring" -or $job.JobState -eq "Queued") -and $elapsed -lt $timeout) {
+                Start-Sleep -Seconds 3
+                $elapsed += 3
+                $job = Get-BitsTransfer -JobId $job.JobId
+                $progress = if ($job.BytesTotal -gt 0) { [math]::Round(($job.BytesTransferred / $job.BytesTotal) * 100, 2) } else { 0 }
+                Write-Log "Upload progress for $file`: $($job.JobState), $($job.BytesTransferred)/$($job.BytesTotal) ($progress%)"
+            }
 
-            if ($state -eq 5) {
-                $bitsJob.Complete()
-                Write-Log "Custom headers test completed - JOB PRESERVED"
-
-                # Display received headers
-                if (Test-Path $destPath) {
-                    $headers = Get-Content $destPath | ConvertFrom-Json
-                    Write-Log "User-Agent header: $($headers.headers.'User-Agent')"
-                    Write-Log "Custom headers in response: $($headers.headers | ConvertTo-Json -Compress)"
-                }
+            if ($job.JobState -eq "Transferred") {
+                Complete-BitsTransfer -BitsJob $job
+                Write-Log "Upload of $file completed successfully - JOB PRESERVED"
             } else {
-                Write-Log "Custom headers test final state: $state - JOB PRESERVED"
+                Write-Log "Upload of $file final state: $($job.JobState) - JOB PRESERVED"
+                if ($job.ErrorDescription) {
+                    Write-Log "Upload error: $($job.ErrorDescription)"
+                }
+            }
+        }   catch {
+            Write-Log "Failed Upload test failed for $file`: $($_.Exception.Message)"
+        }
+}
+
+# Test 6: Custom Headers and Authentication Headers
+function Test-CustomHeaders {
+    Write-Log "=== Test 6: Custom Headers Test ==="
+    try {
+        # Create credentials for demonstration
+        $customHeaders = @(
+            "X-Custom-Header: TestValue123",
+            "X-Test-Client: PowerShell-BITS-Testing",
+            "X-Session-ID: PS-$(Get-Date -Format 'yyyyMMddHHmmss')",
+            "X-User-Agent-Custom: BITS-PowerShell/1.0",
+            "X-Request-Source: Automated-Testing"
+        )
+
+        # Test with httpbin basic auth endpoint
+        $job = Start-BitsTransfer -Source "http://httpbin.org/headers" -CustomHeaders $customHeaders  -Authentication Basic -Destination "$TestDirectory\headers_test.json" -DisplayName "Headers Test" -Asynchronous -CustomHeaders
+        Add-JobToTracking -Job $job -TestName "Headers"
+
+        Write-Log "Headers test job created, ID: $($job.JobId)"
+
+        $timeout = 60
+        $elapsed = 0
+        while (($job.JobState -eq "Transferring" -or $job.JobState -eq "Queued") -and $elapsed -lt $timeout) {
+            Start-Sleep -Seconds 2
+            $elapsed += 2
+            $job = Get-BitsTransfer -JobId $job.JobId
+        }
+
+        if ($job.JobState -eq "Transferred") {
+            Complete-BitsTransfer -BitsJob $job
+            Write-Log "Headers test completed successfully - JOB PRESERVED"
+        } else {
+            Write-Log "Headers test final state: $($job.JobState) - JOB PRESERVED"
+            if ($job.ErrorDescription) {
+                Write-Log "headers error: $($job.ErrorDescription)"
             }
         }
     }
     catch {
-        Write-Log "Custom headers test failed: $($_.Exception.Message)"
+        Write-Log "Credentials test failed: $($_.Exception.Message)"
     }
 }
 
 
-# Test 6: Credentials Test
+# Test 7: Credentials Test
 function Test-Credentials {
-    Write-Log "=== Test 6: Credentials Test ==="
+    Write-Log "=== Test 7: Credentials Test ==="
     try {
         # Create credentials for demonstration
         $username = "testuser"
@@ -702,7 +717,7 @@ function Test-Credentials {
         $credential = New-Object System.Management.Automation.PSCredential($username, $securePassword)
 
         # Test with httpbin basic auth endpoint
-        $job = Start-BitsTransfer -Source "http://httpbin.org/basic-auth/testuser/testpass" -Destination "$TestDirectory\auth_test.json" -Credential $credential -DisplayName "Credentials Test" -Asynchronous
+        $job = Start-BitsTransfer -Source "http://httpbin.org/basic-auth/testuser/testpass" -Authentication Basic -Destination "$TestDirectory\auth_test.json" -Credential $credential -DisplayName "Credentials Test" -Asynchronous
         Add-JobToTracking -Job $job -TestName "Credentials"
 
         Write-Log "Credentials test job created, ID: $($job.JobId)"
@@ -715,7 +730,7 @@ function Test-Credentials {
             $job = Get-BitsTransfer -JobId $job.JobId
         }
 
-        if ($job.JobState -eq 'JobState.TRANSFERRED') {
+        if ($job.JobState -eq "Transferred") {
             Complete-BitsTransfer -BitsJob $job
             Write-Log "Credentials test completed successfully - JOB PRESERVED"
         } else {
@@ -727,60 +742,6 @@ function Test-Credentials {
     }
     catch {
         Write-Log "Credentials test failed: $($_.Exception.Message)"
-    }
-}
-
-# Test 7: Multiple Concurrent Jobs
-function Test-ConcurrentJobs {
-    Write-Log "=== Test 7: Concurrent Jobs Test ==="
-
-    $jobs = @()
-
-    try {
-        # Create multiple download jobs
-        for ($i = 1; $i -le 5; $i++) {
-            $job = Start-BitsTransfer -Source "http://httpbin.org/bytes/$($i * 1024)" -Destination "$TestDirectory\\concurrent_$i.bin" -DisplayName "Concurrent Job $i" -Asynchronous
-            Add-JobToTracking -Job $job -TestName "ConcurrentJobs"
-            $jobs += $job
-            Write-Log "Created concurrent job $i, ID: $($job.JobId)"
-        }
-
-        # Monitor all jobs but don't delete
-        $timeout = 120
-        $elapsed = 0
-
-        while ($elapsed -lt $timeout) {
-            Start-Sleep -Seconds 5
-            $elapsed += 5
-
-            $completedCount = 0
-            $transferringCount = 0
-
-            foreach ($job in $jobs) {
-                $currentJob = Get-BitsTransfer -JobId $job.JobId -ErrorAction SilentlyContinue
-                if ($currentJob) {
-                    switch ($currentJob.JobState) {
-                        'JobState.TRANSFERRED' {
-                            $completedCount++
-                            Complete-BitsTransfer -BitsJob $currentJob -ErrorAction SilentlyContinue
-                        }
-                        "Transferring" { $transferringCount++ }
-                        "Queued" { $transferringCount++ }
-                    }
-                }
-            }
-
-            Write-Log "Concurrent jobs status: $completedCount completed, $transferringCount active"
-
-            if ($completedCount -eq $jobs.Count) {
-                break
-            }
-        }
-
-        Write-Log "Concurrent jobs test completed - ALL JOBS PRESERVED"
-    }
-    catch {
-        Write-Log "Concurrent jobs test failed: $($_.Exception.Message)"
     }
 }
 
@@ -885,7 +846,7 @@ function Test-FailedDownloads {
     # Test 4: Connection Timeout (slow response)
     try {
         Write-Log "--- Test 4: Connection Timeout Test ---"
-        $failJob4 = Start-BitsTransfer -Source "http://httpbin.org/delay/30" -Destination "$TestDirectory\failed_timeout.txt" -DisplayName "Failed Download - Timeout" -Asynchronous
+        $failJob4 = Start-BitsTransfer -Source "http://httpbin.org/delay/120" -Destination "$TestDirectory\failed_timeout.txt" -DisplayName "Failed Download - Timeout" -Asynchronous -RetryTimeout 0 
         Add-JobToTracking -Job $failJob4 -TestName "FailedDownload-Timeout"
 
         Write-Log "Created timeout test job, ID: $($failJob4.JobId)"
@@ -893,38 +854,11 @@ function Test-FailedDownloads {
         # Set a shorter timeout for this test
         try {
             Set-BitsTransfer -BitsJob $failJob4 -NoProgressTimeout 15
-            Write-Log "Set NoProgressTimeout to 15 seconds"
+            Write-Log "Set NoProgressTimeout to 120 seconds"
         }
         catch {
             Write-Log "Could not set timeout: $($_.Exception.Message)"
         }
-
-        # Monitor for failure
-        $timeout = 45
-        $elapsed = 0
-        while (($failJob4.JobState -eq "Transferring" -or $failJob4.JobState -eq "Queued" -or $failJob4.JobState -eq "Connecting") -and $elapsed -lt $timeout) {
-            Start-Sleep -Seconds 3
-            $elapsed += 3
-            $failJob4 = Get-BitsTransfer -JobId $failJob4.JobId
-            Write-Log "Timeout test job state: $($failJob4.JobState), Elapsed: $elapsed seconds"
-
-            # Log additional timeout-related properties
-            if ($elapsed % 12 -eq 0) {
-                Write-Log "  NoProgressTimeout setting: $($failJob4.NoProgressTimeout) seconds"
-                Write-Log "  MinimumRetryDelay: $($failJob4.MinimumRetryDelay) seconds"
-                Write-Log "  Error Count: $($failJob4.ErrorCount)"
-            }
-        }
-
-        Write-Log "Timeout test final state: $($failJob4.JobState)"
-        if ($failJob4.JobState -eq "Error") {
-            Write-Log "  Error Description: $($failJob4.ErrorDescription)"
-            Write-Log "  Error Context: $($failJob4.ErrorContext)"
-            Write-Log "  Error Count: $($failJob4.ErrorCount)"
-            Write-Log "  HTTP Status: $($failJob4.HttpStatus)"
-            Write-Log "  Final NoProgressTimeout: $($failJob4.NoProgressTimeout)"
-        }
-        Write-Log "Timeout test job PRESERVED for inspection"
     }
     catch {
         Write-Log "Timeout test exception: $($_.Exception.Message)"
@@ -933,7 +867,7 @@ function Test-FailedDownloads {
     # Test 5: Invalid File Path (Access Denied)
     try {
         Write-Log "--- Test 5: Invalid Destination Path (Access Denied) ---"
-        $invalidPath = "C:\\Windows\\System32\failed_access_denied.txt"  # Typically requires admin rights
+        $invalidPath = "C:\Windows\System32\failed_access_denied.txt"  # Typically requires admin rights
         $failJob5 = Start-BitsTransfer -Source "http://httpbin.org/bytes/1024" -Destination $invalidPath -DisplayName "Failed Download - Access Denied" -Asynchronous
         Add-JobToTracking -Job $failJob5 -TestName "FailedDownload-AccessDenied"
 
@@ -964,14 +898,106 @@ function Test-FailedDownloads {
     }
 }
 
+
+# Test 9: Callback on Success Test (using bitsadmin)
+function Test-CallbackOnSuccess {
+    Write-Log "=== Test 9: Callback on Success Test (Using bitsadmin.exe) ==="
+    
+    try {
+        # Test 1: Download with Notepad Callback
+        Write-Log "--- Test 1: Download with Notepad Callback ---"
+        
+        $jobName1 = "CallbackDownload_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        $sourceUrl = "http://httpbin.org/bytes/2048"
+        $destPath1 = "$TestDirectory\callback_download.bin"
+        
+        # Create BITS job
+        Write-Log "Creating BITS job: $jobName1"
+        & bitsadmin.exe /create /download $jobName1
+        
+        # Add file
+        & bitsadmin.exe /addfile $jobName1 $sourceUrl $destPath1
+        Write-Log "Added file to job"
+        
+        # Set callback to launch notepad
+        & bitsadmin.exe /setnotifycmdline $jobName1 "notepad.exe" "`"$destPath1`""
+        Write-Log "Set callback: notepad.exe `"$destPath1`""
+        
+        # Resume job
+        & bitsadmin.exe /resume $jobName1
+        Write-Log "Job resumed - callback will trigger on completion"
+        
+        # Test 2: Upload with Notepad Callback
+        Write-Log "--- Test 2: Upload with Notepad Callback ---"
+        
+        # Create upload file
+        "Upload callback test content - $(Get-Date)" | Out-File "$TestDirectory\upload_callback.txt"
+        
+        $jobName2 = "CallbackUpload_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        $uploadUrl = "http://$ServerAddress/callback_test.txt"
+        
+        # Create upload job
+        Write-Log "Creating upload job: $jobName2"
+        & bitsadmin.exe /create /upload $jobName2
+        
+        # Add upload file
+        & bitsadmin.exe /addfile $jobName2 $uploadUrl "$TestDirectory\upload_callback.txt"
+        Write-Log "Added upload file to job"
+        
+        # Set callback to launch notepad with source file
+        & bitsadmin.exe /setnotifycmdline $jobName2 "notepad.exe" "`"$TestDirectory\upload_callback.txt`""
+        Write-Log "Set upload callback: notepad.exe `"$TestDirectory\upload_callback.txt`""
+        
+        # Resume upload job
+        & bitsadmin.exe /resume $jobName2
+        Write-Log "Upload job resumed - callback will trigger on completion"
+        
+        # Test 3: Multiple Files with Batch Callback
+        Write-Log "--- Test 3: Multiple Files with Batch Callback ---"
+        
+        # Create batch file for callback
+        $batchFile = "$TestDirectory\success_callback.bat"
+        "@echo off`necho BITS Success! > `"$TestDirectory\callback_result.txt`"`nnotepad.exe `"$TestDirectory\callback_result.txt`"" | Out-File $batchFile -Encoding ASCII
+        
+        $jobName3 = "CallbackMulti_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        
+        # Create multi-file job
+        Write-Log "Creating multi-file job: $jobName3"
+        & bitsadmin.exe /create /download $jobName3
+        
+        # Add multiple files
+        & bitsadmin.exe /addfile $jobName3 "http://httpbin.org/bytes/1024" "$TestDirectory\multi1.bin"
+        & bitsadmin.exe /addfile $jobName3 "http://httpbin.org/bytes/2048" "$TestDirectory\multi2.bin"
+        & bitsadmin.exe /addfile $jobName3 "http://httpbin.org/json" "$TestDirectory\multi3.json"
+        Write-Log "Added 3 files to multi-file job"
+        
+        # Set batch callback
+        & bitsadmin.exe /setnotifycmdline $jobName3 "`"$batchFile`"" ""
+        Write-Log "Set batch callback: `"$batchFile`""
+        
+        # Resume multi-file job
+        & bitsadmin.exe /resume $jobName3
+        Write-Log "Multi-file job resumed - batch callback will trigger on completion"
+        
+        Write-Log "=== All Callback Jobs Created ==="
+        Write-Log "Jobs created with callbacks - they will execute notepad.exe on successful completion"
+        Write-Log "Use 'bitsadmin /list' to monitor job progress"
+        
+    }
+    catch {
+        Write-Log "Callback test failed: $($_.Exception.Message)"
+    }
+}
+
+
 Create-TestFiles
-Add-JobToTracking
 Test-BasicDownload
 Test-PriorityLevels
 Test-RangeDownload
 Test-UploadJobs
+Test-UploadJobs
 Test-CustomHeaders
 Test-Credentials
-Test-ConcurrentJobs
 Test-FailedDownloads
+Test-CallbackOnSuccess
 """  # noqa: E501
