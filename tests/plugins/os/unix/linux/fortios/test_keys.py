@@ -94,7 +94,7 @@ def test_aes_decrypt() -> None:
     assert data == decrypted_rootfs_header
 
 
-def test_aes_decrypt_from_keychain_file(target_unix: Target, tmp_path: Path) -> None:
+def test_decrypt_rootfs_from_keychain_file(target_unix: Target, tmp_path: Path) -> None:
     # encrypted FGT_1000D-v7.6.4.F-build3596-FORTINET.out/rootfs.gz
     kernel_hash = "8e7fb3af9fe68d69af224857164347cee271264308c8ba86e9ad036e405ac6c8"
     encrypted_rootfs_header = bytes.fromhex(
@@ -133,7 +133,7 @@ def test_aes_decrypt_from_keychain_file(target_unix: Target, tmp_path: Path) -> 
         assert fh.read() == decrypted_rootfs_header
 
 
-def test_aes_decrypt_from_keychain_value(target_unix: Target, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_decrypt_rootfs_from_keychain_value(target_unix: Target, monkeypatch: pytest.MonkeyPatch) -> None:
     # encrypted FGT_1000D-v7.6.4.F-build3596-FORTINET.out/rootfs.gz
     kernel_hash = "8e7fb3af9fe68d69af224857164347cee271264308c8ba86e9ad036e405ac6c8"
     encrypted_rootfs_header = bytes.fromhex(
