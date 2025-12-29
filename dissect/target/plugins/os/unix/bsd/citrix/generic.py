@@ -23,7 +23,8 @@ class GenericPlugin(Plugin):
         """Return the likely install date of Citrix Netscaler."""
         entries = ["/flash/.version", "/flash", "/var"]
         for entry in entries:
-            if (fp := self.target.fs.path(entry)).exists():
-                # We can use birthtime since Citrix uses FFS.
-                return ts.from_unix(fp.stat().st_birthtime)
+            if (path := self.target.fs.path(entry)).exists():
+                # Prioritize birth time if available
+                stat = path.stat()
+                return ts.from_unix(stat.st_birthtime or stat.st_ctime)
         return None
