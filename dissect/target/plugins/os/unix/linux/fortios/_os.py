@@ -590,11 +590,11 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key |
             # 32 bytes hex string
             key_data, key_iv = _kdf_7_4_x(key.value)
             keys.append(ChaCha20Key(key_data, key_iv))
-        elif key.provider in ("fortios-aeskey", None) and len(key.value) == 97:
+        elif key.provider in ("fortios-aeskey", None) and len(key.value) == 97 and ":" in key.value:
             # 48 bytes hex string with colon separator
             key_data, _, key_iv = key.value.partition(":")
             keys.append(AesKey(key_data, key_iv))
-        elif key.provider in ("fortios-chacha20key", None) and len(key.value) == 97:
+        elif key.provider in ("fortios-chacha20key", None) and len(key.value) == 97 and ":" in key.value:
             # 48 bytes hex string with colon separator
             key_data, _, key_iv = key.value.partition(":")
             keys.append(ChaCha20Key(key_data, key_iv))
