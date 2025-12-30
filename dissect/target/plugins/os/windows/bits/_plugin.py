@@ -111,7 +111,6 @@ class BitsPlugin(Plugin):
     @export(record=[BitsRecord])
     def qmgr_ese(self) -> Iterator[BitsRecord]:
         """Return entries found in background intelligent transfer service ESE database. (Windows 10 or later).
-            and Later.
 
         Version pre windows 10 use a different format
 
