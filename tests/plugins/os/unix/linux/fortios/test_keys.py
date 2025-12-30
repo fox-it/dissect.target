@@ -115,7 +115,7 @@ def test_decrypt_rootfs_from_keychain_file(target_unix: Target, tmp_path: Path) 
 
     keychain_file = tmp_path / "fortios_keychain.csv"
     keychain_file.write_text(
-        "fortios-aeskey,passphrase,"
+        "fortios-aeskey,recovery_key,"
         "8e7fb3af9fe68d69af224857164347cee271264308c8ba86e9ad036e405ac6c8,"
         "5adbbe614bcde31c3e05ba2e261c1a2410f0900ed340689835520a0612fc612b:e4973d6eff0412b4dbf4fe43c4d3136d"
     )

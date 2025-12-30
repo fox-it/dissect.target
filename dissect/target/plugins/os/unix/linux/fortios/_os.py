@@ -563,9 +563,9 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key |
     When using the ``--keychain-file`` option, the CSV format is:
 
         provider,key_type,identifier,value
-        fortios-chacha20seed,,<kernel_hash>,<chacha20_seed>
-        fortios-chacha20key,,<kernel_hash>,<chacha20_key>:<chacha20_iv>
-        fortios-aeskey,,<kernel_hash>,<aes_key>:<aes_iv>
+        fortios-chacha20seed,recovery_key,<kernel_hash>,<chacha20_seed>
+        fortios-chacha20key,recovery_key,<kernel_hash>,<chacha20_key>:<chacha20_iv>
+        fortios-aeskey,recovery_key,<kernel_hash>,<aes_key>:<aes_iv>
 
     When using the ``--keychain-value`` option, multiple keys are returned due to missing provider.
 
