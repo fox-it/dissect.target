@@ -110,7 +110,8 @@ class BitsPlugin(Plugin):
 
     @export(record=[BitsRecord])
     def qmgr_ese(self) -> Iterator[BitsRecord]:
-        """Return entries found in the qmgr.db file (background intelligent transfer service). Only works for win10+
+        """Return entries found in background intelligent transfer service ESE database. (Windows 10 or later).
+            and Later.
 
         Version pre windows 10 use a different format
 
@@ -210,7 +211,7 @@ class BitsPlugin(Plugin):
                                 source=db_path,
                             )
                             entry_yielded = True
-                    # if not files related or not found, we yield data that we have
+                    # if a job has no files related or not found, we yield data that we have
                     if not entry_yielded:
                         yield BitsRecord(
                             job_type=entry.type,
