@@ -290,9 +290,9 @@ def test_windows_user_from_sam(target_win_users: Target) -> None:
     target_win_users.machine_sid = Mock(
         return_value=iter([ComputerSidRecord(sid="S-1-5-21-3263113198-3007035898-945866154")])
     )
-    target_win_users.sam = Mock(return_value=[fake_sam_user])
+    target_win_users.users = Mock(return_value=[fake_sam_user])
 
-    users = list(target_win_users.users())
+    users = list(WindowsPlugin(target_win_users).users_from_ProfileList())
 
     # There should be two users, SYSTEM and the user from SAM
     assert len(users) == 2

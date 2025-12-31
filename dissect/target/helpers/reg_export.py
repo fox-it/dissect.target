@@ -2,6 +2,7 @@
 """
 reg-export.py - Export Windows registry hives to .reg format using dissect.target
 """
+
 import argparse
 import sys
 import time
@@ -20,9 +21,11 @@ SHORTNAMES = {
     "HKU": "HKEY_USERS",
 }
 
+
 def _escape_reg_string(value: str) -> str:
     """Escape special characters for .reg file format"""
     return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
 
 def export_registry(target: Target, paths: list) -> str:
     """Export registry keys and values recursively"""
@@ -37,6 +40,7 @@ def export_registry(target: Target, paths: list) -> str:
         _export_key(start_key, path, lines, path)
 
     return "\n".join(lines)
+
 
 def _export_key(key: VirtualKey, path: str, lines: list, current_path: str = "") -> None:
     """Recursively export registry key"""
@@ -77,10 +81,11 @@ def _expand_shortname(key_path: str) -> str:
     """Expand registry shortnames to full names."""
     for short, full in SHORTNAMES.items():
         if key_path.startswith(short + "\\"):
-            return full + key_path[len(short):]
+            return full + key_path[len(short) :]
         if key_path == short:
             return full
     return key_path
+
 
 def _parse_value(value_str: str) -> object:
     """Parse a value string from .reg format into appropriate Python type.
@@ -107,6 +112,7 @@ def _parse_value(value_str: str) -> object:
     # Default to string
     return value_str
 
+
 class RegHive(VirtualHive):
     """VirtualHive wrapper that expands registry shortnames in key lookups."""
 
@@ -114,6 +120,7 @@ class RegHive(VirtualHive):
         if key_path:
             key_path = _expand_shortname(key_path)
         return super().key(key_path)
+
 
 def _load_reg(reg_content: str) -> RegHive:
     """Load a .reg file content into a RegHive (VirtualHive with shortname support)
@@ -144,6 +151,7 @@ def _load_reg(reg_content: str) -> RegHive:
             current_key.add_value(name, value)
     return hive
 
+
 def load_reg_from_file(filepath: str) -> RegHive:
     """Load a .reg file from the specified file path.
 
@@ -156,6 +164,7 @@ def load_reg_from_file(filepath: str) -> RegHive:
     with Path(filepath).open() as file:
         reg_content = file.read()
     return _load_reg(reg_content)
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export Windows registry to .reg format")

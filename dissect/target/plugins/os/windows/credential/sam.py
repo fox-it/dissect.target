@@ -22,6 +22,7 @@ from dissect.target.plugin import Plugin, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+
 sam_def = """
 struct user_F {
   char      unknown1[8];
@@ -242,6 +243,7 @@ SamUserRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("uint32", "rid"),
+        ("string", "sid"),
         ("string", "fullname"),
         ("string", "username"),
         ("string", "admincomment"),
@@ -255,7 +257,6 @@ SamUserRecord = TargetRecordDescriptor(
         ("uint32", "logins"),
         ("string", "lm"),
         ("string", "nt"),
-        ("boolean", "local_admin"),
     ],
 )
 
@@ -263,9 +264,11 @@ SamGroupRecord = TargetRecordDescriptor(
     "windows/sam/group/member",
     [
         ("uint32", "group_rid"),
+        ("string", "group_sid"),
         ("string", "group_name"),
         ("string", "group_description"),
         ("string", "member_sid"),
+        ("string", "member_name"),
     ],
 )
 
@@ -362,7 +365,7 @@ def parse_sid_cstruct(buf: bytes, offset: int = 0) -> tuple[str, int]:
     return sid_str, (cur - offset)
 
 
-def parse_alias_c_cstruct(cbytes: bytes) -> tuple[int, str, str, list[str]]:
+def parse_sam_group_c_value(cbytes: bytes) -> tuple[int, str, str, list[str]]:
     """
     Parse an Aliases RID 'C' value using cstruct for the fixed header.
     Returns: (rid, name, description, members)
@@ -475,6 +478,21 @@ class SamPlugin(Plugin):
             raise ValueError("SAM key checksum validation failed!")
         return samkey
 
+    def get_local_admins(self) -> set[str]:
+        """Retrieve the SIDs of local administrators from the SAM hive."""
+        local_admins = set()
+        try:
+            admin_group_key = self.target.registry.key(self.DEFAULT_ADMIN_GROUP_PATH)
+        except Exception:
+            return local_admins
+
+        c_bytes = admin_group_key.value("C").value
+        _, _, _, members = parse_sam_group_c_value(c_bytes)
+        for sid in members:
+            local_admins.add(sid)
+
+        return local_admins
+
     @export(record=SamGroupRecord)
     def groups(self) -> Iterator[SamGroupRecord]:
         """Yields local group memberships from the SAM hive.
@@ -483,22 +501,45 @@ class SamPlugin(Plugin):
             SamGroupRecord: Records containing group RID, name, description, and member SID.
         """
 
+        # Windows stores built-in groups and local groups in different locations.
+        # Local groups have SIDs based on the machine SID, while built-in groups use a well-known SID prefix.
+        if not (machine_sid := next(self.target.machine_sid(), None)):
+            # use a placeholder if machine SID is not available
+            machine_sid = "S-1-5-21-0000000000-0000000000-0000000000"
+        builtin_prefix = "S-1-5-32"  # Built-in group SID prefix
+
         for group_path in self.SAM_GROUP_KEYS:
-            for group in self.target.registry.key(group_path).subkeys():
-                if group.name in ["Members", "Names"]:
+            # Determine the correct SID prefix based on group type
+            sid_prefix = builtin_prefix if "Builtin" in group_path else machine_sid
+
+            users = list(self.target.users())
+
+            for key in self.target.registry.key(group_path).subkeys():
+                if key.name in ["Members", "Names"]:
                     continue
 
-                c_bytes = group.value("C").value
+                c_bytes = key.value("C").value
+                group_rid, group_name, group_desc, group_members = parse_sam_group_c_value(c_bytes)
 
-                rid, name, desc, members = parse_alias_c_cstruct(c_bytes)
+                group_sid = f"{sid_prefix}-{group_rid}"
 
                 # By yielding only members of groups, we skip empty groups entirely.
-                for sid in members:
+                for member_sid in group_members:
+                    # Check if the member SID corresponds to a user and get the username
+                    # I had issues using UserPLugin().find(sid=member_sid), probably recursion, so doing it manually.
+                    user_details = None
+                    for user in users:
+                        if user.sid == member_sid:
+                            user_details = user
+                            break
+
                     yield SamGroupRecord(
-                        group_rid=rid,
-                        group_name=name,
-                        group_description=desc,
-                        member_sid=sid,
+                        group_rid=group_rid,
+                        group_sid=group_sid,
+                        group_name=group_name,
+                        group_description=group_desc,
+                        member_sid=member_sid,
+                        member_name=user_details.name if user_details else "",
                         _target=self.target,
                     )
 
@@ -531,19 +572,19 @@ class SamPlugin(Plugin):
             logins (uint32): Parsed logins (max 0xFFFF = 65535).
             lm (string): Parsed LM-hash.
             nt (string): Parsed NT-hash.
-            is_local_admin (boolean): True if user is a local administrator.
         """
 
-        # Get local administrators group members
-        # Try Except in order to pass tests where group keys are missing.
         try:
-            key = self.target.registry.key(self.DEFAULT_ADMIN_GROUP_PATH)
-            _, _, _, local_admins = parse_alias_c_cstruct(key.value("C").value)
-        except Exception:
-            local_admins = []
+            syskey = self.target.lsa.syskey  # aka. bootkey
+            samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
+        except Exception as e:
+            self.target.log.warning("Could not calculate SAM key")
+            self.target.log.debug("", exc_info=e)
+            samkey = None
 
-        syskey = self.target.lsa.syskey  # aka. bootkey
-        samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
+        # Get machine SID or placeholder SID for constructing user SIDs
+        if not (machine_sid := next(self.target.machine_sid(), None)):
+            machine_sid = "S-1-5-21-0000000000-0000000000-0000000000"
 
         almpassword = b"LMPASSWORD\0"
         antpassword = b"NTPASSWORD\0"
@@ -570,17 +611,21 @@ class SamPlugin(Plugin):
                 u_lmpw = v_data[v.lmpw_ofs : v.lmpw_ofs + v.lmpw_len]
                 u_ntpw = v_data[v.ntpw_ofs : v.ntpw_ofs + v.ntpw_len]
 
-                lm_hash = decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
-                nt_hash = decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
+                lm_hash = ""
+                nt_hash = ""
+                if samkey:
+                    lm_hash = decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
+                    nt_hash = decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
 
                 names_key = self.target.registry.key(f"{self.SAM_USER_KEY}\\Users\\Names\\{u_username}")
 
-                # Check if user rid is in local admins group
-                local_admin = any(rid.endswith("-" + str(f.rid)) for rid in local_admins)
+                # Construct the SID as <machine_sid>-<rid>
+                sid = f"{machine_sid}-{f.rid}"
 
                 yield SamUserRecord(
                     ts=names_key.ts,
                     rid=f.rid,
+                    sid=sid,
                     fullname=u_fullname,
                     username=u_username,
                     admincomment=u_admin_comment,
@@ -594,6 +639,5 @@ class SamPlugin(Plugin):
                     failedlogins=f.failedcnt,
                     lm=lm_hash,
                     nt=nt_hash,
-                    local_admin=local_admin,
                     _target=self.target,
                 )
