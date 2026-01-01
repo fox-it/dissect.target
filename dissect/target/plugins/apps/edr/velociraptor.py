@@ -52,8 +52,8 @@ class VelociraptorRecordBuilder:
             elif isinstance(value, str):
                 record_type = "string"
             elif isinstance(value, dict):
-                record_type = "record"
-                value = self.build(value, target)
+                # Skip nested objects that contain additional metadata
+                continue
             else:
                 record_type = "dynamic"
 
