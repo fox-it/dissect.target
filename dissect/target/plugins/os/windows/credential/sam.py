@@ -506,6 +506,8 @@ class SamPlugin(Plugin):
         if not (machine_sid := next(self.target.machine_sid(), None)):
             # use a placeholder if machine SID is not available
             machine_sid = "S-1-5-21-0000000000-0000000000-0000000000"
+        else:
+            machine_sid = machine_sid.sid
         builtin_prefix = "S-1-5-32"  # Built-in group SID prefix
 
         for group_path in self.SAM_GROUP_KEYS:
@@ -585,6 +587,8 @@ class SamPlugin(Plugin):
         # Get machine SID or placeholder SID for constructing user SIDs
         if not (machine_sid := next(self.target.machine_sid(), None)):
             machine_sid = "S-1-5-21-0000000000-0000000000-0000000000"
+        else:
+            machine_sid = machine_sid.sid
 
         almpassword = b"LMPASSWORD\0"
         antpassword = b"NTPASSWORD\0"

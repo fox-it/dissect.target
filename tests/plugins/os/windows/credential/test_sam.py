@@ -389,7 +389,7 @@ def test_sam_plugin_groups(target_win_users: Target) -> None:
     """Test SAM groups loading from a .reg file using reg_export."""
 
     # Load test data registry hive from .reg file
-    reg_test_file_path = "tests/_data/plugins/os/windows/crediential/sam_groups.reg"
+    reg_test_file_path = "tests/_data/plugins/os/windows/credential/sam_groups.reg"
     hive = reg_export.load_reg_from_file(reg_test_file_path)
 
     # Replace the target's registry root with the loaded hive
@@ -400,14 +400,14 @@ def test_sam_plugin_groups(target_win_users: Target) -> None:
     results = list(target_win_users.sam.groups())
 
     # Test for the default administrator group from \\SAM\\Domains\\Builtin\\Aliases
-    assert len(results) == 9
+    assert len(results) == 10
     assert results[0].group_rid == 544
     assert results[0].group_name == "Administrators"
     assert results[0].group_description == "Administrators have complete and unrestricted access to the computer/domain"
     assert results[0].member_sid == "S-1-5-21-3713105778-3002763963-2454762811-500"
 
     # Test for a custom group from \\SAM\\Domains\\Account\\Aliases
-    assert results[8].group_rid == 1002
-    assert results[8].group_name == "custom_local_admin_group"
-    assert results[8].group_description == "I'm a custom local admin group"
-    assert results[8].member_sid == "S-1-5-21-3713105778-3002763963-2454762811-1003"
+    assert results[9].group_rid == 1002
+    assert results[9].group_name == "custom_local_admin_group"
+    assert results[9].group_description == "I'm a custom local admin group"
+    assert results[9].member_sid == "S-1-5-21-3713105778-3002763963-2454762811-1003"

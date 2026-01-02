@@ -21,6 +21,9 @@ SHORTNAMES = {
     "HKU": "HKEY_USERS",
 }
 
+REG_FILE_HEADER = "Windows Registry Editor Version "
+REG_FILE_VERSION = "5.00"
+
 
 def _escape_reg_string(value: str) -> str:
     """Escape special characters for .reg file format"""
@@ -29,10 +32,16 @@ def _escape_reg_string(value: str) -> str:
 
 def export_registry(target: Target, paths: list) -> str:
     """Export registry keys and values recursively"""
+    # Write header and comments about exported paths
     lines = []
-    lines.append("Windows Registry Editor Version 5.00")
+    lines.append(REG_FILE_HEADER + REG_FILE_VERSION)
+    lines.append("")
+    lines.append("; This .reg file was generated using reg-export.py (part of Dissect Target)")
+    lines.append("; Registery paths exported:")
+    lines.extend([f"; - {path}" for path in paths])
     lines.append("")
 
+    # Process each specified path
     for path in paths:
         print("Exporting path:", path)
 
@@ -132,10 +141,16 @@ def _load_reg(reg_content: str) -> RegHive:
         RegHive: The loaded virtual registry hive with shortname expansion
     """
     hive = RegHive()
+
+    # validate reg header
     lines = reg_content.splitlines()
+    if not lines[0].startswith(REG_FILE_HEADER):
+        raise ValueError("Invalid .reg file format, unexpected header")
+
     current_key = None
     for line in lines:
         line = line.strip()
+        # Skip empty and comment ";" lines)
         if not line or line.startswith(";"):
             continue
         if line.startswith("[") and line.endswith("]"):
@@ -181,17 +196,19 @@ def main() -> None:
     if args.output is None:
         args.output = f"reg-save-{int(time.time())}.reg"
 
-    try:
+    # try:
+    if True:
         target = Target.open(args.target)
         output = export_registry(target, args.path)
 
-        if output:
-            with Path.open(args.output, "w", encoding="utf-8") as f:
-                f.write(output)
-            print(f"Registry exported to {args.output}")
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        print(output)
+    #     if output:
+    #         with Path.open(args.output, "w", encoding="utf-8") as f:
+    #             f.write(output)
+    #         print(f"Registry exported to {args.output}")
+    # #except Exception as e:
+    #     print(f"Error: {e}", file=sys.stderr)
+    #     sys.exit(1)
 
 
 if __name__ == "__main__":
