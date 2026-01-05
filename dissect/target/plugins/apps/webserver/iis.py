@@ -148,11 +148,15 @@ class IISLogsPlugin(WebserverPlugin):
             "auto": parse_autodetect_format_log,
         }
 
-        for format in ("IIS", "W3C", "auto"):
+        for format, parser in parsers.items():
             for log_dir in self.log_dirs.get(format, ()):
                 for log_file in log_dir.rglob("*.log"):
                     self.target.log.info("Processing IIS log file %s in %s format", log_file, format)
-                    yield from parsers[format](self.target, log_file)
+                    try:
+                        yield from parser(self.target, log_file)
+                    except Exception as e:
+                        self.target.log.error("Issue processing log file %s in %s format", log_file, format)  # noqa TRY400
+                        self.target.log.debug("", exc_info=e)
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
