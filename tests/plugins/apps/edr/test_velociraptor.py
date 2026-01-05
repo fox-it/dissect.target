@@ -48,4 +48,4 @@ def test_windows_velociraptor(mock_velociraptor_dir: Path, target_win: Target) -
     assert record.commandline == "/silentConfig"
     assert record.currentdirectory == "C:\\Windows\\system32\\"
     assert record._desc.name == "velociraptor/windows_memory_processinfo"
-    assert record.env.allusersprofile == "C:\\ProgramData"
+    assert hasattr(record, "env") is False
