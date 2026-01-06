@@ -11,6 +11,8 @@ from dissect.target.loader import Loader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.target import Target
 
 log = get_logger(__name__)
@@ -41,7 +43,7 @@ class DirectLoader(Loader):
         target.filesystems.add(vfs)
         target._os_plugin = DefaultOSPlugin
 
-    def yield_all_file_recursively(self, base_path: Path, max_depth: int = 7):
+    def yield_all_file_recursively(self, base_path: Path, max_depth: int = 7) -> Iterator[Path]:
         """
         Return list of all files recursively, as rglob is not case-sensitive until python 3.12
 

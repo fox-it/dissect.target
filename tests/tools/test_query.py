@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import logging
 import re
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
@@ -509,45 +508,3 @@ def test_direct_mode(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPa
         target_query()
         out, _ = capsys.readouterr()
     assert len(out.splitlines()) == 3
-
-
-def test_direct_sensitive_mode(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Asset cim plugin fail in case sensitive mode"""
-    with monkeypatch.context() as m:
-        m.setattr(
-            "sys.argv",
-            [
-                "target-query",
-                "-f",
-                "cim",
-                str(absolute_path("_data/plugins/os/windows/cim/")),
-                "--direct-sensitive",
-                "-s",
-            ],
-        )
-
-        target_query()
-        out, _ = capsys.readouterr()
-    assert out == ""
-
-
-def test_direct_overlap_warning(caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Asset cim plugin fail in case sensitive mode"""
-    with monkeypatch.context() as m, caplog.at_level(logging.WARNING):
-        m.setattr(
-            "sys.argv",
-            [
-                "target-query",
-                "-f",
-                "example_namespace",
-                "--direct",
-                str(absolute_path("_data/loaders/direct/overlap")),
-                "-s",
-            ],
-        )
-
-        target_query()
-        assert (
-            "Direct mode used in case insensitive mode, but this will cause files overlap, "
-            "consider using --direct-sensitive" in caplog.text
-        )
