@@ -3,13 +3,13 @@ from __future__ import annotations
 from io import BytesIO
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.child.esxi import ESXiChildTargetPlugin
 from dissect.target.plugins.os.unix.esxi._os import ESXiPlugin
+from dissect.target.plugins.os.unix.esxi.vm import VirtualMachinePlugin
 from dissect.target.target import Target
 
 
-def test_esxi_children() -> None:
-    """Test that the ESXi child target plugin lists children correctly."""
+def test_vm() -> None:
+    """Test that the ESXi VM inventory plugin yields the correct records."""
     vfs = VirtualFilesystem()
     vfs.map_file_fh(
         "/etc/vmware/hostd/vmInventory.xml",
@@ -23,9 +23,6 @@ def test_esxi_children() -> None:
           </ConfigRoot>
         """),
     )
-    vfs.map_file_fh(
-        "/vmfs/volumes/6800e48c-3dcffc58-6af7-bc2411ec8065/Alpine/Alpine.vmx", BytesIO(b'displayName = "Alpine"')
-    )
 
     # vmx not defined in vmInventory
     vfs.map_file_fh(
@@ -38,16 +35,14 @@ def test_esxi_children() -> None:
     target.fs.mount("/", vfs)
     target.apply()
 
-    target.add_plugin(ESXiChildTargetPlugin)
+    target.add_plugin(VirtualMachinePlugin)
 
-    children = [child for _, child in target.list_children()]
+    records = list(target.vm.inventory())
+    assert len(records) == 1
+    assert str(records[0].path) == "/vmfs/volumes/6800e48c-3dcffc58-6af7-bc2411ec8065/Alpine/Alpine.vmx"
 
-    assert len(children) == 2
+    orphaned = list(target.vm.orphaned())
+    assert len(orphaned) == 1
+    assert str(orphaned[0].path) == "/vmfs/volumes/6800e48c-3dcffc58-6af7-bc2411ec8065/Debian/Debian.vmx"
 
-    assert children[0].type == "esxi"
-    assert children[0].name == "Alpine"
-    assert str(children[0].path) == "/vmfs/volumes/6800e48c-3dcffc58-6af7-bc2411ec8065/Alpine/Alpine.vmx"
-
-    assert children[1].type == "esxi"
-    assert children[1].name == "Debian"
-    assert str(children[1].path) == "/vmfs/volumes/6800e48c-3dcffc58-6af7-bc2411ec8065/Debian/Debian.vmx"
+    assert len(list(target.vm())) == 2

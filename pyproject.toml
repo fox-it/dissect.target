@@ -29,7 +29,7 @@ dependencies = [
     "dissect.cstruct>=4,<5",
     "dissect.database>=1,<2",
     "dissect.eventlog>=3,<4",
-    "dissect.evidence>=3,<4",
+    "dissect.evidence>=3.13.dev2,<4",  # TODO: update on release!
     "dissect.hypervisor>=3.20,<4",
     "dissect.ntfs>=3.16.dev,<4",
     "dissect.regf>=3.13,<4",
@@ -55,6 +55,7 @@ full = [
     "dissect.clfs>=1,<2",
     "dissect.cramfs>=1,<2",
     "dissect.etl>=3,<4",
+    "dissect.executable>=1,<2",
     "dissect.extfs>=3,<4",
     "dissect.fat>=3,<4",
     "dissect.ffs>=3,<4",
@@ -86,7 +87,8 @@ dev = [
     "dissect.database[dev]>=1.0.dev,<2.0.dev",
     "dissect.etl[dev]>=3.0.dev,<4.0.dev",
     "dissect.eventlog[dev]>=3.0.dev,<4.0.dev",
-    "dissect.evidence[dev]>=3.0.dev,<4.0.dev",
+    "dissect.evidence[dev]>=3.13.dev2,<4.0.dev",
+    "dissect.executable[dev]>=1.0.dev,<2.0.dev",
     "dissect.extfs[dev]>=3.0.dev,<4.0.dev",
     "dissect.fat[dev]>=3.0.dev,<4.0.dev",
     "dissect.ffs[dev]>=3.0.dev,<4.0.dev",
@@ -149,18 +151,20 @@ dev = [
 ]
 
 [project.scripts]
+target-build-magic = "dissect.target.tools.build_magic:main"
 target-build-pluginlist = "dissect.target.tools.build_pluginlist:main"
-target-dump = "dissect.target.tools.dump:main"
 target-dd = "dissect.target.tools.dd:main"
+target-inspect = "dissect.target.tools.inspect:main"
 target-diff = "dissect.target.tools.diff:main"
+target-dump = "dissect.target.tools.dump:main"
 target-fs = "dissect.target.tools.fs:main"
 target-info = "dissect.target.tools.info:main"
 target-mount = "dissect.target.tools.mount:main"
+target-qfind = "dissect.target.tools.qfind:main"
 target-query = "dissect.target.tools.query:main"
 target-reg = "dissect.target.tools.reg:main"
 target-shell = "dissect.target.tools.shell:main"
 target-yara = "dissect.target.tools.yara:main"
-target-qfind = "dissect.target.tools.qfind:main"
 
 [tool.ruff]
 line-length = 120
@@ -208,6 +212,7 @@ ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM1
 
 [tool.ruff.lint.per-file-ignores]
 "tests/_docs/**" = ["INP001"]
+"dissect/target/helpers/magic/mimetypes/**" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["dissect.target"]
