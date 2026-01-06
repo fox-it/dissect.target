@@ -269,7 +269,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path: str | Path, *, apply: bool = True) -> Self:
+    def open(cls, path: str | Path) -> Self:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
@@ -277,7 +277,6 @@ class Target:
                   If the path is a ``os.PathLike`` object, it will be used as-is.
                   If the path is a string and looks like a URI, it will be parsed as such.
                   If the path is a string and does not like like a URI, it will be treated as a local path.
-            loader_args: Additional arguments for the loader.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
@@ -308,7 +307,7 @@ class Target:
         except Exception as e:
             raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {spec}: {e}") from e
 
-        return cls._load(spec, loader_instance, apply=apply)
+        return cls._load(spec, loader_instance)
 
     @classmethod
     def open_raw(cls, path: str | Path, *, apply: bool = True) -> Self:
@@ -321,9 +320,7 @@ class Target:
         return cls._load(path, loader.RawLoader(adjusted_path), apply=apply)
 
     @classmethod
-    def open_all(
-        cls, paths: str | Path | list[str | Path], include_children: bool = False, *, apply: bool = True
-    ) -> Iterator[Self]:
+    def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
 
         If the path is a directory, iterate files one directory deep.
@@ -418,7 +415,7 @@ class Target:
         for spec in paths:
             loaded = False
 
-            for target in _open_all(spec, include_children=include_children, apply=apply):
+            for target in _open_all(spec, include_children=include_children):
                 loaded = True
                 at_least_one_loaded = True
                 yield target
@@ -439,7 +436,7 @@ class Target:
 
                 if path.is_dir():
                     for entry in path.iterdir():
-                        for target in _open_all(entry, include_children=include_children, apply=apply):
+                        for target in _open_all(entry, include_children=include_children):
                             at_least_one_loaded = True
                             yield target
 

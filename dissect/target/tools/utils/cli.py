@@ -233,22 +233,20 @@ def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
     return target
 
 
-def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Target]:
+def open_targets(args: argparse.Namespace) -> Iterator[Target]:
     direct: bool = getattr(args, "direct", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
 
     targets: Iterable[Target] = (
-        [Target.open_direct(args.targets)]
-        if direct
-        else Target.open_all(args.targets, include_children=children, apply=apply)
+        [Target.open_direct(args.targets)] if direct else Target.open_all(args.targets, children)
     )
 
     for target in targets:
         if child:
             try:
                 target.log.warning("Switching to --child %s", child)
-                target = target.open_child(child, apply=apply)
+                target = target.open_child(child)
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
                 target.log.debug("", exc_info=e)

@@ -68,7 +68,7 @@ class Loader:
 
     def __init__(
         self, path: Path, *, parsed_path: urllib.parse.ParseResult | None = None, resolve: bool = True,
-        loader_args: list[str] | None = None, **kwargs
+        **kwargs
     ):
         self.path = path
         self.absolute_path = None
@@ -83,19 +83,25 @@ class Loader:
         self.parsed_query = (
             dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True)) if parsed_path else {}
         )
-        self.loader_args = loader_args or []
 
-        self._parser = argparse.ArgumentParser(
-            prog=f"loader:{self.__class__.__name__.lower()}",
-            description=f"Options for the '{self.__class__.__name__}' loader.",
+        self._parser = self._create_parser(self.__class__)
+
+    @classmethod
+    def print_help(cls) -> None:
+        """Prints the help message for this loader's specific arguments."""
+        cls._create_parser(cls).print_help()
+
+    @staticmethod
+    def _create_parser(cls: type[Loader]) -> argparse.ArgumentParser:
+        """Creates the argument parser for this loader."""
+        parser = argparse.ArgumentParser(
+            prog=f"loader:{cls.__name__.lower()}",
+            description=f"Options for the '{cls.__name__}' loader.",
             add_help=False,
         )
-        for args, kwargs in  getattr(self, "__args__", []):
-            self._parser.add_argument(*args, **kwargs)
-
-    def print_help(self) -> None:
-        """Prints the help message for this loader's specific arguments."""
-        self._parser.print_help()
+        for args, kwargs in getattr(cls, "__args__", []):
+            parser.add_argument(*args, **kwargs)
+        return parser
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self.path)!r})"
@@ -131,8 +137,8 @@ class Loader:
 
     def map(self, target: Target) -> None:
         """Wrapper around the _map function that handles argument passing."""
-        # The loader now parses its own arguments
-        loader_options = self._parser.parse_args(self.loader_args)
+        # The loader parses its own arguments from argv
+        loader_options, _ = self._parser.parse_known_args()
 
         # The query string can act as a default for any arguments not provided on the command line
         for key, value in self.parsed_query.items():
