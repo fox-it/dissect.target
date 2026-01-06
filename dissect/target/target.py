@@ -268,7 +268,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path: str | Path, *, apply: bool = True) -> Self:
+    def open(cls, path: str | Path) -> Self:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
@@ -276,7 +276,6 @@ class Target:
                   If the path is a ``os.PathLike`` object, it will be used as-is.
                   If the path is a string and looks like a URI, it will be parsed as such.
                   If the path is a string and does not like like a URI, it will be treated as a local path.
-            loader_args: Additional arguments for the loader.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
@@ -306,7 +305,7 @@ class Target:
         except Exception as e:
             raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {spec}: {e}") from e
 
-        return cls._load(spec, loader_instance, apply=apply)
+        return cls._load(spec, loader_instance)
 
     @classmethod
     def open_raw(cls, path: str | Path, *, apply: bool = True) -> Self:

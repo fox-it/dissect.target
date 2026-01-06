@@ -125,9 +125,7 @@ def main() -> int:
             return 1
 
         # The loader now knows how to print its own help.
-        # We just need to instantiate it. Note that the path is not important here.
-        loader_instance = loader_cls(pathlib.Path())
-        loader_instance.print_help()
+        loader_cls.print_help()
         return 0
 
     process_generic_arguments(parser, args)
@@ -167,8 +165,7 @@ def main() -> int:
     execution_report.set_event_callbacks(Target)
 
     try:
-        # Pass the loader-specific arguments (`rest`) to open_targets
-        for target in open_targets(args, loader_args=rest):
+        for target in open_targets(args):
             record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []
