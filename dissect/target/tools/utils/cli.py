@@ -254,7 +254,7 @@ def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Ta
         if child:
             try:
                 target.log.warning("Switching to --child %s", child)
-                target = target.open_child(child, apply=apply)
+                target = target.open_child(child)
             except Exception as e:
                 target.log.exception("Exception while opening child %r: %s", child, e)  # noqa: TRY401
                 target.log.debug("", exc_info=e)
