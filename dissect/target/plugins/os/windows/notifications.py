@@ -444,7 +444,7 @@ class NotificationsPlugin(Plugin):
         target_tz = self.target.datetime.tzinfo
 
         for user, wpndatabase in self.wpndb_files:
-            db = SQLite3(wpndatabase.open())
+            db = SQLite3(wpndatabase)
             handlers = {}
 
             if table := db.table("NotificationHandler"):
