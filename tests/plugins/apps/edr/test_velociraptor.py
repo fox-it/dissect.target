@@ -35,8 +35,10 @@ def test_windows_velociraptor(mock_velociraptor_dir: Path, target_win: Target) -
     target_win.add_plugin(VelociraptorPlugin)
 
     results = list(target_win.velociraptor())
+    results_extract = list(target_win.velociraptor.results(extract=True))
 
     record = results[0]
+    record_extract = results_extract[0]
 
     assert record.name == "Microsoft.SharePoint.exe"
     assert record.pebbaseaddress == "0x295000"
@@ -49,3 +51,5 @@ def test_windows_velociraptor(mock_velociraptor_dir: Path, target_win: Target) -
     assert record.currentdirectory == "C:\\Windows\\system32\\"
     assert record._desc.name == "velociraptor/windows_memory_processinfo"
     assert hasattr(record, "env") is False
+
+    assert record_extract.env.allusersprofile == "C:\\ProgramData"
