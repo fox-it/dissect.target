@@ -667,11 +667,8 @@ class TargetCli(TargetCmd):
                 continue
 
             # Add a trailing slash to directories, to allow for easier traversal of the filesystem
-            suggestion = f"{fname}/" if fpath.is_dir() else fname
-
-            # Escape spaces in paths
-            if " " in suggestion:
-                suggestion = suggestion.replace(" ", "\\ ")
+            # Add trailing slashes for directories and escape spaces in paths
+            suggestion = (f"{fname}/" if fpath.is_dir() else fname).replace(" ", "\\ ")
 
             suggestions.append(suggestion)
         return suggestions
