@@ -650,7 +650,11 @@ class TargetCli(TargetCmd):
         return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
-        path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
+        """Attempt to autocomplete the current commandline based on the target filesystem."""
+
+        # Line also contains the base command and possibly spaces in the path.
+        path = self.resolve_path(line[:begidx].replace("\\ ", "\00").rsplit(" ")[-1].replace("\00", " "))
+
         textlower = text.lower()
 
         suggestions = []
@@ -658,8 +662,17 @@ class TargetCli(TargetCmd):
             if not fname.lower().startswith(textlower):
                 continue
 
+            # Do not suggest non-directories for autocompletion with cd command.
+            if line.startswith("cd ") and not fpath.is_dir():
+                continue
+
             # Add a trailing slash to directories, to allow for easier traversal of the filesystem
             suggestion = f"{fname}/" if fpath.is_dir() else fname
+
+            # Escape spaces in paths
+            if " " in suggestion:
+                suggestion = suggestion.replace(" ", "\\ ")
+
             suggestions.append(suggestion)
         return suggestions
 
@@ -670,7 +683,7 @@ class TargetCli(TargetCmd):
         if isinstance(path, fsutil.TargetPath):
             return path
 
-        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
+        path = fsutil.abspath(path.replace("\\ ", " "), cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.target.fs.path(path)
 
     def resolve_glob_path(self, path: str) -> Iterator[fsutil.TargetPath]:
@@ -1133,9 +1146,9 @@ class TargetCli(TargetCmd):
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """print a hexdump of file(s)"""
-        paths = list(self.resolve_glob_path(args.path))
+        paths = [p for p in self.resolve_glob_path(args.path) if p.is_file()]
         if not paths:
-            print(f"{args.path}: No such file or directory")
+            print(f"{args.path}: No such file")
             return False
 
         for path in paths:
