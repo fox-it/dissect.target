@@ -114,31 +114,26 @@ def get_target_info(target: Target, recursive: bool = False) -> dict[str, str | 
         "volumes": get_volumes_info(target),
         "mounts": get_mounts_info(target),
         "children": get_children_info(target, recursive),
-        "hostname": get_func_safe(target, "hostname"),
-        "domain": get_optional_func(target, "domain"),
-        "ips": get_func_safe(target, "ips"),
-        "os_family": get_func_safe(target, "os"),
-        "os_version": get_func_safe(target, "version"),
-        "architecture": get_func_safe(target, "architecture"),
-        "language": get_optional_func(target, "language"),
-        "timezone": get_optional_func(target, "timezone"),
-        "install_date": get_optional_func(target, "install_date"),
-        "last_activity": get_optional_func(target, "activity"),
+        "hostname": get_property(target, "hostname"),
+        "domain": get_property(target, "domain"),
+        "ips": get_property(target, "ips"),
+        "os_family": get_property(target, "os"),
+        "os_version": get_property(target, "version"),
+        "architecture": get_property(target, "architecture"),
+        "language": get_property(target, "language"),
+        "timezone": get_property(target, "timezone"),
+        "install_date": get_property(target, "install_date"),
+        "last_activity": get_property(target, "activity"),
     }
 
 
-def get_optional_func(target: Target, func: str) -> str | None:
-    if target.has_function(func):
-        return getattr(target, func)
-    return None
-
-
-def get_func_safe(target: Target, func: str) -> str | None:
+def get_property(target: Target, func: str) -> str | None:
     try:
-        return getattr(target, func)
+        if target.has_function(func):
+            return getattr(target, func)
     except Exception as e:
         log.warning("Error executing %s : %s", str(func), e)
-        return None
+    return None
 
 
 def print_target_info(target: Target, target_info: dict[str, str | list[str]]) -> None:
