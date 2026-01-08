@@ -166,8 +166,8 @@ def print_target_info(target: Target, target_info: dict[str, str | list[str]]) -
         print(f"{name.capitalize().replace('_', ' '):14s} : {value}")
 
 
-def catch_errors(func: Callable) -> Callable:
-    """Catch all errors and return dict with error if encountered"""
+def catch_errors(func: Callable[[Target], list[dict]]) -> Callable[[Target], list[dict]]:
+    """Catch all errors and return dict with error if encountered."""
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs) -> list[dict[str, Any]]:
