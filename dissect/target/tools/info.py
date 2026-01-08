@@ -174,7 +174,7 @@ def catch_errors(func: Callable[[Target], list[dict]]) -> Callable[[Target], lis
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            log.warning("Error executing %s : %s", str(func), e)
+            log.warning("Error executing %s: %s", str(func), e)
             return [{"error": str(e)}]
 
     return wrapper
