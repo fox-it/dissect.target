@@ -27,7 +27,7 @@ except ImportError:
     HAS_ENVELOPE = False
 
 from dissect.target.filesystems import tar
-from dissect.target.plugin import OperatingSystem, export, internal
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
 
 if TYPE_CHECKING:
@@ -143,16 +143,6 @@ class ESXiPlugin(UnixPlugin):
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.ESXI.value
-
-    @internal
-    def osdata_fs(self) -> TargetPath | None:
-        """
-        return path to osdata vmfs, present in esxi 7+
-        """
-        os_data = list(self.target.fs.path("/vmfs/volumes/").glob("OSDATA-*"))
-        if os_data:
-            return os_data[0]
-        return None
 
     def _mount_nfs_shares(self) -> None:
         """Mount NFS shares found in the configstore."""
@@ -355,14 +345,14 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
         elif fs.__type__ == "vmfs":
             target.fs.mount(f"/vmfs/volumes/{fs.vmfs.uuid}", fs)
             target.fs.symlink(f"/vmfs/volumes/{fs.vmfs.uuid}", f"/vmfs/volumes/{fs.vmfs.label}")
-
-            if fs.volume.name in ("OSDATA", "LOCKER"):
+            # in ESXi 8+, OSDATA partition does not have the OSData name, we must use label
+            if fs.volume.name in ("OSDATA", "LOCKER") or fs.vmfs.label == f"OSDATA-{str(fs.vmfs.uuid).lower()}":
                 target.fs.symlink(
                     f"/vmfs/volumes/{fs.vmfs.uuid}",
                     f"/vmfs/volumes/{fs.volume.name}-{fs.vmfs.uuid}",
                 )
 
-                if fs.volume.name == "OSDATA":
+                if fs.volume.name in ["OSDATA"] or fs.vmfs.label == f"OSDATA-{str(fs.vmfs.uuid).lower()}":
                     osdata_fs = fs
                 elif fs.volume.name == "LOCKER":
                     locker_fs = fs
@@ -388,6 +378,10 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
         target.fs.symlink(f"/vmfs/volumes/OSDATA-{osdata_fs.vmfs.uuid}", "/var/lib/vmware/osdata")
         target.fs.symlink("/var/lib/vmware/osdata/store", "/store")
         target.fs.symlink("/var/lib/vmware/osdata/locker", "/locker")
+        # In ESXI7+; /scratch is symlink to os data
+        # We just check if /scratch already exists
+        if not target.fs.exists("/scratch"):
+            target.fs.symlink("/var/lib/vmware/osdata", "/scratch")
 
     elif locker_fs:
         target.fs.symlink(f"/vmfs/volumes/LOCKER-{locker_fs.vmfs.uuid}", "/locker")

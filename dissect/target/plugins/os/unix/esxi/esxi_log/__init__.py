@@ -29,7 +29,7 @@ ESXiLogRecord = TargetRecordDescriptor(
         ("path", "source"),
     ],
 )
-COMMON_LOG_LOCATION: list[str] = ["/var/log", "/var/run/log", "/scratch/log", "/var/lib/vmware/osdata"]
+
 RE_LOG_FORMAT: Pattern = re.compile(
     r"""
     ((?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)\s)? # ts, moslty including milliseconds, but not always
@@ -46,7 +46,7 @@ RE_LOG_FORMAT: Pattern = re.compile(
 )
 
 
-def get_esxi_log_path(target: Target, logname: str) -> list[Path]:
+def get_esxi_log_path(target: Target, logname: str) -> Iterator[Path]:
     """
     Get log location, looking in most usual location, as well as in the osdata partition
 
@@ -54,19 +54,23 @@ def get_esxi_log_path(target: Target, logname: str) -> list[Path]:
         - https://knowledge.broadcom.com/external/article/306962/location-of-esxi-log-files.html
     :return:
     """
-    log_paths = []
-    for log_location in COMMON_LOG_LOCATION:
-        for path in target.fs.path(log_location).glob(f"{logname}.*"):
-            try:
-                log_paths.append(path.resolve(strict=True))
-            except FilesystemError as e:  # noqa PERF203
-                target.info.warning("Fail to resolve path to %s : %s", path, str(e))
-
-    if osdata_fs := target.osdata_fs():
-        log_paths.extend(osdata_fs.glob(f"log/{logname}.*"))
-    # TODO : read /etc/vmsyslog.conf / /etc/vmsyslog.conf.d -> logdir
-    # as ESXi use a lot of symlink, use resolve list(set to deduplicate files
-    return list(set(log_paths))
+    # Depending on collection method, log are not always located at the same location
+    # In tech support logs are in /var/run/log
+    # In live collection in /scratch/log
+    # On live disk, symlink must have be made from os data
+    # We stop to the first existing folder with files to prevent duplicate
+    # /var/log usually contains only uncompressed log file, thus this entry is the last one checked
+    files_found = False
+    for log_location in ["/scratch/log", "/var/run/log", "/var/log"]:
+        if target.fs.path(log_location).exists():
+            for path in target.fs.path(log_location).glob(f"{logname}.*"):
+                try:
+                    yield path.resolve(strict=True)
+                    files_found = True
+                except FilesystemError as e:  # noqa PERF203
+                    target.info.warning("Fail to resolve path to %s : %s", path, str(e))
+        if files_found:
+            break
 
 
 def yield_log_records(
