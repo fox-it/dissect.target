@@ -48,7 +48,7 @@ class UacTarSubloader(TarSubLoader):
         - https://tclahr.github.io/uac-docs/
     """
 
-    FS_ROOT_TUPLE = (f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")
+    FS_ROOT_TUPLE = (f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/", f"./{FILESYSTEMS_ROOT}/")
 
     @staticmethod
     def detect(path: Path, tarfile: tf.TarFile) -> bool:
