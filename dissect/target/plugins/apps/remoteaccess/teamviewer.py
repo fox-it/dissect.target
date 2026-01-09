@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     GENERIC_LOG_RECORD_FIELDS,
@@ -49,6 +49,20 @@ RE_START = re.compile(
 )
 
 
+TeamviewerIncomingRecord = TargetRecordDescriptor(
+    "remoteaccess/teamviewer/incoming",
+    [
+        ("datetime", "ts"),
+        ("datetime", "end"),
+        ("string", "remote_id"),
+        ("string", "name"),
+        ("string", "user"),
+        ("string", "connection_type"),
+        ("string", "connection_id"),
+    ],
+)
+
+
 class TeamViewerPlugin(RemoteAccessPlugin):
     """TeamViewer client plugin.
 
@@ -66,10 +80,10 @@ class TeamViewerPlugin(RemoteAccessPlugin):
         "/var/log/teamviewer*/*.log",
     )
 
-    SYSTEM_INCOMING_GLOBS = [
+    SYSTEM_INCOMING_GLOBS = (
         "sysvol/Program Files/TeamViewer/*_incoming.txt",
         "sysvol/Program Files (x86)/TeamViewer/*_incoming.txt",
-    ]
+    )
 
     USER_GLOBS = (
         "AppData/Roaming/TeamViewer/teamviewer*_logfile.log",
@@ -180,95 +194,50 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     _user=user_details.user if user_details else None,
                 )
 
-    @export(record=RemoteAccessIncomingConnectionRecord)
-    def incoming_connections(self):
-        """Return the content of the TeamViewer incoming connections logs.
+    @export(record=TeamviewerIncomingRecord)
+    def incoming(self) -> Iterator[TeamviewerIncomingRecord]:
+        """Yield TeamViewer incoming connection logs.
 
-        TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a
-        system.
-
-        References:
-            - https://www.teamviewer.com/nl/
+        TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a system.
         """
-        hostname = str(self.target).split("Collection-")[1].split("-")[0]
         for logfile in self.incoming_logfiles:
             logfile = self.target.fs.path(logfile)
 
-            with logfile.open("rt", encoding="latin-1") as file:
-                next(file)
-                while True:
-                    try:
-                        line = file.readline()
+            for line in logfile.open("rt", errors="replace"):
+                if not (line := line.strip()) or line.startswith("# "):
+                    continue
 
-                    except UnicodeDecodeError:
-                        continue
+                fields = line.split("\t")
+                if len(fields) < 7:
+                    self.target.log.warning("Skipping TeamViewer incoming connection log line %r in %s", line, logfile)
+                    continue
 
-                    # End of file, quit while loop
-                    if not line:
-                        break
-
-                    line = line.strip()
-
-                    # Skip empty lines
-                    if not line:
-                        continue
-
-                    fields = line.split("\t")
-                    if len(fields) < 7:
-                        print("Line does not contain enough fields:", line)
-                        continue
-                    remote_teamviewer_id = fields[0]
-                    username_or_hostname = fields[1]
-                    # print(username_or_hostname)
-                    starttime = datetime.strptime(fields[2], "%d-%m-%Y %H:%M:%S")  # .strftime('%Y-%m-%d %H:%M:%S')
-                    endtime = datetime.strptime(fields[3], "%d-%m-%Y %H:%M:%S")  # .strftime('%Y/%m/%d %H:%M:%S')
-                    connected_user = fields[4]
-                    connection_type = fields[5]
-                    connection_guid = fields[6].strip()  # Remove any trailing whitespace
-                    """
-                    # Older logs first mention the start time and then leave out the year
-                    if line.startswith("Start:"):
-                        start_date = datetime.strptime(line.split()[1], "%Y/%m/%d")
-
-                    # Sometimes there are weird, mult-line/pretty print log messages.
-                    # We only parse the start line which starts with year (%Y/) or month (%m/)
-                    if not re.match(START_PATTERN, line):
-                        continue
-
-                    ts_day, ts_time, description = line.split(" ", 2)
-                    ts_time = ts_time.split(".")[0]
-
-                    # Correct for use of : as millisecond separator
-                    if ts_time.count(":") > 2:
-                        ts_time = ":".join(ts_time.split(":")[:3])
-                    # Correct for missing year in date
-                    if ts_day.count("/") == 1:
-                        if not start_date:
-                            self.target.log.debug("Missing year in log line, skipping line.")
-                            continue
-                        ts_day = f"{start_date.year}/{ts_day}"
-                    # Correct for year if short notation for 2000 is used
-                    if ts_day.count("/") == 2 and len(ts_day.split("/")[0]) == 2:
-                        ts_day = "20" + ts_day
-
-                    timestamp = datetime.strptime(f"{ts_day} {ts_time}", "%Y/%m/%d %H:%M:%S")
-
-
-                    """
-                    # print(starttime)
-                    # print(endtime)
-                    yield RemoteAccessIncomingConnectionRecord(
-                        tool="teamviewer",
-                        logfile=str(logfile),
-                        remote_tvid=remote_teamviewer_id,
-                        tv_user_host=username_or_hostname,
-                        start_time=starttime,
-                        end_time=endtime,
-                        user_context=connected_user,
-                        connection_type=connection_type,
-                        connection_guid=connection_guid,
-                        _target=self.target,
+                try:
+                    start = datetime.strptime(fields[2], "%d-%m-%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+                    end = datetime.strptime(fields[3], "%d-%m-%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+                except Exception as e:
+                    self.target.log.warning(
+                        "Unable to parse timestamps in TeamViewer incoming connection log line %r in %s", line, logfile
                     )
+                    self.target.log.debug("", exc_info=e)
+                    continue
+
+                remote_id = fields[0]
+                name = fields[1]
+                user = fields[4]
+                connection_type = fields[5]
+                connection_id = fields[6]
+
+                yield TeamviewerIncomingRecord(
+                    ts=start,
+                    end=end,
+                    remote_id=remote_id,
+                    name=name,
+                    user=user,
+                    connection_type=connection_type,
+                    connection_id=connection_id,
+                    _target=self.target,
+                )
 
 
 def parse_start(line: str) -> datetime | None:
