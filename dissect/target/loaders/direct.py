@@ -36,9 +36,9 @@ class DirectLoader(Loader):
         vfs = VirtualFilesystem(case_sensitive=self.case_sensitive)
         for path in self.paths:
             if path.is_file():
-                vfs.map_file(str(path), str(path))
+                vfs.map_file(str(path), path)
             elif path.is_dir():
-                vfs.map_dir(str(path), str(path))
+                vfs.map_dir(str(path), path)
 
         target.filesystems.add(vfs)
         target._os_plugin = DefaultOSPlugin
