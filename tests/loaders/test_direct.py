@@ -1,11 +1,12 @@
+import io
 import logging
 from pathlib import Path
-from zipfile import ZipFile
 
 import pytest
 
+
 from dissect.target import Target
-from tests._utils import absolute_path
+from dissect.target.filesystem import VirtualFilesystem
 
 
 def test_direct_overlap_warning(
@@ -15,17 +16,20 @@ def test_direct_overlap_warning(
     We must uncompress files in a temporary directory as having two files with same name
     would cause issue with git on case insensitive fs.
     """
-    ZipFile(absolute_path("_data/loaders/direct/overlap.zip")).extractall(tmp_path)
-    if len(list((tmp_path / "overlap").iterdir())) < 2:
-        pytest.skip("Test running on an insensitive fs")
+    print("HERE")
+    source_vfs = VirtualFilesystem(case_sensitive=True)
+    source_vfs.map_file_fh("file.txt", io.BytesIO(b"a"))
+    source_vfs.map_file_fh("File.txt", io.BytesIO(b"b"))
+    print(source_vfs)
     with caplog.at_level(logging.WARNING):
-        _ = Target.open_direct([tmp_path], case_sensitive=True)
+        _ = Target.open_direct([source_vfs.path("/")], case_sensitive=True)
         assert (
             "Direct mode used in case insensitive mode, but this will cause files overlap, "
             "consider using --direct-sensitive" not in caplog.text
         )
-        _ = Target.open_direct([tmp_path], case_sensitive=False)
+        _ = Target.open_direct([source_vfs.path("/")], case_sensitive=False)
         assert (
             "Direct mode used in case insensitive mode, but this will cause files overlap, "
             "consider using --direct-sensitive" in caplog.text
         )
+    print("HERE2")

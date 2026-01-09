@@ -70,3 +70,10 @@ class DirectLoader(Loader):
             functools.reduce(operator.iadd, (list(self.yield_all_file_recursively(p)) for p in self.paths), [])
         )
         return len({str(p).lower() for p in all_files_list}) != len(all_files_list)
+
+    def __repr__(self) -> str:
+        """
+        As DirectLoader does not call super().__init__() self.path is not defined, we need to redefine the __repr__ func
+        :return:
+        """
+        return f"{self.__class__.__name__}({str(self.paths)!r})"
