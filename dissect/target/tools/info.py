@@ -132,7 +132,8 @@ def get_property(target: Target, func: str) -> str | None:
         if target.has_function(func):
             return getattr(target, func)
     except Exception as e:
-        log.warning("Error executing %s : %s", str(func), e)
+        log.warning("Error executing %s: %s", func, e)
+        log.debug("", exc_info=e)
     return None
 
 
@@ -169,7 +170,8 @@ def catch_errors(func: Callable[[Target], list[dict]]) -> Callable[[Target], lis
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            log.warning("Error executing %s: %s", str(func), e)
+            log.warning("Error executing %s: %s", func.__name__, e)
+            log.debug("", exc_info=e)
             return [{"error": str(e)}]
 
     return wrapper

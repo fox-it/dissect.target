@@ -58,6 +58,7 @@ def test_target_info(
 def test_target_info_with_exception(
     capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, output_type: str, options: list
 ) -> None:
+    """Test target-info on a target that raises exceptions in some properties."""
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
