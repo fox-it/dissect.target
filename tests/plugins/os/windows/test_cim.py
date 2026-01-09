@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 
 def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    """Test the CIM plugin for extracting WMI Consumer Bindings."""
     wbem_repository = absolute_path("_data/plugins/os/windows/cim/default-namespace")
     fs_win.map_dir("Windows/System32/wbem/repository", wbem_repository)
 
@@ -267,6 +268,7 @@ PSComputerName           : DESKTOP-O8964S4
 
 
 def test_consumerbindings_all_namespaces(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    """Test the CIM plugin for extracting WMI Consumer Bindings from all namespaces."""
     wbem_repository = absolute_path("_data/plugins/os/windows/cim/non-default-namespace")
     fs_win.map_dir("Windows/System32/wbem/repository", wbem_repository)
     target_win.add_plugin(cim.CimPlugin)
