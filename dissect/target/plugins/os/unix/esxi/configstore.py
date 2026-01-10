@@ -42,8 +42,8 @@ class ConfigstorePlugin(Plugin):
         return self._configstore.get(key, default)
 
 
-def parse_config_store(fh: Path) -> dict[str, Any]:
-    db = SQLite3(fh)
+def parse_config_store(path: Path) -> dict[str, Any]:
+    db = SQLite3(path)
 
     store = {}
 
