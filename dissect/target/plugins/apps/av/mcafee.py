@@ -96,55 +96,55 @@ class McAfeePlugin(Plugin):
         len_marker = len(self.MARKER_SUSPICIOUS_UDP_CONNECTION)
 
         for log_file in self.get_log_files():
-            database = SQLite3(log_file)
-            fields = defaultdict(dict)
-            fields_table = database.table(self.TABLE_FIELD)
+            with SQLite3(log_file) as database:
+                fields = defaultdict(dict)
+                fields_table = database.table(self.TABLE_FIELD)
 
-            for field in fields_table.rows():
-                fields[field.fkey][field.field_id] = field.data
-            log_table = database.table(self.TABLE_LOG)
+                for field in fields_table.rows():
+                    fields[field.fkey][field.field_id] = field.data
+                log_table = database.table(self.TABLE_LOG)
 
-            for entry in log_table.rows():
-                fkey = entry.fkey
-                log_fields = fields[fkey]
-                ip = None
-                protocol = None
-                port = None
-                threat = None
+                for entry in log_table.rows():
+                    fkey = entry.fkey
+                    log_fields = fields[fkey]
+                    ip = None
+                    protocol = None
+                    port = None
+                    threat = None
 
-                for key, log_field in log_fields.items():
-                    try:
-                        ipaddress.ip_address(log_field)
-                        ip = log_field
-                        continue
-                    except ValueError:
-                        pass
+                    for key, log_field in log_fields.items():
+                        try:
+                            ipaddress.ip_address(log_field)
+                            ip = log_field
+                            continue
+                        except ValueError:
+                            pass
 
-                    if log_field.startswith(
-                        (self.MARKER_SUSPICIOUS_TCP_CONNECTION, self.MARKER_SUSPICIOUS_UDP_CONNECTION)
-                    ):
-                        port = int(log_field[len_marker:])
-                        protocol = log_field[:3]
-                        continue
+                        if log_field.startswith(
+                            (self.MARKER_SUSPICIOUS_TCP_CONNECTION, self.MARKER_SUSPICIOUS_UDP_CONNECTION)
+                        ):
+                            port = int(log_field[len_marker:])
+                            protocol = log_field[:3]
+                            continue
 
-                    if key == self.TEMPLATE_ID_INFECTION and entry.details_info.find(self.MARKER_INFECTION) > -1:
-                        threat = log_field
+                        if key == self.TEMPLATE_ID_INFECTION and entry.details_info.find(self.MARKER_INFECTION) > -1:
+                            threat = log_field
 
-                if threat:
-                    yield McAfeeMscLogRecord(
-                        ts=from_unix(entry.date),
-                        threat=threat,
-                        message=self._clean_message(entry.details_info),
-                        keywords=",".join(log_fields.values()),
-                        fkey=entry.fkey,
-                    )
-                else:
-                    yield McAfeeMscFirewallRecord(
-                        ts=from_unix(entry.date),
-                        ip=ip,
-                        protocol=protocol,
-                        port=port,
-                        message=self._clean_message(entry.details_info),
-                        keywords=",".join(log_fields.values()),
-                        fkey=entry.fkey,
-                    )
+                    if threat:
+                        yield McAfeeMscLogRecord(
+                            ts=from_unix(entry.date),
+                            threat=threat,
+                            message=self._clean_message(entry.details_info),
+                            keywords=",".join(log_fields.values()),
+                            fkey=entry.fkey,
+                        )
+                    else:
+                        yield McAfeeMscFirewallRecord(
+                            ts=from_unix(entry.date),
+                            ip=ip,
+                            protocol=protocol,
+                            port=port,
+                            message=self._clean_message(entry.details_info),
+                            keywords=",".join(log_fields.values()),
+                            fkey=entry.fkey,
+                        )

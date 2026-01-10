@@ -166,35 +166,34 @@ class SearchIndexPlugin(Plugin):
     def parse_sqlite(self, path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the SQLite3 ``SystemIndex_1_PropertyStore`` table."""
 
-        db = SQLite3(path)
+        with SQLite3(path) as db:
+            # ``ColumnId`` is translated using the ``SystemIndex_1_PropertyStore_Metadata`` table.
+            columns = {
+                row.get("Id"): row.get("UniqueKey", "").split("-", maxsplit=1)[-1]
+                for row in db.table("SystemIndex_1_PropertyStore_Metadata").rows()
+            }
 
-        # ``ColumnId`` is translated using the ``SystemIndex_1_PropertyStore_Metadata`` table.
-        columns = {
-            row.get("Id"): row.get("UniqueKey", "").split("-", maxsplit=1)[-1]
-            for row in db.table("SystemIndex_1_PropertyStore_Metadata").rows()
-        }
+            if not (table := db.table("SystemIndex_1_PropertyStore")):
+                self.target.log.warning("Database %s does not have a table called 'SystemIndex_1_PropertyStore'", path)
+                return
 
-        if not (table := db.table("SystemIndex_1_PropertyStore")):
-            self.target.log.warning("Database %s does not have a table called 'SystemIndex_1_PropertyStore'", path)
-            return
+            current_work_id = None
+            values = {}
 
-        current_work_id = None
-        values = {}
+            for row in table.rows():
+                work_id = row.get("WorkId")
+                if current_work_id is None:
+                    current_work_id = work_id
+                if work_id != current_work_id:
+                    yield from self.build_record(values, user_details, path)
+                    current_work_id = work_id
+                    values = {}
 
-        for row in table.rows():
-            work_id = row.get("WorkId")
-            if current_work_id is None:
-                current_work_id = work_id
-            if work_id != current_work_id:
-                yield from self.build_record(values, user_details, path)
-                current_work_id = work_id
-                values = {}
+                if value := row.get("Value"):
+                    column_name = columns[row.get("ColumnId")]
+                    values[column_name] = value
 
-            if value := row.get("Value"):
-                column_name = columns[row.get("ColumnId")]
-                values[column_name] = value
-
-        yield from self.build_record(values, user_details, path)
+            yield from self.build_record(values, user_details, path)
 
     def build_record(
         self, values: dict[str, Any] | TableRecord, user_details: UserDetails | None, db_path: Path
