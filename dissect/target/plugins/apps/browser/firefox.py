@@ -696,14 +696,17 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
 
         if master_key_cka != CKA_ID:
             raise ValueError(
-                f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}' in {key4_file}"
+                f"Password master key CKA_ID '{master_key_cka}' "
+                f"is not equal to expected value '{CKA_ID}' in {key4_file}"
             )
 
         decoded_password_check: core.Sequence = core.load(password_check)
         decoded_master_key: core.Sequence = core.load(master_key)
 
         try:
-            decrypted_password_check, algorithm = _decrypt_master_key(decoded_password_check, primary_password, global_salt)
+            decrypted_password_check, algorithm = _decrypt_master_key(
+                decoded_password_check, primary_password, global_salt
+            )
 
         except EOFError:
             raise ValueError("No primary password provided")

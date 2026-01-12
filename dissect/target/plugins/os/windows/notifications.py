@@ -453,9 +453,9 @@ class NotificationsPlugin(Plugin):
                             created_time=datetime.datetime.strptime(row["[CreatedTime]"], "%Y-%m-%d %H:%M:%S").replace(
                                 tzinfo=target_tz
                             ),
-                            modified_time=datetime.datetime.strptime(row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S").replace(
-                                tzinfo=target_tz
-                            ),
+                            modified_time=datetime.datetime.strptime(
+                                row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S"
+                            ).replace(tzinfo=target_tz),
                             id=row["[RecordId]"],
                             primary_id=row["[PrimaryId]"],
                             wns_id=row["[WNSId]"],
