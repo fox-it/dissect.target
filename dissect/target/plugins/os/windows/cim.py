@@ -116,7 +116,6 @@ class CimPlugin(Plugin):
         if len(repodirs) == 0:
             raise UnsupportedPluginError("No CIM database found")
 
-        self._subscription_ns = None
         self._filters: dict[str, EventFilter] = {}
         repodir = repodirs[0]
         index = repodir.joinpath("index.btr")
