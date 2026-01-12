@@ -90,19 +90,8 @@ class IISLogsPlugin(WebserverPlugin):
         if (sysvol_files := self.target.fs.path("sysvol/files")).exists():
             dirs["auto"].add(sysvol_files)
 
-        try:
-            xml_data = ElementTree.fromstring(self.config.read_bytes(), forbid_dtd=True)
-            for log_file_element in xml_data.findall("*/sites/*/logFile"):
-                log_format = log_file_element.get("logFormat") or "W3C"
-                if log_dir := log_file_element.get("directory"):
-                    if log_format not in dirs:
-                        self.target.log.warning("Unsupported log format %s, skipping %s", log_format, log_dir)
-                        continue
-                    dirs[log_format].add(self.target.resolve(log_dir))
-
-        except (ElementTree.ParseError, FileNotFoundError) as e:
-            self.target.log.warning("Error while parsing %s", self.config)
-            self.target.log.debug("", exc_info=e)
+        if self.config.exists():
+            self._read_config_log_paths(dirs)
 
         for log_dir in self.DEFAULT_LOG_DIRS:
             log_dir = self.target.expand_env(log_dir)
@@ -125,6 +114,21 @@ class IISLogsPlugin(WebserverPlugin):
 
     def _get_auxiliary_paths(self) -> Iterator[Path]:
         yield from {self.config}
+
+    def _read_config_log_paths(self, dirs: dict[str, set[str]]) -> None:
+        try:
+            xml_data = ElementTree.fromstring(self.config.read_bytes(), forbid_dtd=True)
+            for log_file_element in xml_data.findall("*/sites/*/logFile"):
+                log_format = log_file_element.get("logFormat") or "W3C"
+                if log_dir := log_file_element.get("directory"):
+                    if log_format not in dirs:
+                        self.target.log.warning("Unsupported log format %s, skipping %s", log_format, log_dir)
+                        continue
+                    dirs[log_format].add(self.target.resolve(log_dir))
+
+        except (ElementTree.ParseError, FileNotFoundError) as e:
+            self.target.log.warning("Error while parsing %s", self.config)
+            self.target.log.debug("", exc_info=e)
 
     @export(record=BasicRecordDescriptor)
     def logs(self) -> Iterator[TargetRecordDescriptor]:
