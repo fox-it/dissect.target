@@ -23,6 +23,7 @@ class MdVolumeSystem(LogicalVolumeSystem):
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         devices: dict[UUID, list[MDPhysicalDisk]] = {}
+        source_disks: dict[UUID, set[BinaryIO]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -31,9 +32,13 @@ class MdVolumeSystem(LogicalVolumeSystem):
             device = MDPhysicalDisk(vol)
             devices.setdefault(device.set_uuid, []).append(device)
 
-        for devs in devices.values():
+            disk = vol.disk if isinstance(vol, Volume) else vol
+            source_disks.setdefault(device.set_uuid, set()).add(disk)
+
+        for uuid, devs in devices.items():
             try:
-                yield cls(devs)
+                disks = list(source_disks[uuid])
+                yield cls(devs, disk=disks[0] if len(disks) == 1 else disks)
             except Exception:  # noqa: PERF203
                 continue
 
