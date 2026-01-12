@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.certificate import parse_x509
-from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
@@ -354,16 +354,19 @@ class NginxPlugin(WebserverPlugin):
 
 
 def construct_hosts_record(target: Target, host_path: Path, server: dict) -> WebserverHostRecord:
+    def _map_path(path: str | None) -> TargetPath:
+        return target.fs.path(path) if path else None
+
     return WebserverHostRecord(
         ts=host_path.lstat().st_mtime,
         webserver="nginx",
         server_name=server.get("server_name") or server.get("listen"),
         server_port=server.get("listen", "").replace(" ssl", "") or None,
-        root_path=server.get("root"),
-        access_log_config=server.get("access_log"),
-        error_log_config=server.get("error_log"),
-        tls_certificate=server.get("ssl_certificate"),
-        tls_key=server.get("ssl_certificate_key"),
+        root_path=_map_path(server.get("root")),
+        access_log_config=_map_path(server.get("access_log")),
+        error_log_config=_map_path(server.get("error_log")),
+        tls_certificate=_map_path(server.get("ssl_certificate")),
+        tls_key=_map_path(server.get("ssl_certificate_key")),
         source=host_path,
         _target=target,
     )
