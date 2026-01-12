@@ -136,6 +136,7 @@ class IISLogsPlugin(WebserverPlugin):
         Supported log formats: IIS, W3C.
         """
 
+        # We handle direct files here because _get_paths cannot select (filter) on the type of logfile.
         if self.target.is_direct:
             for log_file in self.get_paths():
                 yield from parse_autodetect_format_log(self.target, log_file)
