@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.logging import get_logger
@@ -20,6 +21,8 @@ from dissect.target.tools.utils.cli import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from dissect.target.target import Target
 
 
@@ -111,22 +114,26 @@ def get_target_info(target: Target, recursive: bool = False) -> dict[str, str | 
         "volumes": get_volumes_info(target),
         "mounts": get_mounts_info(target),
         "children": get_children_info(target, recursive),
-        "hostname": target.hostname,
-        "domain": get_optional_func(target, "domain"),
-        "ips": target.ips,
-        "os_family": target.os,
-        "os_version": target.version,
-        "architecture": target.architecture,
-        "language": get_optional_func(target, "language"),
-        "timezone": get_optional_func(target, "timezone"),
-        "install_date": get_optional_func(target, "install_date"),
-        "last_activity": get_optional_func(target, "activity"),
+        "hostname": get_property(target, "hostname"),
+        "domain": get_property(target, "domain"),
+        "ips": get_property(target, "ips"),
+        "os_family": get_property(target, "os"),
+        "os_version": get_property(target, "version"),
+        "architecture": get_property(target, "architecture"),
+        "language": get_property(target, "language"),
+        "timezone": get_property(target, "timezone"),
+        "install_date": get_property(target, "install_date"),
+        "last_activity": get_property(target, "activity"),
     }
 
 
-def get_optional_func(target: Target, func: str) -> str | None:
-    if target.has_function(func):
-        return getattr(target, func)
+def get_property(target: Target, func: str) -> str | None:
+    try:
+        if target.has_function(func):
+            return getattr(target, func)
+    except Exception as e:
+        log.warning("Error executing %s: %s", func, e)
+        log.debug("", exc_info=e)
     return None
 
 
@@ -155,18 +162,37 @@ def print_target_info(target: Target, target_info: dict[str, str | list[str]]) -
         print(f"{name.capitalize().replace('_', ' '):14s} : {value}")
 
 
+def catch_errors(func: Callable[[Target], list[dict]]) -> Callable[[Target], list[dict]]:
+    """Catch all errors and return dict with error if encountered."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> list[dict[str, Any]]:
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            log.warning("Error executing %s: %s", func.__name__, e)
+            log.debug("", exc_info=e)
+            return [{"error": str(e)}]
+
+    return wrapper
+
+
+@catch_errors
 def get_disks_info(target: Target) -> list[dict[str, str | int]]:
     return [{"type": d.__type__, "size": d.size} for d in target.disks]
 
 
+@catch_errors
 def get_volumes_info(target: Target) -> list[dict[str, str | int | None]]:
     return [{"name": v.name, "size": v.size, "fs": v.fs.__type__ if v.fs else None} for v in target.volumes]
 
 
+@catch_errors
 def get_mounts_info(target: Target) -> list[dict[str, str | None]]:
     return [{"fs": fs.__type__, "path": path} for path, fs in target.fs.mounts.items()]
 
 
+@catch_errors
 def get_children_info(target: Target, recursive: bool = False) -> list[dict[str, str]]:
     return [
         {"id": child_id, "type": child.type, "name": child.name, "path": str(child.path)}

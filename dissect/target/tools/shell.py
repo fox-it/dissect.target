@@ -1537,7 +1537,9 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[Target], python: bool, registry: bool, commands: list[str] | None) -> None:
+def open_shell(
+    targets: list[Target], python: bool = False, registry: bool = False, commands: list[str] | None = None
+) -> None:
     """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
     if python:
         python_shell(targets, commands=commands)
@@ -1546,7 +1548,7 @@ def open_shell(targets: list[Target], python: bool, registry: bool, commands: li
         target_shell(targets, cli_cls=cli_cls, commands=commands)
 
 
-def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list[str] | None) -> None:
+def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list[str] | None = None) -> None:
     """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
     if cli := create_cli(targets, cli_cls):
         if commands is not None:

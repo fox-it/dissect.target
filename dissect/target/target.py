@@ -269,7 +269,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path: str | Path) -> Self:
+    def open(cls, path: str | Path, *, apply: bool = True) -> Self:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
@@ -307,20 +307,22 @@ class Target:
         except Exception as e:
             raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {spec}: {e}") from e
 
-        return cls._load(spec, loader_instance)
+        return cls._load(spec, loader_instance, apply=apply)
 
     @classmethod
-    def open_raw(cls, path: str | Path) -> Self:
+    def open_raw(cls, path: str | Path, *, apply: bool = True) -> Self:
         """Open a Target with the given path using the :class:`~dissect.target.loaders.raw.RawLoader`.
 
         Args:
             path: Path to load the ``Target`` from.
         """
         adjusted_path = Path(path) if not isinstance(path, os.PathLike) else path
-        return cls._load(path, loader.RawLoader(adjusted_path))
+        return cls._load(path, loader.RawLoader(adjusted_path), apply=apply)
 
     @classmethod
-    def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False) -> Iterator[Self]:
+    def open_all(
+        cls, paths: str | Path | list[str | Path], include_children: bool = False, *, apply: bool = True
+    ) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
 
         If the path is a directory, iterate files one directory deep.
@@ -336,7 +338,7 @@ class Target:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
-        def _open_all(spec: str | Path, include_children: bool = False) -> Iterator[Target]:
+        def _open_all(spec: str | Path, include_children: bool = False, *, apply: bool = True) -> Iterator[Target]:
             # If the path is a URI-like string, separate the path component
             adjusted_path, parsed_path = parse_path_uri(spec)
             # We always need a path to work with, so convert the spec into one if it's not one already
@@ -390,7 +392,9 @@ class Target:
                     # load_spec is the original "spec"
                     # For URI-like paths it's the full original URI
                     # For file/dir-like paths it's a Path object
-                    target = cls._load(load_spec, ldr)
+                    # If include_children is True, we override the apply parameter so we can find child targets
+                    # The apply parameter will then be used on the children
+                    target = cls._load(load_spec, ldr, apply=include_children or apply)
                 except Exception as e:
                     get_target_logger(load_spec).error("Failed to load target with loader %s", ldr)
                     get_target_logger(load_spec).debug("", exc_info=e)
@@ -400,7 +404,7 @@ class Target:
 
                 if include_children:
                     try:
-                        yield from target.open_children()
+                        yield from target.open_children(apply=apply)
                     except Exception as e:
                         get_target_logger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
 
@@ -413,7 +417,7 @@ class Target:
         for spec in paths:
             loaded = False
 
-            for target in _open_all(spec, include_children=include_children):
+            for target in _open_all(spec, include_children=include_children, apply=apply):
                 loaded = True
                 at_least_one_loaded = True
                 yield target
@@ -434,7 +438,7 @@ class Target:
 
                 if path.is_dir():
                     for entry in path.iterdir():
-                        for target in _open_all(entry, include_children=include_children):
+                        for target in _open_all(entry, include_children=include_children, apply=apply):
                             at_least_one_loaded = True
                             yield target
 
@@ -492,7 +496,7 @@ class Target:
                 )
                 self.log.debug("", exc_info=e)
 
-    def open_child(self, child: int | str | Path) -> Target:
+    def open_child(self, child: int | str | Path, *, apply: bool = True) -> Target:
         """Open a child target.
 
         Allows opening a nested child target by path, index or child pattern.
@@ -516,7 +520,7 @@ class Target:
             for child_idx in map(int, str(child).split(".")):
                 for _, child in current_target.list_children():
                     if child_idx == 0:
-                        current_target = Target.open(current_target.fs.path(child.path))
+                        current_target = Target.open(current_target.fs.path(child.path), apply=apply)
                         break
                     child_idx -= 1
                 else:
@@ -525,9 +529,9 @@ class Target:
             return current_target
 
         # Open child by path
-        return Target.open(self.fs.path(child))
+        return Target.open(self.fs.path(child), apply=apply)
 
-    def open_children(self, recursive: bool = False) -> Iterator[Target]:
+    def open_children(self, recursive: bool = False, *, apply: bool = True) -> Iterator[Target]:
         """Open all the child targets on a ``Target``.
 
         Will open all discovered child targets if the current ``Target`` has them, such as VMs on a hypervisor.
@@ -540,7 +544,7 @@ class Target:
         """
         for _, child in self.list_children():
             try:
-                target = self.open_child(child.path)
+                target = self.open_child(child.path, apply=apply)
             except TargetError:
                 self.log.exception("Failed to open child target %s", child)
                 continue
@@ -548,7 +552,7 @@ class Target:
             yield target
 
             if recursive:
-                yield from target.open_children(recursive=recursive)
+                yield from target.open_children(recursive=recursive, apply=apply)
 
     def list_children(self, recursive: bool = False) -> Iterator[tuple[str, ChildTargetRecord]]:
         """Lists all discovered child targets."""
@@ -569,7 +573,7 @@ class Target:
 
                 idx += 1
 
-    def reload(self) -> Target:
+    def reload(self, *, apply: bool = True) -> Target:
         """Reload the current target.
 
         Using the loader with which the target was originally loaded,
@@ -584,12 +588,12 @@ class Target:
         """
 
         if self._loader and self.path:
-            return self._load(self.path, self._loader)
+            return self._load(self.path, self._loader, apply=apply)
 
         raise TargetError("Target has no path and/or loader")
 
     @classmethod
-    def _load(cls, path: str | Path | None, ldr: loader.Loader) -> Self:
+    def _load(cls, path: str | Path | None, ldr: loader.Loader, *, apply: bool = True) -> Self:
         """Internal function that attemps to load a path using a given loader.
 
         Args:
@@ -607,7 +611,9 @@ class Target:
         try:
             ldr.map(target)
             target._loader = ldr
-            target.apply()
+
+            if apply:
+                target.apply()
         except Exception as e:
             raise TargetError(f"Failed to load target: {path}") from e
         else:
@@ -893,6 +899,7 @@ class Collection(Generic[T]):
 
 class DiskCollection(Collection[container.Container]):
     def apply(self) -> None:
+        """Identify (basic) volume systems on all disks and add their volumes to the volume collection."""
         for disk in self.entries:
             # Some LVM configurations (i.e. RAID with the metadata at the end of the disk)
             # may be misidentified as having a valid MBR/GPT on some of the disks
@@ -921,7 +928,13 @@ class DiskCollection(Collection[container.Container]):
 
 
 class VolumeCollection(Collection[volume.Volume]):
-    def apply(self) -> None:
+    def apply(self, *, filesystems: bool = True) -> None:
+        """Identify logical and encrypted volumes on all volumes and add their volumes to the volume collection.
+        Additionally, identify filesystems on all volumes and add them to the filesystem collection.
+
+        Args:
+            filesystems: Whether to identify filesystems on the volumes.
+        """
         # We don't want later additions to modify the todo, so make a copy
         todo = self.entries[:]
         fs_volumes = []
@@ -987,6 +1000,10 @@ class VolumeCollection(Collection[volume.Volume]):
                     new_volumes.append(dec_volume)
 
             todo = new_volumes
+
+        if not filesystems:
+            # Skip filesystem identification
+            return
 
         mv_fs_volumes = []
         for vol in fs_volumes:
