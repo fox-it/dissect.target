@@ -696,8 +696,7 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
 
         if master_key_cka != CKA_ID:
             raise ValueError(
-                f"Password master key CKA_ID '{master_key_cka}' "
-                f"is not equal to expected value '{CKA_ID}' in {key4_file}"
+                f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}' in {key4_file}"  # noqa: E501
             )
 
         decoded_password_check: core.Sequence = core.load(password_check)
