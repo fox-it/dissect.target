@@ -3,7 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dissect.target.plugins.os.windows import cim
-from dissect.target.plugins.os.windows.cim import ActiveScriptEventConsumerRecord, CommandLineEventConsumerRecord
+from dissect.target.plugins.os.windows.cim import (
+    ActiveScriptEventConsumerRecord,
+    CommandLineEventConsumerRecord,
+)
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
@@ -12,7 +15,8 @@ if TYPE_CHECKING:
 
 
 def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
-    wbem_repository = absolute_path("_data/plugins/os/windows/cim")
+    """Test the CIM plugin for extracting WMI Consumer Bindings."""
+    wbem_repository = absolute_path("_data/plugins/os/windows/cim/default-namespace")
     fs_win.map_dir("Windows/System32/wbem/repository", wbem_repository)
 
     target_win.add_plugin(cim.CimPlugin)
@@ -25,7 +29,7 @@ def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
 
 
 def test_cim_direct_mode() -> None:
-    data_path = absolute_path("_data/plugins/os/windows/cim")
+    data_path = absolute_path("_data/plugins/os/windows/cim/default-namespace")
     target = Target.open_direct([data_path])
     records = list(target.cim.consumerbindings())
 
@@ -269,3 +273,13 @@ UNCServerName            :
 PSComputerName           : DESKTOP-O8964S4
 ```
 """  # noqa: E501
+
+
+def test_consumerbindings_all_namespaces(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    """Test the CIM plugin for extracting WMI Consumer Bindings from all namespaces."""
+    wbem_repository = absolute_path("_data/plugins/os/windows/cim/non-default-namespace")
+    fs_win.map_dir("Windows/System32/wbem/repository", wbem_repository)
+    target_win.add_plugin(cim.CimPlugin)
+    consumer_records = list(target_win.cim.consumerbindings())
+    binding_names = [r.filter_name for r in consumer_records]
+    assert "Pentestlab-WMI" in binding_names

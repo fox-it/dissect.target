@@ -502,7 +502,14 @@ def test_direct_mode(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPa
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", "cim", str(absolute_path("_data/plugins/os/windows/cim/")), "--direct", "-s"],
+            [
+                "target-query",
+                "-f",
+                "cim",
+                str(absolute_path("_data/plugins/os/windows/cim/default-namespace")),
+                "--direct",
+                "-s",
+            ],
         )
 
         target_query()
