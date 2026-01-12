@@ -3,18 +3,18 @@ from __future__ import annotations
 import base64
 import itertools
 import json
-import logging
 from base64 import b64decode
 from hashlib import pbkdf2_hmac, sha1
 from itertools import chain
 from typing import TYPE_CHECKING
 
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
@@ -30,8 +30,6 @@ from dissect.target.plugins.apps.browser.browser import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
-
-    from dissect.sql.sqlite3 import SQLite3
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -59,7 +57,8 @@ FIREFOX_EXTENSION_RECORD_FIELDS = [
     ("string[]", "optional_permissions"),
 ]
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class FirefoxPlugin(BrowserPlugin):
@@ -171,10 +170,10 @@ class FirefoxPlugin(BrowserPlugin):
                 db_file = profile_dir.joinpath(filename)
 
             try:
-                yield user_details, db_file, sqlite3.SQLite3(db_file.open())
+                yield user_details, db_file, SQLite3(db_file)
             except FileNotFoundError:
                 self.target.log.info("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -240,7 +239,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -287,7 +286,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing cookie file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -375,7 +374,7 @@ class FirefoxPlugin(BrowserPlugin):
                         _target=self.target,
                         _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -674,9 +673,7 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
     # Extract neccesary information from the key4.db file. Multiple values might exist for the
     # values we are interested in. Generally the last entry will be the currently active value,
     # which is why we need to iterate every row in the table to get the last entry.
-    with key4_file.open("rb") as fh:
-        db = sqlite3.SQLite3(fh)
-
+    with SQLite3(key4_file) as db:
         # Get the last ``item`` (global salt) and ``item2`` (password check) values.
         if table := db.table("metadata"):
             for row in table.rows():
@@ -694,40 +691,42 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
         else:
             raise ValueError(f"Missing table 'nssPrivate' in key4.db {key4_file}")
 
-    if not master_key:
-        raise ValueError(f"Password master key is not defined in key4.db {key4_file}")
+        if not master_key:
+            raise ValueError(f"Password master key is not defined in key4.db {key4_file}")
 
-    if master_key_cka != CKA_ID:
-        raise ValueError(
-            f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}' in {key4_file}"
-        )
+        if master_key_cka != CKA_ID:
+            raise ValueError(
+                f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}' in {key4_file}"  # noqa: E501
+            )
 
-    decoded_password_check: core.Sequence = core.load(password_check)
-    decoded_master_key: core.Sequence = core.load(master_key)
+        decoded_password_check: core.Sequence = core.load(password_check)
+        decoded_master_key: core.Sequence = core.load(master_key)
 
-    try:
-        decrypted_password_check, algorithm = _decrypt_master_key(decoded_password_check, primary_password, global_salt)
+        try:
+            decrypted_password_check, algorithm = _decrypt_master_key(
+                decoded_password_check, primary_password, global_salt
+            )
 
-    except EOFError:
-        raise ValueError("No primary password provided")
+        except EOFError:
+            raise ValueError("No primary password provided")
 
-    except ValueError as e:
-        raise ValueError(f"Unable to decrypt Firefox password check: {e!s}") from e
+        except ValueError as e:
+            raise ValueError(f"Unable to decrypt Firefox password check: {e!s}") from e
 
-    if not decrypted_password_check:
-        raise ValueError(f"Encountered unknown algorithm {algorithm} while decrypting Firefox master key")
+        if not decrypted_password_check:
+            raise ValueError(f"Encountered unknown algorithm {algorithm} while decrypting Firefox master key")
 
-    expected_password_check = b"password-check\x02\x02"
+        expected_password_check = b"password-check\x02\x02"
 
-    if decrypted_password_check != expected_password_check:
-        log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
-        raise ValueError("Master key decryption failed. Provided password could be missing or incorrect")
+        if decrypted_password_check != expected_password_check:
+            log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
+            raise ValueError("Master key decryption failed. Provided password could be missing or incorrect")
 
-    decrypted, algorithm = _decrypt_master_key(decoded_master_key, primary_password, global_salt)
+        decrypted, algorithm = _decrypt_master_key(decoded_master_key, primary_password, global_salt)
 
-    block_size = 16 if algos.EncryptionAlgorithmId.map(algorithm) == "pbes2" else 8
+        block_size = 16 if algos.EncryptionAlgorithmId.map(algorithm) == "pbes2" else 8
 
-    return unpad(decrypted, block_size)
+        return unpad(decrypted, block_size)
 
 
 def decrypt_value(b64_ciphertext: str, key: bytes) -> bytes | None:

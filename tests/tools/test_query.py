@@ -237,7 +237,7 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
 
         with (
             patch(
-                "dissect.target.tools.utils.find_functions",
+                "dissect.target.tools.utils.cli.find_functions",
                 autospec=True,
                 side_effect=mock_find_functions,
             ),
@@ -459,7 +459,7 @@ def test_arguments_passed_correctly(
 
         with (
             patch(
-                "dissect.target.tools.utils.find_functions",
+                "dissect.target.tools.utils.cli.find_functions",
                 autospec=True,
                 side_effect=mock_find_functions,
             ),

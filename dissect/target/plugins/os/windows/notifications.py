@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from dissect.cstruct import cstruct
-from dissect.sql import sqlite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import wintimestamp
 from flow.record import GroupedRecord
 
@@ -444,50 +444,50 @@ class NotificationsPlugin(Plugin):
         target_tz = self.target.datetime.tzinfo
 
         for user, wpndatabase in self.wpndb_files:
-            db = sqlite3.SQLite3(wpndatabase.open())
-            handlers = {}
+            with SQLite3(wpndatabase) as db:
+                handlers = {}
 
-            if table := db.table("NotificationHandler"):
-                for row in table.rows():
-                    handlers[row["[RecordId]"]] = WpnDatabaseNotificationHandlerRecord(
-                        created_time=datetime.datetime.strptime(row["[CreatedTime]"], "%Y-%m-%d %H:%M:%S").replace(
-                            tzinfo=target_tz
-                        ),
-                        modified_time=datetime.datetime.strptime(row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S").replace(
-                            tzinfo=target_tz
-                        ),
-                        id=row["[RecordId]"],
-                        primary_id=row["[PrimaryId]"],
-                        wns_id=row["[WNSId]"],
-                        handler_type=row["[HandlerType]"],
-                        wnf_event_name=row["[WNFEventName]"],
-                        system_data_property_set=row["[SystemDataPropertySet]"],
-                        _target=self.target,
-                        _user=user,
-                    )
+                if table := db.table("NotificationHandler"):
+                    for row in table.rows():
+                        handlers[row["[RecordId]"]] = WpnDatabaseNotificationHandlerRecord(
+                            created_time=datetime.datetime.strptime(row["[CreatedTime]"], "%Y-%m-%d %H:%M:%S").replace(
+                                tzinfo=target_tz
+                            ),
+                            modified_time=datetime.datetime.strptime(
+                                row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S"
+                            ).replace(tzinfo=target_tz),
+                            id=row["[RecordId]"],
+                            primary_id=row["[PrimaryId]"],
+                            wns_id=row["[WNSId]"],
+                            handler_type=row["[HandlerType]"],
+                            wnf_event_name=row["[WNFEventName]"],
+                            system_data_property_set=row["[SystemDataPropertySet]"],
+                            _target=self.target,
+                            _user=user,
+                        )
 
-            if table := db.table("Notification"):
-                for row in table.rows():
-                    record = WpnDatabaseNotificationRecord(
-                        arrival_time=wintimestamp(row["[ArrivalTime]"]),
-                        expiry_time=wintimestamp(row["[ExpiryTime]"]),
-                        order=row["[Order]"],
-                        id=row["[Id]"],
-                        handler_id=row["[HandlerId]"],
-                        activity_id=UUID(bytes=row["[ActivityId]"]),
-                        type=row["[Type]"],
-                        payload_data=row["[Payload]"],
-                        payload_type=row["[PayloadType]"],
-                        tag=row["[Tag]"],
-                        group=row["[Group]"],
-                        boot_id=row["[BootId]"],
-                        expires_on_reboot=row["[ExpiresOnReboot]"] != "FALSE",
-                        _target=self.target,
-                        _user=user,
-                    )
-                    handler = handlers.get(row["[HandlerId]"])
+                if table := db.table("Notification"):
+                    for row in table.rows():
+                        record = WpnDatabaseNotificationRecord(
+                            arrival_time=wintimestamp(row["[ArrivalTime]"]),
+                            expiry_time=wintimestamp(row["[ExpiryTime]"]),
+                            order=row["[Order]"],
+                            id=row["[Id]"],
+                            handler_id=row["[HandlerId]"],
+                            activity_id=UUID(bytes=row["[ActivityId]"]),
+                            type=row["[Type]"],
+                            payload_data=row["[Payload]"],
+                            payload_type=row["[PayloadType]"],
+                            tag=row["[Tag]"],
+                            group=row["[Group]"],
+                            boot_id=row["[BootId]"],
+                            expires_on_reboot=row["[ExpiresOnReboot]"] != "FALSE",
+                            _target=self.target,
+                            _user=user,
+                        )
+                        handler = handlers.get(row["[HandlerId]"])
 
-                    if handler:
-                        yield GroupedRecord("windows/notification/wpndatabase/grouped", [record, handler])
-                    else:
-                        yield record
+                        if handler:
+                            yield GroupedRecord("windows/notification/wpndatabase/grouped", [record, handler])
+                        else:
+                            yield record

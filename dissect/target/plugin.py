@@ -9,7 +9,6 @@ import fnmatch
 import functools
 import importlib
 import importlib.util
-import logging
 import os
 import sys
 import traceback
@@ -25,6 +24,7 @@ import dissect.target.plugins.os.default as default
 from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.helpers.utils import StrEnum
 
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from dissect.target.helpers.record import ChildTargetRecord
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 MODULE_PATH = "dissect.target.plugins"
 """The base module path to the in-tree plugins."""
@@ -459,10 +459,21 @@ class Plugin:
                 self.target.log.debug("", exc_info=e)
 
     def get_paths(self) -> Iterator[Path]:
+        """Return all artifact paths."""
         if self.target.is_direct:
             yield from self._get_paths_direct()
         else:
             yield from self._get_paths()
+
+    def get_all_paths(self) -> Iterator[Path]:
+        """Return all artifact and auxiliary paths.
+
+        The implementation of this function will
+        probably change in the future, but the interface
+        should stay the same.
+        """
+        yield from self.get_paths()
+        yield from self._get_auxiliary_paths()
 
     def _get_paths_direct(self) -> Iterator[Path]:
         """Return all paths as given by the user."""
@@ -470,7 +481,14 @@ class Plugin:
             yield self.target.fs.path(str(path))
 
     def _get_paths(self) -> Iterator[Path]:
-        """Return all files of interest to the plugin.
+        """Return all artifact files of interest to the plugin.
+
+        To be implemented by the plugin subclass.
+        """
+        raise NotImplementedError
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        """Return all auxiliary files of interest to the plugin.
 
         To be implemented by the plugin subclass.
         """
@@ -623,7 +641,7 @@ def register(plugincls: type[Plugin]) -> None:
             for part in module_parts[:-2]:
                 obj = obj.setdefault(part, {})
 
-        log.debug("Plugin registered: %s", module_key)
+        log.trace("Plugin registered: %s", module_key)
 
 
 def _get_plugins() -> PluginRegistry:

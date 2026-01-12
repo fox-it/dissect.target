@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import traceback
 import urllib.parse
@@ -21,6 +20,7 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import config
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import parse_path_uri
+from dissect.target.helpers.logging import TargetLogAdapter, get_logger
 from dissect.target.helpers.utils import StrEnum, slugify
 from dissect.target.loaders.direct import DirectLoader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
@@ -32,7 +32,8 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.record import ChildTargetRecord
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 FunctionTuple = tuple[plugin.Plugin, plugin.Plugin | property | None]
 
@@ -44,15 +45,10 @@ class Event(StrEnum):
     FUNC_EXEC_ERROR = "function-execution-error"
 
 
-def getlogger(target: Target) -> TargetLogAdapter:
+def get_target_logger(target: Target) -> TargetLogAdapter:
     if not log.root.handlers:
         log.setLevel(os.getenv("DISSECT_LOG_TARGET", "CRITICAL"))
     return TargetLogAdapter(log, {"target": target})
-
-
-class TargetLogAdapter(logging.LoggerAdapter):
-    def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        return f"{self.extra['target']}: {msg}", kwargs
 
 
 class Target:
@@ -88,7 +84,7 @@ class Target:
             self.path_query = dict(urllib.parse.parse_qsl(self.parsed_path.query, keep_blank_values=True))
 
         self.props: dict[Any, Any] = {}
-        self.log = getlogger(self)
+        self.log = get_target_logger(self)
 
         self._name = None
         self._plugins: list[plugin.Plugin] = []
@@ -273,7 +269,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path: str | Path) -> Self:
+    def open(cls, path: str | Path, *, apply: bool = True) -> Self:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
@@ -311,20 +307,22 @@ class Target:
         except Exception as e:
             raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {spec}: {e}") from e
 
-        return cls._load(spec, loader_instance)
+        return cls._load(spec, loader_instance, apply=apply)
 
     @classmethod
-    def open_raw(cls, path: str | Path) -> Self:
+    def open_raw(cls, path: str | Path, *, apply: bool = True) -> Self:
         """Open a Target with the given path using the :class:`~dissect.target.loaders.raw.RawLoader`.
 
         Args:
             path: Path to load the ``Target`` from.
         """
         adjusted_path = Path(path) if not isinstance(path, os.PathLike) else path
-        return cls._load(path, loader.RawLoader(adjusted_path))
+        return cls._load(path, loader.RawLoader(adjusted_path), apply=apply)
 
     @classmethod
-    def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False) -> Iterator[Self]:
+    def open_all(
+        cls, paths: str | Path | list[str | Path], include_children: bool = False, *, apply: bool = True
+    ) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
 
         If the path is a directory, iterate files one directory deep.
@@ -340,7 +338,7 @@ class Target:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
-        def _open_all(spec: str | Path, include_children: bool = False) -> Iterator[Target]:
+        def _open_all(spec: str | Path, include_children: bool = False, *, apply: bool = True) -> Iterator[Target]:
             # If the path is a URI-like string, separate the path component
             adjusted_path, parsed_path = parse_path_uri(spec)
             # We always need a path to work with, so convert the spec into one if it's not one already
@@ -359,7 +357,7 @@ class Target:
                 # Couldn't find a loader
                 return
 
-            getlogger(spec).debug("Attempting to use loader: %s", loader_cls)
+            get_target_logger(spec).debug("Attempting to use loader: %s", loader_cls)
             # See if the loader provides any additional paths to load
             # This is useful for URI-like paths that have wildcard components
             for sub_path in loader_cls.find_all(found_path, parsed_path=parsed_path):
@@ -385,8 +383,8 @@ class Target:
                     ldr = loader_cls(load_path, parsed_path=load_parsed_path)
                 except Exception as e:
                     message = "%s" if isinstance(e, TargetPathNotFoundError) else "Failed to initiate loader: %s"
-                    getlogger(load_spec).error(message, e)
-                    getlogger(load_spec).debug("", exc_info=e)
+                    get_target_logger(load_spec).error(message, e)
+                    get_target_logger(load_spec).debug("", exc_info=e)
                     continue
 
                 try:
@@ -394,19 +392,21 @@ class Target:
                     # load_spec is the original "spec"
                     # For URI-like paths it's the full original URI
                     # For file/dir-like paths it's a Path object
-                    target = cls._load(load_spec, ldr)
+                    # If include_children is True, we override the apply parameter so we can find child targets
+                    # The apply parameter will then be used on the children
+                    target = cls._load(load_spec, ldr, apply=include_children or apply)
                 except Exception as e:
-                    getlogger(load_spec).error("Failed to load target with loader %s", ldr)
-                    getlogger(load_spec).debug("", exc_info=e)
+                    get_target_logger(load_spec).error("Failed to load target with loader %s", ldr)
+                    get_target_logger(load_spec).debug("", exc_info=e)
                     continue
                 else:
                     yield target
 
                 if include_children:
                     try:
-                        yield from target.open_children()
+                        yield from target.open_children(apply=apply)
                     except Exception as e:
-                        getlogger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
+                        get_target_logger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
 
         at_least_one_loaded = False
 
@@ -417,7 +417,7 @@ class Target:
         for spec in paths:
             loaded = False
 
-            for target in _open_all(spec, include_children=include_children):
+            for target in _open_all(spec, include_children=include_children, apply=apply):
                 loaded = True
                 at_least_one_loaded = True
                 yield target
@@ -435,13 +435,12 @@ class Target:
 
                 if not path.exists():
                     raise TargetError(f"Failed to find loader for {path}: path does not exist")
-                elif not path.is_dir():
-                    raise TargetError(f"Failed to find loader for {path}: path is not a directory")
 
-                for entry in path.iterdir():
-                    for target in _open_all(entry, include_children=include_children):
-                        at_least_one_loaded = True
-                        yield target
+                if path.is_dir():
+                    for entry in path.iterdir():
+                        for target in _open_all(entry, include_children=include_children, apply=apply):
+                            at_least_one_loaded = True
+                            yield target
 
         if not at_least_one_loaded:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
@@ -475,25 +474,29 @@ class Target:
             try:
                 plugin_cls: type[plugin.ChildTargetPlugin] = plugin.load(plugin_desc)
                 child_plugin = plugin_cls(self)
-            except PluginError:
-                self.log.exception("Failed to load child plugin: %s", plugin_desc.qualname)
+            except PluginError as e:
+                self.log.error("Failed to load child plugin: %s (%s)", plugin_desc.qualname, e)  # noqa: TRY400
+                self.log.debug("", exc_info=e)
                 continue
-            except Exception:
-                self.log.exception("Broken child plugin: %s", plugin_desc.qualname)
+            except Exception as e:
+                self.log.error("Broken child plugin: %s (%s)", plugin_desc.qualname, e)  # noqa: TRY400
+                self.log.debug("", exc_info=e)
                 continue
 
             try:
                 child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
-            except PluginError as e:
-                self.log.info("Child plugin reported itself as incompatible: %s", plugin_desc.qualname)
-                self.log.debug("", exc_info=e)
-            except Exception:
-                self.log.exception(
-                    "An exception occurred while checking for child plugin compatibility: %s", plugin_desc.qualname
+            except UnsupportedPluginError as e:
+                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc.qualname, e)
+            except Exception as e:
+                self.log.error(  # noqa: TRY400
+                    "An exception occurred while checking for child plugin compatibility: %s (%s)",
+                    plugin_desc.qualname,
+                    e,
                 )
+                self.log.debug("", exc_info=e)
 
-    def open_child(self, child: int | str | Path) -> Target:
+    def open_child(self, child: int | str | Path, *, apply: bool = True) -> Target:
         """Open a child target.
 
         Allows opening a nested child target by path, index or child pattern.
@@ -517,7 +520,7 @@ class Target:
             for child_idx in map(int, str(child).split(".")):
                 for _, child in current_target.list_children():
                     if child_idx == 0:
-                        current_target = Target.open(current_target.fs.path(child.path))
+                        current_target = Target.open(current_target.fs.path(child.path), apply=apply)
                         break
                     child_idx -= 1
                 else:
@@ -526,9 +529,9 @@ class Target:
             return current_target
 
         # Open child by path
-        return Target.open(self.fs.path(child))
+        return Target.open(self.fs.path(child), apply=apply)
 
-    def open_children(self, recursive: bool = False) -> Iterator[Target]:
+    def open_children(self, recursive: bool = False, *, apply: bool = True) -> Iterator[Target]:
         """Open all the child targets on a ``Target``.
 
         Will open all discovered child targets if the current ``Target`` has them, such as VMs on a hypervisor.
@@ -541,7 +544,7 @@ class Target:
         """
         for _, child in self.list_children():
             try:
-                target = self.open_child(child.path)
+                target = self.open_child(child.path, apply=apply)
             except TargetError:
                 self.log.exception("Failed to open child target %s", child)
                 continue
@@ -549,7 +552,7 @@ class Target:
             yield target
 
             if recursive:
-                yield from target.open_children(recursive=recursive)
+                yield from target.open_children(recursive=recursive, apply=apply)
 
     def list_children(self, recursive: bool = False) -> Iterator[tuple[str, ChildTargetRecord]]:
         """Lists all discovered child targets."""
@@ -570,7 +573,7 @@ class Target:
 
                 idx += 1
 
-    def reload(self) -> Target:
+    def reload(self, *, apply: bool = True) -> Target:
         """Reload the current target.
 
         Using the loader with which the target was originally loaded,
@@ -585,12 +588,12 @@ class Target:
         """
 
         if self._loader and self.path:
-            return self._load(self.path, self._loader)
+            return self._load(self.path, self._loader, apply=apply)
 
         raise TargetError("Target has no path and/or loader")
 
     @classmethod
-    def _load(cls, path: str | Path | None, ldr: loader.Loader) -> Self:
+    def _load(cls, path: str | Path | None, ldr: loader.Loader, *, apply: bool = True) -> Self:
         """Internal function that attemps to load a path using a given loader.
 
         Args:
@@ -608,7 +611,9 @@ class Target:
         try:
             ldr.map(target)
             target._loader = ldr
-            target.apply()
+
+            if apply:
+                target.apply()
         except Exception as e:
             raise TargetError(f"Failed to load target: {path}") from e
         else:
@@ -649,7 +654,7 @@ class Target:
             # Now subclassed OS Plugins are on the same detection "layer" as
             # regular OS Plugins, but can still inherit functions.
             qualname = plugin_desc.qualname
-            self.log.debug("Loading OS plugin: %s", qualname)
+            self.log.trace("Loading OS plugin: %s", qualname)
             try:
                 os_plugin: type[plugin.OSPlugin] = plugin.load(plugin_desc)
                 fs = os_plugin.detect(self)
@@ -717,7 +722,7 @@ class Target:
             UnsupportedPluginError: Raised when plugins were found, but they were incompatible
             PluginError: Raised when any other exception occurs while trying to load the plugin.
         """
-        self.log.debug("Adding plugin: %s", plugin_cls)
+        self.log.trace("Adding plugin: %s", plugin_cls)
 
         if not isinstance(plugin_cls, plugin.Plugin):
             try:
@@ -818,7 +823,7 @@ class Target:
                 for descriptor in plugin.lookup(function, self._os_plugin):
                     try:
                         self.load_plugin(descriptor)
-                        self.log.debug("Found compatible plugin '%s' for function '%s'", descriptor.qualname, function)
+                        self.log.trace("Found compatible plugin '%s' for function '%s'", descriptor.qualname, function)
                         break
                     except UnsupportedPluginError as e:
                         self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_desc=descriptor)
@@ -894,6 +899,7 @@ class Collection(Generic[T]):
 
 class DiskCollection(Collection[container.Container]):
     def apply(self) -> None:
+        """Identify (basic) volume systems on all disks and add their volumes to the volume collection."""
         for disk in self.entries:
             # Some LVM configurations (i.e. RAID with the metadata at the end of the disk)
             # may be misidentified as having a valid MBR/GPT on some of the disks
@@ -922,7 +928,13 @@ class DiskCollection(Collection[container.Container]):
 
 
 class VolumeCollection(Collection[volume.Volume]):
-    def apply(self) -> None:
+    def apply(self, *, filesystems: bool = True) -> None:
+        """Identify logical and encrypted volumes on all volumes and add their volumes to the volume collection.
+        Additionally, identify filesystems on all volumes and add them to the filesystem collection.
+
+        Args:
+            filesystems: Whether to identify filesystems on the volumes.
+        """
         # We don't want later additions to modify the todo, so make a copy
         todo = self.entries[:]
         fs_volumes = []
@@ -988,6 +1000,10 @@ class VolumeCollection(Collection[volume.Volume]):
                     new_volumes.append(dec_volume)
 
             todo = new_volumes
+
+        if not filesystems:
+            # Skip filesystem identification
+            return
 
         mv_fs_volumes = []
         for vol in fs_volumes:

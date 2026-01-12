@@ -7,7 +7,7 @@ import pytest
 
 from dissect.target.plugin import FailureDescriptor, FunctionDescriptor, PluginRegistry
 from dissect.target.target import Event, Target
-from dissect.target.tools.report import (
+from dissect.target.tools.utils.report import (
     ExecutionReport,
     TargetExecutionReport,
     format_target_report,
@@ -208,9 +208,9 @@ def test_execution_report_get_formatted_report(
     target_report2: TargetExecutionReport,
 ) -> None:
     with (
-        patch("dissect.target.tools.report.make_cli_args_overview", return_value="line_1"),
-        patch("dissect.target.tools.report.make_plugin_import_errors_overview", return_value="line_2"),
-        patch("dissect.target.tools.report.format_target_report", return_value="line_x"),
+        patch("dissect.target.tools.utils.report.make_cli_args_overview", return_value="line_1"),
+        patch("dissect.target.tools.utils.report.make_plugin_import_errors_overview", return_value="line_2"),
+        patch("dissect.target.tools.utils.report.format_target_report", return_value="line_x"),
     ):
         assert execution_report.get_formatted_report() == "line_1\nline_2\nline_x\nline_x"
 

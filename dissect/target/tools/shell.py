@@ -33,18 +33,12 @@ from dissect.target.exceptions import (
     TargetError,
 )
 from dissect.target.helpers import cyber, fsutil, regutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
 from dissect.target.target import Target
-from dissect.target.tools.fsutils import (
-    fmt_ls_colors,
-    ls_scandir,
-    print_ls,
-    print_stat,
-    print_xattr,
-)
 from dissect.target.tools.info import get_target_info, print_target_info
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     escape_str,
@@ -54,13 +48,21 @@ from dissect.target.tools.utils import (
     open_targets,
     process_generic_arguments,
 )
+from dissect.target.tools.utils.fs import (
+    fmt_ls_colors,
+    ls_scandir,
+    print_ls,
+    print_stat,
+    print_xattr,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from dissect.target.filesystem import FilesystemEntry
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -1535,7 +1537,9 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[Target], python: bool, registry: bool, commands: list[str] | None) -> None:
+def open_shell(
+    targets: list[Target], python: bool = False, registry: bool = False, commands: list[str] | None = None
+) -> None:
     """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
     if python:
         python_shell(targets, commands=commands)
@@ -1544,7 +1548,7 @@ def open_shell(targets: list[Target], python: bool, registry: bool, commands: li
         target_shell(targets, cli_cls=cli_cls, commands=commands)
 
 
-def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list[str] | None) -> None:
+def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list[str] | None = None) -> None:
     """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
     if cli := create_cli(targets, cli_cls):
         if commands is not None:

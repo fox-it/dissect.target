@@ -105,7 +105,7 @@ class CapabilityPlugin(Plugin):
         """
 
         for entry in self.target.fs.recurse("/"):
-            if not entry.is_file() or entry.is_symlink():
+            if not entry.is_file(follow_symlinks=False):
                 continue
             yield from parse_entry(entry, self.target)
 

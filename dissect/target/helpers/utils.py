@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import re
 from datetime import datetime, timezone, tzinfo
 from enum import Enum, IntEnum
@@ -9,12 +8,14 @@ from typing import TYPE_CHECKING, BinaryIO, TypeVar
 from dissect.util.ts import from_unix
 
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 def findall(buf: bytes, needle: bytes) -> Iterator[int]:
