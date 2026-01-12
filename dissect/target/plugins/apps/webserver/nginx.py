@@ -3,13 +3,16 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from itertools import chain
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.certificate import parse_x509
+from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
+    WebserverCertificateRecord,
     WebserverErrorLogRecord,
     WebserverHostRecord,
     WebserverPlugin,
@@ -245,6 +248,7 @@ class NginxPlugin(WebserverPlugin):
 
                 yield WebserverAccessLogRecord(
                     ts=ts,
+                    webserver="nginx",
                     bytes_sent=bytes_sent,
                     **log,
                     source=path,
@@ -287,6 +291,7 @@ class NginxPlugin(WebserverPlugin):
 
                 yield WebserverErrorLogRecord(
                     ts=ts,
+                    webserver="nginx",
                     **log,
                     source=path,
                     _target=self.target,
@@ -300,34 +305,71 @@ class NginxPlugin(WebserverPlugin):
             - https://nginx.org/en/docs/http/ngx_http_core_module.html#server
         """
 
-        def yield_record(current_server: dict) -> Iterator[WebserverHostRecord]:
-            yield WebserverHostRecord(
-                ts=host_path.lstat().st_mtime,
-                server_name=current_server.get("server_name") or current_server.get("listen"),
-                server_port=current_server.get("listen"),
-                root_path=current_server.get("root"),
-                access_log_config=current_server.get("access_log"),
-                error_log_config=current_server.get("error_log"),
-                source=host_path,
-                _target=self.target,
-            )
-
         for host_path in self.host_paths:
-            current_server = {}
+            server = {}
             seen_server_directive = False
             for line in host_path.open("rt"):
                 if "server {" in line:
-                    if current_server:
-                        yield from yield_record(current_server)
-                    current_server = {}
+                    if server:
+                        yield construct_hosts_record(self.target, host_path, server)
+                    server = {}
                     seen_server_directive = True
 
                 elif seen_server_directive:
                     key, _, value = line.strip().partition(" ")
-                    current_server[key] = value.rstrip(";")
+                    server[key] = value.rstrip(";").strip()
 
-            if current_server:
-                yield from yield_record(current_server)
+            if server:
+                yield construct_hosts_record(self.target, host_path, server)
+
+    @export(record=WebserverCertificateRecord)
+    def certificates(self) -> Iterator[WebserverCertificateRecord]:
+        """Return found server certificates in the NGINX configuration."""
+        certs = set()
+
+        for host in self.hosts():
+            # Parse x509 certificate
+            if host.tls_certificate and (cert_path := self.target.fs.path(host.tls_certificate)).is_file():
+                certs.add(cert_path)
+
+        root = self.target.fs.path("/etc/nginx")
+        for cert_path in chain(root.glob("**/*.crt"), root.glob("**/*.pem")):
+            if cert_path not in certs:
+                certs.add(cert_path)
+
+        for cert_path in certs:
+            try:
+                cert = parse_x509(cert_path)
+                yield WebserverCertificateRecord(
+                    ts=cert_path.lstat().st_mtime,
+                    webserver="nginx",
+                    **cert._asdict(),
+                    host=host.server_name,
+                    source=cert_path,
+                    _target=self.target,
+                )
+            except Exception as e:  # noqa: PERF203
+                self.target.log.warning("Unable to parse certificate %s :%s", cert_path, e)
+                self.target.log.debug("", exc_info=e)
+
+
+def construct_hosts_record(target: Target, host_path: Path, server: dict) -> WebserverHostRecord:
+    def _map_path(path: str | None) -> TargetPath:
+        return target.fs.path(path) if path else None
+
+    return WebserverHostRecord(
+        ts=host_path.lstat().st_mtime,
+        webserver="nginx",
+        server_name=server.get("server_name") or server.get("listen"),
+        server_port=server.get("listen", "").replace(" ssl", "") or None,
+        root_path=_map_path(server.get("root")),
+        access_log_config=_map_path(server.get("access_log")),
+        error_log_config=_map_path(server.get("error_log")),
+        tls_certificate=_map_path(server.get("ssl_certificate")),
+        tls_key=_map_path(server.get("ssl_certificate_key")),
+        source=host_path,
+        _target=target,
+    )
 
 
 def parse_json_line(line: str) -> dict[str, str] | None:
