@@ -23,17 +23,22 @@ class DdfVolumeSystem(LogicalVolumeSystem):
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         sets: dict[bytes, list[DDFPhysicalDisk]] = {}
+        source_disks: dict[bytes, set[BinaryIO]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
                 continue
 
-            disk = DDFPhysicalDisk(vol)
-            sets.setdefault(disk.anchor.DDF_Header_GUID, []).append(disk)
+            ddf_disk = DDFPhysicalDisk(vol)
+            sets.setdefault(ddf_disk.anchor.DDF_Header_GUID, []).append(ddf_disk)
 
-        for devs in sets.values():
+            disk = vol.disk if isinstance(vol, Volume) else vol
+            source_disks.setdefault(ddf_disk.anchor.DDF_Header_GUID, set()).add(disk)
+
+        for guid, devs in sets.items():
             try:
-                yield cls(devs)
+                disks = list(source_disks[guid])
+                yield cls(devs, disk=disks[0] if len(disks) == 1 else disks)
             except Exception:  # noqa: PERF203
                 continue
 
