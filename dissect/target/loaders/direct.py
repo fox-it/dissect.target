@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import functools
 import operator
+import sys
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterator
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.logging import get_logger
@@ -44,14 +45,27 @@ class DirectLoader(Loader):
 
     def check_case_insensitive_overlap(self) -> bool:
         """Verify if two differents files will have the same path in a case-insensitive fs"""
-
-        def get_files(path: Path) -> list[Path]:
-            if not path.exists():
-                return []
-            if path.is_file():
-                return [path]
-            # Recursively find all files in the directory
-            return list(path.rglob("*"))
+        if sys.version_info >= (3, 12) or sys.platform != "win32":
+            def get_files(path: Path) -> Iterator[Path]:
+                if not path.exists():
+                    return
+                if path.is_file():
+                    yield path
+                # Recursively find all files in the directory
+                yield from path.rglob("*")
+        else:
+            def get_files(path: Path, max_depth: int = 7) -> Iterator[Path]:
+                if max_depth == 0:
+                    return
+                if not path.exists():
+                    return
+                if path.is_file():
+                    yield path
+                for f in path.iterdir():
+                    if f.is_dir():
+                        yield from get_files(f, max_depth=max_depth - 1)
+                    else:
+                        yield f
 
         # Create a flat list of all file paths from all input directories
         all_paths = chain.from_iterable(get_files(p) for p in self.paths)
