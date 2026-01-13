@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import io
 import logging
-from pathlib import Path
-
-import pytest
+import typing
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
+
+if typing.TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 def test_direct_overlap_warning(
