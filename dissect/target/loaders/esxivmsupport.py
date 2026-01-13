@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystems.tar import TarFilesystem
-from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 from dissect.target.loaders.dir import map_dirs
 from dissect.target.loaders.tar import TarSubLoader
