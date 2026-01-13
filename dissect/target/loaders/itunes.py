@@ -146,7 +146,7 @@ class ITunesBackup:
     def _open_manifest_db(self) -> SQLite3:
         path = self.root.joinpath("Manifest.db")
         if not self.encrypted or self.manifest["Lockdown"]["ProductVersion"] < "10.2":
-            fh = path.open("rb")
+            fh = path
         else:
             key = self.key_bag.unwrap(self.manifest["ManifestKey"])
             fh = BytesIO(aes_decrypt(path.read_bytes(), key))
