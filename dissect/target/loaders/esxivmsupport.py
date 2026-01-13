@@ -64,5 +64,5 @@ class EsxiVmSupportTarSubloader(TarSubLoader):
         return required_paths.issubset(names)
 
     def map(self, target: Target) -> None:
-        fs = TarFilesystem(tarfile=self.tar, base=self.tar.getnames()[0].split("/")[0], fh=self.tar.fileobj)
+        fs = TarFilesystem(self.tar.fileobj, tarfile=self.tar, base=self.tar.getnames()[0].split("/")[0])
         target.filesystems.add(fs)
