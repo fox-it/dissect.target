@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import operator
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -11,8 +12,6 @@ from dissect.target.loader import Loader
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
-
     from dissect.target.target import Target
 
 log = get_logger(__name__)
@@ -43,33 +42,24 @@ class DirectLoader(Loader):
         target.filesystems.add(vfs)
         target._os_plugin = DefaultOSPlugin
 
-    def yield_all_file_recursively(self, base_path: Path, max_depth: int = 7) -> Iterator[Path]:
-        """
-        Return list of all files recursively, as rglob is not case-sensitive until python 3.12
-
-        :param base_path:
-        :param max_depth: max depth, prevent infinite recursion
-        :return:
-        """
-        if max_depth == 0:
-            return
-        if not base_path.exists():
-            return
-        if base_path.is_file():
-            yield base_path
-            return
-        for f in base_path.iterdir():
-            if f.is_dir():
-                yield from self.yield_all_file_recursively(f, max_depth=max_depth - 1)
-            else:
-                yield f
-
     def check_case_insensitive_overlap(self) -> bool:
         """Verify if two differents files will have the same path in a case-insensitive fs"""
-        all_files_list = list(
-            functools.reduce(operator.iadd, (list(self.yield_all_file_recursively(p)) for p in self.paths), [])
-        )
-        return len({str(p).lower() for p in all_files_list}) != len(all_files_list)
+
+        def get_files(path: Path) -> list[Path]:
+            if not path.exists():
+                return []
+            if path.is_file():
+                return [path]
+            # Recursively find all files in the directory
+            return list(path.rglob("*"))
+
+        # Create a flat list of all file paths from all input directories
+        all_paths = chain.from_iterable(get_files(p) for p in self.paths)
+        # Filter out directories, keeping only files
+        all_files = [p for p in all_paths if p.is_file()]
+        # Compare the count of all files with the count of unique, lowercased file paths
+
+        return len({str(p).lower() for p in all_files}) != len(all_files)
 
     def __repr__(self) -> str:
         """
