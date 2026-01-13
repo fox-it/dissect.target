@@ -137,6 +137,7 @@ class TarLoader(Loader):
         import_lazy("dissect.target.loaders.acquire").AcquireTarSubLoader,
         import_lazy("dissect.target.loaders.uac").UacTarSubloader,
         import_lazy("dissect.target.loaders.nscollector").NsCollectorTarSubLoader,
+        import_lazy("dissect.target.loaders.esxivmsupport").EsxiVmSupportTarSubloader,
         GenericTarSubLoader,  # should be last
     )
 
