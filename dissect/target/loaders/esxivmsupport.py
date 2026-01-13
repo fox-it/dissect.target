@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-log = get_logger(__name__)
 # From tech support readme
 # Files/Directories of Interest:
 # ------------------------------
