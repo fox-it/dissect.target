@@ -4,6 +4,7 @@ from tests._utils import absolute_path
 
 
 def test_ewf_container() -> None:
+    """Test that EWF containers are properly opened."""
     path = absolute_path("_data/containers/ewf/small.E01")
 
     fh = container.open(path)
