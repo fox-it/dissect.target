@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import pytest
+
 from dissect.target.helpers.cache import Cache
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
 from dissect.target.plugins.os.windows.ual import UalPlugin
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -60,13 +63,13 @@ def test_cache_filename(target_win: Target) -> None:
     )
 
 
-def test_cache_write_failure_behavior(target_bare: Target) -> None:
+def test_cache_write_failure_behavior(target_bare: Target, tmp_path: Path) -> None:
     """
     Specifically tests the 'Write Path' (Cache Miss) which returns a CacheWriter.
     We verify that CacheWriter acts as an Iterator even when the underlying
     plugin returns None (stops immediately).
     """
-    target_bare._config.CACHE_DIR = "/tmp"
+    target_bare._config.CACHE_DIR = str(tmp_path)
 
     # 1. Mock Plugin with two modes
     class MockPlugin:
@@ -117,9 +120,6 @@ def test_cache_write_failure_behavior(target_bare: Target) -> None:
     # 2. calling next() should raise StopIteration, NOT TypeError
     assert iter(gen_failure) is gen_failure
 
-    try:
+    # CacheWriter should be an empty iterable
+    with pytest.raises(StopIteration):
         next(gen_failure)
-    except StopIteration:
-        pass
-    except TypeError as e:
-        raise AssertionError(f"Crash detected! CacheWriter is not an iterator: {e}")
