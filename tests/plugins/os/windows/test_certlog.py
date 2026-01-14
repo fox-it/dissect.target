@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import TYPE_CHECKING
 
 from dissect.target.plugins.os.windows import certlog
@@ -23,10 +24,9 @@ def test_certlog_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     certificates = list(target_win.certlog.certificates())
     assert len(certificates) == 11
     assert len(list(target_win.certlog.certificate_extensions())) == 92
-
-    assert certificates[0].serial_number_hex == "1169f0517d9b598e4ba7af46e4674066"
-    assert int(certificates[0].serial_number_hex, 16) == 23146941333149199441888068127529844838
-    # TODO: Further certificate normalization, see https://github.com/fox-it/dissect.target/issues/1452
+    assert certificates[0].serial_number == "1169f0517d9b598e4ba7af46e4674066"
+    assert certificates[0].fingerprint.sha1 == hashlib.sha1(certificates[0].raw_certificate).hexdigest()
+    assert certificates[0].fingerprint.sha1 == "061ec97dcef82d0e2d100b590e790a803d4573ae"
 
 
 def test_certlog_plugin_direct() -> None:

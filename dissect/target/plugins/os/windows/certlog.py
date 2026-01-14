@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from dissect.database.ese.tools import certlog
 from dissect.database.exception import Error
@@ -10,7 +10,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
     from dissect.target.target import Target
@@ -43,7 +43,7 @@ CertificateExtensionRecord = TargetRecordDescriptor(
 CertificateRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/certificate",
     [
-        ("string", "certificate_hash2"),
+        ("digest", "fingerprint"),
         ("string", "certificate_template"),
         ("string", "common_name"),
         ("string", "country"),
@@ -57,7 +57,7 @@ CertificateRecord = TargetRecordDescriptor(
         ("string", "organization"),
         ("string", "organizational_unit"),
         ("string", "public_key_algorithm"),
-        ("string", "serial_number_hex"),
+        ("string", "serial_number"),
         ("string", "state_or_province"),
         ("string", "street_address"),
         ("string", "subject_key_identifier"),
@@ -69,8 +69,8 @@ CertificateRecord = TargetRecordDescriptor(
         ("string", "enrollment_flags"),
         ("string", "general_flags"),
         ("string", "issuer_name_id"),
-        ("datetime", "not_after"),
-        ("datetime", "not_before"),
+        ("datetime", "not_valid_after"),
+        ("datetime", "not_valid_before"),
         ("string", "private_key_flags"),
         ("string", "public_key"),
         ("varint", "public_key_length"),
@@ -98,7 +98,7 @@ RequestRecord = TargetRecordDescriptor(
         ("string", "distinguished_name"),
         ("string", "domain_component"),
         ("string", "email"),
-        ("string", "endorsement_certificate_hash"),
+        ("string", "endorsement_fingerprint"),
         ("string", "endorsement_key_hash"),
         ("string", "given_name"),
         ("string", "initials"),
@@ -172,7 +172,8 @@ FIELD_MAPPINGS = {
     "$AttributeValue": "common_name",
     "$CRLPublishError": "crl_publish_error",
     "$CallerName": "caller_name",
-    "$CertificateHash2": "certificate_hash2",
+    "$CertificateHash": "fingerprint",
+    "$CertificateHash2": "fingerprint",
     "$CertificateTemplate": "certificate_template",
     "$CommonName": "common_name",
     "$Country": "country",
@@ -181,7 +182,7 @@ FIELD_MAPPINGS = {
     "$DistinguishedName": "distinguished_name",
     "$DomainComponent": "domain_component",
     "$EMail": "email",
-    "$EndorsementCertificateHash": "endorsement_certificate_hash",
+    "$EndorsementCertificateHash": "endorsement_fingerprint",
     "$EndorsementKeyHash": "endorsement_key_hash",
     "$ExtensionName": "extension_name",
     "$GivenName": "given_name",
@@ -193,7 +194,7 @@ FIELD_MAPPINGS = {
     "$PublicKeyAlgorithm": "public_key_algorithm",
     "$RequestAttributes": "request_attributes",
     "$RequesterName": "requester_name",
-    "$SerialNumber": "serial_number_hex",
+    "$SerialNumber": "serial_number",
     "$SignerApplicationPolicies": "signer_application_policies",
     "$SignerPolicies": "signer_policies",
     "$StateOrProvince": "state_or_province",
@@ -221,8 +222,8 @@ FIELD_MAPPINGS = {
     "NameId": "name_id",
     "NextPublish": "next_publish",
     "NextUpdate": "next_update",
-    "NotAfter": "not_after",
-    "NotBefore": "not_before",
+    "NotAfter": "not_valid_after",
+    "NotBefore": "not_valid_before",
     "Number": "number",
     "PrivateKeyFlags": "private_key_flags",
     "PropagationComplete": "propagation_complete",
@@ -251,6 +252,27 @@ FIELD_MAPPINGS = {
     "TableName": "table_name",
     "ThisPublish": "this_publish",
     "ThisUpdate": "this_update",
+}
+
+
+def format_fingerprint(input_hash: str | None) -> tuple[str | None, str | None, str | None]:
+    if input_hash:
+        input_hash = input_hash.replace(" ", "")
+        # older version use md5
+        if len(input_hash) == 64:
+            return input_hash, None, None
+    return None, input_hash, None
+
+
+def format_serial_number(serial_number_as_hex: str | None) -> str | None:
+    if not serial_number_as_hex:
+        return None
+    return serial_number_as_hex.replace(" ", "")
+
+
+FORMATING_FUNC: dict[str, Callable[[Any], Any]] = {
+    "fingerprint": format_fingerprint,
+    "serial_number": format_serial_number,
 }
 
 
@@ -302,6 +324,8 @@ class CertLogPlugin(Plugin):
                 record_values = {}
                 for column, value in column_values:
                     new_column = FIELD_MAPPINGS.get(column)
+                    if new_column in FORMATING_FUNC:
+                        value = FORMATING_FUNC[new_column](value)
                     if new_column:
                         record_values[new_column] = value
                     else:

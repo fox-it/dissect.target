@@ -15,10 +15,9 @@ try:
 except ImportError:
     HAS_ASN1 = False
 
-
 COMMON_CERTIFICATE_FIELDS = [
     ("digest", "fingerprint"),
-    ("varint", "serial_number"),
+    ("string", "serial_number"),
     ("datetime", "not_valid_before"),
     ("datetime", "not_valid_after"),
     ("string", "issuer_dn"),
@@ -75,6 +74,22 @@ def compute_pem_fingerprints(pem: str | bytes) -> tuple[str, str, str]:
     return md5, sha1, sha256
 
 
+def format_serial_number_as_hex(serial_number: int | None) -> str | None:
+    """
+    Format serial_number from integer to hex. Add a prefix 0 if output length is not pair, in order to be consistent
+        with usual serial_number representation (navigator, openssl etc...).
+
+    :param serial_number:
+    :return:
+    """
+    if serial_number is None:
+        return serial_number
+    serial_number_as_hex = f"{serial_number:x}"
+    if len(serial_number_as_hex) % 2 == 1:
+        serial_number_as_hex = f"0{serial_number_as_hex}"
+    return serial_number_as_hex
+
+
 def parse_x509(file: str | bytes | Path) -> CertificateRecord:
     """Parses a PEM file. Returns a CertificateREcord. Does not parse a public key embedded in a x509 certificate."""
 
@@ -111,6 +126,6 @@ def parse_x509(file: str | bytes | Path) -> CertificateRecord:
         issuer_dn=",".join(issuer),
         subject_dn=",".join(subject),
         fingerprint=(md5, crt.sha1.hex(), crt.sha256.hex()),
-        serial_number=crt.serial_number,
+        serial_number=format_serial_number_as_hex(crt.serial_number),
         pem=crt.dump(),
     )

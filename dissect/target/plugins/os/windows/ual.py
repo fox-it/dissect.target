@@ -53,7 +53,7 @@ VirtualMachineRecord = TargetRecordDescriptor(
         ("datetime", "last_seen_active_date"),
         ("string", "vm_guid"),
         ("string", "bios_guid"),
-        ("string", "serial"),
+        ("string", "serial_number"),
         ("string", "path"),
     ],
 )
@@ -129,7 +129,7 @@ FIELD_NAME_MAP = {
     "ProductName": "product_name",
     "RoleGuid": "role_guid",
     "RoleName": "role_name",
-    "SerialNumber": "serial",
+    "SerialNumber": "serial_number",
     "ServicePackMajor": "service_pack_major_version",
     "ServicePackMinor": "service_pack_minor_version",
     "SystemDNSHostName": "system_dns_hostname",

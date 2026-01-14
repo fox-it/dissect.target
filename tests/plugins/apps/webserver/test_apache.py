@@ -500,7 +500,7 @@ def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesyst
     assert records[0].fingerprint.md5 == "a218ac9b6dbdaa8b23658c4d18c1cfc1"
     assert records[0].fingerprint.sha1 == "6566d8ebea1feb4eb3d12d9486cddb69e4e9e827"
     assert records[0].fingerprint.sha256 == "7221d881743505f13b7bfe854bdf800d7f0cd22d34307ed7157808a295299471"
-    assert records[0].serial_number == 21067204948278457910649605551283467908287726794
+    assert records[0].serial_number == "03b0afa702c33e37fffd40e0c402b2120c1284ca"
     assert records[0].not_valid_before == datetime(2025, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
     assert records[0].not_valid_after == datetime(2026, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
     assert records[0].issuer_dn == "C=AU,ST=Some-State,O=Internet Widgits Pty Ltd,CN=example.com"
