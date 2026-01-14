@@ -64,8 +64,8 @@ def test_cache_filename(target_win: Target) -> None:
 
 
 def test_cache_write_failure_behavior(target_bare: Target, tmp_path: Path) -> None:
-    """
-    Specifically tests the 'Write Path' (Cache Miss) which returns a CacheWriter.
+    """Specifically tests the 'Write Path' (Cache Miss) which returns a CacheWriter.
+
     We verify that CacheWriter acts as an Iterator even when the underlying
     plugin returns None (stops immediately).
     """
