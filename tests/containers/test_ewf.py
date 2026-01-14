@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target import container
 from dissect.target.containers.ewf import EwfContainer
 from tests._utils import absolute_path
