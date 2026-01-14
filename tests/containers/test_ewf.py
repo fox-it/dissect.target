@@ -3,7 +3,7 @@ from dissect.target.containers.ewf import EwfContainer
 from tests._utils import absolute_path
 
 
-def test_split_container() -> None:
+def test_ewf_container() -> None:
     path = absolute_path("_data/containers/ewf/small.E01")
 
     fh = container.open(path)
