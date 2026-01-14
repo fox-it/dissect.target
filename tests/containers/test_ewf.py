@@ -33,4 +33,3 @@ def test_ewf_container_splitted() -> None:
     fh.seek(-15, whence=os.SEEK_CUR)
     assert fh.read(20) == b"CZ_\xbe\xc0\xf5\xfb\xf2\x7f/a\xd6\xb5w="
     fh.close()
-

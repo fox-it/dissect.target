@@ -62,5 +62,3 @@ def test_split_container(obj: str, request: pytest.FixtureRequest) -> None:
     assert fh.read(4) == b"BBBB"
     fh.seek(-4, whence=os.SEEK_END)
     assert fh.read(4) == b"DDDD"
-
-
