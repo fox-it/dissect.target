@@ -8,7 +8,12 @@ from tests._utils import absolute_path
 
 
 def test_ewf_container() -> None:
-    """Test that EWF containers are properly opened."""
+    """Test that EWF containers are properly opened.
+
+    ```
+    echo "testdissecte01" | ewfacquirestream -t small
+    ```
+    """
     path = absolute_path("_data/containers/ewf/small.E01")
 
     fh = container.open(path)
@@ -22,14 +27,21 @@ def test_ewf_container() -> None:
 
 
 def test_ewf_container_splitted() -> None:
-    """Test that EWF containers are properly opened when container is split among multiple files"""
-    path = absolute_path("_data/containers/ewf/splitted.E01")
+    """Test that EWF containers are properly opened when container is split among multiple files.
+
+    ```
+    # ewfacquire has a minimum 1mb split size, we generate a bit more than 1Mb of compressed data
+    dd if=/dev/urandom bs=512 count=2100 of=random
+    cat random | ewfacquirestream -t split -S 1048576
+    ```
+    """
+    path = absolute_path("_data/containers/ewf/split.E01")
 
     fh = container.open(path)
     assert isinstance(fh, EwfContainer)
-    assert fh.read(20) == b"\x90g`\x023H\xd2_\x18\x9cj\xb7G\x80\x8c\xf1\r\x7f\x80\xda"
+    assert fh.read(20) == b'T\x0e\xf4x\x9eT\x17\xda\xca\xbfV\xbb\xda\x99"\xe7S\xa8J\xe7'
     fh.seek(0, whence=io.SEEK_END)
     assert fh.tell() == 1075200
     fh.seek(-15, whence=io.SEEK_CUR)
-    assert fh.read(20) == b"CZ_\xbe\xc0\xf5\xfb\xf2\x7f/a\xd6\xb5w="
+    assert fh.read(20) == b"L5\x089\x8c\xe4\x91~\x9a4\xbcG@\xb4\x11"
     fh.close()
