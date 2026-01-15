@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import io
 from io import BytesIO
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -55,10 +55,10 @@ def test_split_container(obj: str, request: pytest.FixtureRequest) -> None:
     fh = container.open(request.getfixturevalue(obj))
     _assert_split_container(fh)
     assert fh.read(4096) == (b"A" * 512) + (b"B" * 512) + (b"C" * 512) + (b"D" * 512)
-    fh.seek(0, whence=os.SEEK_SET)
+    fh.seek(0, whence=io.SEEK_SET)
     assert fh.read(4) == b"AAAA"
     assert fh.tell() == 4
-    fh.seek(508, whence=os.SEEK_CUR)
+    fh.seek(508, whence=io.SEEK_CUR)
     assert fh.read(4) == b"BBBB"
-    fh.seek(-4, whence=os.SEEK_END)
+    fh.seek(-4, whence=io.SEEK_END)
     assert fh.read(4) == b"DDDD"

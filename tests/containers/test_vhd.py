@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import gzip
-import os
+import io
 
 from dissect.target import container
 from dissect.target.containers.vhd import VhdContainer
@@ -17,7 +17,7 @@ def test_vhd_container() -> None:
     a = fh.read(20)
     assert a == b"\x00" * 20
     assert fh.tell() == 20
-    fh.seek(0, whence=os.SEEK_END)
+    fh.seek(0, whence=io.SEEK_END)
     assert fh.tell() == 4194304
     fh.close()
     gz_file.close()
