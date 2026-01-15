@@ -17,7 +17,8 @@ except ImportError:
 
 COMMON_CERTIFICATE_FIELDS = [
     ("digest", "fingerprint"),
-    ("string", "serial_number"),
+    ("varint", "serial_number"),
+    ("string", "serial_number_hex"),
     ("datetime", "not_valid_before"),
     ("datetime", "not_valid_after"),
     ("string", "issuer_dn"),
@@ -84,10 +85,12 @@ def format_serial_number_as_hex(serial_number: int | None) -> str | None:
     """
     if serial_number is None:
         return serial_number
-    serial_number_as_hex = f"{serial_number:x}"
-    if len(serial_number_as_hex) % 2 == 1:
-        serial_number_as_hex = f"0{serial_number_as_hex}"
-    return serial_number_as_hex
+    if serial_number > 0:
+        serial_number_as_hex = f"{serial_number:x}"
+        if len(serial_number_as_hex) % 2 == 1:
+            serial_number_as_hex = f"0{serial_number_as_hex}"
+        return serial_number_as_hex
+    return f"-{-serial_number:x}"
 
 
 def parse_x509(file: str | bytes | Path) -> CertificateRecord:
@@ -126,6 +129,7 @@ def parse_x509(file: str | bytes | Path) -> CertificateRecord:
         issuer_dn=",".join(issuer),
         subject_dn=",".join(subject),
         fingerprint=(md5, crt.sha1.hex(), crt.sha256.hex()),
-        serial_number=format_serial_number_as_hex(crt.serial_number),
+        serial_number=crt.serial_number,
+        serial_number_hex=format_serial_number_as_hex(crt.serial_number),
         pem=crt.dump(),
     )

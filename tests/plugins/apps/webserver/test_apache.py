@@ -500,9 +500,97 @@ def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesyst
     assert records[0].fingerprint.md5 == "a218ac9b6dbdaa8b23658c4d18c1cfc1"
     assert records[0].fingerprint.sha1 == "6566d8ebea1feb4eb3d12d9486cddb69e4e9e827"
     assert records[0].fingerprint.sha256 == "7221d881743505f13b7bfe854bdf800d7f0cd22d34307ed7157808a295299471"
-    assert records[0].serial_number == "03b0afa702c33e37fffd40e0c402b2120c1284ca"
+    assert records[0].serial_number == 21067204948278457910649605551283467908287726794
+    assert records[0].serial_number_hex == "03b0afa702c33e37fffd40e0c402b2120c1284ca"
     assert records[0].not_valid_before == datetime(2025, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
     assert records[0].not_valid_after == datetime(2026, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
     assert records[0].issuer_dn == "C=AU,ST=Some-State,O=Internet Widgits Pty Ltd,CN=example.com"
+    assert records[0].host == "example.com"
+    assert records[0].source == "/etc/apache2/ssl/example/cert.crt"
+
+
+def test_apache_hosts_certificates_negative_serial_number(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we can parse Apache ``VirtualHost`` certificates, with a certificate using a negative serial number
+    certificate generated using
+    ```
+    openssl genrsa -out negative_serial.key 2048
+    openssl req -new -x509 -key negative_serial.key \
+        -out negative_serial.crt -days 365 -set_serial -1337 -config openssl.cnf
+    ```
+
+    Where openssl.cnf has the following content
+
+    ```
+    [ req ]
+    default_bits       = 2048
+    distinguished_name = req_distinguished_name
+    x509_extensions    = v3_ca
+    prompt             = no
+
+    [ req_distinguished_name ]
+    C  = FR
+    ST = RHONE
+    L  = Lyon
+    O  = Dissect
+    OU = Demo
+    CN = docs.dissect.tools
+
+    [ v3_ca ]
+    subjectKeyIdentifier   = hash
+    authorityKeyIdentifier = keyid:always,issuer
+    basicConstraints       = critical,CA:TRUE
+    keyUsage              = critical,digitalSignature,keyEncipherment
+    subjectAltName        = @alt_names
+
+    [ alt_names ]
+    DNS.1 = monserveur.example.com
+    DNS.2 = www.monserveur.example.com
+    IP.1  = 192.168.1.100
+    ```
+
+
+    """
+
+    fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(b'ServerRoot "/etc/apache2"\n'))
+
+    site = r"""
+    <VirtualHost *:443>
+        ServerName example.com
+        ServerAlias www.example.com
+        DocumentRoot /var/www/html
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+        SSLEngine on
+        SSLCertificateFile /path/to/cert.crt
+        SSLCertificateKeyFile /path/to/cert.key
+    </VirtualHost>
+    """
+    fs_unix.map_file_fh("/etc/apache2/sites-available/example.conf", BytesIO(textwrap.dedent(site).encode()))
+    fs_unix.map_file("/path/to/cert.crt", absolute_path("_data/plugins/apps/webserver/negative_serial.crt"))
+    fs_unix.map_file("/path/to/cert.key", absolute_path("_data/plugins/apps/webserver/negative_serial.key"))
+
+    # Map a default location too
+    fs_unix.map_file(
+        "/etc/apache2/ssl/example/cert.crt", absolute_path("_data/plugins/apps/webserver/negative_serial.crt")
+    )
+    fs_unix.map_file(
+        "/etc/apache2/ssl/example/cert.key", absolute_path("_data/plugins/apps/webserver/negative_serial.key")
+    )
+
+    target_unix.add_plugin(ApachePlugin)
+
+    records = sorted(target_unix.apache.certificates(), key=lambda r: r.source)
+    assert len(records) == 2
+
+    assert records[0].webserver == "apache"
+    assert records[0].fingerprint.md5 == "ca443d8103dea9606941eca59f91171a"
+    assert records[0].fingerprint.sha1 == "2611b6245659da68772c1b70830ec8d7b4b9c4af"
+    assert records[0].fingerprint.sha256 == "0d69e5c68a62353cc7a1dd9d088d60f1028184e8bb693a2ba81cedd05b8804c1"
+    assert records[0].serial_number == -1337
+    # openssl display the following for negative numbers : Serial Number: -1337 (-0x539)
+    assert records[0].serial_number_hex == "-539"
+    assert records[0].not_valid_before == datetime(2026, 1, 15, 13, 32, 00, tzinfo=timezone.utc)
+    assert records[0].not_valid_after == datetime(2027, 1, 15, 13, 32, 00, tzinfo=timezone.utc)
+    assert records[0].issuer_dn == "C=FR,ST=RHONE,L=Lyon,O=Dissect,OU=Demo,CN=docs.dissect.tools"
     assert records[0].host == "example.com"
     assert records[0].source == "/etc/apache2/ssl/example/cert.crt"

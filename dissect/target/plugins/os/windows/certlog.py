@@ -58,6 +58,8 @@ CertificateRecord = TargetRecordDescriptor(
         ("string", "organizational_unit"),
         ("string", "public_key_algorithm"),
         ("string", "serial_number"),
+        ("string", "serial_number_hex"),
+        ("varint", "serial_number"),
         ("string", "state_or_province"),
         ("string", "street_address"),
         ("string", "subject_key_identifier"),
@@ -194,7 +196,7 @@ FIELD_MAPPINGS = {
     "$PublicKeyAlgorithm": "public_key_algorithm",
     "$RequestAttributes": "request_attributes",
     "$RequesterName": "requester_name",
-    "$SerialNumber": "serial_number",
+    "$SerialNumber": "serial_number_hex",
     "$SignerApplicationPolicies": "signer_application_policies",
     "$SignerPolicies": "signer_policies",
     "$StateOrProvince": "state_or_province",
@@ -283,9 +285,15 @@ def format_serial_number(serial_number_as_hex: str | None, target: Target) -> st
     return serial_number_as_hex.replace(" ", "")
 
 
+def serial_number_as_int(serial_number_as_hex: str | None) -> int | None:
+    if not serial_number_as_hex:
+        return None
+    return int(serial_number_as_hex, 16)
+
+
 FORMATING_FUNC: dict[str, Callable[[Any, Target], Any]] = {
     "fingerprint": format_fingerprint,
-    "serial_number": format_serial_number,
+    "serial_number_hex": format_serial_number,
 }
 
 
@@ -341,6 +349,9 @@ class CertLogPlugin(Plugin):
                         value = FORMATING_FUNC[new_column](value, self.target)
                     if new_column and new_column not in record_values:
                         record_values[new_column] = value
+                        # Serial number is format as int and string, to ease search of a specific sn in both format
+                        if new_column == "serial_number_hex":
+                            record_values["serial_number"] = serial_number_as_int(value)
                     elif new_column:
                         self.target.log.debug(
                             "Unexpected element while processing %s entries : %s column already exists "
