@@ -255,22 +255,35 @@ FIELD_MAPPINGS = {
 }
 
 
-def format_fingerprint(input_hash: str | None) -> tuple[str | None, str | None, str | None]:
+def format_fingerprint(input_hash: str | None, target: Target) -> tuple[str | None, str | None, str | None]:
     if input_hash:
         input_hash = input_hash.replace(" ", "")
-        # older version use md5
-        if len(input_hash) == 64:
-            return input_hash, None, None
-    return None, input_hash, None
+        # hash is expected to be a sha1, but as it not documented, we make this function more flexible if hash is
+        # in another standard format (md5/sha256), especially in the futur
+        match len(input_hash):
+            case 32:
+                return input_hash, None, None
+            case 40:
+                return None, input_hash, None
+            case 64:
+                return None, None, input_hash
+            case _:
+                target.log.warning(
+                    "Unexpected hash size found while processing certlog "
+                    "$CertificateHash/$CertificateHash2 column: len %d, content %s",
+                    len(input_hash),
+                    input_hash,
+                )
+    return None, None, None
 
 
-def format_serial_number(serial_number_as_hex: str | None) -> str | None:
+def format_serial_number(serial_number_as_hex: str | None, target: Target) -> str | None:
     if not serial_number_as_hex:
         return None
     return serial_number_as_hex.replace(" ", "")
 
 
-FORMATING_FUNC: dict[str, Callable[[Any], Any]] = {
+FORMATING_FUNC: dict[str, Callable[[Any, Target], Any]] = {
     "fingerprint": format_fingerprint,
     "serial_number": format_serial_number,
 }
@@ -325,9 +338,18 @@ class CertLogPlugin(Plugin):
                 for column, value in column_values:
                     new_column = FIELD_MAPPINGS.get(column)
                     if new_column in FORMATING_FUNC:
-                        value = FORMATING_FUNC[new_column](value)
-                    if new_column:
+                        value = FORMATING_FUNC[new_column](value, self.target)
+                    if new_column and new_column not in record_values:
                         record_values[new_column] = value
+                    elif new_column:
+                        self.target.log.debug(
+                            "Unexpected element while processing %s entries : %s column already exists "
+                            "(mapped from original column name %s). This may be cause by two column that were not"
+                            " expected to be present in the same time.",
+                            table_name,
+                            new_column,
+                            column,
+                        )
                     else:
                         self.target.log.debug(
                             "Unexpected column for table %s in CA %s: %s", table_name, ca_name, column
