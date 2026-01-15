@@ -69,8 +69,6 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
                 (shell, path, None) for path in self.target.fs.path("/").glob(history_absolute_path_glob.lstrip("/"))
             )
 
-        # Also utilize the _find_history_files function of the parent class
-        history_files.extend(super()._find_history_files())
         return history_files
 
     def _find_user_by_name(self, username: str) -> UnixUserRecord | None:
