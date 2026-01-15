@@ -501,7 +501,7 @@ def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesyst
     assert records[0].fingerprint.sha1 == "6566d8ebea1feb4eb3d12d9486cddb69e4e9e827"
     assert records[0].fingerprint.sha256 == "7221d881743505f13b7bfe854bdf800d7f0cd22d34307ed7157808a295299471"
     assert records[0].serial_number == 21067204948278457910649605551283467908287726794
-    assert records[0].serial_number_hex == "03b0afa702c33e37fffd40e0c402b2120c1284ca"
+    assert records[0].serial_number_hex == "0x03b0afa702c33e37fffd40e0c402b2120c1284ca"
     assert records[0].not_valid_before == datetime(2025, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
     assert records[0].not_valid_after == datetime(2026, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
     assert records[0].issuer_dn == "C=AU,ST=Some-State,O=Internet Widgits Pty Ltd,CN=example.com"
@@ -588,7 +588,7 @@ def test_apache_hosts_certificates_negative_serial_number(target_unix: Target, f
     assert records[0].fingerprint.sha256 == "0d69e5c68a62353cc7a1dd9d088d60f1028184e8bb693a2ba81cedd05b8804c1"
     assert records[0].serial_number == -1337
     # openssl display the following for negative numbers : Serial Number: -1337 (-0x539)
-    assert records[0].serial_number_hex == "-539"
+    assert records[0].serial_number_hex == "-0x539"
     assert records[0].not_valid_before == datetime(2026, 1, 15, 13, 32, 00, tzinfo=timezone.utc)
     assert records[0].not_valid_after == datetime(2027, 1, 15, 13, 32, 00, tzinfo=timezone.utc)
     assert records[0].issuer_dn == "C=FR,ST=RHONE,L=Lyon,O=Dissect,OU=Demo,CN=docs.dissect.tools"

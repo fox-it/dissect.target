@@ -282,7 +282,7 @@ def format_fingerprint(input_hash: str | None, target: Target) -> tuple[str | No
 def format_serial_number(serial_number_as_hex: str | None, target: Target) -> str | None:
     if not serial_number_as_hex:
         return None
-    return serial_number_as_hex.replace(" ", "")
+    return f"0x{serial_number_as_hex.replace(' ', '')}"
 
 
 def serial_number_as_int(serial_number_as_hex: str | None) -> int | None:

@@ -274,5 +274,5 @@ def test_nginx_host_certificate(target_unix: Target, fs_unix: VirtualFilesystem)
     assert records[0].fingerprint.sha1 == "6566d8ebea1feb4eb3d12d9486cddb69e4e9e827"
     assert records[0].fingerprint.sha256 == "7221d881743505f13b7bfe854bdf800d7f0cd22d34307ed7157808a295299471"
     assert records[0].serial_number == 21067204948278457910649605551283467908287726794
-    assert records[0].serial_number_hex == "03b0afa702c33e37fffd40e0c402b2120c1284ca"
+    assert records[0].serial_number_hex == "0x03b0afa702c33e37fffd40e0c402b2120c1284ca"
     assert records[0].issuer_dn == "C=AU,ST=Some-State,O=Internet Widgits Pty Ltd,CN=example.com"

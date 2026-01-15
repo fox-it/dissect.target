@@ -89,8 +89,8 @@ def format_serial_number_as_hex(serial_number: int | None) -> str | None:
         serial_number_as_hex = f"{serial_number:x}"
         if len(serial_number_as_hex) % 2 == 1:
             serial_number_as_hex = f"0{serial_number_as_hex}"
-        return serial_number_as_hex
-    return f"-{-serial_number:x}"
+        return f"0x{serial_number_as_hex}"
+    return f"-{-serial_number:#x}"
 
 
 def parse_x509(file: str | bytes | Path) -> CertificateRecord:
