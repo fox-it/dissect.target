@@ -159,7 +159,7 @@ class CamPlugin(Plugin):
             )
 
     def _open_db(self) -> SQLite3 | None:
-        return SQLite3(self.camdb_path.open("rb")) if self.camdb_path else None
+        return SQLite3(self.camdb_path) if self.camdb_path else None
 
     def _build_context_dict(self) -> defaultdict[str, dict] | None:
         MAPDB = defaultdict(dict)

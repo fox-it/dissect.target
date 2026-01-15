@@ -57,7 +57,7 @@ class TarFilesystem(Filesystem):
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
 
         for member in self.tar.getmembers():
-            mname = member.name.strip("/")
+            mname = member.name.removeprefix("./").strip("/")
             if not mname.startswith(self.base) or mname == ".":
                 continue
 
