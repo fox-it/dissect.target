@@ -8,7 +8,13 @@ from tests._utils import absolute_path
 
 
 def test_qcow2_container() -> None:
-    """Test that QCOW2 containers are properly opened."""
+    """Test that QCOW2 containers are properly opened.
+
+    ```
+    echo "testdissecteqcow2" > small.txt
+    qemu-img convert -f raw -O qcow2 small.txt small.qcow2
+    ```
+    """
     path = absolute_path("_data/containers/qcow2/small.qcow2")
 
     fh = container.open(path)
