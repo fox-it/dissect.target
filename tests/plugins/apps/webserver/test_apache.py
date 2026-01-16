@@ -562,37 +562,33 @@ def test_apache_hosts_certificates_negative_serial_number(
         -out negative_serial.crt -days 365 -set_serial <serial_number> -config openssl.cnf
     ```
 
-    Where openssl.cnf has the following content
+    Where openssl.cnf has the following content::
 
-    ```
-    [ req ]
-    default_bits       = 2048
-    distinguished_name = req_distinguished_name
-    x509_extensions    = v3_ca
-    prompt             = no
+        [ req ]
+        default_bits       = 2048
+        distinguished_name = req_distinguished_name
+        x509_extensions    = v3_ca
+        prompt             = no
 
-    [ req_distinguished_name ]
-    C  = FR
-    ST = RHONE
-    L  = Lyon
-    O  = Dissect
-    OU = Demo
-    CN = docs.dissect.tools
+        [ req_distinguished_name ]
+        C  = FR
+        ST = RHONE
+        L  = Lyon
+        O  = Dissect
+        OU = Demo
+        CN = docs.dissect.tools
 
-    [ v3_ca ]
-    subjectKeyIdentifier   = hash
-    authorityKeyIdentifier = keyid:always,issuer
-    basicConstraints       = critical,CA:TRUE
-    keyUsage              = critical,digitalSignature,keyEncipherment
-    subjectAltName        = @alt_names
+        [ v3_ca ]
+        subjectKeyIdentifier   = hash
+        authorityKeyIdentifier = keyid:always,issuer
+        basicConstraints       = critical,CA:TRUE
+        keyUsage              = critical,digitalSignature,keyEncipherment
+        subjectAltName        = @alt_names
 
-    [ alt_names ]
-    DNS.1 = monserveur.example.com
-    DNS.2 = www.monserveur.example.com
-    IP.1  = 192.168.1.100
-    ```
-
-
+        [ alt_names ]
+        DNS.1 = monserveur.example.com
+        DNS.2 = www.monserveur.example.com
+        IP.1  = 192.168.1.100
     """
 
     fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(b'ServerRoot "/etc/apache2"\n'))
