@@ -394,7 +394,7 @@ def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin) -
     log_dir = None
     if version and version[0] == "7":
         try:
-            log_dir = plugin_obj._configstore["esx"]["syslog"]["global_settings"][""]["user_value"]["log_dir"]
+            log_dir = target.configstore._configstore["esx"]["syslog"]["global_settings"][""]["user_value"]["log_dir"]
         except KeyError:
             target.log.warning("Failed to read log_dir from configstore, falling back to /scratch/log")
             log_dir = "/scratch/log"
