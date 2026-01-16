@@ -1,24 +1,19 @@
 from __future__ import annotations
 
-from binascii import hexlify
 from datetime import datetime
 from functools import cached_property
-from hashlib import md5
 from typing import TYPE_CHECKING, Any
 
-from Crypto.Cipher import AES, ARC4, DES
-from dissect.cstruct import cstruct
 from dissect.database.ese.ntds import NTDS
 from dissect.database.ese.ntds.util import UserAccountControl
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, UnsupportedPluginError, export
-from dissect.target.plugins.os.windows.credential.sam import rid_to_key
+from dissect.target.plugins.os.windows.credential.sam import remove_des_layer
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dissect.cstruct.types import structure
     from dissect.database.ese.ntds.objects import Computer, User
 
     from dissect.target.target import Target
@@ -89,7 +84,7 @@ GENERIC_FIELDS = [
     ("uint32", "iteration_count"),
     ("uint32", "default_iteration_count"),
     ("string[]", "packages"),
-    ("string", "w_digest"),
+    ("string[]", "w_digest"),
     ("uint32", "user_account_control"),
     *[("boolean", flag.name.lower()) for flag in UserAccountControl],
     ("string[]", "object_classes"),
@@ -121,73 +116,23 @@ NtdsComputerAccountRecord = TargetRecordDescriptor(
     ],
 )
 
-crypto_structures = """
-typedef struct {
-    BYTE Header[8];
-    BYTE KeyMaterial[16];
-    DWORD Unknown;
-    BYTE EncryptedHash[EOF];
-} CRYPTED_HASHW16;
-
-typedef struct {
-    BYTE Header[8];
-    BYTE KeyMaterial[16];
-    BYTE EncryptedHash[EOF];
-} CRYPTED_HISTORY;
-
-typedef struct {
-    BYTE Header[8];
-    BYTE KeyMaterial[16];
-    BYTE EncryptedHash[EOF];
-} CRYPTED_BLOB;
-
-typedef struct {
-    CHAR Header;
-    CHAR Padding[3];
-    CHAR Key[16];
-} PEK_KEY;
-
-typedef struct {
-    BYTE Header[8];
-    BYTE KeyMaterial[16];
-    BYTE EncryptedHash[16];
-} CRYPTED_HASH;
-"""
-
-
-# Initialize cstruct parsers
-c_ntds_crypto = cstruct().load(crypto_structures)
-
 
 class NtdsPlugin(Plugin):
     """Plugin to parse NTDS.dit Active Directory database and extract user credentials.
 
-    This plugin decrypts and extracts user password hashes, password history,
-    Kerberos keys, and other authentication data from the NTDS.dit database
-    found on Windows Domain Controllers.
+    This plugin extracts user password hashes, password history, Kerberos keys,
+    and other authentication data from the NTDS.dit database found on Windows Domain Controllers.
     """
 
     __namespace__ = "ntds"
 
-    # Encryption and crypto constants
-    class CryptoConstants:
-        """Constants used for cryptographic operations."""
+    # NTDS Registry consts
+    NTDS_PARAMETERS_REGISTRY_PATH = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\NTDS\\Parameters"
+    NTDS_PARAMETERS_DB_VALUE = "DSA Database file"
 
-        DES_BLOCK_SIZE = 8
-        IV_SIZE = 16
-        NTLM_HASH_SIZE = 16
-
-        # The header contains the PEK index encoded in the hex representation of the header bytes.
-        PEK_INDEX_HEX_START = 8
-        PEK_INDEX_HEX_END = 10
-
-        # Version-specific headers
-        WINDOWS_2016_TP4_HASH_HEADER = b"\x13\x00\x00\x00"
-
-        # Default values
-        DEFAULT_LM_HASH = "aad3b435b51404eeaad3b435b51404ee"
-        DEFAULT_NT_HASH = "31d6cfe0d16ae931b73c59d7e0c089c0"
-        EMPTY_BYTE = b"\x00"
+    # Default values
+    DEFAULT_LM_HASH = "aad3b435b51404eeaad3b435b51404ee"
+    DEFAULT_NT_HASH = "31d6cfe0d16ae931b73c59d7e0c089c0"
 
     def __init__(self, target: Target):
         """Initialize the NTDS plugin.
@@ -199,7 +144,7 @@ class NtdsPlugin(Plugin):
 
         if self.target.has_function("registry"):
             ntds_path_key = self.target.registry.value(
-                key="HKLM\\SYSTEM\\CurrentControlSet\\Services\\NTDS\\Parameters", value="DSA Database file"
+                key=self.NTDS_PARAMETERS_REGISTRY_PATH, value=self.NTDS_PARAMETERS_DB_VALUE
             )
             self.ntds_path = self.target.fs.path(ntds_path_key.value)
 
@@ -209,257 +154,18 @@ class NtdsPlugin(Plugin):
         Raises:
             UnsupportedPluginError: If NTDS.dit is not found or system hive is missing.
         """
-        if not self.target.has_function("registry"):
-            raise UnsupportedPluginError("Registry function not available")
-
-        if not self.ntds_path.exists():
-            raise UnsupportedPluginError("NTDS.dit file not found")
-
         if not self.target.has_function("lsa") or not hasattr(self.target.lsa, "syskey"):
             raise UnsupportedPluginError("System Hive is not present or LSA function not available")
 
+        if not self.ntds_path.exists():
+            raise UnsupportedPluginError("NTDS.dit file does not exists")
+
     @cached_property
     def ntds(self) -> NTDS:
-        return NTDS(self.ntds_path.open())
+        ntds = NTDS(self.ntds_path.open())
+        ntds.pek.unlock(self.target.lsa.syskey)
 
-    @cached_property
-    def pek_list(self) -> list[bytes]:
-        """Extract PEK list structure and decrypt PEK keys.
-
-        Raises:
-            RuntimeError: If PEK list cannot be found in the database or couldn't extract PEK keys from the PEK list.
-
-        Returns:
-            pek_list: list containing PEK keys
-        """
-        self.ntds.pek.unlock(self.target.lsa.syskey)
-        return self.ntds.pek.keys
-
-    def _derive_rc4_key(self, key: bytes, key_material: bytes, iterations: int) -> bytes:
-        """Derive RC4 key using MD5 with multiple iterations.
-
-        Args:
-            key: RC4 key.
-            key_material: Random key material for this encryption.
-            iterations: Number of MD5 iterations to perform.
-
-        Returns:
-            16-byte RC4 key.
-        """
-        hasher = md5()
-        hasher.update(key)
-        for _ in range(iterations):
-            hasher.update(key_material)
-        return hasher.digest()
-
-    def _aes_decrypt(self, key: bytes, data: bytes, iv: bytes) -> bytes:
-        """Decrypt data using AES-CBC.
-
-        Args:
-            key: AES encryption key.
-            data: Encrypted data.
-            iv: Initialization vector.
-
-        Returns:
-            Decrypted data.
-        """
-        aes = AES.new(key, AES.MODE_CBC, iv)
-        plain = b""
-
-        # Decrypt in IV-sized blocks
-        for idx in range(0, len(data), self.CryptoConstants.IV_SIZE):
-            block = data[idx : idx + self.CryptoConstants.IV_SIZE]
-
-            # Pad incomplete blocks
-            if len(block) < self.CryptoConstants.IV_SIZE:
-                padding_size = self.CryptoConstants.IV_SIZE - len(block)
-                block = block + (self.CryptoConstants.EMPTY_BYTE * padding_size)
-
-            plain += aes.decrypt(block)
-
-        return plain
-
-    def _get_pek_index_from_header(self, header: bytes) -> int:
-        """Extract PEK index from header bytes.
-
-        The PEK index is encoded in the hex representation of the header
-        at positions 8:10.
-
-        Args:
-            header: Header bytes containing encoded PEK index.
-
-        Returns:
-            PEK index value.
-        """
-        hex_header = hexlify(bytearray(header))
-        start = self.CryptoConstants.PEK_INDEX_HEX_START
-        end = self.CryptoConstants.PEK_INDEX_HEX_END
-        return int(hex_header[start:end], 16)
-
-    def _remove_rc4_layer(self, crypted: structure) -> bytes:
-        """Remove RC4 encryption layer using PEK key.
-
-        Args:
-            crypted: Encrypted structure with Header, KeyMaterial, and EncryptedHash.
-
-        Returns:
-            Data with RC4 layer removed.
-        """
-        pek_index = self._get_pek_index_from_header(crypted.Header)
-        rc4_key = self._derive_rc4_key(
-            self.pek_list[pek_index],
-            bytearray(crypted.KeyMaterial),
-            iterations=1,  # Single iteration for hash decryption
-        )
-
-        rc4 = ARC4.new(rc4_key)
-        return rc4.encrypt(bytearray(crypted.EncryptedHash))
-
-    def _remove_des_layer(self, crypted_hash: bytes, rid: int) -> bytes:
-        """Remove final DES encryption layer using RID-derived keys.
-
-        The hash is split into two 8-byte blocks, each decrypted with
-        a different RID-derived key.
-
-        Args:
-            crypted_hash: 16-byte DES-encrypted hash.
-            rid: Relative ID of the user account.
-
-        Returns:
-            16-byte decrypted hash.
-
-        Raises:
-            ValueError: If crypted_hash is not 16 bytes.
-        """
-        expected_size = 2 * self.CryptoConstants.DES_BLOCK_SIZE
-        if len(crypted_hash) != expected_size:
-            raise ValueError(f"crypted_hash must be {expected_size} bytes long")
-
-        key1, key2 = rid_to_key(rid)
-        des1 = DES.new(key1, DES.MODE_ECB)
-        des2 = DES.new(key2, DES.MODE_ECB)
-
-        block_size = self.CryptoConstants.DES_BLOCK_SIZE
-        block1 = des1.decrypt(crypted_hash[:block_size])
-        block2 = des2.decrypt(crypted_hash[block_size : 2 * block_size])
-
-        return block1 + block2
-
-    def _decrypt_hash(self, blob: bytes | None, rid: int, is_lm: bool) -> str:
-        """Decrypt a single NT or LM password hash.
-
-        Args:
-            blob: Encrypted hash blob from database.
-            rid: User's relative ID.
-            is_lm: True for LM hash, False for NT hash.
-
-        Returns:
-            Hex string of the decrypted hash.
-        """
-        if not blob:
-            return self.CryptoConstants.DEFAULT_LM_HASH if is_lm else self.CryptoConstants.DEFAULT_NT_HASH
-
-        crypted = c_ntds_crypto.CRYPTED_HASH(blob)
-        header_bytes = bytearray(crypted.Header)
-
-        if header_bytes.startswith(self.CryptoConstants.WINDOWS_2016_TP4_HASH_HEADER):
-            # Modern encryption (AES)
-            decrypted = self._decrypt_hash_modern(blob, rid)
-        else:
-            # Legacy encryption (RC4 + DES)
-            decrypted = self._decrypt_hash_legacy(crypted, rid)
-
-        return hexlify(decrypted).decode()
-
-    def _decrypt_hash_modern(self, blob: bytes, rid: int) -> bytes:
-        """Decrypt hash using modern AES encryption (Windows Server 2016+).
-
-        Args:
-            blob: Encrypted hash blob.
-            rid: User's relative ID.
-
-        Returns:
-            Decrypted hash bytes.
-        """
-        # Parse structure with correct size
-        crypted = c_ntds_crypto.CRYPTED_HASHW16(blob)
-
-        # Decrypt AES layer
-        pek_index = self._get_pek_index_from_header(crypted.Header)
-        decrypted = self._aes_decrypt(
-            self.pek_list[pek_index],
-            bytearray(crypted.EncryptedHash[: self.CryptoConstants.NTLM_HASH_SIZE]),
-            bytearray(crypted.KeyMaterial),
-        )
-
-        # Remove DES layer
-        return self._remove_des_layer(decrypted, rid)
-
-    def _decrypt_hash_legacy(self, crypted: structure, rid: int) -> bytes:
-        """Decrypt hash using legacy RC4+DES encryption.
-
-        Args:
-            crypted: Encrypted hash structure.
-            rid: User's relative ID.
-
-        Returns:
-            Decrypted hash bytes.
-        """
-        tmp = self._remove_rc4_layer(crypted)
-        return self._remove_des_layer(tmp, rid)
-
-    def _decrypt_history(self, blob: bytes, rid: int) -> list[str]:
-        """Decrypt password history containing multiple hashes.
-
-        Args:
-            blob: Encrypted history blob.
-            rid: User's relative ID.
-
-        Returns:
-            List of hex-encoded password hashes.
-        """
-        if not blob:
-            return []
-
-        # Parse structure
-        crypted = c_ntds_crypto.CRYPTED_HISTORY(blob)
-        header_bytes = bytearray(crypted.Header)
-
-        if header_bytes.startswith(self.CryptoConstants.WINDOWS_2016_TP4_HASH_HEADER):
-            # Modern AES encryption
-            decrypted = self._decrypt_history_modern(blob)
-        else:
-            # Legacy RC4 encryption
-            decrypted = self._remove_rc4_layer(crypted)
-
-        # Split into individual hashes and remove DES layer from each
-        hash_size = self.CryptoConstants.NTLM_HASH_SIZE
-        hashes = []
-        for i in range(0, len(decrypted), hash_size):
-            block = decrypted[i : i + hash_size]
-            if len(block) == hash_size:
-                hash_bytes = self._remove_des_layer(block, rid)
-                hashes.append(hexlify(hash_bytes).decode())
-
-        return hashes
-
-    def _decrypt_history_modern(self, blob: bytes) -> bytes:
-        """Decrypt password history using modern AES encryption.
-
-        Args:
-            blob: Encrypted history blob.
-
-        Returns:
-            Decrypted history data containing multiple hashes.
-        """
-        crypted = c_ntds_crypto.CRYPTED_HASHW16(blob)
-
-        pek_index = self._get_pek_index_from_header(crypted.Header)
-        return self._aes_decrypt(
-            self.pek_list[pek_index],
-            bytearray(crypted.EncryptedHash[: self.CryptoConstants.NTLM_HASH_SIZE]),
-            bytearray(crypted.KeyMaterial),
-        )
+        return ntds
 
     def _decode_user_account_control(self, uac: int) -> dict[str, bool]:
         """Decode User Account Control flags.
@@ -484,8 +190,7 @@ class NtdsPlugin(Plugin):
         try:
             supplemental_credentials = account.supplementalCredentials
         except KeyError:
-            yield {}
-            return
+            supplemental_credentials = None
 
         if supplemental_credentials is None:
             yield {}
@@ -500,7 +205,7 @@ class NtdsPlugin(Plugin):
                 info["packages"] = supplemental_credential["Packages"]
 
             if "Primary:WDigest" in supplemental_credential:
-                info["w_digest"] = "".join(supplemental_credential["Primary:WDigest"])
+                info["w_digest"] = [digest_hash.hex() for digest_hash in supplemental_credential["Primary:WDigest"]]
 
             if not {"Primary:Kerberos", "Primary:Kerberos-Newer-Keys"}.intersection(supplemental_credential):
                 yield info
@@ -565,27 +270,30 @@ class NtdsPlugin(Plugin):
         """
         self.target.log.debug("Decrypting hash for user: %s", account.name)
 
-        # Decrypt password hashes
         try:
-            lm_hash = self._decrypt_hash(account.dBCSPwd, account.rid, True)
+            lm_pwd_data = account.dBCSPwd
         except KeyError:
-            lm_hash = self.CryptoConstants.DEFAULT_LM_HASH
+            lm_pwd_data = None
+        lm_hash = remove_des_layer(lm_pwd_data, account.rid).hex() if lm_pwd_data else self.DEFAULT_LM_HASH
 
         try:
-            nt_hash = self._decrypt_hash(account.unicodePwd, account.rid, False)
+            nt_pwd_data = account.unicodePwd
         except KeyError:
-            nt_hash = self.CryptoConstants.DEFAULT_NT_HASH
+            nt_pwd_data = None
+        nt_hash = remove_des_layer(nt_pwd_data, account.rid).hex() if nt_pwd_data else self.DEFAULT_NT_HASH
 
         # Decrypt password histories
         try:
-            lm_history = self._decrypt_history(account.lmPwdHistory, account.rid)
+            lm_history_data = account.lmPwdHistory
         except KeyError:
-            lm_history = None
+            lm_history_data = None
+        lm_history = [remove_des_layer(lm, account.rid).hex() for lm in lm_history_data] if lm_history_data else None
 
         try:
-            nt_history = self._decrypt_history(account.ntPwdHistory, account.rid)
+            nt_history_data = account.ntPwdHistory
         except KeyError:
-            nt_history = None
+            nt_history_data = None
+        nt_history = [remove_des_layer(nt, account.rid).hex() for nt in nt_history_data] if nt_history_data else None
 
         # Decode UAC flags
         uac_flags = self._decode_user_account_control(account.user_account_control)
@@ -608,7 +316,7 @@ class NtdsPlugin(Plugin):
 
         try:
             member_of = [group.distinguished_name for group in account.groups()]
-        except KeyError:
+        except ValueError:
             member_of = None
 
         try:

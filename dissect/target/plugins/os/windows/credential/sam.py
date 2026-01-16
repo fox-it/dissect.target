@@ -263,6 +263,37 @@ def rid_to_key(rid: int) -> tuple[bytes, bytes]:
     return k1, k2
 
 
+def remove_des_layer(crypted_hash: bytes, rid: int) -> bytes:
+    """Remove final DES encryption layer using RID-derived keys.
+
+    The hash is split into two 8-byte blocks, each decrypted with
+    a different RID-derived key.
+
+    Args:
+        crypted_hash: 16-byte DES-encrypted hash.
+        rid: Relative ID of the user account.
+
+    Returns:
+        16-byte decrypted hash.
+
+    Raises:
+        ValueError: If crypted_hash is not 16 bytes.
+    """
+    DES_BLOCK_SIZE = 8
+    expected_size = 2 * DES_BLOCK_SIZE
+    if len(crypted_hash) != expected_size:
+        raise ValueError(f"crypted_hash must be {expected_size} bytes long")
+
+    key1, key2 = rid_to_key(rid)
+    des1 = DES.new(key1, DES.MODE_ECB)
+    des2 = DES.new(key2, DES.MODE_ECB)
+
+    block1 = des1.decrypt(crypted_hash[:DES_BLOCK_SIZE])
+    block2 = des2.decrypt(crypted_hash[DES_BLOCK_SIZE:expected_size])
+
+    return block1 + block2
+
+
 def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -> bytes:
     if not enc_hash:
         return b""
@@ -271,8 +302,6 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
 
     if sh.revision not in [0x01, 0x02]:
         raise ValueError(f"Unsupported LM/NT hash revision encountered: {sh.revision}")
-
-    d1, d2 = (DES.new(k, DES.MODE_ECB) for k in rid_to_key(rid))
 
     if sh.revision == 0x01:  # LM/NT revision 0x01 involving RC4
         sh_hash = enc_hash[len(c_sam.SAM_HASH) :]
@@ -290,7 +319,7 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
         sh_hash = enc_hash[len(c_sam.SAM_HASH_AES) :]
         obfkey = AES.new(samkey, AES.MODE_CBC, sh.salt).decrypt(sh_hash)[:16]
 
-    return d1.decrypt(obfkey[:8]) + d2.decrypt(obfkey[8:])
+    return remove_des_layer(obfkey, rid)
 
 
 class SamPlugin(Plugin):
