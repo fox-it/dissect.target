@@ -79,10 +79,12 @@ def format_serial_number_as_hex(serial_number: int | None) -> str | None:
     """Format serial_number from integer to hex.
 
     Add a prefix 0 if output length is not pair, in order to be consistent with usual serial_number representation
-    (navigator, openssl etc...).
-    For negative number use the same representation as navigator, which differ from openssl
-    E.g for -1337 :
-        open ssl : Serial Number: -1337 (-0x539)
+    (navigator, openssl etc...). 
+    For negative number use the same representation as navigator, which differ from OpenSSL.
+    
+    For example for -1337::
+    
+        OpenSSL : Serial Number: -1337 (-0x539)
         Navigator : FA C7
 
     Args:
