@@ -30,7 +30,7 @@ EXPECTED_FILES_OR_DIR = ["etc/vmware/esx.conf", "error.log", "action.log"]
 
 
 class VmSupportLoader(Loader):
-    """Loader for extracted ESXi vm-support
+    """Loader for extracted ESXi vm-support.
 
     References:
         - https://knowledge.broadcom.com/external/article/313542
