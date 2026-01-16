@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from dissect.target.loader import open as loader_open
-from dissect.target.loaders.esxivmsupport import EsxiVmSupportLoader, EsxiVmSupportTarSubloader
+from dissect.target.loaders.vmsupport import VmSupportLoader, VmSupportTarSubloader
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.target import Target
 from tests._utils import absolute_path
@@ -42,9 +42,9 @@ def mock_vmsupport_dir(tmp_path: Path) -> Path:
 @pytest.mark.parametrize(
     ("path", "loader"),
     [
-        ("_data/loaders/esxivmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz", TarLoader),
-        ("_data/loaders/esxivmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz", TarLoader),
-        ("mock_vmsupport_dir", EsxiVmSupportLoader),
+        ("_data/loaders/vmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz", TarLoader),
+        ("_data/loaders/vmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz", TarLoader),
+        ("mock_vmsupport_dir", VmSupportLoader),
     ],
 )
 def test_target_open(
@@ -58,15 +58,15 @@ def test_target_open(
 
         assert isinstance(target._loader, loader)
         if isinstance(target._loader, TarLoader):
-            assert isinstance(target._loader.subloader, EsxiVmSupportTarSubloader)
+            assert isinstance(target._loader.subloader, VmSupportTarSubloader)
         assert target.path == path
 
 
 @pytest.mark.parametrize(
     "data_path",
     [
-        "_data/loaders/esxivmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz",
-        "_data/loaders/esxivmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz",
+        "_data/loaders/vmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz",
+        "_data/loaders/vmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz",
     ],
 )
 def test_compressed_tar(data_path: str) -> None:
@@ -78,7 +78,7 @@ def test_compressed_tar(data_path: str) -> None:
 
     t = Target()
     loader.map(t)
-    assert isinstance(loader.subloader, EsxiVmSupportTarSubloader)
+    assert isinstance(loader.subloader, VmSupportTarSubloader)
     assert len(t.filesystems) == 1
 
     t.apply()
@@ -92,7 +92,7 @@ def test_dir(mock_vmsupport_dir: Path) -> None:
     """Test if we map an extracted vm support directory correctly."""
 
     loader = loader_open(mock_vmsupport_dir)
-    assert isinstance(loader, EsxiVmSupportLoader)
+    assert isinstance(loader, VmSupportLoader)
 
     t = Target()
     loader.map(t)
@@ -108,8 +108,8 @@ def test_dir(mock_vmsupport_dir: Path) -> None:
 @pytest.mark.parametrize(
     ("archive", "loader"),
     [
-        ("_data/loaders/esxivmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz", TarLoader),
-        ("_data/loaders/esxivmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz", TarLoader),
+        ("_data/loaders/vmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz", TarLoader),
+        ("_data/loaders/vmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz", TarLoader),
     ],
 )
 @pytest.mark.benchmark

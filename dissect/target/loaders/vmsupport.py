@@ -47,7 +47,7 @@ class VmSupportLoader(Loader):
         map_dirs(target, [next(self.absolute_path.iterdir())], OperatingSystem.ESXI)
 
 
-class EsxiVmSupportTarSubloader(TarSubLoader):
+class VmSupportTarSubloader(TarSubLoader):
     """Loader for tar-based ESXi vm-support.
 
     References:
