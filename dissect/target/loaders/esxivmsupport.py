@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 EXPECTED_FILES_OR_DIR = ["etc/vmware/esx.conf", "error.log", "action.log"]
 
 
-class EsxiVmSupportLoader(Loader):
+class VmSupportLoader(Loader):
     """Loader for extracted ESXi vm-support
 
     References:
