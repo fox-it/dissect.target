@@ -76,12 +76,12 @@ def compute_pem_fingerprints(pem: str | bytes) -> tuple[str, str, str]:
 
 
 def format_serial_number_as_hex(serial_number: int | None) -> str | None:
-    """
-    Format serial_number from integer to hex. Add a prefix 0 if output length is not pair, in order to be consistent
-        with usual serial_number representation (navigator, openssl etc...).
+    """Format serial_number from integer to hex. 
+    
+    Add a prefix 0 if output length is not pair, in order to be consistent with usual serial_number representation (navigator, openssl etc...).
 
-    :param serial_number:
-    :return:
+    Args:
+        serial_number: The serial number to format as hex.
     """
     if serial_number is None:
         return serial_number
