@@ -76,21 +76,29 @@ def compute_pem_fingerprints(pem: str | bytes) -> tuple[str, str, str]:
 
 
 def format_serial_number_as_hex(serial_number: int | None) -> str | None:
-    """Format serial_number from integer to hex. 
-    
-    Add a prefix 0 if output length is not pair, in order to be consistent with usual serial_number representation (navigator, openssl etc...).
+    """Format serial_number from integer to hex.
+
+    Add a prefix 0 if output length is not pair, in order to be consistent with usual serial_number representation
+    (navigator, openssl etc...).
+    For negative number use the same representation as navigator, which differ from openssl
+    E.g for -1337 :
+        open ssl : Serial Number: -1337 (-0x539)
+        Navigator : FA C7
 
     Args:
         serial_number: The serial number to format as hex.
     """
     if serial_number is None:
         return serial_number
+
     if serial_number > 0:
         serial_number_as_hex = f"{serial_number:x}"
         if len(serial_number_as_hex) % 2 == 1:
             serial_number_as_hex = f"0{serial_number_as_hex}"
-        return f"0x{serial_number_as_hex}"
-    return f"-{-serial_number:#x}"
+        return f"{serial_number_as_hex}"
+    # Representation is always a multiple of 8 bits, we need to compute this size
+    output_bin_len = (8 - (len(bin(serial_number)) - 3) % 8) + len(bin(serial_number)) - 3
+    return f"{serial_number & ((1 << output_bin_len) - 1):x}"
 
 
 def parse_x509(file: str | bytes | Path) -> CertificateRecord:

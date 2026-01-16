@@ -484,12 +484,16 @@ def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesyst
     </VirtualHost>
     """
     fs_unix.map_file_fh("/etc/apache2/sites-available/example.conf", BytesIO(textwrap.dedent(site).encode()))
-    fs_unix.map_file("/path/to/cert.crt", absolute_path("_data/plugins/apps/webserver/example.crt"))
-    fs_unix.map_file("/path/to/cert.key", absolute_path("_data/plugins/apps/webserver/example.key"))
+    fs_unix.map_file("/path/to/cert.crt", absolute_path("_data/plugins/apps/webserver/certificates/example.crt"))
+    fs_unix.map_file("/path/to/cert.key", absolute_path("_data/plugins/apps/webserver/certificates/example.key"))
 
     # Map a default location too
-    fs_unix.map_file("/etc/apache2/ssl/example/cert.crt", absolute_path("_data/plugins/apps/webserver/example.crt"))
-    fs_unix.map_file("/etc/apache2/ssl/example/cert.key", absolute_path("_data/plugins/apps/webserver/example.key"))
+    fs_unix.map_file(
+        "/etc/apache2/ssl/example/cert.crt", absolute_path("_data/plugins/apps/webserver/certificates/example.crt")
+    )
+    fs_unix.map_file(
+        "/etc/apache2/ssl/example/cert.key", absolute_path("_data/plugins/apps/webserver/certificates/example.key")
+    )
 
     target_unix.add_plugin(ApachePlugin)
 
@@ -501,7 +505,7 @@ def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesyst
     assert records[0].fingerprint.sha1 == "6566d8ebea1feb4eb3d12d9486cddb69e4e9e827"
     assert records[0].fingerprint.sha256 == "7221d881743505f13b7bfe854bdf800d7f0cd22d34307ed7157808a295299471"
     assert records[0].serial_number == 21067204948278457910649605551283467908287726794
-    assert records[0].serial_number_hex == "0x03b0afa702c33e37fffd40e0c402b2120c1284ca"
+    assert records[0].serial_number_hex == "03b0afa702c33e37fffd40e0c402b2120c1284ca"
     assert records[0].not_valid_before == datetime(2025, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
     assert records[0].not_valid_after == datetime(2026, 11, 27, 15, 31, 20, tzinfo=timezone.utc)
     assert records[0].issuer_dn == "C=AU,ST=Some-State,O=Internet Widgits Pty Ltd,CN=example.com"
@@ -509,13 +513,52 @@ def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesyst
     assert records[0].source == "/etc/apache2/ssl/example/cert.crt"
 
 
-def test_apache_hosts_certificates_negative_serial_number(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+@pytest.mark.parametrize(
+    ("crt_name", "serial_number", "serial_number_hex"),
+    [
+        pytest.param(
+            "negative_serial_high.crt",
+            -21067204948278457910649605551283467908287726794,
+            "fc4f5058fd3cc1c80002bf1f3bfd4dedf3ed7b36",
+            id="high_number",
+        ),
+        pytest.param(
+            "negative_serial_high_2.crt",
+            -210672049482784579106496055512834679082877267940,
+            "db192379e45f91d0001b773857e50b4b8746d01c",
+            id="high_number_158_bits",
+        ),
+        pytest.param(
+            "negative_serial_high_3.crt",
+            -421344098965569158212992111025669358165754535880,
+            "b63246f3c8bf23a00036ee70afca16970e8da038",
+            id="high_number_159_bits",
+        ),
+        pytest.param(
+            "negative_serial_high_4.crt",
+            -842688197931138316425984222051338716331509071760,
+            "ff6c648de7917e4740006ddce15f942d2e1d1b4070",
+            id="high_number_160_bits",
+        ),
+        pytest.param(
+            "negative_serial.crt",
+            -1337,
+            "fac7",
+            id="small_number",
+        ),
+    ],
+)
+def test_apache_hosts_certificates_negative_serial_number(
+    target_unix: Target, fs_unix: VirtualFilesystem, crt_name: str, serial_number: int, serial_number_hex: str
+) -> None:
     """Test if we can parse Apache ``VirtualHost`` certificates, with a certificate using a negative serial number
-    certificate generated using
+    certificate generated using.
+    Each test use a nuber with a different length in binary format
+
     ```
     openssl genrsa -out negative_serial.key 2048
     openssl req -new -x509 -key negative_serial.key \
-        -out negative_serial.crt -days 365 -set_serial -1337 -config openssl.cnf
+        -out negative_serial.crt -days 365 -set_serial <serial_number> -config openssl.cnf
     ```
 
     Where openssl.cnf has the following content
@@ -566,15 +609,18 @@ def test_apache_hosts_certificates_negative_serial_number(target_unix: Target, f
     </VirtualHost>
     """
     fs_unix.map_file_fh("/etc/apache2/sites-available/example.conf", BytesIO(textwrap.dedent(site).encode()))
-    fs_unix.map_file("/path/to/cert.crt", absolute_path("_data/plugins/apps/webserver/negative_serial.crt"))
-    fs_unix.map_file("/path/to/cert.key", absolute_path("_data/plugins/apps/webserver/negative_serial.key"))
+    fs_unix.map_file("/path/to/cert.crt", absolute_path(f"_data/plugins/apps/webserver/certificates/{crt_name}"))
+    fs_unix.map_file(
+        "/path/to/cert.key", absolute_path("_data/plugins/apps/webserver/certificates/negative_serial.key")
+    )
 
     # Map a default location too
     fs_unix.map_file(
-        "/etc/apache2/ssl/example/cert.crt", absolute_path("_data/plugins/apps/webserver/negative_serial.crt")
+        "/etc/apache2/ssl/example/cert.crt", absolute_path(f"_data/plugins/apps/webserver/certificates/{crt_name}")
     )
     fs_unix.map_file(
-        "/etc/apache2/ssl/example/cert.key", absolute_path("_data/plugins/apps/webserver/negative_serial.key")
+        "/etc/apache2/ssl/example/cert.key",
+        absolute_path("_data/plugins/apps/webserver/certificates/negative_serial.key"),
     )
 
     target_unix.add_plugin(ApachePlugin)
@@ -583,14 +629,10 @@ def test_apache_hosts_certificates_negative_serial_number(target_unix: Target, f
     assert len(records) == 2
 
     assert records[0].webserver == "apache"
-    assert records[0].fingerprint.md5 == "ca443d8103dea9606941eca59f91171a"
-    assert records[0].fingerprint.sha1 == "2611b6245659da68772c1b70830ec8d7b4b9c4af"
-    assert records[0].fingerprint.sha256 == "0d69e5c68a62353cc7a1dd9d088d60f1028184e8bb693a2ba81cedd05b8804c1"
-    assert records[0].serial_number == -1337
+    assert records[0].serial_number == serial_number
     # openssl display the following for negative numbers : Serial Number: -1337 (-0x539)
-    assert records[0].serial_number_hex == "-0x539"
-    assert records[0].not_valid_before == datetime(2026, 1, 15, 13, 32, 00, tzinfo=timezone.utc)
-    assert records[0].not_valid_after == datetime(2027, 1, 15, 13, 32, 00, tzinfo=timezone.utc)
+    # But navigators show FA:C7, we keep this representation
+    assert records[0].serial_number_hex == serial_number_hex
     assert records[0].issuer_dn == "C=FR,ST=RHONE,L=Lyon,O=Dissect,OU=Demo,CN=docs.dissect.tools"
     assert records[0].host == "example.com"
     assert records[0].source == "/etc/apache2/ssl/example/cert.crt"

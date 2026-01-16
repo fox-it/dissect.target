@@ -256,8 +256,8 @@ def test_nginx_host_certificate(target_unix: Target, fs_unix: VirtualFilesystem)
     }
     """
     fs_unix.map_file_fh("/etc/nginx/sites-enabled/example.com.conf", BytesIO(textwrap.dedent(bar_conf).encode()))
-    fs_unix.map_file("/path/to/cert.pem", absolute_path("_data/plugins/apps/webserver/example.crt"))
-    fs_unix.map_file("/path/to/key.pem", absolute_path("_data/plugins/apps/webserver/example.key"))
+    fs_unix.map_file("/path/to/cert.pem", absolute_path("_data/plugins/apps/webserver/certificates/example.crt"))
+    fs_unix.map_file("/path/to/key.pem", absolute_path("_data/plugins/apps/webserver/certificates/example.key"))
     target_unix.add_plugin(NginxPlugin)
 
     records = list(target_unix.nginx.hosts())
