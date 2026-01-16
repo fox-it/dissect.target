@@ -90,7 +90,10 @@ def test_esxi_os_creation_version_7(target_bare: Target) -> None:
 
     fs2 = VirtualFilesystem()
     fs2.map_file_fh("/etc/vmware/esx.conf", BytesIO(b'/resourceGroups/version = "7.13.37"\n'))
-    fs2.map_file("/var/lib/vmware/configstore/backup/current-store-1", absolute_path("_data/plugins/os/unix/esxi/current-store-1"))
+    fs2.map_file(
+        "/var/lib/vmware/configstore/backup/current-store-1",
+        absolute_path("_data/plugins/os/unix/esxi/current-store-1"),
+    )
     target_bare.filesystems.add(fs2)
 
     target_bare.apply()
