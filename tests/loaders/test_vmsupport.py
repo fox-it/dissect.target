@@ -6,8 +6,8 @@ from unittest.mock import patch
 import pytest
 
 from dissect.target.loader import open as loader_open
-from dissect.target.loaders.vmsupport import VmSupportLoader, VmSupportTarSubloader
 from dissect.target.loaders.tar import TarLoader
+from dissect.target.loaders.vmsupport import VmSupportLoader, VmSupportTarSubloader
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
