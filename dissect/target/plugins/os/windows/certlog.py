@@ -278,7 +278,7 @@ def format_fingerprint(input_hash: str | None, target: Target) -> tuple[str | No
     return None, None, None
 
 
-def format_serial_number(serial_number_as_hex: str | None, target: Target) -> str | None:
+def format_serial_number(serial_number_as_hex: str | None) -> str | None:
     if not serial_number_as_hex:
         return None
     return serial_number_as_hex.replace(" ", "")
