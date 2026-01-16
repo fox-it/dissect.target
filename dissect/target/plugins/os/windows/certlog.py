@@ -269,11 +269,9 @@ def format_fingerprint(input_hash: str | None) -> tuple[str | None, str | None, 
             case 64:
                 return None, None, input_hash
             case _:
-                target.log.warning(
+                raise ValueError(
                     "Unexpected hash size found while processing certlog "
-                    "$CertificateHash/$CertificateHash2 column: len %d, content %s",
-                    len(input_hash),
-                    input_hash,
+                    f"$CertificateHash/$CertificateHash2 column: len {len(input_hash)}, content {input_hash}"
                 )
     return None, None, None
 
