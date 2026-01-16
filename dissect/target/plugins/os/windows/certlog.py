@@ -261,7 +261,7 @@ def format_fingerprint(input_hash: str | None, target: Target) -> tuple[str | No
     if input_hash:
         input_hash = input_hash.replace(" ", "")
         # hash is expected to be a sha1, but as it not documented, we make this function more flexible if hash is
-        # in another standard format (md5/sha256), especially in the futur
+        # in another standard format (md5/sha256), especially in the future
         match len(input_hash):
             case 32:
                 return input_hash, None, None
