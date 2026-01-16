@@ -50,7 +50,7 @@ def mock_vmsupport_dir(tmp_path: Path) -> Path:
 def test_target_open(
     opener: Callable[[str | Path], Target], path: str, loader: type[Loader], mock_vmsupport_dir: Path
 ) -> None:
-    """Test that we correctly use the ESXIvmsupport loaders when opening a ``Target``."""
+    """Test that we correctly use the ESXi vm-support loaders when opening a ``Target``."""
     path = mock_vmsupport_dir if path == "mock_vmsupport_dir" else absolute_path(path)
 
     with patch("dissect.target.target.Target.apply"):
