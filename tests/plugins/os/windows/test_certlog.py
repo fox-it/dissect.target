@@ -25,7 +25,7 @@ def test_certlog_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert len(certificates) == 11
     assert len(list(target_win.certlog.certificate_extensions())) == 92
     assert certificates[0].serial_number == 23146941333149199441888068127529844838
-    assert certificates[0].serial_number_hex == "0x1169f0517d9b598e4ba7af46e4674066"
+    assert certificates[0].serial_number_hex == "1169f0517d9b598e4ba7af46e4674066"
     assert certificates[0].fingerprint.sha1 == hashlib.sha1(certificates[0].raw_certificate).hexdigest()
     assert certificates[0].fingerprint.sha1 == "061ec97dcef82d0e2d100b590e790a803d4573ae"
 
