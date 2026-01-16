@@ -99,7 +99,7 @@ def format_serial_number_as_hex(serial_number: int | None) -> str | None:
             serial_number_as_hex = f"0{serial_number_as_hex}"
         return serial_number_as_hex
     # Representation is always a multiple of 8 bits, we need to compute this size
-    output_bin_len = (8 - (len(bin(serial_number)) - 3) % 8) + len(bin(serial_number)) - 3
+    output_bin_len = (8 - (serial_number.bit_length() % 8) + serial_number.bit_length()
     return f"{serial_number & ((1 << output_bin_len) - 1):x}"
 
 
