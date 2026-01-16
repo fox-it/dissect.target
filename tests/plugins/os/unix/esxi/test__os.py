@@ -79,7 +79,9 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
 
 def test_esxi_os_creation_version_7(target_bare: Target) -> None:
     """Test handling of ``ESXiPlugin.create`` for ESXi 7 with separate partitions.
-    Indirectly tests the ESXi configstore plugin."""
+
+    Indirectly tests the ESXi configstore plugin.
+    """
 
     fs1 = VirtualFilesystem()
     fs1.map_file_fh("boot.cfg", BytesIO(b"build=7.13.37-1.2.3.4\nmodules=example.v00 --- example.tgz\n"))
