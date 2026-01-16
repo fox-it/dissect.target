@@ -288,7 +288,7 @@ def serial_number_as_int(serial_number_as_hex: str | None) -> int | None:
     return int(serial_number_as_hex, 16)
 
 
-FORMATING_FUNC: dict[str, Callable[[Any, Target], Any]] = {
+FORMATING_FUNC: dict[str, Callable[[Any], Any]] = {
     "fingerprint": format_fingerprint,
     "serial_number_hex": format_serial_number,
 }
@@ -344,9 +344,9 @@ class CertLogPlugin(Plugin):
                     new_column = FIELD_MAPPINGS.get(column)
                     if new_column in FORMATING_FUNC:
                         try:
-                            value = FORMATING_FUNC[new_column](value, self.target)
+                            value = FORMATING_FUNC[new_column](value)
                         except Exception as e:
-                            self.target.log.warning("Error formatting column %s (%s): %s", new_column, column, e)
+                            self.target.log.warning("Error formatting column %s (%s): %s", new_column, column, value)
                             self.target.log.debug("", exc_info=e)
                             value = None
                     if new_column and new_column not in record_values:
