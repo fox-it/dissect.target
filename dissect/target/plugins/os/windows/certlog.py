@@ -256,7 +256,7 @@ FIELD_MAPPINGS = {
 }
 
 
-def format_fingerprint(input_hash: str | None, target: Target) -> tuple[str | None, str | None, str | None]:
+def format_fingerprint(input_hash: str | None) -> tuple[str | None, str | None, str | None]:
     if input_hash:
         input_hash = input_hash.replace(" ", "")
         # hash is expected to be a sha1, but as it not documented, we make this function more flexible if hash is
