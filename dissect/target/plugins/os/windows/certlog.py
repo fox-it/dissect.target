@@ -343,7 +343,12 @@ class CertLogPlugin(Plugin):
                 for column, value in column_values:
                     new_column = FIELD_MAPPINGS.get(column)
                     if new_column in FORMATING_FUNC:
-                        value = FORMATING_FUNC[new_column](value, self.target)
+                        try:
+                            value = FORMATING_FUNC[new_column](value, self.target)
+                        except Exception as e:
+                            self.target.log.warning("Error formatting column %s (%s): %s", new_column, column, e)
+                            self.target.log.debug("", exc_info=e)
+                            value = None
                     if new_column and new_column not in record_values:
                         record_values[new_column] = value
                         # Serial number is format as int and string, to ease search of a specific sn in both format
