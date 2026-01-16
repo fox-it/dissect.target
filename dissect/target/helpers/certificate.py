@@ -79,11 +79,11 @@ def format_serial_number_as_hex(serial_number: int | None) -> str | None:
     """Format serial_number from integer to hex.
 
     Add a prefix 0 if output length is not pair, in order to be consistent with usual serial_number representation
-    (navigator, openssl etc...). 
+    (navigator, openssl etc...).
     For negative number use the same representation as navigator, which differ from OpenSSL.
-    
+
     For example for -1337::
-    
+
         OpenSSL : Serial Number: -1337 (-0x539)
         Navigator : FA C7
 
@@ -99,7 +99,7 @@ def format_serial_number_as_hex(serial_number: int | None) -> str | None:
             serial_number_as_hex = f"0{serial_number_as_hex}"
         return serial_number_as_hex
     # Representation is always a multiple of 8 bits, we need to compute this size
-    output_bin_len = (8 - (serial_number.bit_length() % 8) + serial_number.bit_length()
+    output_bin_len = (8 - (serial_number.bit_length() % 8) + serial_number.bit_length())
     return f"{serial_number & ((1 << output_bin_len) - 1):x}"
 
 

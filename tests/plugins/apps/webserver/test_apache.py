@@ -552,15 +552,15 @@ def test_apache_hosts_certificates_negative_serial_number(
     target_unix: Target, fs_unix: VirtualFilesystem, crt_name: str, serial_number: int, serial_number_hex: str
 ) -> None:
     """Test if we can parse Apache ``VirtualHost`` certificates, with a certificate using a negative serial number.
-    
-    Each test uses a number with a different length in binary format, to ensure the representation matches the one from navigator.
+
+    Each test uses a number with a different length in binary format, to ensure the representation matches
+    the one from navigator.
 
     Generated using::
-    
+
         openssl genrsa -out negative_serial.key 2048
         openssl req -new -x509 -key negative_serial.key \
             -out negative_serial.crt -days 365 -set_serial <serial_number> -config openssl.cnf
-    ```
 
     Where openssl.cnf has the following content::
 
