@@ -57,7 +57,6 @@ CertificateRecord = TargetRecordDescriptor(
         ("string", "organization"),
         ("string", "organizational_unit"),
         ("string", "public_key_algorithm"),
-        ("string", "serial_number"),
         ("string", "serial_number_hex"),
         ("varint", "serial_number"),
         ("string", "state_or_province"),
