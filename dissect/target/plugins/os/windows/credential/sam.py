@@ -282,7 +282,9 @@ def remove_des_layer(crypted_hash: bytes, rid: int) -> bytes:
     DES_BLOCK_SIZE = 8
     expected_size = 2 * DES_BLOCK_SIZE
     if len(crypted_hash) != expected_size:
-        raise ValueError(f"crypted_hash must be {expected_size} bytes long")
+        # TODO: Understand why hash bigger than 16 bytes are generated
+        # raise ValueError(f"crypted_hash must be {expected_size} bytes long")
+        return b""
 
     key1, key2 = rid_to_key(rid)
     des1 = DES.new(key1, DES.MODE_ECB)

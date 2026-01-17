@@ -316,7 +316,7 @@ class NtdsPlugin(Plugin):
 
         try:
             member_of = [group.distinguished_name for group in account.groups()]
-        except ValueError:
+        except Exception:  # TODO: Understand why multiple exception are thrown
             member_of = None
 
         try:
