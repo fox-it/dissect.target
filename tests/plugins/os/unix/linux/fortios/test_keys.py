@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import re
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import pytest
 
+from dissect.target.helpers import keychain
 from dissect.target.plugins.os.unix.linux.fortios._keys import (
     KERNEL_KEY_MAP,
     AesKey,
@@ -15,7 +17,13 @@ from dissect.target.plugins.os.unix.linux.fortios._os import (
     aes_decrypt,
     decrypt_rootfs,
     key_iv_for_kernel_hash,
+    key_iv_from_keychain,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 def test_kernel_key_map() -> None:
@@ -84,3 +92,77 @@ def test_aes_decrypt() -> None:
     assert isinstance(key, AesKey)
     data = aes_decrypt(BytesIO(encrypted_rootfs_header), key)
     assert data == decrypted_rootfs_header
+
+
+def test_decrypt_rootfs_from_keychain_file(target_unix: Target, tmp_path: Path) -> None:
+    # encrypted FGT_1000D-v7.6.4.F-build3596-FORTINET.out/rootfs.gz
+    kernel_hash = "8e7fb3af9fe68d69af224857164347cee271264308c8ba86e9ad036e405ac6c8"
+    encrypted_rootfs_header = bytes.fromhex(
+        """
+    d739 ba66 6d65 ca64 4295 b7e4 3c48 7165
+    49ab e60c fc39 ef48 30b0 06cd f32c 37f2
+    """
+    )
+    decrypted_rootfs_header = bytes.fromhex(
+        """
+    1f8b 0800 4d07 a668 0003 a4d3 5390 2ed0
+    d226 e8c2 aeaf 6cdb b66d dbb6 6d57 edb2
+    """
+    )
+
+    keys = key_iv_from_keychain(target_unix, kernel_hash=kernel_hash)
+    assert not keys, "Keys found in keychain when none were expected"
+
+    keychain_file = tmp_path / "fortios_keychain.csv"
+    keychain_file.write_text(
+        "fortios-aeskey,recovery_key,"
+        "8e7fb3af9fe68d69af224857164347cee271264308c8ba86e9ad036e405ac6c8,"
+        "5adbbe614bcde31c3e05ba2e261c1a2410f0900ed340689835520a0612fc612b:e4973d6eff0412b4dbf4fe43c4d3136d"
+    )
+    keychain.register_keychain_file(keychain_file)
+
+    keys = key_iv_from_keychain(target_unix, kernel_hash=kernel_hash)
+    assert keys, "No keys found in keychain for testing"
+
+    for key in keys:
+        assert isinstance(key, AesKey)
+        assert key.key == bytes.fromhex("5adbbe614bcde31c3e05ba2e261c1a2410f0900ed340689835520a0612fc612b")
+        assert key.iv == bytes.fromhex("e4973d6eff0412b4dbf4fe43c4d3136d")
+
+        fh = decrypt_rootfs(BytesIO(encrypted_rootfs_header), key)
+        assert fh.read() == decrypted_rootfs_header
+
+
+def test_decrypt_rootfs_from_keychain_value(target_unix: Target) -> None:
+    # encrypted FGT_1000D-v7.6.4.F-build3596-FORTINET.out/rootfs.gz
+    kernel_hash = "8e7fb3af9fe68d69af224857164347cee271264308c8ba86e9ad036e405ac6c8"
+    encrypted_rootfs_header = bytes.fromhex(
+        """
+    d739 ba66 6d65 ca64 4295 b7e4 3c48 7165
+    49ab e60c fc39 ef48 30b0 06cd f32c 37f2
+    """
+    )
+    decrypted_rootfs_header = bytes.fromhex(
+        """
+    1f8b 0800 4d07 a668 0003 a4d3 5390 2ed0
+    d226 e8c2 aeaf 6cdb b66d dbb6 6d57 edb2
+    """
+    )
+
+    keys = key_iv_from_keychain(target_unix, kernel_hash=kernel_hash)
+    assert not keys, "Keys found in keychain when none were expected"
+
+    keychain.register_wildcard_value(
+        "5adbbe614bcde31c3e05ba2e261c1a2410f0900ed340689835520a0612fc612b:e4973d6eff0412b4dbf4fe43c4d3136d"
+    )
+
+    keys = key_iv_from_keychain(target_unix, kernel_hash=kernel_hash)
+    assert keys, "No keys found in keychain for testing"
+
+    for key in keys:
+        assert isinstance(key, AesKey)
+        assert key.key == bytes.fromhex("5adbbe614bcde31c3e05ba2e261c1a2410f0900ed340689835520a0612fc612b")
+        assert key.iv == bytes.fromhex("e4973d6eff0412b4dbf4fe43c4d3136d")
+
+        fh = decrypt_rootfs(BytesIO(encrypted_rootfs_header), key)
+        assert fh.read() == decrypted_rootfs_header
