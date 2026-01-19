@@ -60,7 +60,7 @@ class DirectLoader(Loader):
             def get_files(path: Path, max_depth: int = 7) -> Iterator[Path]:
                 """
                 rglob seems to have issue on windows with python <3.12 when working on a case sensitive FS. Thus
-                we use another implemntation without using rglob.
+                we use another implementation without using rglob.
                 Probably related to https://github.com/python/cpython/issues/94537
 
                 :param path:
@@ -71,14 +71,14 @@ class DirectLoader(Loader):
                     return
                 if not path.exists():
                     return
-                if path.is_file():
+                if path.is_dir():
+                    for f in path.iterdir():
+                        if f.is_dir():
+                            yield from get_files(f, max_depth=max_depth - 1)
+                        else:
+                            yield f
+                elif path.is_file():
                     yield path
-                for f in path.iterdir():
-                    if f.is_dir():
-                        yield from get_files(f, max_depth=max_depth - 1)
-                    else:
-                        yield f
-
         # Create a flat list of all file paths from all input directories
         all_paths = chain.from_iterable(get_files(p) for p in self.paths)
         # Filter out directories, keeping only files
