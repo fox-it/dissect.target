@@ -269,7 +269,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path: str | Path) -> Self:
+    def open(cls, path: str | Path, *, apply: bool = True) -> Self:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
@@ -307,7 +307,7 @@ class Target:
         except Exception as e:
             raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {spec}: {e}") from e
 
-        return cls._load(spec, loader_instance)
+        return cls._load(spec, loader_instance, apply=apply)
 
     @classmethod
     def open_raw(cls, path: str | Path, *, apply: bool = True) -> Self:
@@ -320,7 +320,9 @@ class Target:
         return cls._load(path, loader.RawLoader(adjusted_path), apply=apply)
 
     @classmethod
-    def open_all(cls, paths: str | Path | list[str | Path], include_children: bool = False) -> Iterator[Self]:
+    def open_all(
+        cls, paths: str | Path | list[str | Path], include_children: bool = False, *, apply: bool = True
+    ) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
 
         If the path is a directory, iterate files one directory deep.
@@ -415,7 +417,7 @@ class Target:
         for spec in paths:
             loaded = False
 
-            for target in _open_all(spec, include_children=include_children):
+            for target in _open_all(spec, include_children=include_children, apply=apply):
                 loaded = True
                 at_least_one_loaded = True
                 yield target
@@ -436,7 +438,7 @@ class Target:
 
                 if path.is_dir():
                     for entry in path.iterdir():
-                        for target in _open_all(entry, include_children=include_children):
+                        for target in _open_all(entry, include_children=include_children, apply=apply):
                             at_least_one_loaded = True
                             yield target
 

@@ -67,8 +67,7 @@ class Loader:
     """
 
     def __init__(
-        self, path: Path, *, parsed_path: urllib.parse.ParseResult | None = None, resolve: bool = True,
-        **kwargs
+        self, path: Path, *, parsed_path: urllib.parse.ParseResult | None = None, resolve: bool = True, **kwargs
     ):
         self.path = path
         self.absolute_path = None
@@ -149,7 +148,7 @@ class Loader:
         # Pass the parsed options directly to the implementation map function
         return self._map(target, **vars(loader_options))
 
-    def _map(self) -> None:
+    def _map(self, **kwargs) -> None:
         """Maps the loaded path into a ``Target``.
 
         Args:
