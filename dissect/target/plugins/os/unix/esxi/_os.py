@@ -345,7 +345,7 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
         elif fs.__type__ == "vmfs":
             target.fs.mount(f"/vmfs/volumes/{fs.vmfs.uuid}", fs)
             target.fs.symlink(f"/vmfs/volumes/{fs.vmfs.uuid}", f"/vmfs/volumes/{fs.vmfs.label}")
-            # in ESXi 8+, OSDATA volume is a physical volume (lvm), thus we need to identify the logical volume
+
             if fs.volume.name in ("OSDATA", "LOCKER"):
                 target.fs.symlink(
                     f"/vmfs/volumes/{fs.vmfs.uuid}",
