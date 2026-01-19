@@ -346,13 +346,13 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
             target.fs.mount(f"/vmfs/volumes/{fs.vmfs.uuid}", fs)
             target.fs.symlink(f"/vmfs/volumes/{fs.vmfs.uuid}", f"/vmfs/volumes/{fs.vmfs.label}")
             # in ESXi 8+, OSDATA volume is a physical volume (lvm), thus we need to identify the logical volume
-            if fs.volume.name in ("OSDATA", "LOCKER") or fs.vmfs.label == f"OSDATA-{str(fs.vmfs.uuid).lower()}":
+            if fs.volume.name in ("OSDATA", "LOCKER"):
                 target.fs.symlink(
                     f"/vmfs/volumes/{fs.vmfs.uuid}",
                     f"/vmfs/volumes/{fs.volume.name}-{fs.vmfs.uuid}",
                 )
 
-                if fs.volume.name in ["OSDATA"] or fs.vmfs.label == f"OSDATA-{str(fs.vmfs.uuid).lower()}":
+                if fs.volume.name == "OSDATA":
                     osdata_fs = fs
                 elif fs.volume.name == "LOCKER":
                     locker_fs = fs
@@ -378,10 +378,6 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
         target.fs.symlink(f"/vmfs/volumes/OSDATA-{osdata_fs.vmfs.uuid}", "/var/lib/vmware/osdata")
         target.fs.symlink("/var/lib/vmware/osdata/store", "/store")
         target.fs.symlink("/var/lib/vmware/osdata/locker", "/locker")
-        # In ESXI7+; /scratch is symlink to os data
-        # We just check if /scratch already exists
-        if not target.fs.exists("/scratch"):
-            target.fs.symlink("/var/lib/vmware/osdata", "/scratch")
 
     elif locker_fs:
         target.fs.symlink(f"/vmfs/volumes/LOCKER-{locker_fs.vmfs.uuid}", "/locker")
