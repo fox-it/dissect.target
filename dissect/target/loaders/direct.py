@@ -79,6 +79,7 @@ class DirectLoader(Loader):
                             yield f
                 elif path.is_file():
                     yield path
+
         # Create a flat list of all file paths from all input directories
         all_paths = chain.from_iterable(get_files(p) for p in self.paths)
         # Filter out directories, keeping only files
