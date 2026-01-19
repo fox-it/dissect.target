@@ -256,8 +256,8 @@ def test_nginx_host_certificate(target_unix: Target, fs_unix: VirtualFilesystem)
     }
     """
     fs_unix.map_file_fh("/etc/nginx/sites-enabled/example.com.conf", BytesIO(textwrap.dedent(bar_conf).encode()))
-    fs_unix.map_file("/path/to/cert.pem", absolute_path("_data/plugins/apps/webserver/example.crt"))
-    fs_unix.map_file("/path/to/key.pem", absolute_path("_data/plugins/apps/webserver/example.key"))
+    fs_unix.map_file("/path/to/cert.pem", absolute_path("_data/plugins/apps/webserver/certificates/example.crt"))
+    fs_unix.map_file("/path/to/key.pem", absolute_path("_data/plugins/apps/webserver/certificates/example.key"))
     target_unix.add_plugin(NginxPlugin)
 
     records = list(target_unix.nginx.hosts())
@@ -274,4 +274,5 @@ def test_nginx_host_certificate(target_unix: Target, fs_unix: VirtualFilesystem)
     assert records[0].fingerprint.sha1 == "6566d8ebea1feb4eb3d12d9486cddb69e4e9e827"
     assert records[0].fingerprint.sha256 == "7221d881743505f13b7bfe854bdf800d7f0cd22d34307ed7157808a295299471"
     assert records[0].serial_number == 21067204948278457910649605551283467908287726794
+    assert records[0].serial_number_hex == "03b0afa702c33e37fffd40e0c402b2120c1284ca"
     assert records[0].issuer_dn == "C=AU,ST=Some-State,O=Internet Widgits Pty Ltd,CN=example.com"
