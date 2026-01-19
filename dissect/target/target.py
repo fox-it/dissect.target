@@ -268,7 +268,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path: str | Path) -> Self:
+    def open(cls, path: str | Path, *, apply: bool = True) -> Self:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
@@ -305,7 +305,7 @@ class Target:
         except Exception as e:
             raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {spec}: {e}") from e
 
-        return cls._load(spec, loader_instance)
+        return cls._load(spec, loader_instance, apply=apply)
 
     @classmethod
     def open_raw(cls, path: str | Path, *, apply: bool = True) -> Self:
