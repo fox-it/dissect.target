@@ -278,6 +278,7 @@ register("overlay2", "Overlay2Loader")
 register("overlay", "OverlayLoader")
 register("phobos", "PhobosLoader")
 register("uac", "UacLoader")
+register("vmsupport", "VmSupportLoader")
 # tar and zip loaders should be low priority to give other loaders a chance first
 register("tar", "TarLoader")
 register("zip", "ZipLoader")
