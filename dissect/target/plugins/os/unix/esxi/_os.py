@@ -91,6 +91,7 @@ class ESXiPlugin(UnixPlugin):
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
         if sysvol.path("/etc/vmware/esx.conf").exists():
             target.fs.mount("/", sysvol)
+            _link_log_dir_live_system_collection(target)
             return cls(target)
 
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
@@ -110,8 +111,8 @@ class ESXiPlugin(UnixPlugin):
 
         obj = cls(target)
 
-        # Symlink the /var/log directory to the correct destination (if available)
-        _link_log_dir(target, cfg, obj)
+        # Symlink the /var/log and /var/run/log directory to the correct destination (if available)
+        _link_log_dir_raw_disk(target)
 
         return obj
 
@@ -151,14 +152,13 @@ class ESXiPlugin(UnixPlugin):
         try:
             # Configstore available on ESX7+, but not used to store IP related information until 8+
             if configstore := self.target.configstore.get("esx", None):
-                # TODO : locate host ip addr
                 advanced_option = configstore.get("advanced_options", {})
                 mgmt_ip = advanced_option.get("net", {}).get("", {}).get("vital_value", {}).get("management_addr", None)
                 host_ip = advanced_option.get("misc", {}).get("", {}).get("vital_value", {}).get("host_IP_addr", None)
         except UnsupportedPluginError:
             pass
         if mgmt_ip is None and host_ip is None:
-            # Before ESX7, Ip are stored in esxconf
+            # Before ESX8, Ip are stored in esxconf
 
             host_ip = self.target.esxconf.get("/adv/Misc/HostIPAddr")
             mgmt_ip = self.target.esxconf.get("/adv/Net/ManagementAddr")
@@ -221,7 +221,6 @@ class ESXiPlugin(UnixPlugin):
         if not self.target.has_function("configstore.get"):
             self.target.log.warning("No configstore found, unable to mount NFS shares")
             return
-
         nfs_shares: dict[str, Any] = (
             self.target.configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
         )
@@ -352,7 +351,6 @@ def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO | None:
 
 def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: TargetPath) -> tar.TarFilesystem | None:
     local_tgz = None
-
     if HAS_ENVELOPE:
         try:
             local_tgz = _decrypt_envelope(local_tgz_ve, encryption_info)
@@ -360,7 +358,6 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
             target.log.debug("Failed to decrypt %s, likely TPM encrypted", local_tgz_ve)
     else:
         target.log.debug("Skipping static decryption because of missing crypto module")
-
     if not local_tgz and target.name == "local":
         target.log.info(
             "local.tgz is encrypted but static decryption failed, attempting dynamic decryption using crypto-util"
@@ -397,12 +394,12 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
             # ESXi 7 relies on volume names
             # ESXi 6 uses volume numbers
             if fs.volume.name in ("BOOTBANK1", "BOOTBANK2") or (
-                fs.volume.number
-                in (
-                    5,
-                    6,
-                )
-                and fs.exists("boot.cfg")
+                    fs.volume.number
+                    in (
+                            5,
+                            6,
+                    )
+                    and fs.exists("boot.cfg")
             ):
                 if fs is sysvol:
                     target.fs.symlink(f"/vmfs/volumes/{fs_uuid}", "/bootbank")
@@ -460,18 +457,22 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
         target.fs.symlink(f"/vmfs/volumes/LOCKER-{locker_fs.vmfs.uuid}", "/locker")
 
 
-def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin) -> None:
-    version = cfg["build"]
+def _get_log_dir_from_target(target: Target) -> str:
+    """Identify log dir from either configstore (ESXi7+) or /etc/vmsyslog.conf (ESXi6)."""
 
-    # Don't really know how ESXi does this, but let's just take a shortcut for now
-    log_dir = None
-    if version and version[0] == "7":
+    # After ESXi7, log dir is stored in the configstore
+    # As retrieving version is not easy, we just check if configstore exists
+    log_dir = "/scratch/log"
+    if target.has_function("configstore.get"):
         try:
-            log_dir = target.configstore._configstore["esx"]["syslog"]["global_settings"][""]["user_value"]["log_dir"]
+            parse_boot_cfg(target.configstore.get("esx"))
+            log_dir = target.configstore.get("esx")["syslog"]["global_settings"][""]["user_value"]["log_dir"]
         except KeyError:
             target.log.warning("Failed to read log_dir from configstore, falling back to /scratch/log")
-            log_dir = "/scratch/log"
-    elif version and version[0] == "6":
+
+    else:
+        # If configstore is missing, we assume we are on a pre ESXi7 version
+        # Checking version is complex, especially when dealing with live collection
         vmsyslog_file = target.fs.path("/etc/vmsyslog.conf")
         if vmsyslog_file.exists():
             try:
@@ -486,10 +487,51 @@ def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin) -
                     "Failed to read log_dir from vmsyslog.conf, falling back to /scratch/log",
                     exc_info=e,
                 )
-                log_dir = "/scratch/log"
+    return log_dir
 
-    if log_dir:
-        target.fs.symlink(log_dir, "/var/log")
+
+def _link_log_dir_live_system_collection(target: Target) -> None:
+    """
+    Link log directories on a live system collection.
+    Ensure symlink from log_dir (usually /scratch/log) to /var/run/log or vice versa
+    As sometime log_dir is collected, sometime only /var/run/log is collected
+
+    :param target:
+    :return:
+    """
+    log_dir = _get_log_dir_from_target(target)
+    if target.fs.exists('/var/run/log') and target.fs.exists(log_dir):
+        pass
+    elif target.fs.exists('/var/run/log'):
+        target.fs.symlink("/var/run/log", log_dir)
+    elif target.fs.exists(log_dir):
+        target.fs.symlink(log_dir, "/var/run/log")
+    else:
+        target.log.warning(
+            "Failed to symlink log_dir neither /var/run/log or log_dir : %s exists", log_dir
+        )
+
+
+def _link_log_dir_raw_disk(target: Target) -> None:
+    """
+    Link log directory from a disk system : symlink from log_dir (usually /scratch/log) to /var/run/log
+    :param target:
+    :return:
+    """
+
+    # Don't really know how ESXi does this, but let's just take a shortcut for now
+    log_dir = _get_log_dir_from_target(target)
+
+    # /var/log also contains some log files,
+    # but it symlinked file, by file (only currently append files, not <>.X.gz.
+    # Furthermore, it does not contain all log and may already contain some files/directories
+    # Not symlinked files seems to be RAM only.
+    # e.g tallylog
+    # Thus we only symlink the /var/run/log
+    if not target.fs.exists('/var/run/log'):
+        target.fs.symlink(log_dir, "/var/run/log")
+    else:
+        target.log.warning("/var/run/log already exists. Does not create symlink from log dir : %s", log_dir)
 
 
 def parse_boot_cfg(fh: TextIO) -> dict[str, str]:
