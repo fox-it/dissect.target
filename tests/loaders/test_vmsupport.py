@@ -43,7 +43,9 @@ def mock_vmsupport_dir(tmp_path: Path) -> Path:
     ("path", "loader"),
     [
         ("_data/loaders/vmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz", TarLoader),
+        ("_data/loaders/vmsupport/esx-localhost7-2026-01-20--09.27-139218.tgz", TarLoader),
         ("_data/loaders/vmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz", TarLoader),
+        ("_data/loaders/vmsupport/esx-localhost9-2026-01-09--16.26-149929.tgz", TarLoader),
         ("mock_vmsupport_dir", VmSupportLoader),
     ],
 )
@@ -66,7 +68,9 @@ def test_target_open(
     "data_path",
     [
         "_data/loaders/vmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz",
+        "_data/loaders/vmsupport/esx-localhost7-2026-01-20--09.27-139218.tgz",
         "_data/loaders/vmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz",
+        "_data/loaders/vmsupport/esx-localhost9-2026-01-09--16.26-149929.tgz",
     ],
 )
 def test_compressed_tar(data_path: str) -> None:
@@ -109,7 +113,9 @@ def test_dir(mock_vmsupport_dir: Path) -> None:
     ("archive", "loader"),
     [
         ("_data/loaders/vmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz", TarLoader),
+        ("_data/loaders/vmsupport/esx-localhost7-2026-01-20--09.27-139218.tgz", TarLoader),
         ("_data/loaders/vmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz", TarLoader),
+        ("_data/loaders/vmsupport/esx-localhost9-2026-01-09--16.26-149929.tgz", TarLoader),
     ],
 )
 @pytest.mark.benchmark
