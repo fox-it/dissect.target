@@ -1,37 +1,50 @@
 from __future__ import annotations
-import re
-from datetime import datetime
-from typing import TYPE_CHECKING, Iterator
-import logging
 
-from dissect.target.plugin import Plugin, export
-from dissect.target.helpers.record import TargetRecordDescriptor
+import re
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from dissect.target import Target
-
-log = logging.getLogger(__name__)
+    from collections.abc import Iterator
 
 IntuneManagementExtensionLogRecord = TargetRecordDescriptor(
-    "IntuneManagementExtension/log",
+    "windows/intune/managementextension/log",
     [
         ("datetime", "timestamp"),
         ("string", "component"),
         ("string", "thread"),
         ("string", "type"),
+        ("string", "context"),
         ("string", "message"),
         ("string", "file_origin"),
     ],
 )
 
 LOG_PATTERN = re.compile(
-    r'<!\[LOG\[(?P<message>.*?)\]LOG\]!>'
-    r'<time="(?P<hms>\d{2}:\d{2}:\d{2})(?:\.(?P<fractional_seconds>\d+))?"\s+'
-    r'date="(?P<date>[\d-]+)"\s+component="(?P<component>[^"]+)"'
-    r'\s+context="[^"]*"\s+type="(?P<type>\d+)"\s+thread="(?P<thread>\d+)"\s+file="(?P<file_origin>[^"]*)"',
-    re.DOTALL | re.IGNORECASE,
+    r"""
+        <!\[LOG\[(?P<message>.*?)\]LOG\]!>
+        <time="(?P<hms>\d{2}:\d{2}:\d{2})
+            (?:\.(?P<fractional_seconds>\d+))?"
+        \s+
+        date="(?P<date>[\d-]+)"
+        \s+
+        component="(?P<component>[^"]+)"
+        \s+
+        context="(?P<context>[^"]*)"
+        \s+
+        type="(?P<type>\d+)"
+        \s+
+        thread="(?P<thread>\d+)"
+        \s+
+        file="(?P<file_origin>[^"]*)"
+    """,
+    re.DOTALL | re.IGNORECASE | re.VERBOSE,
 )
+
 
 class IntuneManagementExtensionLogParserPlugin(Plugin):
     """Parse Microsoft Intune Management Extension logs (including rotated logs).
@@ -53,9 +66,7 @@ class IntuneManagementExtensionLogParserPlugin(Plugin):
         """
         log_dir = self.target.fs.path(self.LOG_DIR)
         if not log_dir.exists():
-            raise UnsupportedPluginError(
-                f"Intune Management Extension log directory not found: {self.LOG_DIR}"
-            )
+            raise UnsupportedPluginError(f"Intune Management Extension log directory not found: {self.LOG_DIR}")
 
         has_logs = any(
             p.name.lower().startswith("intunemanagementextension") and p.name.lower().endswith(".log")
@@ -73,20 +84,20 @@ class IntuneManagementExtensionLogParserPlugin(Plugin):
         """
         log_dir = self.target.fs.path(self.LOG_DIR)
         log_files = [
-            p for p in log_dir.iterdir()
+            p
+            for p in log_dir.iterdir()
             if p.name.lower().startswith("intunemanagementextension") and p.name.lower().endswith(".log")
         ]
 
         if not log_files:
-            log.warning(f"No Intune Management Extension log files found under {self.LOG_DIR}")
+            self.target.log.warning("No Intune Management Extension log files found under %s", self.LOG_DIR)
             return
 
         for log_path in log_files:
             try:
-                with log_path.open("r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
-            except Exception as e:
-                log.exception(f"Failed to open log file {log_path}: {e}")
+                content = log_path.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                self.target.log.exception("Failed to open log file %s", log_path)
                 continue
 
             match_count = 0
@@ -105,7 +116,7 @@ class IntuneManagementExtensionLogParserPlugin(Plugin):
                 timestamp = None
                 for fmt in ("%m-%d-%Y %H:%M:%S.%f", "%d-%m-%Y %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S.%f"):
                     try:
-                        timestamp = datetime.strptime(f"{date_str} {time_str}", fmt)
+                        timestamp = datetime.strptime(f"{date_str} {time_str}", fmt).replace(tzinfo=timezone.utc)
                         break
                     except ValueError:
                         continue
@@ -115,14 +126,15 @@ class IntuneManagementExtensionLogParserPlugin(Plugin):
                 log_type = match.group("type")
 
                 yield IntuneManagementExtensionLogRecord(
-                    timestamp=timestamp.isoformat(timespec="microseconds"),
+                    timestamp=timestamp,
                     component=match.group("component"),
                     thread=match.group("thread"),
                     type=log_type,
+                    context=match.group("context"),
                     message=msg,
                     file_origin=f"{log_path.name}:{match.group('file_origin')}",
                     _target=self.target,
                 )
 
             if match_count == 0:
-                log.warning(f"No log entries matched regex in {log_path}")
+                self.target.log.warning("No log entries matched regex in %s", log_path)

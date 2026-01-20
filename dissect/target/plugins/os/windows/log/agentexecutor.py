@@ -1,20 +1,18 @@
 from __future__ import annotations
-import re
-from datetime import datetime
-from typing import TYPE_CHECKING, Iterator
-import logging
 
-from dissect.target.plugin import Plugin, export
-from dissect.target.helpers.record import TargetRecordDescriptor
+import re
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from dissect.target import Target
-
-log = logging.getLogger(__name__)
+    from collections.abc import Iterator
 
 AgentExecutorLogRecord = TargetRecordDescriptor(
-    "agentexecutor/log",
+    "windows/intune/agentexecutor/log",
     [
         ("datetime", "timestamp"),
         ("string", "component"),
@@ -27,16 +25,27 @@ AgentExecutorLogRecord = TargetRecordDescriptor(
 )
 
 LOG_PATTERN = re.compile(
-    r'<!\[LOG\[(?P<message>.*?)\]LOG\]!>'
-    r'<time="(?P<hms>\d{2}:\d{2}:\d{2})(?:\.(?P<fractional_seconds>\d{1,7}))?"\s+'
-    r'date="(?P<date>[\d-]+)"\s+'
-    r'component="(?P<component>[^"]+)"\s+'
-    r'context="(?P<context>[^"]*)"\s+'
-    r'type="(?P<type>\d+)"\s+'
-    r'thread="(?P<thread>\d+)"'
-    r'(?:\s+file="(?P<file_origin>[^"]*)")?',
-    re.DOTALL | re.IGNORECASE,
+    r"""
+        <!\[LOG\[(?P<message>.*?)\]LOG\]!>
+        <time="(?P<hms>\d{2}:\d{2}:\d{2})
+            (?:\.(?P<fractional_seconds>\d{1,7}))?"
+        \s+
+        date="(?P<date>[\d-]+)"
+        \s+
+        component="(?P<component>[^"]+)"
+        \s+
+        context="(?P<context>[^"]*)"
+        \s+
+        type="(?P<type>\d+)"
+        \s+
+        thread="(?P<thread>\d+)"
+        (?:
+            \s+file="(?P<file_origin>[^"]*)"
+        )?
+    """,
+    re.DOTALL | re.IGNORECASE | re.VERBOSE,
 )
+
 
 class AgentExecutorLogPlugin(Plugin):
     """Parse Microsoft Intune AgentExecutor logs.
@@ -48,7 +57,6 @@ class AgentExecutorLogPlugin(Plugin):
     """
 
     DEFAULT_LOG_PATH = "sysvol/ProgramData/Microsoft/IntuneManagementExtension/Logs/AgentExecutor.log"
-    
 
     def check_compatible(self) -> None:
         """Verify that the AgentExecutor log file exists within the target.
@@ -56,11 +64,8 @@ class AgentExecutorLogPlugin(Plugin):
         Raises:
             UnsupportedPluginError: If the expected log file does not exist.
         """
-        log_path = self.target.fs.path(self.DEFAULT_LOG_PATH)
-        if not log_path.exists():
-            raise UnsupportedPluginError(
-                f"AgentExecutor.log not found at {self.DEFAULT_LOG_PATH}"
-            )
+        if not self.target.fs.path(self.DEFAULT_LOG_PATH).exists():
+            raise UnsupportedPluginError(f"AgentExecutor.log not found at {self.DEFAULT_LOG_PATH}")
 
     @export(record=AgentExecutorLogRecord)
     def agentexecutor(self) -> Iterator[AgentExecutorLogRecord]:
@@ -75,10 +80,9 @@ class AgentExecutorLogPlugin(Plugin):
         log_path = self.target.fs.path(self.DEFAULT_LOG_PATH)
 
         try:
-            with log_path.open("r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
-        except Exception as e:
-            log.exception(f"Failed to open log file {log_path}: {e}")
+            content = log_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            self.target.log.exception("Failed to open log file %s", log_path)
             return
 
         match_count = 0
@@ -97,20 +101,19 @@ class AgentExecutorLogPlugin(Plugin):
             timestamp = None
             for fmt in ("%m-%d-%Y %H:%M:%S.%f", "%d-%m-%Y %H:%M:%S.%f"):
                 try:
-                    timestamp = datetime.strptime(f"{date_str} {time_str}", fmt)
+                    timestamp = datetime.strptime(f"{date_str} {time_str}", fmt).replace(tzinfo=timezone.utc)
                     break
                 except ValueError:
                     continue
 
             if not timestamp:
-                log.debug(f"Could not parse datetime from {date_str} {time_str}")
+                self.target.log.debug("Could not parse datetime from %s %s", date_str, time_str)
                 continue
 
-            iso_timestamp = timestamp.isoformat(timespec="microseconds")
             log_type = match.group("type")
 
             yield AgentExecutorLogRecord(
-                timestamp=iso_timestamp,
+                timestamp=timestamp,
                 component=match.group("component"),
                 thread=match.group("thread"),
                 type=log_type,
@@ -121,4 +124,4 @@ class AgentExecutorLogPlugin(Plugin):
             )
 
         if match_count == 0:
-            log.warning(f"No log entries matched the regex in {log_path}")
+            self.target.log.warning("No log entries matched the regex in %s", log_path)
