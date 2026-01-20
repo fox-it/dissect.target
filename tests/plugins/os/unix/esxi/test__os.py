@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import typing
 from io import BytesIO
-from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+import pytest
+from flow.record.fieldtypes import datetime as dt
+
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.loader import open as loader_open
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.esxi._os import ESXiPlugin, _create_local_fs, _decrypt_crypto_util
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
-if TYPE_CHECKING:
-    from dissect.target.target import Target
+if typing.TYPE_CHECKING:
+    import datetime
 
 
 def test__create_tar_fs_no_envelope(target_linux: Target, fs_unix: VirtualFilesystem) -> None:
@@ -75,6 +80,94 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
     assert target_bare.hostname == "localhost"
     assert target_bare.version == "6.7.0"
     assert target_bare.ips == ["192.168.56.101"]
+
+
+@pytest.mark.parametrize(
+    ("data_path", "hostname", "ips", "version", "users"),
+    [
+        (
+            "_data/loaders/vmsupport/esx-localhost6-2026-01-12--13.56-2107676.tar.gz",
+            "localhost",
+            ["192.168.122.133"],
+            "6.7.0-14320388",
+            # vm support does not contains the /etc/passwd file, thus no user are returned
+            [],
+        ),
+        (
+            "_data/loaders/vmsupport/esx-localhost7-2026-01-20--09.27-139218.tgz",
+            "localhost",
+            ["192.168.122.186"],
+            "7.0.3-0.50.20036589",
+            [
+                ("dcui", "DCUI User", dt("2026-01-20 09:24:23+00:00"), dt("2026-01-20 09:24:23+00:00"), True),
+                ("dissect", "Test dissect", dt("2026-01-20 09:24:23+00:00"), dt("2026-01-20 09:24:23+00:00"), True),
+                ("root", "Administrator", dt("2026-01-20 09:24:23+00:00"), dt("2026-01-20 09:24:23+00:00"), True),
+                (
+                    "vpxuser",
+                    "VMware VirtualCenter administration account",
+                    dt("2026-01-20 09:24:23+00:00"),
+                    dt("2026-01-20 09:24:23+00:00"),
+                    True,
+                ),
+            ],
+        ),
+        (
+            "_data/loaders/vmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz",
+            "localhost",
+            ["192.168.122.207"],
+            "8.0.3-0.70.24677879",
+            [("root", "Administrator", dt("2026-01-09 15:59:34+00:00"), dt("2026-01-09 15:59:34+00:00"), True)],
+        ),
+        (
+            "_data/loaders/vmsupport/esx-localhost9-2026-01-09--16.26-149929.tgz",
+            "localhost",
+            ["192.168.122.43"],
+            "9.0.0-0.24678710",
+            [("root", "Administrator", dt("2026-01-09 16:20:11+00:00"), dt("2026-01-09 16:20:11+00:00"), True)],
+        ),
+    ],
+)
+def test_esxi_os_detection_from_vmsupport(
+    data_path: str,
+    hostname: str,
+    ips: list[str],
+    version: str,
+    users: list[tuple[str, str | None, datetime.datetime | None, datetime.datetime | None, bool | None]],
+) -> None:
+    """Test if os function works on a vmsupport collection."""
+    """"
+    TODO for test:
+    * Create user
+    * Change log folder
+    * Change hostname
+    """
+    path = absolute_path(data_path)
+    loader = loader_open(path)
+    target = Target()
+    loader.map(target)
+    target.apply()
+    assert isinstance(target._os, ESXiPlugin)
+    assert target.os == OperatingSystem.ESXI
+    assert target.hostname == hostname
+    assert target.version == version
+    assert target.ips == ips
+    assert target.domain == ""
+    assert (
+        sorted(
+            [
+                (
+                    u.name,
+                    getattr(u, "description", None),
+                    getattr(u, "modified_time", None),
+                    getattr(u, "creation_time", None),
+                    getattr(u, "shell_access", None),
+                )
+                for u in list(target.users())
+            ],
+            key=lambda x: x[0],
+        )
+        == users
+    )
 
 
 def test_esxi_os_creation_version_7(target_bare: Target) -> None:

@@ -9,8 +9,10 @@ from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 from dissect.util.hash.jenkins import lookup8
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.filesystems.vmtar import VmtarFilesystem
+from dissect.target.helpers.record import COMMON_UNIX_FIELDS, TargetRecordDescriptor, UnixUserRecord
 from dissect.target.helpers.sunrpc import client
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 
@@ -31,11 +33,24 @@ from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem, VirtualFilesystem
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
+
+ESXiUserRecord = TargetRecordDescriptor(
+    "unix/esxi/user",
+    [
+        *COMMON_UNIX_FIELDS,
+        ("string", "description"),
+        ("datetime", "modified_time"),
+        ("datetime", "creation_time"),
+        ("boolean", "shell_access"),
+    ],
+)
 
 
 class ESXiPlugin(UnixPlugin):
@@ -102,21 +117,51 @@ class ESXiPlugin(UnixPlugin):
 
     @export(property=True)
     def hostname(self) -> str:
+        try:
+            # Configstore available on ESX7+, but not used to store hostname related information until 8+
+            if configstore := self.target.configstore.get("esx", None):
+                hostname = (
+                    configstore.get("advanced_options", {})
+                    .get("misc", {})
+                    .get("", {})
+                    .get("vital_value", {})
+                    .get("host_name", None)
+                )
+                if hostname:
+                    return hostname
+        except UnsupportedPluginError:
+            # Configstore only available in esxi7+
+            pass
+
         if hostname := self.target.esxconf.get("/adv/Misc/HostName"):
             return hostname.split(".", 1)[0]
         return "localhost"
 
     @export(property=True)
     def domain(self) -> str | None:
-        if hostname := self.target.esxconf.get("/adv/Misc/HostName"):
+        if hostname := self.target.hostname:
             return hostname.partition(".")[2]
         return None
 
     @export(property=True)
     def ips(self) -> list[str]:
         result = set()
-        host_ip = self.target.esxconf.get("/adv/Misc/HostIPAddr")
-        mgmt_ip = self.target.esxconf.get("/adv/Net/ManagementAddr")
+        host_ip = None
+        mgmt_ip = None
+        try:
+            # Configstore available on ESX7+, but not used to store IP related information until 8+
+            if configstore := self.target.configstore.get("esx", None):
+                # TODO : locate host ip addr
+                advanced_option = configstore.get("advanced_options", {})
+                mgmt_ip = advanced_option.get("net", {}).get("", {}).get("vital_value", {}).get("management_addr", None)
+                host_ip = advanced_option.get("misc", {}).get("", {}).get("vital_value", {}).get("host_IP_addr", None)
+        except UnsupportedPluginError:
+            pass
+        if mgmt_ip is None and host_ip is None:
+            # Before ESX7, Ip are stored in esxconf
+
+            host_ip = self.target.esxconf.get("/adv/Misc/HostIPAddr")
+            mgmt_ip = self.target.esxconf.get("/adv/Net/ManagementAddr")
 
         if host_ip:
             result.add(host_ip)
@@ -137,12 +182,39 @@ class ESXiPlugin(UnixPlugin):
                 continue
 
             _, _, version = line.partition("=")
-            return f"VMware ESXi {version.strip()}"
+            return version.strip()
         return None
 
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.ESXI.value
+
+    @export(record=[ESXiUserRecord, UnixUserRecord])
+    def users(self) -> Iterator[ESXiUserRecord | UnixUserRecord]:
+        if self.version and self.version[0] < "7":
+            yield from super().users(sessions=False)
+        else:
+            try:
+                if configstore := self.target.configstore.get("esx", None):
+                    users = configstore.get("authentication", {}).get("user_accounts", {})
+                    for v in users.values():
+                        user_value = v.get("user_value", {})
+                        vital_value = v.get("user_value", {})
+                        yield ESXiUserRecord(
+                            name=user_value.get("name", None),
+                            description=user_value.get("description", None),
+                            passwd=user_value.get("password_hash", None),
+                            modified_time=v.get("modified_time", None),
+                            creation_time=v.get("creation_time", None),
+                            uid=vital_value.get("uid", None),
+                            source=self.target.configstore.path,
+                            # When shell access is disabled, this key is present with the value
+                            # DISABLED. This key is absent otherwise
+                            shell_access=user_value.get("shell_access", None) != "DISABLED",
+                            _target=self.target,
+                        )
+            except UnsupportedPluginError:
+                pass
 
     def _mount_nfs_shares(self) -> None:
         """Mount NFS shares found in the configstore."""
