@@ -42,6 +42,7 @@ def mock_uac_dir(tmp_path: Path) -> Path:
     [
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz", TarLoader),
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143112.tar.gz", TarLoader),
+        ("_data/loaders/uac/uac-testdissecthostname-esxi-20260120163519.tar.gz", TarLoader),
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143106.zip", ZipLoader),
         ("mock_uac_dir", UacLoader),
     ],
@@ -69,6 +70,8 @@ def test_target_open(
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz"),
         # this one start with ./[root]
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143112.tar.gz"),
+        # This one if from an ESXi
+        ("_data/loaders/uac/uac-testdissecthostname-esxi-20260120163519.tar.gz"),
     ],
 )
 def test_compressed_tar(data_path: str) -> None:

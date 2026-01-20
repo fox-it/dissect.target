@@ -8,7 +8,6 @@ import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.loader import open as loader_open
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.esxi._os import ESXiPlugin, _create_local_fs, _decrypt_crypto_util
 from dissect.target.target import Target
@@ -119,11 +118,50 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
             [("root", "Administrator", dt("2026-01-09 15:59:34+00:00"), dt("2026-01-09 15:59:34+00:00"), True)],
         ),
         (
-            "_data/loaders/vmsupport/esx-localhost9-2026-01-09--16.26-149929.tgz",
-            "localhost",
+            "_data/loaders/vmsupport/esx-testdissecthostname9-2026-01-20--16.28-133046.tgz",
+            "testdissecthostname",
             ["192.168.122.43"],
             "9.0.0-0.24678710",
-            [("root", "Administrator", dt("2026-01-09 16:20:11+00:00"), dt("2026-01-09 16:20:11+00:00"), True)],
+            [
+                (
+                    "dissect_user",
+                    "Test user for dissect data sample (with shell access)",
+                    dt("2026-01-20 16:09:01+00:00"),
+                    dt("2026-01-20 13:34:11+00:00"),
+                    True,
+                ),
+                (
+                    "dissect_user_no_shell",
+                    "Test user for dissect, without shell access",
+                    dt("2026-01-20 16:09:01+00:00"),
+                    dt("2026-01-20 13:34:51+00:00"),
+                    False,
+                ),
+                ("root", "Administrator", dt("2026-01-20 16:09:01+00:00"), dt("2026-01-09 16:20:11+00:00"), True),
+            ],
+        ),
+        (
+            "_data/loaders/uac/uac-testdissecthostname-esxi-20260120163519.tar.gz",
+            "testdissecthostname",
+            ["192.168.122.43"],
+            "9.0",  # No boot.cfg, thus version is without build number
+            [
+                (
+                    "dissect_user",
+                    "Test user for dissect data sample (with shell access)",
+                    dt("2026-01-20 16:09:01+00:00"),
+                    dt("2026-01-20 13:34:11+00:00"),
+                    True,
+                ),
+                (
+                    "dissect_user_no_shell",
+                    "Test user for dissect, without shell access",
+                    dt("2026-01-20 16:09:01+00:00"),
+                    dt("2026-01-20 13:34:51+00:00"),
+                    False,
+                ),
+                ("root", "Administrator", dt("2026-01-20 16:09:01+00:00"), dt("2026-01-09 16:20:11+00:00"), True),
+            ],
         ),
     ],
 )
@@ -141,11 +179,7 @@ def test_esxi_os_detection_from_vmsupport(
     * Change log folder
     * Change hostname
     """
-    path = absolute_path(data_path)
-    loader = loader_open(path)
-    target = Target()
-    loader.map(target)
-    target.apply()
+    target = Target.open(absolute_path(data_path))
     assert isinstance(target._os, ESXiPlugin)
     assert target.os == OperatingSystem.ESXI
     assert target.hostname == hostname
@@ -168,6 +202,24 @@ def test_esxi_os_detection_from_vmsupport(
         )
         == users
     )
+
+
+def test_esxi9_os_log_dir_detection_vmsupport() -> None:
+    """Test is log_dir is properly identified and symlinked to/from /var/run/log if one of those folder does not exists.
+    :return:
+    """
+    target = Target.open(absolute_path("_data/loaders/uac/uac-testdissecthostname-esxi-20260120163519.tar.gz"))
+    assert target.fs.path("/var/run/log").is_symlink()
+    assert target.fs.path("/var/run/log").resolve() == target.fs.path("/scratch/log2")
+
+
+def test_esxi9_os_log_dir_detection_uac() -> None:
+    """Test is log_dir is properly identified and symlinked to/from /var/run/log if one of those folder does not exists.
+    :return:
+    """
+    target = Target.open(absolute_path("_data/loaders/vmsupport/esx-testdissecthostname9-2026-01-20--16.28-133046.tgz"))
+    assert target.fs.path("/scratch/log2").is_symlink()
+    assert target.fs.path("/scratch/log2").resolve() == target.fs.path("/var/run/log")
 
 
 def test_esxi_os_creation_version_7(target_bare: Target) -> None:

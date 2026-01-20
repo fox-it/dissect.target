@@ -394,12 +394,12 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
             # ESXi 7 relies on volume names
             # ESXi 6 uses volume numbers
             if fs.volume.name in ("BOOTBANK1", "BOOTBANK2") or (
-                    fs.volume.number
-                    in (
-                            5,
-                            6,
-                    )
-                    and fs.exists("boot.cfg")
+                fs.volume.number
+                in (
+                    5,
+                    6,
+                )
+                and fs.exists("boot.cfg")
             ):
                 if fs is sysvol:
                     target.fs.symlink(f"/vmfs/volumes/{fs_uuid}", "/bootbank")
@@ -494,22 +494,20 @@ def _link_log_dir_live_system_collection(target: Target) -> None:
     """
     Link log directories on a live system collection.
     Ensure symlink from log_dir (usually /scratch/log) to /var/run/log or vice versa
-    As sometime log_dir is collected, sometime only /var/run/log is collected
+    As sometime log_dir is collected, ometime only /var/run/log is collected
 
     :param target:
     :return:
     """
     log_dir = _get_log_dir_from_target(target)
-    if target.fs.exists('/var/run/log') and target.fs.exists(log_dir):
+    if target.fs.exists("/var/run/log") and target.fs.exists(log_dir):
         pass
-    elif target.fs.exists('/var/run/log'):
+    elif target.fs.exists("/var/run/log"):
         target.fs.symlink("/var/run/log", log_dir)
     elif target.fs.exists(log_dir):
         target.fs.symlink(log_dir, "/var/run/log")
     else:
-        target.log.warning(
-            "Failed to symlink log_dir neither /var/run/log or log_dir : %s exists", log_dir
-        )
+        target.log.warning("Failed to symlink log_dir neither /var/run/log or log_dir : %s exists", log_dir)
 
 
 def _link_log_dir_raw_disk(target: Target) -> None:
@@ -528,7 +526,7 @@ def _link_log_dir_raw_disk(target: Target) -> None:
     # Not symlinked files seems to be RAM only.
     # e.g tallylog
     # Thus we only symlink the /var/run/log
-    if not target.fs.exists('/var/run/log'):
+    if not target.fs.exists("/var/run/log"):
         target.fs.symlink(log_dir, "/var/run/log")
     else:
         target.log.warning("/var/run/log already exists. Does not create symlink from log dir : %s", log_dir)
