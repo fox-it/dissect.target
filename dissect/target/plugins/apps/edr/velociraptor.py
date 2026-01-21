@@ -22,10 +22,10 @@ ISO_8601_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{
 
 
 class VelociraptorRecordBuilder:
-    def __init__(self, artifact_name: str, extract: bool):
+    def __init__(self, artifact_name: str, extract_nested: bool):
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
         self.record_name = f"velociraptor/{artifact_name}"
-        self.extract = extract
+        self.extract_nested = extract_nested
 
     def build(self, object: dict, target: Target) -> TargetRecordDescriptor:
         """Builds a Velociraptor record."""
@@ -53,7 +53,7 @@ class VelociraptorRecordBuilder:
             elif isinstance(value, str):
                 record_type = "string"
             elif isinstance(value, dict):
-                if self.extract:
+                if self.extract_nested:
                     record_type = "record"
                     value = self.build(value, target)
                 else:
@@ -88,18 +88,18 @@ class VelociraptorPlugin(Plugin):
 
     @export(record=DynamicDescriptor(["datetime"]))
     @arg(
-        "--extract",
+        "--extract-nested",
         action="store_true",
         help="extracts JSON objects from the artifacts",
     )
     def results(
         self,
-        extract: bool = False,
+        extract_nested: bool = False,
     ) -> Iterator[Record]:
         """Return Rapid7 Velociraptor artifacts.
 
         By default JSON objects are not extracted from the artifacts,
-        this can be done with the argument ``--extract``.
+        this can be done with the argument ``--extract-nested``.
 
         References:
             - https://docs.velociraptor.app/docs/vql/artifacts/
@@ -109,7 +109,7 @@ class VelociraptorPlugin(Plugin):
             artifact_name = (
                 urllib.parse.unquote(artifact.name.removesuffix(".json")).split("/")[0].lower().replace(".", "_")
             )
-            record_builder = VelociraptorRecordBuilder(artifact_name, extract=extract)
+            record_builder = VelociraptorRecordBuilder(artifact_name, extract_nested=extract_nested)
 
             for line in artifact.open("rt"):
                 if not (line := line.strip()):
