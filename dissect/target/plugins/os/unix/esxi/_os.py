@@ -280,7 +280,6 @@ class ESXiPlugin(UnixPlugin):
                     )
             for user in users_dict.values():
                 yield ESXiUserRecord(
-
                     **user._asdict(),
                     _target=self.target,
                 )
