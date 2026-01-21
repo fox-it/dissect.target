@@ -232,6 +232,7 @@ class ESXiPlugin(UnixPlugin):
         if not self.target.has_function("configstore.get"):
             self.target.log.warning("No configstore found, unable to mount NFS shares")
             return
+
         nfs_shares: dict[str, Any] = (
             self.target.configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
         )
