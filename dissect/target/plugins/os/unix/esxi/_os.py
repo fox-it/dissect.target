@@ -503,6 +503,7 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
 
                 if fs.volume.name in ["OSDATA"] or fs.vmfs.label == f"OSDATA-{str(fs.vmfs.uuid).lower()}":
                     osdata_fs = fs
+                # It may not work, but we lack test data for this use case.
                 elif fs.volume.name == "LOCKER":
                     locker_fs = fs
 
