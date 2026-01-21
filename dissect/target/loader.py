@@ -93,6 +93,7 @@ class Loader:
     @staticmethod
     def _create_parser(cls: type[Loader]) -> argparse.ArgumentParser:
         """Creates the argument parser for this loader."""
+        # Do like generate_argparse_for_method in cli.py
         parser = argparse.ArgumentParser(
             prog=f"loader:{cls.__name__.lower()}",
             description=f"Options for the '{cls.__name__}' loader.",
