@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def test_esxi_6_log_shell(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi6"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi6/shell.log.gz")
-    fs_esxi.map_file("/var/log/shell.log.gz", data_file)
+    fs_esxi.map_file("/var/run/log/shell.log.gz", data_file)
 
     target_esxi.add_plugin(ShellLogPlugin)
 
@@ -35,13 +35,13 @@ def test_esxi_6_log_shell(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     assert results[13].pid == 2099491
     assert results[13].message == "./uac --profile full -f zip ."
     assert results[13].user == "root"
-    assert results[13].source == "/var/log/shell.log.gz"
+    assert results[13].source == "/var/run/log/shell.log.gz"
 
 
 def test_esxi_7_log_shell(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi6"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi7/shell.log.gz")
-    fs_esxi.map_file("/var/log/shell.log.gz", data_file)
+    fs_esxi.map_file("/var/run/log/shell.log.gz", data_file)
 
     target_esxi.add_plugin(ShellLogPlugin)
 
@@ -66,7 +66,7 @@ def test_esxi_7_log_shell(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 def test_esxi_8_log_shell(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi6"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi8/shell.log.gz")
-    fs_esxi.map_file("/var/log/shell.log.gz", data_file)
+    fs_esxi.map_file("/var/run/log/shell.log.gz", data_file)
 
     target_esxi.add_plugin(ShellLogPlugin)
 
@@ -109,7 +109,7 @@ def test_esxi_8_log_shell(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 def test_esxi_9_log_shell(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi6"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi9/shell.log.gz")
-    fs_esxi.map_file("/var/log/shell.log.gz", data_file)
+    fs_esxi.map_file("/var/run/log/shell.log.gz", data_file)
 
     target_esxi.add_plugin(ShellLogPlugin)
 

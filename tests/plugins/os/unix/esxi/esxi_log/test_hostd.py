@@ -57,7 +57,7 @@ def test_esxi_6_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi 7"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi7/hostd.0.gz")
-    fs_esxi.map_file("/scratch/log/hostd.0.gz", data_file)
+    fs_esxi.map_file("/var/run/log/hostd.0.gz", data_file)
 
     target_esxi.add_plugin(HostdPlugin)
 
@@ -87,7 +87,7 @@ def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     assert results[29].application == "hostd"
     assert results[29].log_level == "info"
     assert results[29].pid == 2100292
-    assert results[29].source == "/scratch/log/hostd.0.gz"
+    assert results[29].source == "/var/run/log/hostd.0.gz"
     assert (
         results[29].message
         == "VmkVprobSource::Post event: (vim.event.EventEx) {\n    key = 90,\n    chainId = -1,\n    createdTime = "
@@ -103,7 +103,7 @@ def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 def test_esxi_8_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi 7"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi8/hostd.1.gz")
-    fs_esxi.map_file("/var/log/hostd.1.gz", data_file)
+    fs_esxi.map_file("/var/run/log/hostd.1.gz", data_file)
 
     target_esxi.add_plugin(HostdPlugin)
 
@@ -132,7 +132,7 @@ def test_esxi_8_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 def test_esxi_9_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi 9"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi9/hostd.0.gz")
-    fs_esxi.map_file("/var/log/hostd.0.gz", data_file)
+    fs_esxi.map_file("/var/run/log/hostd.0.gz", data_file)
 
     target_esxi.add_plugin(HostdPlugin)
 
@@ -152,7 +152,7 @@ def test_esxi_9_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
     assert results[2377].application == "Hostd"
     assert results[2377].log_level == "Er(163)"
     assert results[2377].pid == 132123
-    assert results[2377].source == "/var/log/hostd.0.gz"
+    assert results[2377].source == "/var/run/log/hostd.0.gz"
     assert results[2377].message == (
         "Failed to load event type <EventType>\n"
         "                "

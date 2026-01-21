@@ -54,23 +54,15 @@ def get_esxi_log_path(target: Target, logname: str) -> Iterator[Path]:
         - https://knowledge.broadcom.com/external/article/306962/location-of-esxi-log-files.html
     :return:
     """
-    # Depending on collection method, log are not always located at the same location
-    # In tech support logs are in /var/run/log
-    # In live collection in /scratch/log
-    # On live disk, symlink must have be made from os data
-    # We stop to the first existing folder with files to prevent duplicate
-    # /var/log usually contains only uncompressed log file, thus this entry is the last one checked
-    files_found = False
-    for log_location in ["/scratch/log", "/var/run/log", "/var/log"]:
-        if target.fs.path(log_location).exists():
-            for path in target.fs.path(log_location).glob(f"{logname}.*"):
-                try:
-                    yield path.resolve(strict=True)
-                    files_found = True
-                except FilesystemError as e:  # noqa PERF203
-                    target.info.warning("Fail to resolve path to %s : %s", path, str(e))
-        if files_found:
-            break
+    # Esxi/loaders should ensure that logs are symlinked to /var/run/log, as on a live ESXi hosts.
+    if (var_run_log := target.fs.path("/var/run/log")).exists():
+        print("HERE")
+        for path in var_run_log.glob(f"{logname}.*"):
+            try:
+                yield path.resolve(strict=True)
+            except FilesystemError as e:  # noqa PERF203
+                target.info.warning("Fail to resolve path to %s : %s", path, str(e))
+    return
 
 
 def yield_log_records(

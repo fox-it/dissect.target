@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def test_esxi_6_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi6"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi6/auth.log.gz")
-    fs_esxi.map_file("/var/log/auth.log.gz", data_file)
+    fs_esxi.map_file("/var/run/log/auth.log.gz", data_file)
 
     target_esxi.add_plugin(EsxiAuthPlugin)
 
@@ -33,13 +33,13 @@ def test_esxi_6_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> Non
     assert results[12].log_level is None
     assert results[12].pid == 2099486
     assert results[12].message == "Accepted keyboard-interactive/pam for root from 192.168.56.1 port 46932 ssh2"
-    assert results[12].source == "/var/log/auth.log.gz"
+    assert results[12].source == "/var/run/log/auth.log.gz"
 
 
 def test_esxi_7_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
     """Test with log from an ESXi7"""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi7/auth.log.gz")
-    fs_esxi.map_file("/scratch/log/auth.log.gz", data_file)
+    fs_esxi.map_file("/var/run/log/auth.log.gz", data_file)
 
     target_esxi.add_plugin(EsxiAuthPlugin)
 
@@ -51,7 +51,7 @@ def test_esxi_7_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> Non
     assert results[0].log_level is None
     assert results[0].pid == 2102622
     assert results[0].message == "FIPS mode initialized"
-    assert results[0].source == "/scratch/log/auth.log.gz"
+    assert results[0].source == "/var/run/log/auth.log.gz"
 
     assert results[4].ts == dt("2024-12-06T10:58:46.944Z")
     assert results[4].application == "sshd"
@@ -62,7 +62,7 @@ def test_esxi_7_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> Non
         '`"&& mkdir "` echo /var/core/ansible-tmp-1733482726.6630323-32096-231798679827098 `" && '
         "echo ansible-tmp-1733482726.6630323-32096-231798679827098=\"'"
     )
-    assert results[4].source == "/scratch/log/auth.log.gz"
+    assert results[4].source == "/var/run/log/auth.log.gz"
 
 
 def test_esxi_9_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
@@ -71,7 +71,7 @@ def test_esxi_9_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> Non
     In ESXi8+, logs seems to be nearly empty/useless
     """
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi9/auth.log.gz")
-    fs_esxi.map_file("/scratch/log/auth.log.gz", data_file)
+    fs_esxi.map_file("/var/run/log/auth.log.gz", data_file)
 
     target_esxi.add_plugin(EsxiAuthPlugin)
 
@@ -83,4 +83,4 @@ def test_esxi_9_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> Non
     assert results[0].log_level == "In(38)"
     assert results[0].pid == 132774
     assert results[0].message == "/etc/ssh/sshd_config line 14: Deprecated option fipsmode"
-    assert results[0].source == "/scratch/log/auth.log.gz"
+    assert results[0].source == "/var/run/log/auth.log.gz"
