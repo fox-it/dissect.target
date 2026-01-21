@@ -65,16 +65,19 @@ def test_target_open(
 
 
 @pytest.mark.parametrize(
-    "data_path",
+    ("data_path", "etc_passwd_first_line"),
     [
-        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz"),
+        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz", b"root:x:0:0:root:/root:/bin/bash\n"),
         # this one start with ./[root]
-        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143112.tar.gz"),
+        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143112.tar.gz", b"root:x:0:0:root:/root:/bin/bash\n"),
         # This one if from an ESXi
-        ("_data/loaders/uac/uac-testdissecthostname-esxi-20260120163519.tar.gz"),
+        (
+            "_data/loaders/uac/uac-testdissecthostname-esxi-20260120163519.tar.gz",
+            b"root:x:0:0:Administrator:/:/bin/sh\n",
+        ),
     ],
 )
-def test_compressed_tar(data_path: str) -> None:
+def test_compressed_tar(data_path: str, etc_passwd_first_line: bytes) -> None:
     """Test if we map a compressed UAC tar image correctly."""
     path = absolute_path(data_path)
 
@@ -90,7 +93,7 @@ def test_compressed_tar(data_path: str) -> None:
     test_file = t.fs.path("/etc/passwd")
     assert test_file.exists()
     assert test_file.is_file()
-    assert test_file.open().readline() == b"root:x:0:0:root:/root:/bin/bash\n"
+    assert test_file.open().readline() == etc_passwd_first_line
 
 
 def test_compressed_zip() -> None:

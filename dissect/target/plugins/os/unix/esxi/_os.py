@@ -5,14 +5,13 @@ import subprocess
 from configparser import ConfigParser
 from configparser import Error as ConfigParserError
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, NamedTuple, TextIO
 
 from dissect.util.hash.jenkins import lookup8
 
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.filesystems.vmtar import VmtarFilesystem
-from dissect.target.helpers.record import COMMON_UNIX_FIELDS, TargetRecordDescriptor, UnixUserRecord
+from dissect.target.helpers.record import COMMON_UNIX_FIELDS, TargetRecordDescriptor
 from dissect.target.helpers.sunrpc import client
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 
@@ -45,12 +44,25 @@ ESXiUserRecord = TargetRecordDescriptor(
     "unix/esxi/user",
     [
         *COMMON_UNIX_FIELDS,
-        ("string", "description"),
-        ("datetime", "modified_time"),
-        ("datetime", "creation_time"),
+        ("datetime", "modified_time"),  # From configstore, ESX7 + only
+        ("datetime", "creation_time"),  # From configstore, ESX7 + only
         ("boolean", "shell_access"),
     ],
 )
+
+
+class Users(NamedTuple):
+    name: str
+    passwd: str | None = None
+    uid: int | None = None
+    gid: int | None = None
+    gecos: str | None = None
+    home: str | None = None
+    shell: str | None = None
+    source: str | None = None
+    shell_access: bool | None = None
+    modified_time: str | None = None
+    creation_time: str | None = None
 
 
 class ESXiPlugin(UnixPlugin):
@@ -111,25 +123,28 @@ class ESXiPlugin(UnixPlugin):
 
         obj = cls(target)
 
-        # Symlink the /var/log and /var/run/log directory to the correct destination (if available)
+        # Symlink the /var/run/log directory to the correct destination (if available)
         _link_log_dir_raw_disk(target)
 
         return obj
 
     @export(property=True)
     def hostname(self) -> str:
-        if self.target.has_plugin("configstore"):
+        if self.target.has_function("configstore.get"):
             # Configstore available on ESX7+, but not used to store hostname related information until 8+
-            if configstore := self.target.configstore.get("esx", None):
-                hostname = (
-                    configstore.get("advanced_options", {})
-                    .get("misc", {})
-                    .get("", {})
-                    .get("vital_value", {})
-                    .get("host_name", None)
+            hostname = (
+                self.target.configstore.get(
+                    component="esx",
+                    config_groupe="advanced_options",
+                    value_groupe_name="misc",
+                    identifier="",
+                    default={},
                 )
-                if hostname:
-                    return hostname
+                .get("vital_value", {})
+                .get("host_name", None)
+            )
+            if hostname:
+                return hostname
         if hostname := self.target.esxconf.get("/adv/Misc/HostName"):
             return hostname.split(".", 1)[0]
         return "localhost"
@@ -145,12 +160,31 @@ class ESXiPlugin(UnixPlugin):
         result = set()
         host_ip = None
         mgmt_ip = None
-        if self.target.has_plugin("configstore"):
+        if self.target.has_function("configstore.get"):
             # Configstore available on ESX7+, but not used to store IP related information until 8+
-            if configstore := self.target.configstore.get("esx", None):
-                advanced_option = configstore.get("advanced_options", {})
-                mgmt_ip = advanced_option.get("net", {}).get("", {}).get("vital_value", {}).get("management_addr", None)
-                host_ip = advanced_option.get("misc", {}).get("", {}).get("vital_value", {}).get("host_IP_addr", None)
+
+            mgmt_ip = (
+                self.target.configstore.get(
+                    component="esx",
+                    config_groupe="advanced_options",
+                    value_groupe_name="net",
+                    identifier="",
+                    default={},
+                )
+                .get("vital_value", {})
+                .get("management_addr", None)
+            )
+            host_ip = (
+                self.target.configstore.get(
+                    component="esx",
+                    config_groupe="advanced_options",
+                    value_groupe_name="misc",
+                    identifier="",
+                    default={},
+                )
+                .get("vital_value", {})
+                .get("host_IP_addr", None)
+            )
 
         if mgmt_ip is None and host_ip is None:
             # Before ESX8, Ip are stored in esxconf
@@ -184,8 +218,8 @@ class ESXiPlugin(UnixPlugin):
     def os(self) -> str:
         return OperatingSystem.ESXI.value
 
-    @export(record=[ESXiUserRecord, UnixUserRecord])
-    def users(self) -> Iterator[ESXiUserRecord | UnixUserRecord]:
+    @export(record=[ESXiUserRecord])
+    def users(self) -> Iterator[ESXiUserRecord]:
         """
         Return users from /etc/passwd (if available/collected) and from configstore (ESXi7).
         Both entries are merges together.
@@ -196,31 +230,62 @@ class ESXiPlugin(UnixPlugin):
         Returns:
 
         """
-        if self.version and self.version[0] < "7":
-            yield from super().users(sessions=False)
-        else:
-            try:
-                if configstore := self.target.configstore.get("esx", None):
-                    users = configstore.get("authentication", {}).get("user_accounts", {})
-                    for v in users.values():
-                        user_value = v.get("user_value", {})
-                        vital_value = v.get("vital_value", {})
-
-                        yield ESXiUserRecord(
-                            name=user_value.get("name", None),
-                            description=user_value.get("description", None),
-                            passwd=user_value.get("password_hash", None),
-                            modified_time=v.get("modified_time", None),
-                            creation_time=v.get("creation_time", None),
-                            uid=vital_value.get("uid", None),
-                            source=self.target.configstore.path,
-                            # When shell access is disabled, this key is present with the value
-                            # DISABLED. This key is absent otherwise
-                            shell_access=user_value.get("shell_access", None) != "DISABLED",
-                            _target=self.target,
-                        )
-            except UnsupportedPluginError:
-                pass
+        # First we retrieve users from /etc/passwd if file is present
+        users_dict: dict[str, Users] = {
+            record.name: Users(
+                name=record.name,
+                passwd=record.passwd,
+                uid=record.uid,
+                gid=record.gid,
+                gecos=record.gecos,
+                home=record.home,
+                shell=record.shell,
+                source=record.source,
+                shell_access=record.shell != "/sbin/nologin",
+            )
+            for record in super().users(sessions=False)
+        }
+        if self.target.has_function("configstore.get"):
+            users = self.target.configstore.get(
+                component="esx", config_groupe="authentication", value_groupe_name="user_accounts", default={}
+            )
+            for v in users.values():
+                user_value = v.get("user_value", {})
+                vital_value = v.get("vital_value", {})
+                user_name = user_value.get("name", None)
+                if user_name in users_dict:
+                    user = users_dict[user_name]
+                    users_dict[user_name] = Users(
+                        name=user.name,
+                        passwd=user_value.get("password_hash", None),
+                        uid=user.uid,
+                        gid=user.gid,
+                        gecos=user.gecos or user_value.get("description", None),
+                        home=user.home,
+                        shell=user.shell,
+                        source="+".join([str(user.source), str(self.target.configstore.path)]),
+                        shell_access=user_value.get("shell_access", None) != "DISABLED",
+                        modified_time=v.get("modified_time", None),
+                        creation_time=v.get("creation_time", None),
+                    )
+                else:
+                    users_dict[user_name] = Users(
+                        name=user_value.get("name", None),
+                        gecos=user_value.get("description", None),
+                        passwd=user_value.get("password_hash", None),
+                        modified_time=v.get("modified_time", None),
+                        creation_time=v.get("creation_time", None),
+                        uid=vital_value.get("uid", None),
+                        source=self.target.configstore.path,
+                        shell_access=user_value.get("shell_access", None) != "DISABLED",
+                    )
+            for user in users_dict.values():
+                yield ESXiUserRecord(
+                    # When shell access is disabled, this key is present with the value
+                    # DISABLED. This key is absent otherwise
+                    **user._asdict(),
+                    _target=self.target,
+                )
 
     def _mount_nfs_shares(self) -> None:
         """Mount NFS shares found in the configstore."""
@@ -228,8 +293,8 @@ class ESXiPlugin(UnixPlugin):
             self.target.log.warning("No configstore found, unable to mount NFS shares")
             return
 
-        nfs_shares: dict[str, Any] = (
-            self.target.configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
+        nfs_shares: dict[str, Any] = self.target.configstore.get(
+            component="esx", config_groupe="storage", value_groupe_name="nfs_v3_datastores", default={}
         )
         if not nfs_shares:
             if self._is_nfs_enabled:
@@ -472,10 +537,12 @@ def _get_log_dir_from_target(target: Target) -> str:
     # After ESXi7, log dir is stored in the configstore
     # As retrieving version is not easy, we just check if configstore exists
     log_dir = "/scratch/log"
-    if target.has_plugin("configstore"):
+    if target.has_function("configstore.get"):
         try:
             parse_boot_cfg(target.configstore.get("esx"))
-            log_dir = target.configstore.get("esx")["syslog"]["global_settings"][""]["user_value"]["log_dir"]
+            log_dir = target.configstore.get(
+                component="esx", config_groupe="syslog", value_groupe_name="global_settings", identifier="", default={}
+            )["user_value"]["log_dir"]
         except KeyError:
             target.log.warning("Failed to read log_dir from configstore, falling back to /scratch/log")
 

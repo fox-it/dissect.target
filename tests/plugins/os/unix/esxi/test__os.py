@@ -98,11 +98,19 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
             ["192.168.122.186"],
             "7.0.3-0.50.20036589",
             [
-                ("dcui", "DCUI User", dt("2026-01-20 09:24:23+00:00"), dt("2026-01-20 09:24:23+00:00"), True),
-                ("dissect", "Test dissect", dt("2026-01-20 09:24:23+00:00"), dt("2026-01-20 09:24:23+00:00"), True),
-                ("root", "Administrator", dt("2026-01-20 09:24:23+00:00"), dt("2026-01-20 09:24:23+00:00"), True),
+                ("dcui", 100, "DCUI User", dt("2026-01-20 09:24:23+00:00"), dt("2026-01-20 09:24:23+00:00"), True),
+                (
+                    "dissect",
+                    1000,
+                    "Test dissect",
+                    dt("2026-01-20 09:24:23+00:00"),
+                    dt("2026-01-20 09:24:23+00:00"),
+                    True,
+                ),
+                ("root", 0, "Administrator", dt("2026-01-20 09:24:23+00:00"), dt("2026-01-20 09:24:23+00:00"), True),
                 (
                     "vpxuser",
+                    500,
                     "VMware VirtualCenter administration account",
                     dt("2026-01-20 09:24:23+00:00"),
                     dt("2026-01-20 09:24:23+00:00"),
@@ -115,7 +123,7 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
             "localhost",
             ["192.168.122.207"],
             "8.0.3-0.70.24677879",
-            [("root", "Administrator", dt("2026-01-09 15:59:34+00:00"), dt("2026-01-09 15:59:34+00:00"), True)],
+            [("root", 0, "Administrator", dt("2026-01-09 15:59:34+00:00"), dt("2026-01-09 15:59:34+00:00"), True)],
         ),
         (
             "_data/loaders/vmsupport/esx-testdissecthostname9-2026-01-20--16.28-133046.tgz",
@@ -125,6 +133,7 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
             [
                 (
                     "dissect_user",
+                    1000,
                     "Test user for dissect data sample (with shell access)",
                     dt("2026-01-20 16:09:01+00:00"),
                     dt("2026-01-20 13:34:11+00:00"),
@@ -132,12 +141,13 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
                 ),
                 (
                     "dissect_user_no_shell",
+                    1001,
                     "Test user for dissect, without shell access",
                     dt("2026-01-20 16:09:01+00:00"),
                     dt("2026-01-20 13:34:51+00:00"),
                     False,
                 ),
-                ("root", "Administrator", dt("2026-01-20 16:09:01+00:00"), dt("2026-01-09 16:20:11+00:00"), True),
+                ("root", 0, "Administrator", dt("2026-01-20 16:09:01+00:00"), dt("2026-01-09 16:20:11+00:00"), True),
             ],
         ),
         (
@@ -146,8 +156,10 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
             ["192.168.122.43"],
             "9.0",  # No boot.cfg, thus version is without build number
             [
+                ("dcui", 100, "DCUI User", None, None, True),
                 (
                     "dissect_user",
+                    1000,
                     "Test user for dissect data sample (with shell access)",
                     dt("2026-01-20 16:09:01+00:00"),
                     dt("2026-01-20 13:34:11+00:00"),
@@ -155,30 +167,26 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
                 ),
                 (
                     "dissect_user_no_shell",
+                    1001,
                     "Test user for dissect, without shell access",
                     dt("2026-01-20 16:09:01+00:00"),
                     dt("2026-01-20 13:34:51+00:00"),
                     False,
                 ),
-                ("root", "Administrator", dt("2026-01-20 16:09:01+00:00"), dt("2026-01-09 16:20:11+00:00"), True),
+                ("root", 0, "Administrator", dt("2026-01-20 16:09:01+00:00"), dt("2026-01-09 16:20:11+00:00"), True),
+                ("vpxuser", 500, "VMware VirtualCenter administration account", None, None, True),
             ],
         ),
     ],
 )
-def test_esxi_os_detection_from_vmsupport(
+def test_esxi_os_functions(
     data_path: str,
     hostname: str,
     ips: list[str],
     version: str,
     users: list[tuple[str, str | None, datetime.datetime | None, datetime.datetime | None, bool | None]],
 ) -> None:
-    """Test if os function works on a vmsupport collection."""
-    """"
-    TODO for test:
-    * Create user
-    * Change log folder
-    * Change hostname
-    """
+    """Test if os function works on a vmsupport or uac collection."""
     target = Target.open(absolute_path(data_path))
     assert isinstance(target._os, ESXiPlugin)
     assert target.os == OperatingSystem.ESXI
@@ -191,7 +199,8 @@ def test_esxi_os_detection_from_vmsupport(
             [
                 (
                     u.name,
-                    getattr(u, "description", None),
+                    u.uid,
+                    u.gecos,
                     getattr(u, "modified_time", None),
                     getattr(u, "creation_time", None),
                     getattr(u, "shell_access", None),

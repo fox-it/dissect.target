@@ -41,9 +41,32 @@ class ConfigstorePlugin(Plugin):
             raise UnsupportedPluginError("ESXi configstore not found on target")
 
     @internal
-    def get(self, key: str, default: Any = None) -> dict[str, Any]:
-        """Get configstore value for the specified key."""
-        return self._configstore.get(key, default)
+    def get(
+        self,
+        component: str,
+        config_groupe: str | None = None,
+        value_groupe_name: str | None = None,
+        identifier: str | None = None,
+        default: Any = None,
+    ) -> dict[str, Any]:
+        """Get configstore value for the specified key.
+        Subkey order is component -> config_group -> value_group_name -> identifier.
+
+        Sub subkey are used only previous subkey are defined. E.g is value_group_name is None, identifier will be
+        ignored"
+        """
+        if identifier is not None and value_groupe_name is not None and config_groupe is not None:
+            return (
+                self._configstore.get(component, {})
+                .get(config_groupe, {})
+                .get(value_groupe_name, {})
+                .get(identifier, default)
+            )
+        if value_groupe_name is not None and config_groupe is not None:
+            return self._configstore.get(component, {}).get(config_groupe, {}).get(value_groupe_name, default)
+        if config_groupe is not None:
+            return self._configstore.get(component, {}).get(config_groupe, default)
+        return self._configstore.get(component, default)
 
 
 def parse_config_store(path: Path) -> dict[str, Any]:
