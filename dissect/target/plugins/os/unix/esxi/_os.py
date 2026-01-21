@@ -187,7 +187,7 @@ class ESXiPlugin(UnixPlugin):
             )
 
         if mgmt_ip is None and host_ip is None:
-            # Before ESX8, Ip are stored in esxconf
+            # Before ESX8, Ip adresses are stored in esxconf
 
             host_ip = self.target.esxconf.get("/adv/Misc/HostIPAddr")
             mgmt_ip = self.target.esxconf.get("/adv/Net/ManagementAddr")
@@ -221,14 +221,11 @@ class ESXiPlugin(UnixPlugin):
     @export(record=[ESXiUserRecord])
     def users(self) -> Iterator[ESXiUserRecord]:
         """
-        Return users from /etc/passwd (if available/collected) and from configstore (ESXi7).
+        Return users from /etc/passwd (if available/collected) and from configstore (ESXi7+).
         Both entries are merges together.
-        Usually DCUI and vpuser are not present in configstore.
-        If /etc/shadow is not collected, password hash are present in configstore, but are censored
-            when collected using vmsupport (replaced with *****)
-        Configstore allows to retrieve the creation_time and last modification_time.
-        Returns:
-
+        Usually DCUI and vpuser are not present in configstore in ESXi8+, but still present in the system.
+        Password hash are present in configstore, but are censored when collected using vmsupport (replaced with *****)
+        Configstore allows to retrieve the creation_time and last modification_time of the database entry.
         """
         # First we retrieve users from /etc/passwd if file is present
         users_dict: dict[str, Users] = {
@@ -264,6 +261,8 @@ class ESXiPlugin(UnixPlugin):
                         home=user.home,
                         shell=user.shell,
                         source="+".join([str(user.source), str(self.target.configstore.path)]),
+                        # When shell access is disabled, this key is present with the value
+                        # DISABLED. This key is absent otherwise
                         shell_access=user_value.get("shell_access", None) != "DISABLED",
                         modified_time=v.get("modified_time", None),
                         creation_time=v.get("creation_time", None),
@@ -281,8 +280,7 @@ class ESXiPlugin(UnixPlugin):
                     )
             for user in users_dict.values():
                 yield ESXiUserRecord(
-                    # When shell access is disabled, this key is present with the value
-                    # DISABLED. This key is absent otherwise
+
                     **user._asdict(),
                     _target=self.target,
                 )
@@ -534,12 +532,11 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
 def _get_log_dir_from_target(target: Target) -> str:
     """Identify log dir from either configstore (ESXi7+) or /etc/vmsyslog.conf (ESXi6)."""
 
-    # After ESXi7, log dir is stored in the configstore
-    # As retrieving version is not easy, we just check if configstore exists
+    # After ESXi7, log dir location is stored in the configstore.
+    # As retrieving version is not easy, we just check if configstore exists.
     log_dir = "/scratch/log"
     if target.has_function("configstore.get"):
         try:
-            parse_boot_cfg(target.configstore.get("esx"))
             log_dir = target.configstore.get(
                 component="esx", config_groupe="syslog", value_groupe_name="global_settings", identifier="", default={}
             )["user_value"]["log_dir"]
@@ -548,7 +545,6 @@ def _get_log_dir_from_target(target: Target) -> str:
 
     else:
         # If configstore is missing, we assume we are on a pre ESXi7 version
-        # Checking version is complex, especially when dealing with live collection
         vmsyslog_file = target.fs.path("/etc/vmsyslog.conf")
         if vmsyslog_file.exists():
             try:
