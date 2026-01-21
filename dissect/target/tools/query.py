@@ -105,7 +105,7 @@ def main() -> int:
     args, rest = parser.parse_known_args()
 
     # Show help for target-query
-    if not args.function and ("-h" in rest or "--help" in rest): 
+    if not args.function and ("-h" in rest or "--help" in rest):
         if not args.loader:
             parser.print_help()
             return 0
