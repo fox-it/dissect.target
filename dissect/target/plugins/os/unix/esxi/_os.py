@@ -118,7 +118,7 @@ class ESXiPlugin(UnixPlugin):
 
     @export(property=True)
     def hostname(self) -> str:
-        try:
+        if self.target.has_plugin('configstore'):
             # Configstore available on ESX7+, but not used to store hostname related information until 8+
             if configstore := self.target.configstore.get("esx", None):
                 hostname = (
@@ -130,10 +130,6 @@ class ESXiPlugin(UnixPlugin):
                 )
                 if hostname:
                     return hostname
-        except UnsupportedPluginError:
-            # Configstore only available in esxi7+
-            pass
-
         if hostname := self.target.esxconf.get("/adv/Misc/HostName"):
             return hostname.split(".", 1)[0]
         return "localhost"
@@ -149,14 +145,13 @@ class ESXiPlugin(UnixPlugin):
         result = set()
         host_ip = None
         mgmt_ip = None
-        try:
+        if self.target.has_plugin('configstore'):
             # Configstore available on ESX7+, but not used to store IP related information until 8+
             if configstore := self.target.configstore.get("esx", None):
                 advanced_option = configstore.get("advanced_options", {})
                 mgmt_ip = advanced_option.get("net", {}).get("", {}).get("vital_value", {}).get("management_addr", None)
                 host_ip = advanced_option.get("misc", {}).get("", {}).get("vital_value", {}).get("host_IP_addr", None)
-        except UnsupportedPluginError:
-            pass
+
         if mgmt_ip is None and host_ip is None:
             # Before ESX8, Ip are stored in esxconf
 
@@ -477,7 +472,7 @@ def _get_log_dir_from_target(target: Target) -> str:
     # After ESXi7, log dir is stored in the configstore
     # As retrieving version is not easy, we just check if configstore exists
     log_dir = "/scratch/log"
-    if target.has_function("configstore.get"):
+    if target.has_plugin('configstore'):
         try:
             parse_boot_cfg(target.configstore.get("esx"))
             log_dir = target.configstore.get("esx")["syslog"]["global_settings"][""]["user_value"]["log_dir"]
