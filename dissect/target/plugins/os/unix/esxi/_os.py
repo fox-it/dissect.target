@@ -118,7 +118,7 @@ class ESXiPlugin(UnixPlugin):
 
     @export(property=True)
     def hostname(self) -> str:
-        if self.target.has_plugin('configstore'):
+        if self.target.has_plugin("configstore"):
             # Configstore available on ESX7+, but not used to store hostname related information until 8+
             if configstore := self.target.configstore.get("esx", None):
                 hostname = (
@@ -145,7 +145,7 @@ class ESXiPlugin(UnixPlugin):
         result = set()
         host_ip = None
         mgmt_ip = None
-        if self.target.has_plugin('configstore'):
+        if self.target.has_plugin("configstore"):
             # Configstore available on ESX7+, but not used to store IP related information until 8+
             if configstore := self.target.configstore.get("esx", None):
                 advanced_option = configstore.get("advanced_options", {})
@@ -472,7 +472,7 @@ def _get_log_dir_from_target(target: Target) -> str:
     # After ESXi7, log dir is stored in the configstore
     # As retrieving version is not easy, we just check if configstore exists
     log_dir = "/scratch/log"
-    if target.has_plugin('configstore'):
+    if target.has_plugin("configstore"):
         try:
             parse_boot_cfg(target.configstore.get("esx"))
             log_dir = target.configstore.get("esx")["syslog"]["global_settings"][""]["user_value"]["log_dir"]
