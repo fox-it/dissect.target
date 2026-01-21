@@ -191,6 +191,16 @@ class ESXiPlugin(UnixPlugin):
 
     @export(record=[ESXiUserRecord, UnixUserRecord])
     def users(self) -> Iterator[ESXiUserRecord | UnixUserRecord]:
+        """
+        Return users from /etc/passwd (if available/collected) and from configstore (ESXi7).
+        Both entries are merges together.
+        Usually DCUI and vpuser are not present in configstore.
+        If /etc/shadow is not collected, password hash are present in configstore, but are censored
+            when collected using vmsupport (replaced with *****)
+        Configstore allows to retrieve the creation_time and last modification_time.
+        Returns:
+
+        """
         if self.version and self.version[0] < "7":
             yield from super().users(sessions=False)
         else:
@@ -199,7 +209,8 @@ class ESXiPlugin(UnixPlugin):
                     users = configstore.get("authentication", {}).get("user_accounts", {})
                     for v in users.values():
                         user_value = v.get("user_value", {})
-                        vital_value = v.get("user_value", {})
+                        vital_value = v.get("vital_value", {})
+
                         yield ESXiUserRecord(
                             name=user_value.get("name", None),
                             description=user_value.get("description", None),
@@ -351,6 +362,7 @@ def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO | None:
 
 def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: TargetPath) -> tar.TarFilesystem | None:
     local_tgz = None
+
     if HAS_ENVELOPE:
         try:
             local_tgz = _decrypt_envelope(local_tgz_ve, encryption_info)
@@ -358,6 +370,7 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
             target.log.debug("Failed to decrypt %s, likely TPM encrypted", local_tgz_ve)
     else:
         target.log.debug("Skipping static decryption because of missing crypto module")
+
     if not local_tgz and target.name == "local":
         target.log.info(
             "local.tgz is encrypted but static decryption failed, attempting dynamic decryption using crypto-util"
@@ -491,13 +504,10 @@ def _get_log_dir_from_target(target: Target) -> str:
 
 
 def _link_log_dir_live_system_collection(target: Target) -> None:
-    """
-    Link log directories on a live system collection.
+    """Link log directories on a live system collection.
     Ensure symlink from log_dir (usually /scratch/log) to /var/run/log or vice versa
-    As sometime log_dir is collected, ometime only /var/run/log is collected
+    As sometime log_dir is collected, sometime only /var/run/log is collected
 
-    :param target:
-    :return:
     """
     log_dir = _get_log_dir_from_target(target)
     if target.fs.exists("/var/run/log") and target.fs.exists(log_dir):
@@ -511,11 +521,7 @@ def _link_log_dir_live_system_collection(target: Target) -> None:
 
 
 def _link_log_dir_raw_disk(target: Target) -> None:
-    """
-    Link log directory from a disk system : symlink from log_dir (usually /scratch/log) to /var/run/log
-    :param target:
-    :return:
-    """
+    """Link log directory from a disk system : symlink from log_dir (usually /scratch/log) to /var/run/log"""
 
     # Don't really know how ESXi does this, but let's just take a shortcut for now
     log_dir = _get_log_dir_from_target(target)
