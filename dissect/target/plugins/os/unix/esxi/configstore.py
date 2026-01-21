@@ -53,7 +53,29 @@ class ConfigstorePlugin(Plugin):
         Subkey order is component -> config_group -> value_group_name -> identifier.
 
         Sub subkey are used only previous subkey are defined. E.g is value_group_name is None, identifier will be
-        ignored"
+        ignored
+
+        Configstore is a SQlite3 Db with the following schema
+
+            CREATE TABLE Config(Component TEXT
+                ConfigGroup TEXT
+                Name TEXT
+                Identifier TEXT NOT NULL DEFAULT ''
+                ModifiedTime DATETIME DEFAULT (datetime(CURRENT_TIMESTAMP))
+                CreationTime DATETIME
+                Version TEXT DEFAULT ''
+                Success BOOLEAN DEFAULT 1
+                AutoConfValue TEXT
+                 UserValue TEXT
+                 VitalValue TEXT
+                 CachedValue TEXT
+                 DesiredValue TEXT
+                 Revision INTEGER DEFAULT 0
+                 PRIMARY KEY(Component
+                     ConfigGroup
+                     Name
+                     Identifier)
+            );
         """
         if identifier is not None and value_groupe_name is not None and config_groupe is not None:
             return (
