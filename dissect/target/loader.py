@@ -148,7 +148,7 @@ class Loader:
         # Pass the parsed options directly to the implementation map function
         return self._map(target, **vars(loader_options))
 
-    def _map(self, **kwargs) -> None:
+    def _map(self, target: Target, **kwargs) -> None:
         """Maps the loaded path into a ``Target``.
 
         Args:
