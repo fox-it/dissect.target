@@ -445,7 +445,7 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
 
         if local_tgz is None:
             target.log.warning("Dynamic decryption of %s failed", local_tgz_ve)
-    else:
+    elif not local_tgz:
         target.log.warning("local.tgz is encrypted but static decryption failed and no dynamic decryption available!")
 
     if local_tgz:
