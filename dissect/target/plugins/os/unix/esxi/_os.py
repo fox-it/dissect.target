@@ -222,8 +222,8 @@ class ESXiPlugin(UnixPlugin):
     def users(self) -> Iterator[ESXiUserRecord]:
         """
         Return users from /etc/passwd (if available/collected) and from configstore (ESXi7+).
-        Both entries are merges together.
-        Usually DCUI and vpuser are not present in configstore in ESXi8+, but still present in the system.
+        Both entries are merged.
+        Usually DCUI and vpxuser are not present in configstore in ESXi8+, but still present in the system.
         Password hash are present in configstore, but are censored when collected using vmsupport (replaced with *****)
         Configstore allows to retrieve the creation_time and last modification_time of the database entry.
         """
@@ -252,6 +252,14 @@ class ESXiPlugin(UnixPlugin):
                 user_name = user_value.get("name", None)
                 if user_name in users_dict:
                     user = users_dict[user_name]
+                    if user.uid != vital_value.get("uid", None):
+                        self.target.log.warning(
+                            "issue when merging users from /etc/passwd and configstore : %s has two differente Uid. "
+                            "From configstore : %s, from /etc/passwd : %s",
+                            user_name,
+                            user.uid,
+                            vital_value.get("uid", None),
+                        )
                     users_dict[user_name] = Users(
                         name=user.name,
                         passwd=user_value.get("password_hash", None),
