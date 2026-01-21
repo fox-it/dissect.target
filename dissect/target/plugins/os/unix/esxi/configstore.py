@@ -21,7 +21,7 @@ class ConfigstorePlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self._configstore = None
+        self._configstore = {}
 
         # ESXi 7 introduced the configstore
         # It's made available at /etc/vmware/configstore/current-store-1 during boot, but stored at
@@ -30,9 +30,7 @@ class ConfigstorePlugin(Plugin):
             self._configstore = parse_config_store(path)
 
     def check_compatible(self) -> None:
-        if self.target.os != "esxi":
-            raise UnsupportedPluginError("ESXi specific plugin loaded on non-ESXi target")
-
+        # NOTE: Unable to use OS specific functions here, as this method can be called in ESXiPlugin.create
         if not self._configstore:
             raise UnsupportedPluginError("ESXi configstore not found on target")
 
