@@ -57,7 +57,7 @@ class VelociraptorRecordBuilder:
                     record_type = "record"
                     value = self.build(value, target)
                 else:
-                    # Skip (nested) objects that contain additional metadata
+                    # Skip nested objects that contain additional metadata
                     continue
             else:
                 record_type = "dynamic"
