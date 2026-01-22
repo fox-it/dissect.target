@@ -446,7 +446,9 @@ class Target:
 
                 if path.is_dir():
                     for entry in path.iterdir():
-                        for target in _open_all(entry, include_children=include_children, recursive=recursive, apply=apply):
+                        for target in _open_all(
+                            entry, include_children=include_children, recursive=recursive, apply=apply
+                        ):
                             at_least_one_loaded = True
                             yield target
 
