@@ -799,12 +799,11 @@ class TargetCli(TargetCmd):
             print("can't specify -c and -u at the same time")
             return False
 
-        if not path or not self.check_dir(path):
+        if not path:
             return False
 
-        if path.is_file():
-            print(args.path)  # mimic ls behaviour
-            return False
+        if not path.exists():
+            print(f"ls: cannot access {path}: No such file or directory")
 
         # Disable color if output is redirected to a file
         use_color = False
