@@ -810,6 +810,8 @@ class TargetCli(TargetCmd):
         use_color = False
         if hasattr(stdout, "isatty") and stdout.isatty():
             use_color = True
+        if os.getenv("NO_COLOR") in ["1", "True", "true"]:
+            use_color = False
 
         print_ls(
             path,
