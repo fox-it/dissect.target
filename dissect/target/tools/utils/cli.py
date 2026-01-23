@@ -218,7 +218,7 @@ def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
     child: str | None = getattr(args, "child", None)
 
     target = (
-        Target.open_direct(args.targets, getattr(args, "direct_sensitive", False))
+        Target.open_direct(args.targets, case_sensitive=getattr(args, "direct_sensitive", False))
         if direct
         else Target.open(args.target, apply=apply)
     )
@@ -243,7 +243,7 @@ def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Ta
     child: str | None = getattr(args, "child", None)
 
     targets: Iterable[Target] = (
-        [Target.open_direct(args.targets, getattr(args, "direct_sensitive", False))]
+        [Target.open_direct(args.targets, case_sensitive=getattr(args, "direct_sensitive", False))]
         if direct
         else Target.open_all(args.targets, include_children=children, apply=apply)
     )
