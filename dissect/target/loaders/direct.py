@@ -23,6 +23,13 @@ class DirectLoader(Loader):
         self.case_sensitive = case_sensitive
         self.paths = [(Path(path) if not isinstance(path, Path) else path).resolve() for path in paths]
 
+    def __repr__(self) -> str:
+        """
+        As DirectLoader does not call super().__init__() self.path is not defined, we need to redefine the __repr__ func
+        :return:
+        """
+        return f"{self.__class__.__name__}({str(self.paths)!r})"
+
     @staticmethod
     def detect(path: Path) -> bool:
         return False
@@ -87,10 +94,3 @@ class DirectLoader(Loader):
         # Compare the count of all files with the count of unique, lowercased file paths
 
         return len({str(p).lower() for p in all_files}) != len(all_files)
-
-    def __repr__(self) -> str:
-        """
-        As DirectLoader does not call super().__init__() self.path is not defined, we need to redefine the __repr__ func
-        :return:
-        """
-        return f"{self.__class__.__name__}({str(self.paths)!r})"
