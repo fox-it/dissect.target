@@ -102,7 +102,7 @@ def main() -> int:
 
     advanced_group = parser.add_argument_group("Advanced options")
     advanced_group.add_argument(
-        "--direct-sensitive", action="store_true", help="Same as --direct, but paths will be case sensitive"
+        "--direct-sensitive", action="store_true", help="same as --direct, but paths will be case-sensitive"
     )
 
     configure_generic_arguments(parser)
