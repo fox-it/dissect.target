@@ -106,3 +106,33 @@ def test_teamviewer_timezone(target_win_users: Target, fs_win: VirtualFilesystem
     assert records[0].message == "1234  5678 G1   LanguageControl: device language is 'enUS'"
     assert records[0].source == "C:\\Users\\John\\AppData\\Roaming\\TeamViewer\\TeamViewer1337_Logfile.log"
     assert records[0].username == "John"
+
+
+def test_teamviewer_incoming(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
+    """Test TeamViewer incoming connection log parsing."""
+    log = """
+    1031857653	DESKTOP-CAK7OMO	11-09-2022 14:44:03	11-09-2022 15:27:53	SERVER TV	RemoteControl	{C2CC2F16-D1F4-4547-9928-EE63891D4CC0}
+    1031857653	DESKTOP-CAK7OMO	22-12-2022 19:25:22	22-12-2022 19:49:28	Server	RemoteControl	{4BF22BA7-32BA-4F64-8755-97E6E45F9883}
+    """  # noqa: E501
+    fs_win.map_file_fh("Program Files/TeamViewer/Connections_incoming.txt", BytesIO(dedent(log).encode()))
+
+    target_win_users.add_plugin(TeamViewerPlugin)
+
+    records = list(target_win_users.teamviewer.incoming())
+    assert len(records) == 2
+
+    assert records[0].ts == datetime(2022, 9, 11, 14, 44, 3, tzinfo=timezone.utc)
+    assert records[0].end == datetime(2022, 9, 11, 15, 27, 53, tzinfo=timezone.utc)
+    assert records[0].remote_id == "1031857653"
+    assert records[0].name == "DESKTOP-CAK7OMO"
+    assert records[0].user == "SERVER TV"
+    assert records[0].connection_type == "RemoteControl"
+    assert records[0].connection_id == "{C2CC2F16-D1F4-4547-9928-EE63891D4CC0}"
+
+    assert records[1].ts == datetime(2022, 12, 22, 19, 25, 22, tzinfo=timezone.utc)
+    assert records[1].end == datetime(2022, 12, 22, 19, 49, 28, tzinfo=timezone.utc)
+    assert records[1].remote_id == "1031857653"
+    assert records[1].name == "DESKTOP-CAK7OMO"
+    assert records[1].user == "Server"
+    assert records[1].connection_type == "RemoteControl"
+    assert records[1].connection_id == "{4BF22BA7-32BA-4F64-8755-97E6E45F9883}"
