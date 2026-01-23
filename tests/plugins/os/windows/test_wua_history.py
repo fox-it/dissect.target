@@ -49,7 +49,7 @@ def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> No
     )
     assert record.support_url == "https://go.microsoft.com/fwlink/?LinkId=52661"
     assert record.categories == ["Microsoft Defender Antivirus"]
-    assert record.more_info_url == "https://go.microsoft.com/fwlink/?linkid=2007160"
+    assert record.more_info_url == ["https://go.microsoft.com/fwlink/?linkid=2007160"]
     assert record.id_user == 0
     assert record.is_service_is_additional == "False"
     assert record.classification == "e0789628-ce08-4437-be74-2495b842f43b"

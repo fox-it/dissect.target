@@ -36,7 +36,7 @@ WuaHistoryRecord = TargetRecordDescriptor(
         ("string", "support_url"),
         ("string", "uninstall_steps"),
         ("string[]", "categories"),
-        ("string", "more_info_url"),
+        ("string[]", "more_info_url"),
         ("string", "path"),
         ("varint", "id_user"),
         ("string", "is_service_is_additional"),
