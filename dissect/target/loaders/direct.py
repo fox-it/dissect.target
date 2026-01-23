@@ -44,7 +44,7 @@ class DirectLoader(Loader):
         target._os_plugin = DefaultOSPlugin
 
     def check_case_insensitive_overlap(self) -> bool:
-        """Verify if two differents files will have the same path in a case-insensitive fs"""
+        """Verify if two differents files will have the same path in a case-insensitive scenario."""
         if sys.version_info >= (3, 12) or sys.platform != "win32":
 
             def get_files(path: Path) -> Iterator[Path]:
