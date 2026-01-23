@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 IntuneManagementExtensionLogRecord = TargetRecordDescriptor(
     "windows/intune/managementextension/log",
     [
-        ("datetime", "timestamp"),
+        ("datetime", "ts"),
         ("string", "component"),
         ("string", "thread"),
         ("string", "type"),

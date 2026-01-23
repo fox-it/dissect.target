@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 AgentExecutorLogRecord = TargetRecordDescriptor(
     "windows/intune/agentexecutor/log",
     [
-        ("datetime", "timestamp"),
+        ("datetime", "ts"),
         ("string", "component"),
         ("string", "thread"),
         ("string", "type"),
