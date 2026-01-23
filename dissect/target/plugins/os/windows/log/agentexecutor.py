@@ -110,13 +110,11 @@ class AgentExecutorLogPlugin(Plugin):
                 self.target.log.debug("Could not parse datetime from %s %s", date_str, time_str)
                 continue
 
-            log_type = match.group("type")
-
             yield AgentExecutorLogRecord(
                 timestamp=timestamp,
                 component=match.group("component"),
                 thread=match.group("thread"),
-                type=log_type,
+                type=match.group("type"),
                 context=match.group("context"),
                 message=msg,
                 file_origin=match.group("file_origin") or "AgentExecutor.log",
