@@ -111,7 +111,7 @@ class AgentExecutorLogPlugin(Plugin):
                 continue
 
             yield AgentExecutorLogRecord(
-                timestamp=timestamp,
+                ts=timestamp,
                 component=match.group("component"),
                 thread=match.group("thread"),
                 type=match.group("type"),

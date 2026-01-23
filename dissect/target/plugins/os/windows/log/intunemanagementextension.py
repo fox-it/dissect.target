@@ -124,7 +124,7 @@ class IntuneManagementExtensionLogParserPlugin(Plugin):
                     continue
 
                 yield IntuneManagementExtensionLogRecord(
-                    timestamp=timestamp,
+                    ts=timestamp,
                     component=match.group("component"),
                     thread=match.group("thread"),
                     type=match.group("type"),
