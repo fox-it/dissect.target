@@ -498,7 +498,7 @@ def test_mixed_namespace_and_regular_regression(capsys: pytest.CaptureFixture, m
 
 
 def test_direct_mode(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Asset cim plugin works in direct insensitive mode"""
+    """Test that the cim plugin works in direct insensitive mode."""
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
