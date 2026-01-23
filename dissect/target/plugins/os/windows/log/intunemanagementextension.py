@@ -123,13 +123,11 @@ class IntuneManagementExtensionLogParserPlugin(Plugin):
                 if not timestamp:
                     continue
 
-                log_type = match.group("type")
-
                 yield IntuneManagementExtensionLogRecord(
                     timestamp=timestamp,
                     component=match.group("component"),
                     thread=match.group("thread"),
-                    type=log_type,
+                    type=match.group("type"),
                     context=match.group("context"),
                     message=msg,
                     file_origin=f"{log_path.name}:{match.group('file_origin')}",
