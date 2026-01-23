@@ -69,11 +69,8 @@ class DirectLoader(Loader):
                 rglob seems to have issue on windows with python <3.12 when working on a case sensitive FS. Thus
                 we use another implementation without using rglob.
                 Probably related to https://github.com/python/cpython/issues/94537
-
-                :param path:
-                :param max_depth:
-                :return:
                 """
+
                 if max_depth == 0:
                     return
                 if not path.exists():
