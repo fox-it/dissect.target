@@ -80,7 +80,7 @@ class AgentExecutorLogPlugin(Plugin):
         log_path = self.target.fs.path(self.DEFAULT_LOG_PATH)
 
         try:
-            content = log_path.read_text(encoding="utf-8", errors="ignore")
+            content = log_path.read_text()
         except Exception:
             self.target.log.exception("Failed to open log file %s", log_path)
             return
