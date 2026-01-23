@@ -35,7 +35,7 @@ WuaHistoryRecord = TargetRecordDescriptor(
         ("string", "uninstall_notes"),
         ("string", "support_url"),
         ("string", "uninstall_steps"),
-        ("string", "categories"),
+        ("string[]", "categories"),
         ("string", "more_info_url"),
         ("string", "path"),
         ("varint", "id_user"),
@@ -1008,7 +1008,7 @@ class WuaHistoryPlugin(Plugin):
         .. code-block:: text
 
             ts (datetime): The timestamp (UTC) of when the Windows Update Agent operation was finished.
-            categories (string): Category of the update.
+            categories (string[]): Category of the update.
             classification (string): Unique ID indicating which classification the update has.
             classification_mapped (string): Mapping of the 'classification' field, giving an understandable classification.
             client_id (string): Client that initiated the Windows Update Agent operation.
