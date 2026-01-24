@@ -7,13 +7,13 @@ import os
 from itertools import tee
 from pathlib import Path
 from types import GeneratorType
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from flow.record import RecordReader, RecordWriter
 from flow.record.base import HAS_ZSTD
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from flow.record.adapter.stream import StreamReader, StreamWriter
 
@@ -166,7 +166,7 @@ class Cache:
                         target.log.debug("", exc_info=e)
                     else:
                         target.log.info("Using cache for function: %s", self.fname)
-                        return reader
+                        return iter(reader)
                 else:
                     target.log.warning("Cache will NOT be used. File is empty: %s", cache_file)
             else:
@@ -211,7 +211,7 @@ class Cache:
                                 e,
                             )
                         target.log.debug("Caching to file: %s", temp_path)
-                        return CacheWriter(cache_file, temp_path, self.func(*args, **kwargs), writer)
+                        return iter(CacheWriter(cache_file, temp_path, self.func(*args, **kwargs), writer))
                     except Exception as e:
                         target.log.error("Cache will NOT be written. Failed to cache to file: %s (%s)", cache_file, e)  # noqa: TRY400
                         target.log.debug("", exc_info=e)

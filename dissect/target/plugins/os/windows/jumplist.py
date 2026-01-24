@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import logging
 from struct import error as StructError
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -12,6 +11,7 @@ from dissect.shellitem.lnk import Lnk
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.shell_application_ids import APPLICATION_IDENTIFIERS
 from dissect.target.helpers.utils import findall
@@ -23,7 +23,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 LNK_GUID = b"\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00\x46"
 

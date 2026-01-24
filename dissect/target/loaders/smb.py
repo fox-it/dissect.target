@@ -107,9 +107,9 @@ class SmbLoader(Loader):
         if not self._password:
             self._nt, self._lm = self._get_hashes()
 
-        krb_ticketparsed_query = self.parsed_query.get("ticket", self.parsed_query.get("ccache", ""))
+        krb_ticket_params = self.parsed_query.get("ticket", self.parsed_query.get("ccache", ""))
         krb_ticket_env = os.getenv("SMB_KERBEROS_TICKET", os.getenv("KRB5CCNAME", ""))
-        self._krb_ticket = krb_ticketparsed_query or krb_ticket_env
+        self._krb_ticket = krb_ticket_params or krb_ticket_env
         self._krb_aes = self.parsed_query.get("aes", os.getenv("SMB_KERBEROS_AES_KEY", ""))
         self._krb_dc = self.parsed_query.get("dc", os.getenv("SMB_KERBEROS_DC", ""))
         self._krb_dc_ip = self.parsed_query.get("dc-ip", os.getenv("SMB_KERBEROS_DC_IP", ""))

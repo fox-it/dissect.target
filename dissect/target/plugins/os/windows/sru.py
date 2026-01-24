@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Union
 
-from dissect.esedb.exceptions import Error
-from dissect.esedb.tools import sru
+from dissect.database.ese.tools import sru
+from dissect.database.exception import Error
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -234,7 +234,7 @@ SdpNetworkProviderRecord = TargetRecordDescriptor(
     ],
 )
 
-SRURecord = Union[
+SRURecord = Union[  # noqa: UP007
     NetworkDataRecord,
     NetworkConnectivityRecord,
     EnergyEstimatorRecord,
@@ -249,7 +249,6 @@ SRURecord = Union[
     SdpCpuProviderRecord,
     SdpNetworkProviderRecord,
 ]
-
 FIELD_MAPPINGS = {
     "ActiveAcTime": "active_ac_time",
     "ActiveDcTime": "active_dc_time",
@@ -410,7 +409,7 @@ class SRUPlugin(Plugin):
 
         for entry in self._sru.get_table_entries(table=table):
             values = (entry[name] for name in columns)
-            column_values = zip(columns, values)
+            column_values = zip(columns, values, strict=False)
 
             record_values = {}
             for column, value in column_values:

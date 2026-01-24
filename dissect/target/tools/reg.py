@@ -11,17 +11,19 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     TargetError,
 )
-from dissect.target.target import Target
-from dissect.target.tools.utils import (
+from dissect.target.helpers.logging import get_logger
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_targets,
     process_generic_arguments,
 )
 
 if TYPE_CHECKING:
     from dissect.target.helpers.regutil import RegistryKey
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -42,10 +44,10 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
-    process_generic_arguments(args)
+    process_generic_arguments(parser, args)
 
     try:
-        for target in Target.open_all(args.targets):
+        for target in open_targets(args):
             if not target.has_function("registry"):
                 target.log.error("Target has no Windows Registry")
                 continue

@@ -16,17 +16,18 @@ from getpass import getpass
 from pathlib import Path
 from struct import pack, unpack_from
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from dissect.util.stream import AlignedStream
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 
@@ -37,7 +38,8 @@ try:
 except ImportError:
     HAS_PAHO = False
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DISK_INDEX_OFFSET = 9
 

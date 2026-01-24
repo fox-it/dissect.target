@@ -26,7 +26,7 @@ import sys
 from glob import _Globber
 from pathlib import Path, PurePath
 from pathlib._abc import PathBase, UnsupportedOperation
-from typing import IO, TYPE_CHECKING, Callable, ClassVar
+from typing import IO, TYPE_CHECKING, ClassVar
 
 from dissect.target import filesystem
 from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
@@ -34,7 +34,7 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from typing_extensions import Self
 
@@ -142,18 +142,17 @@ class PureDissectPath(PurePath):
 
 
 class TargetPath(Path, PureDissectPath):
-    __slots__ = ("_entry",)
+    __slots__ = ("_direntry", "_entry")
 
     @classmethod
     def _unsupported_msg(cls, attribute: str) -> str:
         return f"{cls.__name__}.{attribute} is unsupported"
 
     def get(self) -> FilesystemEntry:
-        try:
-            return self._entry
-        except AttributeError:
-            self._entry = self._fs.get(str(self))
-            return self._entry
+        """Return the :class:`FilesystemEntry` for this path."""
+        if not hasattr(self, "_entry"):
+            self._entry = self._direntry.get() if hasattr(self, "_direntry") else self._fs.get(str(self))
+        return self._entry
 
     def stat(self, *, follow_symlinks: bool = True) -> stat_result:
         """
@@ -228,7 +227,7 @@ class TargetPath(Path, PureDissectPath):
             for entry in scandir_it:
                 name = entry.name
                 child_path = self.joinpath(name)
-                child_path._entry = entry
+                child_path._direntry = entry
                 yield child_path
 
     def glob(

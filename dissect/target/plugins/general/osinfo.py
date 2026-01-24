@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator, Iterator
-from typing import Callable
+from collections.abc import Callable, Generator, Iterator
 
 from flow.record import GroupedRecord
 

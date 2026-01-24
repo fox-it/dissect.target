@@ -2,17 +2,15 @@ from __future__ import annotations
 
 import io
 import json
-import logging
 import re
 import sys
 from collections import deque
-from collections.abc import ItemsView, Iterable, Iterator, KeysView
+from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Literal,
     TextIO,
 )
@@ -20,6 +18,7 @@ from typing import (
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import to_list
 
 if TYPE_CHECKING:
@@ -47,7 +46,7 @@ except ImportError:
     HAS_TOML = False
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -294,7 +293,7 @@ class CSVish(Default):
             columns = re.split(self.SEPARATOR, line, maxsplit=self.maxsplit)
 
             # keep unparsed lines separate (often env vars)
-            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns))
+            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns, strict=False))
 
             information_dict[str(i)] = data
 

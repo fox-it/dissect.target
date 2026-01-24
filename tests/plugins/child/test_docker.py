@@ -10,10 +10,11 @@ if TYPE_CHECKING:
 
 def test_docker(target_linux_docker: Target) -> None:
     target_linux_docker.add_plugin(DockerChildTargetPlugin)
-    children = sorted(target_linux_docker.list_children(), key=lambda r: r.path)
+    children = sorted([child for _, child in target_linux_docker.list_children()], key=lambda r: r.path)
 
     assert len(children) == 3
     assert children[0].type == "docker"
+    assert children[0].name == "epic_lichterman"
 
     assert [c.path for c in children] == [
         "/var/lib/docker/image/overlay2/layerdb/mounts/01b646bc043eb4ad72f3a64b4ffd9be2cbeb399e0a07497d749d724460ccad3a",

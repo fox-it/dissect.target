@@ -9,20 +9,14 @@ import fnmatch
 import functools
 import importlib
 import importlib.util
-import logging
 import os
 import sys
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import chain, zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
-
-try:
-    from typing import TypeAlias  # novermin
-except ImportError:
-    # COMPAT: Remove this when we drop Python 3.9
-    TypeAlias = Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from flow.record import Record, RecordDescriptor
 
@@ -30,6 +24,7 @@ import dissect.target.plugins.os.default as default
 from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.helpers.utils import StrEnum
 
@@ -42,7 +37,7 @@ if TYPE_CHECKING:
     from dissect.target.helpers.record import ChildTargetRecord
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 MODULE_PATH = "dissect.target.plugins"
 """The base module path to the in-tree plugins."""
@@ -74,11 +69,8 @@ class OperatingSystem(StrEnum):
     WINDOWS = "windows"
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class PluginDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("exports", "findable", "functions", "module", "namespace", "path", "qualname")
-
     module: str
     qualname: str
     namespace: str
@@ -92,23 +84,8 @@ class PluginDescriptor:
         return load(self)
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FunctionDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = (
-        "alias",
-        "exported",
-        "findable",
-        "internal",
-        "method_name",
-        "module",
-        "name",
-        "namespace",
-        "output",
-        "path",
-        "qualname",
-    )
-
     name: str
     namespace: str
     path: str
@@ -138,18 +115,13 @@ class FunctionDescriptor:
         return getattr(self.func, "__args__", [])
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FailureDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("module", "stacktrace")
-
     module: str
     stacktrace: list[str]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginDescriptorLookup:
     # All regular plugins
     # {"<module_path>": PluginDescriptor}
@@ -162,9 +134,7 @@ class PluginDescriptorLookup:
     __child__: dict[str, PluginDescriptor] = field(default_factory=dict)
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FunctionDescriptorLookup:
     # All regular plugins
     # {"<function_name>": {"<module_path>": FunctionDescriptor}}
@@ -180,9 +150,7 @@ class FunctionDescriptorLookup:
 _OSTree: TypeAlias = dict[str, "_OSTree"]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginRegistry:
     # Plugin descriptor lookup
     __plugins__: PluginDescriptorLookup = field(default_factory=PluginDescriptorLookup)
@@ -491,10 +459,21 @@ class Plugin:
                 self.target.log.debug("", exc_info=e)
 
     def get_paths(self) -> Iterator[Path]:
+        """Return all artifact paths."""
         if self.target.is_direct:
             yield from self._get_paths_direct()
         else:
             yield from self._get_paths()
+
+    def get_all_paths(self) -> Iterator[Path]:
+        """Return all artifact and auxiliary paths.
+
+        The implementation of this function will
+        probably change in the future, but the interface
+        should stay the same.
+        """
+        yield from self.get_paths()
+        yield from self._get_auxiliary_paths()
 
     def _get_paths_direct(self) -> Iterator[Path]:
         """Return all paths as given by the user."""
@@ -502,7 +481,14 @@ class Plugin:
             yield self.target.fs.path(str(path))
 
     def _get_paths(self) -> Iterator[Path]:
-        """Return all files of interest to the plugin.
+        """Return all artifact files of interest to the plugin.
+
+        To be implemented by the plugin subclass.
+        """
+        raise NotImplementedError
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        """Return all auxiliary files of interest to the plugin.
 
         To be implemented by the plugin subclass.
         """
@@ -655,7 +641,7 @@ def register(plugincls: type[Plugin]) -> None:
             for part in module_parts[:-2]:
                 obj = obj.setdefault(part, {})
 
-        log.debug("Plugin registered: %s", module_key)
+        log.trace("Plugin registered: %s", module_key)
 
 
 def _get_plugins() -> PluginRegistry:

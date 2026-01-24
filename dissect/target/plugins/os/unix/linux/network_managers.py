@@ -1,26 +1,27 @@
 from __future__ import annotations
 
-import logging
 import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
 from re import Match, compile, sub
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 try:
     from ruamel.yaml import YAML
@@ -540,7 +541,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 
         # Ubuntu cloud-init
         if "Received dhcp lease on" in line:
-            interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+            _, ip, _ = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
             ips.add(ip)
             continue
 
@@ -575,9 +576,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             and " address " in line
             and " via " in line
         ):
-            interface, ip, netmask, gateway = re.search(
-                r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line
-            ).groups()
+            _, ip, _, _ = re.search(r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line).groups()
             ips.add(ip)
             continue
 
