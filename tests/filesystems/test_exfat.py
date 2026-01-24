@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
@@ -178,3 +179,14 @@ def test_filesystem_entry_is_file(
     assert other_file.is_file()
     assert other_file.is_file(follow_symlinks=False)
     assert not some_path.is_file()
+
+def test_exfat_identifier_no_guid() -> None:
+    """ExFAT.identifier fallback using exfat.vbr.volume_serial when volume.guid is None."""
+    dummy_fh = BytesIO(b"")  # empty in-memory file handle
+    with patch("dissect.target.filesystems.exfat.ExfatFilesystem.__init__", lambda self, fh: None):
+        fs = ExfatFilesystem(fh=dummy_fh)
+        fs.volume = Mock(guid=None)
+        fs.exfat = Mock(vbr=Mock(volume_serial=987654321))
+
+        expected_uuid = "987654321"
+        assert fs.identifier == expected_uuid

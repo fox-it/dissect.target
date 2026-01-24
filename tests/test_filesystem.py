@@ -21,6 +21,7 @@ from dissect.target.exceptions import (
     SymlinkRecursionError,
 )
 from dissect.target.filesystem import (
+    Filesystem,
     FilesystemEntry,
     LayerFilesystem,
     MappedFile,
@@ -1293,3 +1294,36 @@ def test_layer_filesystem_relative_link() -> None:
     lfs.mount("/mnt", vfs)
 
     assert lfs.path("/mnt/bye/world").read_text() == "o/"
+
+
+class DummyMockFilesystem(Filesystem):
+    __type__ = "test"
+
+def test_filesystem_identifier_from_volume_guid() -> None:
+    """Filesystem.identifier returns a string when volume.guid is set."""
+    guid = "test" * 4
+
+    fs = DummyMockFilesystem()
+    fs.volume = Mock(guid=guid)
+
+    assert fs.identifier == guid
+
+
+def test_filesystem_identifier_string_when_no_guid() -> None:
+    """Filesystem.identifier returns the volume name when volume.guid is None."""
+
+    fs = DummyMockFilesystem()
+    fs.volume = Mock(guid=None)
+    fs.volume.name = "TestVolume"
+
+    assert fs.identifier == "TestVolume"
+
+
+def test_filesystem_identifier_string_when_no_guid_or_name() -> None:
+    """Filesystem.identifier returns the fs type name when volume.guid and volume name are None."""
+
+    fs = DummyMockFilesystem()
+    fs.volume = Mock(guid=None)
+    fs.volume.name = None
+
+    assert fs.identifier == "filesystem_test"
