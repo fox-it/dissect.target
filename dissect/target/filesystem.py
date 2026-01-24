@@ -24,9 +24,9 @@ TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from uuid import UUID
 
     from typing_extensions import Self
-    from uuid import UUID
 
     from dissect.target.target import Target
 
