@@ -3,14 +3,14 @@ from __future__ import annotations
 import stat
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import FilesystemEntry, VirtualFile, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.loaders.tar import TarLoader
-from dissect.target.plugins.filesystem.walkfs import WalkFsPlugin
+from dissect.target.plugins.filesystem.walkfs import WalkFsPlugin, get_disk_serial
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -125,3 +125,43 @@ def test_walkfs_xattr(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     ]
     assert results[-1].effective
     assert results[-1].root_id is None
+    
+@pytest.fixture
+def mock_fs_entry() -> MagicMock:
+    """Fixture to create a mock FilesystemEntry object."""
+    mock_entry = MagicMock(spec=FilesystemEntry)
+    mock_fs = Mock()
+    mock_volume = Mock()
+    mock_disk = Mock()
+
+    # Set up the mock object structure
+    mock_entry.fs = mock_fs
+    mock_fs.volume = mock_volume
+    mock_volume.disk = mock_disk
+
+    # Clear any attributes from previous tests
+    mock_volume.guid = None
+    mock_fs.__type__ = "generic"
+    for attr in ("ntfs", "extfs", "fatfs", "exfat"):
+        if hasattr(mock_fs, attr):
+            setattr(mock_fs, attr, None)
+    if hasattr(mock_disk.vs, "serial"):
+        mock_disk.vs = None
+
+    return mock_entry
+
+def test_get_disk_serial_no_serial(mock_fs_entry: MagicMock) -> None:
+    """Test get_disk_serial when the `serial` attribute is missing."""
+    # The default mock aparently does have the `serial` attribute on `vs`
+
+    mock_fs_entry.fs.volume.disk.vs = Mock()
+    if hasattr(mock_fs_entry.fs.volume.vs, "serial"):
+        delattr(mock_fs_entry.fs.volume.vs, "serial")
+    assert get_disk_serial(mock_fs_entry.fs) is None
+
+def test_get_disk_serial(mock_fs_entry: MagicMock) -> None:
+    """Test get_disk_serial when a serial number is available."""
+    # Mock the `serial` attribute on the `vs` object
+    mock_fs_entry.fs.volume.vs = Mock(serial="A1B2C3D4")
+
+    assert get_disk_serial(mock_fs_entry.fs) == "A1B2C3D4"
