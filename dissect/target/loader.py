@@ -76,7 +76,7 @@ class Loader:
             except Exception:
                 log.debug("Failed to resolve loader path %r", path)
                 self.absolute_path = path
-            self.base_path = self.absolute_path.parent
+            # self.base_path = self.absolute_path.parent
         self.parsed_path = parsed_path
         self.parsed_query = (
             dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True)) if parsed_path else {}
@@ -289,4 +289,5 @@ register("cyber", "CyberLoader")
 register("log", "LogLoader")
 register("remote", "RemoteLoader")
 register("mqtt", "MqttLoader")
+register("gzip", "GzipLoader")
 register("multiraw", "MultiRawLoader")  # Should be last
