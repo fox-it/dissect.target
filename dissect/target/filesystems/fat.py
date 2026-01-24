@@ -10,7 +10,7 @@ from dissect.fat import exceptions as fat_exc
 from dissect.fat import fat
 
 from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -59,7 +59,21 @@ class FatFilesystem(Filesystem):
         return int(self.fatfs.volume_id, 16)
 
 
+class FatDirEntry(DirEntry):
+    fs: FatFilesystem
+    entry: fat.RootDirectory | fat.DirectoryEntry
+
+    def get(self) -> FatFilesystemEntry:
+        return FatFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class FatFilesystemEntry(FilesystemEntry):
+    fs: FatFilesystem
+    entry: fat.RootDirectory | fat.DirectoryEntry
+
     def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
@@ -71,26 +85,16 @@ class FatFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self.entry.open()
 
-    def iterdir(self) -> Iterator[str]:
-        """List the directory contents of a directory. Returns a generator of strings."""
-        if not self.is_dir():
-            raise NotADirectoryError(self.path)
-
-        for f in self.entry.iterdir():
-            if f.name in (".", ".."):
-                continue
-            yield f.name
-
     def scandir(self) -> Iterator[FilesystemEntry]:
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        for f in self.entry.iterdir():
-            if f.name in (".", ".."):
+        for entry in self.entry.iterdir():
+            if entry.name in (".", ".."):
                 continue
-            path = fsutil.join(self.path, f.name, alt_separator=self.fs.alt_separator)
-            yield FatFilesystemEntry(self.fs, path, f)
+
+            yield FatDirEntry(self.fs, self.path, entry.name, entry)
 
     def is_symlink(self) -> bool:
         """Return whether this entry is a link."""

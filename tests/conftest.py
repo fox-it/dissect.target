@@ -299,6 +299,13 @@ def fs_bsd() -> VirtualFilesystem:
 
 
 @pytest.fixture
+def fs_esxi() -> VirtualFilesystem:
+    fs = VirtualFilesystem()
+    fs.map_file("/etc/vmware/esx.conf", absolute_path("_data/plugins/os/unix/esxi/_os/etc/vmware/esx.conf"))
+    return fs
+
+
+@pytest.fixture
 def fs_android() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("/data")

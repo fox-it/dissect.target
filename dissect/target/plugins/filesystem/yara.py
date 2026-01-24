@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 from io import BytesIO
 from pathlib import Path
 
 from dissect.target.helpers import hashutil
+from dissect.target.helpers.logging import get_logger
 
 try:
     import yara
@@ -24,7 +24,8 @@ from dissect.target.plugin import Plugin, arg, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",

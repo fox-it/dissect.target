@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import tarfile as tf
 from io import BytesIO
 from typing import TYPE_CHECKING
@@ -12,13 +11,15 @@ from dissect.target.filesystems.tar import (
 )
 from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader, SubLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 TAR_EXT_COMP = (
     ".tar.gz",
@@ -135,6 +136,8 @@ class TarLoader(Loader):
         import_lazy("dissect.target.loaders.containerimage").ContainerImageTarSubLoader,
         import_lazy("dissect.target.loaders.acquire").AcquireTarSubLoader,
         import_lazy("dissect.target.loaders.uac").UacTarSubloader,
+        import_lazy("dissect.target.loaders.nscollector").NsCollectorTarSubLoader,
+        import_lazy("dissect.target.loaders.vmsupport").VmSupportTarSubloader,
         GenericTarSubLoader,  # should be last
     )
 

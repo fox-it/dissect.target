@@ -27,7 +27,7 @@ class UtmLoader(Loader):
     def map(self, target: Target) -> None:
         data_dir = self.absolute_path.joinpath("Data")
         for drive in self.config.get("Drive", []):
-            if drive.get("ImageType") != "Disk":
+            if (type := drive.get("ImageType")) and type != "Disk":
                 continue
 
             path = data_dir.joinpath(drive["ImageName"])

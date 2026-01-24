@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume import lvm
 
+from dissect.target.helpers.logging import get_logger
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
@@ -12,7 +12,8 @@ if TYPE_CHECKING:
 
     from typing_extensions import Self
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 OPEN_TYPES = (
     "linear",

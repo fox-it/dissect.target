@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -12,8 +13,7 @@ from dissect.target.plugins.os.windows.dpapi.crypto import (
     _SHA1,
     _SHA512,
 )
-from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIBlob, DPAPIPlugin
-from dissect.target.plugins.os.windows.dpapi.master_key import MasterKeyFile
+from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIBlob, DPAPIPlugin, MasterKeyFile
 from tests._utils import absolute_path
 from tests.conftest import add_win_user
 from tests.plugins.os.windows.credential.test_lsa import (
@@ -573,3 +573,63 @@ def test_dpapi_master_keys_deduplicate(
     with patch("dissect.target.plugins.os.windows.dpapi.dpapi.MasterKeyFile") as MasterKeyFileMock:
         dict(plugin.master_keys)
         MasterKeyFileMock.assert_called_once()
+
+
+def test_dpapi_master_key_decrypt_with_hash(
+    target_win: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive, hive_hku: VirtualHive
+) -> None:
+    """Test that 'master_keys' are decrypted first with a password and then with a hash."""
+    # Setup: create a fake master key file and hash
+    sid = "S-1-5-21-1111111111-2222222222-3333333333-1001"
+    mk_guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    mk_hash = "0123456789abcdef0123456789abcdef"  # 16 bytes hex string
+
+    add_win_user(hive_hklm, hive_hku, target_win, sid=sid, home="C:\\Users\\user")
+    map_lsa_system_keys(
+        hive_hklm,
+        {"Data": "deadbeef", "GBG": "cafebabe", "JD": "feedface", "Skew1": "badc0de1"},
+    )
+
+    # Register the hash in the keychain
+    class MyStr(str):
+        __slots__ = ()
+
+    keychain.register_key(
+        key_type=keychain.KeyType.PASSPHRASE,
+        value=MyStr(mk_hash),
+        identifier=None,
+        provider="user",
+    )
+
+    # Map a dummy master key file using an in-memory BytesIO
+    fs_win.map_file_fh(f"Users/user/AppData/Roaming/Microsoft/Protect/{sid}/{mk_guid}", io.BytesIO(b"\x00" * 128))
+
+    map_version_value(target_win, "CurrentVersion", 10.0)
+    target_win.add_plugin(DPAPIPlugin)
+
+    # Patch MasterKeyFile to track decrypted state in a closure
+    decrypted_state = False
+
+    def fake_decrypt_with_password(self: MasterKeyFile, *args, **kwargs) -> bool:
+        nonlocal decrypted_state
+        decrypted_state = False
+        return False
+
+    def fake_decrypt_with_hash(self: MasterKeyFile, user_sid: str, password_hash: bytes) -> bool:
+        nonlocal decrypted_state
+        decrypted_state = len(password_hash) > 0
+        return decrypted_state
+
+    def decrypted_getter(self: MasterKeyFile) -> bool:
+        return decrypted_state
+
+    with (
+        patch.object(MasterKeyFile, "decrypt_with_password", new=fake_decrypt_with_password),
+        patch.object(MasterKeyFile, "decrypt_with_hash", new=fake_decrypt_with_hash),
+        patch.object(MasterKeyFile, "decrypted", new=property(decrypted_getter)),
+    ):
+        # 'master_keys' is the subject under test: accessing it should trigger the PyPy workaround
+        keys = target_win.dpapi.master_keys
+        assert sid in keys
+        assert mk_guid in keys[sid]
+        assert decrypted_state

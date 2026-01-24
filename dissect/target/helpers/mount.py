@@ -1,33 +1,25 @@
 from __future__ import annotations
 
 import errno
-import logging
 from ctypes import c_void_p
 from functools import lru_cache
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.util.feature import Feature, feature_enabled
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.filesystem import Filesystem, FilesystemEntry
 
-if feature_enabled(Feature.BETA):
-    from fuse3 import FuseOSError, Operations
-    from fuse3.c_fuse import fuse_config_p, fuse_conn_info_p
 
-    HAS_FUSE3 = True
-else:
-    from fuse import FuseOSError, Operations
+from fuse import FuseOSError, Operations
 
-    fuse_config_p = c_void_p
-    fuse_conn_info_p = c_void_p
-
-    HAS_FUSE3 = False
+fuse_config_p = c_void_p
+fuse_conn_info_p = c_void_p
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 CACHE_SIZE = 64 * 1024  # Tuned for ~0.7GB of memory usage on extFS
 
@@ -145,11 +137,3 @@ class DissectMount(Operations):
     def releasedir(self, path: str, fh: int) -> int:
         del self.dir_handles[fh]
         return 0
-
-    if HAS_FUSE3:
-        # Define the fuse3 bindings here
-
-        def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
-            if file := self.file_handles.get(fh):
-                return file.seek(off, whence)
-            raise FuseOSError(errno.EBADFD)

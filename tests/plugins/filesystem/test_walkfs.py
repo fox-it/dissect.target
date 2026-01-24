@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 
-from dissect.target.filesystem import FilesystemEntry, VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.helpers import fsutil
 from dissect.target.loaders.tar import TarLoader
-from dissect.target.plugins.filesystem.walkfs import WalkFSPlugin, get_disk_serial
+from dissect.target.plugins.filesystem.walkfs import WalkFsPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -25,11 +27,11 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_entry("/.test/test.txt", VirtualFile(fs_unix, "test.txt", None))
     fs_unix.map_file_entry("/.test/.more.test.txt", VirtualFile(fs_unix, ".more.test.txt", None))
 
-    target_unix.add_plugin(WalkFSPlugin)
+    target_unix.add_plugin(WalkFsPlugin)
 
-    results = list(target_unix.walkfs())
+    results = sorted(target_unix.walkfs(), key=lambda r: r.path)
     assert len(results) == 14
-    assert sorted([r.path for r in results]) == [
+    assert [r.path for r in results] == [
         "/",
         "/.test",
         "/.test/.more.test.txt",
@@ -55,49 +57,71 @@ def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> N
     loader.map(target_bare)
     target_bare.apply()
 
-    result = benchmark(lambda: next(WalkFSPlugin(target_bare).walkfs()))
+    result = benchmark(lambda: next(WalkFsPlugin(target_bare).walkfs()))
 
     assert result.path == "/"
 
 
-@pytest.fixture
-def mock_fs_entry() -> MagicMock:
-    """Fixture to create a mock FilesystemEntry object."""
-    mock_entry = MagicMock(spec=FilesystemEntry)
-    mock_fs = Mock()
-    mock_volume = Mock()
-    mock_disk = Mock()
+def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we detect a SUID binary correctly in the WalkFS plugin."""
 
-    # Set up the mock object structure
-    mock_entry.fs = mock_fs
-    mock_fs.volume = mock_volume
-    mock_volume.disk = mock_disk
+    vfile = VirtualFile(fs_unix, "binary", None)
+    vfile.lstat = Mock()
+    vfile.lstat.return_value = fsutil.stat_result([stat.S_IFREG | stat.S_ISUID, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    fs_unix.map_file_entry("/path/to/suid/binary", vfile)
 
-    # Clear any attributes from previous tests
-    mock_volume.guid = None
-    mock_fs.__type__ = "generic"
-    for attr in ("ntfs", "extfs", "fatfs", "exfat"):
-        if hasattr(mock_fs, attr):
-            setattr(mock_fs, attr, None)
-    if hasattr(mock_disk.vs, "serial"):
-        mock_disk.vs = None
+    target_unix.add_plugin(WalkFsPlugin)
 
-    return mock_entry
+    results = list(target_unix.walkfs())
+    assert len(results) == 7
+
+    assert results[-1].path == "/path/to/suid/binary"
+    assert results[-1].fs_types == ["virtual"]
+    assert results[-1].mode == 34816
+    assert results[-1].is_suid
 
 
-def test_get_disk_serial(mock_fs_entry: MagicMock) -> None:
-    """Test get_disk_serial when a serial number is available."""
-    # Mock the `serial` attribute on the `vs` object
-    mock_fs_entry.fs.volume.vs = Mock(serial="A1B2C3D4")
+def test_walkfs_xattr(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we parse xattrs correctly in the WalkFS plugin."""
 
-    assert get_disk_serial(mock_fs_entry.fs) == "A1B2C3D4"
+    xattr1 = Mock()
+    xattr1.name = "security.capability"
+    xattr1.value = bytes.fromhex("010000010020f00000f00f0f")
 
+    xattr2 = Mock()
+    xattr2.name = "example.attr"
+    xattr2.value = b"some value"
 
-def test_get_disk_serial_no_serial(mock_fs_entry: MagicMock) -> None:
-    """Test get_disk_serial when the `serial` attribute is missing."""
-    # The default mock aparently does have the `serial` attribute on `vs`
+    vfile1 = VirtualFile(fs_unix, "file", None)
+    vfile1.lattr = Mock()
+    vfile1.lattr.return_value = [xattr1, xattr2]
+    vfile1.fs.__type__ = "extfs"
+    fs_unix.map_file_entry("/path/to/xattr1/file", vfile1)
 
-    mock_fs_entry.fs.volume.disk.vs = Mock()
-    if hasattr(mock_fs_entry.fs.volume.vs, "serial"):
-        delattr(mock_fs_entry.fs.volume.vs, "serial")
-    assert get_disk_serial(mock_fs_entry.fs) is None
+    target_unix.add_plugin(WalkFsPlugin)
+
+    results = list(target_unix.walkfs(capability=True))
+    assert len(results) == 8
+
+    assert results[-2].path == "/path/to/xattr1/file"
+    assert results[-2].fs_types == ["extfs"]
+    assert results[-2].attr == ["security.capability=010000010020f00000f00f0f", "example.attr=736f6d652076616c7565"]
+
+    assert results[-1].mtime
+    assert results[-1].permitted == ["CAP_NET_RAW", "CAP_SYS_PACCT", "CAP_SYS_ADMIN", "CAP_SYS_BOOT", "CAP_SYS_NICE"]
+    assert results[-1].inheritable == [
+        "CAP_NET_ADMIN",
+        "CAP_NET_RAW",
+        "CAP_IPC_LOCK",
+        "CAP_IPC_OWNER",
+        "CAP_SYS_MODULE",
+        "CAP_SYS_RAWIO",
+        "CAP_SYS_CHROOT",
+        "CAP_SYS_PTRACE",
+        "CAP_SYS_RESOURCE",
+        "CAP_SYS_TIME",
+        "CAP_SYS_TTY_CONFIG",
+        "CAP_MKNOD",
+    ]
+    assert results[-1].effective
+    assert results[-1].root_id is None

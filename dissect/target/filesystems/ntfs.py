@@ -9,6 +9,7 @@ from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
 from dissect.ntfs.exceptions import Error as NtfsError
 from dissect.ntfs.exceptions import FileNotFoundError as NtfsFileNotFoundError
 from dissect.ntfs.exceptions import NotADirectoryError as NtfsNotADirectoryError
+from dissect.ntfs.util import segment_reference
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -16,12 +17,13 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.ntfs.attr import FileName, StandardInformation
     from dissect.ntfs.util import AttributeMap
 
 
@@ -65,27 +67,92 @@ class NtfsFilesystem(Filesystem):
         return self.ntfs.serial
 
 
+class NtfsDirEntry(DirEntry):
+    entry: IndexEntry
+
+    def get(self) -> FilesystemEntry:
+        return NtfsFilesystemEntry(self.fs, self.path, self.entry.dereference())
+
+    def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+        if follow_symlinks and self.is_symlink():
+            return super().is_dir(follow_symlinks=follow_symlinks)
+
+        return self.entry.attribute.is_dir()
+
+    def is_file(self, *, follow_symlinks: bool = True) -> bool:
+        if follow_symlinks and self.is_symlink():
+            return super().is_file(follow_symlinks=follow_symlinks)
+
+        return self.entry.attribute.is_file()
+
+    def is_symlink(self) -> bool:
+        return self.entry.attribute.is_symlink() or self.entry.attribute.is_mount_point()
+
+    def is_junction(self) -> bool:
+        return self.entry.attribute.is_mount_point()
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        if follow_symlinks and self.is_symlink():
+            return self.fs.stat(self.path)
+
+        attr: FileName = self.entry.attribute
+        if attr.is_symlink() or attr.is_mount_point():
+            # Technically NTFS mount points/junctions are not symlinks, but it's easier if we pretend they are
+            mode = stat.S_IFLNK
+        elif attr.is_dir():
+            mode = stat.S_IFDIR
+        else:
+            mode = stat.S_IFREG
+
+        # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
+        st_info = fsutil.stat_result(
+            [
+                mode | 0o777,
+                segment_reference(self.entry.header.FileReference),
+                id(self.fs),
+                0,
+                0,
+                0,
+                attr.file_size,
+                attr.last_access_time.timestamp(),
+                attr.last_modification_time.timestamp(),
+                # ctime gets set to creation time for python <3.12 purposes
+                attr.creation_time.timestamp(),
+            ]
+        )
+
+        # Set the nanosecond resolution separately
+        st_info.st_atime_ns = attr.last_access_time_ns
+        st_info.st_mtime_ns = attr.last_modification_time_ns
+
+        st_info.st_ctime_ns = attr.creation_time_ns
+
+        st_info.st_birthtime = attr.creation_time.timestamp()
+        st_info.st_birthtime_ns = attr.creation_time_ns
+
+        # real_size is none if the size is resident
+        st_info.st_blksize = self.entry.index.record.ntfs.cluster_size
+        st_info.st_blocks = math.ceil(attr.allocated_size / 512)
+
+        return st_info
+
+
 class NtfsFilesystemEntry(FilesystemEntry):
-    def __init__(
-        self, fs: NtfsFilesystem, path: str, entry: MftRecord | None = None, index_entry: IndexEntry | None = None
-    ):
+    fs: NtfsFilesystem
+    entry: MftRecord
+
+    def __init__(self, fs: NtfsFilesystem, path: str, entry: MftRecord):
         super().__init__(fs, path, entry)
-        self.index_entry = index_entry
 
         self.ads = ""
         if ":" in self.path:
             self.path, self.ads = path.rsplit(":", maxsplit=1)
 
-    def dereference(self) -> MftRecord:
-        if not self.entry:
-            self.entry = self.index_entry.dereference()
-        return self.entry
-
     def get(self, path: str) -> NtfsFilesystemEntry:
         return NtfsFilesystemEntry(
             self.fs,
             fsutil.join(self.path, path, alt_separator=self.fs.alt_separator),
-            self.fs._get_record(path, self.dereference()),
+            self.fs._get_record(path, self.entry),
         )
 
     def open(self, name: str = "") -> BinaryIO:
@@ -96,36 +163,23 @@ class NtfsFilesystemEntry(FilesystemEntry):
             return self.readlink_ext().open(name)
 
         stream = name or self.ads
-        return self.dereference().open(stream)
+        return self.entry.open(stream)
 
-    def _iterdir(self, ignore_dos: bool = True) -> Iterator[IndexEntry]:
+    def scandir(self, ignore_dos: bool = True) -> Iterator[NtfsDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            yield from self.readlink_ext()._iterdir(ignore_dos=ignore_dos)
-            return
-
-        for entry in self.dereference().iterdir(ignore_dos=ignore_dos):
+        for entry in self._resolve().entry.iterdir(ignore_dos=ignore_dos):
             if entry.attribute.file_name == ".":
                 continue
 
-            yield entry
-
-    def iterdir(self) -> Iterator[str]:
-        for index_entry in self._iterdir():
-            yield index_entry.attribute.file_name
-
-    def scandir(self) -> Iterator[NtfsFilesystemEntry]:
-        for index_entry in self._iterdir():
-            path = fsutil.join(self.path, index_entry.attribute.file_name, alt_separator=self.fs.alt_separator)
-            yield NtfsFilesystemEntry(self.fs, path, index_entry=index_entry)
+            yield NtfsDirEntry(self.fs, self.path, entry.attribute.file_name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         if not follow_symlinks and self.is_symlink():
             return False
 
-        return self.dereference().is_dir()
+        return self.entry.is_dir()
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         if not follow_symlinks and self.is_symlink():
@@ -134,8 +188,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
         return not self.is_dir(follow_symlinks=follow_symlinks)
 
     def is_symlink(self) -> bool:
-        entry = self.dereference()
-        return entry.is_symlink() or entry.is_mount_point()
+        return self.entry.is_symlink() or self.entry.is_mount_point()
 
     def readlink(self) -> str:
         # Note: we only need to check and resolve symlinks when actually interacting with the target, such as
@@ -144,7 +197,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
         if not self.is_symlink():
             raise NotASymlinkError
 
-        reparse_point = self.dereference().attributes.REPARSE_POINT
+        reparse_point = self.entry.attributes.REPARSE_POINT
         print_name = reparse_point.print_name
         if reparse_point.absolute:
             # Prefix with \\ to make the path play ball with all the filesystem utilities
@@ -158,7 +211,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
         return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
-        record = self.dereference()
+        record = self.entry
 
         size = 0
         real_size = 0
@@ -175,7 +228,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
         else:
             mode = stat.S_IFDIR
 
-        stdinfo = record.attributes.STANDARD_INFORMATION
+        stdinfo: StandardInformation = record.attributes.STANDARD_INFORMATION
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         st_info = fsutil.stat_result(
@@ -219,4 +272,4 @@ class NtfsFilesystemEntry(FilesystemEntry):
         return self.lattr()
 
     def lattr(self) -> AttributeMap:
-        return self.dereference().attributes
+        return self.entry.attributes
