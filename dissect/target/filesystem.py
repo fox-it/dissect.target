@@ -515,10 +515,11 @@ class Filesystem:
             return str(self.uuid)
         if self.serial:
             return str(self.serial)
-        if self.volume and self.volume.guid:
-            return self.volume.guid
-        if self.volume and self.volume.name:
-            return self.volume.name
+        if self.volume:
+            if guid := getattr(self.volume, "guid", None):
+                return guid
+            if name := getattr(self.volume, "name", None):
+                return name
         log.error("no identifier found for filesystem of type %s", self.__type__)
         return f"filesystem_{self.__type__}"
 
