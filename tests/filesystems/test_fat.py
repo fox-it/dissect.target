@@ -31,7 +31,8 @@ def test_get_entry(raised_exception: Exception, expected_exception: Exception) -
 
     with pytest.raises(expected_exception):
         mocked_fs._get_entry(mocked_fs, path="")
-        
+
+
 def test_fat_identifier_no_guid() -> None:
     """FAT.identifier fallback using fatfs.volume_id when volume.guid is None."""
     dummy_fh = BytesIO(b"")  # empty in-memory file handle

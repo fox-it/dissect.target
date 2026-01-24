@@ -180,6 +180,7 @@ def test_filesystem_entry_is_file(
     assert other_file.is_file(follow_symlinks=False)
     assert not some_path.is_file()
 
+
 def test_exfat_identifier_no_guid() -> None:
     """ExFAT.identifier fallback using exfat.vbr.volume_serial when volume.guid is None."""
     dummy_fh = BytesIO(b"")  # empty in-memory file handle

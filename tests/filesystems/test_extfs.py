@@ -53,6 +53,7 @@ def test_stat_information() -> None:
     assert stat_info.st_blksize == 0x1000
     assert stat_info.st_blocks == 8
 
+
 def test_ext_identifier_no_guid() -> None:
     """EXT.identifier fallback using extfs.identifier when volume.guid is None."""
     fs = ExtFilesystem(fh=absolute_path("_data/filesystems/symlink_disk.ext4").open("rb"))

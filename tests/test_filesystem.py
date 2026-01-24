@@ -1299,6 +1299,7 @@ def test_layer_filesystem_relative_link() -> None:
 class DummyMockFilesystem(Filesystem):
     __type__ = "test"
 
+
 def test_filesystem_identifier_from_volume_guid() -> None:
     """Filesystem.identifier returns a string when volume.guid is set."""
     guid = "test" * 4

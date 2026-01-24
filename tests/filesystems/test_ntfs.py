@@ -12,7 +12,7 @@ from dissect.ntfs.mft import MftRecord
 from dissect.ntfs.util import AttributeMap
 
 from dissect.target.exceptions import FileNotFoundError
-from dissect.target.filesystem import Filesystem, VirtualFilesystem
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem, NtfsFilesystemEntry
 
 
@@ -130,6 +130,7 @@ def test_stat_information(cluster_size: int, size: int, resident: bool, expected
 
         assert stat_info.st_blksize == cluster_size
         assert stat_info.st_blocks == expected_blks
+
 
 def test_ntfs_identifier_from_volume_guid() -> None:
     """NTFS filesystem identifier is derived correctly from volume GUID."""
