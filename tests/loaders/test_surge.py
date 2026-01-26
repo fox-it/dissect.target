@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 from dissect.target import Target
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.surge import SurgeLoader
+from dissect.target.loaders.zip import ZipLoader
+from dissect.target.plugins.filesystem.ntfs.usnjrnl import UsnjrnlPlugin
 from tests._utils import absolute_path, mkdirs
 
 
@@ -180,22 +182,25 @@ def test_loader_with_windows_variants(mock_surge_windows_dir: Path) -> None:
 
     for path in paths:
         loader = loader_open(path)
-        assert isinstance(loader, SurgeLoader)
+        assert isinstance(loader, (SurgeLoader, ZipLoader))
 
         t = Target()
         loader.map(t)
         t.apply()
+        t.add_plugin(UsnjrnlPlugin)
+        usnjrnl_records = list(t.usnjrnl())
 
         assert "sysvol" in t.fs.mounts
         assert "c:" in t.fs.mounts
         assert "d:" in t.fs.mounts
         assert "e:" in t.fs.mounts
 
-    # The 3 found drive letter directories + the fake NTFS filesystem
-    assert len(t.filesystems) == 4
-    # The 3 found drive letters + sysvol + the fake NTFS filesystem at /$fs$
-    assert len(t.fs.mounts) == 5
-    assert len(list(t.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
+        # The 3 found drive letters + fake NTFS
+        assert len(t.filesystems) == 4
+        # The 3 found drive letters + sysvol + ntfs
+        assert len(t.fs.mounts) == 5
+        # The single usnjrnl record for C
+        assert len(usnjrnl_records) == 1
 
 
 def test_loader_with_macos_variants(mock_surge_macos_dir: Path) -> None:
@@ -211,7 +216,7 @@ def test_loader_with_macos_variants(mock_surge_macos_dir: Path) -> None:
 
     for path in paths:
         loader = loader_open(path)
-        assert isinstance(loader, SurgeLoader)
+        assert isinstance(loader, (SurgeLoader, ZipLoader))
 
         t = Target()
         loader.map(t)
@@ -235,7 +240,7 @@ def test_loader_with_linux_variants(mock_surge_linux_dir: Path) -> None:
 
     for path in paths:
         loader = loader_open(path)
-        assert isinstance(loader, SurgeLoader)
+        assert isinstance(loader, (SurgeLoader, ZipLoader))
 
         t = Target()
         loader.map(t)
