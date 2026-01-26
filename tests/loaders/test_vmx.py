@@ -55,6 +55,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: 
 
 
 def test_loader(mock_vmwarevm_dir: Path) -> None:
+    """Test that ``VmxLoader`` correctly loads a VMware VMX file and its disks."""
     (mock_vmwarevm_dir / "mock.vmdk").touch()
 
     with _mock_vmx_and_container_open(["mock.vmdk"]) as mock_container_open:
@@ -69,6 +70,7 @@ def test_loader(mock_vmwarevm_dir: Path) -> None:
 
 
 def test_missing_disk(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Test handling of missing disks in ``VmxLoader``."""
     t = Target()
 
     with _mock_vmx_and_container_open(["mock.vmdk"]), caplog.at_level(logging.DEBUG, t.log.name):
@@ -81,6 +83,7 @@ def test_missing_disk(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture)
 
 
 def test_missing_snapshots(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Test handling of missing snapshots in ``VmxLoader``."""
     (mock_vmwarevm_dir / "mock.vmdk").touch()
     (mock_vmwarevm_dir / "mock-000001.vmdk").touch()
 
@@ -107,6 +110,7 @@ def test_missing_snapshots(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFix
 
 
 def test_missing_snapshots_base(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Test handling of missing snapshots down to the base disk in ``VmxLoader``."""
     (mock_vmwarevm_dir / "mock.vmdk").touch()
 
     t = Target()
@@ -133,6 +137,7 @@ def test_missing_snapshots_base(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptu
 
 
 def test_missing_all_snapshots(mock_vmwarevm_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Test handling of all missing snapshots in ``VmxLoader``."""
     t = Target()
 
     with _mock_vmx_and_container_open(["mock-000001.vmdk"]), caplog.at_level(logging.DEBUG, t.log.name):
