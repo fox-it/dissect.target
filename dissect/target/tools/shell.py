@@ -1166,6 +1166,63 @@ class TargetCli(TargetCmd):
         return False
 
     @arg("path")
+    def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Compute the MD5 checksum of a provided path, or from stdin, and write it to stdout.
+
+        Args:
+            args (argparse.Namespace): the arguments passed to md5sum.
+            stdout (TextIO): the file handle to write the md5sum output to.
+
+        Returns:
+            bool: always False, since True indicates the CLI should exit.
+        """
+        path = self.check_file(args.path)
+        if not path:
+            return False
+
+        (md5,) = path.get().hash(["md5"])
+        print(f"{md5}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Compute the SHA1 checksum of a provided path, or from stdin, and write it to stdout.
+
+        Args:
+            args (argparse.Namespace): the arguments passed to sha1sum.
+            stdout (TextIO): the file handle to write the sha1sum output to.
+
+        Returns:
+            bool: always False, since True indicates the CLI should exit.
+        """
+        path = self.check_file(args.path)
+        if not path:
+            return False
+
+        (sha1,) = path.get().hash(["sha1"])
+        print(f"{sha1}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Compute the SHA256 checksum of a provided path, or from stdin, and write it to stdout.
+
+        Args:
+            args (argparse.Namespace): the arguments passed to sha256sum.
+            stdout (TextIO): the file handle to write the sha256sum output to.
+
+        Returns:
+            bool: always False, since True indicates the CLI should exit.
+        """
+        path = self.check_file(args.path)
+        if not path:
+            return False
+
+        (sha256,) = path.get().hash(["sha256"])
+        print(f"{sha256}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
     @alias("head")
     @alias("more")
     def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> bool:
