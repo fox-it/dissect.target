@@ -1176,8 +1176,7 @@ class TargetCli(TargetCmd):
         Returns:
             bool: always False, since True indicates the CLI should exit.
         """
-        path = self.check_file(args.path)
-        if not path:
+        if not (path := self.check_file(args.path)):
             return False
 
         (md5,) = path.get().hash(["md5"])
@@ -1195,8 +1194,7 @@ class TargetCli(TargetCmd):
         Returns:
             bool: always False, since True indicates the CLI should exit.
         """
-        path = self.check_file(args.path)
-        if not path:
+        if not (path := self.check_file(args.path)):
             return False
 
         (sha1,) = path.get().hash(["sha1"])
@@ -1214,8 +1212,7 @@ class TargetCli(TargetCmd):
         Returns:
             bool: always False, since True indicates the CLI should exit.
         """
-        path = self.check_file(args.path)
-        if not path:
+        if not (path := self.check_file(args.path)):
             return False
 
         (sha256,) = path.get().hash(["sha256"])
