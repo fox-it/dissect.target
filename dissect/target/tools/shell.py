@@ -1167,7 +1167,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """Compute the MD5 checksum of a provided path, or from stdin, and write it to stdout.
+        """print the MD5 checksum of a file provided by a path or from stdin.
 
         Args:
             args (argparse.Namespace): the arguments passed to md5sum.
@@ -1185,7 +1185,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """Compute the SHA1 checksum of a provided path, or from stdin, and write it to stdout.
+        """print the SHA1 checksum of a file provided by a path or from stdin.
 
         Args:
             args (argparse.Namespace): the arguments passed to sha1sum.
@@ -1203,7 +1203,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """Compute the SHA256 checksum of a provided path, or from stdin, and write it to stdout.
+        """print the SHA256 checksum of a file provided by a path or from stdin.
 
         Args:
             args (argparse.Namespace): the arguments passed to sha256sum.
@@ -1536,7 +1536,6 @@ def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Ite
     On context exit the generator will close the input stream and wait for
     the subprocessess to finish.
     """
-
     if not pipe_parts:
         raise ValueError("No pipe components provided")
 
