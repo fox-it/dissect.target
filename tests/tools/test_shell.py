@@ -257,20 +257,19 @@ def test_redirect_simple_ls(tmp_path: Path, target_win: Target, monkeypatch: pyt
     assert "sysvol" in content
 
 
-def test_target_cli_hashsums(tmp_path: Path, target_unix: Target, capsys: pytest.CaptureFixture) -> None:
+def test_target_cli_hash_checksums(target_unix: Target, capsys: pytest.CaptureFixture) -> None:
     target_unix.fs.map_file_fh("/test-file", BytesIO(b"Hello world!"))
-    out_file = tmp_path / "checksum.txt"
 
     cli = TargetCli(target_unix)
 
-    cli.onecmd(f"cat /test-file | md5sum > {out_file}")
-    assert "86fb269d190d2c85f6e0468ceca42a20  -" in out_file.read_text()
+    cli.onecmd("md5sum /test-file")
+    assert "86fb269d190d2c85f6e0468ceca42a20  /test-file" in capsys.readouterr().out
 
-    cli.onecmd(f"sha1sum /test-file > {out_file}")
-    assert "d3486ae9136e7856bc42212385ea797094475802  /test-file" in out_file.read_text()
+    cli.onecmd("sha1sum /test-file")
+    assert "d3486ae9136e7856bc42212385ea797094475802  /test-file" in capsys.readouterr().out
 
-    cli.onecmd(f"cat /test-file | sha256sum - > {out_file}")
-    assert "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a  -" in out_file.read_text()
+    cli.onecmd("sha256sum /test-file")
+    assert "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a  /test-file" in capsys.readouterr().out
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test")

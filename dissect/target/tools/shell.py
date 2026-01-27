@@ -1167,15 +1167,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """Compute the MD5 checksum of a provided path, or from stdin, and write it to stdout.
-
-        Args:
-            args (argparse.Namespace): the arguments passed to md5sum.
-            stdout (TextIO): the file handle to write the md5sum output to.
-
-        Returns:
-            bool: always False, since True indicates the CLI should exit.
-        """
+        """print the MD5 checksum of a file provided by a path"""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1185,15 +1177,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """Compute the SHA1 checksum of a provided path, or from stdin, and write it to stdout.
-
-        Args:
-            args (argparse.Namespace): the arguments passed to sha1sum.
-            stdout (TextIO): the file handle to write the sha1sum output to.
-
-        Returns:
-            bool: always False, since True indicates the CLI should exit.
-        """
+        """print the SHA1 checksum of a file provided by a path"""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1203,15 +1187,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """Compute the SHA256 checksum of a provided path, or from stdin, and write it to stdout.
-
-        Args:
-            args (argparse.Namespace): the arguments passed to sha256sum.
-            stdout (TextIO): the file handle to write the sha256sum output to.
-
-        Returns:
-            bool: always False, since True indicates the CLI should exit.
-        """
+        """print the SHA256 checksum of a file provided by a path"""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1536,7 +1512,6 @@ def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Ite
     On context exit the generator will close the input stream and wait for
     the subprocessess to finish.
     """
-
     if not pipe_parts:
         raise ValueError("No pipe components provided")
 
