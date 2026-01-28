@@ -1166,6 +1166,60 @@ class TargetCli(TargetCmd):
         return False
 
     @arg("path")
+    def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the MD5 checksum of a file provided by a path or from stdin.
+
+        Args:
+            args (argparse.Namespace): the arguments passed to md5sum.
+            stdout (TextIO): the file handle to write the md5sum output to.
+
+        Returns:
+            bool: always False, since True indicates the CLI should exit.
+        """
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (md5,) = path.get().hash(["md5"])
+        print(f"{md5}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the SHA1 checksum of a file provided by a path or from stdin.
+
+        Args:
+            args (argparse.Namespace): the arguments passed to sha1sum.
+            stdout (TextIO): the file handle to write the sha1sum output to.
+
+        Returns:
+            bool: always False, since True indicates the CLI should exit.
+        """
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (sha1,) = path.get().hash(["sha1"])
+        print(f"{sha1}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the SHA256 checksum of a file provided by a path or from stdin.
+
+        Args:
+            args (argparse.Namespace): the arguments passed to sha256sum.
+            stdout (TextIO): the file handle to write the sha256sum output to.
+
+        Returns:
+            bool: always False, since True indicates the CLI should exit.
+        """
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (sha256,) = path.get().hash(["sha256"])
+        print(f"{sha256}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
     @alias("head")
     @alias("more")
     def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1482,7 +1536,6 @@ def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Ite
     On context exit the generator will close the input stream and wait for
     the subprocessess to finish.
     """
-
     if not pipe_parts:
         raise ValueError("No pipe components provided")
 
