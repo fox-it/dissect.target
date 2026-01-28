@@ -7,6 +7,7 @@ from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.helpers.magic import magic
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.unix.capability import parse_entry as parse_capability_entry
@@ -29,6 +30,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("uint32", "mode"),
         ("uint32", "uid"),
         ("uint32", "gid"),
+        ("string", "mimetype"),
         ("boolean", "is_suid"),
         ("string[]", "attr"),
         ("string[]", "fs_types"),
@@ -142,6 +144,14 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
 
     except Exception as e:
         target.log.warning("Unable to expand xattr for entry %s: %s", entry.path, e)
+        target.log.debug("", exc_info=e)
+
+    try:
+        fields["mimetype"] = magic.from_entry(entry, mime=True)
+    except (FileNotFoundError, IsADirectoryError):
+        pass
+    except Exception as e:
+        target.log.warning("Unable to determine mimetype for entry %s: %s", entry.path, e)
         target.log.debug("", exc_info=e)
 
     yield FilesystemRecord(

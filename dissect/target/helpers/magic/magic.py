@@ -91,7 +91,6 @@ def from_descriptor(fh: BinaryIO, suffix: str | None = None, *, mime: bool = Fal
         raise TypeError("Provided fh does not have a read or seek method")
 
     return Magic().detect(fh, suffix, mime=mime)
-    return from_buffer(fh, suffix, mime=mime)
 
 
 # Convenience alias, not present in python-magic.
