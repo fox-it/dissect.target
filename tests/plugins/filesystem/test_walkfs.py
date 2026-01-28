@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import stat
+from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
@@ -20,12 +21,14 @@ if TYPE_CHECKING:
 
 
 def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_entry("/path/to/some/file", VirtualFile(fs_unix, "file", None))
-    fs_unix.map_file_entry("/path/to/some/other/file.ext", VirtualFile(fs_unix, "file.ext", None))
-    fs_unix.map_file_entry("/root_file", VirtualFile(fs_unix, "root_file", None))
-    fs_unix.map_file_entry("/other_root_file.ext", VirtualFile(fs_unix, "other_root_file.ext", None))
-    fs_unix.map_file_entry("/.test/test.txt", VirtualFile(fs_unix, "test.txt", None))
-    fs_unix.map_file_entry("/.test/.more.test.txt", VirtualFile(fs_unix, ".more.test.txt", None))
+    """Test basic walkfs plugin behavior."""
+
+    fs_unix.map_file_fh("/path/to/some/file", BytesIO(bytes.fromhex("89504e470d0a1a0a")))
+    fs_unix.map_file_fh("/path/to/some/other/file.ext", BytesIO(b""))
+    fs_unix.map_file_fh("/root_file", BytesIO(b""))
+    fs_unix.map_file_fh("/other_root_file.ext", BytesIO(b""))
+    fs_unix.map_file_fh("/.test/test.txt", BytesIO(b""))
+    fs_unix.map_file_fh("/.test/.more.test.txt", BytesIO(b""))
 
     target_unix.add_plugin(WalkFsPlugin)
 
@@ -47,6 +50,12 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
         "/root_file",
         "/var",
     ]
+
+    assert {str(r.path): r.mimetype for r in results if r.mimetype} == {
+        "/.test/.more.test.txt": "text/plain",  # inferred by txt extension
+        "/.test/test.txt": "text/plain",  # inferred by txt extension
+        "/path/to/some/file": "image/png",  # inferred by magic bytes
+    }
 
 
 @pytest.mark.benchmark
