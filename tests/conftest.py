@@ -23,6 +23,7 @@ from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
 from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
+from dissect.target.plugins.os.unix.esxi._os import ESXiPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
@@ -37,7 +38,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from dissect.target.plugin import OSPlugin
-
 
 HAS_BENCHMARK = importlib.util.find_spec("pytest_benchmark") is not None
 
@@ -445,6 +445,11 @@ def target_citrix(tmp_path: pathlib.Path, fs_bsd: VirtualFilesystem) -> Target:
 @pytest.fixture
 def target_android(tmp_path: pathlib.Path, fs_android: Filesystem) -> Target:
     return make_os_target(tmp_path, AndroidPlugin, root_fs=fs_android)
+
+
+@pytest.fixture
+def target_esxi(tmp_path: pathlib.Path, fs_esxi: Filesystem) -> Target:
+    return make_os_target(tmp_path, ESXiPlugin, root_fs=fs_esxi)
 
 
 def add_win_user(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Target, sid: str, home: str) -> None:
