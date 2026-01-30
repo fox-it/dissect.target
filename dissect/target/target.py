@@ -446,12 +446,12 @@ class Target:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
 
     @classmethod
-    def open_direct(cls, paths: list[str | Path]) -> Self:
+    def open_direct(cls, paths: list[str | Path], *, case_sensitive: bool = False) -> Self:
         """Create a minimal target with a virtual root filesystem with all ``paths`` mapped into it.
 
         This is useful when running plugins on individual files.
         """
-        return cls._load("direct", DirectLoader(paths))
+        return cls._load("direct", DirectLoader(paths, case_sensitive))
 
     @property
     def is_direct(self) -> bool:

@@ -7,11 +7,11 @@ from dissect.target.plugins.os.windows.cim import (
     ActiveScriptEventConsumerRecord,
     CommandLineEventConsumerRecord,
 )
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
 def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -26,6 +26,14 @@ def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert len([r for r in consumer_records if type(r) == ActiveScriptEventConsumerRecord.recordType]) == 2  # noqa: E721
     # Ensure associated filter query was correctly found for all
     assert len([record for record in target_win.cim() if record.filter_query]) == 3
+
+
+def test_cim_direct_mode() -> None:
+    data_path = absolute_path("_data/plugins/os/windows/cim/default-namespace")
+    target = Target.open_direct([data_path])
+    records = list(target.cim.consumerbindings())
+
+    assert len(records) == 3
 
 
 r"""
