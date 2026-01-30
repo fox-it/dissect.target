@@ -10,7 +10,7 @@ import pytest
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.loaders.tar import TarLoader
-from dissect.target.plugins.filesystem.walkfs import WalkFsPlugin, get_disk_serial
+from dissect.target.plugins.filesystem.walkfs import WalkFsPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -125,20 +125,3 @@ def test_walkfs_xattr(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     ]
     assert results[-1].effective
     assert results[-1].root_id is None
-
-
-def test_get_disk_serial_no_serial() -> None:
-    """Test get_disk_serial when the `serial` attribute is missing."""
-
-    vfs = VirtualFilesystem()
-    vfs.volume = Mock(vs=Mock(serial="A1B2C3D4"))
-    assert get_disk_serial(vfs) == "A1B2C3D4"
-
-
-def test_get_disk_serial() -> None:
-    """Test get_disk_serial when a serial number is available."""
-
-    vfs = VirtualFilesystem()
-    # initialize the Volume with vs as an empty object (no attributes)
-    vfs.volume = Mock(vs=object())
-    assert get_disk_serial(vfs) is None
