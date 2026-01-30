@@ -236,7 +236,7 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
             "proc/1337",
             VirtualSymlink(fs, "/proc/1337/fd/4", "socket:[1337]"),
             "acquire\x00-p\x00full\x00--proc\x00",
-            "VAR=1",
+            "",
         ),
     )
     stat_files_data = (
@@ -253,7 +253,8 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
 
         fs.map_file_fh(dir + "/stat", BytesIO(stat_files_data[idx].encode()))
         fs.map_file_fh(dir + "/cmdline", BytesIO(cmdline.encode()))
-        fs.map_file_fh(dir + "/environ", BytesIO(environ.encode()))
+        if environ:
+            fs.map_file_fh(dir + "/environ", BytesIO(environ.encode()))
 
     # symlink acquire process to self
     fs.link("/proc/1337", "/proc/self")
