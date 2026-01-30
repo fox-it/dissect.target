@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "dissect.target"
 description = "This module ties all other Dissect modules together, it provides a programming API and command line tools which allow easy access to various data sources inside disk images or file collections (a.k.a. targets)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE", "COPYRIGHT"]
 authors = [
@@ -126,6 +126,10 @@ mqtt = [
     "dissect.target[full]",
     "paho-mqtt==1.6.1",
 ]
+mcp = [
+    "mcp[cli]==1.26.0",
+    "mcpo==0.0.19",
+]
 
 [dependency-groups]
 test = [
@@ -159,6 +163,7 @@ target-diff = "dissect.target.tools.diff:main"
 target-dump = "dissect.target.tools.dump:main"
 target-fs = "dissect.target.tools.fs:main"
 target-info = "dissect.target.tools.info:main"
+target-mcp = "dissect.target.tools.mcp:main"
 target-mount = "dissect.target.tools.mount:main"
 target-qfind = "dissect.target.tools.qfind:main"
 target-query = "dissect.target.tools.query:main"
