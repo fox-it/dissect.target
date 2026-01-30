@@ -33,7 +33,6 @@ FilesystemRecord = TargetRecordDescriptor(
         ("string[]", "attr"),
         ("string[]", "fs_types"),
         ("string[]", "volume_identifiers"),
-        ("string[]", "disk_identifiers"),
     ],
 )
 
@@ -132,18 +131,15 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
 
     if isinstance(entry, LayerFilesystemEntry):
         fs_types = []
-        volume_uuids = []
         volume_identifiers = []
 
         for sub_entry in entry.entries:
             fs_types.append(sub_entry.fs.__type__)
-            volume_uuids.append(sub_entry.fs.identifier)
-            volume_identifiers.append(get_disk_serial(sub_entry.fs))
+            volume_identifiers.append(sub_entry.fs.identifier)
 
     else:
         fs_types = [entry.fs.__type__]
-        volume_uuids = [entry.fs.identifier]
-        volume_identifiers = [get_disk_serial(entry.fs)]
+        volume_identifiers = [entry.fs.identifier]
 
     fields = {
         "atime": from_unix(entry_stat.st_atime),
@@ -158,8 +154,7 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
         "gid": entry_stat.st_gid,
         "is_suid": bool(entry_stat.st_mode & stat.S_ISUID),
         "fs_types": fs_types,
-        "volume_identifiers": volume_uuids,
-        "disk_identifiers": volume_identifiers,
+        "volume_identifiers": volume_identifiers,
     }
 
     try:
