@@ -169,8 +169,15 @@ class MftPlugin(Plugin):
         action="store_true",
         help="compacts MFT timestamps into MACB bitfield (format: MACB[standard|ads]/MACB[filename])",
     )
+    @arg("--ignore-dos", action="store_true", help="ignore DOS file names")
     def records(
-        self, compact: bool = False, fs: int | None = None, start: int = 0, end: int = -1, macb: bool = False
+        self,
+        compact: bool = False,
+        fs: int | None = None,
+        start: int = 0,
+        end: int = -1,
+        macb: bool = False,
+        ignore_dos: bool = False,
     ) -> Iterator[
         FilesystemStdRecord | FilesystemFilenameRecord | FilesystemStdCompactRecord | FilesystemFilenameCompactRecord
     ]:
@@ -218,7 +225,7 @@ class MftPlugin(Plugin):
                     try:
                         info.update(record, filesystem)
 
-                        for path in record.full_paths():
+                        for path in record.full_paths(ignore_dos):
                             path = f"{info.drive_letter}{path}"
                             yield from aggregator(
                                 iter_records(
