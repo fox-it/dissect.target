@@ -102,21 +102,6 @@ class WalkFsPlugin(Plugin):
                 continue
 
 
-def get_disk_serial(filesystem: Filesystem) -> str | None:
-    """
-    Returns the disk serial number if it exists; otherwise, returns None.
-
-    Args:
-        entry: :class:`Filesystem` instance
-
-    Returns:
-        Disk serial number as str, or None if not available.
-    """
-    entry_volume = getattr(filesystem, "volume", None)
-    volume_vs = getattr(entry_volume, "vs", None)
-    return getattr(volume_vs, "serial", None)
-
-
 def generate_record(target: Target, entry: FilesystemEntry, capability: bool) -> Iterator[FilesystemRecord]:
     """Generate a :class:`WalkFsRecord` from the given :class:`FilesystemEntry`.
 
