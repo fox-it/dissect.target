@@ -22,11 +22,8 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def mock_ntfs_dirfs(tmp_path: Path) -> Path:
-    root = tmp_path
-
-    # Cleanup first (conftest creates a MockTarget- tempfile)
-    for item in root.iterdir():
-        item.unlink()
+    root = tmp_path / "mock_ntfs"
+    root.mkdir()
 
     # Create files
     (root / "$Boot").touch()
