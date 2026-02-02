@@ -502,15 +502,20 @@ class Filesystem:
 
     @cached_property
     def uuid(self) -> UUID | None:
+        """Return the UUID of the filesystem if it has one."""
         return None
 
     @cached_property
     def serial(self) -> int | str | None:
+        """Return the serial of the filesystem if it has one."""
         return None
 
     @cached_property
     def identifier(self) -> str:
-        """Returns the identifier of the Filesystem."""
+        """Returns the identifier of the filesystem. 
+        
+        Usually this is a serial or UUID, but it can also be a volume GUID or name.
+        """
         if self.uuid:
             return str(self.uuid)
         if self.serial:
@@ -520,7 +525,6 @@ class Filesystem:
                 return guid
             if name := getattr(self.volume, "name", None):
                 return name
-        log.error("no identifier found for filesystem of type %s", self.__type__)
         return f"filesystem_{self.__type__}"
 
 
