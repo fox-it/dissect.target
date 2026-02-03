@@ -749,7 +749,7 @@ def test_open_decompress_missing_module(
 
     with monkeypatch.context() as m:
         m.setattr(f"{fsutil.__name__}.{mock_bool_name}", False)
-        with pytest.raises(RuntimeError, match=r".* detected, but package was not installed: pip install .*"):
+        with pytest.raises(RuntimeError, match=r".* compression detected, but missing optional python module"):
             fsutil.open_decompress(vfs.path("compressed_file"))
 
 
