@@ -5,8 +5,8 @@ import re
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from dissect.sql import Error as SQLError
-from dissect.sql import SQLite3
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -175,8 +175,8 @@ class PodmanPlugin(ContainerPlugin):
         """
 
         try:
-            db = SQLite3(path.open("rb"))
-        except (ValueError, SQLError) as e:
+            db = SQLite3(path)
+        except (ValueError, DBError) as e:
             self.target.log.warning("Unable to read Podman database %s: %s", path, e)
             self.target.log.debug("", exc_info=e)
             return
@@ -221,7 +221,7 @@ class PodmanPlugin(ContainerPlugin):
                 started=container.get("startedTime"),
                 finished=container.get("finishedTime"),
                 ports=list(convert_ports(container.get("newPortMappings", []))),  # TODO: research "exposedPorts"
-                names=container.get("name"),
+                name=container.get("name"),
                 volumes=volumes,
                 environment=container.get("spec", {}).get("process", {}).get("env", []),
                 mount_path=mount_path,
@@ -271,7 +271,7 @@ class PodmanPlugin(ContainerPlugin):
                 image_id=other_config.get("image"),
                 command=" ".join(config.get("process", {}).get("args", [])),
                 created=other_config.get("created"),
-                names=other_config.get("names"),
+                name=other_config.get("names"),
                 environment=config.get("process", {}).get("env", []),
                 mount_path=path.joinpath(f"storage/overlay/{other_config.get('layer')}") if other_config else None,
                 config_path=config_path,

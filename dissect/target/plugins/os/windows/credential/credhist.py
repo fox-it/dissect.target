@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, BinaryIO
 from uuid import UUID
@@ -12,6 +11,7 @@ from dissect.util.sid import read_sid
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import keychain
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.dpapi.crypto import (
@@ -27,7 +27,8 @@ if TYPE_CHECKING:
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 CredHistRecord = create_extended_descriptor([UserRecordDescriptorExtension])(

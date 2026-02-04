@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar, Union
+from typing import TYPE_CHECKING, TypeVar
 
 from dissect.target.helpers.nfs.nfs3 import (
     CookieVerf,
@@ -33,8 +33,7 @@ if TYPE_CHECKING:
     import io
 
 
-# Used Union because 3.9 does not support '|' here even with future annotations
-class MountResultDeserializer(XdrDeserializer[Union[MountOK, MountStat]]):
+class MountResultDeserializer(XdrDeserializer[MountOK | MountStat]):
     def deserialize(self, payload: io.BytesIO) -> MountOK | MountStat:
         mount_stat = self._read_enum(payload, MountStat)
         if mount_stat != MountStat.OK:
@@ -105,7 +104,6 @@ class EntryPlusSerializer(XdrDeserializer[EntryPlus]):
         return EntryPlus(fileid, name, cookie, attributes, handle)
 
 
-# Used Union because 3.9 does not support '|' here even with future annotations
 class ReadDirPlusResultDeserializer(XdrDeserializer[ReadDirPlusResult]):
     def deserialize(self, payload: io.BytesIO) -> ReadDirPlusResult:
         dir_attributes = self._read_optional(payload, FileAttributesSerializer())
@@ -172,8 +170,7 @@ class ReadLink3ResultDeserializer(XdrDeserializer[ReadlinkResult]):
 ResultType = TypeVar("ResultType")
 
 
-# RdJ: Consider implementing in terms of a monadic bind, using generators
-class ResultDeserializer(XdrDeserializer[Union[ResultType, NfsStat]]):
+class ResultDeserializer(XdrDeserializer[ResultType | NfsStat]):
     """A higher order deserializer that returns a result or an NFS status."""
 
     def __init__(self, deserializer: XdrDeserializer[ResultType]):

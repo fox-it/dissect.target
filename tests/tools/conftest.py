@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.tools.logging import configure_logging
+from dissect.target.tools.utils.logging import configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -10,6 +9,7 @@ from dissect.util import ts
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.protobuf import ProtobufVarint
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import arg, export
@@ -26,7 +26,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DockerContainerRecord = TargetRecordDescriptor(
     "apps/containers/docker/container",
@@ -200,7 +201,7 @@ class DockerPlugin(ContainerPlugin):
                     started=convert_timestamp(config.get("State", {}).get("StartedAt")),
                     finished=convert_timestamp(config.get("State", {}).get("FinishedAt")),
                     ports=list(convert_ports(ports)),
-                    names=config.get("Name", "").replace("/", "", 1),
+                    name=config.get("Name", "").replace("/", "", 1),
                     volumes=volumes,
                     environment=config.get("Config", {}).get("Env", []),
                     mount_path=mount_path,

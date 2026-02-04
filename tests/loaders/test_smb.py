@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,7 +10,7 @@ import pytest
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 
 @pytest.fixture
@@ -18,6 +18,8 @@ def mock_impacket(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
     with monkeypatch.context() as m:
         if "dissect.target.loaders.smb" in sys.modules:
             m.delitem(sys.modules, "dissect.target.loaders.smb")
+        if "dissect.target.filesystems.smb" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.filesystems.smb")
 
         mock_impacket = MagicMock()
         m.setitem(sys.modules, "impacket", mock_impacket)

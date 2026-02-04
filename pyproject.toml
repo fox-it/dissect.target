@@ -1,13 +1,14 @@
 [build-system]
-requires = ["setuptools>=65.5.0", "setuptools_scm[toml]>=6.4.0"]
+requires = ["setuptools>=80.9.0", "setuptools_scm[toml]>=6.4.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "dissect.target"
 description = "This module ties all other Dissect modules together, it provides a programming API and command line tools which allow easy access to various data sources inside disk images or file collections (a.k.a. targets)"
 readme = "README.md"
-requires-python = "~=3.9"
-license.text = "Affero General Public License v3"
+requires-python = ">=3.10"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "COPYRIGHT"]
 authors = [
   {name = "Dissect Team", email = "dissect@fox-it.com"}
 ]
@@ -16,7 +17,6 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
-  "License :: OSI Approved",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Topic :: Internet :: Log Analysis",
@@ -27,15 +27,15 @@ classifiers = [
 dependencies = [
     "defusedxml",
     "dissect.cstruct>=4,<5",
+    "dissect.database>=1.1.dev3,<2",  # TODO: update on release!
     "dissect.eventlog>=3,<4",
-    "dissect.evidence>=3,<4",
-    "dissect.hypervisor>=3.19.dev2,<4",  # TODO: update on release!
-    "dissect.ntfs>=3.4,<4",
+    "dissect.evidence>=3.13.dev2,<4",  # TODO: update on release!
+    "dissect.hypervisor>=3.21.dev3,<4", # TODO: update on release!
+    "dissect.ntfs>=3.16.dev,<4",
     "dissect.regf>=3.13,<4",
-    "dissect.sql>=3.12.dev4,<4",  # TODO: update on release!
     "dissect.util>=3,<4",
-    "dissect.volume>=2,<4",
-    "flow.record~=3.19.0",
+    "dissect.volume>=3.17,<4",
+    "flow.record~=3.21.0",
     "structlog",
 ]
 dynamic = ["version"]
@@ -48,84 +48,78 @@ repository = "https://github.com/fox-it/dissect.target"
 [project.optional-dependencies]
 full = [
     "asn1crypto",
+    "dissect.apfs>=1.0.2.dev,<2",  # TODO: update on release!
     "dissect.archive>=1,<2",
     "dissect.btrfs>=1,<2",
     "dissect.cim>=3,<4",
     "dissect.clfs>=1,<2",
-    "dissect.esedb>=3,<4",
+    "dissect.cramfs>=1,<2",
     "dissect.etl>=3,<4",
+    "dissect.executable>=1,<2",
     "dissect.extfs>=3,<4",
     "dissect.fat>=3,<4",
     "dissect.ffs>=3,<4",
-    "dissect.fve>=4.2,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
+    "dissect.fve>=4.5,<5",
     "dissect.jffs>=1.5,<2",
     "dissect.ole>=3,<4",
-    "dissect.qnxfs>=1,<2",
+    "dissect.qnxfs>=1.1,<2",
     "dissect.shellitem>=3,<4",
     "dissect.squashfs>=1,<2",
     "dissect.thumbcache>=1,<2",
-    "dissect.vmfs>=3.12.dev,<4",  # TODO: update on release
+    "dissect.vmfs>=3.12,<4",
     "dissect.xfs>=3,<4",
     "ipython",
     "fusepy",
     "pycryptodome",
     "ruamel.yaml",
     "tomli; python_version<'3.11'",
-    # dissect.target's caching uses flow.record functionlity which depends on the
-    # zstandard module being available. However flow.record does not define
-    # zstandard as a dependency, nor does it allow zstandard to be installed
-    # through extras.
-    #
-    # Until such time that this dependency can be installed through
-    # flow.record, we define it as a dependency of dissect.target.
-    "zstandard",
+    "backports.zstd; python_version < '3.14'"
 ]
 dev = [
     "dissect.target[full,yara]",
+    "dissect.apfs[dev]>=1.0.2.dev,<2.0.dev",  # TODO: update on release!
     "dissect.archive[dev]>=1.0.dev,<2.0.dev",
     "dissect.btrfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cim[dev]>=3.0.dev,<4.0.dev",
     "dissect.clfs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.cramfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cstruct>=4.0.dev,<5.0.dev",
-    "dissect.esedb[dev]>=3.0.dev,<4.0.dev",
+    "dissect.database[dev]>=1.1.dev3,<2.0.dev",  # TODO: update on release!
     "dissect.etl[dev]>=3.0.dev,<4.0.dev",
     "dissect.eventlog[dev]>=3.0.dev,<4.0.dev",
-    "dissect.evidence[dev]>=3.0.dev,<4.0.dev",
+    "dissect.evidence[dev]>=3.13.dev2,<4.0.dev",
+    "dissect.executable[dev]>=1.0.dev,<2.0.dev",
     "dissect.extfs[dev]>=3.0.dev,<4.0.dev",
     "dissect.fat[dev]>=3.0.dev,<4.0.dev",
     "dissect.ffs[dev]>=3.0.dev,<4.0.dev",
-    "dissect.fve[dev]>=4.2.dev,<5.0.dev; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
-    "dissect.hypervisor[dev]>=3.19.dev,<4.0.dev",
+    "dissect.fve[dev]>=4.5.dev,<5.0.dev",
+    "dissect.hypervisor[dev]>=3.21.dev3,<4.0.dev",  # TODO: update on release!
     "dissect.jffs[dev]>=1.5.dev,<2.0.dev",
-    "dissect.ntfs[dev]>=3.4.dev,<4.0.dev",
-    "dissect.qnxfs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.ntfs[dev]>=3.16.dev,<4.0.dev",
+    "dissect.qnxfs[dev]>=1.1.dev,<2.0.dev",
     "dissect.regf[dev]>=3.13.dev,<4.0.dev",
     "dissect.shellitem[dev]>=3.0.dev,<4.0.dev",
-    "dissect.sql[dev]>=3.12.dev,<4.0.dev",
     "dissect.squashfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.thumbcache[dev]>=1.0.dev,<2.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.vmfs[dev]>=3.12.dev,<4.0.dev",
-    "dissect.volume[dev]>=3.0.dev,<4.0.dev",
+    "dissect.volume[dev]>=3.17.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
-    "pexpect",
-    "docutils",
-    "typing_extensions",
 ]
 yara = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "yara-python"
+    "yara-python>=4.3.0",
 ]
 smb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "impacket==0.10.0"
+    "impacket==0.10.0",
 ]
 cb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "carbon-black-cloud-sdk~=1.4.3"
+    "carbon-black-cloud-sdk~=1.4.3",
 ]
 mqtt = [
     # Grab the dependencies for dissect.target
@@ -133,23 +127,48 @@ mqtt = [
     "paho-mqtt==1.6.1",
 ]
 
+[dependency-groups]
+test = [
+    "pytest",
+    "pexpect",
+    "docutils",
+]
+lint = [
+    "typing_extensions",
+    "ruff==0.13.1",
+    "vermin",
+]
+build = [
+    "build",
+]
+debug = [
+    "ipdb",
+]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"},
+    {include-group = "debug"},
+]
+
 [project.scripts]
+target-build-magic = "dissect.target.tools.build_magic:main"
 target-build-pluginlist = "dissect.target.tools.build_pluginlist:main"
-target-dump = "dissect.target.tools.dump.run:main"
 target-dd = "dissect.target.tools.dd:main"
+target-inspect = "dissect.target.tools.inspect:main"
 target-diff = "dissect.target.tools.diff:main"
+target-dump = "dissect.target.tools.dump:main"
 target-fs = "dissect.target.tools.fs:main"
 target-info = "dissect.target.tools.info:main"
 target-mount = "dissect.target.tools.mount:main"
+target-qfind = "dissect.target.tools.qfind:main"
 target-query = "dissect.target.tools.query:main"
 target-reg = "dissect.target.tools.reg:main"
 target-shell = "dissect.target.tools.shell:main"
 target-yara = "dissect.target.tools.yara:main"
-target-qfind = "dissect.target.tools.qfind:main"
 
 [tool.ruff]
 line-length = 120
-required-version = ">=0.11.0"
+required-version = ">=0.13.1"
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -189,17 +208,15 @@ select = [
   "FURB",
   "RUF",
 ]
-ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003"]
+ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003", "PLC0415"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/_docs/**" = ["INP001"]
+"dissect/target/helpers/magic/mimetypes/**" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["dissect.target"]
 known-third-party = ["dissect"]
-
-[tool.setuptools]
-license-files = ["LICENSE", "COPYRIGHT"]
 
 [tool.setuptools.packages.find]
 include = ["dissect.*"]

@@ -5,15 +5,21 @@ from datetime import datetime, timezone
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any, BinaryIO
 
-from cbc_sdk.live_response_api import LiveResponseError, LiveResponseSession
 from dissect.util import ts
 
 from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+try:
+    from cbc_sdk.live_response_api import LiveResponseError, LiveResponseSession
+
+    HAS_CARBON_BLACK = True
+except ImportError:
+    HAS_CARBON_BLACK = False
 
 CB_TIMEFORMAT = "%Y-%m-%dT%H:%M:%S%fZ"
 
@@ -28,6 +34,11 @@ class CbFilesystem(Filesystem):
     __type__ = "cb"
 
     def __init__(self, session: LiveResponseSession, prefix: str, *args, **kwargs):
+        if not HAS_CARBON_BLACK:
+            raise ImportError(
+                "Required dependency 'carbon-black-cloud-sdk-python' is missing, install with 'pip install dissect.target[cb]'"  # noqa: E501
+            )
+
         self.session = session
         self.prefix = prefix.lower()
 
@@ -75,6 +86,18 @@ class CbFilesystem(Filesystem):
             raise FileNotFoundError(path)
 
 
+class CbDirEntry(DirEntry):
+    fs: CbFilesystem
+    entry: tuple[dict[str, Any], str]
+
+    def get(self) -> CbFilesystemEntry:
+        entry, cbpath = self.entry
+        return CbFilesystemEntry(self.fs, self.path, entry, cbpath)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class CbFilesystemEntry(FilesystemEntry):
     def __init__(self, fs: Filesystem, path: str, entry: Any, cbpath: str):
         super().__init__(fs, path, entry)
@@ -89,25 +112,22 @@ class CbFilesystemEntry(FilesystemEntry):
         """Returns file handle (file-like object)."""
         return self.fs.session.get_raw_file(self.cbpath)
 
-    def iterdir(self) -> Iterator[str]:
-        """List the directory contents of a directory. Returns a generator of strings."""
-        for entry in self.scandir():
-            yield entry.name
-
-    def scandir(self) -> Iterator[CbFilesystemEntry]:
+    def scandir(self) -> Iterator[CbDirEntry]:
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         if not self.is_dir():
-            raise NotADirectoryError(f"'{self.path}' is not a directory")
+            raise NotADirectoryError(self.path)
 
         separator = self.fs.alt_separator or "/"
         for entry in self.fs.session.list_directory(self.cbpath + separator):
-            filename = entry["filename"]
-            if filename in (".", ".."):
+            if entry["filename"] in (".", ".."):
                 continue
 
-            path = fsutil.join(self.path, filename, alt_separator=self.fs.alt_separator)
-            cbpath = separator.join([self.cbpath, filename])
-            yield CbFilesystemEntry(self.fs, path, entry, cbpath)
+            yield CbDirEntry(
+                self.fs,
+                self.path,
+                entry["filename"],
+                (entry, separator.join([self.cbpath, entry["filename"]])),
+            )
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         """Return whether this entry is a directory."""

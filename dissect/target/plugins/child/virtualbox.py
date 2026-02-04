@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from defusedxml import ElementTree as ET
-from dissect.hypervisor.descriptor.vbox import VBox
+from defusedxml import ElementTree
+from dissect.hypervisor.descriptor.vbox import NS
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
@@ -45,7 +45,6 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
     def find_vms(self) -> Iterator[Path]:
         """Yield Oracle VirtualBox ``.vbox`` file(s) found on the target."""
         seen = set()
-
         for user_details in self.target.user_details.all_with_home():
             # Yield `.vbox` from default locations and add to seen.
             for default_path in self.DEFAULT_PATHS:
@@ -63,14 +62,14 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
                         continue
 
                     try:
-                        config = ET.fromstring(path.read_text())
+                        config = ElementTree.fromstring(path.read_text())
                     except Exception as e:
                         self.target.log.warning("Unable to parse %s: %s", path, e)
                         self.target.log.debug("", exc_info=e)
                         continue
 
                     # Parse MachineEntries
-                    for machine in config.findall(f".//{VBox.VBOX_XML_NAMESPACE}MachineEntry"):
+                    for machine in config.findall(f".//{NS}MachineEntry"):
                         if (
                             (src := machine.get("src"))
                             and (src_path := self.target.fs.path(src)).exists()
@@ -80,7 +79,7 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
                             yield src_path
 
                     # Glob for SystemProperties defaultMachineFolder
-                    for system_properties in config.findall(f".//{VBox.VBOX_XML_NAMESPACE}SystemProperties"):
+                    for system_properties in config.findall(f".//{NS}SystemProperties"):
                         if (folder_str := system_properties.get("defaultMachineFolder")) and (
                             folder_dir := self.target.fs.path(folder_str)
                         ).is_dir():
@@ -95,8 +94,18 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for vbox in self.vboxes:
+            try:
+                config = ElementTree.fromstring(vbox.read_bytes())
+                name = config.find(f".//{NS}Machine").attrib["name"]
+            except Exception as e:
+                self.target.log.error("Failed to parse name from VirtualBox XML: %s", vbox)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
+
+                name = None
+
             yield ChildTargetRecord(
                 type=self.__type__,
+                name=name,
                 path=vbox,
                 _target=self.target,
             )

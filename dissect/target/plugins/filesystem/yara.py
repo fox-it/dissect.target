@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 from io import BytesIO
 from pathlib import Path
 
 from dissect.target.helpers import hashutil
+from dissect.target.helpers.logging import get_logger
 
 try:
     import yara
@@ -24,15 +24,18 @@ from dissect.target.plugin import Plugin, arg, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",
     [
+        ("datetime", "ts_mtime"),
         ("path", "path"),
-        ("digest", "digest"),
         ("string", "rule"),
+        ("string[]", "matches"),
         ("string[]", "tags"),
+        ("digest", "digest"),
         ("string", "namespace"),
     ],
 )
@@ -93,11 +96,17 @@ class YaraPlugin(Plugin):
 
                     buf = file.open().read()
                     for match in compiled_rules.match(data=buf):
+                        string_matches: list[str] = []
+                        for string in match.strings:
+                            string_matches.extend(f"{string}={instance}" for instance in string.instances)
+
                         yield YaraMatchRecord(
+                            ts_mtime=file.stat().st_mtime,
                             path=self.target.fs.path(file.path),
-                            digest=hashutil.common(BytesIO(buf)),
                             rule=match.rule,
+                            matches=string_matches,
                             tags=match.tags,
+                            digest=hashutil.common(BytesIO(buf)),
                             namespace=match.namespace,
                             _target=self.target,
                         )

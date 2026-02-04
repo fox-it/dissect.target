@@ -7,9 +7,6 @@ from typing import TYPE_CHECKING
 
 from dissect.regf import regf
 from dissect.util import ts
-from impacket.dcerpc.v5 import rpcrt, rrp, scmr, transport
-from impacket.dcerpc.v5.rpcrt import DCERPCException
-from impacket.smbconnection import SessionError, SMBConnection
 
 from dissect.target.exceptions import (
     LoaderError,
@@ -36,6 +33,15 @@ if TYPE_CHECKING:
     from impacket.dcerpc.v5.srvs import SHARE_INFO_1
 
     from dissect.target.target import Target
+
+try:
+    from impacket.dcerpc.v5 import rpcrt, rrp, scmr, transport
+    from impacket.dcerpc.v5.rpcrt import DCERPCException
+    from impacket.smbconnection import SessionError, SMBConnection
+
+    HAS_IMPACKET = True
+except ImportError:
+    HAS_IMPACKET = False
 
 
 class SmbLoader(Loader):
@@ -84,6 +90,11 @@ class SmbLoader(Loader):
     def __init__(self, path: Path, parsed_path: ParseResult | None = None):
         super().__init__(path, parsed_path=parsed_path, resolve=False)
 
+        if not HAS_IMPACKET:
+            raise ImportError(
+                "Required dependency 'impacket' is missing, install with 'pip install dissect.target[smb]'"
+            )
+
         if parsed_path is None:
             raise LoaderError("Missing URI connection details")
 
@@ -96,9 +107,9 @@ class SmbLoader(Loader):
         if not self._password:
             self._nt, self._lm = self._get_hashes()
 
-        krb_ticketparsed_query = self.parsed_query.get("ticket", self.parsed_query.get("ccache", ""))
+        krb_ticket_params = self.parsed_query.get("ticket", self.parsed_query.get("ccache", ""))
         krb_ticket_env = os.getenv("SMB_KERBEROS_TICKET", os.getenv("KRB5CCNAME", ""))
-        self._krb_ticket = krb_ticketparsed_query or krb_ticket_env
+        self._krb_ticket = krb_ticket_params or krb_ticket_env
         self._krb_aes = self.parsed_query.get("aes", os.getenv("SMB_KERBEROS_AES_KEY", ""))
         self._krb_dc = self.parsed_query.get("dc", os.getenv("SMB_KERBEROS_DC", ""))
         self._krb_dc_ip = self.parsed_query.get("dc-ip", os.getenv("SMB_KERBEROS_DC_IP", ""))
@@ -168,7 +179,6 @@ class SmbLoader(Loader):
                     mount_name = share_name.lower().replace("$", ":")
 
                 target.fs.mount(mount_name, smb_filesystem)
-
             except SessionError as e:
                 target.log.warning("Failed to mount share '%s', reason: %s", share_name, e)
 

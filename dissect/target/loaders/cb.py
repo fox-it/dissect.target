@@ -4,13 +4,6 @@ import ipaddress
 from functools import cached_property
 from typing import TYPE_CHECKING
 
-try:
-    from cbc_sdk.errors import CredentialError
-    from cbc_sdk.platform import Device
-    from cbc_sdk.rest_api import CBCloudAPI
-except ImportError:
-    raise ImportError("Please install 'carbon-black-cloud-sdk-python' to use the 'cb://' target.")
-
 from dissect.util import ts
 
 from dissect.target.exceptions import (
@@ -39,6 +32,15 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+try:
+    from cbc_sdk.errors import CredentialError
+    from cbc_sdk.platform import Device
+    from cbc_sdk.rest_api import CBCloudAPI
+
+    HAS_CARBON_BLACK = True
+except ImportError:
+    HAS_CARBON_BLACK = False
+
 
 class CbLoader(Loader):
     """Use Carbon Black endpoints as targets using Live Response.
@@ -50,6 +52,11 @@ class CbLoader(Loader):
 
     def __init__(self, path: Path, parsed_path: ParseResult | None = None):
         super().__init__(path, parsed_path=parsed_path, resolve=False)
+
+        if not HAS_CARBON_BLACK:
+            raise ImportError(
+                "Required dependency 'carbon-black-cloud-sdk-python' is missing, install with 'pip install dissect.target[cb]'"  # noqa: E501
+            )
 
         self.host = self.parsed_path.path.strip("/")
         instance = self.parsed_path.hostname
