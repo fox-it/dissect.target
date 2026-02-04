@@ -66,15 +66,10 @@ class TarFilesystem(Filesystem):
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             file_entry = entry_cls(self, rel_name, member)
 
-            # Prevent overriding an already created folder with an empty member dir entry.
             try:
-                if member.isdir() and self._fs.get(file_entry.path).is_dir():
-                    log.debug("Skipping directory member %r in tar as %r is already mapped", member, file_entry.path)
-                    continue
-            except (FileNotFoundError, NotADirectoryError):
-                pass
-
-            self._fs.map_file_entry(rel_name, file_entry)
+                self._fs.map_file_entry(rel_name, file_entry)
+            except KeyError as e:
+                log.debug("Skipping directory member %r in tar as %r is already mapped: %s", member, file_entry.path, e)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:

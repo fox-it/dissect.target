@@ -968,10 +968,24 @@ class VirtualDirectory(FilesystemEntry):
     def lattr(self) -> Any:
         raise TypeError(f"lattr is not allowed on VirtualDirectory: {self.path}")
 
-    def add(self, name: str, entry: FilesystemEntry) -> None:
-        """Add an entry to this :class:`VirtualDirectory`. Overrides already existing entries with ``name``."""
+    def add(self, name: str, entry: FilesystemEntry, clobber: bool = False) -> None:
+        """Add an entry to this :class:`VirtualDirectory`.
+
+        Only overrides already existing entries with ``name`` if argument ``clobber`` is set to ``True``.
+
+        Args:
+            name: Name of the entry in this directory
+            entry: FilesystemEntry to add to this directory
+            clobber: Allow overwrites (default: False)
+
+        Raises:
+            KeyError if ``name`` already exists in this directory and ``clobber`` is ``False``
+        """
         if not self.fs.case_sensitive:
             name = name.lower()
+
+        if not clobber and name in self.entries:
+            raise KeyError(f"Entry {name!r} already exists in {self!r}")
 
         self.entries[name] = entry
 
@@ -1258,7 +1272,7 @@ class VirtualFilesystem(Filesystem):
 
     mount = map_fs
 
-    def map_dir(self, vfspath: str, realpath: pathlib.Path | str) -> None:
+    def map_dir(self, vfspath: str, realpath: pathlib.Path | str, *, clobber: bool = False) -> None:
         """Recursively map a directory from the host machine into the VFS."""
         if not isinstance(realpath, pathlib.Path):
             realpath = pathlib.Path(realpath)
@@ -1288,9 +1302,11 @@ class VirtualFilesystem(Filesystem):
             for file_ in files:
                 vfs_file_path = fsutil.join(vfsroot, file_, alt_separator=self.alt_separator)
                 real_file_path = root.joinpath(file_)
-                directory.add(file_, MappedFile(self, vfs_file_path, str(real_file_path)))
+                directory.add(file_, MappedFile(self, vfs_file_path, str(real_file_path)), clobber=clobber)
 
-    def map_file(self, vfspath: str, realpath: str | pathlib.Path, compression: str | None = None) -> None:
+    def map_file(
+        self, vfspath: str, realpath: str | pathlib.Path, *, compression: str | None = None, clobber: bool = False
+    ) -> None:
         """Map a file from the host machine into the VFS."""
         realpath = str(realpath)
         vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
@@ -1302,17 +1318,17 @@ class VirtualFilesystem(Filesystem):
             mapped_file = MappedCompressedFile(self, file_path, realpath, algo=compression)
         else:
             mapped_file = MappedFile(self, file_path, realpath)
-        self.map_file_entry(vfspath, mapped_file)
+        self.map_file_entry(vfspath, mapped_file, clobber=clobber)
 
-    def map_file_fh(self, vfspath: str, fh: BinaryIO) -> None:
+    def map_file_fh(self, vfspath: str, fh: BinaryIO, *, clobber: bool = False) -> None:
         """Map a file handle into the VFS."""
         vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
         if vfspath[-1] == "/":
             raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
         file_path = vfspath.lstrip("/")
-        self.map_file_entry(vfspath, VirtualFile(self, file_path, fh))
+        self.map_file_entry(vfspath, VirtualFile(self, file_path, fh), clobber=clobber)
 
-    def map_file_entry(self, vfspath: str, entry: FilesystemEntry) -> None:
+    def map_file_entry(self, vfspath: str, entry: FilesystemEntry, *, clobber: bool = False) -> None:
         """Map a :class:`FilesystemEntry` into the VFS.
 
         Any missing subdirectories up to, but not including, the last part of
@@ -1329,9 +1345,11 @@ class VirtualFilesystem(Filesystem):
                 directory = self.root
 
             entry_name = fsutil.basename(vfspath, alt_separator=self.alt_separator)
-            directory.add(entry_name, entry)
+            directory.add(entry_name, entry, clobber=clobber)
 
-    def map_dir_from_tar(self, vfspath: str, tar_file: str | pathlib.Path, map_single_file: bool = False) -> None:
+    def map_dir_from_tar(
+        self, vfspath: str, tar_file: str | pathlib.Path, *, map_single_file: bool = False, clobber: bool = False
+    ) -> None:
         """Map files in a tar onto the VFS.
 
         Args:
@@ -1353,12 +1371,12 @@ class VirtualFilesystem(Filesystem):
             # We map the first file we find in the tar to the provided vfspath.
             for file in [f[0] for _, _, f in tfs.walk_ext("/") if f]:
                 file.name = fsutil.basename(vfspath)
-                self.map_file_entry(vfspath, file)
+                self.map_file_entry(vfspath, file, clobber=clobber)
                 return
         else:
             self.mount(vfspath, tfs)
 
-    def map_file_from_tar(self, vfspath: str, tar_file: str | pathlib.Path) -> None:
+    def map_file_from_tar(self, vfspath: str, tar_file: str | pathlib.Path, *, clobber: bool = False) -> None:
         """Map a single file in a tar archive to the given path in the VFS.
 
         The provided tar archive should contain *one* file.
@@ -1367,7 +1385,7 @@ class VirtualFilesystem(Filesystem):
             vfspath: Destination path in the virtual filesystem.
             tar_file: Source path of the tar file to map.
         """
-        return self.map_dir_from_tar(vfspath.lstrip("/"), tar_file, map_single_file=True)
+        return self.map_dir_from_tar(vfspath.lstrip("/"), tar_file, map_single_file=True, clobber=clobber)
 
     def link(self, src: str, dst: str) -> None:
         """Hard link a :class:`FilesystemEntry` to another location.
