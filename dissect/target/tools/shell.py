@@ -1176,6 +1176,36 @@ class TargetCli(TargetCmd):
         return False
 
     @arg("path")
+    def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the MD5 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (md5,) = path.get().hash(["md5"])
+        print(f"{md5}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the SHA1 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (sha1,) = path.get().hash(["sha1"])
+        print(f"{sha1}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the SHA256 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (sha256,) = path.get().hash(["sha256"])
+        print(f"{sha256}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
     @alias("head")
     @alias("more")
     def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1492,7 +1522,6 @@ def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Ite
     On context exit the generator will close the input stream and wait for
     the subprocessess to finish.
     """
-
     if not pipe_parts:
         raise ValueError("No pipe components provided")
 
