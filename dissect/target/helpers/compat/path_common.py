@@ -83,7 +83,7 @@ def scandir(path: TargetPath) -> _DissectScandirIterator:
 
 def realpath(path: TargetPath, *, strict: bool = False) -> str:
     """Return the canonical path of the specified filename, eliminating any symbolic links encountered in the path."""
-    filename = str(path)
+    filename = normalize(str(path), alt_separator=path._fs.alt_separator)
     path, _ = _joinrealpath(path._fs, filename[:0], filename, strict, {})
     return abspath(path)
 
