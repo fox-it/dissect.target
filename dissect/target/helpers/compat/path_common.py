@@ -124,16 +124,21 @@ def _joinrealpath(fs: Filesystem, path: str, rest: str, strict: bool, seen: dict
             continue
         newpath = posixpath.join(path, name)
         try:
-            st = fs.get(newpath).lstat()
+            _entry = fs.get(newpath)
+            st = _entry.lstat()
+            if not fs.case_sensitive:
+                newpath = posixpath.join(path, _entry.realname())
         except FilesystemError:
             if strict:
                 raise
             is_link = False
         else:
             is_link = stat.S_ISLNK(st.st_mode)
+
         if not is_link:
             path = newpath
             continue
+
         # Resolve the symbolic link
         if newpath in seen:
             # Already seen this path
