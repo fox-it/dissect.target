@@ -69,8 +69,9 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
                 (shell, path, None) for path in self.target.fs.path("/").glob(history_absolute_path_glob.lstrip("/"))
             )
 
-        # Also utilize the _find_history_files function of the parent class
+        # Also utilize the _find_history_files function of the parent class for relative paths.
         history_files.extend(super()._find_history_files())
+
         return history_files
 
     def _find_user_by_name(self, username: str) -> UnixUserRecord | None:
@@ -94,6 +95,8 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
                 yield from self.parse_netscaler_cli_history(history_path, user)
             elif shell in ("citrix-netscaler-bash", "citrix-netscaler-sh"):
                 yield from self.parse_netscaler_bash_history(history_path)
+            else:
+                yield from self.parse_generic_history(history_path, user, shell)
 
     def parse_netscaler_bash_history(self, path: TargetPath) -> Iterator[CommandHistoryRecord]:
         """Parse bash.log* contents."""
