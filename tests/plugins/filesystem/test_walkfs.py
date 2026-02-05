@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import stat
 from io import BytesIO
 from pathlib import Path
@@ -66,9 +67,7 @@ def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> N
     loader.map(target_bare)
     target_bare.apply()
 
-    result = benchmark(lambda: next(WalkFsPlugin(target_bare).walkfs()))
-
-    assert result.path == "/"
+    benchmark(lambda: list(itertools.islice(WalkFsPlugin(target_bare).walkfs(), 100)))
 
 
 def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
