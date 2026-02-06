@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from dissect.target.artifact_spec import Spec
 from dissect.target.exceptions import UnsupportedPluginError
@@ -25,47 +25,57 @@ class AnydeskPlugin(RemoteAccessPlugin):
     __namespace__ = "anydesk"
 
     # Anydesk logs when installed as a service
-    SERVICE_GLOBS = Spec((
-        # Standard client >= Windows 7
-        "sysvol/ProgramData/AnyDesk/*.trace",
-        # Custom client >= Windows 7
-        "sysvol/ProgramData/AnyDesk/ad_*/*.trace",
-        # Windows XP / 2003
-        "sysvol/Documents and Settings/Public/AnyDesk/*.trace",
-        "sysvol/Documents and Settings/Public/AnyDesk/ad_*/*.trace",
-        # Standard/Custom client Linux/MacOS
-        "var/log/anydesk*/*.trace",
-    ))
+    SERVICE_GLOBS = Spec(
+        (
+            # Standard client >= Windows 7
+            "sysvol/ProgramData/AnyDesk/*.trace",
+            # Custom client >= Windows 7
+            "sysvol/ProgramData/AnyDesk/ad_*/*.trace",
+            # Windows XP / 2003
+            "sysvol/Documents and Settings/Public/AnyDesk/*.trace",
+            "sysvol/Documents and Settings/Public/AnyDesk/ad_*/*.trace",
+            # Standard/Custom client Linux/MacOS
+            "var/log/anydesk*/*.trace",
+        )
+    )
 
     # Anydesk Filetransfer logs when installed as a service
-    FILETRANSFER_SERVICE_LOGS = Spec((
-        # File transfer service log
-        "sysvol/ProgramData/AnyDesk/file_transfer_trace.txt",
-    ))
+    FILETRANSFER_SERVICE_LOGS = Spec(
+        (
+            # File transfer service log
+            "sysvol/ProgramData/AnyDesk/file_transfer_trace.txt",
+        )
+    )
 
     # User specific Anydesk filetransfer log
-    FILETRANSFER_USER_LOGS = Spec((
-        # File transfer log
-        "AppData/Roaming/AnyDesk/file_transfer_trace.txt",
-    ), from_user_home=True)
+    FILETRANSFER_USER_LOGS = Spec(
+        (
+            # File transfer log
+            "AppData/Roaming/AnyDesk/file_transfer_trace.txt",
+        ),
+        from_user_home=True,
+    )
 
     # User specific Anydesk logs
-    USER_GLOBS = Spec((
-        # Standard client Windows
-        "AppData/Roaming/AnyDesk/*.trace",
-        # Custom client Windows
-        "AppData/Roaming/AnyDesk/ad_*/*.trace",
-        # Windows XP / 2003
-        "AppData/AnyDesk/*.trace",
-        # Standard client Linux/MacOS
-        ".anydesk/*.trace",
-        # Custom client Linux/MacOS
-        ".anydesk_ad_*/*.trace",
-    ), from_user_home=True)
+    USER_GLOBS = Spec(
+        (
+            # Standard client Windows
+            "AppData/Roaming/AnyDesk/*.trace",
+            # Custom client Windows
+            "AppData/Roaming/AnyDesk/ad_*/*.trace",
+            # Windows XP / 2003
+            "AppData/AnyDesk/*.trace",
+            # Standard client Linux/MacOS
+            ".anydesk/*.trace",
+            # Custom client Linux/MacOS
+            ".anydesk_ad_*/*.trace",
+        ),
+        from_user_home=True,
+    )
 
-    __spec__ = {
-        'trace_files': [SERVICE_GLOBS, USER_GLOBS],
-        'filetransfer_files': [FILETRANSFER_SERVICE_LOGS, FILETRANSFER_USER_LOGS]
+    __spec__: ClassVar[dict[str, list[Spec]]] = {
+        "trace_files": [SERVICE_GLOBS, USER_GLOBS],
+        "filetransfer_files": [FILETRANSFER_SERVICE_LOGS, FILETRANSFER_USER_LOGS],
     }
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -77,7 +87,7 @@ class AnydeskPlugin(RemoteAccessPlugin):
     )
 
     def check_compatible(self) -> None:
-        if not self.artifacts.get('trace_files') and not self.artifacts.get('filetransfer_files'):
+        if not self.artifacts.get("trace_files") and not self.artifacts.get("filetransfer_files"):
             raise UnsupportedPluginError("No Anydesk files found on target")
 
     @export(record=RemoteAccessLogRecord)

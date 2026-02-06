@@ -16,12 +16,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import chain, zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, ClassVar, TypeAlias
 
 from flow.record import Record, RecordDescriptor
 
 import dissect.target.plugins.os.default as default
-from dissect.target.artifact_spec import Spec, Artifact
 from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
@@ -34,11 +33,10 @@ if TYPE_CHECKING:
 
     from typing_extensions import Self
 
+    from dissect.target.artifact_spec import Artifact, Spec
     from dissect.target.filesystem import Filesystem
     from dissect.target.helpers.record import ChildTargetRecord
     from dissect.target.target import Target
-
-    from dissect.target.plugins.general.users import UserDetails
 
 log = get_logger(__name__)
 
@@ -369,7 +367,7 @@ class Plugin:
     """Defines the plugin namespace."""
     __record_descriptors__: list[RecordDescriptor] = None
     """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
-    __spec__ : dict[str, list[Spec]] = None
+    __spec__: ClassVar[dict[str, list[Spec]]] = None
     """Defines a dict of artifact locations needed for the parsing"""
     __register__: bool = True
     """Determines whether this plugin will be registered."""
@@ -386,8 +384,7 @@ class Plugin:
     """Internal. A list of all method names decorated with ``@internal`` or ``@export``."""
     __exports__: list[str]
     """Internal. A list of all method names decorated with ``@export``."""
-    
-    
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
@@ -405,6 +402,7 @@ class Plugin:
 
     def __init__(self, target: Target):
         self.target = target
+        self.artifacts = self.get_artifacts()
 
     def __getattr__(self, name: str, /) -> Any:
         # "Magic" attribute access is only allowed on namespace plugins, to allow for indirect nesting of namespaces
@@ -464,13 +462,15 @@ class Plugin:
                 self.target.log.error("Error while executing `%s.%s`: %s", self.__namespace__, method_name, e)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
 
-    @property
-    def artifacts(self) -> dict[str, list[Artifact]]:
+    def get_artifacts(self) -> dict[str, list[Artifact]]:
         """
         Return the artifacts specified in __spec__
 
         Returns: The present artifacts as specified in __spec__
         """
+        if self.__spec__ is None:
+            return {}
+
         result = {}
         for name, spec in self.__spec__.items():
             result[name] = []
@@ -511,7 +511,7 @@ class Plugin:
 
         To be implemented by the plugin subclass.
         """
-        if self.SPEC is None:
+        if self.__spec__ is None:
             raise NotImplementedError
 
         for item_list in self.artifacts.values():
