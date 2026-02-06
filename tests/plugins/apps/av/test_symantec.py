@@ -50,7 +50,7 @@ def test_symantec_log(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert isinstance(records[0], type(SEPLogRecord()))
     assert records[0].ts == dt("2023-08-18T15:18:46Z")
     assert records[0].virus == "EICAR Test String"
-    assert records[0].source_file == Path("C:\\eicar.com")
+    assert records[0].source_file == "C:\\eicar.com"
     assert records[0].action_taken == "Pending Analysis"
     assert records[0].virus_type == "Test"
     assert records[0].scan_id == "1692364523"

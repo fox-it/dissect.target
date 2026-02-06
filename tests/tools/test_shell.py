@@ -257,6 +257,34 @@ def test_redirect_simple_ls(tmp_path: Path, target_win: Target, monkeypatch: pyt
     assert "sysvol" in content
 
 
+def test_target_cli_ls_file(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    # disable colorful output in `target-shell`
+    monkeypatch.setattr(fs, "LS_COLORS", {})
+
+    out, _ = run_target_shell(
+        monkeypatch,
+        capsys,
+        str(absolute_path("_data/filesystems/squashfs/gzip.sqfs")),
+        "ls -l small-file",
+    )
+    assert "1000 1000          9 2022-12-05T18:53:05.000000+00:00" in out
+
+
+def test_target_cli_hash_checksums(target_unix: Target, capsys: pytest.CaptureFixture) -> None:
+    target_unix.fs.map_file_fh("/test-file", BytesIO(b"Hello world!"))
+
+    cli = TargetCli(target_unix)
+
+    cli.onecmd("md5sum /test-file")
+    assert "86fb269d190d2c85f6e0468ceca42a20  /test-file" in capsys.readouterr().out
+
+    cli.onecmd("sha1sum /test-file")
+    assert "d3486ae9136e7856bc42212385ea797094475802  /test-file" in capsys.readouterr().out
+
+    cli.onecmd("sha256sum /test-file")
+    assert "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a  /test-file" in capsys.readouterr().out
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test")
 def test_redirect_pipe(tmp_path: Path, target_win: Target, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fs, "LS_COLORS", {"di": "\033[34m", "fi": "\033[0m"})
