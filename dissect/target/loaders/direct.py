@@ -52,7 +52,6 @@ class DirectLoader(Loader):
         if sys.version_info >= (3, 12) or sys.platform != "win32":
 
             def get_files(path: Path) -> Iterator[Path]:
-                """Return list of all files recursively."""
                 if not path.exists():
                     return
                 if path.is_file():
