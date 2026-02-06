@@ -47,6 +47,24 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
         "/root_file",
         "/var",
     ]
+    assert [r.name for r in results] == [
+        "",
+        ".test",
+        ".more.test.txt",
+        "test.txt",
+        "etc",
+        "other_root_file.ext",
+        "path",
+        "to",
+        "some",
+        "file",
+        "other",
+        "file.ext",
+        "root_file",
+        "var",
+    ]
+    assert results[0].type == "dir"
+    assert results[3].type == "file"
 
 
 @pytest.mark.benchmark

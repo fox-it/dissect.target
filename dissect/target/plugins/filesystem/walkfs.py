@@ -125,8 +125,6 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
         ftype = "dir"
     elif entry.is_file():
         ftype = "file"
-    elif entry.is_symlink():
-        ftype = "symlink"
 
     fields = {
         "atime": from_unix(entry_stat.st_atime),
