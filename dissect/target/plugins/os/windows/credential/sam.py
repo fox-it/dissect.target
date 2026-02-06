@@ -263,35 +263,25 @@ def rid_to_key(rid: int) -> tuple[bytes, bytes]:
     return k1, k2
 
 
-def remove_des_layer(crypted_hash: bytes, rid: int) -> bytes:
-    """Remove final DES encryption layer using RID-derived keys.
-
-    The hash is split into two 8-byte blocks, each decrypted with
-    a different RID-derived key.
+def des_decrypt(data: bytes, rid: int) -> bytes:
+    """Decrypt a DES-encrypted hash using the RID-derived keys.
 
     Args:
-        crypted_hash: 16-byte DES-encrypted hash.
+        data: Encrypted data (16 bytes).
         rid: Relative ID of the user account.
 
-    Returns:
-        16-byte decrypted hash.
-
     Raises:
-        ValueError: If crypted_hash is not 16 bytes.
+        ValueError: If data is not 16 bytes.
     """
-    DES_BLOCK_SIZE = 8
-    expected_size = 2 * DES_BLOCK_SIZE
-    if len(crypted_hash) != expected_size:
-        # TODO: Understand why hash bigger than 16 bytes are generated
-        # raise ValueError(f"crypted_hash must be {expected_size} bytes long")
-        return b""
+    if len(data) != 16:
+        raise ValueError("data must be 16 bytes long")
 
     key1, key2 = rid_to_key(rid)
     des1 = DES.new(key1, DES.MODE_ECB)
     des2 = DES.new(key2, DES.MODE_ECB)
 
-    block1 = des1.decrypt(crypted_hash[:DES_BLOCK_SIZE])
-    block2 = des2.decrypt(crypted_hash[DES_BLOCK_SIZE:expected_size])
+    block1 = des1.decrypt(data[:8])
+    block2 = des2.decrypt(data[8:])
 
     return block1 + block2
 
@@ -321,7 +311,7 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
         sh_hash = enc_hash[len(c_sam.SAM_HASH_AES) :]
         obfkey = AES.new(samkey, AES.MODE_CBC, sh.salt).decrypt(sh_hash)[:16]
 
-    return remove_des_layer(obfkey, rid)
+    return des_decrypt(obfkey, rid)
 
 
 class SamPlugin(Plugin):
