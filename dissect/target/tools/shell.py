@@ -799,17 +799,18 @@ class TargetCli(TargetCmd):
             print("can't specify -c and -u at the same time")
             return False
 
-        if not path or not self.check_dir(path):
+        if not path:
             return False
 
-        if path.is_file():
-            print(args.path)  # mimic ls behaviour
-            return False
+        if not path.exists():
+            print(f"ls: cannot access {path}: No such file or directory")
 
         # Disable color if output is redirected to a file
         use_color = False
         if hasattr(stdout, "isatty") and stdout.isatty():
             use_color = True
+        if os.getenv("NO_COLOR") in ["1", "True", "true"]:
+            use_color = False
 
         print_ls(
             path,
@@ -1166,6 +1167,36 @@ class TargetCli(TargetCmd):
         return False
 
     @arg("path")
+    def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the MD5 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (md5,) = path.get().hash(["md5"])
+        print(f"{md5}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the SHA1 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (sha1,) = path.get().hash(["sha1"])
+        print(f"{sha1}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the SHA256 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (sha256,) = path.get().hash(["sha256"])
+        print(f"{sha256}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
     @alias("head")
     @alias("more")
     def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1482,7 +1513,6 @@ def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Ite
     On context exit the generator will close the input stream and wait for
     the subprocessess to finish.
     """
-
     if not pipe_parts:
         raise ValueError("No pipe components provided")
 
