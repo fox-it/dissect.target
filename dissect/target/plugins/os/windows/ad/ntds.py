@@ -126,7 +126,7 @@ class NtdsPlugin(Plugin):
         """Extract all user accounts from the NTDS.dit database."""
         for user in self.ntds.users():
             yield NtdsUserRecord(
-                **extract_user_info(self.ntds, user, self.target),
+                **extract_user_info(user, self.target),
                 info=user.get("info"),
                 comment=user.get("comment"),
                 telephone_number=user.get("telephoneNumber"),
@@ -139,7 +139,7 @@ class NtdsPlugin(Plugin):
         """Extract all computer accounts from the NTDS.dit database."""
         for computer in self.ntds.computers():
             yield NtdsComputerRecord(
-                **extract_user_info(self.ntds, computer, self.target),
+                **extract_user_info(computer, self.target),
                 dns_hostname=computer.get("dNSHostName"),
                 operating_system=computer.get("operatingSystem"),
                 operating_system_version=computer.get("operatingSystemVersion"),
@@ -147,7 +147,7 @@ class NtdsPlugin(Plugin):
             )
 
 
-def extract_user_info(ntds: NTDS, user: User | Computer, target: Target) -> dict[str, Any]:
+def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
 
     lm_hash = des_decrypt(lm_pwd, user.rid).hex() if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
