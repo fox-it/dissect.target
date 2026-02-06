@@ -62,11 +62,9 @@ class DirectLoader(Loader):
         else:
 
             def get_files(path: Path, max_depth: int = 7) -> Iterator[Path]:
-                """
-                rglob seems to have issue on windows with python <3.12 when working on a case sensitive FS. Thus
-                we use another implementation without using rglob.
-                Probably related to https://github.com/python/cpython/issues/94537
-                """
+                # rglob seems to have issue on windows with python <3.12 when working on a case sensitive FS. Thus
+                # we use another implementation without using rglob.
+                # Probably related to https://github.com/python/cpython/issues/94537
 
                 if max_depth == 0:
                     return
