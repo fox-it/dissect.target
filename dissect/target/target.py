@@ -694,14 +694,22 @@ class Target:
         counter = 0
         path = "/$fs$/fs0"
 
+        fake_ntfs = set()
         for fs in self.filesystems:
+            ntfs_obj = getattr(fs, "ntfs", None)
+            if ntfs_obj in fake_ntfs:
+                continue
             if fs not in root_fs.mounts.values():
                 # determine mount point
                 while root_fs.path(path).exists():
                     counter += 1
                     path = f"/$fs$/fs{counter}"
-
                 root_fs.mount(path, fs)
+            if ntfs_obj and fs.__type__ != "ntfs":
+                # A non ntfs filesystem with a "ntfs" object means that add_virtual_ntfs_filesystem was used.
+                # We use this ntfs object to identify the "fake" ntfs filesystem.
+                # This functions due to the fake ntfs object is added to the filesystem after its parent.
+                fake_ntfs.add(ntfs_obj)
 
     def add_plugin(
         self,
