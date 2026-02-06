@@ -24,10 +24,7 @@ class DirectLoader(Loader):
         self.paths = [(Path(path) if not isinstance(path, Path) else path).resolve() for path in paths]
 
     def __repr__(self) -> str:
-        """
-        As DirectLoader does not call super().__init__() self.path is not defined, we need to redefine the __repr__ func
-        :return:
-        """
+        # We need to override __repr__ because we do not define self.path
         return f"{self.__class__.__name__}({str(self.paths)!r})"
 
     @staticmethod
