@@ -512,8 +512,8 @@ class Filesystem:
 
     @cached_property
     def identifier(self) -> str:
-        """Returns the identifier of the filesystem. 
-        
+        """Returns the identifier of the filesystem.
+
         Usually this is a serial or UUID, but it can also be a volume GUID or name.
         """
         if self.uuid:
