@@ -525,7 +525,7 @@ class Filesystem:
                 return guid
             if name := getattr(self.volume, "name", None):
                 return name
-        return f"filesystem_{self.__type__}"
+        return repr(self)
 
 
 class FilesystemEntry:
