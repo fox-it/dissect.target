@@ -1,0 +1,270 @@
+from __future__ import annotations
+
+import math
+import stat
+from typing import TYPE_CHECKING, BinaryIO
+
+from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
+from dissect.ntfs.exceptions import Error as NtfsError
+from dissect.ntfs.exceptions import FileNotFoundError as NtfsFileNotFoundError
+from dissect.ntfs.exceptions import NotADirectoryError as NtfsNotADirectoryError
+from dissect.ntfs.util import segment_reference
+
+from dissect.target.exceptions import (
+    FileNotFoundError,
+    IsADirectoryError,
+    NotADirectoryError,
+    NotASymlinkError,
+)
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
+from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.ntfs.attr import FileName, StandardInformation
+    from dissect.ntfs.util import AttributeMap
+
+
+class NtfsFilesystem(Filesystem):
+    __type__ = "ntfs"
+
+    def __init__(
+        self,
+        fh: BinaryIO | None = None,
+        boot: BinaryIO | None = None,
+        mft: BinaryIO | None = None,
+        usnjrnl: BinaryIO | None = None,
+        sds: BinaryIO | None = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
+        self.ntfs = NTFS(fh, boot=boot, mft=mft, usnjrnl=usnjrnl, sds=sds)
+
+    @staticmethod
+    def _detect(fh: BinaryIO) -> bool:
+        sector = fh.read(512)
+        return sector[3:11] == NTFS_SIGNATURE
+
+    def get(self, path: str) -> NtfsFilesystemEntry:
+        return NtfsFilesystemEntry(self, path, self._get_record(path))
+
+    def _get_record(self, path: str, root: MftRecord | None = None) -> MftRecord:
+        try:
+            path = path.rsplit(":", maxsplit=1)[0]
+            return self.ntfs.mft.get(path, root=root)
+        except NtfsFileNotFoundError as e:
+            raise FileNotFoundError(path) from e
+        except NtfsNotADirectoryError as e:
+            raise NotADirectoryError(path) from e
+        except NtfsError as e:
+            raise FileNotFoundError(path) from e
+
+
+class NtfsDirEntry(DirEntry):
+    entry: IndexEntry
+
+    def get(self) -> FilesystemEntry:
+        return NtfsFilesystemEntry(self.fs, self.path, self.entry.dereference())
+
+    def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+        if follow_symlinks and self.is_symlink():
+            return super().is_dir(follow_symlinks=follow_symlinks)
+
+        return self.entry.attribute.is_dir()
+
+    def is_file(self, *, follow_symlinks: bool = True) -> bool:
+        if follow_symlinks and self.is_symlink():
+            return super().is_file(follow_symlinks=follow_symlinks)
+
+        return self.entry.attribute.is_file()
+
+    def is_symlink(self) -> bool:
+        return self.entry.attribute.is_symlink() or self.entry.attribute.is_mount_point()
+
+    def is_junction(self) -> bool:
+        return self.entry.attribute.is_mount_point()
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        if follow_symlinks and self.is_symlink():
+            return self.fs.stat(self.path)
+
+        attr: FileName = self.entry.attribute
+        if attr.is_symlink() or attr.is_mount_point():
+            # Technically NTFS mount points/junctions are not symlinks, but it's easier if we pretend they are
+            mode = stat.S_IFLNK
+        elif attr.is_dir():
+            mode = stat.S_IFDIR
+        else:
+            mode = stat.S_IFREG
+
+        # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
+        st_info = fsutil.stat_result(
+            [
+                mode | 0o777,
+                segment_reference(self.entry.header.FileReference),
+                id(self.fs),
+                0,
+                0,
+                0,
+                attr.file_size,
+                attr.last_access_time.timestamp(),
+                attr.last_modification_time.timestamp(),
+                # ctime gets set to creation time for python <3.12 purposes
+                attr.creation_time.timestamp(),
+            ]
+        )
+
+        # Set the nanosecond resolution separately
+        st_info.st_atime_ns = attr.last_access_time_ns
+        st_info.st_mtime_ns = attr.last_modification_time_ns
+
+        st_info.st_ctime_ns = attr.creation_time_ns
+
+        st_info.st_birthtime = attr.creation_time.timestamp()
+        st_info.st_birthtime_ns = attr.creation_time_ns
+
+        # real_size is none if the size is resident
+        st_info.st_blksize = self.entry.index.record.ntfs.cluster_size
+        st_info.st_blocks = math.ceil(attr.allocated_size / 512)
+
+        return st_info
+
+
+class NtfsFilesystemEntry(FilesystemEntry):
+    fs: NtfsFilesystem
+    entry: MftRecord
+
+    def __init__(self, fs: NtfsFilesystem, path: str, entry: MftRecord):
+        super().__init__(fs, path, entry)
+
+        self.ads = ""
+        if ":" in self.path:
+            self.path, self.ads = path.rsplit(":", maxsplit=1)
+
+    def get(self, path: str) -> NtfsFilesystemEntry:
+        return NtfsFilesystemEntry(
+            self.fs,
+            fsutil.join(self.path, path, alt_separator=self.fs.alt_separator),
+            self.fs._get_record(path, self.entry),
+        )
+
+    def open(self, name: str = "") -> BinaryIO:
+        if self.is_dir():
+            raise IsADirectoryError(self.path)
+
+        if self.is_symlink():
+            return self.readlink_ext().open(name)
+
+        stream = name or self.ads
+        return self.entry.open(stream)
+
+    def scandir(self, ignore_dos: bool = True) -> Iterator[NtfsDirEntry]:
+        if not self.is_dir():
+            raise NotADirectoryError(self.path)
+
+        for entry in self._resolve().entry.iterdir(ignore_dos=ignore_dos):
+            if entry.attribute.file_name == ".":
+                continue
+
+            yield NtfsDirEntry(self.fs, self.path, entry.attribute.file_name, entry)
+
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        if not follow_symlinks and self.is_symlink():
+            return False
+
+        return self.entry.is_dir()
+
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        if not follow_symlinks and self.is_symlink():
+            return False
+
+        return not self.is_dir(follow_symlinks=follow_symlinks)
+
+    def is_symlink(self) -> bool:
+        return self.entry.is_symlink() or self.entry.is_mount_point()
+
+    def readlink(self) -> str:
+        # Note: we only need to check and resolve symlinks when actually interacting with the target, such as
+        # opening a file or iterating a directory. This is because the reparse point itself will have the appropriate
+        # flags set to indicate if the target is a file or directory
+        if not self.is_symlink():
+            raise NotASymlinkError
+
+        reparse_point = self.entry.attributes.REPARSE_POINT
+        print_name = reparse_point.print_name
+        if reparse_point.absolute:
+            # Prefix with \\ to make the path play ball with all the filesystem utilities
+            # Note: absolute links (such as directory junctions) will _always_ fail within the filesystem
+            # This is because absolute links include the drive letter, of which we have no knowledge here
+            # These will only work in the RootFilesystem
+            print_name = "\\" + print_name
+        return fsutil.normalize(print_name, self.fs.alt_separator)
+
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
+
+    def lstat(self) -> fsutil.stat_result:
+        record = self.entry
+
+        size = 0
+        real_size = 0
+        if self.is_symlink():
+            mode = stat.S_IFLNK
+        elif self.is_file():
+            mode = stat.S_IFREG
+            try:
+                size = record.size(self.ads)
+                real_size = record.size(self.ads, allocated=True)
+            except NtfsFileNotFoundError as e:
+                # Occurs when it cannot find the the specific ads inside its attributes
+                raise FileNotFoundError from e
+        else:
+            mode = stat.S_IFDIR
+
+        stdinfo: StandardInformation = record.attributes.STANDARD_INFORMATION
+
+        # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
+        st_info = fsutil.stat_result(
+            [
+                mode | 0o777,
+                record.segment,
+                id(self.fs),
+                record.header.ReferenceCount,
+                0,
+                0,
+                size,
+                stdinfo.last_access_time.timestamp(),
+                stdinfo.last_modification_time.timestamp(),
+                # ctime gets set to creation time for python <3.12 purposes
+                stdinfo.creation_time.timestamp(),
+            ]
+        )
+
+        # Set the nanosecond resolution separately
+        st_info.st_atime_ns = stdinfo.last_access_time_ns
+        st_info.st_mtime_ns = stdinfo.last_modification_time_ns
+
+        st_info.st_ctime_ns = stdinfo.creation_time_ns
+
+        st_info.st_birthtime = stdinfo.creation_time.timestamp()
+        st_info.st_birthtime_ns = stdinfo.creation_time_ns
+
+        # real_size is none if the size is resident
+        st_info.st_blksize = record.ntfs.cluster_size
+        blocks = 0
+        if not record.resident:
+            blocks = math.ceil(real_size / 512)
+
+        st_info.st_blocks = blocks
+
+        return st_info
+
+    def attr(self) -> AttributeMap:
+        if self.is_symlink():
+            return self.readlink_ext().lattr()
+        return self.lattr()
+
+    def lattr(self) -> AttributeMap:
+        return self.entry.attributes

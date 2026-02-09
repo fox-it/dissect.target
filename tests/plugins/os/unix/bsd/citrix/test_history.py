@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+import datetime
+import gzip
+import textwrap
+from io import BytesIO
+from typing import TYPE_CHECKING
+
+import pytest
+
+from dissect.target.plugins.os.unix.bsd.citrix.history import CitrixCommandHistoryPlugin
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
+
+COMMANDHISTORY_DATA = """\
+Aug  9 12:56:00 <local7.notice> ns bash[23841]: root on /dev/pts/0 shell_command="find . -name '*ci.php*'"
+Aug 10 11:57:39 <local7.notice> ns bash[56440]: (null) on /dev/pts/1 shell_command="debug "hello world""
+"""
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/var/log/bash.log",
+        "/var/log/sh.log",
+    ],
+)
+def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd: VirtualFilesystem, path: str) -> None:
+    fs_bsd.map_file_fh(path, BytesIO(textwrap.dedent(COMMANDHISTORY_DATA).encode()))
+    fs_bsd.map_file_fh("/root/.bash_history", BytesIO(b"echo 'hello world'\nexit"))
+    target_citrix.add_plugin(CitrixCommandHistoryPlugin)
+
+    results = list(target_citrix.commandhistory())
+    assert len(results) == 4
+
+    # Due to the usage of year_rollover_helper, the results are returned back-to-front. Moreover, it takes the
+    # year from the file's mtime, which in this mocked version is epoch 0 (thus the year 1970)
+    assert results[1].ts == datetime.datetime(1970, 8, 9, 12, 56, 0, tzinfo=datetime.timezone.utc)
+    assert results[1].command == "find . -name '*ci.php*'"
+    assert results[1].order == -1
+    assert results[1].shell == "citrix-netscaler-bash"
+    assert results[1].source == path
+
+    assert results[0].ts == datetime.datetime(1970, 8, 10, 11, 57, 39, tzinfo=datetime.timezone.utc)
+    assert results[0].command == 'debug "hello world"'
+    assert results[0].order == 0
+    assert results[0].shell == "citrix-netscaler-bash"
+    assert results[0].source == path
+
+    assert not results[2].ts
+    assert results[2].command == "echo 'hello world'"
+    assert results[2].order == 0
+    assert results[2].shell == "bash"
+    assert results[2].source == "/root/.bash_history"
+    assert results[2].username == "root"
+
+    assert not results[3].ts
+    assert results[3].command == "exit"
+    assert results[3].order == 1
+    assert results[3].shell == "bash"
+    assert results[3].source == "/root/.bash_history"
+    assert results[3].username == "root"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/var/log/bash.log.0.gz",
+        "/var/log/sh.log.1.gz",
+    ],
+)
+def test_netscaler_commandhistory_decompress(target_citrix: Target, fs_bsd: VirtualFilesystem, path: str) -> None:
+    fs_bsd.map_file_fh(path, BytesIO(gzip.compress(textwrap.dedent(COMMANDHISTORY_DATA).encode())))
+    target_citrix.add_plugin(CitrixCommandHistoryPlugin)
+
+    results = list(target_citrix.commandhistory())
+    assert len(results) == 2
+    # Due to the usage of year_rollover_history, the results are returned back-to-front
+    assert results[1].ts == datetime.datetime(1970, 8, 9, 12, 56, 0, tzinfo=datetime.timezone.utc)
+    assert results[1].command == "find . -name '*ci.php*'"
+    assert results[1].order == -1
+    assert results[1].shell == "citrix-netscaler-bash"
+    assert results[1].source == path
+
+    assert results[0].ts == datetime.datetime(1970, 8, 10, 11, 57, 39, tzinfo=datetime.timezone.utc)
+    assert results[0].command == 'debug "hello world"'
+    assert results[0].order == 0
+    assert results[0].shell == "citrix-netscaler-bash"
+    assert results[0].source == path
+
+
+def test_netscaler_cli_history(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
+    commandhistory_data = """\
+    _HiStOrY_V2_
+    help
+    shell
+    """
+
+    fs_bsd.map_file_fh("/var/nstmp/user/.nscli_history", BytesIO(textwrap.dedent(commandhistory_data).encode()))
+    fs_bsd.map_file_fh("/root/.bash_history", BytesIO(b"echo 'hello world'\nexit"))
+
+    target_citrix.add_plugin(CitrixCommandHistoryPlugin)
+
+    results = list(target_citrix.commandhistory())
+    assert len(results) == 4
+
+    assert not results[0].ts
+    assert results[0].command == "echo 'hello world'"
+    assert results[0].order == 0
+    assert results[0].shell == "bash"
+    assert results[0].source == "/root/.bash_history"
+    assert results[0].username == "root"
+
+    assert not results[1].ts
+    assert results[1].command == "exit"
+    assert results[1].order == 1
+    assert results[1].shell == "bash"
+    assert results[1].source == "/root/.bash_history"
+    assert results[1].username == "root"
+
+    assert not results[2].ts
+    assert results[2].command == "help"
+    assert results[2].order == 0
+    assert results[2].shell == "citrix-netscaler-cli"
+    assert results[2].source == "/var/nstmp/user/.nscli_history"
+
+    assert not results[3].ts
+    assert results[3].command == "shell"
+    assert results[3].order == 1
+    assert results[3].shell == "citrix-netscaler-cli"
+    assert results[3].source == "/var/nstmp/user/.nscli_history"
