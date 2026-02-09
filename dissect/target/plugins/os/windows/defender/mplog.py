@@ -194,7 +194,7 @@ DefenderMPLogRTPRecord = TargetRecordDescriptor(
     ],
 )
 
-DEFENDER_MPLOG_TS_PATTERN = r"(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z)"
+DEFENDER_MPLOG_TS_PATTERN = r"(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}(?:Z|[+-][0-9]{2}:[0-9]{2})?)"
 
 # Loosely based on https://github.com/Intrinsec/mplog_parser but feel free to add patterns
 
