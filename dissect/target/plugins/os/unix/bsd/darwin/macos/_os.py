@@ -66,7 +66,8 @@ class MacOSPlugin(DarwinPlugin):
     def hostname(self) -> str | None:
         try:
             preferences = plistlib.load(self.target.fs.path(self.SYSTEM).open())
-            return preferences["System"]["System"]["ComputerName"]
+            # return preferences["System"]["System"]["ComputerName"]
+            return preferences["System"]["Network"]["HostNames"]["LocalHostName"]
 
         except FileNotFoundError:
             pass
