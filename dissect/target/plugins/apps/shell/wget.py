@@ -89,8 +89,8 @@ class WgetPlugin(Plugin):
                 yield WgetHstsRecord(
                     ts_created=int(created),
                     host=host,
-                    explicit_port=port != 0,
                     port=port if port != 0 else None,
+                    explicit_port=port != 0,
                     include_subdomains=int(subdomain_count),
                     max_age=int(created) + int(max_age),
                     source=hsts_file,
