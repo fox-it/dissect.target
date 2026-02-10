@@ -93,7 +93,7 @@ def dhcp(fake_plist: dict) -> dict:
                 (0, "type", ["Ethernet"]),
                 (0, "enabled", ["True"]),
                 (0, "cidr", ["192.122.13.34/32"]),
-                (0, "hostname", ["dummys Mac"]),
+                (0, "hostname", ["dummys-Mac"]),
                 (0, "gateway", ["8.8.8.8"]),
                 (0, "dns", ["8.8.8.8"]),
                 (0, "mac", []),
