@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.volume import disk
 
@@ -25,6 +25,10 @@ class DissectVolumeSystem(VolumeSystem):
             return False
         else:
             return True
+
+    @property
+    def backing_objects(self) -> Iterator[Any]:
+        yield self.fh
 
     def _volumes(self) -> Iterator[Volume]:
         for v in self._disk.partitions:

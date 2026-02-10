@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pathlib
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.fve import bde
 
@@ -33,6 +33,10 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         return bde.is_bde_volume(fh)
+
+    @property
+    def backing_objects(self) -> Iterator[Any]:
+        yield self.fh
 
     def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):
