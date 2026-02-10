@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.volume import lvm
 
@@ -68,6 +68,12 @@ class LvmVolumeSystem(LogicalVolumeSystem):
     def _detect_volume(fh: BinaryIO) -> bool:
         buf = fh.read(4096)
         return b"LABELONE" in buf
+
+    @property
+    def backing_objects(self) -> Iterator[Any]:
+        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
+        for dev in vols:
+            yield dev.fh
 
     def _volumes(self) -> Iterator[Volume]:
         num = 1

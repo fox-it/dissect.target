@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import io
 from typing import TYPE_CHECKING
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, PropertyMock, call, patch
 
 import pytest
-from dissect.volume.lvm.physical import LVM2Device
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.plugins.scrape.scrape import ScrapePlugin
@@ -58,8 +57,8 @@ class MockFactory:
         decrypted.disk = volume.disk  # Points to physical disk
 
         decrypted.vs = Mock(spec=EncryptedVolumeSystem)
-        decrypted.vs.fh = volume
 
+        type(decrypted.vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in [volume]))
         return decrypted
 
     @staticmethod
@@ -72,12 +71,9 @@ class MockFactory:
         lv.size = size
         lv.offset = 0
         lv.disk = [v.disk for v in backing_volumes]  # List of physical disks
-        lv.vs = Mock()
-
-        # Setup LVM relationship
-        # The LV volume object's vs.fh is a list of PVs (backing volumes)
         lv.vs = Mock(spec=LogicalVolumeSystem)
-        lv.vs.fh = [Mock(fh=bv) for bv in backing_volumes]  # wrap in source_dev style
+
+        type(lv.vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in backing_volumes))
 
         return lv
 
@@ -407,8 +403,7 @@ def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
 
     # Create a mock LVM volume system and assign to the logical volume
     lvm_vs = Mock(spec=LogicalVolumeSystem)
-    lvm_dev = Mock(spec=LVM2Device, fh=vol1)
-    lvm_vs.fh = [lvm_dev]
+    type(lvm_vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in [vol1]))
     lvm_lv.vs = lvm_vs
 
     # Add LVM logical volume to target volumes

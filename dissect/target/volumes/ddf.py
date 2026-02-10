@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.volume.ddf.ddf import DDF, DEFAULT_SECTOR_SIZE, DDFPhysicalDisk
 
@@ -51,6 +51,12 @@ class DdfVolumeSystem(LogicalVolumeSystem):
     def _detect_volume(fh: BinaryIO) -> bool:
         fh.seek(-DEFAULT_SECTOR_SIZE, io.SEEK_END)
         return int.from_bytes(fh.read(4), "big") == 0xDE11DE11
+
+    @property
+    def backing_objects(self) -> Iterator[Any]:
+        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
+        for dev in vols:
+            yield dev.fh
 
     def _volumes(self) -> Iterator[Volume]:
         # MD only supports one configuration and virtual disk but doing this as a loop

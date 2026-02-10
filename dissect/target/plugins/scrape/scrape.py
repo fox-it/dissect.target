@@ -21,11 +21,11 @@ if TYPE_CHECKING:
 
 @dataclass
 class ScrapeContext:
-    scrape_map: dict
-    volume_region_map: dict
-    all_flag: bool
-    lvm_flag: bool
-    encrypted_flag: bool
+    scrape_map: dict[Container, dict[tuple[int, int], tuple[Container | Volume, int]]]
+    volume_region_map: dict[Volume, tuple[Container, tuple[int, int]]]
+    all: bool
+    lvm: bool
+    encrypted: bool
 
 
 class ScrapePlugin(Plugin):
@@ -104,7 +104,7 @@ class ScrapePlugin(Plugin):
         # Build initial map from physical disks
         offset = 0
         for disk in self.target.disks:
-            for volume in self._get_disk_vols(disk):
+            for volume in self._get_disk_volumes(disk):
                 if offset != volume.offset:
                     # We don't add gaps (source=disk) to the volume_region_map
                     # as they can't be dependencies.
@@ -144,12 +144,12 @@ class ScrapePlugin(Plugin):
 
             # Stalemate Check
             if not processed_this_pass and pending_layered:
-                if context.lvm_flag and context.encrypted_flag:
+                if context.lvm and context.encrypted:
                     self.target.log.warning(
-                        "Could not resolve storage dependencies. Stuck with %d layered volumes.", len(pending_layered)
+                        "Could not resolve storage dependencies. Stuck with %d layered volumes", len(pending_layered)
                     )
                 else:
-                    self.target.log.warning("Could not resolve storage dependencies, set lvm and encrypted flags.")
+                    self.target.log.warning("Could not resolve storage dependencies, set lvm and encrypted flags")
                     break
 
         # Generate streams from the scrape_map
@@ -282,12 +282,11 @@ class ScrapePlugin(Plugin):
             for needle, offset, match in find_needles(disk, needles=needles, block_size=block_size):
                 yield disk, needle, offset, match
 
-    @internal
-    def _get_disk_vols(self, disk: Container) -> Iterator[Volume]:
+    def _get_disk_volumes(self, disk: Container) -> Iterator[Volume]:
         """Yields all volumes for a given disk container.
 
         When the disk has an associated volume system, volumes are retrieved from there.
-        When the disk is raw, volumes are retrieved from the target's volume list.
+        When the disk is raw, volumes are retrieved from the target's volume list and matched against the disk.
 
         Args:
             disk: The disk container to get volumes for.
@@ -301,16 +300,22 @@ class ScrapePlugin(Plugin):
 
 
 def process_lvm_layer(context: ScrapeContext, volume: Volume) -> bool:
-    if not (context.lvm_flag and isinstance(volume.vs, LogicalVolumeSystem)):
+    """
+    Processes an LVM logical volume in the scraping context.
+
+    If dependencies (backing physical volumes) are met, removes their regions from the scrape map (unless `all` is set),
+    adds the logical volume as a new region, and updates the volume region map.
+
+    Returns True if processed, False otherwise.
+    """
+    if not (context.lvm and isinstance(volume.vs, LogicalVolumeSystem)):
         return False
 
     dependencies_met = True
     backing_regions_info = []
 
     try:
-        for source_dev in volume.vs.fh:
-            backing_vol_obj = source_dev.fh
-
+        for backing_vol_obj in volume.vs.backing_objects:
             if backing_vol_obj not in context.volume_region_map:
                 dependencies_met = False
                 break
@@ -323,7 +328,7 @@ def process_lvm_layer(context: ScrapeContext, volume: Volume) -> bool:
     if not dependencies_met:
         return False
 
-    if not context.all_flag:
+    if not context.all:
         for map_key, region_key in backing_regions_info:
             # Use idempotent delete operation because multiple LVs can share the same backing PV
             # Note this is rather crude, because the backing volume is not necessarily fully consumed by the LV.
@@ -341,19 +346,27 @@ def process_lvm_layer(context: ScrapeContext, volume: Volume) -> bool:
 
 
 def process_encrypted_layer(context: ScrapeContext, volume: Volume) -> bool:
-    if not (context.encrypted_flag and isinstance(volume.vs, EncryptedVolumeSystem)):
+    """
+    Processes an encrypted volume layer in the scraping context.
+
+    If dependencies are met, replaces the encrypted region with the decrypted volume region
+    in the scrape map and updates the volume region map.
+
+    Returns True if processed, False otherwise.
+    """
+    if not (context.encrypted and isinstance(volume.vs, EncryptedVolumeSystem)):
         return False
 
     backing_vol_obj = None
     try:
-        backing_vol_obj = volume.vs.fh
-    except (AttributeError, TypeError):
+        backing_vol_obj = next(volume.vs.backing_objects)
+    except (AttributeError, TypeError, StopIteration):
         return False
 
     if backing_vol_obj not in context.volume_region_map:
         return False
 
-    if not context.all_flag:
+    if not context.all:
         map_key, region_key = context.volume_region_map[backing_vol_obj]
 
         # Remove encrypted region from scrape_map

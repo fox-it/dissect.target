@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.vmfs import lvm
 from dissect.vmfs.c_lvm import c_lvm
@@ -54,6 +54,12 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         fh.seek(c_lvm.LVM_DEV_HEADER_OFFSET)
         sector = fh.read(512)
         return int.from_bytes(sector[:4], "little") == c_lvm.LVM_MAGIC_NUMBER
+
+    @property
+    def backing_objects(self) -> Iterator[Any]:
+        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
+        for vol in vols:
+            yield vol.fh
 
     def _volumes(self) -> Iterator[Volume]:
         for i, volume in enumerate(self.lvm.volumes):
