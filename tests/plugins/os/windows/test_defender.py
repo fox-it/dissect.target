@@ -30,10 +30,13 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.parametrize(
-    "value, expected",
+    ("value", "expected"),
     [
         ("2025-11-26T22:01:52.403Z", datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone.utc)),
-        ("2025-11-26T22:01:52.403+02:00", datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone(timedelta(hours=2)))),
+        (
+            "2025-11-26T22:01:52.403+02:00",
+            datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone(timedelta(hours=2))),
+        ),
         ("2025-11-26T22:01:52.403", datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone.utc)),
         ("2025-11-26T22:01:52Z", datetime(2025, 11, 26, 22, 1, 52, tzinfo=timezone.utc)),
         ("2025-11-26T22:01:52+00:00", datetime(2025, 11, 26, 22, 1, 52, tzinfo=timezone.utc)),
