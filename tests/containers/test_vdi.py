@@ -12,9 +12,9 @@ from tests._utils import absolute_path
 def test_vdi_container() -> None:
     """Test that VDI containers are properly opened.
 
-    ```
-    VBoxManage createmedium disk --filename "./tests/small.vdi" --size 2 --format=VDI
-    ```
+    Generated with::
+
+        VBoxManage createmedium disk --filename "./tests/small.vdi" --size 2 --format=VDI
     """
     path = absolute_path("_data/containers/vdi/small.vdi.gz")
     gz_file = gzip.GzipFile(path)

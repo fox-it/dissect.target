@@ -13,9 +13,9 @@ def test_vmdk_container() -> None:
     """
     Test that VMDK containers are properly opened.
 
-    ```
-    VBoxManage createmedium disk --filename "./small.vmdk" --size 2 --format=VMDK
-    ```
+    Generated with::
+
+        VBoxManage createmedium disk --filename "./small.vmdk" --size 2 --format=VMDK
     """
     path = absolute_path("_data/containers/vmdk/small.vmdk.gz")
     gz_file = gzip.GzipFile(path)

@@ -13,9 +13,10 @@ def test_vhdx_container() -> None:
     """Test that VHDX containers are properly opened.
 
     VBoxManage does not allow to create vhdx. We convert a previously generated vdi to vhdx
-    ```
-    qemu-img convert -f vdi -O vhdx small.vdi small.vhdx
-    ````
+
+    Generated with::
+
+        qemu-img convert -f vdi -O vhdx small.vdi small.vhdx
     """
     path = absolute_path("_data/containers/vhdx/small.vhdx.gz")
     gz_file = gzip.GzipFile(path)

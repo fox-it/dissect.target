@@ -13,9 +13,9 @@ def test_vhd_container() -> None:
     """
     Test that VHD containers are properly opened.
 
-    ```
-    VBoxManage createmedium disk --filename "./small.vhd" --size 2 --format=VHD
-    ```
+    Generated with::
+
+        VBoxManage createmedium disk --filename "./small.vhd" --size 2 --format=VHD
     """
     path = absolute_path("_data/containers/vhd/small.vhd.gz")
     gz_file = gzip.GzipFile(path)

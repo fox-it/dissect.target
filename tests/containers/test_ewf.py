@@ -12,9 +12,8 @@ def test_ewf_container() -> None:
     """Test that EWF containers are properly opened.
 
     Generated with::
-    
-        echo "testdissecte01" | ewfacquirestream -t small
 
+        echo "testdissecte01" | ewfacquirestream -t small
     """
     path = absolute_path("_data/containers/ewf/small.E01")
 
