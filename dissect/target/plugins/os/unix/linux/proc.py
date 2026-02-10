@@ -472,13 +472,10 @@ class ProcProcess:
     def _parse_environ(self) -> Iterator[Environ]:
         """Internal function to parse entries in ``/proc/[pid]/environ``."""
         # entries in /proc/<pid>/environ are null-terminated
-        environ_path = self.get("environ")
-        if not environ_path.exists():
+        if not (environ_path := self.get("environ")).exists():
             return
 
-        lines = environ_path.read_text().split("\x00")
-
-        for line in lines:
+        for line in environ_path.read_text().split("\x00"):
             if line == "":
                 # Skip empty line
                 continue
