@@ -140,8 +140,18 @@ DefenderMpCmdRunLogRecord = TargetRecordDescriptor(
 
 
 def parse_iso_datetime(datetime_value: str) -> datetime.datetime:
-    """Parse ISO8601 serialized datetime with ``Z`` ending."""
-    return datetime.datetime.strptime(datetime_value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
+    """Parse ISO8601 serialized datetime with optional ``Z`` or UTC offset ending.
+
+    MpLog timestamps may appear as:
+    - ``2025-11-26T22:01:52.403Z``
+    - ``2025-11-26T22:01:52.403+02:00``
+    - ``2025-11-26T22:01:52.403`` (no suffix, assumed UTC)
+    """
+    # Normalize Z to +00:00 so fromisoformat can handle all variants uniformly.
+    dt = datetime.datetime.fromisoformat(datetime_value.strip().replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
 
 
 def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iterator[DefenderLogRecord]:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -11,7 +11,7 @@ from flow.record.fieldtypes import command
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
-from dissect.target.plugins.os.windows.defender._plugin import MicrosoftDefenderPlugin
+from dissect.target.plugins.os.windows.defender._plugin import MicrosoftDefenderPlugin, parse_iso_datetime
 from dissect.target.plugins.os.windows.defender.quarantine import (
     STREAM_ID,
     c_defender,
@@ -27,6 +27,23 @@ if TYPE_CHECKING:
 
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("2025-11-26T22:01:52.403Z", datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone.utc)),
+        (
+            "2025-11-26T22:01:52.403+02:00",
+            datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone(timedelta(hours=2))),
+        ),
+        ("2025-11-26T22:01:52.403", datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone.utc)),
+        ("2025-11-26T22:01:52Z", datetime(2025, 11, 26, 22, 1, 52, tzinfo=timezone.utc)),
+        ("2025-11-26T22:01:52+00:00", datetime(2025, 11, 26, 22, 1, 52, tzinfo=timezone.utc)),
+    ],
+)
+def test_parse_iso_datetime(value: str, expected: datetime) -> None:
+    assert parse_iso_datetime(value) == expected
 
 
 def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
