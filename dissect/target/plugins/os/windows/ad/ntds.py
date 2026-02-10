@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from dissect.database.ese.ntds import NTDS
 
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, UnsupportedPluginError, export
+from dissect.target.plugin import Plugin, UnsupportedPluginError, export, internal
 from dissect.target.plugins.os.windows.credential.sam import des_decrypt
 
 if TYPE_CHECKING:
@@ -115,6 +115,7 @@ class NtdsPlugin(Plugin):
             raise UnsupportedPluginError("No NTDS.dit database found on target")
 
     @cached_property
+    @internal
     def ntds(self) -> NTDS:
         ntds = NTDS(self.path.open("rb"))
         ntds.pek.unlock(self.target.lsa.syskey)
@@ -154,8 +155,8 @@ def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
     nt_hash = des_decrypt(nt_pwd, user.rid).hex() if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
 
     # Decrypt password history
-    lm_history = [des_decrypt(lm, user.rid).hex() for lm in user.get("lmPwdHistory") or []]
-    nt_history = [des_decrypt(nt, user.rid).hex() for nt in user.get("ntPwdHistory") or []]
+    lm_history = [des_decrypt(lm, user.rid).hex() for lm in user.get("lmPwdHistory")]
+    nt_history = [des_decrypt(nt, user.rid).hex() for nt in user.get("ntPwdHistory")]
 
     try:
         member_of = [group.distinguished_name for group in user.groups()]

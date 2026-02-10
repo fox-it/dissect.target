@@ -51,16 +51,16 @@ def test_users(target_win_ntds: Target) -> None:
         "ESSOS$": "f1580437d0120689ad3909b9fe9b74fe",  # Unknown Password
         "Administrator": "c66d72021a2d4744409969a581a1705e",  # Unknown Password
         "renly.baratheon": "f667bd83b30c87801cef53856618d534",  # Unknown Password
-        "vagrant": md4("vagrant"),
-        "lord.varys": md4("_W1sper_$"),
-        "jaime.lannister": md4("cersei"),
-        "tyron.lannister": md4("Alc00L&S3x"),
-        "cersei.lannister": md4("il0vejaime"),
-        "joffrey.baratheon": md4("1killerlion"),
-        "stannis.baratheon": md4("Drag0nst0ne"),
-        "petyer.baelish": md4("@littlefinger@"),
-        "tywin.lannister": md4("powerkingftw135"),
-        "maester.pycelle": md4("MaesterOfMaesters"),
+        "vagrant": md4("vagrant").hex(),
+        "lord.varys": md4("_W1sper_$").hex(),
+        "jaime.lannister": md4("cersei").hex(),
+        "tyron.lannister": md4("Alc00L&S3x").hex(),
+        "cersei.lannister": md4("il0vejaime").hex(),
+        "joffrey.baratheon": md4("1killerlion").hex(),
+        "stannis.baratheon": md4("Drag0nst0ne").hex(),
+        "petyer.baelish": md4("@littlefinger@").hex(),
+        "tywin.lannister": md4("powerkingftw135").hex(),
+        "maester.pycelle": md4("MaesterOfMaesters").hex(),
     }
 
     results = list(target_win_ntds.ad.users())
