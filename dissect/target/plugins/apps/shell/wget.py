@@ -19,6 +19,7 @@ WgetHstsRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     [
         ("datetime", "ts_created"),
         ("uri", "host"),
+        ("varint", "port"),
         ("boolean", "explicit_port"),
         ("boolean", "include_subdomains"),
         ("datetime", "max_age"),
@@ -79,7 +80,7 @@ class WgetPlugin(Plugin):
 
                 try:
                     host, port, subdomain_count, created, max_age = line.split("\t")
-
+                    port = int(port)
                 except ValueError as e:
                     self.target.log.warning("Unexpected wget hsts line in file: %s", hsts_file)
                     self.target.log.debug("", exc_info=e)
@@ -88,7 +89,8 @@ class WgetPlugin(Plugin):
                 yield WgetHstsRecord(
                     ts_created=int(created),
                     host=host,
-                    explicit_port=int(port),
+                    explicit_port=port != 0,
+                    port=port if port != 0 else None,
                     include_subdomains=int(subdomain_count),
                     max_age=int(created) + int(max_age),
                     source=hsts_file,
