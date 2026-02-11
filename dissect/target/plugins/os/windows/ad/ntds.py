@@ -50,7 +50,7 @@ GENERIC_FIELDS = [
 
 # Record descriptor for NTDS user secrets
 NtdsUserRecord = TargetRecordDescriptor(
-    "windows/credential/ad/user",
+    "windows/ad/user",
     [
         *GENERIC_FIELDS,
         ("string", "info"),
@@ -60,7 +60,7 @@ NtdsUserRecord = TargetRecordDescriptor(
     ],
 )
 NtdsComputerRecord = TargetRecordDescriptor(
-    "windows/credential/ad/computer",
+    "windows/ad/computer",
     [
         *GENERIC_FIELDS,
         ("string", "dns_hostname"),
