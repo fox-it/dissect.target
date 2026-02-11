@@ -10,9 +10,6 @@ if TYPE_CHECKING:
 
 
 def test_environ(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
-    # Assigned to `_` to suppress "unused variable" linter warnings.
-    _ = fs_linux_proc
-
     target_linux_users.add_plugin(ProcPlugin)
     results = list(target_linux_users.environ())
     assert len(results) == 3
