@@ -32,6 +32,7 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
     TargetError,
 )
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
@@ -1295,7 +1296,9 @@ class TargetCli(TargetCmd):
 class UnixConfigTreeCli(TargetCli):
     def __init__(self, target: Target):
         TargetCmd.__init__(self, target)
-        self.config_tree = target.etc()
+        self.config_tree = VirtualFilesystem()
+        self.config_tree.root = self.target.fs.get("/etc")
+
         self.prompt_base = _target_name(target)
 
         self.cwd = None
@@ -1319,8 +1322,10 @@ class UnixConfigTreeCli(TargetCli):
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.config_tree.path(path)
 
-    def resolve_key(self, path: str) -> FilesystemEntry:
-        return self.config_tree.path(path).get()
+    def resolve_key(self, path: str) -> FilesystemEntry | dict:
+        entry = self.config_tree.path(path)
+
+        return entry.get()
 
     def resolve_glob_path(self, path: fsutil.TargetPath) -> Iterator[fsutil.TargetPath]:
         path = self.resolve_path(path)
