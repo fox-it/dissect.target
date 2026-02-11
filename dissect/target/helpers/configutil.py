@@ -219,6 +219,9 @@ class ConfigurationParser:
     def items(self) -> ItemsView:
         return self.parsed_data.items()
 
+    def as_dict(self) -> dict:
+        return self.parsed_data
+
 
 class Default(ConfigurationParser):
     """Parse a configuration file specified by ``separator`` and ``comment_prefixes``.
