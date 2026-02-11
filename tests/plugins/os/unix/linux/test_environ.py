@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 
 def test_environ(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
-    # Reference the fixture to ensure its setup logic runs (side effects).
     # Assigned to `_` to suppress "unused variable" linter warnings.
     _ = fs_linux_proc
 
