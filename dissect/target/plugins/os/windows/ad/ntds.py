@@ -89,13 +89,7 @@ class NtdsPlugin(Plugin):
     __namespace__ = "ad"
 
     def __init__(self, target: Target):
-        """Initialize the NTDS plugin.
-
-        Args:
-            target: The target system to analyze.
-        """
         super().__init__(target)
-
         self.path = None
 
         if self.target.has_function("registry"):
@@ -103,22 +97,19 @@ class NtdsPlugin(Plugin):
             self.path = self.target.fs.path(key.value)
 
     def check_compatible(self) -> None:
-        """Check if the plugin can run on the target system.
-
-        Raises:
-            UnsupportedPluginError: If NTDS.dit is not found or system hive is missing.
-        """
         if not self.target.has_function("lsa"):
             raise UnsupportedPluginError("System Hive is not present or LSA function not available")
 
-        if not self.path or not self.path.exists():
+        if self.path is None or not self.path.is_file():
             raise UnsupportedPluginError("No NTDS.dit database found on target")
 
     @cached_property
     @internal
     def ntds(self) -> NTDS:
         ntds = NTDS(self.path.open("rb"))
-        ntds.pek.unlock(self.target.lsa.syskey)
+
+        if self.target.has_function("lsa"):
+            ntds.pek.unlock(self.target.lsa.syskey)
 
         return ntds
 
