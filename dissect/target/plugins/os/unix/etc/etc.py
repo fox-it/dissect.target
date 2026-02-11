@@ -64,8 +64,9 @@ class EtcTree(Plugin):
 
     @export(record=UnixConfigTreeRecord)
     @arg("--glob", dest="pattern", default="*", help="Glob-style pattern to search for")
-    @arg("--root", dest="root", default="/", help="Path to use as root for search")
-    def etc(self, pattern: str, root: str) -> Iterator[UnixConfigTreeRecord]:
+    @arg("--root", dest="root", default="/etc", help="Path to use as root for search")
+    @arg("--unknowns", dest="unknowns", action="store_false", help="Return unknown / unparsable objects")
+    def etc(self, pattern: str, root: str, unknowns: bool) -> Iterator[UnixConfigTreeRecord]:
         """Yield etc configuration records."""
 
         for entry, _, items in self.target.fs.walk(root):
@@ -73,6 +74,10 @@ class EtcTree(Plugin):
                 try:
                     path = Path(entry) / item
                     config_object = configutil.parse(self.target.fs.path(path))
+                    if not unknowns and isinstance(config_object, (configutil.Txt, configutil.Bin)):
+                        # We don't have a specific config parser for this file,
+                        # Ignore those config paths to get proper records
+                        continue
                     yield from self._sub(config_object, path, orig_path=path, pattern=pattern)
-                except Exception:  # noqa: PERF203
+                except Exception:
                     self.target.log.warning("Could not open configuration item: %s", item)
