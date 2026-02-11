@@ -512,7 +512,7 @@ class Env(ConfigurationParser):
 
     RE_KV = re.compile(r"^(?P<key>.+?)=(?P<value>(\".+?\")|(\'.+?\')|(.*?))?(?P<comment> \#.+?)?$")
 
-    def __init__(self, comments: bool = True, *args, **kwargs):
+    def __init__(self, comments: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.comments = comments
         self.parsed_data: dict | tuple[dict, str | None] = {}
@@ -903,7 +903,7 @@ class Leases(Default):
 
 @dataclass(frozen=True)
 class ParserOptions:
-    collapse: bool | set | None = None
+    collapse: bool | set[str] | None = None
     collapse_inverse: bool | None = None
     separator: tuple[str] | None = None
     comment_prefixes: tuple[str] | None = None
@@ -912,11 +912,11 @@ class ParserOptions:
 @dataclass(frozen=True)
 class ParserConfig:
     parser: type[ConfigurationParser] = Default
-    collapse: bool | set | None = None
+    collapse: bool | set[str] | None = None
     collapse_inverse: bool | None = None
     separator: tuple[str] | None = None
     comment_prefixes: tuple[str] | None = None
-    fields: tuple[str] | None = None
+    fields: tuple[str, ...] | None = None
 
     def create_parser(self, options: ParserOptions | None = None) -> ConfigurationParser:
         kwargs = {}
@@ -938,8 +938,9 @@ MATCH_MAP: dict[str, ParserConfig] = {
     "*/vim/vimrc*": ParserConfig(Txt),
 }
 
-CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
+CONFIG_MAP: dict[str, ParserConfig] = {
     "ini": ParserConfig(Ini),
+    "env": ParserConfig(Env),
     "xml": ParserConfig(Xml),
     "json": ParserConfig(Json),
     "yml": ParserConfig(Yaml),
@@ -958,12 +959,14 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "template": ParserConfig(Txt),
     "toml": ParserConfig(Toml),
     "leases": ParserConfig(Leases),
+    "meta_bare": ParserConfig(Default),  # Return the basic config parser
 }
 
 
-KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
+KNOWN_FILES: dict[str, ParserConfig] = {
     "ulogd.conf": ParserConfig(Ini),
     "sshd_config": ParserConfig(Indentation, separator=(r"\s",)),
+    "sensors3.conf": ParserConfig(Indentation, separator=(r"\s",)),
     "hosts.allow": ParserConfig(Default, separator=(":",), comment_prefixes=("#",)),
     "hosts.deny": ParserConfig(Default, separator=(":",), comment_prefixes=("#",)),
     "hosts": ParserConfig(Default, separator=(r"\s",)),
@@ -1028,7 +1031,6 @@ def parse(path: Path, hint: str | None = None, *args, **kwargs) -> Configuration
         raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 
     options = ParserOptions(*args, **kwargs)
-
     return parse_config(path, hint, options)
 
 
@@ -1043,6 +1045,7 @@ def parse_config(
     with entry.open("rb") as fh:
         open_file = io.TextIOWrapper(fh, encoding="utf-8") if not isinstance(parser, Bin) else io.BytesIO(fh.read())
         parser.read_file(open_file)
+        open_file.close()
 
     if isinstance(parser, SystemD):
         return _parse_drop_files(entry, options, parser)
@@ -1074,5 +1077,5 @@ def _select_parser(path: Path, hint: str | None = None) -> ParserConfig:
         if path.match(match):
             return value
 
-    extention_parser = CONFIG_MAP.get(path.suffix.lstrip("."), ParserConfig(Default))
+    extention_parser = CONFIG_MAP.get(path.suffix.lstrip("."), ParserConfig(Txt))
     return KNOWN_FILES.get(path.name, extention_parser)
