@@ -10,8 +10,7 @@ from tests._utils import absolute_path
 
 
 def test_vhd_container() -> None:
-    """
-    Test that VHD containers are properly opened.
+    """Test that VHD containers are properly opened.
 
     Generated with::
 

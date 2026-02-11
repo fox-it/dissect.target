@@ -10,8 +10,7 @@ from tests._utils import absolute_path
 
 
 def test_vmdk_container() -> None:
-    """
-    Test that VMDK containers are properly opened.
+    """Test that VMDK containers are properly opened.
 
     Generated with::
 

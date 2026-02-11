@@ -12,7 +12,7 @@ from tests._utils import absolute_path
 def test_vhdx_container() -> None:
     """Test that VHDX containers are properly opened.
 
-    VBoxManage does not allow to create vhdx. We convert a previously generated vdi to vhdx
+    VBoxManage does not allow to create VHDX. We convert a previously generated VDI to VHDX.
 
     Generated with::
 
