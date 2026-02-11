@@ -43,11 +43,11 @@ def test_ewf_detect_path() -> None:
 def test_ewf_container_splitted() -> None:
     """Test that EWF containers are properly opened when container is split among multiple files.
 
-    ```
-    # ewfacquire has a minimum 1mb split size, we generate a bit more than 1Mb of compressed data
-    dd if=/dev/urandom bs=512 count=2100 of=random
-    cat random | ewfacquirestream -t split -S 1048576
-    ```
+    Generated with::
+
+        # ewfacquire has a minimum 1mb split size, we generate a bit more than 1Mb of compressed data
+        dd if=/dev/urandom bs=512 count=2100 of=random
+        cat random | ewfacquirestream -t split -S 1048576
     """
     path = absolute_path("_data/containers/ewf/split.E01")
 
