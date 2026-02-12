@@ -64,7 +64,7 @@ def test_credhist_partial(target_win_users: Target, fs_win: VirtualFilesystem) -
         provider="user",
     )
 
-    results = list(target_win_users.credhist())
+    results = list(target_win_users.credential.credhist())
     assert len(results) == 3
     assert [result.nt for result in results] == [md4("user").hex(), md4("password").hex(), None]
 
