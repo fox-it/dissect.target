@@ -114,7 +114,11 @@ class GenericTarSubLoader(TarSubLoader):
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             entry = entry_cls(volume, fsutil.normpath(mname), member)
-            volume.map_file_entry(entry.path, entry)
+
+            try:
+                volume.map_file_entry(entry.path, entry)
+            except KeyError as e:
+                log.debug("Skipping directory member %r in tar as %r is already mapped: %s", member, entry.path, e)
 
         for vol_name, vol in volumes.items():
             loaderutil.add_virtual_ntfs_filesystem(
