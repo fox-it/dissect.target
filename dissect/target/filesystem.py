@@ -6,7 +6,7 @@ import os
 import pathlib
 import stat
 from collections import defaultdict
-from functools import cache
+from functools import cache, cached_property
 from typing import TYPE_CHECKING, Any, BinaryIO, Final
 
 from dissect.target.exceptions import (
@@ -24,6 +24,7 @@ TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from uuid import UUID
 
     from typing_extensions import Self
 
@@ -498,6 +499,33 @@ class Filesystem:
             The digests of the contents of ``path``.
         """
         return self.get(path).hash(algos)
+
+    @cached_property
+    def uuid(self) -> UUID | None:
+        """Return the UUID of the filesystem if it has one."""
+        return None
+
+    @cached_property
+    def serial(self) -> int | str | None:
+        """Return the serial of the filesystem if it has one."""
+        return None
+
+    @cached_property
+    def identifier(self) -> str:
+        """Returns the identifier of the filesystem.
+
+        Usually this is a serial or UUID, but it can also be a volume GUID or name.
+        """
+        if self.uuid:
+            return str(self.uuid)
+        if self.serial:
+            return str(self.serial)
+        if self.volume:
+            if guid := getattr(self.volume, "guid", None):
+                return guid
+            if name := getattr(self.volume, "name", None):
+                return name
+        return repr(self)
 
 
 class FilesystemEntry:
