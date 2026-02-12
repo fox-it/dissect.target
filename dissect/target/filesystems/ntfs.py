@@ -268,3 +268,9 @@ class NtfsFilesystemEntry(FilesystemEntry):
 
     def lattr(self) -> AttributeMap:
         return self.entry.attributes
+
+    def realname(self) -> str:
+        filename = self.entry.filename or self.name
+        if self.ads:
+            return f"{filename}:{self.ads}"
+        return filename
