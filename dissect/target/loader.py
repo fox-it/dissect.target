@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import os
 import urllib.parse
 from pathlib import Path
@@ -82,6 +83,26 @@ class Loader:
             dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True)) if parsed_path else {}
         )
 
+        self._parser = self._create_parser(self.__class__)
+
+    @classmethod
+    def print_help(cls) -> None:
+        """Prints the help message for this loader's specific arguments."""
+        cls._create_parser(cls).print_help()
+
+    @staticmethod
+    def _create_parser(cls: type[Loader]) -> argparse.ArgumentParser:
+        """Creates the argument parser for this loader."""
+        # Do like generate_argparse_for_method in cli.py
+        parser = argparse.ArgumentParser(
+            prog=f"loader:{cls.__name__.lower()}",
+            description=f"Options for the '{cls.__name__}' loader.",
+            add_help=False,
+        )
+        for args, kwargs in getattr(cls, "__args__", []):
+            parser.add_argument(*args, **kwargs)
+        return parser
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self.path)!r})"
 
@@ -115,6 +136,20 @@ class Loader:
         yield path
 
     def map(self, target: Target) -> None:
+        """Wrapper around the _map function that handles argument passing."""
+        # The loader parses its own arguments from argv
+        loader_options, _ = self._parser.parse_known_args()
+
+        # The query string can act as a default for any arguments not provided on the command line
+        for key, value in self.parsed_query.items():
+            # argparse sets missing optional arguments to None. We only want to override if it's None.
+            if getattr(loader_options, key, None) is None:
+                setattr(loader_options, key, value)
+
+        # Pass the parsed options directly to the implementation map function
+        return self._map(target, **vars(loader_options))
+
+    def _map(self, target: Target, **kwargs) -> None:
         """Maps the loaded path into a ``Target``.
 
         Args:
