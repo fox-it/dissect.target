@@ -331,7 +331,7 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
         "output": "record",
         "arguments": [],
         "alias": False,
-        "path": "os.windows.credential.sam.sam",
+        "path": "os.windows.sam.sam",
     }
 
     # plugin with arguments

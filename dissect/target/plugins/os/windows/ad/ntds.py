@@ -8,7 +8,7 @@ from dissect.database.ese.ntds import NTDS
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, UnsupportedPluginError, export, internal
-from dissect.target.plugins.os.windows.credential.sam import des_decrypt
+from dissect.target.plugins.os.windows.sam import des_decrypt
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
