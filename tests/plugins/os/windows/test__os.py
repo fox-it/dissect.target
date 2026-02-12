@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from unittest.mock import Mock
 
 import pytest
 from flow.record.fieldtypes import windows_path
 
+from dissect.target.helpers import reg_export
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
-from dissect.target.plugins.os.windows.generic import ComputerSidRecord
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
@@ -283,29 +282,24 @@ def test_windows_user_from_sam(target_win_users: Target) -> None:
         - https://learn.microsoft.com/en-us/previous-versions/troubleshoot/windows-client/renaming-user-account-not-change-profile-path
     """
 
-    fake_sam_user = Mock()
-    fake_sam_user.rid = 1002
-    fake_sam_user.username = "Jane"  # Should override "John" from home folder
-
-    target_win_users.machine_sid = Mock(
-        return_value=iter([ComputerSidRecord(sid="S-1-5-21-3263113198-3007035898-945866154")])
-    )
-    target_win_users.sam = Mock(return_value=[fake_sam_user])
+    test_data = "tests/_data/plugins/os/windows/credential/sam_groups.reg"
+    hive = reg_export.load_reg_from_file(test_data)
+    target_win_users.registry._root = hive
 
     users = list(target_win_users.users())
 
-    # There should be two users, SYSTEM and the user from SAM
-    assert len(users) == 2
-
-    # SYSTEM user
-    assert users[0].sid == "S-1-5-18"
-    assert users[0].name == "systemprofile"
-    assert users[0].home == windows_path("c:\\Windows\\system32\\config\\systemprofile")
+    # There are 10 users in the SAM + ProfileList, but only one is relevant, user Wick renamed from John
+    assert len(users) == 10
 
     # User from SAM, username from SAM should have priority
-    assert users[1].sid == "S-1-5-21-3263113198-3007035898-945866154-1002"
-    assert users[1].name == "Jane"
-    assert users[1].home == windows_path("C:\\Users\\John")
+    assert users[6].sid == "S-1-5-21-3713105778-3002763963-2454762811-1004"
+    assert users[6].name == "Wick"
+    assert users[6].home == windows_path("C:\\Users\\John")
+
+    # SYSTEM user
+    assert users[7].sid == "S-1-5-18"
+    assert users[7].name == "systemprofile"
+    assert users[7].home == windows_path("%systemroot%\\system32\\config\\systemprofile")
 
 
 @pytest.mark.parametrize(

@@ -22,6 +22,7 @@ from dissect.target.plugin import Plugin, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+
 sam_def = """
 struct user_F {
   char      unknown1[8];
@@ -211,15 +212,38 @@ struct SAM_HASH_AES {  /* size: >=24 */
   char salt[16];        /* 0x08 */
   /* char data[];          0x18, variable size */
 };
+
+typedef struct _ALIAS_C_HDR {
+    uint32 rid;        // 0x00
+    uint32 unk04;      // 0x04
+    uint32 unk08;      // 0x08
+    uint32 unk0C;      // 0x0C
+    uint32 name_ofs;   // 0x10  relative to 0x34
+    uint32 name_len;   // 0x14  bytes, UTF-16LE
+    uint32 unk18;      // 0x18
+    uint32 desc_ofs;   // 0x1C  relative to 0x34
+    uint32 desc_len;   // 0x20  bytes, UTF-16LE
+    uint32 unk24;      // 0x24
+    uint32 sid_ofs;    // 0x28  relative to 0x34
+    uint32 sid_len;    // 0x2C  bytes
+    uint32 sid_cnt;    // 0x30
+} ALIAS_C_HDR;
+
+typedef struct _SID_PREFIX {
+    uint8  revision;      // 1
+    uint8  subcnt;        // 1
+    uint8  ident_auth[6]; // 6 (big-endian integer)
+} SID_PREFIX;
 """
 
 c_sam = cstruct().load(sam_def)
 
-SamRecord = TargetRecordDescriptor(
-    "windows/credential/sam",
+SamUserRecord = TargetRecordDescriptor(
+    "windows/sam/user",
     [
         ("datetime", "ts"),
         ("uint32", "rid"),
+        ("string", "sid"),
         ("string", "fullname"),
         ("string", "username"),
         ("string", "admincomment"),
@@ -233,6 +257,18 @@ SamRecord = TargetRecordDescriptor(
         ("uint32", "logins"),
         ("string", "lm"),
         ("string", "nt"),
+    ],
+)
+
+SamGroupRecord = TargetRecordDescriptor(
+    "windows/sam/group/member",
+    [
+        ("uint32", "group_rid"),
+        ("string", "group_sid"),
+        ("string", "group_name"),
+        ("string", "group_description"),
+        ("string", "member_sid"),
+        ("string", "member_name"),
     ],
 )
 
@@ -314,6 +350,87 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
     return des_decrypt(obfkey, rid)
 
 
+def parse_sid_cstruct(buf: bytes, offset: int = 0) -> tuple[str, int]:
+    """
+    Parse a SID using cstruct for the fixed prefix, then loop for the variable subauthorities.
+
+    Layout:
+      1 byte  revision
+      1 byte  subcnt
+      6 bytes identifier authority (big-endian)
+      N x 4-byte subauthorities (little-endian)
+    """
+    SID_PREFIX_LEN = 8  # 1(revision)+1(subcnt)+6(identifier authority)
+
+    if len(buf) - offset < SID_PREFIX_LEN:
+        raise ValueError("Buffer too small for SID prefix")
+
+    sp = c_sam.SID_PREFIX(buf[offset : offset + SID_PREFIX_LEN])
+    rev = sp.revision
+    subcnt = sp.subcnt
+    ident_auth = int.from_bytes(bytes(sp.ident_auth), "big")
+
+    cur = offset + SID_PREFIX_LEN
+    need = subcnt * 4
+    if len(buf) - cur < need:
+        raise ValueError("Buffer too small for SID subauthorities")
+
+    subs: list[int] = []
+    for _ in range(subcnt):
+        # subauthority is little-endian uint32
+        val = int.from_bytes(buf[cur : cur + 4], "little")
+        subs.append(val)
+        cur += 4
+
+    sid_str = f"S-{rev}-{ident_auth}" + "".join(f"-{s}" for s in subs)
+    return sid_str, (cur - offset)
+
+
+def parse_sam_group_c_value(cbytes: bytes) -> tuple[int, str, str, list[str]]:
+    """
+    Parse an Aliases RID 'C' value using cstruct for the fixed header.
+    Returns: (rid, name, description, members)
+    """
+    ALIAS_C_HDR_LEN = 0x34  # 13 DWORDs = 52 bytes
+
+    if len(cbytes) < ALIAS_C_HDR_LEN:
+        raise ValueError("C value too small")
+
+    hdr = c_sam.ALIAS_C_HDR(cbytes[:ALIAS_C_HDR_LEN])
+    base = ALIAS_C_HDR_LEN
+
+    def read_utf16_rel(ofs: int, ln: int) -> str:
+        if ln <= 0:
+            return ""
+        start = base + ofs
+        end = start + ln
+        if start < 0 or end > len(cbytes):
+            return ""
+        try:
+            return cbytes[start:end].decode("utf-16le", errors="replace")
+        except Exception:
+            return ""
+
+    name = read_utf16_rel(hdr.name_ofs, hdr.name_len)
+    desc = read_utf16_rel(hdr.desc_ofs, hdr.desc_len)
+
+    members: list[str] = []
+    if hdr.sid_len > 0 and hdr.sid_cnt > 0:
+        arr_start = base + hdr.sid_ofs
+        arr_end = arr_start + hdr.sid_len
+        if 0 <= arr_start < len(cbytes) and arr_end <= len(cbytes):
+            arr = cbytes[arr_start:arr_end]
+            cur = 0
+            for _ in range(hdr.sid_cnt):
+                if cur >= len(arr):
+                    break
+                sid, used = parse_sid_cstruct(arr, cur)
+                members.append(sid)
+                cur += used
+
+    return hdr.rid, name, desc, members
+
+
 class SamPlugin(Plugin):
     """SAM plugin.
 
@@ -325,7 +442,14 @@ class SamPlugin(Plugin):
         - https://web.archive.org/web/20190717124313/http://www.beginningtoseethelight.org/ntsecurity/index.htm
     """
 
-    SAM_KEY = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account"
+    __namespace__ = "sam"
+
+    SAM_USER_KEY = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account"
+    SAM_GROUP_KEYS = (
+        "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Builtin\\Aliases",
+        "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account\\Aliases",
+    )
+    DEFAULT_ADMIN_GROUP_PATH = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Builtin\\Aliases\\00000220"
 
     def check_compatible(self) -> None:
         if not HAS_CRYPTO:
@@ -334,14 +458,14 @@ class SamPlugin(Plugin):
         if not self.target.has_function("lsa"):
             raise UnsupportedPluginError("LSA plugin is required for SAM plugin")
 
-        if not len(list(self.target.registry.keys(self.SAM_KEY))) > 0:
-            raise UnsupportedPluginError(f"Registry key not found: {self.SAM_KEY}")
+        if not len(list(self.target.registry.keys(self.SAM_USER_KEY))) > 0:
+            raise UnsupportedPluginError(f"Registry key not found: {self.SAM_USER_KEY}")
 
     def calculate_samkey(self, syskey: bytes) -> bytes:
         aqwerty = b"!@#$%^&*()qwertyUIOPAzxcvbnmQQQQQQQQQQQQ)(*@&%\0"
         anum = b"0123456789012345678901234567890123456789\0"
 
-        f_reg = self.target.registry.key(self.SAM_KEY).value("F").value
+        f_reg = self.target.registry.key(self.SAM_USER_KEY).value("F").value
         f = c_sam.DOMAIN_ACCOUNT_F(f_reg)
         f_key = f_reg[len(c_sam.DOMAIN_ACCOUNT_F) :]
         fk = c_sam.SAM_KEY(f_key)
@@ -375,8 +499,75 @@ class SamPlugin(Plugin):
             raise ValueError("SAM key checksum validation failed!")
         return samkey
 
-    @export(record=SamRecord)
-    def sam(self) -> Iterator[SamRecord]:
+    def get_local_admins(self) -> set[str]:
+        """Retrieve the SIDs of local administrators from the SAM hive."""
+        local_admins = set()
+        try:
+            admin_group_key = self.target.registry.key(self.DEFAULT_ADMIN_GROUP_PATH)
+        except Exception:
+            return local_admins
+
+        c_bytes = admin_group_key.value("C").value
+        _, _, _, members = parse_sam_group_c_value(c_bytes)
+        for sid in members:
+            local_admins.add(sid)
+
+        return local_admins
+
+    @export(record=SamGroupRecord)
+    def groups(self) -> Iterator[SamGroupRecord]:
+        """Yields local group memberships from the SAM hive.
+
+        Yields:
+            SamGroupRecord: Records containing group RID, name, description, and member SID.
+        """
+
+        # Windows stores built-in groups and local groups in different locations.
+        # Local groups have SIDs based on the machine SID, while built-in groups use a well-known SID prefix.
+        if not (machine_sid := next(self.target.machine_sid(), None)):
+            # use a placeholder if machine SID is not available
+            machine_sid = "S-1-5-21-0000000000-0000000000-0000000000"
+        else:
+            machine_sid = machine_sid.sid
+        builtin_prefix = "S-1-5-32"  # Built-in group SID prefix
+
+        for group_path in self.SAM_GROUP_KEYS:
+            # Determine the correct SID prefix based on group type
+            sid_prefix = builtin_prefix if "Builtin" in group_path else machine_sid
+
+            users = list(self.target.users())
+
+            for key in self.target.registry.key(group_path).subkeys():
+                if key.name in ["Members", "Names"]:
+                    continue
+
+                c_bytes = key.value("C").value
+                group_rid, group_name, group_desc, group_members = parse_sam_group_c_value(c_bytes)
+
+                group_sid = f"{sid_prefix}-{group_rid}"
+
+                # By yielding only members of groups, we skip empty groups entirely.
+                for member_sid in group_members:
+                    # Check if the member SID corresponds to a user and get the username
+                    # I had issues using UserPLugin().find(sid=member_sid), probably recursion, so doing it manually.
+                    user_details = None
+                    for user in users:
+                        if user.sid == member_sid:
+                            user_details = user
+                            break
+
+                    yield SamGroupRecord(
+                        group_rid=group_rid,
+                        group_sid=group_sid,
+                        group_name=group_name,
+                        group_description=group_desc,
+                        member_sid=member_sid,
+                        member_name=user_details.name if user_details else "",
+                        _target=self.target,
+                    )
+
+    @export(record=SamUserRecord)
+    def users(self) -> Iterator[SamUserRecord]:
         """Dump SAM entries
 
         The Security Account Manager (SAM) registry hive contains registry keys that store usernames, full names and
@@ -406,13 +597,24 @@ class SamPlugin(Plugin):
             nt (string): Parsed NT-hash.
         """
 
-        syskey = self.target.lsa.syskey  # aka. bootkey
-        samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
+        try:
+            syskey = self.target.lsa.syskey  # aka. bootkey
+            samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
+        except Exception as e:
+            self.target.log.warning("Could not calculate SAM key")
+            self.target.log.debug("", exc_info=e)
+            samkey = None
+
+        # Get machine SID or placeholder SID for constructing user SIDs
+        if not (machine_sid := next(self.target.machine_sid(), None)):
+            machine_sid = "S-1-5-21-0000000000-0000000000-0000000000"
+        else:
+            machine_sid = machine_sid.sid
 
         almpassword = b"LMPASSWORD\0"
         antpassword = b"NTPASSWORD\0"
 
-        for users_key in self.target.registry.keys(f"{self.SAM_KEY}\\Users"):
+        for users_key in self.target.registry.keys(f"{self.SAM_USER_KEY}\\Users"):
             for user_key in users_key.subkeys():
                 if user_key.name == "Names":
                     continue
@@ -434,14 +636,21 @@ class SamPlugin(Plugin):
                 u_lmpw = v_data[v.lmpw_ofs : v.lmpw_ofs + v.lmpw_len]
                 u_ntpw = v_data[v.ntpw_ofs : v.ntpw_ofs + v.ntpw_len]
 
-                lm_hash = decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
-                nt_hash = decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
+                lm_hash = ""
+                nt_hash = ""
+                if samkey:
+                    lm_hash = decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
+                    nt_hash = decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
 
-                names_key = self.target.registry.key(f"{self.SAM_KEY}\\Users\\Names\\{u_username}")
+                names_key = self.target.registry.key(f"{self.SAM_USER_KEY}\\Users\\Names\\{u_username}")
 
-                yield SamRecord(
+                # Construct the SID as <machine_sid>-<rid>
+                sid = f"{machine_sid}-{f.rid}"
+
+                yield SamUserRecord(
                     ts=names_key.ts,
                     rid=f.rid,
+                    sid=sid,
                     fullname=u_fullname,
                     username=u_username,
                     admincomment=u_admin_comment,

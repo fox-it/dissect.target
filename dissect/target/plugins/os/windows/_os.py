@@ -9,6 +9,7 @@ from uuid import UUID
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export, internal
+from dissect.target.plugins.os.windows.credential import sam
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
-    from dissect.target.plugins.os.windows.credential.sam import SamRecord
+    from dissect.target.plugins.os.windows.credential.sam import SamUserRecord
     from dissect.target.target import Target
 
 ARCH_MAP = {
@@ -287,13 +288,13 @@ class WindowsPlugin(OSPlugin):
             pass
 
     @cached_property
-    def _sam_by_sid(self) -> dict[str, SamRecord]:
+    def _sam_by_sid(self) -> dict[str, SamUserRecord]:
         if not (machine_sid := next(self.target.machine_sid(), None)):
             return {}
 
-        sam_users: dict[str, SamRecord] = {}
+        sam_users: dict[str, SamUserRecord] = {}
         try:
-            for sam_record in self.target.sam():
+            for sam_record in self.target.sam.users():
                 # Compose SID from domain_sid and RID
                 sam_users[f"{machine_sid.sid}-{sam_record.rid}"] = sam_record
         except Exception as e:
@@ -302,8 +303,62 @@ class WindowsPlugin(OSPlugin):
 
         return sam_users
 
+    def _get_home_for_user(self, sid: str) -> str | None:
+        """Get the profile path for a user SID from the ProfileList registry key."""
+        key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+        try:
+            profile_key = self.target.registry.key(f"{key}\\{sid}")
+            return profile_key.value("ProfileImagePath").value
+        except RegistryError as e:
+            self.target.log.debug("Could not read ProfileImagePath for SID %s", sid, exc_info=e)
+            return None
+
     @export(record=WindowsUserRecord)
     def users(self) -> Iterator[WindowsUserRecord]:
+        """Return Windows users found on the system.
+
+        This method yields the unique users found in the SAM hive and the ProfileList registry key.
+        """
+        seen_sids = set()
+
+        # user_from_sam can cause tests to fail when not all required registry keys are present.
+        try:
+            users = self.users_from_sam()
+            for user in users:
+                seen_sids.add(user.sid)
+                yield user
+        except Exception as e:
+            # continue with users_from_ProfileList
+            self.target.log.warning("Could not read users from SAM hive")
+            self.target.log.debug("", exc_info=e)
+
+        for user in self.users_from_ProfileList():
+            if user.sid in seen_sids:
+                continue
+
+            seen_sids.add(user.sid)
+            yield user
+
+    @export(record=WindowsUserRecord)
+    def users_from_sam(self) -> Iterator[WindowsUserRecord]:
+        """Return Windows users found in the SAM hive"""
+        for sam_user in sam.SamPlugin(self.target).users():
+            home = None
+            name = None
+            if sam_user.sid in self._sam_by_sid:
+                sam_record = self._sam_by_sid[sam_user.sid]
+                name = sam_record.username
+                home = self._get_home_for_user(sam_user.sid)
+
+            yield WindowsUserRecord(
+                sid=sam_user.sid,
+                name=name,
+                home=self.target.resolve(home) if home else None,
+                _target=self.target,
+            )
+
+    @export(record=WindowsUserRecord)
+    def users_from_ProfileList(self) -> Iterator[WindowsUserRecord]:
         # Be aware that this function can never do anything which needs user
         # registry hives. Initializing those hives will need this function,
         # which will then cause a recursion.
