@@ -16,7 +16,7 @@ WinlogonRecord = TargetRecordDescriptor(
         ("datetime", "ts_mtime"),
         ("string", "password"),
         ("path", "source"),
-    ]
+    ],
 )
 
 

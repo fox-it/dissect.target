@@ -8,9 +8,6 @@ from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPlugi
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.windows.credential.credential import WindowsCredentialPlugin
-from dissect.target.plugins.os.windows.dpapi.keyprovider.defaultpassword.defaultpassword import (
-    DefaultPasswordKeyProvider,
-)
 from dissect.target.plugins.os.windows.lsa import LSAPlugin
 
 if TYPE_CHECKING:
@@ -21,7 +18,7 @@ struct DefaultPassword {
     DWORD   length;
     char    flags[4*3];
     WCHAR   data[length/2];
-    char    checksum_or_guid[0x10];
+    // char    checksum_or_guid[0x10];
 };
 """
 
@@ -33,7 +30,7 @@ DefaultPasswordRecord = TargetRecordDescriptor(
         ("datetime", "ts_mtime"),
         ("string", "default_password"),
         ("path", "source"),
-    ]
+    ],
 )
 
 
@@ -59,7 +56,6 @@ class DefaultPasswordPlugin(WindowsCredentialPlugin):
         # Search for DefaultPassword values in the LSA
         for secret in ["DefaultPassword", "DefaultPassword_OldVal"]:
             if default_pass := self.target.lsa._secrets.get(secret):
-
                 # Ignore irrelevant DefaultPassword references
                 if "TBAL_{".encode("utf-16-le") in default_pass:
                     continue
