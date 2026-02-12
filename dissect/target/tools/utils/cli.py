@@ -72,11 +72,14 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
     parser.add_argument("-L", "--loader", help="select a specific loader (i.e. vmx, raw)")
     parser.add_argument("--child", help="load child of target by path of index (see --list-children)")
-    parser.add_argument("--children", action="store_true", help="include children")
+    parser.add_argument("--children", action="store_true", help="include children (depth=1 or use --recursive)")
     parser.add_argument(
-        "--list-children", action=_OverrideRequiredAction, help="list all children indices and paths, then exit"
+        "--list-children",
+        action=_OverrideRequiredAction,
+        help="list children indices and paths (optionally use \
+                --recursive), then exit",
     )
-    parser.add_argument("--recursive", action="store_true", help="make --list-children behave recursively")
+    parser.add_argument("--recursive", action="store_true", help="make --(list-)children behave recursively")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", action="store_true", help="print version")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
@@ -245,7 +248,7 @@ def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Ta
     targets: Iterable[Target] = (
         [Target.open_direct(args.targets, case_sensitive=getattr(args, "direct_sensitive", False))]
         if direct
-        else Target.open_all(args.targets, include_children=children, apply=apply)
+        else Target.open_all(args.targets, include_children=children, recursive=args.recursive, apply=apply)
     )
 
     for target in targets:
