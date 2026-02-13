@@ -331,7 +331,7 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
         "output": "record",
         "arguments": [],
         "alias": False,
-        "path": "os.windows.credential.sam.sam",
+        "path": "os.windows.sam.sam",
     }
 
     # plugin with arguments
@@ -495,3 +495,23 @@ def test_mixed_namespace_and_regular_regression(capsys: pytest.CaptureFixture, m
         "<example/descriptor hostname=None domain=None field_a='example' field_b='record'>\n"
         "<example/descriptor hostname=None domain=None field_a='namespace_example' field_b='record'>\n"
     ) in out
+
+
+def test_direct_mode(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that the cim plugin works in direct insensitive mode."""
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-f",
+                "cim",
+                str(absolute_path("_data/plugins/os/windows/cim/default-namespace")),
+                "--direct",
+                "-s",
+            ],
+        )
+
+        target_query()
+        out, _ = capsys.readouterr()
+    assert len(out.splitlines()) == 3
