@@ -7,7 +7,9 @@ import sys
 from collections import deque
 from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView
 from configparser import ConfigParser, MissingSectionHeaderError
+from contextlib import nullcontext
 from dataclasses import dataclass
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -1051,10 +1053,11 @@ def parse_config(
     parser_type = _select_parser(entry, hint)
 
     parser = parser_type.create_parser(options)
-    with entry.open("rb") as fh:
-        open_file = io.TextIOWrapper(fh, encoding="utf-8") if not isinstance(parser, Bin) else io.BytesIO(fh.read())
+
+    cm = nullcontext if isinstance(parser, Bin) else partial(io.TextIOWrapper, encoding="utf-8")
+
+    with entry.open("rb") as fh, cm(fh) as open_file:
         parser.read_file(open_file)
-        open_file.close()
 
     if isinstance(parser, SystemD):
         return _parse_drop_files(entry, options, parser)
