@@ -266,8 +266,16 @@ class Default(ConfigurationParser):
         prev_key = None
         for line in self.line_reader(fh):
             if line.startswith((" ", "\t")):
-                # This part was indented so it is a continuation of the previous key
+                # This part was indented so it is assumed to be a continuation of the previous key
                 prev_value = information_dict.get(prev_key)
+                if not isinstance(prev_value, str):
+                    # If the previous value is not a string, some parsing already occured which would imply
+                    # that this line is not a continuation of the previous value.
+                    # Meaning we are in an unknown state and should not continue parsing.
+
+                    raise ConfigurationParsingError(
+                        "Unexpected state occurred when parsing using the `Default` parser."
+                    )
                 information_dict[prev_key] = f"{prev_value} {line.strip()}"
                 continue
 
