@@ -944,6 +944,7 @@ MATCH_MAP: dict[str, ParserConfig] = {
     "*/xml/*": ParserConfig(Xml),
     "*.bashrc": ParserConfig(Txt),
     "*/vim/vimrc*": ParserConfig(Txt),
+    "*/fonts/conf.*/*.conf": ParserConfig(Xml),
 }
 
 CONFIG_MAP: dict[str, ParserConfig] = {
