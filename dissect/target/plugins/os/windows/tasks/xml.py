@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
@@ -95,6 +96,28 @@ def str_to_bool(string_to_convert: str) -> bool | None:
         return False
 
     raise ValueError(f"Invalid boolean string: '{string_to_convert}' (expected 'true' or 'false')")
+
+
+def parse_datetime(value: str) -> datetime | None:
+    """Parse a datetime string to a datetime object.
+
+    Accepts strings in the form YYYY-MM-DDThh:mm:ss
+     and returns a datetime object.
+
+    Args:
+        value: The input datetime string.
+
+    Returns:
+        None for an empty string, otherwise a datetime object.
+    """
+    if not value:
+        return None
+    try:
+        date = datetime.fromisoformat(value)
+    except ValueError:
+        value = value.replace(" ", "T")
+        date = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc).replace(tzinfo=None)
+    return date
 
 
 class XmlTask:
@@ -245,8 +268,8 @@ class XmlTask:
         for trigger in self.task_element.findall("Triggers/*"):
             trigger_type = trigger.tag
             trigger_enabled = str_to_bool(self.get_element("Enabled", trigger))
-            start_boundary = self.get_element("StartBoundary", trigger)
-            end_boundary = self.get_element("EndBoundary", trigger)
+            start_boundary = parse_datetime(self.get_element("StartBoundary", trigger))
+            end_boundary = parse_datetime(self.get_element("EndBoundary", trigger))
             repetition_interval = self.get_element("Repetition/Interval", trigger)
             repetition_duration = self.get_element("Repetition/Duration", trigger)
             repetition_stop_duration_end = str_to_bool(self.get_element("Repetition/StopAtDurationEnd", trigger))
