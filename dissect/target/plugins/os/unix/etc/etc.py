@@ -17,7 +17,7 @@ UnixConfigTreeRecord = TargetRecordDescriptor(
     "unix/config",
     [
         ("path", "source"),
-        ("path", "config_path"),
+        ("path", "path"),
         ("string", "key"),
         ("string[]", "value"),
     ],
@@ -53,7 +53,7 @@ class EtcTree(Plugin):
                 data = {
                     "_target": self.target,
                     "source": orig_path,
-                    "config_path": "/" / config_path,
+                    "path": "/" / config_path,
                     "key": key,
                     "value": value,
                 }
@@ -65,15 +65,15 @@ class EtcTree(Plugin):
                 yield UnixConfigTreeRecord(**data)
 
     @export(record=UnixConfigTreeRecord)
-    @arg("--glob", dest="pattern", default="*", help="Glob-style pattern to search for")
-    @arg("--root", dest="root", default="/etc", help="Path to use as root for search")
-    @arg("--unknowns", dest="unknowns", action="store_true", help="Return unknown / unparsable objects")
+    @arg("--glob", dest="pattern", default="*", help="glob-style pattern to search for")
+    @arg("--root", dest="root", default="/etc", help="path to use as root for search")
+    @arg("--unknowns", dest="unknowns", action="store_true", help="return unknown / unparsable objects")
     def etc(self, pattern: str, root: str, unknowns: bool) -> Iterator[UnixConfigTreeRecord]:
         """This plugin yields configuration information from the etc directory in key value pairs.
 
         Args:
-            pattern: What Glob-style pattern to search for
-            root: Path to use as root for searching
+            pattern: What glob-style pattern to search for.
+            root: Path to use as root for searching.
             unknowns: Whether to also yield entries for unknown entries.
 
         Yields UnixConfigTreeRecord with the following fields:
@@ -81,7 +81,7 @@ class EtcTree(Plugin):
         .. code-block:: text
 
             source (path): The path on the target used for parsing.
-            config_path (path): The path inside the configuration file that is being used.
+            path (path): The path inside the configuration file that is being used.
             key (string): The configuration key returned by parsing.
             value (string[]): The configuration value belonging to the key.
         """
