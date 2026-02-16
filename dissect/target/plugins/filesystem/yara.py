@@ -5,6 +5,7 @@ from io import BytesIO
 from pathlib import Path
 
 from dissect.target.helpers import hashutil
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.logging import get_logger
 
 try:
@@ -54,6 +55,7 @@ class YaraPlugin(Plugin):
     @arg("-p", "--path", default="/", help="path on target(s) to recursively scan")
     @arg("-m", "--max-size", type=int, default=DEFAULT_MAX_SCAN_SIZE, help="maximum file size in bytes to scan")
     @arg("-c", "--check", action="store_true", help="check if every YARA rule is valid")
+    @arg("--no-decompress", action="store_true", help="do not automatically decompress files for extra scanning")
     @export(record=YaraMatchRecord)
     def yara(
         self,
@@ -61,6 +63,7 @@ class YaraPlugin(Plugin):
         path: str = "/",
         max_size: int = DEFAULT_MAX_SCAN_SIZE,
         check: bool = False,
+        no_decompress: bool = False,
     ) -> Iterator[YaraMatchRecord]:
         """Scan files inside the target up to a given maximum size with YARA rule file(s).
 
@@ -69,7 +72,7 @@ class YaraPlugin(Plugin):
             path: ``string`` of absolute target path to scan.
             max_size: Files larger than this size will not be scanned.
             check: Check if provided rules are valid, only compiles valid rules.
-
+            no_decompress: Do not automatically decompress compressed files before scanning.
         Returns:
             Iterator yields ``YaraMatchRecord``.
         """
@@ -87,6 +90,11 @@ class YaraPlugin(Plugin):
 
         self.target.log.warning("Will not scan files larger than %s MB", max_size // 1024 // 1024)
 
+        if no_decompress:
+            self.target.log.info("Will not automatically check in compressed files")
+        else:
+            self.target.log.info("Will check in compressed files automatically")
+
         for _, _, files in self.target.fs.walk_ext(path):
             for file in files:
                 try:
@@ -94,22 +102,31 @@ class YaraPlugin(Plugin):
                         self.target.log.info("Not scanning file of %s MB: '%s'", (file_size // 1024 // 1024), file)
                         continue
 
-                    buf = file.open().read()
-                    for match in compiled_rules.match(data=buf):
-                        string_matches: list[str] = []
-                        for string in match.strings:
-                            string_matches.extend(f"{string}={instance}" for instance in string.instances)
+                    # file handles to scan, original file and its decompressed content, if applicable and not disabled.
+                    fhandles = set()
+                    fh_original = file.open()
+                    fhandles.add(fh_original)
+                    if not no_decompress:
+                        fh_decompress = open_decompress(fileobj=fh_original)
+                        fhandles.add(fh_decompress)
 
-                        yield YaraMatchRecord(
-                            ts_mtime=file.stat().st_mtime,
-                            path=self.target.fs.path(file.path),
-                            rule=match.rule,
-                            matches=string_matches,
-                            tags=match.tags,
-                            digest=hashutil.common(BytesIO(buf)),
-                            namespace=match.namespace,
-                            _target=self.target,
-                        )
+                    for fh in fhandles:
+                        buf = fh.read()
+                        for match in compiled_rules.match(data=buf):
+                            string_matches: list[str] = []
+                            for string in match.strings:
+                                string_matches.extend(f"{string}={instance}" for instance in string.instances)
+
+                            yield YaraMatchRecord(
+                                ts_mtime=file.stat().st_mtime,
+                                path=self.target.fs.path(file.path),
+                                rule=match.rule,
+                                matches=string_matches,
+                                tags=match.tags,
+                                digest=hashutil.common(BytesIO(buf)),
+                                namespace=match.namespace,
+                                _target=self.target,
+                            )
 
                 except FileNotFoundError:
                     continue
