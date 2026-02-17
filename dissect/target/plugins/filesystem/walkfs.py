@@ -25,7 +25,6 @@ FilesystemRecord = TargetRecordDescriptor(
         ("datetime", "btime"),
         ("varint", "ino"),
         ("path", "path"),
-        ("string", "name"),
         ("filesize", "size"),
         ("uint32", "mode"),
         ("uint32", "uid"),
@@ -121,7 +120,9 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
         fs_types = [entry.fs.__type__]
 
     ftype = "unknown"
-    if entry.is_dir():
+    if entry.is_symlink():
+        ftype = "symlink"
+    elif entry.is_dir():
         ftype = "dir"
     elif entry.is_file():
         ftype = "file"
@@ -133,7 +134,6 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
         "btime": from_unix(entry_stat.st_birthtime) if entry_stat.st_birthtime else None,
         "ino": entry_stat.st_ino,
         "path": entry.path,
-        "name": entry.name,
         "size": entry_stat.st_size,
         "mode": entry_stat.st_mode,
         "uid": entry_stat.st_uid,
