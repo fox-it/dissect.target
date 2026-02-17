@@ -804,6 +804,7 @@ class TargetCli(TargetCmd):
 
         if not path.exists():
             print(f"ls: cannot access {path}: No such file or directory")
+            return False
 
         # Disable color if output is redirected to a file
         use_color = False
