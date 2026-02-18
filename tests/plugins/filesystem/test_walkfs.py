@@ -27,14 +27,16 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_entry("/other_root_file.ext", VirtualFile(fs_unix, "other_root_file.ext", None))
     fs_unix.map_file_entry("/.test/test.txt", VirtualFile(fs_unix, "test.txt", None))
     fs_unix.map_file_entry("/.test/.more.test.txt", VirtualFile(fs_unix, ".more.test.txt", None))
+    fs_unix.symlink("/.test/.more.test.txt", "/.test/.more.test.symlink.txt")
 
     target_unix.add_plugin(WalkFsPlugin)
 
     results = sorted(target_unix.walkfs(), key=lambda r: r.path)
-    assert len(results) == 14
+    assert len(results) == 15
     assert [r.path for r in results] == [
         "/",
         "/.test",
+        "/.test/.more.test.symlink.txt",
         "/.test/.more.test.txt",
         "/.test/test.txt",
         "/etc",
@@ -48,6 +50,9 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
         "/root_file",
         "/var",
     ]
+    assert results[0].type == "dir"
+    assert results[2].type == "symlink"
+    assert results[3].type == "file"
 
 
 @pytest.mark.benchmark
