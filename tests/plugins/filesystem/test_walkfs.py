@@ -33,7 +33,7 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
     target_unix.add_plugin(WalkFsPlugin)
 
-    results = sorted(target_unix.walkfs(), key=lambda r: r.path)
+    results = sorted(target_unix.walkfs(mimetype=True), key=lambda r: r.path)
     assert len(results) == 14
     assert [r.path for r in results] == [
         "/",
@@ -60,14 +60,21 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
 
 @pytest.mark.benchmark
-def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> None:
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({}, id="default"),
+        pytest.param({"mimetype": True}, id="mimetype"),
+    ],
+)
+def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture, params: dict) -> None:
     """Benchmark walkfs performance on a small tar archive with ~500 files."""
 
     loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine-docker.tar")))
     loader.map(target_bare)
     target_bare.apply()
 
-    benchmark(lambda: list(itertools.islice(WalkFsPlugin(target_bare).walkfs(), 100)))
+    benchmark(lambda: list(itertools.islice(WalkFsPlugin(target_bare).walkfs(**params), 100)))
 
 
 def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:

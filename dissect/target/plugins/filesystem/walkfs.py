@@ -48,9 +48,9 @@ class WalkFsPlugin(Plugin):
     @export(record=FilesystemRecord)
     @arg("--walkfs-path", default="/", help="path to recursively walk")
     @arg("--capability", action="store_true", help="output capability records")
-    @arg("--no-mimetype", action="store_true", help="disable mimetype lookup of files")
+    @arg("--mimetype", action="store_true", help="enable mimetype lookup of files")
     def walkfs(
-        self, walkfs_path: str = "/", capability: bool = False, no_mimetype: bool = False
+        self, walkfs_path: str = "/", capability: bool = False, mimetype: bool = False
     ) -> Iterator[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries.
 
@@ -65,7 +65,7 @@ class WalkFsPlugin(Plugin):
         Yields FilesystemRecords for every filesystem entry and CapabilityRecords if ``xattr`` security
         attributes were found in the filesystem entry and the ``--capability`` flag is set.
 
-        Mimetype lookup can be disabled using the ``--no-mimetype`` flag.
+        Mimetype lookup can be enabled using the ``--mimetype`` flag.
 
         .. code-block:: text
 
@@ -81,10 +81,10 @@ class WalkFsPlugin(Plugin):
             mode (uint32): contains the file type and mode.
             uid (uint32): the user id of the owner of the entry.
             gid (uint32): the group id of the owner of the entry.
+            mimetype (string): detected mimetype of the entry.
             is_suid (boolean): denotes if the entry has the set-user-id bit set.
             attr (string[]): list of key-value pair attributes separated by '='.
             fs_types (string[]): list of filesystem type(s) of the entry.
-            mimetype (string): detected mimetype of the entry.
         """
 
         path = self.target.fs.path(walkfs_path)
@@ -99,7 +99,7 @@ class WalkFsPlugin(Plugin):
 
         for entry in self.target.fs.recurse(walkfs_path):
             try:
-                yield from generate_record(self.target, entry, capability, no_mimetype)
+                yield from generate_record(self.target, entry, capability, mimetype)
             except FileNotFoundError as e:  # noqa: PERF203
                 self.target.log.warning("File not found: %s", entry)
                 self.target.log.debug("", exc_info=e)
@@ -110,13 +110,15 @@ class WalkFsPlugin(Plugin):
 
 
 def generate_record(
-    target: Target, entry: FilesystemEntry, capability: bool, no_mimetype: bool
+    target: Target, entry: FilesystemEntry, capability: bool, mimetype: bool
 ) -> Iterator[FilesystemRecord]:
     """Generate a :class:`WalkFsRecord` from the given :class:`FilesystemEntry`.
 
     Args:
         target: :class:`Target` instance
         entry: :class:`FilesystemEntry` instance
+        capability: bool
+        mimetype: bool
 
     Returns:
         Generator of :class:`FilesystemRecord` for the given :class:`FilesystemEntry`.
@@ -154,7 +156,7 @@ def generate_record(
         target.log.warning("Unable to expand xattr for entry %s: %s", entry.path, e)
         target.log.debug("", exc_info=e)
 
-    if not no_mimetype:
+    if mimetype:
         try:
             fields["mimetype"] = magic.from_entry(entry, mime=True)
         except (FileNotFoundError, IsADirectoryError):
