@@ -58,6 +58,7 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert results[3].type == "file"
 
     assert {str(r.path): r.mimetype for r in results if r.mimetype} == {
+        "/.test/.more.test.symlink.txt": "text/plain",  # inferred by txt extension
         "/.test/.more.test.txt": "text/plain",  # inferred by txt extension
         "/.test/test.txt": "text/plain",  # inferred by txt extension
         "/path/to/some/file": "image/png",  # inferred by magic bytes
