@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import math
 import stat
+from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.fat import exceptions as fat_exc
@@ -52,6 +53,10 @@ class FatFilesystem(Filesystem):
             raise NotADirectoryError(path) from e
         except fat_exc.Error as e:
             raise FileNotFoundError(path) from e
+
+    @cached_property
+    def serial(self) -> int | str | None:
+        return int(self.fatfs.volume_id, 16)
 
 
 class FatDirEntry(DirEntry):

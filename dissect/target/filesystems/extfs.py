@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import stat
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.extfs import extfs
@@ -17,6 +18,7 @@ from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from uuid import UUID
 
 
 class ExtFilesystem(Filesystem):
@@ -45,6 +47,10 @@ class ExtFilesystem(Filesystem):
             raise NotASymlinkError(path) from e
         except extfs.Error as e:
             raise FileNotFoundError(path) from e
+
+    @cached_property
+    def uuid(self) -> UUID | None:
+        return self.extfs.uuid
 
 
 class ExtDirEntry(DirEntry):

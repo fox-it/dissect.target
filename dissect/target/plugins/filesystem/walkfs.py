@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import Filesystem, FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.unix.capability import parse_entry as parse_capability_entry
@@ -33,6 +33,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("string", "type"),
         ("string[]", "attr"),
         ("string[]", "fs_types"),
+        ("string[]", "volume_identifiers"),
     ],
 )
 
@@ -115,9 +116,16 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
     entry_stat = entry.lstat()
 
     if isinstance(entry, LayerFilesystemEntry):
-        fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
+        fs_types = []
+        volume_identifiers = []
+
+        for sub_entry in entry.entries:
+            fs_types.append(sub_entry.fs.__type__)
+            volume_identifiers.append(sub_entry.fs.identifier)
+
     else:
         fs_types = [entry.fs.__type__]
+        volume_identifiers = [entry.fs.identifier]
 
     ftype = "unknown"
     if entry.is_symlink():
@@ -141,6 +149,7 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
         "type": ftype,
         "is_suid": bool(entry_stat.st_mode & stat.S_ISUID),
         "fs_types": fs_types,
+        "volume_identifiers": volume_identifiers,
     }
 
     try:

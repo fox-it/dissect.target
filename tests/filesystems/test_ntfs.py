@@ -130,3 +130,24 @@ def test_stat_information(cluster_size: int, size: int, resident: bool, expected
 
         assert stat_info.st_blksize == cluster_size
         assert stat_info.st_blocks == expected_blks
+
+
+def test_ntfs_identifier_from_volume_guid() -> None:
+    """NTFS filesystem identifier is derived correctly from volume GUID."""
+    guid = "test" * 4
+    volume = Mock(guid=guid)
+
+    fs = NtfsFilesystem()
+    fs.volume = volume
+
+    assert fs.identifier == guid
+
+
+def test_ntfs_identifier_no_guid() -> None:
+    """NTFS.identifier falls back to serial when volume.guid is None."""
+    serial_number = "123456789"
+    fs = NtfsFilesystem()
+    fs.volume = Mock(guid=None)
+    fs.ntfs = Mock(serial=serial_number)
+
+    assert fs.identifier == serial_number

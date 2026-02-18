@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import stat
+from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
@@ -60,6 +61,10 @@ class NtfsFilesystem(Filesystem):
             raise NotADirectoryError(path) from e
         except NtfsError as e:
             raise FileNotFoundError(path) from e
+
+    @cached_property
+    def serial(self) -> int | str | None:
+        return self.ntfs.serial
 
 
 class NtfsDirEntry(DirEntry):
