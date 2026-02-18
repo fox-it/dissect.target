@@ -230,13 +230,20 @@ class TargetPath(Path, PureDissectPath):
                 child_path._direntry = entry
                 yield child_path
 
+    def _reset_class(self, paths: Iterator[_GlobberTargetPath]) -> Iterator[Self]:
+        for p in paths:
+            p.__class__ = self.__class__
+            yield p
+
     def glob(
         self, pattern: str, *, case_sensitive: bool | None = None, recurse_symlinks: bool = False
     ) -> Iterator[Self]:
         """Iterate over this subtree and yield all existing files (of any
         kind, including directories) matching the given relative pattern.
         """
-        return PathBase.glob(self, pattern, case_sensitive=case_sensitive, recurse_symlinks=recurse_symlinks)
+        return self._reset_class(
+            PathBase.glob(self, pattern, case_sensitive=case_sensitive, recurse_symlinks=recurse_symlinks)
+        )
 
     def rglob(
         self, pattern: str, *, case_sensitive: bool | None = None, recurse_symlinks: str = False
