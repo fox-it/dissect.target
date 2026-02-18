@@ -261,6 +261,7 @@ def test_target_cli_ls_file(capsys: pytest.CaptureFixture, monkeypatch: pytest.M
     # disable colorful output in `target-shell`
     monkeypatch.setattr(fs, "LS_COLORS", {})
 
+    # ls on a file gives ls output
     out, _ = run_target_shell(
         monkeypatch,
         capsys,
@@ -268,6 +269,15 @@ def test_target_cli_ls_file(capsys: pytest.CaptureFixture, monkeypatch: pytest.M
         "ls -l small-file",
     )
     assert "1000 1000          9 2022-12-05T18:53:05.000000+00:00" in out
+
+    # ls on a non-existing path does not break
+    out, _ = run_target_shell(
+        monkeypatch,
+        capsys,
+        str(absolute_path("_data/filesystems/squashfs/gzip.sqfs")),
+        "ls -l this-path-does-not-exist",
+    )
+    assert out == "gzip.sqfs:/$ ls: cannot access /this-path-does-not-exist: No such file or directory\ngzip.sqfs:/$ \n"
 
 
 def test_target_cli_hash_checksums(target_unix: Target, capsys: pytest.CaptureFixture) -> None:
