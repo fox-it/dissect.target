@@ -122,9 +122,9 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
     ftype = "unknown"
     if entry.is_symlink():
         ftype = "symlink"
-    elif entry.is_dir():
+    elif entry.is_dir(follow_symlinks=False):
         ftype = "dir"
-    elif entry.is_file():
+    elif entry.is_file(follow_symlinks=False):
         ftype = "file"
 
     fields = {
