@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import stat
+from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
@@ -21,17 +22,19 @@ if TYPE_CHECKING:
 
 
 def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_entry("/path/to/some/file", VirtualFile(fs_unix, "file", None))
-    fs_unix.map_file_entry("/path/to/some/other/file.ext", VirtualFile(fs_unix, "file.ext", None))
-    fs_unix.map_file_entry("/root_file", VirtualFile(fs_unix, "root_file", None))
-    fs_unix.map_file_entry("/other_root_file.ext", VirtualFile(fs_unix, "other_root_file.ext", None))
-    fs_unix.map_file_entry("/.test/test.txt", VirtualFile(fs_unix, "test.txt", None))
-    fs_unix.map_file_entry("/.test/.more.test.txt", VirtualFile(fs_unix, ".more.test.txt", None))
+    """Test basic walkfs plugin behavior."""
+
+    fs_unix.map_file_fh("/path/to/some/file", BytesIO(bytes.fromhex("89504e470d0a1a0a")))
+    fs_unix.map_file_fh("/path/to/some/other/file.ext", BytesIO(b""))
+    fs_unix.map_file_fh("/root_file", BytesIO(b""))
+    fs_unix.map_file_fh("/other_root_file.ext", BytesIO(b""))
+    fs_unix.map_file_fh("/.test/test.txt", BytesIO(b""))
+    fs_unix.map_file_fh("/.test/.more.test.txt", BytesIO(b""))
     fs_unix.symlink("/.test/.more.test.txt", "/.test/.more.test.symlink.txt")
 
     target_unix.add_plugin(WalkFsPlugin)
 
-    results = sorted(target_unix.walkfs(), key=lambda r: r.path)
+    results = sorted(target_unix.walkfs(mimetype=True), key=lambda r: r.path)
     assert len(results) == 15
     assert [r.path for r in results] == [
         "/",
@@ -54,16 +57,30 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert results[2].type == "symlink"
     assert results[3].type == "file"
 
+    assert {str(r.path): r.mimetype for r in results if r.mimetype} == {
+        "/.test/.more.test.symlink.txt": "text/plain",  # inferred by txt extension
+        "/.test/.more.test.txt": "text/plain",  # inferred by txt extension
+        "/.test/test.txt": "text/plain",  # inferred by txt extension
+        "/path/to/some/file": "image/png",  # inferred by magic bytes
+    }
+
 
 @pytest.mark.benchmark
-def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> None:
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({}, id="default"),
+        pytest.param({"mimetype": True}, id="mimetype"),
+    ],
+)
+def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture, params: dict) -> None:
     """Benchmark walkfs performance on a small tar archive with ~500 files."""
 
     loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine-docker.tar")))
     loader.map(target_bare)
     target_bare.apply()
 
-    benchmark(lambda: list(itertools.islice(WalkFsPlugin(target_bare).walkfs(), 100)))
+    benchmark(lambda: list(itertools.islice(WalkFsPlugin(target_bare).walkfs(**params), 100)))
 
 
 def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
