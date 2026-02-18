@@ -1422,7 +1422,6 @@ class NamespacePlugin(Plugin):
                 self.target.log.error("Failed to load subplugin: %s", entry)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
 
-
     def check_compatible(self) -> None:
         at_least_one = False
         for entry in self.__subplugins__:
