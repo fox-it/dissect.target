@@ -145,7 +145,7 @@ def generate_record(
         "ctime": from_unix(entry_stat.st_ctime),
         "btime": from_unix(entry_stat.st_birthtime) if entry_stat.st_birthtime else None,
         "ino": entry_stat.st_ino,
-        "path": target.fs.path(entry.path),
+        "path": entry.path,
         "size": entry_stat.st_size,
         "mode": entry_stat.st_mode,
         "uid": entry_stat.st_uid,
