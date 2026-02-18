@@ -112,7 +112,7 @@ class UnixPlugin(OSPlugin):
                         gid=pwent.get(3) or None,
                         gecos=pwent.get(4),
                         home=posix_path(pwent.get(5)),
-                        shell=pwent.get(6),
+                        shell=posix_path(pwent.get(6)),
                         source=passwd_file,
                         _target=self.target,
                     )
@@ -156,7 +156,7 @@ class UnixPlugin(OSPlugin):
                 yield UnixUserRecord(
                     name=user["name"],
                     home=posix_path(user["home"]),
-                    shell=user["shell"],
+                    shell=posix_path(user["shell"]),
                     source="/var/log/syslog",
                     _target=self.target,
                 )
