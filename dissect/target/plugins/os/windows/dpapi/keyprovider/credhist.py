@@ -24,6 +24,6 @@ class CredHistKeyProviderPlugin(KeyProviderPlugin):
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
         """Yield Windows CREDHIST SHA1 hashes."""
-        for credhist in self.target.credhist():
+        for credhist in self.target.credential.credhist():
             if value := credhist.sha1:
                 yield self.__namespace__, value

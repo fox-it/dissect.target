@@ -732,6 +732,27 @@ def test_open_decompress(file_name: str, compressor: Callable, content: bytes) -
     assert fsutil.open_decompress(fileobj=fh).read() == content
 
 
+@pytest.mark.parametrize(
+    ("compressor", "mock_bool_name"),
+    [
+        (fsutil.lzma.compress, "HAS_XZ"),
+        (fsutil.bz2.compress, "HAS_BZ2"),
+        (fsutil.zstd.compress, "HAS_ZSTD"),
+    ],
+)
+def test_open_decompress_missing_module(
+    compressor: Callable, mock_bool_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    vfs = VirtualFilesystem()
+    fh = io.BytesIO(compressor(b"hello world"))
+    vfs.map_file_fh("compressed_file", fh)
+
+    with monkeypatch.context() as m:
+        m.setattr(f"{fsutil.__name__}.{mock_bool_name}", False)
+        with pytest.raises(RuntimeError, match=r".* compression detected, but missing optional python module"):
+            fsutil.open_decompress(vfs.path("compressed_file"))
+
+
 def test_open_decompress_text_modes() -> None:
     vfs = VirtualFilesystem()
     vfs.map_file_fh("test", io.BytesIO(b"zomgbbq"))

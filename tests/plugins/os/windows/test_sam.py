@@ -6,7 +6,7 @@ import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
-from tests.plugins.os.windows.credential.test_lsa import map_lsa_system_keys
+from tests.plugins.os.windows.test_lsa import map_lsa_system_keys
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 try:
     from Crypto.Hash import MD4
 
-    from dissect.target.plugins.os.windows.credential.sam import SamPlugin
+    from dissect.target.plugins.os.windows.sam import SamPlugin
 
     HAS_CRYPTO = True
 except ImportError:
