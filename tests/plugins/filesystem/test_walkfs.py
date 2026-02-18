@@ -30,14 +30,16 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/other_root_file.ext", BytesIO(b""))
     fs_unix.map_file_fh("/.test/test.txt", BytesIO(b""))
     fs_unix.map_file_fh("/.test/.more.test.txt", BytesIO(b""))
+    fs_unix.symlink("/.test/.more.test.txt", "/.test/.more.test.symlink.txt")
 
     target_unix.add_plugin(WalkFsPlugin)
 
     results = sorted(target_unix.walkfs(mimetype=True), key=lambda r: r.path)
-    assert len(results) == 14
+    assert len(results) == 15
     assert [r.path for r in results] == [
         "/",
         "/.test",
+        "/.test/.more.test.symlink.txt",
         "/.test/.more.test.txt",
         "/.test/test.txt",
         "/etc",
@@ -51,6 +53,9 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
         "/root_file",
         "/var",
     ]
+    assert results[0].type == "dir"
+    assert results[2].type == "symlink"
+    assert results[3].type == "file"
 
     assert {str(r.path): r.mimetype for r in results if r.mimetype} == {
         "/.test/.more.test.txt": "text/plain",  # inferred by txt extension
