@@ -1406,6 +1406,23 @@ class NamespacePlugin(Plugin):
             aggregator.__subplugins__.append(cls.__namespace__)
             cls.__update_aggregator_docs(aggregator)
 
+    def _get_paths(self) -> Iterator[Path]:
+        # Specific plugins should implement itself
+        if self.__namespace__ in self.__subplugins__:
+            raise NotImplementedError
+
+        # Aggregate the paths of the subplugins
+        for entry in self.__subplugins__:
+            try:
+                plugin, _ = self.target.get_function(entry)
+                yield from plugin.get_paths()
+            except UnsupportedPluginError:  # noqa: PERF203
+                self.target.log.warning("Subplugin %s is not compatible with target", entry)
+            except Exception as e:
+                self.target.log.error("Failed to load subplugin: %s", entry)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
+
+
     def check_compatible(self) -> None:
         at_least_one = False
         for entry in self.__subplugins__:
