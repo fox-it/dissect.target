@@ -27,11 +27,10 @@ class NtdsFilesystem(Filesystem):
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
-        buf = fh.read(512)
+        buf = fh.read(8)
         if int.from_bytes(buf[4:8], "little") == ulDAEMagic:
             ese = ESE(fh)
-            tables = [table.name for table in ese.tables()]
-            return "datatable" in tables and "link_table" in tables
+            return {"datatable", "link_table"}.issubset(table.name for table in ese.tables())
         return False
 
     def get(self, path: str) -> NtdsFilesystemEntry:
