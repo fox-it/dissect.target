@@ -113,29 +113,6 @@ def test_filesystem_entry_get(exfat_fs: ExfatFilesystem, some_path: ExfatFilesys
     assert some_file.entry[0]._mock_name == "Mock_some_path_some_file"
 
 
-def test_filesystem_entry__iterdir(exfat_fs: ExfatFilesystem, some_path: ExfatFilesystemEntry) -> None:
-    file_names = []
-    file_entries = []
-
-    for entry_name, entry_file_tree in some_path._iterdir():
-        file_names.append(entry_name)
-        file_entries.append(entry_file_tree[0]._mock_name)
-
-    assert len(file_names) == 2
-    assert "some_file" in file_names
-    assert "other_file" in file_names
-    assert "Mock_some_path_some_file" in file_entries
-    assert "Mock_some_path_other_file" in file_entries
-
-
-def test_filesystem_entry__iterdir_raises(
-    exfat_fs: ExfatFilesystem,
-    other_file: ExfatFilesystemEntry,
-) -> None:
-    with pytest.raises(NotADirectoryError):
-        list(other_file._iterdir())
-
-
 def test_filesystem_entry_iterdir(
     exfat_fs: ExfatFilesystem,
     some_path: ExfatFilesystemEntry,

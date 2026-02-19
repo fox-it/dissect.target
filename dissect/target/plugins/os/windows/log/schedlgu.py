@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import datetime
-import logging
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 SchedLgURecord = TargetRecordDescriptor(
     "windows/tasks/log/schedlgu",
@@ -111,14 +112,13 @@ class SchedLgUPlugin(Plugin):
 
     PATHS = (
         "sysvol/SchedLgU.txt",
-        "sysvol/windows/SchedLgU.txt",
-        "sysvol/windows/tasks/SchedLgU.txt",
-        "sysvol/winnt/tasks/SchedLgU.txt",
+        "%windir%/SchedLgU.txt",
+        "%windir%/tasks/SchedLgU.txt",
     )
 
     def __init__(self, target: Target):
         self.target = target
-        self.paths = [self.target.fs.path(path) for path in self.PATHS if self.target.fs.path(path).exists()]
+        self.paths = [resolved_path for path in self.PATHS if (resolved_path := self.target.resolve(path)).exists()]
 
     def check_compatible(self) -> None:
         if len(self.paths) == 0:

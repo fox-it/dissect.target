@@ -39,6 +39,8 @@ if TYPE_CHECKING:
 
     from flow.record import Record
 
+    from dissect.target.target import Target
+
 DEFENDER_EVTX_FIELDS = [
     ("datetime", "ts"),
     ("uint32", "EventID"),
@@ -96,12 +98,18 @@ DEFENDER_EVTX_FIELDS = [
     ("string", "Version"),
 ]
 
-DEFENDER_LOG_DIR = "sysvol/windows/system32/winevt/logs"
+DEFENDER_LOG_DIR = "%windir%/system32/winevt/logs"
 DEFENDER_LOG_FILENAME_GLOB = "Microsoft-Windows-Windows Defender*"
 EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
 DEFENDER_QUARANTINE_DIR = "sysvol/programdata/microsoft/windows defender/quarantine"
 DEFENDER_MPLOG_DIR = "sysvol/programdata/microsoft/windows defender/support"
+DEFENDER_MPCMDRUN_SYSTEM_DIRS = (
+    "sysvol/Windows/Temp",
+    "sysvol/Windows.old/Windows/Temp",
+    "sysvol/Windows/Microsoft Antimalware/Tmp",
+)
+DEFENDER_MPCMDRUN_USER_DIRS = ("AppData/Local/Temp",)
 DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey"]
 
 DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
@@ -120,10 +128,30 @@ DefenderExclusionRecord = TargetRecordDescriptor(
     ],
 )
 
+DefenderMpCmdRunLogRecord = TargetRecordDescriptor(
+    "filesystem/windows/defender/mpcmdrunlog",
+    [
+        ("datetime", "ts_start"),
+        ("datetime", "ts_end"),
+        ("string", "command"),
+        ("path", "source"),
+    ],
+)
+
 
 def parse_iso_datetime(datetime_value: str) -> datetime.datetime:
-    """Parse ISO8601 serialized datetime with ``Z`` ending."""
-    return datetime.datetime.strptime(datetime_value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
+    """Parse ISO8601 serialized datetime with optional ``Z`` or UTC offset ending.
+
+    MpLog timestamps may appear as:
+    - ``2025-11-26T22:01:52.403Z``
+    - ``2025-11-26T22:01:52.403+02:00``
+    - ``2025-11-26T22:01:52.403`` (no suffix, assumed UTC)
+    """
+    # Normalize Z to +00:00 so fromisoformat can handle all variants uniformly.
+    dt = datetime.datetime.fromisoformat(datetime_value.strip().replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
 
 
 def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iterator[DefenderLogRecord]:
@@ -145,14 +173,31 @@ class MicrosoftDefenderPlugin(Plugin):
 
     __namespace__ = "defender"
 
+    def __init__(self, target: Target):
+        super().__init__(target)
+
+        self.mpcmdrun_logs: set[Path] = set()
+        for system_dir in DEFENDER_MPCMDRUN_SYSTEM_DIRS:
+            if not (dir := self.target.fs.path(system_dir)).is_dir():
+                continue
+            self.mpcmdrun_logs.update(dir.glob("MpCmdRun.log*"))
+
+        for user_details in self.target.user_details.all_with_home():
+            for user_dir in DEFENDER_MPCMDRUN_USER_DIRS:
+                if not (dir := user_details.home_path.joinpath(user_dir)).is_dir():
+                    continue
+                self.mpcmdrun_logs.update(dir.glob("MpCmdRun.log*"))
+
     def check_compatible(self) -> None:
-        # Either the Defender log folder, the quarantine folder or the exclusions registry key
-        # has to exist for this plugin to be compatible.
+        # Either the Defender log folder, the quarantine folder, a Temp folder of the
+        # MpCmdRun log or the exclusions registry key has to exist for this plugin to
+        # be compatible.
 
         if not any(
             [
-                self.target.fs.path(DEFENDER_LOG_DIR).exists(),
+                self.target.resolve(DEFENDER_LOG_DIR).exists(),
                 self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
+                *self.mpcmdrun_logs,
                 (
                     self.target.has_function("registry")
                     and len(list(self.target.registry.keys(DEFENDER_EXCLUSION_KEY))) > 0
@@ -196,8 +241,8 @@ class MicrosoftDefenderPlugin(Plugin):
             # These fields are present for all (currently known) quarantine entry types
             fields = {
                 "ts": entry.timestamp,
-                "quarantine_id": entry.quarantine_id,
-                "scan_id": entry.scan_id,
+                "quarantine_id": entry.quarantine_id.hex(),
+                "scan_id": entry.scan_id.hex(),
                 "threat_id": entry.threat_id,
                 "detection_name": entry.detection_name,
             }
@@ -543,3 +588,45 @@ class MicrosoftDefenderPlugin(Plugin):
                 for unknown_field in resource.unknown_fields:
                     self.target.log.warning("Encountered an unknown field identifier: %s", unknown_field.Identifier)
             yield entry
+
+    @export(record=[DefenderMpCmdRunLogRecord])
+    def mpcmdrun(self) -> Iterator[DefenderMpCmdRunLogRecord]:
+        """Return entries in Defender ``MpCmdRun.log`` files from ``MpCmdRun.exe`` invocations.
+
+        Entries always start with the used command line, and often contains a start time. The start time is omitted
+        in some instances.
+
+        References:
+            - https://learn.microsoft.com/defender-endpoint/command-line-arguments-microsoft-defender-antivirus
+            - https://lolbas-project.github.io/lolbas/Binaries/MpCmdRun
+            - https://itm4n.github.io/cve-2020-1170-windows-defender-eop
+        """
+        tzinfo = self.target.datetime.tzinfo
+
+        sep = "-" * 85
+        field_names = [
+            ("command", "MpCmdRun: Command Line: "),
+            ("ts_start", "Start Time: "),
+            ("ts_end", "MpCmdRun: End Time: "),
+        ]
+
+        for file in self.mpcmdrun_logs:
+            fields = {}
+            for line in file.open("rt", encoding="utf-16-le"):
+                if sep in line:
+                    if fields:
+                        yield DefenderMpCmdRunLogRecord(
+                            **fields,
+                            source=file,
+                            _target=self.target,
+                        )
+                    fields = {}
+
+                for field, prefix in field_names:
+                    if prefix in line:
+                        value = line.replace(prefix, "").strip()
+                        if field.startswith("ts_"):
+                            value = datetime.datetime.strptime(
+                                value.replace("\u200e", ""), "%a %b %d %Y %H:%M:%S"
+                            ).replace(tzinfo=tzinfo)
+                        fields[field] = value

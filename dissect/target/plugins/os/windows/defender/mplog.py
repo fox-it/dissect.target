@@ -89,7 +89,7 @@ DefenderMPLogEMSRecord = TargetRecordDescriptor(
         ("varint", "pid"),
         ("string", "sigseq"),
         ("varint", "send_memory_scan_report"),
-        ("varint", "source"),
+        ("varint", "source_id"),
     ],
 )
 
@@ -194,7 +194,10 @@ DefenderMPLogRTPRecord = TargetRecordDescriptor(
     ],
 )
 
-DEFENDER_MPLOG_TS_PATTERN = r"(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z)"
+DEFENDER_MPLOG_TS_PATTERN = (
+    r"(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+    r"\.[0-9]{3}(?:Z|[+-][0-9]{2}:[0-9]{2})?)"
+)
 
 # Loosely based on https://github.com/Intrinsec/mplog_parser but feel free to add patterns
 
@@ -249,7 +252,7 @@ DEFENDER_MPLOG_PATTERNS = [
                 pid:\s(?P<pid>\d*),\s
                 sigseq:\s(?P<sigseq>\w*),\s
                 sendMemoryScanReport:\s(?P<send_memory_scan_report>\d*),\s
-                source:\s(?P<source>\d*)
+                source:\s(?P<source_id>\d*)
             """,
             re.VERBOSE,
         ),

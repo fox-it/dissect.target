@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import operator
 import struct
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
-from dissect.target.plugin import OperatingSystem, OSPlugin, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -14,6 +16,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.plugins.os.windows.sam import SamRecord
     from dissect.target.target import Target
 
 ARCH_MAP = {
@@ -74,7 +77,7 @@ class WindowsPlugin(OSPlugin):
                         drive = p[1]
 
                         if value.startswith(b"DMIO:ID:"):
-                            guid = value[8:]
+                            guid = str(UUID(bytes_le=value[8:]))
 
                             for volume in self.target.volumes:
                                 if volume.guid == guid and volume.fs:
@@ -283,29 +286,48 @@ class WindowsPlugin(OSPlugin):
         except RegistryError:
             pass
 
+    @cached_property
+    def _sam_by_sid(self) -> dict[str, SamRecord]:
+        if not (machine_sid := next(self.target.machine_sid(), None)):
+            return {}
+
+        sam_users: dict[str, SamRecord] = {}
+        try:
+            for sam_record in self.target.sam():
+                # Compose SID from domain_sid and RID
+                sam_users[f"{machine_sid.sid}-{sam_record.rid}"] = sam_record
+        except Exception as e:
+            self.target.log.warning("Could not read SAM records")
+            self.target.log.debug("", exc_info=e)
+
+        return sam_users
+
     @export(record=WindowsUserRecord)
     def users(self) -> Iterator[WindowsUserRecord]:
         # Be aware that this function can never do anything which needs user
         # registry hives. Initializing those hives will need this function,
         # which will then cause a recursion.
+
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
         sids = set()
         for k in self.target.registry.keys(key):
             for subkey in k.subkeys():
                 sid = subkey.name
+
                 if sid in sids:
                     continue
 
                 sids.add(sid)
-                name = None
                 home = None
+                name = None
                 try:
                     profile_image_path = subkey.value("ProfileImagePath")
                 except RegistryValueNotFoundError:
                     pass
                 else:
                     home = profile_image_path.value
-                    name = home.split("\\")[-1]
+                    # Use SAM username if available
+                    name = self._sam_by_sid[sid].username if sid in self._sam_by_sid else home.split("\\")[-1]
 
                 yield WindowsUserRecord(
                     sid=subkey.name,
@@ -313,6 +335,24 @@ class WindowsPlugin(OSPlugin):
                     home=self.target.resolve(home),
                     _target=self.target,
                 )
+
+    @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        yield from (
+            (resolved_path, user_criterion)
+            for path, user_criterion in [
+                ("%windir%/ServiceProfiles/LocalService", ("sid", "S-1-5-19")),
+                ("%windir%/ServiceProfiles/NetworkService", ("sid", "S-1-5-20")),
+                ("%windir%/System32/config/systemprofile", ("sid", "S-1-5-18")),
+                ("%windir%/SysWOW64/config/systemprofile", ("sid", "S-1-5-18")),
+            ]
+            if (resolved_path := self.target.resolve(path)).exists()
+        )
+
+        # Homedirs for users when there is no user profile information available.
+        for user_dir in ("sysvol/Users", "sysvol/Documents and Settings"):
+            if (resolved := self.target.resolve(user_dir)).exists():
+                yield from ((entry, None) for entry in resolved.iterdir() if entry.is_dir())
 
     @export(property=True)
     def os(self) -> str:

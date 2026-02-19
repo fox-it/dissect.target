@@ -7,10 +7,14 @@ from unittest.mock import patch
 
 import pytest
 
+from dissect.target.helpers.logging import TRACE_LEVEL
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from dissect.target.filesystem import VirtualFilesystem
 
 
@@ -18,7 +22,7 @@ def test_missing_hives(fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixtu
     target = Target()
     target.filesystems.add(fs_win)
 
-    with caplog.at_level(logging.DEBUG, target.log.name):
+    with caplog.at_level(TRACE_LEVEL, target.log.name):
         target.apply()
 
         expected = []
@@ -153,3 +157,56 @@ def test_registry_plugin_root_none(target_win_users: Target) -> None:
 
     assert plugin.key()
     assert plugin.key("")
+
+
+@pytest.mark.parametrize(
+    ("keys", "values", "expected_output"),
+    [
+        pytest.param(
+            "HKLM\\SOFTWARE\\SomePath",
+            "Foo",
+            ["FooValue"],
+            id="single-key-single-value",
+        ),
+        pytest.param(
+            "HKLM\\SOFTWARE\\SomePath",
+            ("Foo", "Bar"),
+            ["FooValue", "BarValue"],
+            id="single-key-multi-value",
+        ),
+        pytest.param(
+            ("HKLM\\SOFTWARE\\SomePath", "HKLM\\SOFTWARE\\AnotherPath"),
+            "Foo",
+            ["FooValue", "AnotherFooValue"],
+            id="multi-key-single-value",
+        ),
+        pytest.param(
+            ("HKLM\\SOFTWARE\\SomePath", "HKLM\\SOFTWARE\\AnotherPath"),
+            ("Foo", "Bar"),
+            ["FooValue", "BarValue", "AnotherFooValue", "AnotherBarValue"],
+            id="multi-key-multi-value",
+        ),
+    ],
+)
+def test_registry_plugin_values_keys(
+    target_win_users: Target,
+    hive_hklm: VirtualHive,
+    keys: str | Iterable[str] | None,
+    values: str | Iterable[str] | None,
+    expected_output: list[str],
+) -> None:
+    """Test if we can handle different input values for :meth:`RegistryPlugin.values`."""
+
+    key_path = "SOFTWARE\\SomePath"
+    key = VirtualKey(hive_hklm, key_path)
+    key.add_value("Foo", VirtualValue(hive_hklm, "Foo", "FooValue"))
+    key.add_value("Bar", VirtualValue(hive_hklm, "Bar", "BarValue"))
+    hive_hklm.map_key(key_path, key)
+
+    key_path = "SOFTWARE\\AnotherPath"
+    key = VirtualKey(hive_hklm, key_path)
+    key.add_value("Foo", VirtualValue(hive_hklm, "Foo", "AnotherFooValue"))
+    key.add_value("Bar", VirtualValue(hive_hklm, "Bar", "AnotherBarValue"))
+    hive_hklm.map_key(key_path, key)
+
+    assert [v.value for v in target_win_users.registry.values(keys, values)] == expected_output

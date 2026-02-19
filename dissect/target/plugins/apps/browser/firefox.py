@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import base64
-import hmac
+import itertools
 import json
-import logging
 from base64 import b64decode
 from hashlib import pbkdf2_hmac, sha1
 from itertools import chain
 from typing import TYPE_CHECKING
 
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
@@ -29,11 +29,9 @@ from dissect.target.plugins.apps.browser.browser import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
-    from dissect.sql.sqlite3 import SQLite3
-
-    from dissect.target.helpers.fsutil import TargetPath
-    from dissect.target.plugins.general.users import UserRecord
+    from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
 try:
@@ -59,7 +57,8 @@ FIREFOX_EXTENSION_RECORD_FIELDS = [
     ("string[]", "optional_permissions"),
 ]
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class FirefoxPlugin(BrowserPlugin):
@@ -71,15 +70,22 @@ class FirefoxPlugin(BrowserPlugin):
         # Windows
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
-        # Linux
+        # Linux (146 and before)
         ".mozilla/firefox",
         "snap/firefox/common/.mozilla/firefox",
         ".var/app/org.mozilla.firefox/.mozilla/firefox",
+        # Linux (147 and newer) uses XDG_CONFIG_HOME by default
+        ".config/mozilla/firefox",
+        "snap/firefox/common/.config/mozilla/firefox",
+        ".var/app/org.mozilla.firefox/.config/mozilla/firefox",
         # macOS
         "Library/Application Support/Firefox",
     )
 
-    SYSTEM_DIRS = ("/data/data/org.mozilla.vrbrowser/files/mozilla",)
+    SYSTEM_DIRS = (
+        # Android Oculus VR
+        "/data/data/org.mozilla.vrbrowser/files/mozilla",
+    )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
@@ -104,32 +110,46 @@ class FirefoxPlugin(BrowserPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.dirs: list[tuple[UserRecord, TargetPath]] = []
+        self.installs = list(self.find_installs())
+
+    def find_installs(self) -> Iterator[tuple[UserDetails | None, Path]]:
+        """Find Firefox install directories on the target."""
 
         for user_details in self.target.user_details.all_with_home():
             for directory in self.USER_DIRS:
-                cur_dir = user_details.home_path.joinpath(directory)
-                if not cur_dir.exists():
-                    continue
-                self.dirs.append((user_details.user, cur_dir))
+                if (install := user_details.home_path.joinpath(directory)).is_dir():
+                    yield user_details, install
 
         for directory in self.SYSTEM_DIRS:
-            if (cur_dir := target.fs.path(directory)).exists():
-                self.dirs.append((None, cur_dir))
+            if (install := self.target.fs.path(directory)).is_dir():
+                yield None, install
 
     def check_compatible(self) -> None:
-        if not len(self.dirs):
-            raise UnsupportedPluginError("No Firefox directories found")
+        if not len(self.installs):
+            raise UnsupportedPluginError("No Firefox directories found on target")
 
-    def _iter_profiles(self) -> Iterator[tuple[UserRecord, TargetPath, TargetPath]]:
-        """Yield user directories."""
-        for user, cur_dir in self.dirs:
-            for profile_dir in cur_dir.iterdir():
-                if not profile_dir.is_dir():
+    def _iter_profiles(self) -> Iterator[tuple[UserDetails | None, Path, Path]]:
+        """Yield user directories by iterating over found Firefox install directories.
+
+        Currently does not parse ``$INSTALL/profiles.ini`` file.
+        """
+
+        seen = set()
+
+        for user_details, install in self.installs:
+            for child in install.iterdir():
+                # Profile dirs have a dot in their name
+                if not child.is_dir() or "." not in child.name:
                     continue
-                yield user, cur_dir, profile_dir
 
-    def _iter_db(self, filename: str) -> Iterator[tuple[UserRecord, SQLite3]]:
+                # Prevent duplicates
+                if child in seen:
+                    continue
+                seen.add(child)
+
+                yield user_details, install, child
+
+    def _iter_db(self, filename: str) -> Iterator[tuple[UserDetails | None, Path, SQLite3]]:
         """Yield opened history database files of all users.
 
         Args:
@@ -138,11 +158,12 @@ class FirefoxPlugin(BrowserPlugin):
         Yields:
             Opened SQLite3 databases.
         """
-        iter_system = ((None, system_dir, None) for user, system_dir in self.dirs if user is None)
 
-        for user, cur_dir, profile_dir in chain(iter_system, self._iter_profiles()):
-            if user is None and profile_dir is None:
-                db_file = cur_dir.parent.joinpath(filename)
+        iter_system = ((None, system_dir, None) for user, system_dir in self.installs if user is None)
+
+        for user_details, install, profile_dir in chain(iter_system, self._iter_profiles()):
+            if user_details is None and profile_dir is None:
+                db_file = install.parent.joinpath(filename)
                 # On some Android variants, some files may exist in the base directory (places.sqlite) but others
                 # in a nested profile directory (cookies.sqlite)
                 # /data/data/org.mozilla.vrbrowser/files/places.sqlite
@@ -153,10 +174,10 @@ class FirefoxPlugin(BrowserPlugin):
                 db_file = profile_dir.joinpath(filename)
 
             try:
-                yield user, db_file, sqlite3.SQLite3(db_file.open())
+                yield user_details, db_file, SQLite3(db_file)
             except FileNotFoundError:
                 self.target.log.info("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -174,11 +195,11 @@ class FirefoxPlugin(BrowserPlugin):
             url (uri): History URL.
             title (string): Page title.
             description (string): Page description.
-            rev_host (string): Reverse hostname.
+            host (string): Hostname.
             visit_type (varint): Visit type.
             visit_count (varint): Amount of visits.
             hidden (string): Hidden value.
-            typed (string): Typed value.
+            typed (boolean): Typed value.
             session (varint): Session value.
             from_visit (varint): Record ID of the "from" visit.
             from_url (uri): URL of the "from" visit.
@@ -186,7 +207,7 @@ class FirefoxPlugin(BrowserPlugin):
         """
         from_timestamp = from_unix_ms if self.target.os == OperatingSystem.ANDROID else from_unix_us
 
-        for user, db_file, db in self._iter_db("places.sqlite"):
+        for user_details, db_file, db in self._iter_db("places.sqlite"):
             try:
                 places = {row.id: row for row in db.table("moz_places").rows()}
                 visits = {}
@@ -208,7 +229,9 @@ class FirefoxPlugin(BrowserPlugin):
                         url=try_idna(place.url),
                         title=place.title,
                         description=place.description,
-                        rev_host=try_idna(place.rev_shot),
+                        host="".join(list(reversed(try_idna(place.rev_host).decode()))).lstrip(".")
+                        if place.rev_host
+                        else None,
                         visit_type=row.visit_type,
                         visit_count=place.visit_count,
                         hidden=place.hidden,
@@ -218,9 +241,9 @@ class FirefoxPlugin(BrowserPlugin):
                         from_url=try_idna(from_place.url) if from_place else None,
                         source=db_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -248,7 +271,7 @@ class FirefoxPlugin(BrowserPlugin):
                 is_http_only (bool): Cookie http only flag.
                 same_site (bool): Cookie same site flag.
         """
-        for user, db_file, db in self._iter_db("cookies.sqlite"):
+        for user_details, db_file, db in self._iter_db("cookies.sqlite"):
             try:
                 for cookie in db.table("moz_cookies").rows():
                     yield self.BrowserCookieRecord(
@@ -265,9 +288,9 @@ class FirefoxPlugin(BrowserPlugin):
                         same_site=bool(cookie.sameSite),
                         source=db_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing cookie file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -289,7 +312,7 @@ class FirefoxPlugin(BrowserPlugin):
             state (varint): Download state number.
             source: (path): The source file of the download record.
         """
-        for user, db_file, db in self._iter_db("places.sqlite"):
+        for user_details, db_file, db in self._iter_db("places.sqlite"):
             try:
                 places = {row.id: row for row in db.table("moz_places").rows()}
                 if not (moz_anno_attributes := db.table("moz_anno_attributes")):
@@ -353,9 +376,9 @@ class FirefoxPlugin(BrowserPlugin):
                         state=state,
                         source=db_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user_details.user if user_details else None,
                     )
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -384,52 +407,40 @@ class FirefoxPlugin(BrowserPlugin):
             source_uri (path): Source path from which the extension was downloaded.
             source (path): The source file of the download record.
         """
-        for user, _, profile_dir in self._iter_profiles():
-            extension_file = profile_dir.joinpath("extensions.json")
-
-            if not extension_file.exists():
-                self.target.log.warning(
-                    "No 'extensions.json' addon file found for user %s in directory %s",
-                    user.name,
-                    profile_dir,
-                )
+        for user_details, _, profile_dir in self._iter_profiles():
+            if not (extension_file := profile_dir.joinpath("extensions.json")).is_file():
                 continue
 
             try:
                 extensions = json.load(extension_file.open())
-
-                for extension in extensions.get("addons", []):
-                    yield self.BrowserExtensionRecord(
-                        ts_install=from_unix_ms(extension.get("installDate", 0)),
-                        ts_update=from_unix_ms(extension.get("updateDate", 0)),
-                        browser="firefox",
-                        id=extension.get("id"),
-                        name=(extension.get("defaultLocale", {}) or {}).get("name"),
-                        short_name=None,
-                        default_title=None,
-                        description=(extension.get("defaultLocale", {}) or {}).get("description"),
-                        version=extension.get("version"),
-                        ext_path=extension.get("path"),
-                        from_webstore=None,
-                        permissions=(extension.get("userPermissions", {}) or {}).get("permissions"),
-                        manifest_version=extension.get("manifestVersion"),
-                        source_uri=extension.get("sourceURI"),
-                        optional_permissions=(extension.get("optionalPermissions", {}) or {}).get("permissions"),
-                        source=extension_file,
-                        _target=self.target,
-                        _user=user,
-                    )
-
-            except FileNotFoundError:
-                self.target.log.info(
-                    "No 'extensions.json' addon file found for user %s in directory %s",
-                    user.name,
-                    profile_dir,
-                )
-            except json.JSONDecodeError:
+            except (UnicodeDecodeError, json.JSONDecodeError) as e:
                 self.target.log.warning(
-                    "extensions.json file in directory %s is malformed, consider inspecting the file manually",
-                    profile_dir,
+                    "Firefox file '%s' is malformed, consider inspecting the file manually: %s",
+                    extension_file,
+                    e,
+                )
+                self.target.log.debug("", exc_info=e)
+
+            for extension in extensions.get("addons", []):
+                yield self.BrowserExtensionRecord(
+                    ts_install=from_unix_ms(extension.get("installDate", 0)),
+                    ts_update=from_unix_ms(extension.get("updateDate", 0)),
+                    browser="firefox",
+                    extension_id=extension.get("id"),
+                    name=(extension.get("defaultLocale", {}) or {}).get("name"),
+                    short_name=None,
+                    default_title=None,
+                    description=(extension.get("defaultLocale", {}) or {}).get("description"),
+                    version=extension.get("version"),
+                    ext_path=extension.get("path"),
+                    from_webstore=None,
+                    permissions=(extension.get("userPermissions", {}) or {}).get("permissions"),
+                    manifest_version=extension.get("manifestVersion"),
+                    source_uri=extension.get("sourceURI"),
+                    optional_permissions=(extension.get("optionalPermissions", {}) or {}).get("permissions"),
+                    source=extension_file,
+                    _target=self.target,
+                    _user=user_details.user if user_details else None,
                 )
 
     @export(record=BrowserPasswordRecord)
@@ -439,54 +450,87 @@ class FirefoxPlugin(BrowserPlugin):
         Automatically decrypts passwords from Firefox 58 onwards (2018) if no primary password is set.
         Alternatively, you can supply a primary password through the keychain to access the Firefox password store.
 
-        ``PASSPHRASE`` passwords in the keychain with providers ``browser``, ``firefox``, ``user`` and no provider
+        Passphrases in the keychain with providers ``browser``, ``firefox``, ``user`` and no provider
         can be used to decrypt secrets for this plugin.
 
-        Resources:
+        References:
+            - https://github.com/mozilla-firefox/firefox/tree/main/toolkit/components/passwordmgr
             - https://github.com/lclevy/firepwd
         """
-        for user, _, profile_dir in self._iter_profiles():
-            login_file = profile_dir.joinpath("logins.json")
+
+        working_passwords = set()
+
+        for user_details, _, profile_dir in self._iter_profiles():
+            logins_file = profile_dir.joinpath("logins.json")
+            logins_backup = profile_dir.joinpath("logins-backup.json")
+
             key3_file = profile_dir.joinpath("key3.db")
             key4_file = profile_dir.joinpath("key4.db")
 
-            if not login_file.exists():
-                self.target.log.warning(
-                    "No 'logins.json' password file found for user %s in directory %s",
-                    user.name,
-                    profile_dir,
-                )
+            # Do not attempt master key decryption if this profile has no logins.
+            if not logins_file.is_file() and not logins_backup.is_file():
                 continue
 
-            if key3_file.exists() and not key4_file.exists():
+            if key3_file.is_file() and not key4_file.is_file():
                 self.target.log.warning("Unsupported file 'key3.db' found in %s", profile_dir)
                 continue
 
-            if not key4_file.exists():
+            if not key4_file.is_file():
                 self.target.log.warning("No 'key4.db' found in %s", profile_dir)
                 continue
 
-            try:
-                logins = json.load(login_file.open())
+            if not HAS_CRYPTO or not HAS_ASN1:
+                self.target.log.error("Missing dependencies pycryptodome or asn1crypto for Firefox password decryption")
+                continue
+
+            # Decrypt the master key for this profile first. The ``BrowserPlugin.keychain()`` includes an empty password
+            # which is required to decrypt Firefox master keys with no primary password set.
+            key = None
+
+            for primary_password in itertools.chain(working_passwords, self.keychain()):
+                try:
+                    key = decrypt_master_key(key4_file, primary_password.encode())
+                    working_passwords.add(primary_password)
+                    break
+
+                except ValueError as e:
+                    self.target.log.debug(
+                        "Failed to decrypt Firefox master key using primary password %r: %s", primary_password, e
+                    )
+
+            if not key:
+                self.target.log.error(
+                    "Failed to decrypt Firefox master key in file '%s' using provided passphrase(s)", key4_file
+                )
+                continue
+
+            for login_file in (logins_file, logins_backup):
+                if not login_file.is_file():
+                    continue
+
+                try:
+                    logins = json.load(login_file.open())
+                except (UnicodeDecodeError, json.JSONDecodeError) as e:
+                    self.target.log.warning(
+                        "Firefox file '%s' is malformed, consider inspecting the file manually: %s",
+                        login_file,
+                        e,
+                    )
+                    self.target.log.debug("", exc_info=e)
 
                 for login in logins.get("logins", []):
                     decrypted_username = None
                     decrypted_password = None
 
-                    for password in self.keychain():
-                        try:
-                            decrypted_username, decrypted_password = decrypt(
-                                login.get("encryptedUsername"),
-                                login.get("encryptedPassword"),
-                                key4_file,
-                                password,
-                            )
-                        except ValueError as e:
-                            self.target.log.warning("Exception while trying to decrypt")
-                            self.target.log.debug("", exc_info=e)
+                    try:
+                        decrypted_username = decrypt_value(login.get("encryptedUsername"), key)
+                        decrypted_password = decrypt_value(login.get("encryptedPassword"), key)
 
-                        if decrypted_password and decrypted_username:
-                            break
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Exception while trying to decrypt Firefox login in '%s': %s", login_file, e
+                        )
+                        self.target.log.debug("", exc_info=e)
 
                     yield self.BrowserPasswordRecord(
                         ts_created=from_unix_ms(login.get("timeCreated", 0)),
@@ -495,86 +539,27 @@ class FirefoxPlugin(BrowserPlugin):
                         browser="firefox",
                         id=login.get("id"),
                         url=login.get("hostname"),
-                        encrypted_username=base64.b64decode(login.get("encryptedUsername", "")),
-                        encrypted_password=base64.b64decode(login.get("encryptedPassword", "")),
+                        encrypted_username=base64.b64decode(login.get("encryptedUsername", ""))
+                        if not decrypted_username
+                        else None,
+                        encrypted_password=base64.b64decode(login.get("encryptedPassword", ""))
+                        if not decrypted_password
+                        else None,
                         decrypted_username=decrypted_username,
                         decrypted_password=decrypted_password,
                         source=login_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user_details.user if user_details else None,
                     )
-
-            except FileNotFoundError:
-                self.target.log.info(
-                    "No password file found for user %s in directory %s",
-                    user.name,
-                    profile_dir,
-                )
-            except json.JSONDecodeError:
-                self.target.log.warning(
-                    "logins.json file in directory %s is malformed, consider inspecting the file manually",
-                    profile_dir,
-                )
 
 
 # Define separately because it is not defined in asn1crypto
 pbeWithSha1AndTripleDES_CBC = "1.2.840.113549.1.12.5.1.3"
-CKA_ID = b"\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+CKA_ID = bytes.fromhex("f8000000000000000000000000000001")
 
 
-def decrypt_moz_3des(global_salt: bytes, primary_password: bytes, entry_salt: str, encrypted: bytes) -> bytes:
-    if not HAS_CRYPTO:
-        raise ValueError("Missing pycryptodome dependency")
-
-    hp = sha1(global_salt + primary_password).digest()
-    pes = entry_salt + b"\x00" * (20 - len(entry_salt))
-    chp = sha1(hp + entry_salt).digest()
-    k1 = hmac.new(chp, pes + entry_salt, sha1).digest()
-    tk = hmac.new(chp, pes, sha1).digest()
-    k2 = hmac.new(chp, tk + entry_salt, sha1).digest()
-    k = k1 + k2
-    iv = k[-8:]
-    key = k[:24]
-    return DES3.new(key, DES3.MODE_CBC, iv).decrypt(encrypted)
-
-
-def decode_login_data(data: str) -> tuple[bytes, bytes, bytes]:
-    """Decode Firefox login data.
-
-    Args:
-        data: Base64 encoded data in string format.
-
-    Raises:
-        ValueError: When missing ``pycryptodome`` or ``asn1crypto`` dependencies.
-
-    Returns:
-        Tuple of bytes with ``key_id``, ``iv`` and ``ciphertext``
-    """
-
-    # SEQUENCE {
-    #     KEY_ID
-    #     SEQUENCE {
-    #         OBJECT_IDENTIFIER
-    #         IV
-    #     }
-    #     CIPHERTEXT
-    # }
-
-    if not HAS_CRYPTO:
-        raise ValueError("Missing pycryptodome dependency")
-
-    if not HAS_ASN1:
-        raise ValueError("Missing asn1crypto dependency")
-
-    decoded = core.load(b64decode(data))
-    key_id = decoded[0].native
-    iv = decoded[1][1].native
-    ciphertext = decoded[2].native
-    return key_id, iv, ciphertext
-
-
-def decrypt_pbes2(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> bytes:
-    """Decrypt an item with the given primary password and salt.
+def _decrypt_master_key_pbes2(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> bytes:
+    """Decrypt a Firefox master key with the given primary password and salt.
 
     Args:
         decoded_item: ``core.Sequence`` is a ``list`` representation of ``SEQUENCE`` as described below.
@@ -612,12 +597,6 @@ def decrypt_pbes2(decoded_item: core.Sequence, primary_password: bytes, global_s
     #   OCTETSTRING encrypted
     # }
 
-    if not HAS_CRYPTO:
-        raise ValueError("Missing pycryptodome dependency")
-
-    if not HAS_ASN1:
-        raise ValueError("Missing asn1crypto dependency")
-
     pkcs5_oid = decoded_item[0][1][0][0].dotted
     if algos.KdfAlgorithmId.map(pkcs5_oid) != "pbkdf2":
         raise ValueError(f"Expected pbkdf2 object identifier, got: {pkcs5_oid}")
@@ -645,55 +624,23 @@ def decrypt_pbes2(decoded_item: core.Sequence, primary_password: bytes, global_s
     return AES.new(key, AES.MODE_CBC, iv).decrypt(cipher_text)
 
 
-def decrypt_sha1_triple_des_cbc(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> bytes:
-    """Decrypt an item with the given Firefox primary password and salt.
-
-    Args:
-        decoded_item: ``core.Sequence`` is a ``list`` representation of ``SEQUENCE`` as described below.
-        primary_password: ``bytes`` of Firefox primary password to decrypt ciphertext with.
-        global_salt: ``bytes`` of salt to prepend to primary password when calculating AES key.
-
-    Raises:
-        ValueError: When missing ``pycryptodome`` or ``asn1crypto`` dependencies.
-
-    Returns:
-        Bytes of decrypted 3DES ciphertext.
-    """
-
-    # SEQUENCE {
-    #     SEQUENCE {
-    #         OBJECTIDENTIFIER 1.2.840.113549.1.12.5.1.3
-    #         SEQUENCE {
-    #             OCTETSTRING entry_salt
-    #             INTEGER 01
-    #         }
-    #     }
-    #     OCTETSTRING encrypted
-    # }
-
-    entry_salt = decoded_item[0][1][0].native
-    cipher_text = decoded_item[1].native
-    key = decrypt_moz_3des(global_salt, primary_password, entry_salt, cipher_text)
-    return key[:24]
-
-
-def decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> tuple[bytes, str]:
+def _decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> tuple[bytes, str]:
     """Decrypt the provided ``core.Sequence`` with the provided Firefox primary password and salt.
 
     At this stage we are not yet sure of the structure of ``decoded_item``. The structure will depend on the
     ``core.Sequence`` object identifier at ``decoded_item[0][0]``, hence we extract it. This function will
-    then call the apropriate ``decrypt_pbes2``or ``decrypt_sha1_triple_des_cbc`` functions to decrypt the item.
+    then call the apropriate ``_decrypt_master_key_pbes2`` function to decrypt the item.
+
+    Firefox supports other algorithms (i.e. Firefox before 2018 and ``pbeWithSha1AndTripleDES-CBC`` from ``key3.db``
+    files), but decrypting these is not (yet) supported by this plugin.
 
     Args:
         decoded_item: ``core.Sequence`` is a ``list`` representation of ``SEQUENCE`` as described below.
         primary_password: ``bytes`` of Firefox primary password to decrypt ciphertext with.
         global_salt: ``bytes`` of salt to prepend to primary password when calculating AES key.
 
-    Raises:
-        ValueError: When missing ``pycryptodome`` or ``asn1crypto`` dependencies.
-
     Returns:
-        Tuple of decrypted bytes and a string representation of the identified encryption algorithm.
+        Tuple of decrypted bytes and a dotted ASN.1 string representation of the identified encryption algorithm.
     """
 
     # SEQUENCE {
@@ -704,121 +651,158 @@ def decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, glo
     #     ...
     # }
 
-    if not HAS_CRYPTO:
-        raise ValueError("Missing pycryptodome dependency")
-
-    if not HAS_ASN1:
-        raise ValueError("Missing asn1crypto depdendency")
-
     object_identifier = decoded_item[0][0]
     algorithm = object_identifier.dotted
 
     if algos.EncryptionAlgorithmId.map(algorithm) == "pbes2":
-        return decrypt_pbes2(decoded_item, primary_password, global_salt), algorithm
-    if algorithm == pbeWithSha1AndTripleDES_CBC:
-        return decrypt_sha1_triple_des_cbc(decoded_item, primary_password, global_salt), algorithm
-    # Firefox supports other algorithms (i.e. Firefox before 2018), but decrypting these is not (yet) supported.
-    return b"", algorithm
+        return _decrypt_master_key_pbes2(decoded_item, primary_password, global_salt), algorithm
+
+    raise ValueError(f"Unsupported Firefox master key encryption algorihm {algorithm!s}")
 
 
-def query_global_salt(key4_file: TargetPath) -> tuple[str, str]:
-    with key4_file.open("rb") as fh:
-        db = sqlite3.SQLite3(fh)
-        for row in db.table("metadata").rows():
-            if row.get("id") == "password":
-                return row.get("item1", ""), row.get("item2", "")
-        return None
-
-
-def query_master_key(key4_file: TargetPath) -> tuple[str, str]:
-    with key4_file.open("rb") as fh:
-        db = sqlite3.SQLite3(fh)
-        if row := next(db.table("nssPrivate").rows(), None):
-            return row.get("a11", ""), row.get("a102", "")
-        return None
-
-
-def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple[bytes, str]:
-    if not HAS_CRYPTO:
-        raise ValueError("Missing pycryptodome dependency")
-
-    if not HAS_ASN1:
-        raise ValueError("Missing asn1crypto dependency")
-
-    global_salt, password_check = query_global_salt(key4_file)
-    decoded_password_check = core.load(password_check)
-
-    try:
-        decrypted_password_check, algorithm = decrypt_master_key(decoded_password_check, primary_password, global_salt)
-    except EOFError:
-        raise ValueError("No primary password provided")
-
-    if not decrypted_password_check:
-        raise ValueError(f"Encountered unknown algorithm {algorithm} while decrypting master key")
-
-    expected_password_check = b"password-check\x02\x02"
-    if decrypted_password_check != b"password-check\x02\x02":
-        log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
-        raise ValueError("Master key decryption failed. Provided password could be missing or incorrect")
-
-    master_key, master_key_cka = query_master_key(key4_file)
-    if master_key == b"":
-        raise ValueError("Password master key is not defined")
-
-    if master_key_cka != CKA_ID:
-        raise ValueError(f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}'")
-
-    decoded_master_key = core.load(master_key)
-    decrypted, algorithm = decrypt_master_key(decoded_master_key, primary_password, global_salt)
-    return decrypted[:24], algorithm
-
-
-def decrypt_field(key: bytes, field: tuple[bytes, bytes, bytes]) -> bytes:
-    if not HAS_CRYPTO:
-        raise ValueError("Missing pycryptodome dependency")
-
-    cka, iv, ciphertext = field
-
-    if cka != CKA_ID:
-        raise ValueError(f"Expected cka to equal '{CKA_ID}' but got '{cka}'")
-
-    return unpad(DES3.new(key, DES3.MODE_CBC, iv).decrypt(ciphertext), 8)
-
-
-def decrypt(
-    username: str, password: str, key4_file: TargetPath, primary_password: str = ""
-) -> tuple[str | None, str | None]:
-    """Decrypt a stored username and password using provided credentials and key4 file.
+def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
+    """Retrieve and decrypt the master key from the Firefox NSS database.
 
     Args:
-        username: Encoded and encrypted password.
-        password Encoded and encrypted password.
-        key4_file: Path to key4.db file.
-        primary_password: Password to use for decryption routine.
+        key4_file: Path object to the ``key4.db`` file.
+        primary_password: bytes of the Firefox primary password.
+
+    Raises:
+        ValueError if retrieval or decryption of master key fails.
 
     Returns:
-        A tuple of decoded username and password strings.
-
-    Resources:
-        - https://github.com/lclevy/firepwd
+        32 byte or 24 byte long decrypted and unpadded master key for AES or 3DES operations.
     """
+
+    # Extract neccesary information from the key4.db file. Multiple values might exist for the
+    # values we are interested in. Generally the last entry will be the currently active value,
+    # which is why we need to iterate every row in the table to get the last entry.
+    with SQLite3(key4_file) as db:
+        # Get the last ``item`` (global salt) and ``item2`` (password check) values.
+        if table := db.table("metadata"):
+            for row in table.rows():
+                if row.get("id") == "password":
+                    global_salt = row.get("item1", b"")
+                    password_check = row.get("item2", b"")
+        else:
+            raise ValueError(f"Missing table 'metadata' in key4.db {key4_file}")
+
+        # Get the last ``a11`` (master key) and ``a102`` (cka) values.
+        if table := db.table("nssPrivate"):
+            *_, last_row = table.rows()
+            master_key = last_row.get("a11")
+            master_key_cka = last_row.get("a102")
+        else:
+            raise ValueError(f"Missing table 'nssPrivate' in key4.db {key4_file}")
+
+        if not master_key:
+            raise ValueError(f"Password master key is not defined in key4.db {key4_file}")
+
+        if master_key_cka != CKA_ID:
+            raise ValueError(
+                f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}' in {key4_file}"  # noqa: E501
+            )
+
+        decoded_password_check: core.Sequence = core.load(password_check)
+        decoded_master_key: core.Sequence = core.load(master_key)
+
+        try:
+            decrypted_password_check, algorithm = _decrypt_master_key(
+                decoded_password_check, primary_password, global_salt
+            )
+
+        except EOFError:
+            raise ValueError("No primary password provided")
+
+        except ValueError as e:
+            raise ValueError(f"Unable to decrypt Firefox password check: {e!s}") from e
+
+        if not decrypted_password_check:
+            raise ValueError(f"Encountered unknown algorithm {algorithm} while decrypting Firefox master key")
+
+        expected_password_check = b"password-check\x02\x02"
+
+        if decrypted_password_check != expected_password_check:
+            log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
+            raise ValueError("Master key decryption failed. Provided password could be missing or incorrect")
+
+        decrypted, algorithm = _decrypt_master_key(decoded_master_key, primary_password, global_salt)
+
+        block_size = 16 if algos.EncryptionAlgorithmId.map(algorithm) == "pbes2" else 8
+
+        return unpad(decrypted, block_size)
+
+
+def decrypt_value(b64_ciphertext: str, key: bytes) -> bytes | None:
+    """Decrypt an encrypted value using the decrypted master key and algorithm.
+
+    Args:
+        b64_ciphertext: Base64 encoded ciphertext.
+        key: Decrypted Firefox master key.
+
+    Returns:
+        Decrypted bytes or None.
+
+    Raises:
+        ValueError if decryption fails.
+
+    References:
+        - https://github.com/lclevy/firepwd
+        - https://github.com/Sohimaster/Firefox-Passwords-Decryptor/
+        - https://github.com/mozilla-firefox/firefox/tree/main/toolkit/components/passwordmgr
+        - https://github.com/mozilla-firefox/firefox/blob/main/security/manager/ssl/SecretDecoderRing.cpp
+        - https://github.com/mozilla-firefox/firefox/blob/main/security/nss/lib/pk11wrap/pk11sdr.c#L156
+    """
+
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency")
 
     if not HAS_ASN1:
         raise ValueError("Missing asn1crypto dependency")
 
+    if not b64_ciphertext:
+        raise ValueError("No base64 encoded ciphertext provided")
+
     try:
-        username = decode_login_data(username)
-        password = decode_login_data(password)
-
-        primary_password_bytes = primary_password.encode()
-        key, algorithm = retrieve_master_key(primary_password_bytes, key4_file)
-
-        if algorithm == pbeWithSha1AndTripleDES_CBC or algos.EncryptionAlgorithmId.map(algorithm) == "pbes2":
-            username = decrypt_field(key, username)
-            password = decrypt_field(key, password)
-            return username.decode(), password.decode()
-
+        buf = b64decode(b64_ciphertext)
     except ValueError as e:
-        raise ValueError(f"Failed to decrypt password using keyfile: {key4_file}, password: {primary_password}") from e
+        raise ValueError("Failed to decode Firefox base64 encoded ciphertext") from e
+
+    # Split the key_id, iv and ciphertext
+    if buf.startswith(b"v10"):
+        key_id = buf[3:19]
+        iv = buf[19:31]  # AES-GCM with 12 byte iv
+        ciphertext = buf[31:]
+
+    else:
+        # Firefox ASN.1 format
+        # SEQUENCE {
+        #     KEY_ID
+        #     SEQUENCE {
+        #         OBJECT_IDENTIFIER
+        #         IV
+        #     }
+        #     CIPHERTEXT
+        # }
+        decoded = core.load(buf)
+        key_id = decoded[0].native
+        iv = decoded[1][1].native
+        ciphertext = decoded[2].native
+
+    if key_id != CKA_ID:
+        raise ValueError(f"Expected cka to equal '{CKA_ID}' but got '{key_id}'")
+
+    # Decrypt the ciphertext
+    if len(iv) == 16 and len(key) == 32:
+        cipher = AES.new(key, AES.MODE_CBC, iv=iv)
+
+    elif len(iv) == 12:
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+
+    elif len(iv) == 8:
+        cipher = DES3.new(key, DES3.MODE_CBC, iv)
+
+    else:
+        raise ValueError(f"Unexpected IV length of {len(iv)} and/or key length of {len(key)}")
+
+    return unpad(cipher.decrypt(ciphertext), cipher.block_size)

@@ -9,8 +9,16 @@ import pytest
 
 from dissect.target.plugins.apps.webserver import iis
 from dissect.target.plugins.os.windows import amcache
-from dissect.target.tools.dump import run, state, utils
-from dissect.target.tools.dump.run import main as target_dump
+from dissect.target.tools.dump import (
+    COMPRESSION_TO_EXT,
+    SERIALIZERS,
+    STATE_FILE_NAME,
+    Compression,
+    Serialization,
+    create_state,
+    execute_pipeline,
+)
+from dissect.target.tools.dump import main as target_dump
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -65,22 +73,29 @@ def test_execute_pipeline(
         assert count == 128
 
     with (
-        patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets),
-        patch("dissect.target.tools.dump.run.log_progress", new=mock_log_progress),
+        patch("dissect.target.tools.dump.log_progress", new=mock_log_progress),
     ):
         output_dir = tmp_path / "output"
 
-        serialization = utils.Serialization(serialization_name)
-        compression = utils.Compression(compression_name)
+        serialization = Serialization(serialization_name)
+        compression = Compression(compression_name) if compression_name else Compression.NONE
 
         functions = "iis.logs,amcache.applications"
-
-        run.execute_pipeline(
-            targets=["dummy"],
-            functions=functions,
+        _state = create_state(
             output_dir=output_dir,
+            target_paths=["dummy"],
+            functions=functions,
+            excluded_functions=[],
             serialization=serialization,
             compression=compression,
+        )
+
+        execute_pipeline(
+            state=_state,
+            targets=mock_get_targets(["dummy"]),
+            arguments=[],
+            dry_run=False,
+            limit=None,
         )
 
         target_name = target_win_iis_amcache.name
@@ -89,8 +104,8 @@ def test_execute_pipeline(
 
         assert (output_dir / target_name / "iis").exists()
 
-        serialization_ext = utils.SERIALIZERS[serialization]["ext"]
-        compression_ext = utils.COMPRESSION_TO_EXT[compression]
+        serialization_ext = SERIALIZERS[serialization]["ext"]
+        compression_ext = COMPRESSION_TO_EXT[compression]
 
         iis_sink_filename = f"filesystem_windows_iis_logs.{serialization_ext}"
         if compression_ext:
@@ -109,12 +124,12 @@ def test_execute_pipeline(
         assert (output_dir / target_name / "amcache" / amcache_sink_filename).exists()
 
         # verify that serialized state is in place
-        state_path = output_dir / state.STATE_FILE_NAME
+        state_path = output_dir / STATE_FILE_NAME
         assert state_path.exists()
 
         state_blob = json.loads(state_path.read_text())
 
-        assert state_blob["compression"] == compression_name
+        assert state_blob["compression"] == str(compression_name)
         assert state_blob["serialization"] == serialization_name
         assert state_blob["target_paths"] == ["dummy"]
         assert state_blob["functions"] == functions
@@ -156,18 +171,26 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
             assert count == 128
 
     with (
-        patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets),
-        patch("dissect.target.tools.dump.run.log_progress", new=mock_log_progress),
+        patch("dissect.target.tools.dump.get_targets", new=mock_get_targets),
+        patch("dissect.target.tools.dump.log_progress", new=mock_log_progress),
     ):
         output_dir = tmp_path / "output"
 
         functions = "iis.logs,amcache.applications"
-
-        run.execute_pipeline(
-            targets=["dummy"],
-            functions=functions,
+        _state = create_state(
             output_dir=output_dir,
-            serialization=utils.Serialization.JSONLINES,
+            target_paths=["dummy"],
+            functions=functions,
+            excluded_functions=[],
+            serialization=Serialization.JSONLINES,
+            compression=Compression.NONE,
+        )
+
+        execute_pipeline(
+            state=_state,
+            targets=mock_get_targets(["dummy"]),
+            arguments=[],
+            dry_run=False,
             limit=limit,
         )
 
@@ -176,18 +199,18 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
         # verify that iis records are in place
         assert (output_dir / target_name / "iis").exists()
 
-        serialization_ext = utils.SERIALIZERS[utils.Serialization.JSONLINES]["ext"]
+        serialization_ext = SERIALIZERS[Serialization.JSONLINES]["ext"]
         iis_sink_filename = f"filesystem_windows_iis_logs.{serialization_ext}"
 
         assert (output_dir / target_name / "iis" / iis_sink_filename).exists()
 
         # verify that serialized state is in place
-        state_path = output_dir / state.STATE_FILE_NAME
+        state_path = output_dir / STATE_FILE_NAME
         assert state_path.exists()
 
         state_blob = json.loads(state_path.read_text())
 
-        assert state_blob["compression"] is None
+        assert state_blob["compression"] == "None"
         sink_blobs = state_blob["sinks"]
 
         iis_sink_blob = next(s for s in state_blob["sinks"] if s["func"] == "iis.logs")
@@ -225,6 +248,38 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
                 assert not amcache_sink_blob["is_dirty"]
 
 
+def test_execute_excluded_plugins(target_win_iis_amcache: Target, tmp_path: pathlib.Path) -> None:
+    def mock_get_targets(targets: list[str]) -> Iterator[Target]:
+        yield target_win_iis_amcache
+
+    with patch("dissect.target.tools.dump.get_targets", new=mock_get_targets):
+        output_dir = tmp_path.joinpath("output")
+
+        functions = "amcache.applications"
+        _state = create_state(
+            output_dir=output_dir,
+            target_paths=["dummy"],
+            functions=functions,
+            excluded_functions=[functions],
+            serialization=Serialization.JSONLINES,
+            compression=Compression.NONE,
+        )
+
+        execute_pipeline(
+            state=_state,
+            targets=mock_get_targets(["dummy"]),
+            arguments=[],
+            dry_run=False,
+            limit=None,
+        )
+
+        target_name = target_win_iis_amcache.name
+
+        assert output_dir.joinpath(target_name).exists()
+        assert not output_dir.joinpath(f"{target_name}/amcahce.applications").exists()
+
+
+# tool tests
 def test_dump(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
     with monkeypatch.context() as m:
         m.setattr(
@@ -233,7 +288,7 @@ def test_dump(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
                 "target-dump",
                 "-f",
                 "walkfs",
-                "tests/_data/loaders/tar/test-archive.tar.gz",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
                 "-o",
                 str(tmp_path),
             ],
@@ -246,3 +301,30 @@ def test_dump(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
         entry = tmp_path.joinpath("test-archive.tar.gz/walkfs/filesystem_entry.jsonl")
         assert entry.exists()
         assert "test-file.txt" in entry.read_text()
+
+
+def test_dump_excluded_plugins(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-dump",
+                "-f",
+                "mft,walkfs",
+                "-xf",
+                "mft",
+                str(absolute_path("_data/loaders/tar/test-archive.tar.gz")),
+                "-o",
+                str(tmp_path),
+            ],
+        )
+
+        target_dump()
+
+        assert tmp_path.joinpath("target-dump.state.json").exists()
+
+        entry = tmp_path.joinpath("test-archive.tar.gz/walkfs/filesystem_entry.jsonl")
+        assert entry.exists()
+        assert "test-file.txt" in entry.read_text()
+
+        assert not tmp_path.joinpath("test-archive.tar.gz/mft").exists()

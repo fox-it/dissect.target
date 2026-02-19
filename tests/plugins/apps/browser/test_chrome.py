@@ -11,15 +11,17 @@ from dissect.target.plugins.apps.browser.chrome import ChromePlugin
 from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from tests._utils import absolute_path
 from tests.conftest import add_win_user
-from tests.plugins.os.windows.credential.test_lsa import (
+from tests.plugins.os.windows.test__os import map_version_value
+from tests.plugins.os.windows.test_lsa import (
     POLICY_KEY_PATH_NT6,
     map_lsa_polkey,
     map_lsa_secrets,
     map_lsa_system_keys,
 )
-from tests.plugins.os.windows.test__os import map_version_value
 
 if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
+
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
@@ -85,7 +87,7 @@ def test_chrome_history(target_platform: Target, request: pytest.FixtureRequest)
         records[0].url == "https://www.google.com/search?q=github+fox-it+dissect&oq=github+fox-it+dissect"
         "&aqs=chrome..69i57.12832j0j4&sourceid=chrome&ie=UTF-8"
     )
-    assert records[0].id == "1"
+    assert records[0].id == 1
     assert records[0].visit_count == 2
     assert records[0].ts == dt("2023-02-24T11:54:07.157810+00:00")
 
@@ -105,6 +107,7 @@ def test_chrome_downloads(target_platform: Target, request: pytest.FixtureReques
     assert records[0].ts_start == dt("2023-02-24T11:54:19.726147+00:00")
     assert records[0].ts_end == dt("2023-02-24T11:54:21.030043+00:00")
     assert records[0].url == "https://codeload.github.com/fox-it/dissect/zip/refs/heads/main"
+    assert records[0].state == "complete"
 
 
 @pytest.mark.parametrize(
@@ -122,7 +125,7 @@ def test_chrome_extensions(target_platform: Target, request: pytest.FixtureReque
     assert records[0].ts_update == dt("2022-11-24T15:20:43.682152+00:00")
     assert records[0].name == "Web Store"
     assert records[0].version == "0.2"
-    assert records[0].id == "ahfgeienlihckogmohjhadlkjgocpleb"
+    assert records[0].extension_id == "ahfgeienlihckogmohjhadlkjgocpleb"
 
 
 def test_windows_chrome_passwords_plugin(target_chrome_win: Target) -> None:
@@ -305,7 +308,6 @@ def target_win_11_users_dpapi(
 def test_windows_chrome_passwords_dpapi(
     target_win_users_dpapi: Target,
     fs_win: VirtualFilesystem,
-    guarded_keychain: None,
     keychain_value: str,
     expected_password: str | None,
     expected_notes: str | None,
@@ -342,9 +344,7 @@ def test_windows_chrome_passwords_dpapi(
     assert records[0].decrypted_notes == expected_notes
 
 
-def test_windows_chrome_cookies_dpapi(
-    target_win_users_dpapi: Target, fs_win: VirtualFilesystem, guarded_keychain: None
-) -> None:
+def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: VirtualFilesystem) -> None:
     fs_win.map_dir(
         "Users/user/AppData/Local/Google/Chrome/User Data",
         absolute_path("_data/plugins/apps/browser/chrome/dpapi/windows_10/User_Data"),
@@ -382,16 +382,16 @@ def test_windows_chrome_cookies_dpapi(
 
 
 def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    base_dirs = [
+    base_dirs = (
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Default",
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 1",
-    ]
-    snapshot_dirs = [
+    )
+    snapshot_dirs = (
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Default",
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\119.0.7845.119\\Default",
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Profile 1",
         "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\119.0.7845.119\\Profile 1",
-    ]
+    )
     profile_dirs = base_dirs + snapshot_dirs
 
     for dir in profile_dirs:
@@ -412,20 +412,17 @@ def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFiles
     for records in records_list:
         assert {"chrome"} == {record.browser for record in records}
 
-        for base_dir in base_dirs:
-            base_path_records = [r for r in records if str(r.source.parent).endswith(base_dir)]
+        base_path_records = [r for r in records if str(r.source.parent).endswith(base_dirs)]
 
-        for snapshot_dir in snapshot_dirs:
-            # Retrieve records that are in the snapshot's directory.
-            snapshot_records = [r for r in records if str(r.source.parent).endswith(snapshot_dir)]
+        # Retrieve records that are in the snapshot's directory.
+        snapshot_records = [r for r in records if str(r.source.parent).endswith(snapshot_dirs)]
 
         # We map the same files in each of the snapshot directories.
-        assert len(base_path_records) == len(snapshot_records)
+        # We have two base directories and four snapshot directories, so we expect twice the amount of records.
+        assert len(base_path_records) == len(snapshot_records) // 2
 
 
-def test_chrome_windows_11_decryption(
-    target_win_11_users_dpapi: Target, fs_win: VirtualFilesystem, guarded_keychain: None
-) -> None:
+def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we can decrypt Windows 11 Google Chrome version 127/130 and newer passwords and cookies.
 
     Elevation Service usage by Chromium-based browsers (Google Chrome, Microsoft Edge) depend on several environment
@@ -434,7 +431,7 @@ def test_chrome_windows_11_decryption(
 
     .. code-block::
 
-        (chrome.exe|msedge.exe) --enable-features=UseElevator
+        (chrome.exe|msedge.exe) --enable-field-trial-config --enable-features=UseElevator,AppBoundEncryptionKeyV3
 
     """
 
@@ -487,3 +484,20 @@ def test_chrome_windows_11_decryption(
     assert cookies[1].host == "rijksoverheid.nl"
     assert cookies[1].name == "AnotherExampleCookieName"
     assert cookies[1].value == "420"
+
+
+@pytest.mark.benchmark
+def test_benchmark_chrome_userdirs(
+    target_win_users: Target, fs_win: VirtualFilesystem, benchmark: BenchmarkFixture
+) -> None:
+    """Benchmark :class:`ChromiumMixin` ``_build_userdirs`` performance."""
+
+    for i in range(3):
+        fs_win.map_dir(
+            f"Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Profile {i}",
+            absolute_path("_data/plugins/apps/browser/chrome/generic"),
+        )
+
+    benchmark(
+        lambda: target_win_users.add_plugin(ChromePlugin, check_compatible=True) and list(target_win_users.chrome())
+    )

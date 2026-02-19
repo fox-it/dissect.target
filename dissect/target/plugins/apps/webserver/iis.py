@@ -64,24 +64,23 @@ class IISLogsPlugin(WebserverPlugin):
         - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807%28v=vs.90%29
     """
 
-    APPLICATION_HOST_CONFIG = "sysvol/windows/system32/inetsrv/config/applicationHost.config"
+    APPLICATION_HOST_CONFIG = "%windir%/system32/inetsrv/config/applicationHost.config"
 
-    DEFAULT_LOG_PATHS = (
-        "sysvol\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
-        "sysvol\\Windows.old\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
-        "sysvol\\inetpub\\logs\\LogFiles\\*.log",
-        "sysvol\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log",
-        "sysvol\\Resources\\Directory\\*\\LogFiles\\Web\\W3SVC*\\*.log",
+    DEFAULT_LOG_DIRS = (
+        "%windir%\\System32\\LogFiles\\W3SVC*",
+        "sysvol\\Windows.old\\Windows\\System32\\LogFiles\\W3SVC*",
+        "sysvol\\inetpub\\logs\\LogFiles",
+        "sysvol\\Resources\\Directory\\*\\LogFiles\\Web\\W3SVC*",
     )
 
     __namespace__ = "iis"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.config = self.target.fs.path(self.APPLICATION_HOST_CONFIG)
+        self.config = self.target.resolve(self.APPLICATION_HOST_CONFIG)
 
     def check_compatible(self) -> None:
-        if not self.log_dirs:
+        if not any(self.log_dirs.values()):
             raise UnsupportedPluginError("No IIS log files found")
 
     @cached_property
@@ -91,6 +90,32 @@ class IISLogsPlugin(WebserverPlugin):
         if (sysvol_files := self.target.fs.path("sysvol/files")).exists():
             dirs["auto"].add(sysvol_files)
 
+        if self.config.exists():
+            self._read_config_log_paths(dirs)
+
+        for log_dir in self.DEFAULT_LOG_DIRS:
+            log_dir = self.target.expand_env(log_dir)
+            log_dir = self.target.fs.path(log_dir)
+
+            if not has_glob_magic(str(log_dir)) and log_dir.exists():
+                dirs["auto"].add(log_dir)
+                continue
+
+            for _log_dir_str in self.target.fs.glob(str(log_dir)):
+                if not (_log_dir := self.target.fs.path(_log_dir_str)).is_dir():
+                    continue
+                dirs["auto"].add(_log_dir)
+
+        return dirs
+
+    def _get_paths(self) -> Iterator[Path]:
+        for path in self.log_dirs.values():
+            yield from path
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        yield from {self.config}
+
+    def _read_config_log_paths(self, dirs: dict[str, set[str]]) -> None:
         try:
             xml_data = ElementTree.fromstring(self.config.read_bytes(), forbid_dtd=True)
             for log_file_element in xml_data.findall("*/sites/*/logFile"):
@@ -105,25 +130,6 @@ class IISLogsPlugin(WebserverPlugin):
             self.target.log.warning("Error while parsing %s", self.config)
             self.target.log.debug("", exc_info=e)
 
-        for log_path in self.DEFAULT_LOG_PATHS:
-            try:
-                # later on we use */*.log to collect the files, so we need to move up 2 levels
-                log_dir = self.target.fs.path(log_path).parents[1]
-            except IndexError:
-                self.target.log.info("Incompatible path found: %s", log_path)
-                continue
-
-            if not has_glob_magic(str(log_dir)) and log_dir.exists():
-                dirs["auto"].add(log_dir)
-                continue
-
-            for _log_dir_str in self.target.fs.glob(str(log_dir)):
-                if not (_log_dir := self.target.fs.path(_log_dir_str)).is_dir():
-                    continue
-                dirs["auto"].add(_log_dir)
-
-        return dirs
-
     @export(record=BasicRecordDescriptor)
     def logs(self) -> Iterator[TargetRecordDescriptor]:
         """Return contents of IIS (v7 and above) log files.
@@ -134,23 +140,28 @@ class IISLogsPlugin(WebserverPlugin):
         Supported log formats: IIS, W3C.
         """
 
+        # We handle direct files here because _get_paths cannot select (filter) on the type of logfile.
+        if self.target.is_direct:
+            for log_file in self.get_paths():
+                yield from parse_autodetect_format_log(self.target, log_file)
+            # If we use the direct loader, there are no other files available.
+            return
+
         parsers = {
             "W3C": parse_w3c_format_log,
             "IIS": parse_iis_format_log,
             "auto": parse_autodetect_format_log,
         }
 
-        for format in ("IIS", "W3C", "auto"):
+        for format, parser in parsers.items():
             for log_dir in self.log_dirs.get(format, ()):
-                for log_file in log_dir.glob("*/*.log"):
+                for log_file in log_dir.rglob("*.log"):
                     self.target.log.info("Processing IIS log file %s in %s format", log_file, format)
-                    yield from parsers[format](self.target, log_file)
-
-        # We don't implement _get_paths() in the IIS plugin because there's little use for it for the way the plugin
-        # is currently implemented. So handle direct files here.
-        if self.target.is_direct:
-            for log_file in self.get_paths():
-                yield from parse_autodetect_format_log(self.target, log_file)
+                    try:
+                        yield from parser(self.target, log_file)
+                    except Exception as e:
+                        self.target.log.error("Issue processing log file %s in %s format", log_file, format)  # noqa TRY400
+                        self.target.log.debug("", exc_info=e)
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
@@ -161,10 +172,12 @@ class IISLogsPlugin(WebserverPlugin):
         for iis_record in self.logs():
             yield WebserverAccessLogRecord(
                 ts=iis_record.ts,
+                webserver="iis",
                 remote_user=iis_record.username,
                 remote_ip=iis_record.client_ip,
                 method=iis_record.request_method,
                 uri=iis_record.request_path,
+                query=getattr(iis_record, "request_query", None),
                 protocol=getattr(iis_record, "cs_version", None),
                 status_code=getattr(iis_record, "service_status_code", None),
                 bytes_sent=iis_record.response_size_bytes,
@@ -236,8 +249,9 @@ def parse_w3c_format_log(target: Target, path: Path) -> Iterator[TargetRecordDes
 
         if not record_descriptor:
             target.log.warning("Comment line with the fields defined should come before the values, skipping: %r", line)
+            continue
 
-        raw = replace_dash_with_none(dict(zip(fields, values)))
+        raw = replace_dash_with_none(dict(zip(fields, values, strict=False)))
 
         # Example:
         # {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
@@ -42,6 +43,14 @@ def test_brave_downloads(target_brave: Target) -> None:
     records = list(target_brave.brave.downloads())
     assert len(records) == 2
 
+    assert records[0].ts_start == datetime(2023, 2, 24, 11, 54, 19, 726147, tzinfo=timezone.utc)
+    assert records[0].ts_end == datetime(2023, 2, 24, 11, 54, 21, 30043, tzinfo=timezone.utc)
+    assert records[0].id == 6
+    assert records[0].path == "C:\\Users\\John\\Downloads\\dissect-main (2).zip"
+    assert records[0].url == "https://codeload.github.com/fox-it/dissect/zip/refs/heads/main"
+    assert records[0].size == 17924
+    assert records[0].state == "complete"
+
 
 def test_brave_extensions(target_brave: Target) -> None:
     records = list(target_brave.brave.extensions())
@@ -54,7 +63,7 @@ def test_brave_cookies(target_brave: Target) -> None:
     assert all(record.host == ".tweakers.net" for record in records)
 
 
-def test_windows_edge_passwords_plugin(target_brave: Target) -> None:
+def test_brave_passwords(target_brave: Target) -> None:
     records = list(target_brave.brave.passwords())
 
     assert len(records) == 4

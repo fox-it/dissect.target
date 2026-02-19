@@ -472,9 +472,10 @@ class ProcProcess:
     def _parse_environ(self) -> Iterator[Environ]:
         """Internal function to parse entries in ``/proc/[pid]/environ``."""
         # entries in /proc/<pid>/environ are null-terminated
-        lines = self.get("environ").read_text().split("\x00")
+        if not (environ_path := self.get("environ")).exists():
+            return
 
-        for line in lines:
+        for line in environ_path.read_text().split("\x00"):
             if line == "":
                 # Skip empty line
                 continue
@@ -490,7 +491,7 @@ class ProcProcess:
             yield Environ(variable, contents)
 
     @property
-    def _boottime(self) -> int:
+    def _boottime(self) -> int | None:
         """Returns the boot time of the system.
 
         Used internally to determine process start- and runtimes.
@@ -555,18 +556,25 @@ class ProcProcess:
         return ProcessStateEnum[self._stat_file.get("state", "N")].value
 
     @property
-    def starttime(self) -> datetime:
+    def starttime(self) -> datetime | None:
         """Returns the start time of the process."""
         # Starttime is saved in clockticks per second from the boot time.
         # we asume a standard of 100 clockticks per second. the actual value can be obtained from `getconf CLK_TCK`
         starttime = self._stat_file.get("starttime", 0) / 100
 
-        return from_unix(self._boottime + starttime)
+        # Check if there is a boottime. If not, we cannot determine the starttime.
+        if boottime := self._boottime:
+            return from_unix(boottime + starttime)
+
+        return None
 
     @property
-    def runtime(self) -> timedelta:
+    def runtime(self) -> timedelta | None:
         """Returns the runtime of a process until the moment of acquisition."""
-        return self.now - self.starttime
+        if starttime := self.starttime:
+            return self.now - starttime
+
+        return None
 
     @property
     def now(self) -> datetime:

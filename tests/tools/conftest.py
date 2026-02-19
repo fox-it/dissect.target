@@ -4,17 +4,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import loader
-from dissect.target.tools.logging import configure_logging
+from dissect.target.tools.utils.logging import configure_logging
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-
-@pytest.fixture(scope="module", autouse=True)
-def reset_loaders() -> None:
-    for ldr in loader.LOADERS:
-        ldr.module._module = None
 
 
 @pytest.fixture(autouse=True)

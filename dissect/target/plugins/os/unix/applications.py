@@ -89,7 +89,7 @@ class UnixApplicationsPlugin(Plugin):
         When desktop applications are placed inside certain directories (Autostart directories),
         these applications can be automatically started by the desktop environment.
 
-        Resources:
+        References:
             - https://wiki.archlinux.org/title/Desktop_entries
             - https://specifications.freedesktop.org/desktop-entry-spec/latest/
             - https://unix.stackexchange.com/questions/582928/where-gnome-apps-are-installed

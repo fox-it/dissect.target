@@ -9,18 +9,20 @@ import sys
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.target import Target
-from dissect.target.tools.fsutils import print_ls, print_stat
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
+from dissect.target.tools.utils.fs import print_ls, print_stat
 
 if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import TargetPath
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -143,8 +145,8 @@ def main() -> int:
     parser_cp.set_defaults(handler=cp)
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(parser, args)
 
     if args.subcommand is None:
         parser.error("No subcommand specified")
@@ -156,13 +158,16 @@ def main() -> int:
         log.debug("", exc_info=e)
         return 1
 
-    path = target.fs.path(args.path)
+    glob_path = str(args.path).lstrip("/")
 
-    if not path.exists():
+    found = False
+    for path in target.fs.path("/").glob(glob_path):
+        args.handler(target, path, args)
+        found = True
+
+    if not found:
         print("[!] Path doesn't exist")
         return 1
-
-    args.handler(target, path, args)
 
     return 0
 

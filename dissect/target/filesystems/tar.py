@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import stat
 import tarfile as tf
 from typing import TYPE_CHECKING, BinaryIO
@@ -17,15 +16,18 @@ from dissect.target.filesystem import (
     Filesystem,
     FilesystemEntry,
     VirtualDirectory,
+    VirtualDirEntry,
     VirtualFile,
     VirtualFilesystem,
 )
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class TarFilesystem(Filesystem):
@@ -55,7 +57,7 @@ class TarFilesystem(Filesystem):
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
 
         for member in self.tar.getmembers():
-            mname = member.name.strip("/")
+            mname = member.name.removeprefix("./").strip("/")
             if not mname.startswith(self.base) or mname == ".":
                 continue
 
@@ -92,12 +94,7 @@ class TarFilesystemEntry(VirtualFile):
         except Exception:
             raise FileNotFoundError
 
-    def iterdir(self) -> Iterator[str]:
-        if self.is_dir():
-            return self._resolve().iterdir()
-        return super().iterdir()
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
+    def scandir(self) -> Iterator[VirtualDirEntry]:
         if self.is_dir():
             return self._resolve().scandir()
         return super().scandir()

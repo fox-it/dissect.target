@@ -1,0 +1,37 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "name": "target-query",
+            "module": "dissect.target.tools.query",
+            "args": [
+                "${input:target}",
+                "-f",
+                "${input:functions}"
+            ]
+        },
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "name": "target-shell",
+            "module": "dissect.target.tools.shell",
+            "args": [
+                "${input:target}"
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "type": "promptString",
+            "id": "target",
+            "description": "Path to target file (e.g. /path/to/image.vmdk)"
+        },
+        {
+            "type": "promptString",
+            "id": "functions",
+            "description": "Comma separated target-query function names (e.g. hostname,users)"
+        },
+    ]
+}

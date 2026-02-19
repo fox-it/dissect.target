@@ -3,9 +3,12 @@ from __future__ import annotations
 import io
 from typing import TYPE_CHECKING
 
+import pytest
+
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.apps.productivity.msoffice import MSOffice
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
@@ -70,7 +73,19 @@ def test_office_startup_options(target_win_users: Target, fs_win: VirtualFilesys
     assert item.creation_time == target_win_users.fs.stat(startup_item_path).st_birthtime
 
 
-def test_office_com_addin(target_win_users: Target, hive_hklm: VirtualHive) -> None:
+@pytest.mark.parametrize(
+    "prog_id_exists",
+    [
+        pytest.param("True", id="prog_id_exists"),
+        pytest.param("False", id="prog_id_does_not_exist"),
+    ],
+)
+def test_office_com_addin(
+    target_win_users: Target,
+    hive_hklm: VirtualHive,
+    prog_id_exists: bool,
+    caplog: pytest.CaplogFixture,
+) -> None:
     """Test if COM add-ins are found."""
 
     addin_prog_id = "ExcelAddin"
@@ -81,7 +96,8 @@ def test_office_com_addin(target_win_users: Target, hive_hklm: VirtualHive) -> N
     addin_key.add_value("FriendlyName", "An Excel com addin")
     addin_key.add_value("LoadBehavior", 3)
     hive_hklm.map_key(addin_key_path, addin_key)
-    hive_hklm.map_value(f"Software\\Classes\\{addin_prog_id}\\CLSID", "(Default)", cls_id)
+    if prog_id_exists:
+        hive_hklm.map_value(f"Software\\Classes\\{addin_prog_id}\\CLSID", "(Default)", cls_id)
     hive_hklm.map_value(f"Software\\Classes\\CLSID\\{cls_id}\\InprocServer32", "(Default)", "c:\\payload.exe")
 
     office_plugin = MSOffice(target_win_users)
@@ -92,7 +108,11 @@ def test_office_com_addin(target_win_users: Target, hive_hklm: VirtualHive) -> N
     assert item.name == "An Excel com addin"
     assert item.type == "com"
     assert item.load_behavior == "Autostart"
-    assert item.codebases == ["c:\\payload.exe"]
+    if prog_id_exists:
+        assert item.codebases == ["c:\\payload.exe"]
+    else:
+        assert item.codebases == []
+        assert caplog.messages == f"Could not find ProgID {addin_prog_id} of COM executable in registry"
 
 
 def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive) -> None:
@@ -101,7 +121,7 @@ def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, 
     addin_prog_id = "ExcelAddin"
     addin_key_path = f"Software\\Microsoft\\Office\\Excel\\Addins\\{addin_prog_id}"
 
-    fs_win.map_dir("vsto", "tests/_data/plugins/apps/productivity/vsto")
+    fs_win.map_dir("vsto", absolute_path("_data/plugins/apps/productivity/vsto"))
     addin_key = VirtualKey(hive_hklm, addin_key_path)
     addin_key.add_value("FriendlyName", "An Excel vsto addin")
     addin_key.add_value("LoadBehavior", 2)
@@ -124,7 +144,9 @@ def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, 
 def test_office_web_addin(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     """Test if web add-ins are found."""
 
-    fs_win.map_dir("users/John/AppData/local/Microsoft/Office/16.0/Wef", "tests/_data/plugins/apps/productivity/wef")
+    fs_win.map_dir(
+        "users/John/AppData/local/Microsoft/Office/16.0/Wef", absolute_path("_data/plugins/apps/productivity/wef")
+    )
 
     office_plugin = MSOffice(target_win_users)
     startup_items = list(office_plugin.web())

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import io
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import ContainerError
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ MODULE_PATH = "dissect.target.containers"
 RawContainer = import_lazy("dissect.target.containers.raw").RawContainer
 """A lazy import of :mod:`dissect.target.containers.raw`."""
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 class Container(io.IOBase):
@@ -39,7 +39,7 @@ class Container(io.IOBase):
     __type__: str = None
     """A short string identifying the type of container."""
 
-    def __init__(self, fh: BinaryIO | Path, size: int, vs: VolumeSystem = None):
+    def __init__(self, fh: BinaryIO | Path, size: int, vs: VolumeSystem | None = None):
         self.fh = fh
         self.size = size
 
@@ -50,7 +50,7 @@ class Container(io.IOBase):
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
+        return f"<Container type={self.__type__} size={self.size} vs={self.vs.__type__ if self.vs else None}>"
 
     @classmethod
     def detect(cls, item: list | BinaryIO | Path) -> bool:

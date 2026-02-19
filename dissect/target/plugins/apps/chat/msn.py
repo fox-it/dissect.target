@@ -30,7 +30,7 @@ class MSNPlugin(ChatPlugin):
     Other versions might work but have not been tested. Does not support ``Messenger Plus! Live`` artifacts.
     Tested using Escargot (https://escargot.chat).
 
-    Resources:
+    References:
         - https://en.wikipedia.org/wiki/Microsoft_Messenger_service
         - https://en.wikipedia.org/wiki/MSN_Messenger
         - http://computerforensics.parsonage.co.uk/downloads/MSNandLiveMessengerArtefactsOfConversations.pdf

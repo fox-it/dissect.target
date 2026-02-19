@@ -2,20 +2,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.velociraptor import VelociraptorLoader
 from dissect.target.plugins.apps.edr.velociraptor import VelociraptorPlugin
 from tests._utils import absolute_path
-from tests.loaders.test_velociraptor import create_root
+from tests.loaders.test_velociraptor import mock_velociraptor_dir
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.target import Target
 
+mock_velociraptor_dir  # noqa: B018
 
-def test_windows_velociraptor(target_win: Target, tmp_path: Path) -> None:
+
+def test_windows_velociraptor(mock_velociraptor_dir: Path, target_win: Target) -> None:
     """Test that a Windows Velociraptor artefact result is correctly parsed."""
-    root = create_root("ntfs", tmp_path)
+    root = mock_velociraptor_dir
 
     with absolute_path("_data/plugins/apps/edr/velociraptor/windows-uploads.json").open("rb") as fh:
         root.joinpath("uploads.json").write_bytes(fh.read())
@@ -23,17 +26,19 @@ def test_windows_velociraptor(target_win: Target, tmp_path: Path) -> None:
     with absolute_path("_data/plugins/apps/edr/velociraptor/Windows.Memory.ProcessInfo.json").open("rb") as fh:
         root.joinpath("results/Windows.Memory.ProcessInfo.json").write_bytes(fh.read())
 
-    assert VelociraptorLoader.detect(root) is True
+    loader = loader_open(root)
+    assert isinstance(loader, VelociraptorLoader)
 
-    loader = VelociraptorLoader(root)
     loader.map(target_win)
     target_win.apply()
 
     target_win.add_plugin(VelociraptorPlugin)
 
     results = list(target_win.velociraptor())
+    results_extract = list(target_win.velociraptor.results(extract_nested=True))
 
     record = results[0]
+    record_extract = results_extract[0]
 
     assert record.name == "Microsoft.SharePoint.exe"
     assert record.pebbaseaddress == "0x295000"
@@ -45,4 +50,6 @@ def test_windows_velociraptor(target_win: Target, tmp_path: Path) -> None:
     assert record.commandline == "/silentConfig"
     assert record.currentdirectory == "C:\\Windows\\system32\\"
     assert record._desc.name == "velociraptor/windows_memory_processinfo"
-    assert record.env.allusersprofile == "C:\\ProgramData"
+    assert not hasattr(record, "env")
+
+    assert record_extract.env.allusersprofile == "C:\\ProgramData"

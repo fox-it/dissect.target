@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import importlib
+import sys
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers import keychain
+from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from dissect.target.plugins.os.windows.dpapi.keyprovider.keychain import KeychainKeyProviderPlugin
 
 if TYPE_CHECKING:
+    import pytest
+
     from dissect.target.target import Target
 
 
 def test_dpapi_keyprovider_keychain(target_win: Target) -> None:
     """test if we yield provided keychain items correctly."""
-
-    keychain.KEYCHAIN.clear()
     keychain.register_key(
         key_type=keychain.KeyType.PASSPHRASE,
         value="password1",
@@ -26,11 +29,29 @@ def test_dpapi_keyprovider_keychain(target_win: Target) -> None:
         provider=None,
     )
 
+    target_win.add_plugin(DPAPIPlugin, check_compatible=False)
     target_win.add_plugin(KeychainKeyProviderPlugin)
 
-    keys = list(target_win._dpapi_keyprovider_keychain())
+    keys = list(target_win.dpapi.keyprovider.keychain())
 
     assert keys == [
-        ("_dpapi_keyprovider_keychain", "password1"),
-        ("_dpapi_keyprovider_keychain", "password2"),
+        ("dpapi.keyprovider.keychain", "password1"),
+        ("dpapi.keyprovider.keychain", "password2"),
     ]
+
+
+def test_env_keychain(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test if we can read keychain items from environment variables."""
+    KEYCHAIN_MODULE = "dissect.target.helpers.keychain"
+
+    # Set environment variable before module import
+    monkeypatch.delitem(sys.modules, KEYCHAIN_MODULE, raising=False)
+    monkeypatch.setenv("DISSECT_KEYCHAIN_VALUE", "envtestpass")
+
+    fresh_keychain = importlib.import_module(KEYCHAIN_MODULE)
+
+    keys = fresh_keychain.get_all_keys()
+    # There should be at least one key with value 'envtestpass' and is_wildcard True
+    assert any(k.value == "envtestpass" and k.is_wildcard for k in keys)
+
+    # Monkeypatch will roll back the original keychain module

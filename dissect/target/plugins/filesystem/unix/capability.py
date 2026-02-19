@@ -11,10 +11,13 @@ from dissect.target.plugin import Plugin, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.filesystem import FilesystemEntry
+    from dissect.target.target import Target
+
 CapabilityRecord = TargetRecordDescriptor(
     "filesystem/unix/capability",
     [
-        ("datetime", "ts_mtime"),
+        ("datetime", "mtime"),
         ("path", "path"),
         ("string[]", "permitted"),
         ("string[]", "inheritable"),
@@ -97,37 +100,40 @@ class CapabilityPlugin(Plugin):
     def capability_binaries(self) -> Iterator[CapabilityRecord]:
         """Find all files that have capabilities set on files.
 
-        Resources:
+        References:
             - https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
         """
 
         for entry in self.target.fs.recurse("/"):
-            if not entry.is_file() or entry.is_symlink():
+            if not entry.is_file(follow_symlinks=False):
                 continue
+            yield from parse_entry(entry, self.target)
 
-            try:
-                attrs = [attr for attr in entry.lattr() if attr.name == "security.capability"]
-            except Exception as e:
-                self.target.log.warning("Failed to get attrs for entry %s", entry)
-                self.target.log.debug("", exc_info=e)
-                continue
 
-            for attr in attrs:
-                try:
-                    permitted, inheritable, effective, root_id = parse_attr(attr.value)
-                except ValueError as e:
-                    self.target.log.warning("Could not parse attributes for entry %s: %s", entry, str(e.value))
-                    self.target.log.debug("", exc_info=e)
+def parse_entry(entry: FilesystemEntry, target: Target) -> Iterator[CapabilityRecord]:
+    try:
+        attrs = [attr for attr in entry.lattr() if attr.name == "security.capability"]
+    except Exception as e:
+        target.log.warning("Failed to get attrs for entry %s", entry)
+        target.log.debug("", exc_info=e)
+        return
 
-                yield CapabilityRecord(
-                    ts_mtime=entry.lstat().st_mtime,
-                    path=self.target.fs.path(entry.path),
-                    permitted=permitted,
-                    inheritable=inheritable,
-                    effective=effective,
-                    root_id=root_id,
-                    _target=self.target,
-                )
+    for attr in attrs:
+        try:
+            permitted, inheritable, effective, root_id = parse_attr(attr.value)
+        except ValueError as e:
+            target.log.warning("Could not parse attributes for entry %s: %s", entry, str(e.value))
+            target.log.debug("", exc_info=e)
+
+        yield CapabilityRecord(
+            mtime=entry.lstat().st_mtime,
+            path=target.fs.path(entry.path),
+            permitted=permitted,
+            inheritable=inheritable,
+            effective=effective,
+            root_id=root_id,
+            _target=target,
+        )
 
 
 def parse_attr(attr: bytes) -> tuple[list[str], list[str], bool, int]:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from dissect.sql import sqlite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -78,8 +78,7 @@ class SophosPlugin(Plugin):
         """
         if self.target.fs.path(self.LOG_SOPHOS_HITMAN).exists():
             try:
-                fh = self.target.fs.path(self.LOG_SOPHOS_HITMAN).open("rb")
-                db = sqlite3.SQLite3(fh)
+                db = SQLite3(self.target.fs.path(self.LOG_SOPHOS_HITMAN))
                 alerts = next(filter(lambda t: t.name == "Alerts", db.tables()))
                 for alert in alerts.rows():
                     yield HitmanAlertRecord(

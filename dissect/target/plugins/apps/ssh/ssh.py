@@ -64,7 +64,8 @@ AuthorizedKeysRecord = OpenSSHUserRecordDescriptor(
     "application/openssh/authorized_keys",
     [
         *COMMON_ELLEMENTS,
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
+        ("digest", "fingerprint"),
         ("string", "options"),
     ],
 )
@@ -77,7 +78,7 @@ KnownHostRecord = OpenSSHUserRecordDescriptor(
         *COMMON_ELLEMENTS,
         ("string", "host"),
         ("varint", "port"),
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
         ("string", "marker"),
         ("digest", "fingerprint"),
     ],
@@ -90,7 +91,9 @@ PrivateKeyRecord = OpenSSHUserRecordDescriptor(
         ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
         ("string", "key_format"),
-        ("string", "public_key"),
+        ("bytes", "private_key_pem"),
+        ("bytes", "public_key_pem"),
+        ("digest", "fingerprint"),
         ("boolean", "encrypted"),
     ],
 )
@@ -100,7 +103,7 @@ PublicKeyRecord = OpenSSHUserRecordDescriptor(
     [
         ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
         ("digest", "fingerprint"),
     ],
 )
@@ -117,7 +120,7 @@ def calculate_fingerprints(public_key_decoded: bytes, ssh_keygen_format: bool = 
     parameter is set to ``True``. When set to ``False`` (default) hexdigests are calculated
     instead for ``sha1``and ``sha256``.
 
-    Resources:
+    References:
         - https://en.wikipedia.org/wiki/Public_key_fingerprint
         - https://man7.org/linux/man-pages/man1/ssh-keygen.1.html
         - ``ssh-keygen -l -E <alg> -f key.pub``

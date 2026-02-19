@@ -129,8 +129,8 @@ def test_nginx_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesy
     fs_unix.map_file_fh("etc/nginx/nginx.conf", BytesIO(textwrap.dedent(config).encode()))
     fs_unix.map_file_fh("foo/bar/new.log", BytesIO(b"New"))
     fs_unix.map_file_fh("foo/bar/old.log", BytesIO(b"Old"))
-    fs_unix.map_file_fh("foo/bar/error/new.log", BytesIO(b""))
-    fs_unix.map_file_fh("foo/bar/error/old.log", BytesIO(b""))
+    fs_unix.map_file_fh("foo/bar/error/new.log", BytesIO())
+    fs_unix.map_file_fh("foo/bar/error/old.log", BytesIO())
 
     target_unix.add_plugin(NginxPlugin)
 
@@ -201,10 +201,10 @@ def test_nginx_parse_config(target_unix: Target, fs_unix: VirtualFilesystem) -> 
     """
     fs_unix.map_file_fh("/bla/foo.conf", BytesIO(textwrap.dedent(foo_conf).encode()))
 
-    fs_unix.map_file_fh("/some/access.log", BytesIO(b""))
-    fs_unix.map_file_fh("/some/error.log", BytesIO(b""))
-    fs_unix.map_file_fh("/eighty/access.log.1", BytesIO(b""))
-    fs_unix.map_file_fh("/eighty/error.log.1", BytesIO(b""))
+    fs_unix.map_file_fh("/some/access.log", BytesIO())
+    fs_unix.map_file_fh("/some/error.log", BytesIO())
+    fs_unix.map_file_fh("/eighty/access.log.1", BytesIO())
+    fs_unix.map_file_fh("/eighty/error.log.1", BytesIO())
 
     target_unix.add_plugin(NginxPlugin)
 
@@ -241,3 +241,38 @@ def test_nginx_parse_config(target_unix: Target, fs_unix: VirtualFilesystem) -> 
     assert records[1].access_log_config == "/eighty/access.log"
     assert not records[1].error_log_config
     assert records[1].source == "/more/confs/one.conf"
+
+
+def test_nginx_host_certificate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we can parse NGINX host TLS certificates."""
+
+    bar_conf = """
+        server {
+        listen              443 ssl;
+        ssl_certificate     /path/to/cert.pem;
+        ssl_certificate_key /path/to/key.pem;
+        server_name         example.com;
+        root                /path/to/www;
+    }
+    """
+    fs_unix.map_file_fh("/etc/nginx/sites-enabled/example.com.conf", BytesIO(textwrap.dedent(bar_conf).encode()))
+    fs_unix.map_file("/path/to/cert.pem", absolute_path("_data/plugins/apps/webserver/certificates/example.crt"))
+    fs_unix.map_file("/path/to/key.pem", absolute_path("_data/plugins/apps/webserver/certificates/example.key"))
+    target_unix.add_plugin(NginxPlugin)
+
+    records = list(target_unix.nginx.hosts())
+    assert len(records) == 1
+    assert records[0].server_name == "example.com"
+    assert records[0].server_port == 443
+    assert records[0].tls_certificate == "/path/to/cert.pem"
+
+    records = list(target_unix.nginx.certificates())
+    assert len(records) == 1
+
+    # x509
+    assert records[0].fingerprint.md5 == "a218ac9b6dbdaa8b23658c4d18c1cfc1"
+    assert records[0].fingerprint.sha1 == "6566d8ebea1feb4eb3d12d9486cddb69e4e9e827"
+    assert records[0].fingerprint.sha256 == "7221d881743505f13b7bfe854bdf800d7f0cd22d34307ed7157808a295299471"
+    assert records[0].serial_number == 21067204948278457910649605551283467908287726794
+    assert records[0].serial_number_hex == "03b0afa702c33e37fffd40e0c402b2120c1284ca"
+    assert records[0].issuer_dn == "C=AU,ST=Some-State,O=Internet Widgits Pty Ltd,CN=example.com"

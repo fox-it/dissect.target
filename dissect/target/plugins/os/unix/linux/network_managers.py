@@ -1,28 +1,27 @@
 from __future__ import annotations
 
-import logging
 import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
 from re import Match, compile, sub
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable
 
     from dissect.target.helpers.fsutil import TargetPath
-    from dissect.target.plugins.os.unix.log.journal import JournalRecord
-    from dissect.target.plugins.os.unix.log.messages import MessagesRecord
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 try:
     from ruamel.yaml import YAML
@@ -304,7 +303,7 @@ class Parser:
             Value(s) corrensponding to that network configuration option.
         """
         if not config:
-            log.error("Cannot get option %s: No config to parse", option)
+            log.debug("Cannot get option %s: No config to parse", option)
             return None
 
         if section:
@@ -534,14 +533,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
     if not messages:
         target.log.warning("Could not search for DHCP leases using %s: No log entries found", log_func)
 
-    def records_enumerate(iterable: Iterable) -> Iterator[tuple[int, JournalRecord | MessagesRecord]]:
-        count = 0
-        for rec in iterable:
-            if rec._desc.name == "linux/log/journal":
-                count += 1
-            yield count, rec
-
-    for count, record in records_enumerate(messages):
+    for count, record in enumerate(messages):
         line = record.message
 
         if not line:
@@ -549,7 +541,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 
         # Ubuntu cloud-init
         if "Received dhcp lease on" in line:
-            interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+            _, ip, _ = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
             ips.add(ip)
             continue
 
@@ -584,17 +576,15 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             and " address " in line
             and " via " in line
         ):
-            interface, ip, netmask, gateway = re.search(
-                r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line
-            ).groups()
+            _, ip, _, _ = re.search(r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line).groups()
             ips.add(ip)
             continue
 
-        # The journal parser is relatively slow, so we stop when we have read 10000 journal entries,
+        # The journal and syslog parsers can be relatively slow, so we stop when we have read 10000 entries,
         # or if we have found at least one ip address. When `iter_all` is `True` we continue searching.
         if not iter_all and (ips or count > 10_000):
             if not ips:
-                target.log.warning("No DHCP IP addresses found in first 10000 journal entries")
+                target.log.warning("No DHCP IP addresses found in first 10000 journal or syslog entries")
             break
 
     return ips
@@ -603,7 +593,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 def parse_unix_dhcp_leases(target: Target) -> set[str]:
     """Parse NetworkManager and dhclient DHCP ``.lease`` files.
 
-    Resources:
+    References:
         - https://linux.die.net/man/5/dhclient.conf
 
     Args:

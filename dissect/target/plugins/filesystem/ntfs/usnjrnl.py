@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.ntfs.c_ntfs import segment_reference
+from dissect.ntfs.util import segment_reference
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -17,7 +17,7 @@ UsnjrnlRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("varint", "usn"),
-        ("string", "segment"),
+        ("string", "segment_id"),
         ("path", "path"),
         ("string", "reason"),
         ("uint32", "security_id"),
@@ -82,13 +82,13 @@ class UsnjrnlPlugin(Plugin):
                     segment = segment_reference(record.record.FileReferenceNumber)
                     yield UsnjrnlRecord(
                         ts=ts,
-                        segment=f"{segment}#{record.FileReferenceNumber.SequenceNumber}",
-                        path=self.target.fs.path(path),
                         usn=record.Usn,
+                        segment_id=f"{segment}#{record.FileReferenceNumber.SequenceNumber}",
+                        path=self.target.fs.path(path),
                         reason=str(record.Reason).replace("USN_REASON.", ""),
-                        attr=str(record.FileAttributes).replace("FILE_ATTRIBUTE.", ""),
-                        source=str(record.SourceInfo).replace("USN_SOURCE.", ""),
                         security_id=record.SecurityId,
+                        source=str(record.SourceInfo).replace("USN_SOURCE.", ""),
+                        attr=str(record.FileAttributes).replace("FILE_ATTRIBUTE.", ""),
                         major=record.MajorVersion,
                         minor=record.MinorVersion,
                         _target=target,

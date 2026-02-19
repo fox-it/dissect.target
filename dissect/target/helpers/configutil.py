@@ -2,17 +2,15 @@ from __future__ import annotations
 
 import io
 import json
-import logging
 import re
 import sys
 from collections import deque
-from collections.abc import ItemsView, Iterable, Iterator, KeysView
+from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Literal,
     TextIO,
 )
@@ -20,6 +18,7 @@ from typing import (
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import to_list
 
 if TYPE_CHECKING:
@@ -47,7 +46,7 @@ except ImportError:
     HAS_TOML = False
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -294,7 +293,7 @@ class CSVish(Default):
             columns = re.split(self.SEPARATOR, line, maxsplit=self.maxsplit)
 
             # keep unparsed lines separate (often env vars)
-            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns))
+            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns, strict=False))
 
             information_dict[str(i)] = data
 
@@ -503,7 +502,7 @@ class Env(ConfigurationParser):
     strings. Does not support dynamic env files, e.g. ``foo=`bar```. Also does not support multi-line key/value
     assignments (yet).
 
-    Resources:
+    References:
         - https://docs.docker.com/compose/environment-variables/variable-interpolation/#env-file-syntax
         - https://github.com/theskumar/python-dotenv/blob/main/src/dotenv/parser.py
     """
@@ -828,6 +827,77 @@ class SystemD(Indentation):
         return [], None
 
 
+class Leases(Default):
+    """A :class:`ConfigurationParser` that specifically parses dhclient ``.leases`` files.
+
+    Examples:
+
+        .. code-block::
+
+            >>> Leases = textwrap.dedent(
+                    '''
+                    lease {
+                        interface "eth0"; # A comment that gets ignored
+                        fixed-address 1.2.3.4;
+                        option dhcp-lease-time 13337;
+                        option routers 0.0.0.0;
+                        option host-name "hostname";
+                        renew 1 2023/12/31 13:37:00;
+                        rebind 2 2023/01/01 01:00:00;
+                        expire 3 2024/01/01 13:37:00;
+                        # Another comment that gets ignored
+                    }
+                    '''
+                )
+            >>> parser = Leases(io.StringIO(lease))
+            >>> parser.parsed_data
+            {
+                "lease-0": {
+                    "interface": "eth0",
+                    "fixed-address": "1.2.3.4"
+                    "option": {
+                        "dhcp-lease-time": "13337",
+                        "routers": "0.0.0.0",
+                        "host-name": "hostname"
+                    },
+                    "renew": "1 2023/12/31 13:37:00",
+                    "rebind": "2 2023/01/01 01:00:00",
+                    "expire": "3 2024/01/01 13:37:00",
+            }
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, separator=(r"\s",))
+
+    def _parse_line(self, line: str) -> tuple[str, str]:
+        key, *value = self.SEPARATOR.split(line.strip(), 1)
+        value = value[0].strip() if value else ""
+        return key, value
+
+    def parse_file(self, fh: TextIO) -> None:
+        root = None
+
+        for line in self.line_reader(fh):
+            key, value = self._parse_line(line)
+
+            if key.startswith("}"):
+                continue
+
+            if key.startswith("lease"):
+                idx = len([key for key in self.parsed_data if "lease" in key])
+                root = f"{key}-{idx}"
+                self.parsed_data[root] = {}
+                continue
+
+            if root:
+                if key == "option":
+                    value = dict([value.split(maxsplit=1)])
+
+                _update_dictionary(self.parsed_data[root], key, value)
+            else:
+                _update_dictionary(self.parsed_data, key, value)
+
+
 @dataclass(frozen=True)
 class ParserOptions:
     collapse: bool | set | None = None
@@ -884,6 +954,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
     "toml": ParserConfig(Toml),
+    "leases": ParserConfig(Leases),
 }
 
 

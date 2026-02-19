@@ -6,11 +6,12 @@ import textwrap
 from functools import reduce
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from docutils.core import publish_string
 from docutils.utils import SystemMessage
+from flow.record import RecordDescriptor
 
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -45,12 +46,14 @@ from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
 from dissect.target.plugins.os.unix.linux.fortios._os import FortiOSPlugin
+from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from flow.record import Record
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def test_save_plugin_import_failure() -> None:
@@ -232,7 +235,7 @@ def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
                 internal=False,
                 findable=True,
                 alias=False,
-                output=None,
+                output="record",
                 method_name="__call__",
                 module="mypluginns._plugin",
                 qualname="MyPlugin",
@@ -275,153 +278,6 @@ def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
             exports=["my_function", "__call__"],
         ),
     }
-
-
-class MockOSWarpPlugin(OSPlugin):
-    __exports__ = ("f6",)  # OS exports f6
-    __register__ = False
-    __name__ = "warp"
-
-    def __init__(self):
-        pass
-
-    def f3(self) -> str:
-        return "F3"
-
-    def f6(self) -> str:
-        return "F6"
-
-
-@patch(
-    "dissect.target.plugin._get_plugins",
-    return_value=PluginRegistry(
-        __functions__=FunctionDescriptorLookup(
-            __regular__={
-                "Warp.f3": {
-                    "test.x13.x13": FunctionDescriptor(
-                        name="Warp.f3",
-                        namespace="Warp",
-                        path="test.x13.f3",
-                        exported=True,
-                        internal=False,
-                        findable=True,
-                        alias=False,
-                        output="record",
-                        method_name="f3",
-                        module="test.x13",
-                        qualname="x13",
-                    )
-                },
-                "f3": {
-                    "os.f3": FunctionDescriptor(
-                        name="f3",
-                        namespace=None,
-                        path="os.f3",
-                        exported=True,
-                        internal=False,
-                        findable=True,
-                        alias=False,
-                        output="record",
-                        method_name="f3",
-                        module="os",
-                        qualname="f3",
-                    )
-                },
-                "f22": {
-                    "test.x69.x69": FunctionDescriptor(
-                        name="f22",
-                        namespace=None,
-                        path="test.x69.f22",
-                        exported=True,
-                        internal=False,
-                        findable=False,
-                        alias=False,
-                        output="record",
-                        method_name="f22",
-                        module="test.x69",
-                        qualname="x69",
-                    )
-                },
-            },
-            __os__={
-                "f6": {
-                    "os.warp._os.warp": FunctionDescriptor(
-                        name="f6",
-                        namespace=None,
-                        path="os.warp._os.f6",
-                        exported=True,
-                        internal=False,
-                        findable=True,
-                        alias=False,
-                        output="record",
-                        method_name="f6",
-                        module="os.warp._os",
-                        qualname="warp",
-                    )
-                }
-            },
-        ),
-        __ostree__={"os": {"warp": {}}},
-    ),
-)
-@patch("dissect.target.Target", create=True)
-@pytest.mark.parametrize(
-    ("search", "assert_num_found"),
-    [
-        ("*", 2),  # Found with tree search using wildcard, excluding OS plugins and unfindable
-        ("test.x13.*", 1),  # Found with tree search using wildcard, expands to test.x13.f3
-        ("test.x13", 1),  # Found with tree search, same as above, because users expect +*
-        ("test.x13.f3", 1),
-        ("test.*", 1),  # Found with tree search
-        ("test.[!x]*", 0),  # Not Found with tree search, all in test not starting with x (no x13)
-        ("test.[!y]*", 1),  # Found with tree search, all in test not starting with y (so x13 is ok)
-        ("test.???.??", 1),  # Found with tree search, using question marks
-        ("x13", 0),  # Not Found: Part of namespace but no match
-        ("Warp.*", 0),  # Not Found: Namespace != Module so 0
-        ("os.warp._os.f6", 0),  # OS plugins are excluded from tree search
-        ("f6", 1),  # Found with direct match
-        ("f22", 1),  # Unfindable has no effect on direct match
-        ("Warp.f3", 1),  # Found with namespace + function
-        ("f3", 1),  # Found direct match
-        ("os.*", 1),  # Found matching os.f3
-        ("os", 1),  # No tree search for "os" because it's a direct match
-    ],
-)
-def test_find_functions(target: MagicMock, plugins: dict, search: str, assert_num_found: int) -> None:
-    target._os_plugin = MockOSWarpPlugin
-    target._os_plugin.__module__ = "dissect.target.plugins.os.warp._os"
-
-    found, _ = find_functions(search, target)
-    assert len(found) == assert_num_found
-
-
-def test_find_functions_windows(target_win: Target) -> None:
-    found, _ = find_functions("services", target_win)
-
-    assert len(found) == 1
-    assert found[0].name == "services"
-    assert found[0].path == "os.windows.services.services"
-
-
-def test_find_functions_linux(target_linux: Target) -> None:
-    found, _ = find_functions("services", target_linux)
-
-    assert len(found) == 1
-    assert found[0].name == "services"
-    assert found[0].path == "os.unix.linux.services.services"
-
-
-def test_find_functions_compatible_check(target_linux: Target) -> None:
-    """Test if we correctly check for compatibility in ``find_functions`` and ``_filter_compatible``."""
-
-    found, _ = find_functions("*", target_linux, compatibility=True)
-    assert "os.unix.log.messages.syslog.syslog" not in [f"{f.path}.{f.name}" for f in found]
-
-    with patch("dissect.target.plugins.apps.browser.chrome.ChromePlugin.check_compatible", return_value=None):
-        found, _ = find_functions("*", target_linux, compatibility=True)
-        functions = [f.path for f in found]
-        assert "apps.browser.chrome.cookies" in functions
-        assert "apps.browser.chrome.history" in functions
 
 
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -597,6 +453,59 @@ def test_namesplace_plugin_multiple_same_module(mock_plugins: PluginRegistry) ->
     assert sorted(desc.name for desc in result) == ["bar.baz", "foo.baz"]
 
 
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_nested_namespace_getattr(mock_plugins: PluginRegistry, target_bare: Target) -> None:
+    class Foo(Plugin):
+        __namespace__ = "foo"
+
+        @export(output="yield")
+        def buzz(self) -> Iterator[str]:
+            yield from ["buzz"]
+
+    class FooBar(Plugin):
+        __namespace__ = "foo.bar"
+
+        @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz1"]
+
+        @export(output="yield")
+        def bar(self) -> Iterator[str]:
+            yield from ["bar1"]
+
+    class FooBaz(Plugin):
+        __namespace__ = "foo.baz"
+
+        @export(output="yield")
+        def bazz(self) -> Iterator[str]:
+            yield from ["bazz2"]
+
+        @export(output="yield")
+        def bar(self) -> Iterator[str]:
+            yield from ["bar2"]
+
+    for plugin in [Foo, FooBar, FooBaz]:
+        target_bare._register_plugin_functions(plugin(target_bare))
+
+    assert isinstance(target_bare.foo, Foo)
+    assert isinstance(target_bare.foo.bar, FooBar)
+    assert isinstance(target_bare.foo.baz, FooBaz)
+    assert hasattr(target_bare.foo.bar, "bazz")
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bazz()
+
+    with pytest.raises(AttributeError):
+        target_bare.foo.bar.foo()
+
+    # Test whether we can access the plugin this way
+    assert next(target_bare.foo.bar.bazz()) == "bazz1"
+    assert next(target_bare.foo.bar.bar()) == "bar1"
+    assert next(target_bare.foo.baz.bazz()) == "bazz2"
+    assert next(target_bare.foo.baz.bar()) == "bar2"
+    assert next(target_bare.foo.buzz()) == "buzz"
+
+
 def test_find_plugin_function_default(target_default: Target) -> None:
     found, _ = find_functions("services", target_default)
 
@@ -642,238 +551,574 @@ def test_incompatible_plugin(target_bare: Target) -> None:
         target_bare.add_plugin(_TestIncompatiblePlugin)
 
 
+# A realistic slimmed down mock of a PluginRegistry
 MOCK_PLUGINS = PluginRegistry(
-    __functions__=FunctionDescriptorLookup(
-        __regular__={
-            "mail": {
-                "apps.mail.MailPlugin": FunctionDescriptor(
-                    name="mail",
-                    namespace=None,
-                    path="apps.mail.mail",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="mail",
-                    module="apps.mail",
-                    qualname="MailPlugin",
-                )
-            },
-            "app1": {
-                "os.apps.app1.App1Plugin": FunctionDescriptor(
-                    name="app1",
-                    namespace=None,
-                    path="os.apps.app1.app1",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="app1",
-                    module="os.apps.app1",
-                    qualname="App1Plugin",
-                )
-            },
-            "app2": {
-                "os.apps.app2.App2Plugin": FunctionDescriptor(
-                    name="app2",
-                    namespace=None,
-                    path="os.apps.app2.app2",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="app2",
-                    module="os.apps.app2",
-                    qualname="App2Plugin",
-                ),
-                "os.fooos.apps.app2.App2Plugin": FunctionDescriptor(
-                    name="app2",
-                    namespace=None,
-                    path="os.fooos.apps.app2.app2",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="app2",
-                    module="os.fooos.apps.app2",
-                    qualname="App2Plugin",
-                ),
-            },
-            "foo_app": {
-                "os.fooos.apps.foo_app.FooAppPlugin": FunctionDescriptor(
-                    name="foo_app",
-                    namespace=None,
-                    path="os.fooos.apps.foo_app.foo_app",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="foo_app",
-                    module="os.foos.apps.foo_app",
-                    qualname="FooAppPlugin",
-                )
-            },
-            "bar_app": {
-                "os.fooos.apps.bar_app.BarAppPlugin": FunctionDescriptor(
-                    name="bar_app",
-                    namespace=None,
-                    path="os.fooos.apps.bar_app.bar_app",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="bar_app",
-                    module="os.foos.apps.bar_app",
-                    qualname="BarAppPlugin",
-                )
-            },
-            "foobar": {
-                "os.fooos.foobar.FooBarPlugin": FunctionDescriptor(
-                    name="foobar",
-                    namespace=None,
-                    path="os.fooos.foobar.foobar",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="foobar",
-                    module="os.foos.foobar",
-                    qualname="FooBarPlugin",
-                )
-            },
-        },
-        __os__={
-            "generic_os": {
-                "os._os.GenericOS": FunctionDescriptor(
-                    name="generic_os",
-                    namespace=None,
-                    path="os._os.generic_os",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="generic_os",
-                    module="os._os",
-                    qualname="GenericOS",
-                )
-            },
-            "foo_os": {
-                "os.fooos._os.FooOS": FunctionDescriptor(
-                    name="foo_os",
-                    namespace=None,
-                    path="os.fooos._os.foo_os",
-                    exported=True,
-                    internal=False,
-                    findable=True,
-                    alias=False,
-                    output="record",
-                    method_name="foo_os",
-                    module="os.fooos._os",
-                    qualname="FooOS",
-                )
-            },
-        },
-    ),
     __plugins__=PluginDescriptorLookup(
         __regular__={
-            "apps.mail.MailPlugin": PluginDescriptor(
-                module="apps.mail",
-                qualname="MailPlugin",
+            # Non-OS, regular
+            "general.osinfo.OSInfoPlugin": PluginDescriptor(
+                module="dissect.target.plugins.general.osinfo",
+                qualname="OSInfoPlugin",
                 namespace=None,
-                path="apps.mail",
+                path="general.osinfo",
                 findable=True,
-                functions=["mail"],
-                exports=["mail"],
+                functions=["osinfo"],
+                exports=["osinfo"],
             ),
-            "os.apps.app1.App1Plugin": PluginDescriptor(
-                module="os.apps.app1",
-                qualname="App1Plugin",
-                namespace=None,
-                path="os.apps.app1",
-                findable=True,
-                functions=["app1"],
-                exports=["app1"],
+            # Non-OS, with namespace
+            "apps.chat.chat.ChatPlugin": PluginDescriptor(
+                module="dissect.target.plugins.apps.chat.chat",
+                qualname="ChatPlugin",
+                namespace="chat",
+                path="apps.chat.chat",
+                findable=False,
+                functions=["history", "__call__"],
+                exports=["history", "__call__"],
             ),
-            "os.apps.app2.App2Plugin": PluginDescriptor(
-                module="os.apps.app2",
-                qualname="App2Plugin",
-                namespace=None,
-                path="os.apps.app2",
+            "apps.chat.msn.MSNPlugin": PluginDescriptor(
+                module="dissect.target.plugins.apps.chat.msn",
+                qualname="MSNPlugin",
+                namespace="msn",
+                path="apps.chat.msn",
                 findable=True,
-                functions=["app2"],
-                exports=["app2"],
+                functions=["history", "__call__"],
+                exports=["history", "__call__"],
             ),
-            "os.fooos.apps.app2.App2Plugin": PluginDescriptor(
-                module="os.fooos.apps.app2",
-                qualname="App2Plugin",
+            # OS, regular
+            "os.windows.generic.GenericPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.windows.generic",
+                qualname="GenericPlugin",
                 namespace=None,
-                path="os.fooos.apps.app2",
+                path="os.windows.generic",
                 findable=True,
-                functions=["app2"],
-                exports=["app2"],
+                functions=["domain"],
+                exports=["domain"],
             ),
-            "os.fooos.apps.foo_app.FooAppPlugin": PluginDescriptor(
-                module="os.fooos.apps.foo_app",
-                qualname="FooAppPlugin",
+            "os.unix.cronjobs.CronjobPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.unix.cronjobs",
+                qualname="CronjobPlugin",
                 namespace=None,
-                path="os.fooos.apps.foo_app",
+                path="os.unix.cronjobs",
                 findable=True,
-                functions=["foo_app"],
-                exports=["foo_app"],
+                functions=["cronjobs"],
+                exports=["cronjobs"],
             ),
-            "os.fooos.apps.bar_app.BarAppPlugin": PluginDescriptor(
-                module="os.fooos.apps.bar_app",
-                qualname="BarAppPlugin",
+            "os.windows.regf.runkeys.RunKeysPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.windows.regf.runkeys",
+                qualname="RunKeysPlugin",
                 namespace=None,
-                path="os.fooos.apps.bar_app",
+                path="os.windows.regf.runkeys",
                 findable=True,
-                functions=["bar_app"],
-                exports=["bar_app"],
+                functions=["runkeys"],
+                exports=["runkeys"],
             ),
-            "os.fooos.foobar.FooBarPlugin": PluginDescriptor(
-                module="os.fooos.foobar",
-                qualname="FooBarPlugin",
+            # OS, shared name
+            "os.unix.linux.services.ServicesPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.unix.linux.services",
+                qualname="ServicesPlugin",
                 namespace=None,
-                path="os.fooos.foobar",
+                path="os.unix.linux.services",
                 findable=True,
-                functions=["foobar"],
-                exports=["foobar"],
+                functions=["initd", "services", "systemd"],
+                exports=["services"],
+            ),
+            "os.windows.services.ServicesPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.windows.services",
+                qualname="ServicesPlugin",
+                namespace=None,
+                path="os.windows.services",
+                findable=True,
+                functions=["services"],
+                exports=["services"],
+            ),
+            # OS, with default
+            "os.default.locale.LocalePlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.default.locale",
+                qualname="LocalePlugin",
+                namespace=None,
+                path="os.default.locale",
+                findable=True,
+                functions=["timezone"],
+                exports=["timezone"],
+            ),
+            "os.unix.locale.UnixLocalePlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.unix.locale",
+                qualname="UnixLocalePlugin",
+                namespace=None,
+                path="os.unix.locale",
+                findable=True,
+                functions=["timezone"],
+                exports=["timezone"],
+            ),
+            "os.unix.linux.fortios.locale.FortiOSLocalePlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.unix.linux.fortios.locale",
+                qualname="FortiOSLocalePlugin",
+                namespace=None,
+                path="os.unix.linux.fortios.locale",
+                findable=True,
+                functions=["timezone"],
+                exports=["timezone"],
+            ),
+            "os.windows.locale.WindowsLocalePlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.windows.locale",
+                qualname="WindowsLocalePlugin",
+                namespace=None,
+                path="os.windows.locale",
+                findable=True,
+                functions=["timezone"],
+                exports=["timezone"],
             ),
         },
         __os__={
-            "os._os.GenericOS": PluginDescriptor(
-                module="os._os",
-                qualname="GenericOS",
+            "os.default._os.DefaultOSPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.default._os",
+                qualname="DefaultOSPlugin",
                 namespace=None,
-                path="os._os",
+                path="os.default._os",
                 findable=True,
-                functions=["generic_os"],
-                exports=["generic_os"],
+                functions=["hostname", "os", "os_tree"],
+                exports=["hostname", "os"],
             ),
-            "os.fooos._os.FooOS": PluginDescriptor(
-                module="os.fooos._os",
-                qualname="FooOS",
+            "os.unix._os.UnixPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.unix._os",
+                qualname="UnixPlugin",
                 namespace=None,
-                path="os.fooos._os",
+                path="os.unix._os",
                 findable=True,
-                functions=["foo_os"],
-                exports=["foo_os"],
+                functions=["hostname", "domain", "os", "os_tree"],
+                exports=["hostname", "domain", "os"],
+            ),
+            "os.unix.linux._os.LinuxPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.unix.linux._os",
+                qualname="LinuxPlugin",
+                namespace=None,
+                path="os.unix.linux._os",
+                findable=True,
+                functions=["hostname", "domain", "os", "os_tree"],
+                exports=["hostname", "domain", "os"],
+            ),
+            "os.unix.linux.fortios._os.FortiOSPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.unix.linux.fortios._os",
+                qualname="FortiOSPlugin",
+                namespace=None,
+                path="os.unix.linux.fortios._os",
+                findable=True,
+                functions=["hostname", "domain", "os", "os_tree"],
+                exports=["hostname", "domain", "os"],
+            ),
+            "os.windows._os.WindowsPlugin": PluginDescriptor(
+                module="dissect.target.plugins.os.windows._os",
+                qualname="WindowsPlugin",
+                namespace=None,
+                path="os.windows._os",
+                findable=True,
+                functions=["hostname", "os", "os_tree"],
+                exports=["hostname", "os"],
             ),
         },
+        __child__={},
+    ),
+    __functions__=FunctionDescriptorLookup(
+        __regular__={
+            # Non-OS, regular
+            "osinfo": {
+                "general.osinfo.OSInfoPlugin": FunctionDescriptor(
+                    name="osinfo",
+                    namespace=None,
+                    path="general.osinfo.osinfo",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="record",
+                    method_name="osinfo",
+                    module="dissect.target.plugins.general.osinfo",
+                    qualname="OSInfoPlugin",
+                )
+            },
+            # Non-OS, with namespace
+            "chat": {
+                "apps.chat.chat.ChatPlugin": FunctionDescriptor(
+                    name="chat",
+                    namespace="chat",
+                    path="apps.chat.chat",
+                    exported=True,
+                    internal=False,
+                    findable=False,
+                    alias=False,
+                    output="record",
+                    method_name="__call__",
+                    module="dissect.target.plugins.apps.chat.chat",
+                    qualname="ChatPlugin",
+                )
+            },
+            "chat.history": {
+                "apps.chat.chat.ChatPlugin": FunctionDescriptor(
+                    name="chat.history",
+                    namespace="chat",
+                    path="apps.chat.chat.history",
+                    exported=True,
+                    internal=False,
+                    findable=False,
+                    alias=False,
+                    output="record",
+                    method_name="history",
+                    module="dissect.target.plugins.apps.chat.chat",
+                    qualname="ChatPlugin",
+                )
+            },
+            "msn": {
+                "apps.chat.msn.MSNPlugin": FunctionDescriptor(
+                    name="msn",
+                    namespace="msn",
+                    path="apps.chat.msn",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="record",
+                    method_name="__call__",
+                    module="dissect.target.plugins.apps.chat.msn",
+                    qualname="MSNPlugin",
+                )
+            },
+            "msn.history": {
+                "apps.chat.msn.MSNPlugin": FunctionDescriptor(
+                    name="msn.history",
+                    namespace="msn",
+                    path="apps.chat.msn.history",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="record",
+                    method_name="history",
+                    module="dissect.target.plugins.apps.chat.msn",
+                    qualname="MSNPlugin",
+                )
+            },
+            # OS, regular
+            "domain": {
+                "os.windows.generic.GenericPlugin": FunctionDescriptor(
+                    name="domain",
+                    namespace=None,
+                    path="os.windows.generic.domain",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="domain",
+                    module="dissect.target.plugins.os.windows.generic",
+                    qualname="GenericPlugin",
+                )
+            },
+            "cronjobs": {
+                "os.unix.cronjobs.CronjobPlugin": FunctionDescriptor(
+                    name="cronjobs",
+                    namespace=None,
+                    path="os.unix.cronjobs.cronjobs",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="record",
+                    method_name="cronjobs",
+                    module="dissect.target.plugins.os.unix.cronjobs",
+                    qualname="CronjobPlugin",
+                )
+            },
+            "runkeys": {
+                "os.windows.regf.runkeys.RunKeysPlugin": FunctionDescriptor(
+                    name="runkeys",
+                    namespace=None,
+                    path="os.windows.regf.runkeys.runkeys",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="record",
+                    method_name="runkeys",
+                    module="dissect.target.plugins.os.windows.regf.runkeys",
+                    qualname="RunKeysPlugin",
+                )
+            },
+            # OS, shared name
+            "services": {
+                "os.windows.services.ServicesPlugin": FunctionDescriptor(
+                    name="services",
+                    namespace=None,
+                    path="os.windows.services.services",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="record",
+                    method_name="services",
+                    module="dissect.target.plugins.os.windows.services",
+                    qualname="ServicesPlugin",
+                ),
+                "os.unix.linux.services.ServicesPlugin": FunctionDescriptor(
+                    name="services",
+                    namespace=None,
+                    path="os.unix.linux.services.services",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="record",
+                    method_name="services",
+                    module="dissect.target.plugins.os.unix.linux.services",
+                    qualname="ServicesPlugin",
+                ),
+            },
+            # OS, with default
+            "timezone": {
+                "os.default.locale.LocalePlugin": FunctionDescriptor(
+                    name="timezone",
+                    namespace=None,
+                    path="os.default.locale.timezone",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="timezone",
+                    module="dissect.target.plugins.os.default.locale",
+                    qualname="LocalePlugin",
+                ),
+                "os.unix.locale.UnixLocalePlugin": FunctionDescriptor(
+                    name="timezone",
+                    namespace=None,
+                    path="os.unix.locale.timezone",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="timezone",
+                    module="dissect.target.plugins.os.unix.locale",
+                    qualname="UnixLocalePlugin",
+                ),
+                "os.unix.linux.fortios.locale.FortiOSLocalePlugin": FunctionDescriptor(
+                    name="timezone",
+                    namespace=None,
+                    path="os.unix.linux.fortios.locale.timezone",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="timezone",
+                    module="dissect.target.plugins.os.unix.linux.fortios.locale",
+                    qualname="FortiOSLocalePlugin",
+                ),
+                "os.windows.locale.WindowsLocalePlugin": FunctionDescriptor(
+                    name="timezone",
+                    namespace=None,
+                    path="os.windows.locale.timezone",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="timezone",
+                    module="dissect.target.plugins.os.windows.locale",
+                    qualname="WindowsLocalePlugin",
+                ),
+            },
+        },
+        __os__={
+            "hostname": {
+                "os.default._os.DefaultOSPlugin": FunctionDescriptor(
+                    name="hostname",
+                    namespace=None,
+                    path="os.default._os.hostname",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="hostname",
+                    module="dissect.target.plugins.os.default._os",
+                    qualname="DefaultOSPlugin",
+                ),
+                "os.unix._os.UnixPlugin": FunctionDescriptor(
+                    name="hostname",
+                    namespace=None,
+                    path="os.unix._os.hostname",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="hostname",
+                    module="dissect.target.plugins.os.unix._os",
+                    qualname="UnixPlugin",
+                ),
+                "os.unix.linux._os.LinuxPlugin": FunctionDescriptor(
+                    name="hostname",
+                    namespace=None,
+                    path="os.unix.linux._os.hostname",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="hostname",
+                    module="dissect.target.plugins.os.unix.linux._os",
+                    qualname="LinuxPlugin",
+                ),
+                "os.unix.linux.fortios._os.FortiOSPlugin": FunctionDescriptor(
+                    name="hostname",
+                    namespace=None,
+                    path="os.unix.linux.fortios._os.hostname",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="hostname",
+                    module="dissect.target.plugins.os.unix.linux.fortios._os",
+                    qualname="FortiOSPlugin",
+                ),
+                "os.windows._os.WindowsPlugin": FunctionDescriptor(
+                    name="hostname",
+                    namespace=None,
+                    path="os.windows._os.hostname",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="hostname",
+                    module="dissect.target.plugins.os.windows._os",
+                    qualname="WindowsPlugin",
+                ),
+            },
+            "os": {
+                "os.default._os.DefaultOSPlugin": FunctionDescriptor(
+                    name="os",
+                    namespace=None,
+                    path="os.default._os.os",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="os",
+                    module="dissect.target.plugins.os.default._os",
+                    qualname="DefaultOSPlugin",
+                ),
+                "os.unix._os.UnixPlugin": FunctionDescriptor(
+                    name="os",
+                    namespace=None,
+                    path="os.unix._os.os",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="os",
+                    module="dissect.target.plugins.os.unix._os",
+                    qualname="UnixPlugin",
+                ),
+                "os.unix.linux._os.LinuxPlugin": FunctionDescriptor(
+                    name="os",
+                    namespace=None,
+                    path="os.unix.linux._os.os",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="os",
+                    module="dissect.target.plugins.os.unix.linux._os",
+                    qualname="LinuxPlugin",
+                ),
+                "os.unix.linux.fortios._os.FortiOSPlugin": FunctionDescriptor(
+                    name="os",
+                    namespace=None,
+                    path="os.unix.linux.fortios._os.os",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="os",
+                    module="dissect.target.plugins.os.unix.linux.fortios._os",
+                    qualname="FortiOSPlugin",
+                ),
+                "os.windows._os.WindowsPlugin": FunctionDescriptor(
+                    name="os",
+                    namespace=None,
+                    path="os.windows._os.os",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="os",
+                    module="dissect.target.plugins.os.windows._os",
+                    qualname="WindowsPlugin",
+                ),
+            },
+            "domain": {
+                "os.unix._os.UnixPlugin": FunctionDescriptor(
+                    name="domain",
+                    namespace=None,
+                    path="os.unix._os.domain",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="domain",
+                    module="dissect.target.plugins.os.unix._os",
+                    qualname="UnixPlugin",
+                ),
+                "os.unix.linux._os.LinuxPlugin": FunctionDescriptor(
+                    name="domain",
+                    namespace=None,
+                    path="os.unix.linux._os.domain",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="domain",
+                    module="dissect.target.plugins.os.unix.linux._os",
+                    qualname="LinuxPlugin",
+                ),
+                "os.unix.linux.fortios._os.FortiOSPlugin": FunctionDescriptor(
+                    name="domain",
+                    namespace=None,
+                    path="os.unix.linux.fortios._os.domain",
+                    exported=True,
+                    internal=False,
+                    findable=True,
+                    alias=False,
+                    output="default",
+                    method_name="domain",
+                    module="dissect.target.plugins.os.unix.linux.fortios._os",
+                    qualname="FortiOSPlugin",
+                ),
+            },
+        },
+        __child__={},
     ),
     __ostree__={
         "os": {
-            "fooos": {},
+            "default": {},
+            "unix": {
+                "linux": {
+                    "fortios": {},
+                }
+            },
+            "windows": {},
         }
     },
+    __failed__=[],
 )
 
 
@@ -884,49 +1129,81 @@ MOCK_PLUGINS = PluginRegistry(
             None,
             "__regular__",
             [
-                "apps.mail",
-                "os.apps.app1",
-                "os.apps.app2",
-                "os.fooos.apps.app2",
-                "os.fooos.apps.bar_app",
-                "os.fooos.apps.foo_app",
-                "os.fooos.foobar",
+                "dissect.target.plugins.general.osinfo",
+                "dissect.target.plugins.apps.chat.chat",
+                "dissect.target.plugins.apps.chat.msn",
+                "dissect.target.plugins.os.windows.generic",
+                "dissect.target.plugins.os.unix.cronjobs",
+                "dissect.target.plugins.os.windows.regf.runkeys",
+                "dissect.target.plugins.os.windows.services",
+                "dissect.target.plugins.os.unix.linux.services",
+                "dissect.target.plugins.os.default.locale",
+                "dissect.target.plugins.os.unix.locale",
+                "dissect.target.plugins.os.unix.linux.fortios.locale",
+                "dissect.target.plugins.os.windows.locale",
             ],
         ),
         (
             None,
             "__os__",
             [
-                "os._os",
-                "os.fooos._os",
+                "dissect.target.plugins.os.default._os",
+                "dissect.target.plugins.os.unix._os",
+                "dissect.target.plugins.os.unix.linux._os",
+                "dissect.target.plugins.os.unix.linux.fortios._os",
+                "dissect.target.plugins.os.windows._os",
             ],
         ),
         (
-            "os._os",
+            "os.unix._os",
             "__regular__",
             [
-                "apps.mail",
-                "os.apps.app1",
-                "os.apps.app2",
+                "dissect.target.plugins.general.osinfo",
+                "dissect.target.plugins.apps.chat.chat",
+                "dissect.target.plugins.apps.chat.msn",
+                "dissect.target.plugins.os.unix.cronjobs",
+                "dissect.target.plugins.os.unix.locale",
             ],
         ),
         (
-            "os.fooos._os",
+            "os.unix.linux.fortios._os",
             "__regular__",
             [
-                "apps.mail",
-                "os.apps.app1",
-                "os.apps.app2",
-                "os.fooos.apps.app2",
-                "os.fooos.apps.bar_app",
-                "os.fooos.apps.foo_app",
-                "os.fooos.foobar",
+                "dissect.target.plugins.general.osinfo",
+                "dissect.target.plugins.apps.chat.chat",
+                "dissect.target.plugins.apps.chat.msn",
+                "dissect.target.plugins.os.unix.cronjobs",
+                "dissect.target.plugins.os.unix.locale",
+                "dissect.target.plugins.os.unix.linux.services",
+                "dissect.target.plugins.os.unix.linux.fortios.locale",
             ],
         ),
         (
-            "bar",
+            "os.windows._os",
             "__regular__",
-            ["apps.mail"],
+            [
+                "dissect.target.plugins.general.osinfo",
+                "dissect.target.plugins.apps.chat.chat",
+                "dissect.target.plugins.apps.chat.msn",
+                "dissect.target.plugins.os.windows.generic",
+                "dissect.target.plugins.os.windows.regf.runkeys",
+                "dissect.target.plugins.os.windows.services",
+                "dissect.target.plugins.os.windows.locale",
+            ],
+        ),
+        (
+            "os.bar._os",
+            "__regular__",
+            [
+                "dissect.target.plugins.general.osinfo",
+                "dissect.target.plugins.apps.chat.chat",
+                "dissect.target.plugins.apps.chat.msn",
+            ],
+        ),
+        (
+            "os.windows._os",
+            "__os__",
+            [],
         ),
     ],
 )
@@ -945,7 +1222,7 @@ def test_plugins(
 
         plugin_descriptors = plugins(osfilter=osfilter, index=index)
 
-        assert sorted([desc.module for desc in plugin_descriptors]) == sorted(expected_plugins)
+        assert sorted(desc.module for desc in plugin_descriptors) == sorted(expected_plugins)
 
 
 def test_plugins_default_plugin(target_default: Target) -> None:
@@ -968,6 +1245,128 @@ def test_plugins_default_plugin(target_default: Target) -> None:
     default_os_plugin_desc = plugins(osfilter=target_default._os_plugin, index="__os__")
 
     assert len(list(default_os_plugin_desc)) == 1
+
+
+@pytest.mark.parametrize(
+    ("os_plugin", "pattern", "expected_paths"),
+    [
+        # Direct match
+        (DefaultOSPlugin, "osinfo", ["general.osinfo.osinfo"]),
+        # Direct match with namespace, regardless of `findable` status
+        (DefaultOSPlugin, "chat.history", ["apps.chat.chat.history"]),
+        (DefaultOSPlugin, "msn.history", ["apps.chat.msn.history"]),
+        # Find with tree search using wildcard
+        (DefaultOSPlugin, "general.*", ["general.osinfo.osinfo"]),
+        # Find with tree search using implicit wildcard
+        (DefaultOSPlugin, "general.osinfo", ["general.osinfo.osinfo"]),
+        # Find with exact tree match
+        (DefaultOSPlugin, "general.osinfo.osinfo", ["general.osinfo.osinfo"]),
+        # Find with tree search using more complicated patterns
+        (DefaultOSPlugin, "general.[!o]*", []),
+        (DefaultOSPlugin, "general.[!x]*", ["general.osinfo.osinfo"]),
+        (DefaultOSPlugin, "general.??????.??????", ["general.osinfo.osinfo"]),
+        # Namespaces do not match
+        (DefaultOSPlugin, "chat.*", []),
+        # Part of module paths do not match
+        (DefaultOSPlugin, "generic", []),
+        # OS direct match only matches within the same OS plugin
+        (DefaultOSPlugin, "hostname", ["os.default._os.hostname"]),
+        (WindowsPlugin, "hostname", ["os.windows._os.hostname"]),
+        (LinuxPlugin, "hostname", ["os.unix.linux._os.hostname", "os.unix._os.hostname"]),
+        # OS tree search only matches within the same OS plugin
+        (DefaultOSPlugin, "os.windows._os.hostname", []),
+        (WindowsPlugin, "os.default._os.hostname", []),
+        (DefaultOSPlugin, "os.*.hostname", ["os.default._os.hostname"]),
+        (WindowsPlugin, "os.*.hostname", ["os.windows._os.hostname"]),
+        # # "os" hits the direct match, not the tree search
+        (DefaultOSPlugin, "os", ["os.default._os.os"]),
+        (WindowsPlugin, "os", ["os.windows._os.os"]),
+        # Wildcard matches all regular functions and OS functions (within the same OS)
+        (
+            DefaultOSPlugin,
+            "*",
+            [
+                "os.unix.linux.fortios.locale.timezone",
+                "os.windows.regf.runkeys.runkeys",
+                "os.unix.linux.services.services",
+                "apps.chat.msn.history",
+                "os.windows.generic.domain",
+                "os.unix.cronjobs.cronjobs",
+                "os.windows.services.services",
+                "os.default.locale.timezone",
+                "os.unix.locale.timezone",
+                "os.windows.locale.timezone",
+                "os.default._os.hostname",
+                "os.default._os.os",
+                "general.osinfo.osinfo",
+            ],
+        ),
+        (
+            WindowsPlugin,
+            "*",
+            [
+                "os.windows.regf.runkeys.runkeys",
+                "apps.chat.msn.history",
+                "os.windows.generic.domain",
+                "os.windows.services.services",
+                "os.windows.locale.timezone",
+                "os.windows._os.hostname",
+                "os.windows._os.os",
+                "general.osinfo.osinfo",
+            ],
+        ),
+        # Some OS functions only exist on certain OS plugins
+        (LinuxPlugin, "os.*.domain", ["os.unix.linux._os.domain", "os.unix._os.domain"]),
+        # # Some plugins have complicated paths (i.e. LocalePlugin)
+        (LinuxPlugin, "timezone", ["os.unix.locale.timezone"]),
+        (FortiOSPlugin, "timezone", ["os.unix.linux.fortios.locale.timezone", "os.unix.locale.timezone"]),
+        # Some plugins have overlapping names (i.e. "services")
+        (FortiOSPlugin, "services", ["os.unix.linux.services.services"]),
+        (WindowsPlugin, "services", ["os.windows.services.services"]),
+    ],
+)
+def test_find_functions(os_plugin: type[OSPlugin], pattern: str, expected_paths: list[str]) -> None:
+    with patch("dissect.target.plugin._get_plugins", return_value=MOCK_PLUGINS):
+        target = Target()
+        target._os_plugin = os_plugin
+
+        found, _ = find_functions(pattern, target)
+        assert [desc.path for desc in found] == expected_paths
+
+
+def test_find_functions_windows(target_win: Target) -> None:
+    found, _ = find_functions("services", target_win)
+
+    assert len(found) == 1
+    assert found[0].name == "services"
+    assert found[0].path == "os.windows.services.services"
+
+
+def test_find_functions_linux(target_linux: Target) -> None:
+    found, _ = find_functions("services", target_linux)
+
+    assert len(found) == 1
+    assert found[0].name == "services"
+    assert found[0].path == "os.unix.linux.services.services"
+
+
+def test_find_functions_compatible_check(target_linux: Target) -> None:
+    """Test if we correctly check for compatibility in ``find_functions`` and ``_filter_compatible``."""
+
+    found, _ = find_functions("*", target_linux, compatibility=True)
+    assert "os.unix.log.messages.syslog.syslog" not in [f"{f.path}.{f.name}" for f in found]
+
+    with patch("dissect.target.plugins.apps.browser.chrome.ChromePlugin.check_compatible", return_value=None):
+        found, _ = find_functions("*", target_linux, compatibility=True)
+        functions = [f.path for f in found]
+        assert "apps.browser.chrome.cookies" in functions
+        assert "apps.browser.chrome.history" in functions
+
+
+@pytest.mark.benchmark
+def test_benchmark_functions_compatible_check(target_unix_users: Target, benchmark: BenchmarkFixture) -> None:
+    """Benchmark ``_filter_compatible`` performance."""
+    benchmark(lambda: find_functions("*", target_unix_users, compatibility=True))
 
 
 def test_function_aliases(target_default: Target) -> None:
@@ -1174,6 +1573,10 @@ def test_os_tree(target_bare: Target, os_plugin: type[OSPlugin], results: list[s
     """Test if we correctly return the OS name tree."""
     target_bare._os_plugin = os_plugin
     target_bare.apply()
+    os_funcs = [record.name for record in target_bare.osinfo()]
+
+    # Ensure that os_tree is not present in os_info
+    assert "os_tree" not in os_funcs
     assert target_bare.os_tree() == results
 
 
@@ -1234,11 +1637,11 @@ def test_plugin_alias(target_bare: Target) -> None:
 def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     """This test checks plugin style guide conformity for all exported plugins.
 
-    Resources:
+    References:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
-    # Ignore DefaultOSPlugin and NamespacePlugin instances
-    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultOSPlugin:
+    # Ignore DefaultOSPlugin, NamespacePlugin and OSPlugin instances
+    if issubclass(descriptor.cls, (NamespacePlugin, OSPlugin)) or descriptor.cls is DefaultOSPlugin:
         return
 
     # Plugin method should specify what it returns
@@ -1268,6 +1671,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # The method docstring should compile to rst without warnings
     assert_valid_rst(method_doc_str)
 
+    # The method docstring should follow our conventions
+    assert_compliant_rst(method_doc_str)
+
     # Plugin class should have a docstring
     class_doc_str = descriptor.cls.__doc__
     assert isinstance(class_doc_str, str), f"No docstring for class {descriptor.cls.__name__}"
@@ -1275,6 +1681,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
+
+    # The class docstring should follow our conventions
+    assert_compliant_rst(class_doc_str)
 
     # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
     for arg in descriptor.args:
@@ -1341,6 +1750,122 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
             )
 
 
+def test_plugin_record_field_and_name_consistency() -> None:
+    """Test that ensures that record fields with the same name across different plugins translate to the
+    same normalized type, and that no two records share the same name.
+
+    Consider the following TargetRecordDescriptors for plugins X, Y, Z, A and B::
+
+        # Field consistency example
+        RecordX = TargetRecordDescriptor("record/x", [("varint", "shared_field")])
+        RecordY = TargetRecordDescriptor("record/y", [("path", "shared_field")])
+        RecordZ = TargetRecordDescriptor("record/z", [("string", "shared_field")])
+
+        # Record name consistency example
+        RecordA = TargetRecordDescriptor("record/a", [("string", "field1")])
+        RecordB = TargetRecordDescriptor("record/a", [("varint", "field2")])
+
+    In the first example, ``RecordX`` will fail the test, as the field ``shared_field`` cannot be ``varint`` in
+    one record also being used as ``string``/``path`` in others. ``RecordY`` and ``RecordZ`` do
+    not conflict, as both translate to the same ``wildcard`` type.
+
+    In the second example, ``RecordA`` and ``RecordB`` will fail the test because they both define the name
+    ``record/a``. Duplicate record names may cause collisions in export formats or downstream processing.
+
+    Field type normalization is based on ``FIELD_TYPES_MAP``, loosely aligned with flow.record and
+    ElasticSearch type mappings.
+
+    References:
+        - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
+        - https://github.com/fox-it/flow.record/tree/main/flow/record/fieldtypes
+        - https://github.com/JSCU-NL/dissect-elastic
+    """
+    seen_records: set[RecordDescriptor] = set()
+    seen_field_names: set[str] = set()
+    seen_field_types: dict[str, tuple[str | None, RecordDescriptor]] = {}
+    seen_record_names: set[str] = set()
+    inconsistencies: set[str] = set()
+
+    FIELD_TYPES_MAP = {
+        # strings
+        "string": "string",
+        "stringlist": "string",
+        "wstring": "string",
+        "path": "string",
+        "uri": "string",
+        "command": "string",
+        "dynamic": "string",
+        # ints
+        "varint": "int",
+        "filesize": "int",
+        "uint32": "int",
+        "uint16": "int",
+        "float": "float",
+        # ip / cidr
+        "net.ipaddress": "ip",
+        "net.ipnetwork": "ip_range",
+        "net.ipinterface": "ip_range",
+        # dates
+        "datetime": "datetime",
+        # other
+        "boolean": "boolean",
+        "bytes": "binary",
+        "digest": "keyword",
+    }
+
+    for descriptor in find_functions("*", Target(), compatibility=False, show_hidden=True)[0]:
+        # Test if plugin function record fields make sense and do not conflict with other records.
+        if descriptor.output != "record" or not hasattr(descriptor, "record"):
+            continue
+
+        # Functions can yield a single record or a list of records.
+        records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+
+        for record in records:
+            assert isinstance(record, RecordDescriptor), (
+                f"{record!r} of function {descriptor!r} is not of type RecordDescriptor"
+            )
+            if record.name != "empty":
+                assert record.fields, f"{record!r} has no fields"
+
+            if record in seen_records:
+                continue
+
+            seen_records.add(record)
+            # Detect duplicate record names
+            if record.name in seen_record_names:
+                inconsistencies.add(f"<{record.name}> has duplicates")
+            else:
+                seen_record_names.add(record.name)
+
+            for name, field in record.fields.items():
+                # Make sure field names have the same type when translated. This check does not save multiple field
+                # name and typenames, this is a bare-minumum check only.
+
+                # We only care about the field type, not if it is a list of that type.
+                field_typename = field.typename.replace("[]", "")
+
+                assert field_typename in FIELD_TYPES_MAP, (
+                    f"Field type {field_typename} is not mapped in FIELD_TYPES_MAP, please add it manually."
+                )
+
+                if name in seen_field_names:
+                    seen_typename, seen_record = seen_field_types[name]
+                    if FIELD_TYPES_MAP[seen_typename] != FIELD_TYPES_MAP[field_typename]:
+                        inconsistencies.add(
+                            f"<{record.name} ({field.typename!r}, '{name}')> is duplicate mismatch of <{seen_record.name} ({seen_typename!r}, '{name}')>"  # noqa: E501
+                        )
+
+                else:
+                    seen_field_names.add(name)
+                    seen_field_types[name] = (field_typename, record)
+
+    if inconsistencies:
+        pytest.fail(
+            f"Found {len(inconsistencies)} inconsistencies in RecordDescriptors:\n" + "\n".join(inconsistencies)
+        )
+
+
 def assert_valid_rst(src: str) -> None:
     """Attempts to compile the given string to rst."""
 
@@ -1352,3 +1877,67 @@ def assert_valid_rst(src: str) -> None:
         # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
         if "Unknown interpreted text role" not in str(e):
             pytest.fail(f"Invalid rst: {e}", pytrace=False)
+
+
+def assert_compliant_rst(src: str) -> None:
+    """Makes sure that the given rst docstring follows the project's conventions."""
+
+    # Explicit message stating we want References instead of Resources to prevent confusion
+    if "Resources:\n" in src:
+        pytest.fail(f"Invalid rst: docstring contains 'Resources' instead of 'References': {src!r}", pytrace=False)
+
+    # Generic message stating lists should start with References (assumes lists always have at least one 'http')
+    if "- http" in src and "References:\n" not in src:
+        pytest.fail(f"Invalid rst: docstring contains list but does not mention 'References': {src!r}", pytrace=False)
+
+    # Make sure we use stripes instead of bullets (assumes lists always have at least one 'http')
+    if "* http" in src:
+        pytest.fail(f"Invalid rst: docstring contains bullet instead of dash in list: {src!r}", pytrace=False)
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    [descriptor for descriptor in plugins() if descriptor.namespace and "." in descriptor.namespace],
+    ids=lambda descriptor: descriptor.namespace,
+)
+def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
+    """Test whether all parts of nested namespaces exist and that there are no conflicts with other functions."""
+
+    parts = descriptor.namespace.split(".")
+    for i in range(len(parts)):
+        part = ".".join(parts[: i + 1])
+        result = list(lookup(part))
+
+        if not result:
+            pytest.fail(f"Unreachable namespace {descriptor.namespace!r}, namespace {part!r} does not exist.")
+
+        if len(result) > 1:
+            conflicts = ", ".join(
+                f"{desc.name} ({desc.module}.{desc.qualname})" for desc in result if desc.namespace != part
+            )
+            pytest.fail(f"Namespace name {descriptor.namespace!r} has conflicts with function name: {conflicts}")
+
+
+@pytest.mark.parametrize(
+    "descriptor",
+    # Match plugin classes which are a *direct* base of NamespacePlugin only using :meth:`Plugin.__bases__`,
+    # instead of using ``issubclass`` which would also yield indirectly inherited Plugin classes.
+    [descriptor for descriptor in plugins() if NamespacePlugin in descriptor.cls.__bases__],
+    ids=lambda descriptor: descriptor.qualname,
+)
+def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
+    """This test checks if :class:`NamespacePlugin` usage is correct.
+
+    :class:`NamespacePlugin` is reserved for "grouping" other plugins of the same category. See for
+    example :class:`BrowserPlugin` or :class:`WebserverPlugin`.
+
+    If you want to expose plugin functions under a shared name, e.g. ``foo.bar`` and ``foo.baz``,
+    you should use :class:`Plugin` with ``Plugin.__namespace__ = "foo"`` instead.
+
+    References:
+        - https://github.com/fox-it/dissect.target/issues/1180
+    """
+
+    assert descriptor.cls.__subclasses__(), (
+        f"NamespacePlugin {descriptor.module}.{descriptor.qualname} has no subclasses, are you sure you're using NamespacePlugin correctly?"  # noqa: E501
+    )

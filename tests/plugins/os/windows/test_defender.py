@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -11,7 +11,7 @@ from flow.record.fieldtypes import command
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
-from dissect.target.plugins.os.windows.defender._plugin import MicrosoftDefenderPlugin
+from dissect.target.plugins.os.windows.defender._plugin import MicrosoftDefenderPlugin, parse_iso_datetime
 from dissect.target.plugins.os.windows.defender.quarantine import (
     STREAM_ID,
     c_defender,
@@ -27,6 +27,23 @@ if TYPE_CHECKING:
 
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("2025-11-26T22:01:52.403Z", datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone.utc)),
+        (
+            "2025-11-26T22:01:52.403+02:00",
+            datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone(timedelta(hours=2))),
+        ),
+        ("2025-11-26T22:01:52.403", datetime(2025, 11, 26, 22, 1, 52, 403000, tzinfo=timezone.utc)),
+        ("2025-11-26T22:01:52Z", datetime(2025, 11, 26, 22, 1, 52, tzinfo=timezone.utc)),
+        ("2025-11-26T22:01:52+00:00", datetime(2025, 11, 26, 22, 1, 52, tzinfo=timezone.utc)),
+    ],
+)
+def test_parse_iso_datetime(value: str, expected: datetime) -> None:
+    assert parse_iso_datetime(value) == expected
 
 
 def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
@@ -74,6 +91,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert mimikatz_record.creation_time.date() == detection_date
     assert mimikatz_record.last_write_time.date() == detection_date
     assert mimikatz_record.last_accessed_time.date() == detection_date
+
+    assert mimikatz_record.quarantine_id == "a762038000000000fb1112639186e0d6"
+    assert mimikatz_record.scan_id == "cdbe4600e43a964b8dc2416b0ef7a207"
+    assert mimikatz_record.threat_id == 2147705511
 
 
 def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
@@ -351,7 +372,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[8].pid == 2820
     assert records[8].sigseq == "0x1"
     assert records[8].send_memory_scan_report == 1
-    assert records[8].source == 4
+    assert records[8].source_id == 4
 
     # Original Filename
     assert records[9].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
@@ -453,3 +474,48 @@ def test_recover_quarantined_file_streams(target_win: Target, fs_win: VirtualFil
                 b"[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=C:\\Users\\user\\Downloads\\mimikatz_trunk.zip\r\n",
             ),
         ]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "Windows\\Temp\\MpCmdRun.log",
+        "Users\\John\\AppData\\Local\\Temp\\MpCmdRun.log.bak",
+    ],
+)
+def test_defender_mpcmdrunlog(target_win_users: Target, fs_win: VirtualFilesystem, path: str) -> None:
+    """Test if we can parse a Windows Defender ``MpCmdRun.log`` file."""
+
+    fs_win.map_file(path, absolute_path("_data/plugins/os/windows/defender/mpcmdrun/MpCmdRun.log"))
+
+    target_win_users.add_plugin(MicrosoftDefenderPlugin)
+    records = list(target_win_users.defender.mpcmdrun())
+
+    assert len(records) == 4
+
+    assert path in str(records[0].source)
+    assert records[0].ts_start == dt("2025-11-03 13:08:19+00:00")
+    assert records[0].ts_end == dt("2025-11-03 13:08:20+00:00")
+    assert records[0].command == (
+        '"C:\\ProgramData\\Microsoft\\Windows Defender\\platform\\4.18.2203.5-0\\MpCmdRun.exe" -EnableService'
+    )
+
+    assert path in str(records[1].source)
+    assert records[1].ts_start == dt("2025-11-03 13:09:45+00:00")
+    assert records[1].command == (
+        '"C:\\ProgramData\\Microsoft\\Windows Defender\\platform\\4.18.2203.5-0\\MpCmdRun.exe" -EnableService'
+    )
+
+    assert path in str(records[2].source)
+    assert records[2].ts_start == dt("2025-11-03 13:14:55+00:00")
+    assert records[2].command == (
+        '"C:\\ProgramData\\Microsoft\\Windows Defender\\platform\\4.18.2203.5-0\\MpCmdRun.exe"'
+        " SignatureUpdate -ScheduleJob -RestrictPrivileges"
+    )
+
+    assert path in str(records[3].source)
+    assert records[3].ts_start is None
+    assert records[3].command == (
+        '"C:\\ProgramData\\Microsoft\\Windows Defender\\platform\\4.18.2203.5-0\\MpCmdRun.exe"'
+        " SignaturesUpdateService -ScheduleJob -UncDownload"
+    )

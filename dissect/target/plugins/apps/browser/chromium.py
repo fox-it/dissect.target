@@ -8,13 +8,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath, join
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
@@ -29,8 +28,7 @@ from dissect.target.plugins.apps.browser.browser import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from dissect.sql.sqlite3 import SQLite3
+    from pathlib import Path
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -52,7 +50,7 @@ CHROMIUM_DOWNLOAD_RECORD_FIELDS = [
     ("string", "mime_type"),
 ]
 
-# Resources:
+# References:
 # - Reversing ``PostProcessData`` in ``elevation_service.exe``
 # - https://chromium.googlesource.com/chromium/src/+/master/chrome/elevation_service/elevator.cc
 elevation_def = """
@@ -70,6 +68,16 @@ struct GoogleChromeCipher {
 };
 """
 c_elevation = cstruct(endian="<").load(elevation_def)
+
+# References:
+# - https://github.com/chromium/chromium/blob/main/components/download/public/common/download_item.h
+DOWNLOAD_STATES = {
+    0: "in_progress",
+    1: "complete",
+    2: "cancelled",
+    3: "interrupted",
+    4: "interrupted",  # Older versions of Chromium can have DownloadState value 4 as interrupted.
+}
 
 
 class ChromiumMixin:
@@ -97,48 +105,52 @@ class ChromiumMixin:
         "browser/chromium/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
-    def _build_userdirs(self, hist_paths: list[str]) -> list[tuple[UserDetails, TargetPath]]:
+    def __init__(self, target: Target) -> None:
+        super().__init__(target)
+        self.userdirs = self._build_userdirs(self.DIRS)
+
+    def _build_userdirs(self, hist_paths: list[str]) -> set[tuple[UserDetails, Path]]:
         """Join the selected browser dirs with the user home path.
 
         Args:
             hist_paths: A list with browser paths as strings.
 
         Returns:
-            List of tuples containing user and file path objects.
+            List of tuples containing user and unique file path objects.
         """
-        users_dirs: list[tuple] = []
+        users_dirs: set[tuple] = set()
         for user_details in self.target.user_details.all_with_home():
             for d in hist_paths:
-                home_dir: TargetPath = user_details.home_path
+                home_dir: Path = user_details.home_path
                 for cur_dir in home_dir.glob(d):
                     cur_dir = cur_dir.resolve()
-                    if not cur_dir.exists() or (user_details.user, cur_dir) in users_dirs:
-                        continue
-                    users_dirs.append((user_details, cur_dir))
+                    if cur_dir.exists():
+                        users_dirs.add((user_details, cur_dir))
         return users_dirs
 
-    def _iter_db(
-        self, filename: str, subdirs: list[str] | None = None
-    ) -> Iterator[tuple[UserDetails, TargetPath, SQLite3]]:
-        """Generate a connection to a sqlite database file.
+    def _iter_db(self, filename: str, subdirs: list[str] | None = None) -> Iterator[tuple[UserDetails, Path, SQLite3]]:
+        """Iterate database files of all users.
 
         Args:
             filename: The filename as string of the database where the data is stored.
-            subdirs: Subdirectories to also try for every configured directory.
+            subdirs: Optional list of subdirectory names to iterate for every user directory.
 
         Yields:
-            opened db_file (SQLite3)
-
-        Raises:
-            FileNotFoundError: If the history file could not be found.
-            SQLError: If the history file could not be opened.
+            Tuple of :class:`UserDetails`, :class:`Path` of SQLite3 file and :class:`SQLite3` instance.
         """
         seen = set()
-        dirs = list(self.DIRS)
-        if subdirs:
-            dirs.extend([join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subdirs)])
+        userdirs = self.userdirs
 
-        for user, cur_dir in self._build_userdirs(dirs):
+        if subdirs:
+            userdirs = itertools.chain(
+                self.userdirs,
+                {
+                    (user_details, userdir.joinpath(subdir))
+                    for (user_details, userdir), subdir in itertools.product(userdirs, subdirs)
+                },
+            )
+
+        for user, cur_dir in userdirs:
             db_file = cur_dir.joinpath(filename)
 
             if db_file in seen:
@@ -146,14 +158,14 @@ class ChromiumMixin:
             seen.add(db_file)
 
             try:
-                yield user, db_file, sqlite3.SQLite3(db_file.open())
+                yield user, db_file, SQLite3(db_file)
             except FileNotFoundError:
                 self.target.log.warning("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
-    def _iter_json(self, filename: str) -> Iterator[tuple[UserDetails, TargetPath, dict]]:
+    def _iter_json(self, filename: str) -> Iterator[tuple[UserDetails, Path, dict]]:
         """Iterate over all JSON files in the user directories, yielding a tuple
         of username, JSON file path, and the parsed JSON data.
 
@@ -167,7 +179,7 @@ class ChromiumMixin:
         Raises:
             FileNotFoundError: If the json file could not be found.
         """
-        for user, cur_dir in self._build_userdirs(self.DIRS):
+        for user, cur_dir in self.userdirs:
             json_file = cur_dir.joinpath(filename)
             try:
                 yield user, json_file, json.load(json_file.open())
@@ -175,7 +187,7 @@ class ChromiumMixin:
                 self.target.log.warning("Could not find %s file: %s", filename, json_file)
 
     def check_compatible(self) -> None:
-        if not self._build_userdirs(self.DIRS):
+        if not self.userdirs:
             raise UnsupportedPluginError("No Chromium-based browser directories found")
 
     def history(self, browser_name: str | None = None) -> Iterator[BrowserHistoryRecord]:
@@ -195,11 +207,11 @@ class ChromiumMixin:
                 url (uri): History URL.
                 title (string): Page title.
                 description (string): Page description.
-                rev_host (string): Reverse hostname.
+                host (string): Hostname.
                 visit_type (varint): Visit type.
                 visit_count (varint): Amount of visits.
                 hidden (string): Hidden value.
-                typed (string): Typed value.
+                typed (boolean): Typed value.
                 session (varint): Session value.
                 from_visit (varint): Record ID of the "from" visit.
                 from_url (uri): URL of the "from" visit.
@@ -227,7 +239,7 @@ class ChromiumMixin:
                         url=try_idna(url.url),
                         title=url.title,
                         description=None,
-                        rev_host=None,
+                        host=None,
                         visit_type=None,
                         visit_count=url.visit_count,
                         hidden=url.hidden,
@@ -239,7 +251,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -315,7 +327,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Error processing cookie file %s: %s", db_file, e)
                 self.target.log.debug("", exc_info=e)
 
@@ -363,6 +375,10 @@ class ChromiumMixin:
                         url = download_chain[-1].url
                         url = try_idna(url)
 
+                    # https://github.com/chromium/chromium/blob/main/components/download/public/common/download_item.h
+                    if state := row.get("state"):
+                        state = DOWNLOAD_STATES.get(state)
+
                     yield self.BrowserDownloadRecord(
                         ts_start=webkittimestamp(row.start_time),
                         ts_end=webkittimestamp(row.end_time) if row.end_time else None,
@@ -374,12 +390,12 @@ class ChromiumMixin:
                         url=url,
                         size=row.get("total_bytes"),
                         mime_type=row.get("mime_type"),
-                        state=row.get("state"),
+                        state=state,
                         source=db_file,
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -453,7 +469,7 @@ class ChromiumMixin:
                             ts_install=ts_install,
                             ts_update=ts_update,
                             browser=browser_name,
-                            id=extension_id,
+                            extension_id=extension_id,
                             name=name,
                             short_name=short_name,
                             default_title=default_title,
@@ -487,7 +503,7 @@ class ChromiumMixin:
 
         You can supply a SHA1 hash or plaintext password using the keychain (``-Kv`` or ``-K``).
 
-        Resources:
+        References:
             - https://chromium.googlesource.com/chromium/src/+/master/docs/linux/password_storage.md
             - https://chromium.googlesource.com/chromium/src/+/master/components/os_crypt/sync/os_crypt_linux.cc#40
         """
@@ -550,12 +566,12 @@ class ChromiumMixin:
                     _user=user.user,
                 )
 
-    def decryption_keys(self, local_state_path: TargetPath, username: str) -> ChromiumKeys:
+    def decryption_keys(self, local_state_path: Path, username: str) -> ChromiumKeys:
         """Return decrypted Chromium ``os_crypt.encrypted_key``and ``os_crypt.app_bound_encrypted_key`` values.
 
         Used by :meth:`ChromiumMixin.passwords` and :meth:`ChromiumMixin.cookies` for Windows targets.
 
-        Resources:
+        References:
             - https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html
             - https://github.com/chromium/chromium/tree/main/chrome/browser/os_crypt
             - https://github.com/chromium/chromium/tree/main/chrome/elevation_service
@@ -643,7 +659,7 @@ class ChromiumMixin:
                         cipher = ChaCha20_Poly1305.new(key=key, nonce=data.iv)
 
                     else:
-                        raise ValueError("Unsupported ElevationService key flag {data.flag!r}")  # noqa: TRY301
+                        raise ValueError(f"Unsupported ElevationService key flag {data.flag!r}")  # noqa: TRY301
 
                     aes_key = cipher.decrypt_and_verify(data.ciphertext, data.mac_tag)
 
@@ -746,7 +762,7 @@ def decrypt_v10_linux(
     Returns:
         Decrypted password string.
 
-    Resources:
+    References:
         - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_linux.cc
     """
 
@@ -865,7 +881,7 @@ def decrypt_dpapi(target: Target, user: UserDetails, keys: ChromiumKeys, encrypt
 
     They can be decrypted directly by utilizing the DPAPI plugin.
 
-    Resources:
+    References:
         - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
     """
 

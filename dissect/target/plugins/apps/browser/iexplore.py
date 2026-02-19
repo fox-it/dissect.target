@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.esedb import esedb, record, table
-from dissect.esedb.exceptions import KeyNotFoundError
+from dissect.database.ese import ESE, Record, Table
+from dissect.database.ese.exception import KeyNotFoundError
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -30,9 +30,9 @@ class WebCache:
 
     def __init__(self, target: Target, fh: BinaryIO):
         self.target = target
-        self.db = esedb.EseDB(fh)
+        self.db = ESE(fh)
 
-    def find_containers(self, name: str) -> Iterator[table.Table]:
+    def find_containers(self, name: str) -> Iterator[Table]:
         """Look up all ``ContainerId`` values for a given container name.
 
         Args:
@@ -55,7 +55,7 @@ class WebCache:
             self.target.log.warning("Exception while parsing EseDB Containers table")
             self.target.log.debug("", exc_info=e)
 
-    def _iter_records(self, name: str) -> Iterator[record.Record]:
+    def _iter_records(self, name: str) -> Iterator[Record]:
         """Yield records from a Webcache container.
 
         Args:
@@ -72,11 +72,11 @@ class WebCache:
                 self.target.log.debug("", exc_info=e)
                 continue
 
-    def history(self) -> Iterator[record.Record]:
+    def history(self) -> Iterator[Record]:
         """Yield records from the history webcache container."""
         yield from self._iter_records("history")
 
-    def downloads(self) -> Iterator[record.Record]:
+    def downloads(self) -> Iterator[Record]:
         """Yield records from the iedownload webcache container."""
         yield from self._iter_records("iedownload")
 
@@ -149,11 +149,11 @@ class InternetExplorerPlugin(BrowserPlugin):
             url (uri): History URL.
             title (string): Page title.
             description (string): Page description.
-            rev_host (string): Reverse hostname.
+            host (string): Hostname.
             visit_type (varint): Visit type.
             visit_count (varint): Amount of visits.
             hidden (string): Hidden value.
-            typed (string): Typed value.
+            typed (boolean): Typed value.
             session (varint): Session value.
             from_visit (varint): Record ID of the "from" visit.
             from_url (uri): URL of the "from" visit.
@@ -177,7 +177,7 @@ class InternetExplorerPlugin(BrowserPlugin):
                     url=try_idna(url),
                     title=None,
                     description=None,
-                    rev_host=None,
+                    host=None,
                     visit_type=None,
                     visit_count=container_record.get("AccessCount"),
                     hidden=None,

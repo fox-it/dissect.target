@@ -1,19 +1,21 @@
 from __future__ import annotations
 
+from io import BytesIO
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 from flow.record.fieldtypes import posix_path
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
 
-def test_unix_bsd_darwin_macos_os(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
+def test_macos_os(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
     """Test if we detect a macOS target correctly."""
 
     target_macos_users.add_plugin(MacOSPlugin)
@@ -29,7 +31,7 @@ def test_unix_bsd_darwin_macos_os(target_macos_users: Target, fs_macos: VirtualF
     test_user = users[1]
 
     assert target_macos_users.os == OperatingSystem.MACOS
-    assert target_macos_users.hostname == "dummys Mac"
+    assert target_macos_users.hostname == "dummys-Mac"
     assert target_macos_users.version == "macOS 11.7.5 (20G1225)"
 
     assert len(users) == 2
@@ -45,3 +47,36 @@ def test_unix_bsd_darwin_macos_os(target_macos_users: Target, fs_macos: VirtualF
     assert test_user.home is None
 
     assert ips == ["10.42.43.63", "10.42.43.64"]
+
+
+def test_apfs_mounts(target_bare: Target) -> None:
+    """Test that macOS firmlinks are correctly mounted."""
+    mock_system_volume = VirtualFilesystem()
+    mock_system_volume.__type__ = "apfs"
+    mock_system_volume.apfs = Mock()
+    mock_system_volume.apfs.role = Mock()
+    mock_system_volume.apfs.role.name = "SYSTEM"
+
+    mock_system_volume.makedirs("/Library")
+    mock_system_volume.makedirs("/Applications")
+    mock_system_volume.map_file_fh("/usr/share/firmlinks", BytesIO(b"/Applications\tApplications\n/Library\tLibrary\n"))
+
+    mock_data_volume = VirtualFilesystem()
+    mock_data_volume.__type__ = "apfs"
+    mock_data_volume.apfs = Mock()
+    mock_data_volume.apfs.role = Mock()
+    mock_data_volume.apfs.role.name = "DATA"
+    mock_data_volume.makedirs("/Library/something")
+    mock_data_volume.makedirs("/Applications/Some.app")
+
+    target_bare.filesystems.add(mock_system_volume)
+    target_bare.filesystems.add(mock_data_volume)
+
+    assert MacOSPlugin.detect(target_bare) is mock_system_volume
+    target_bare._os_plugin = MacOSPlugin
+    target_bare.apply()
+
+    assert target_bare.fs.exists("/Applications")
+    assert target_bare.fs.exists("/Library")
+    assert target_bare.fs.exists("/Applications/Some.app")
+    assert target_bare.fs.exists("/Library/something")

@@ -68,7 +68,7 @@ def test_edge_history(target_platform: Target, request: pytest.FixtureRequest) -
     assert {"edge"} == {record.browser for record in records}
 
     assert records[-1].url == "https://github.com/fox-it/dissect"
-    assert records[-1].id == "45"
+    assert records[-1].id == 45
     assert records[-1].visit_count == 2
     assert records[-1].ts == dt("2023-02-24T11:54:44.875477+00:00")
 
@@ -88,6 +88,7 @@ def test_edge_downloads(target_platform: Target, request: pytest.FixtureRequest)
     assert records[0].ts_start == dt("2023-02-24T11:52:36.631304+00:00")
     assert records[0].ts_end == dt("2023-02-24T11:52:37.068768+00:00")
     assert records[0].url == "https://codeload.github.com/fox-it/dissect/zip/refs/heads/main"
+    assert records[0].state == "complete"
 
 
 @pytest.mark.parametrize(
@@ -105,7 +106,7 @@ def test_edge_extensions(target_platform: Target, request: pytest.FixtureRequest
     assert records[0].ts_update == dt("2023-04-18T08:39:57.968208+00:00")
     assert records[0].name == "Web Store"
     assert records[0].version == "0.2"
-    assert records[0].id == "ahfgeienlihckogmohjhadlkjgocpleb"
+    assert records[0].extension_id == "ahfgeienlihckogmohjhadlkjgocpleb"
 
 
 def test_windows_edge_passwords_plugin(target_edge_win: Target) -> None:
@@ -165,14 +166,14 @@ def test_unix_edge_passwords_gnome_plugin(target_edge_unix: Target, fs_unix: Vir
 
 
 def test_edge_windows_snapshots(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    base_dirs = [
+    base_dirs = (
         "Users\\John\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default",
         "Users\\John\\AppData\\Local\\Microsoft\\Edge\\User Data\\Profile 1",
-    ]
-    snapshot_dirs = [
+    )
+    snapshot_dirs = (
         "Users\\John\\AppData\\Local\\Microsoft\\Edge\\User Data\\Snapshots\\116.0.5038.150\\Default",
         "Users\\John\\AppData\\Local\\Microsoft\\Edge\\User Data\\Snapshots\\119.0.7845.119\\Default",
-    ]
+    )
     profile_dirs = base_dirs + snapshot_dirs
 
     for dir in profile_dirs:
@@ -193,12 +194,10 @@ def test_edge_windows_snapshots(target_win_users: Target, fs_win: VirtualFilesys
     for records in records_list:
         assert {"edge"} == {record.browser for record in records}
 
-        for base_dir in base_dirs:
-            base_path_records = [r for r in records if str(r.source.parent).endswith(base_dir)]
+        base_path_records = [r for r in records if str(r.source.parent).endswith(base_dirs)]
 
-        for snapshot_dir in snapshot_dirs:
-            # Retrieve records that are in the snapshot's directory.
-            snapshot_records = [r for r in records if str(r.source.parent).endswith(snapshot_dir)]
+        # Retrieve records that are in the snapshot's directory.
+        snapshot_records = [r for r in records if str(r.source.parent).endswith(snapshot_dirs)]
 
         # We map the same files in each of the snapshot directories.
         assert len(base_path_records) == len(snapshot_records)

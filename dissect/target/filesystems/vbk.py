@@ -13,6 +13,7 @@ from dissect.target.exceptions import (
     NotASymlinkError,
 )
 from dissect.target.filesystem import (
+    DirEntry,
     Filesystem,
     FilesystemEntry,
 )
@@ -35,7 +36,7 @@ class VbkFilesystem(Filesystem):
     def _detect(fh: BinaryIO) -> bool:
         try:
             vbk.VBK(fh)
-        except vbk.VBKError:
+        except (vbk.VBKError, EOFError):
             return False
         else:
             return True
@@ -56,6 +57,26 @@ class VbkFilesystem(Filesystem):
             raise FilesystemError(path) from e
 
 
+class VbkDirEntry(DirEntry):
+    fs: VbkFilesystem
+    entry: vbk.DirItem
+
+    def get(self) -> VbkFilesystemEntry:
+        return VbkFilesystemEntry(self.fs, self.path, self.entry)
+
+    def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+        return self.entry.is_dir()
+
+    def is_file(self, *, follow_symlinks: bool = True) -> bool:
+        return self.entry.is_file()
+
+    def is_symlink(self) -> bool:
+        return False
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class VbkFilesystemEntry(FilesystemEntry):
     fs: VbkFilesystem
     entry: vbk.DirItem
@@ -72,23 +93,12 @@ class VbkFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self.entry.open()
 
-    def iterdir(self) -> Iterator[str]:
+    def scandir(self) -> Iterator[VbkDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
         for entry in self.entry.iterdir():
-            yield entry.name
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        if not self.is_dir():
-            raise NotADirectoryError(self.path)
-
-        for entry in self.entry.iterdir():
-            yield VbkFilesystemEntry(
-                self.fs,
-                fsutil.join(self.path, entry.name, alt_separator=self.fs.alt_separator),
-                entry,
-            )
+            yield VbkDirEntry(self.fs, self.path, entry.name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         return self.entry.is_dir()

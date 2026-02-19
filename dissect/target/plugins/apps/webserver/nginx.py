@@ -3,13 +3,16 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from itertools import chain
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.certificate import parse_x509
+from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
+    WebserverCertificateRecord,
     WebserverErrorLogRecord,
     WebserverHostRecord,
     WebserverPlugin,
@@ -106,6 +109,7 @@ class NginxPlugin(WebserverPlugin):
         self.access_paths = set()
         self.error_paths = set()
         self.host_paths = set()
+        self.config_paths = set()
 
         self.find_logs()
 
@@ -127,10 +131,18 @@ class NginxPlugin(WebserverPlugin):
             if "*" in config_file:
                 base, _, glob = config_file.partition("*")
                 for f in self.target.fs.path(base).rglob(f"*{glob}"):
+                    self.config_paths.add(f)
                     self.parse_config(f)
 
             elif (config_file := self.target.fs.path(config_file)).exists():
+                self.config_paths.add(config_file)
                 self.parse_config(config_file)
+
+    def _get_paths(self) -> Iterator[Path]:
+        yield from self.access_paths | self.error_paths
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        yield from self.config_paths
 
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
         """Parse the given NGINX ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
@@ -236,16 +248,18 @@ class NginxPlugin(WebserverPlugin):
 
                 yield WebserverAccessLogRecord(
                     ts=ts,
+                    webserver="nginx",
                     bytes_sent=bytes_sent,
                     **log,
                     source=path,
                     _target=self.target,
                 )
 
+    @export(record=WebserverErrorLogRecord)
     def error(self) -> Iterator[WebserverErrorLogRecord]:
         """Return contents of NGINX error log files in unified ``WebserverErrorLogRecord`` format.
 
-        Resources:
+        References:
             - https://nginx.org/en/docs/ngx_core_module.html#error_log
             - https://github.com/nginx/nginx/blob/master/src/core/ngx_log.c
         """
@@ -277,46 +291,85 @@ class NginxPlugin(WebserverPlugin):
 
                 yield WebserverErrorLogRecord(
                     ts=ts,
+                    webserver="nginx",
                     **log,
                     source=path,
                     _target=self.target,
                 )
 
+    @export(record=WebserverHostRecord)
     def hosts(self) -> Iterator[WebserverHostRecord]:
         """Return found server directives in the NGINX configuration.
 
-        Resources:
+        References:
             - https://nginx.org/en/docs/http/ngx_http_core_module.html#server
         """
 
-        def yield_record(current_server: dict) -> Iterator[WebserverHostRecord]:
-            yield WebserverHostRecord(
-                ts=host_path.lstat().st_mtime,
-                server_name=current_server.get("server_name") or current_server.get("listen"),
-                server_port=current_server.get("listen"),
-                root_path=current_server.get("root"),
-                access_log_config=current_server.get("access_log"),
-                error_log_config=current_server.get("error_log"),
-                source=host_path,
-                _target=self.target,
-            )
-
         for host_path in self.host_paths:
-            current_server = {}
+            server = {}
             seen_server_directive = False
             for line in host_path.open("rt"):
                 if "server {" in line:
-                    if current_server:
-                        yield from yield_record(current_server)
-                    current_server = {}
+                    if server:
+                        yield construct_hosts_record(self.target, host_path, server)
+                    server = {}
                     seen_server_directive = True
 
                 elif seen_server_directive:
                     key, _, value = line.strip().partition(" ")
-                    current_server[key] = value.rstrip(";")
+                    server[key] = value.rstrip(";").strip()
 
-            if current_server:
-                yield from yield_record(current_server)
+            if server:
+                yield construct_hosts_record(self.target, host_path, server)
+
+    @export(record=WebserverCertificateRecord)
+    def certificates(self) -> Iterator[WebserverCertificateRecord]:
+        """Return found server certificates in the NGINX configuration."""
+        certs = set()
+
+        for host in self.hosts():
+            # Parse x509 certificate
+            if host.tls_certificate and (cert_path := self.target.fs.path(host.tls_certificate)).is_file():
+                certs.add(cert_path)
+
+        root = self.target.fs.path("/etc/nginx")
+        for cert_path in chain(root.glob("**/*.crt"), root.glob("**/*.pem")):
+            if cert_path not in certs:
+                certs.add(cert_path)
+
+        for cert_path in certs:
+            try:
+                cert = parse_x509(cert_path)
+                yield WebserverCertificateRecord(
+                    ts=cert_path.lstat().st_mtime,
+                    webserver="nginx",
+                    **cert._asdict(),
+                    host=host.server_name,
+                    source=cert_path,
+                    _target=self.target,
+                )
+            except Exception as e:  # noqa: PERF203
+                self.target.log.warning("Unable to parse certificate %s :%s", cert_path, e)
+                self.target.log.debug("", exc_info=e)
+
+
+def construct_hosts_record(target: Target, host_path: Path, server: dict) -> WebserverHostRecord:
+    def _map_path(path: str | None) -> TargetPath:
+        return target.fs.path(path) if path else None
+
+    return WebserverHostRecord(
+        ts=host_path.lstat().st_mtime,
+        webserver="nginx",
+        server_name=server.get("server_name") or server.get("listen"),
+        server_port=server.get("listen", "").replace(" ssl", "") or None,
+        root_path=_map_path(server.get("root")),
+        access_log_config=_map_path(server.get("access_log")),
+        error_log_config=_map_path(server.get("error_log")),
+        tls_certificate=_map_path(server.get("ssl_certificate")),
+        tls_key=_map_path(server.get("ssl_certificate_key")),
+        source=host_path,
+        _target=target,
+    )
 
 
 def parse_json_line(line: str) -> dict[str, str] | None:
@@ -333,7 +386,7 @@ def parse_json_line(line: str) -> dict[str, str] | None:
     Unfortunately NGINX has no official default naming convention for JSON access logs,
     users can configure the JSON ``log_format`` as they see fit.
 
-    Resources:
+    References:
         - https://nginx.org/en/docs/http/ngx_http_log_module.html
         - https://github.com/elastic/examples/blob/master/Common%20Data%20Formats/nginx_json_logs/README.md
     """

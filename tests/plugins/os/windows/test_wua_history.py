@@ -22,7 +22,7 @@ def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> No
     assert len(records) == 80
     assert record.ts == datetime(2024, 7, 13, 16, 49, 9, 0, tzinfo=timezone.utc)
     assert record.id_event == 80
-    assert record.status == 1
+    assert record.status_id == 1
     assert record.status_mapped == "Success"
     assert record.server_selection == 2
     assert record.server_selection_mapped == "ssWindowsUpdate"
@@ -48,8 +48,8 @@ def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> No
         "unwanted software. Once you have installed this item, it cannot be removed."
     )
     assert record.support_url == "https://go.microsoft.com/fwlink/?LinkId=52661"
-    assert record.categories == "Microsoft Defender Antivirus"
-    assert record.more_info_url == "https://go.microsoft.com/fwlink/?linkid=2007160"
+    assert record.categories == ["Microsoft Defender Antivirus"]
+    assert record.more_info_url == ["https://go.microsoft.com/fwlink/?linkid=2007160"]
     assert record.id_user == 0
     assert record.is_service_is_additional == "False"
     assert record.classification == "e0789628-ce08-4437-be74-2495b842f43b"

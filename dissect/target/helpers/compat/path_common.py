@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import posixpath
 import stat
-import sys
 from typing import IO, TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
@@ -30,24 +29,11 @@ try:
             self._fs = path._fs
             self._flavour = path._flavour
 
-        if sys.version_info >= (3, 10):
-
-            def __getitem__(self, idx: int) -> TargetPath:
-                result = super().__getitem__(idx)
-                result._fs = self._fs
-                result._flavour = self._flavour
-                return result
-
-        else:
-
-            def __getitem__(self, idx: int) -> TargetPath:
-                if idx < 0:
-                    idx = len(self) + idx
-
-                result = super().__getitem__(idx)
-                result._fs = self._fs
-                result._flavour = self._flavour
-                return result
+        def __getitem__(self, idx: int) -> TargetPath:
+            result = super().__getitem__(idx)
+            result._fs = self._fs
+            result._flavour = self._flavour
+            return result
 
 except ImportError:
     pass
@@ -111,7 +97,7 @@ def isjunction(path: TargetPath) -> bool:
 
     entry = path.get()
     # Python's ntpath isjunction() only checks for mount point reparse tags
-    return isinstance(entry, NtfsFilesystemEntry) and entry.dereference().is_mount_point()
+    return isinstance(entry, NtfsFilesystemEntry) and entry.is_mount_point()
 
 
 # Join two paths, normalizing and eliminating any symbolic links

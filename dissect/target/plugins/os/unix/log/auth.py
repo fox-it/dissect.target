@@ -97,9 +97,15 @@ class SshdService(BaseService):
 
 
 class SystemdLogindService(BaseService):
-    """Class for parsing systemd-logind messages in the auth log."""
+    """Class for parsing systemd-logind messages in the auth log.
 
-    RE_SYSTEMD_LOGIND_WATCHING = re.compile(
+    References:
+        - https://github.com/systemd/systemd/blob/main/src/login/logind-session.c
+        - https://github.com/systemd/systemd/blob/main/src/login/logind-session.h
+        - https://github.com/systemd/systemd/blob/main/src/login/logind-seat.c
+    """
+
+    RE_MSG_WATCHING = re.compile(
         r"""
         (?P<action>Watching\ssystem\sbuttons)\s # Action is "Watching system buttons"
         on\s(?P<device>[^\s]+)\s                # The device the button is related to -> /dev/input/event0
@@ -108,32 +114,64 @@ class SystemdLogindService(BaseService):
         re.VERBOSE,
     )
 
+    RE_MSG_SESSION_NEW = re.compile(
+        r"New session (?P<session>\d+) of user (?P<user>\S+)\.",
+    )
+
+    # Reference: https://github.com/systemd/systemd/commit/07b3556510440f7b5f19e19cca1b46d9d581da43
+    RE_MSG_SESSION_NEW_VARIANT = re.compile(
+        r"New session '(?P<session>\d+)' of user '(?P<user>\S+)' with class '(?P<class>\S+)' and type '(?P<type>\S+)'\."
+    )
+
+    RE_MSG_SESSION_LOGGED_OUT = re.compile(
+        r"Session (?P<session>\d+) logged out\.",
+    )
+
+    RE_MSG_SESSION_REMOVED = re.compile(
+        r"Removed session (?P<session>\d+)\.",
+    )
+
+    RE_MSG_SEAT = re.compile(r"(?P<action>New seat|Removed seat) (?P<seat>\S+)\.")
+
     @classmethod
     def parse(cls, message: str) -> dict[str, str]:
         """Parse auth log message from systemd-logind."""
         additional_fields = {}
+
         # Example: Nov 14 07:14:09 ubuntu-1 systemd-logind[4]: Removed session 4.
-        if "Removed" in message:
-            additional_fields["action"] = "removed session"
-            additional_fields["session"] = message.split()[-1].strip(".")
-        elif "Watching" in message and (match := cls.RE_SYSTEMD_LOGIND_WATCHING.search(message)):
+        if "Removed session" in message:
+            if match := cls.RE_MSG_SESSION_REMOVED.search(message):
+                fields = match.groupdict()
+                additional_fields["action"] = "removed session"
+                additional_fields["session"] = int(fields["session"])
+
+        elif "Watching" in message and (match := cls.RE_MSG_WATCHING.search(message)):
             additional_fields.update(match.groupdict())
+
         # Example: New session 4 of user sampleuser.
+        # Example: New session '4' of user 'sampleuser' with class 'SESSION_USER' and type 'SESSION_TTY'.
         elif "New session" in message:
-            parts = message.removeprefix("New session ").split()
-            additional_fields["action"] = "new session"
-            additional_fields["session"] = parts[0]
-            additional_fields["user"] = parts[-1].strip(".")
+            if (match := cls.RE_MSG_SESSION_NEW.search(message)) or (
+                match := cls.RE_MSG_SESSION_NEW_VARIANT.search(message)
+            ):
+                fields = match.groupdict()
+                additional_fields.update(fields)
+                additional_fields["action"] = "new session"
+                additional_fields["session"] = int(fields["session"])
+
         # Example: Session 4 logged out. Waiting for processes to exit.
         elif "logged out" in message:
-            session = message.removeprefix("Session ").split(maxsplit=1)[0]
-            additional_fields["action"] = "logged out session"
-            additional_fields["session"] = session
+            if match := cls.RE_MSG_SESSION_LOGGED_OUT.search(message):
+                fields = match.groupdict()
+                additional_fields["action"] = "logged out session"
+                additional_fields["session"] = int(fields["session"])
+
         # Example: New seat seat0.
-        elif "New seat" in message:
-            seat = message.split()[-1].strip(".")
-            additional_fields["action"] = "new seat"
-            additional_fields["seat"] = seat
+        # Example: Removed seat seat0.
+        elif ("New seat" in message or "Removed seat" in message) and (match := cls.RE_MSG_SEAT.search(message)):
+            fields = match.groupdict()
+            additional_fields.update(fields)
+            additional_fields["action"] = fields["action"].lower()
 
         return additional_fields
 
@@ -329,7 +367,7 @@ class AuthPlugin(Plugin):
             Debian format: Jan 12 13:37:00 hostname daemon[pid]: pam_unix(daemon:session): message
             Ubuntu  24.04: 2024-01-12T13:37:00.000000+02:00 hostname daemon[pid]: pam_unix(daemon:session): message
 
-        Resources:
+        References:
             - https://help.ubuntu.com/community/LinuxLogFiles
         """
         target_tz = self.target.datetime.tzinfo

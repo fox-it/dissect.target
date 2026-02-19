@@ -1,21 +1,35 @@
 from __future__ import annotations
 
 import codecs
+import hashlib
 import re
 import string
-import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
-from dissect.cstruct import utils
-
-from dissect.target.helpers.scrape import recover_string
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
     from dissect.target.container import Container
-    from dissect.target.target import Target
     from dissect.target.volume import Volume
+
+
+re_NOFLAG = 0  # re.NOFLAG is Python 3.11 and newer only
+
+QFindMatchRecord = TargetRecordDescriptor(
+    "qfind/match",
+    [
+        ("string", "disk"),
+        ("varint", "offset"),
+        ("string", "needle"),
+        ("string", "codec"),
+        ("bytes", "match"),
+        ("bytes", "buffer"),
+    ],
+)
 
 
 class QFindPlugin(Plugin):
@@ -27,26 +41,30 @@ class QFindPlugin(Plugin):
     @arg("-n", "--needles", nargs="*", metavar="NEEDLES", help="needles to search for")
     @arg("-nf", "--needle-file", type=Path, help="file containing the needles to search for")
     @arg("-e", "--encoding", help="encode text needles with these comma separated encodings")
+    @arg("--regex", action="store_true", help="parse needles as regex patterns")
     @arg("--no-hex-decode", action="store_true", help="do not automatically add decoded hex needles (only in raw mode)")
-    @arg("-R", "--raw", action="store_true", help="show raw hex dumps instead of post-processed string output")
     @arg("-i", "--ignore-case", action="store_true", help="case insensitive search")
-    @arg("--allow-non-ascii", action="store_true", help="allow non-ASCII characters in the output")
-    @arg("-u", "--unique", action="store_true", help="only show unique string hits (does not apply to raw output)")
+    @arg("-u", "--unique", action="store_true", help="only yield unique string hits (does not apply to raw output)")
     @arg("-W", "--window", type=int, default=256, help="maximum window size in bytes for context around each hit")
-    @export(output="none")
+    @arg("--strip-null-bytes", action="store_true", help="strip null bytes from matched buffer")
+    @export(record=QFindMatchRecord)
     def qfind(
         self,
         needles: list[str] | None = None,
         needle_file: Path | None = None,
         encoding: str = "",
         no_hex_decode: bool = False,
-        raw: bool = False,
+        regex: bool = False,
         ignore_case: bool = False,
-        allow_non_ascii: bool = False,
         unique: bool = False,
         window: int = 256,
-    ) -> None:
+        strip_null_bytes: bool = False,
+        *,
+        progress: Callable[[Container | Volume, int, int], None] | None = None,
+    ) -> Iterator[QFindMatchRecord]:
         """Find a needle in a haystack.
+
+        Hex encode needles starting with ``#`` in needle files, otherwise these needles are ignored.
 
         Example:
             .. code-block::
@@ -63,28 +81,40 @@ class QFindPlugin(Plugin):
                 # find all instances of "malware" in the target, in UTF-8 and UTF-16-LE (UTF-8 is default)
                 target-qfind <TARGET> --needles malware --encoding utf-16-le
 
-                # use target-query instead of target-qfind
+                # find all matches of regular expression "malware\\s\\d+" in the target (e.g. ``malware 1337``)
+                target-qfind <TARGET> --needles "malware\\s\\d+" --regex
+
+                # use a file for needles
+                target-qfind <TARGET> --needle-file needles.txt
+
+                # use target-query instead of target-qfind (output in records)
                 target-query <TARGET> -f qfind --needles malware
         """
         all_needles = set(needles or [])
         if needle_file and needle_file.exists():
             with needle_file.open("r") as fh:
                 for line in fh:
-                    if (line := line.strip()) and not line.startswith("#"):
-                        all_needles.add(line)
+                    if line := line.strip():
+                        if line.startswith("#"):
+                            self.target.log.warning("Ignoring needle %r", line)
+                        else:
+                            all_needles.add(line)
+
+        self.target.log.info("Loaded %s needles", len(all_needles))
 
         encodings = set()
         for codec in (encoding or "").split(","):
-            codec = codec.strip()
+            if not (codec := codec.strip()):
+                continue
 
             try:
-                codecs.lookup(codec.strip())
+                codecs.lookup(codec)
             except LookupError:
                 self.target.log.warning("Unknown encoding: %s", codec)
             else:
                 encodings.add(codec)
 
-        needle_lookup = {}
+        needle_lookup: dict[bytes, tuple[str, str]] = {}
         for needle in all_needles:
             encoded_needle = needle.encode("utf-8")
             needle_lookup[encoded_needle] = (needle, "utf-8")
@@ -102,18 +132,19 @@ class QFindPlugin(Plugin):
                     needle_lookup[encoded_needle] = (needle, codec)
 
         if not needle_lookup:
-            self.target.log.error("No needles to search for")
+            self.target.log.error("No needles to search for (use '--needles' or '--needle-file')")
             return
 
-        if ignore_case:
+        if ignore_case or regex:
             tmp = {}
             for encoded_needle, _ in needle_lookup.items():
-                tmp[re.compile(re.escape(encoded_needle), re.IGNORECASE)] = _
+                encoded_needle = encoded_needle if regex else re.escape(encoded_needle)
+                tmp[re.compile(encoded_needle, re.IGNORECASE if ignore_case else re_NOFLAG)] = _
             needle_lookup = tmp
 
         seen = set()
-        for _, stream, needle, offset in self.target.scrape.find(
-            list(needle_lookup.keys()), progress=progress(self.target)
+        for disk, stream, needle, offset, match in self.target.scrape.find(
+            list(needle_lookup.keys()), progress=progress
         ):
             original_needle, codec = needle_lookup[needle]
             needle_len = len(needle.pattern if isinstance(needle, re.Pattern) else needle)
@@ -121,49 +152,21 @@ class QFindPlugin(Plugin):
             stream.seek(before_offset)
             buf = stream.read((offset - before_offset) + max(window, needle_len))
 
-            header = f"\r[{offset:#08x} @ {original_needle} ({codec})]"
+            if unique:
+                digest = hashlib.sha1(buf).digest() if window > 20 else buf
 
-            if raw:
-                print(header)
-                palette = [(offset - before_offset, utils.COLOR_NORMAL), (needle_len, utils.COLOR_BG_RED)]
-                utils.hexdump(buf, palette, offset=before_offset)
-            else:
-                codec = "utf-8" if codec == "hex" else codec
-                before_part = recover_string(
-                    buf[: offset - before_offset], codec, reverse=True, ascii=not allow_non_ascii
-                )
-                after_part = recover_string(buf[offset - before_offset :], codec, ascii=not allow_non_ascii)
-                hit = (
-                    before_part
-                    + utils.COLOR_BG_RED
-                    + after_part[:needle_len]
-                    + utils.COLOR_NORMAL
-                    + after_part[needle_len:]
-                )
+                if digest in seen:
+                    continue
+                seen.add(digest)
 
-                if unique:
-                    if hit in seen:
-                        continue
-                    seen.add(hit)
+            match = match.group() if match else original_needle.encode()
 
-                print(header)
-                print(hit)
-
-
-def progress(target: Target) -> Callable[[Container | Volume, int, int], None]:
-    """Progress handler of the qfind plugin."""
-    current_disk = None
-
-    def update(disk: Container | Volume, offset: int, size: int) -> None:
-        nonlocal current_disk
-        if current_disk is None:
-            sys.stderr.write(f"{target}\n")
-
-        if current_disk != disk:
-            sys.stderr.write(f"[Current disk: {disk}]\n")
-            current_disk = disk
-
-        sys.stderr.write(f"\r{offset / float(size) * 100:0.2f}%")
-        sys.stderr.flush()
-
-    return update
+            yield QFindMatchRecord(
+                disk=repr(disk),
+                offset=offset,
+                needle=original_needle,
+                codec=codec,
+                match=match,
+                buffer=buf.strip(b"\x00") if strip_null_bytes else buf,
+                _target=self.target,
+            )

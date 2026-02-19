@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-import logging
 import re
 import uuid
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import NfsError
 from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
@@ -17,10 +17,11 @@ from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.loaders.local import LocalLoader
-from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export, internal
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    import logging
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
     from typing_extensions import Self
@@ -28,7 +29,8 @@ if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 # https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
@@ -83,7 +85,7 @@ class UnixPlugin(OSPlugin):
     def users(self, sessions: bool = False) -> Iterator[UnixUserRecord]:
         """Yield unix user records from passwd files or syslog session logins.
 
-        Resources:
+        References:
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
 
@@ -158,6 +160,14 @@ class UnixPlugin(OSPlugin):
                     source="/var/log/syslog",
                     _target=self.target,
                 )
+
+    @internal
+    def misc_user_paths(self) -> Iterator[tuple[str, tuple[str, str] | None]]:
+        if (root_path := self.target.fs.path("/root")).exists():
+            yield (root_path, ("uid", 0))
+
+        if (home_path := self.target.fs.path("/home")).exists():
+            yield from ((entry, None) for entry in home_path.iterdir() if entry.is_dir())
 
     @export(property=True)
     def architecture(self) -> str | None:
@@ -414,7 +424,7 @@ class UnixPlugin(OSPlugin):
     def _get_architecture(self, os: str = "unix", path: Path | str = "/bin/ls") -> str | None:
         """Determine architecture by reading an ELF header of a binary on the target.
 
-        Resources:
+        References:
             - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
         """
 

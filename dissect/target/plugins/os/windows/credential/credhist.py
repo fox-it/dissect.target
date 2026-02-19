@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, BinaryIO
 from uuid import UUID
@@ -12,8 +11,10 @@ from dissect.util.sid import read_sid
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import keychain
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
+from dissect.target.plugins.os.windows.credential.credential import WindowsCredentialPlugin
 from dissect.target.plugins.os.windows.dpapi.crypto import (
     CipherAlgorithm,
     HashAlgorithm,
@@ -27,7 +28,8 @@ if TYPE_CHECKING:
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 CredHistRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -155,15 +157,17 @@ class CredHistFile:
             password_hash = entry.sha1
 
 
-class CredHistPlugin(Plugin):
+class CredHistPlugin(WindowsCredentialPlugin):
     """Windows CREDHIST file parser.
 
     Windows XP:         ``C:\\Documents and Settings\\username\\Application Data\\Microsoft\\Protect\\CREDHIST``
     Windows 7 and up:   ``C:\\Users\\username\\AppData\\Roaming\\Microsoft\\Protect\\CREDHIST``
 
-    Resources:
+    References:
         - https://www.passcape.com/index.php?section=docsys&cmd=details&id=28#41
     """
+
+    __namespace__ = "credhist"
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -196,6 +200,9 @@ class CredHistPlugin(Plugin):
 
             for password in passwords:
                 credhist.decrypt(hashlib.sha1(password.encode("utf-16-le")).digest())
+
+            if not credhist.entries:
+                self.target.log.warning("File has no credhist entries: %s", path)
 
             for entry in credhist.entries:
                 yield CredHistRecord(

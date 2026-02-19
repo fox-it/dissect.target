@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 import dissect.qnxfs as qnxfs
-from dissect.qnxfs.qnx4 import INode as INode4
-from dissect.qnxfs.qnx6 import INode as INode6
+from dissect.qnxfs.qnx4 import INode4
+from dissect.qnxfs.qnx6 import INode6
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -13,13 +13,13 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-INode = Union[INode4, INode6]
+INode = INode4 | INode6
 
 
 class QnxFilesystem(Filesystem):
@@ -49,6 +49,17 @@ class QnxFilesystem(Filesystem):
             raise FileNotFoundError(path, cause=e)
 
 
+class QnxDirEntry(DirEntry):
+    fs: QnxFilesystem
+    entry: INode
+
+    def get(self) -> QnxFilesystemEntry:
+        return QnxFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
 class QnxFilesystemEntry(FilesystemEntry):
     fs: QnxFilesystem
     entry: INode
@@ -62,22 +73,13 @@ class QnxFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def _iterdir(self) -> Iterator[tuple[str, INode]]:
+    def scandir(self) -> Iterator[QnxDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            yield from self.readlink_ext().iterdir()
-        else:
-            yield from self.entry.iterdir()
-
-    def iterdir(self) -> Iterator[str]:
-        yield from (name for name, _ in self._iterdir())
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        for name, entry in self._iterdir():
-            entry_path = fsutil.join(self.path, name, alt_separator=self.fs.alt_separator)
-            yield QnxFilesystemEntry(self.fs, entry_path, entry)
+        for name, entry in self._resolve().entry.iterdir():
+            # TODO: Separate INode and DirEntry in dissect.qnxfs
+            yield QnxDirEntry(self.fs, self.path, name, entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

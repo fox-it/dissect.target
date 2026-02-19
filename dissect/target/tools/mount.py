@@ -3,15 +3,14 @@ from __future__ import annotations
 import argparse
 import logging
 
-from dissect.util.feature import Feature, feature_enabled
-
 from dissect.target import filesystem
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import parse_options_string
-from dissect.target.target import Target
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_target,
     process_generic_arguments,
 )
 
@@ -19,19 +18,7 @@ from dissect.target.tools.utils import (
 logging.basicConfig(level=logging.INFO)
 
 try:
-    if feature_enabled(Feature.BETA):
-        from fuse3 import FUSE3 as FUSE
-        from fuse3 import util
-
-        FUSE_VERSION = "3"
-        FUSE_LIB_PATH = util.libfuse._name
-    else:
-        from fuse import FUSE, _libfuse
-
-        FUSE_VERSION = "2"
-        FUSE_LIB_PATH = _libfuse._name
-
-    logging.info("Using fuse%s library: %s", FUSE_VERSION, FUSE_LIB_PATH)
+    from fuse import FUSE
 
     from dissect.target.helpers.mount import DissectMount
 
@@ -40,7 +27,7 @@ except Exception:
     HAS_FUSE = False
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -58,15 +45,15 @@ def main() -> int:
     parser.add_argument("-o", "--options", help="additional FUSE options")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-    process_generic_arguments(args, rest)
+    args, _ = parser.parse_known_args()
+    process_generic_arguments(parser, args)
 
     if not HAS_FUSE:
         log.error("fusepy is not installed: pip install fusepy")
         return 1
 
     try:
-        t = Target.open(args.target)
+        t = open_target(args)
     except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
@@ -93,10 +80,23 @@ def main() -> int:
         vnames.setdefault(basename, []).append(v)
         vfs.map_file_fh(f"volumes/{fname}", v)
 
+    fake_ntfs = set()
     for i, fs in enumerate(t.filesystems):
+        ntfs_obj = getattr(fs, "ntfs", None)
+
+        if ntfs_obj in fake_ntfs:
+            continue
+
+        if ntfs_obj and fs.__type__ != "ntfs":
+            # A non ntfs filesystem with a "ntfs" object means that add_virtual_ntfs_filesystem was used.
+            # The fake ntfs object is added to the filesystem after its parent.
+            # We will mount an entry in filesystems/ for the virtual filesystem, not for the "fake" ntfs filesystem.
+            fake_ntfs.add(ntfs_obj)
+
         volumes = fs.volume if isinstance(fs.volume, list) else [fs.volume]
         for volume in volumes:
-            fname = f"filesystems/{vnames[volume] if volume else f'fs_{i}'}"
+            default_name = f"fs_{i}"
+            fname = f"filesystems/{vnames.get(volume, default_name) if volume else default_name}"
             vfs.mount(fname, fs)
 
     # This is kinda silly because fusepy will convert this back into string arguments

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dissect.esedb.exceptions import Error
-from dissect.esedb.tools import ual
+from dissect.database.ese.tools import ual
+from dissect.database.exception import Error
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -53,13 +53,13 @@ VirtualMachineRecord = TargetRecordDescriptor(
         ("datetime", "last_seen_active_date"),
         ("string", "vm_guid"),
         ("string", "bios_guid"),
-        ("string", "serial_number"),
+        ("string", "serial"),
         ("string", "path"),
     ],
 )
 
 DomainSeenRecord = TargetRecordDescriptor(
-    "filesystem/windows/ual/virtual_machines",
+    "filesystem/windows/ual/domain",
     [
         ("datetime", "last_seen_date"),
         ("net.ipaddress", "address"),
@@ -129,7 +129,7 @@ FIELD_NAME_MAP = {
     "ProductName": "product_name",
     "RoleGuid": "role_guid",
     "RoleName": "role_name",
-    "SerialNumber": "serial_number",
+    "SerialNumber": "serial",
     "ServicePackMajor": "service_pack_major_version",
     "ServicePackMinor": "service_pack_minor_version",
     "SystemDNSHostName": "system_dns_hostname",
@@ -157,10 +157,10 @@ class UalPlugin(Plugin):
 
     __namespace__ = "ual"
 
-    LOG_DB_GLOB = "sysvol/Windows/System32/LogFiles/Sum/*.mdb"
+    LOG_DB_GLOB = "%windir%/System32/LogFiles/Sum/*.mdb"
 
     IDENTITY_DB_FILENAME = "SystemIdentity.mdb"
-    IDENTITY_DB_PATH = f"sysvol/Windows/System32/LogFiles/Sum/{IDENTITY_DB_FILENAME}"
+    IDENTITY_DB_PATH = f"%windir%/System32/LogFiles/Sum/{IDENTITY_DB_FILENAME}"
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -176,14 +176,16 @@ class UalPlugin(Plugin):
             raise UnsupportedPluginError("No MDB files found")
 
     def find_mdb_files(self) -> list[Path]:
+        base, _, glob = self.LOG_DB_GLOB.partition("*")
+
         return [
             path
-            for path in self.target.fs.path("/").glob(self.LOG_DB_GLOB)
+            for path in self.target.resolve(base).glob(f"*{glob}")
             if path.exists() and path.name != self.IDENTITY_DB_FILENAME
         ]
 
     def populate_role_guid_map(self) -> None:
-        identity_db = self.target.fs.path(self.IDENTITY_DB_PATH)
+        identity_db = self.target.resolve(self.IDENTITY_DB_PATH)
         if not identity_db.exists():
             return
 

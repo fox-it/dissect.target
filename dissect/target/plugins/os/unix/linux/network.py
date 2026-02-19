@@ -3,33 +3,74 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from ipaddress import ip_address, ip_interface
-from itertools import chain
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from ipaddress import IPv4Interface, IPv6Interface, ip_address, ip_interface
+from itertools import chain, islice
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_args
 
+from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import UnixInterfaceRecord
 from dissect.target.helpers.utils import to_list
-from dissect.target.plugins.os.default.network import NetworkPlugin
+from dissect.target.plugin import arg, export
+from dissect.target.plugins.os.default.network import InterfaceRecord, NetworkPlugin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from ipaddress import IPv4Address, IPv4Interface, IPv6Address, IPv6Interface
+    from ipaddress import IPv4Address, IPv6Address
 
+    from dissect.target.plugins.os.unix.log.journal import JournalRecord
+    from dissect.target.plugins.os.unix.log.messages import MessagesRecord
     from dissect.target.target import Target, TargetPath
 
     NetAddress = IPv4Address | IPv6Address
     NetInterface = IPv4Interface | IPv6Interface
+    LogRecord = JournalRecord | MessagesRecord
 
 
 class LinuxNetworkPlugin(NetworkPlugin):
     """Linux network interface plugin."""
 
-    def _interfaces(self) -> Iterator[UnixInterfaceRecord]:
+    @arg(
+        "-s",
+        "--syslog",
+        action="store_true",
+        help="scan syslog for dhcp leases; use --max-lines to specify number of lines",
+    )
+    @arg(
+        "-m",
+        "--max-lines",
+        action="store",
+        type=int,
+        help="maximum number of lines of syslog to scan (implies --syslog); default is 1000 if --syslog is set",
+    )
+    @export(record=get_args(InterfaceRecord))
+    def interfaces(self, syslog: bool = False, max_lines: int | None = None) -> Iterator[UnixInterfaceRecord]:
+        """Yield interfaces."""
+        # If max_lines is specified, syslog is assumed True
+        if max_lines is not None:
+            syslog = True
+        # If syslog is True and max_lines is None, use default 1000
+        if syslog and max_lines is None:
+            max_lines = 1000
+        max_lines = None if max_lines == 0 else max_lines
+        yield from super().interfaces(scan_syslog=syslog, max_lines=max_lines)
+
+    def _interfaces(self, scan_syslog: bool, max_lines: int | None) -> Iterator[UnixInterfaceRecord]:
         """Try all available network configuration managers and aggregate the results."""
-        for manager_cls in MANAGERS:
+        for manager_cls in MANAGERS + LEASERS:
             manager: LinuxNetworkConfigParser = manager_cls(self.target)
             yield from manager.interfaces()
+
+        if scan_syslog:
+            syslog_parser = SyslogConfigParser(self.target, max_lines)
+            yield from syslog_parser.interfaces()
+
+    @export(record=UnixInterfaceRecord)
+    def dhcp(self) -> Iterator[UnixInterfaceRecord]:
+        """Return interfaces obtained via DHCP."""
+        for interface in self.interfaces():
+            if interface.type == "dhcp":
+                yield interface
 
 
 VlanIdByInterface = dict[str, set[int]]
@@ -157,7 +198,11 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
         return datetime.fromtimestamp(int(last_connected), timezone.utc)
 
     def _parse_ip_section_key(
-        self, key: str, value: str, context: ParserContext, ip_version: Literal["ipv4", "ipv6"]
+        self,
+        key: str,
+        value: str,
+        context: ParserContext,
+        ip_version: Literal["ipv4", "ipv6"],
     ) -> None:
         if not (trimmed := value.strip()):
             return
@@ -200,7 +245,14 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
     Documentation: https://www.freedesktop.org/software/systemd/man/latest/systemd.network.html
     """
 
-    collapsable_items: tuple[str, ...] = ("Match", "Network", "Link", "MACAddress", "Name", "Type")
+    collapsable_items: tuple[str, ...] = (
+        "Match",
+        "Network",
+        "Link",
+        "MACAddress",
+        "Name",
+        "Type",
+    )
 
     config_paths: tuple[str, ...] = (
         "/etc/systemd/network/",
@@ -219,7 +271,7 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
         r"(?P<withoutBrackets>(?:\d{1,3}\.){3}\d{1,3})|\[(?P<withBrackets>\[?[0-9a-fA-F:]+\]?)\]"
     )
 
-    def interfaces(self) -> Iterator:
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
         virtual_networks = self._parse_virtual_networks()
         yield from self._parse_networks(virtual_networks)
 
@@ -281,7 +333,12 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 
                 route_sections: list[dict[str, Any]] = config.get("Route", [])
                 gateway_values = (to_list(route_section.get("Gateway", [])) for route_section in route_sections)
-                gateways.update(filter(None, map(self._parse_gateway, chain.from_iterable(gateway_values))))
+                gateways.update(
+                    filter(
+                        None,
+                        map(self._parse_gateway, chain.from_iterable(gateway_values)),
+                    )
+                )
 
                 dhcp_ipv4, dhcp_ipv6 = self._parse_dhcp(network_section.get("DHCP"))
 
@@ -337,4 +394,374 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
         return ip_address(value)
 
 
-MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser]
+class DhclientLeaseParser(LinuxNetworkConfigParser):
+    """Parse network interfaces from dhclient DHCP ``.leases`` files.
+
+    References:
+        - https://linux.die.net/man/5/dhclient.conf
+    """
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        """Parse network interfaces from dhclient DHCP ``.leases`` files."""
+
+        # TODO: Add support for renew, rebind, expire events.
+        for file in self._config_files(["/var/lib/dhclient/", "/var/lib/dhcp/"], "*.leases"):
+            try:
+                leases = configutil.parse(file, hint="leases")
+                for label, data in leases.parsed_data.items():
+                    if "lease" in label:
+                        if (fixed_address := data.get("fixed-address")) is not None:
+                            if (subnet_mask := data.get("option", {}).get("subnet-mask")) is not None:
+                                fixed_address = ip_interface((fixed_address, subnet_mask))
+                            else:
+                                fixed_address = ip_interface(fixed_address)
+
+                        if (router := data.get("option", {}).get("routers")) is not None:
+                            router = ip_address(router)
+
+                        yield UnixInterfaceRecord(
+                            name=data.get("interface").strip('"'),
+                            type="dhcp",
+                            cidr={fixed_address},
+                            gateway={router},
+                            source=file,
+                            dhcp_ipv4=isinstance(fixed_address, IPv4Interface),
+                            dhcp_ipv6=isinstance(fixed_address, IPv6Interface),
+                            configurator="dhclient",
+                            _target=self._target,
+                        )
+            except Exception as e:  # noqa: PERF203
+                self._target.log.warning("Error parsing dhclient leases file %s", file)
+                self._target.log.debug("", exc_info=e)
+                continue
+
+
+class NetworkManagerLeaseParser(LinuxNetworkConfigParser):
+    """Parse network interfaces from NetworkManager DHCP ``.lease`` files."""
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        """Parse network interfaces from NetworkManager DHCP ``.lease`` files."""
+        for file in self._config_files(["/var/lib/NetworkManager/"], "*.lease"):
+            try:
+                lease = configutil.parse(file, hint="env")
+
+                interface = file.stem.split("-")[-1]  # Extract interface name from file stem
+                if ip_address := lease.get("ADDRESS"):
+                    ip_address = ip_interface(ip_address)
+
+                yield UnixInterfaceRecord(
+                    name=interface,
+                    type="dhcp",
+                    cidr={ip_address},
+                    source=file,
+                    configurator="NetworkManager",
+                    dhcp_ipv4=isinstance(ip_address, IPv4Interface),
+                    dhcp_ipv6=isinstance(ip_address, IPv6Interface),
+                    _target=self._target,
+                )
+            except Exception as e:  # noqa: PERF203
+                self._target.log.warning("Error parsing NetworkManager lease file %s", file)
+                self._target.log.debug("", exc_info=e)
+                continue
+
+
+class ProcConfigParser(LinuxNetworkConfigParser):
+    """Parser for dynamic network configuration data from /proc/net.
+
+    Parse gateways, interface names and network from /proc/net/route.
+    Corroborate with TCP connections from /proc/net/tcp to find local IP addresses.
+    Locally bound Ipv6 addresses are parsed from /proc/net/if_inet6.
+    """
+
+    # Regex to match lines like: |-- 127.0.0.1
+    trie_ip_line_re = re.compile(r"^\s*\|\-\-\s*(\d+\.\d+\.\d+\.\d+)\s*$")
+
+    @dataclass
+    class ParserContext:
+        name: str | None = None
+        ip_interfaces: set[NetInterface] = field(default_factory=set)
+        gateways: set[NetAddress] = field(default_factory=set)
+
+        def to_record(self, target: Target) -> UnixInterfaceRecord:
+            return UnixInterfaceRecord(
+                name=self.name,
+                cidr=self.ip_interfaces,
+                gateway=list(self.gateways),
+                source="/proc/net",
+                configurator="proc",
+                _target=target,
+            )
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        (routes, interfaces) = self._parse_proc_net_route()
+
+        tcp_local_ipv4 = self._parse_proc_net_tcp_local_ipv4()
+        fib_tree_ipv4 = self._parse_proc_fib_trie()
+        self._correlate_route_addresses(routes, tcp_local_ipv4 | fib_tree_ipv4, interfaces)
+
+        self._parse_proc_net_if_inet6(interfaces)
+
+        for iface in interfaces.values():
+            yield iface.to_record(self._target)
+
+    def _parse_proc_net_route(
+        self,
+    ) -> tuple[dict[str, set[IPv4Interface]], dict[str, ProcConfigParser.ParserContext]]:
+        try:
+            with self._target.fs.path("/proc/net/route").open("r") as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/route not found")
+            return ({}, {})
+        except Exception as e:
+            self._target.log.warning("Error reading /proc/net/route")
+            self._target.log.debug("", exc_info=e)
+            return ({}, {})
+
+        interfaces: dict[str, ProcConfigParser.ParserContext] = {}
+        route_interfaces: dict[str, set[IPv4Interface]] = {}
+        for line in lines[1:]:  # Skip header
+            fields = line.split()
+            if len(fields) < 8:
+                self._target.log.warning("Skipping malformed line in /proc/net/route: %s", line)
+                continue
+
+            iface_name, destination_hex, gateway_hex, *_, mask = fields[:8]
+
+            # Only add CIDR if not default route
+            if (addr := be_hex_to_int(destination_hex)) != 0:
+                mask_bit_count = be_hex_to_int(mask).bit_count()
+                route_interfaces.setdefault(iface_name, set()).add(ip_interface((addr, mask_bit_count)))
+
+            # Add gateway if not 0.0.0.0
+            if (gateway := be_hex_to_int(gateway_hex)) != 0:
+                iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                iface.gateways.add(ip_address(gateway))
+
+        return (route_interfaces, interfaces)
+
+    def _correlate_route_addresses(
+        self,
+        routes: dict[str, set[IPv4Interface]],
+        locally_bound_addresses: set[IPv4Address],
+        interfaces: dict[str, ProcConfigParser.ParserContext],
+    ) -> None:
+        """Correlate routes with local bound addresses."""
+
+        for iface_name, route_ifaces in routes.items():
+            iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+            for route_iface in route_ifaces:
+                matched_route_iface = False
+                for ipv4 in locally_bound_addresses:
+                    if ipv4 in route_iface.network:
+                        iface.ip_interfaces.add(ip_interface((ipv4, route_iface.network.prefixlen)))
+                        matched_route_iface = True
+                        break
+                if not matched_route_iface:
+                    iface.ip_interfaces.add(route_iface)  # If no local IP found, still add the route interface
+
+    def _parse_proc_net_if_inet6(self, ctx: dict[str, ProcConfigParser.ParserContext]) -> None:
+        # Parse IPv6 from /proc/net/if_inet6
+        try:
+            with self._target.fs.path("/proc/net/if_inet6").open("r") as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) < 6:
+                        self._target.log.warning("Skipping malformed line in /proc/net/if_inet6: %s", line)
+                        continue
+                    ipv6_hex, _, prefixlen_hex, _, _, iface_name = parts
+                    iface = ctx.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
+                    ipv6_addr = int(ipv6_hex, 16)
+                    prefix_len = int(prefixlen_hex, 16)
+                    iface.ip_interfaces.add(ip_interface((ipv6_addr, prefix_len)))
+
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/if_inet6 does not exist")
+        except Exception as e:
+            self._target.log.warning("Error parsing /proc/net/if_inet6")
+            self._target.log.debug("", exc_info=e)
+
+    def _parse_proc_net_tcp_local_ipv4(self) -> set[IPv4Address]:
+        try:
+            with self._target.fs.path("/proc/net/tcp").open("r") as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/tcp does not exist")
+            return set()
+        except Exception as e:
+            self._target.log.warning("Error reading /proc/net/tcp")
+            self._target.log.debug("", exc_info=e)
+            return set()
+
+        local_ips = set()
+        for line in lines[1:]:  # skip header
+            fields = line.split()
+            if len(fields) < 4:
+                continue
+            _, local_address, _, state, *_ = fields
+            if state == "0A":  # 0A: systemd pollutes outgoing connections so we filter them out
+                continue
+
+            try:
+                ip_hex, _ = local_address.split(":", 1)
+                local_ips.add(ip_address(be_hex_to_int(ip_hex)))
+            except Exception:
+                self._target.log.warning("Failed to parse local address in /proc/net/tcp: %s", local_address)
+                continue
+        return local_ips
+
+    def _parse_proc_fib_trie(self) -> set[IPv4Address]:
+        """
+        Parse a fib_trie-like text and return a set of IPv4Address objects
+        for addresses ending in '/32 host LOCAL'.
+        """
+
+        try:
+            with self._target.fs.path("/proc/net/fib_trie").open("r") as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            self._target.log.info("File /proc/net/fib_trie does not exist")
+            return set()
+        except Exception as e:
+            self._target.log.warning("Error reading /proc/net/fib_trie")
+            self._target.log.debug("", exc_info=e)
+            return set()
+
+        result = set()
+        iterator = configutil.PeekableIterator(lines)
+        for line in iterator:
+            # Skip all the lines that do not contain '/32 host LOCAL' as the next line
+            next_line = iterator.peek()
+            if not next_line or "/32 host LOCAL" not in next_line:
+                continue
+
+            if ip_match := self.trie_ip_line_re.match(line):
+                result.add(ip_address(ip_match.group(1)))
+
+        return result
+
+
+class SyslogConfigParser(LinuxNetworkConfigParser):
+    def __init__(self, target: Target, max_lines: int | None = None):
+        super().__init__(target)
+        self._max_lines = max_lines
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        parsers = [
+            parse_ubuntu_cloud_init_dhcp_lease,
+            parse_network_manager_dhcp_lease_old,
+            parse_network_manager_dhcp_lease_new,
+            parse_networkd_dhcp_lease,
+            parse_network_manager_centos_dhcp_lease,
+            parse_debian_centos_dhclient_lease,
+        ]
+
+        for record in self._read_logs():
+            for parser in parsers:
+                if dhcp_lease := parser(record):
+                    yield UnixInterfaceRecord(
+                        name=dhcp_lease.name,
+                        cidr={dhcp_lease.interface},
+                        gateway={dhcp_lease.gateway} if dhcp_lease.gateway else set(),
+                        source="syslog",
+                    )
+                    break
+
+    def _read_logs(self) -> Iterator[LogRecord]:
+        try:
+            messages_iter = islice(self._target.messages(), self._max_lines)
+        except PluginError:
+            self._target.log.debug("Could not search for DHCP leases from the messages plugin")
+            messages_iter = iter(())
+
+        try:
+            journal_iter = islice(self._target.journal(), self._max_lines)
+        except PluginError:
+            self._target.log.debug("Could not search for DHCP leases from the journal plugin")
+            journal_iter = iter(())
+
+        return filter(lambda log: log.message, chain(messages_iter, journal_iter))
+
+
+def be_hex_to_int(be_hex: str) -> int:
+    """Convert big-endian hex string to integer."""
+    return int.from_bytes(bytes.fromhex(be_hex), "little")
+
+
+class DhcpLease(NamedTuple):
+    name: str | None
+    interface: NetInterface
+    gateway: NetAddress | None
+
+
+def parse_ubuntu_cloud_init_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from Ubuntu cloud-init logs."""
+
+    if not (match := re.search(r"Received dhcp lease on (\w*) for (\S+)", log_record.message)):
+        return None
+    name, interface = match.groups()
+
+    return DhcpLease(name, ip_interface(interface), None) if interface else None
+
+
+def parse_networkd_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from systemd-networkd."""
+
+    if not (match := re.search(r"(\S+): DHCPv[4|6] address (\S+) via (\S+)", log_record.message)):
+        return None
+
+    name, interface, gateway = match.groups()
+    gateway_address = ip_address(gateway) if gateway else None
+    return DhcpLease(name, ip_interface(interface), gateway_address) if interface else None
+
+
+def parse_network_manager_dhcp_lease_old(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from NetworkManager logs old style."""
+
+    # dhcp4 (eth0): option ip_address           => '10.13.37.1'
+    if not (match := re.search(r"dhcp[46] \((\S+)\): option ip_address\s+=>\s+'(\S+)'", log_record.message)):
+        return None
+    name, interface = match.groups()
+
+    return DhcpLease(name, ip_interface(interface), None) if interface else None
+
+
+def parse_network_manager_dhcp_lease_new(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from NetworkManager logs new style."""
+
+    # dhcp4 (eth0): state changed new lease, address=10.13.37.1
+    if not (
+        match := re.search(
+            r"dhcp[46] \((\S+)\): state changed new lease, address=([^\s,]+)",
+            log_record.message,
+        )
+    ):
+        return None
+    name, interface = match.groups()
+
+    return DhcpLease(name, ip_interface(interface), None) if interface else None
+
+
+def parse_network_manager_centos_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP centos information"""
+
+    if not (match := re.search(r"dhcp[46] \((\S+)\):\s+address\s+(\S+)", log_record.message)):
+        return None
+    name, interface = match.groups()
+    return DhcpLease(name, ip_interface(interface), None) if interface else None
+
+
+def parse_debian_centos_dhclient_lease(log_record: LogRecord) -> DhcpLease | None:
+    """Parse DHCP lease information from dhclient bound log lines."""
+
+    if getattr(log_record, "service", None) != "dhclient":
+        return None
+
+    # Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.
+    if not (match := re.search(r"bound to (\S+)", log_record.message)):
+        return None
+    return DhcpLease(None, ip_interface(ip), None) if (ip := match.group(1)) else None
+
+
+MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
+LEASERS = [DhclientLeaseParser, NetworkManagerLeaseParser]

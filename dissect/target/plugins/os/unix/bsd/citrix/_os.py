@@ -1,11 +1,24 @@
 from __future__ import annotations
 
+import gzip
 import re
+from io import BytesIO
 from typing import TYPE_CHECKING
 
+from dissect.util.stream import RangeStream
+
+from dissect.target.filesystems.ffs import FfsFilesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
+
+try:
+    from dissect.executable import ELF
+
+    HAS_EXECUTABLE = True
+
+except ImportError:
+    HAS_EXECUTABLE = False
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -17,14 +30,13 @@ if TYPE_CHECKING:
 
 RE_CONFIG_IP = re.compile(r"-IPAddress (?P<ip>[^ ]+) ")
 RE_CONFIG_HOSTNAME = re.compile(r"set ns hostName (?P<hostname>[^\n]+)\n")
-RE_CONFIG_TIMEZONE = re.compile(
-    r'set ns param.* -timezone "GMT\+(?P<hours>[0-9]+):(?P<minutes>[0-9]+)-.*-(?P<zone_name>.+)"'
-)
 RE_CONFIG_USER = re.compile(r"bind system user (?P<user>[^ ]+) ")
 RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')
 
 
 class CitrixPlugin(BsdPlugin):
+    """Citrix Netscaler OS plugin."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._ips = []
@@ -35,20 +47,19 @@ class CitrixPlugin(BsdPlugin):
     def _parse_netscaler_configs(self) -> None:
         ips = set()
         usernames = set()
-        for config_path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
-            with config_path.open("rt") as config_file:
-                config = config_file.read()
-                for match in RE_CONFIG_IP.finditer(config):
-                    ips.add(match.groupdict()["ip"])
-                for match in RE_CONFIG_USER.finditer(config):
-                    usernames.add(match.groupdict()["user"])
-                if config_path.name == "ns.conf":
-                    # Current configuration of the netscaler
-                    if hostname_match := RE_CONFIG_HOSTNAME.search(config):
-                        self._hostname = hostname_match.groupdict()["hostname"]
-                    if timezone_match := RE_CONFIG_TIMEZONE.search(config):
-                        tzinfo = timezone_match.groupdict()
-                        self.target.timezone = tzinfo["zone_name"]
+
+        for path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
+            config = path.read_text()
+
+            for match in RE_CONFIG_IP.finditer(config):
+                ips.add(match.groupdict()["ip"])
+
+            for match in RE_CONFIG_USER.finditer(config):
+                usernames.add(match.groupdict()["user"])
+
+            if path.name == "ns.conf" and (match := RE_CONFIG_HOSTNAME.search(config)):
+                # Current configuration of the netscaler
+                self._hostname = match.groupdict()["hostname"]
 
         self._config_usernames = list(usernames)
         self._ips = list(ips)
@@ -72,29 +83,93 @@ class CitrixPlugin(BsdPlugin):
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
-        # A disk image of a Citrix Netscaler contains two partitions, that after boot are mounted to /var and /flash.
-        # The rest of the filesystem is recreated at runtime into a 'ramdisk'. Currently, this plugin does not
-        # yet support recreating the ramdisk from a 'clean' state. This might be possible in a future iteration but
-        # requires further research.
+        """Map filesystems as the Citrix Netscaler bootloader would.
 
-        # When the ramdisk is present within the target's filesystems, mount it accordingly,
+        An image of a Citrix Netscaler generally contains two partitions, that after boot are mounted
+        to ``/var``and ``/flash``. The rest of the filesystem is recreated at runtime into a 'ramdisk'.
+        This ramdisk is generally stored read-only in the kernel ELF binary located in ``/flash/ns-*.gz``.
+
+        This implementation supports mapping a live ramdisk which is already mounted at ``/`` and also
+        supports extracting the read-only kernel FFS filesystem from ``/flash/ns-*.gz`` and mounting at ``/``.
+        """
+
+        # When the ramdisk is already present within the target's filesystems, mount it accordingly.
+        has_ramdisk = False
         for fs in target.filesystems:
             if fs.exists("/bin/freebsd-version"):
                 # If available, mount the ramdisk first.
                 target.fs.mount("/", fs)
-        # The 'disk' filesystem is mounted at '/var'.
-        target.fs.mount("/var", sysvol)
+                has_ramdisk = True
 
-        # Enumerate filesystems for flash partition
+        # Check if we are dealing with netscaler-collector filesystem (/shell exists) or full image
+        if sysvol.exists("/shell"):
+            target.fs.mount("/", sysvol)
+        else:
+            # The 'disk' filesystem is mounted at '/var'.
+            target.fs.mount("/var", sysvol)
+
+        # Enumerate filesystems for flash partition.
+        # Multiple flash partitions could exist, so we look for the one with an actual ns.conf present.
         for fs in target.filesystems:
-            if fs.exists("/nsconfig") and fs.exists("/boot"):
+            if fs.exists("/nsconfig/ns.conf") and fs.exists("/boot"):
                 target.fs.mount("/flash", fs)
+
+        # Reconstruct root filesystem from the 'mfs' segment embedded in the kernel.
+        if (
+            not has_ramdisk
+            and (boot_loader_conf := target.fs.path("/flash/boot/loader.conf")).is_file()
+            and (match := RE_LOADER_CONFIG_KERNEL_VERSION.search(boot_loader_conf.read_text()))
+        ):
+            # Finds the currently active kernel version.
+            kernel_version = match.groupdict()["version"]
+
+            if (kernel_gz := target.fs.path(f"/flash/{kernel_version}.gz")).is_file():
+                if HAS_EXECUTABLE:
+                    target.log.warning("Loading compressed kernel filesystem, this can take a while")
+
+                    try:
+                        # This is *significantly* faster than decompressing random reads on the fly.
+                        fh = BytesIO(gzip.decompress(kernel_gz.read_bytes()))
+
+                        # Obtain the offset and size of the mfs section.
+                        section = ELF(fh).sections.by_name("mfs")[0]
+
+                        # Construct a FFS filesystem and add it to the target.
+                        fs = FfsFilesystem(RangeStream(fh, section.offset, section.size))
+
+                        target.filesystems.add(fs)
+                        target.fs.mount("/", fs)
+
+                    except Exception as e:
+                        target.log.error("Failed to load kernel filesystem: %s", e)  # noqa: TRY400
+                        target.log.debug("", exc_info=e)
+
+                else:
+                    target.log.warning("Unable to load kernel filesystem, missing dependency dissect.executable")
+
+            else:
+                target.log.warning("File %s not found, did not load Netscaler kernel in root filesystem", kernel_gz)
 
         return cls(target)
 
     @export(property=True)
     def hostname(self) -> str | None:
-        return self._hostname or super().hostname
+        # Could be set in ns.conf file(s)
+        if self._hostname:
+            return self._hostname
+
+        # Could be found in license file(s)
+        if (dir := self.target.fs.path("/flash/nsconfig/license")).is_dir():
+            hostname = None
+            for lic in dir.glob("*.lic"):
+                for line in lic.open("rt"):
+                    if "HOSTNAME=" in line:
+                        hostname = line.split("HOSTNAME=")[-1].strip()
+            if hostname:
+                return hostname
+
+        # Fallback to BSD hostname file(s)
+        return super().hostname
 
     @export(property=True)
     def version(self) -> str | None:
@@ -103,10 +178,13 @@ class CitrixPlugin(BsdPlugin):
         if version_path.is_file():
             version = version_path.read_text().strip()
 
-        loader_conf_path = self.target.fs.path("/flash/boot/loader.conf")
-        if loader_conf_path.is_file():
-            loader_conf = loader_conf_path.read_text()
-            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(loader_conf):
+        # loader.conf exists in different location for NS image vs Techsupport Collection
+        for config_path in ["/flash/boot/loader.conf", "/nsconfig/loader.conf"]:
+            config = self.target.fs.path(config_path)
+            if not config.is_file():
+                continue
+
+            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(config.read_text()):
                 kernel_version = match.groupdict()["version"]
                 version = f"{version} ({kernel_version})" if version else kernel_version
 

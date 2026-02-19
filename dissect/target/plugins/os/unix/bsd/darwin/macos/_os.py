@@ -28,6 +28,10 @@ class MacOSPlugin(DarwinPlugin):
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"
     SYSTEM = "/Library/Preferences/SystemConfiguration/preferences.plist"
 
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self._add_mounts()
+
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
@@ -41,11 +45,28 @@ class MacOSPlugin(DarwinPlugin):
         target.fs.mount("/", sysvol)
         return cls(target)
 
+    def _add_mounts(self) -> None:
+        data_fs = None
+        for fs in self.target.filesystems:
+            if fs.__type__ == "apfs" and fs.apfs.role.name == "DATA":
+                data_fs = fs
+                break
+
+        if data_fs and (path := self.target.fs.path("/usr/share/firmlinks")).exists():
+            firmlinks = [line.strip().split("\t") for line in path.open("rt") if line.strip()]
+            layer = self.target.fs.append_layer()
+
+            for dst, src in firmlinks:
+                if data_fs.exists(src):
+                    layer.map_file_entry(dst, data_fs.get(src))
+
+        # TODO: synthetic.conf
+
     @export(property=True)
     def hostname(self) -> str | None:
         try:
             preferences = plistlib.load(self.target.fs.path(self.SYSTEM).open())
-            return preferences["System"]["System"]["ComputerName"]
+            return preferences["System"]["Network"]["HostNames"]["LocalHostName"]
 
         except FileNotFoundError:
             pass
