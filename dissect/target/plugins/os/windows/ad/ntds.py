@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds import NTDS
 
+from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, UnsupportedPluginError, export, internal
 from dissect.target.plugins.os.windows.sam import des_decrypt
@@ -69,6 +70,18 @@ NtdsComputerRecord = TargetRecordDescriptor(
     ],
 )
 
+NtdsGPORecord = TargetRecordDescriptor(
+    "windows/ad/gpo",
+    [
+        ("string", "cn"),
+        ("string", "distinguished_name"),
+        ("string", "object_guid"),
+        ("string", "name"),
+        ("string", "display_name"),
+        ("datetime", "creation_time"),
+        ("datetime", "last_modified_time"),
+    ],
+)
 
 # NTDS Registry consts
 NTDS_PARAMETERS_REGISTRY_PATH = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\NTDS\\Parameters"
@@ -92,9 +105,15 @@ class NtdsPlugin(Plugin):
         super().__init__(target)
         self.path = None
 
+        # Fallback path
+        path = "sysvol/windows/NTDS/ntds.dit"
         if self.target.has_function("registry"):
-            key = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE)
-            self.path = self.target.fs.path(key.value)
+            try:
+                path = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE).value
+            except RegistryKeyNotFoundError:
+                pass
+
+        self.path = self.target.fs.path(path)
 
     def check_compatible(self) -> None:
         if not self.target.has_function("lsa"):
@@ -135,6 +154,22 @@ class NtdsPlugin(Plugin):
                 dns_hostname=computer.get("dNSHostName"),
                 operating_system=computer.get("operatingSystem"),
                 operating_system_version=computer.get("operatingSystemVersion"),
+                _target=self.target,
+            )
+
+    @export(record=NtdsGPORecord)
+    def group_policy(self) -> Iterator[NtdsGPORecord]:
+        """Extract all group policy objects (GPO) NTDS.dit database."""
+
+        for gpo in self.ntds.group_policies():
+            yield NtdsGPORecord(
+                cn=gpo.cn,
+                distinguished_name=gpo.distinguishedName,
+                object_guid=gpo.guid,
+                name=gpo.name,
+                display_name=gpo.displayName,
+                creation_time=gpo.whenCreated,
+                last_modified_time=gpo.whenChanged,
                 _target=self.target,
             )
 

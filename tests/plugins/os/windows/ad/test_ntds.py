@@ -89,3 +89,9 @@ def test_computers(target_win_ntds: Target) -> None:
             continue
 
         assert cn_to_ntlm_hash_mapping[result.cn] == result.nt
+
+
+def test_group_policy(target_win_ntds: Target) -> None:
+    results = list(target_win_ntds.ad.group_policy())
+
+    assert len(results) == 5
