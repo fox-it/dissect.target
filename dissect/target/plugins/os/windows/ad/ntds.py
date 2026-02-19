@@ -106,14 +106,9 @@ class NtdsPlugin(Plugin):
         self.path = None
 
         # Fallback path
-        path = "sysvol/windows/NTDS/ntds.dit"
         if self.target.has_function("registry"):
-            try:
-                path = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE).value
-            except RegistryKeyNotFoundError:
-                pass
-
-        self.path = self.target.fs.path(path)
+            key = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE)
+            self.path = self.target.fs.path(key.value)
 
     def check_compatible(self) -> None:
         if not self.target.has_function("lsa"):
