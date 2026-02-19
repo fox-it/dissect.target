@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import platform
 import stat
 from io import BytesIO
 from pathlib import Path
@@ -57,7 +58,8 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert results[2].type == "symlink"
     assert results[3].type == "file"
 
-    assert {str(r.path): r.mimetype for r in results if r.mimetype} == {
+    separator = "\\" if platform.system() == "Windows" else ""
+    assert {fsutil.normalize(str(r.path), alt_separator=separator): r.mimetype for r in results if r.mimetype} == {
         "/.test/.more.test.symlink.txt": "text/plain",  # inferred by txt extension
         "/.test/.more.test.txt": "text/plain",  # inferred by txt extension
         "/.test/test.txt": "text/plain",  # inferred by txt extension
