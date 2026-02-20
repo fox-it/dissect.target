@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.volume.md.md import MD, MDPhysicalDisk, find_super_block
 
@@ -23,6 +23,7 @@ class MdVolumeSystem(LogicalVolumeSystem):
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         devices: dict[UUID, list[MDPhysicalDisk]] = {}
+        source_disks: dict[UUID, set[BinaryIO]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -31,9 +32,13 @@ class MdVolumeSystem(LogicalVolumeSystem):
             device = MDPhysicalDisk(vol)
             devices.setdefault(device.set_uuid, []).append(device)
 
-        for devs in devices.values():
+            disk = vol.disk if isinstance(vol, Volume) else vol
+            source_disks.setdefault(device.set_uuid, set()).add(disk)
+
+        for uuid, devs in devices.items():
             try:
-                yield cls(devs, disk=[dev.fh for dev in devs])
+                disks = list(source_disks[uuid])
+                yield cls(devs, disk=disks[0] if len(disks) == 1 else disks)
             except Exception:  # noqa: PERF203
                 continue
 
@@ -46,6 +51,12 @@ class MdVolumeSystem(LogicalVolumeSystem):
     def _detect_volume(fh: BinaryIO) -> bool:
         offset, _, _ = find_super_block(fh)
         return offset is not None
+
+    @property
+    def backing_objects(self) -> Iterator[Any]:
+        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
+        for vol in vols:
+            yield vol.fh
 
     def _volumes(self) -> Iterator[Volume]:
         # MD only supports one configuration and virtual disk but doing this as a loop

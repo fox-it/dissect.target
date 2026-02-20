@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.target.exceptions import VolumeSystemError
@@ -72,7 +73,6 @@ class VolumeSystem:
         self.fh = fh
         self.disk = disk or fh
         self.serial = serial
-        self._volumes_list: list[Volume] = None
 
         if self.__type__ is None:
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
@@ -121,12 +121,21 @@ class VolumeSystem:
         raise NotImplementedError
 
     @property
+    def backing_objects(self) -> Iterator[Any]:
+        """An iterator of all the raw file-like objects that this volume system is based on.
+
+        For example, a volume system that is based on multiple disks should return the file-like objects
+        of all those disks here.
+
+        Returns:
+            An iterator of all the raw file-like objects that this volume system is based on.
+        """
+        raise NotImplementedError
+
+    @cached_property
     def volumes(self) -> list[Volume]:
         """A list of all the discovered volumes."""
-        if self._volumes_list is None:
-            self._volumes_list = list(self._volumes())
-
-        return self._volumes_list
+        return list(self._volumes())
 
 
 class EncryptedVolumeSystem(VolumeSystem):
@@ -336,7 +345,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
     fh.seek(0)
 
     try:
-        return disk.DissectVolumeSystem(fh)
+        return disk.DissectVolumeSystem(fh, *args, **kwargs)
     except Exception as e:
         raise VolumeSystemError(f"Failed to load volume system for {fh}") from e
     finally:
@@ -380,7 +389,7 @@ def is_encrypted(volume: BinaryIO) -> bool:
     return False
 
 
-def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
+def open_encrypted(volume: BinaryIO, *args, **kwargs) -> Iterator[Volume]:
     """Open an encrypted ``volume``.
 
     An encrypted volume can only be opened if the encrypted volume system can successfully decrypt the volume,
@@ -397,7 +406,7 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
     for manager_cls in ENCRYPTED_VOLUME_MANAGERS:
         try:
             if manager_cls.detect(volume):
-                volume_manager = manager_cls(volume)
+                volume_manager = manager_cls(volume, *args, **kwargs)
                 yield from volume_manager.volumes
         except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", manager_cls)
@@ -410,7 +419,7 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
     return None
 
 
-def open_lvm(volumes: list[BinaryIO], *args, **kwargs) -> Iterator[VolumeSystem]:
+def open_lvm(volumes: list[BinaryIO]) -> Iterator[VolumeSystem]:
     """Open a single logical volume system on a list of file-like objects.
 
     Args:

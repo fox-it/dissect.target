@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.vmfs import lvm
 from dissect.vmfs.c_lvm import c_lvm
@@ -24,6 +24,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         lvm_volumes = defaultdict(list)
+        source_disks: dict[tuple[bytes, bytes], set[BinaryIO]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -34,9 +35,13 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
                 lv_id = (bytes(lv_meta.volMeta.lvID.uuid), lv_meta.volMeta.lvID.snapID)
                 lvm_volumes[lv_id].append(device)
 
-        for devices in lvm_volumes.values():
+                disk = vol.disk if isinstance(vol, Volume) else vol
+                source_disks.setdefault(lv_id, set()).add(disk)
+
+        for lv_id, devices in lvm_volumes.items():
             try:
-                yield cls(devices)
+                disks = list(source_disks[lv_id])
+                yield cls(devices, disk=disks[0] if len(disks) == 1 else disks)
             except Exception:  # noqa: PERF203
                 continue
 
@@ -49,6 +54,12 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         fh.seek(c_lvm.LVM_DEV_HEADER_OFFSET)
         sector = fh.read(512)
         return int.from_bytes(sector[:4], "little") == c_lvm.LVM_MAGIC_NUMBER
+
+    @property
+    def backing_objects(self) -> Iterator[Any]:
+        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
+        for vol in vols:
+            yield vol.fh
 
     def _volumes(self) -> Iterator[Volume]:
         for i, volume in enumerate(self.lvm.volumes):
