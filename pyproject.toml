@@ -211,6 +211,7 @@ select = [
 ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003", "PLC0415"]
 
 [tool.ruff.lint.per-file-ignores]
+"**.pyi" = ["PYI042"]
 "tests/_docs/**" = ["INP001"]
 "dissect/target/helpers/magic/mimetypes/**" = ["E501"]
 

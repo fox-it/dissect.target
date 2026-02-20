@@ -21,6 +21,45 @@ PackageManagerLogRecord = TargetRecordDescriptor(
     ],
 )
 
+PackageManagerPackageRecord = TargetRecordDescriptor(
+    "unix/packagemanager/package",
+    [
+        ("datetime", "ts"),
+        ("string", "package_manager"),
+        ("string", "package_name"),
+        ("string", "package_name_full"),
+        ("string", "package_version"),
+        ("string", "package_release"),
+        ("string", "package_arch"),
+        ("string", "package_vendor"),
+        ("string", "package_summary"),
+        ("filesize", "package_size"),
+        ("string", "package_archive"),
+        ("digest", "digest"),  # digest of the archive
+        ("path[]", "package_files"),
+        ("digest[]", "package_files_digests"),
+        ("path", "source"),
+    ],
+)
+
+PackageManagerPackageFileRecord = TargetRecordDescriptor(
+    "unix/packagemanager/package/file",
+    [
+        ("datetime", "ts"),
+        ("string", "package_manager"),
+        ("string", "package_name"),
+        ("string", "package_name_full"),
+        ("path", "path"),
+        ("boolean", "exists"),
+        ("filesize", "stored_size"),
+        ("filesize", "actual_size"),
+        ("digest", "stored_digest"),
+        ("digest", "actual_digest"),
+        ("boolean", "digest_match"),
+        ("path", "source"),
+    ],
+)
+
 
 class OperationTypes(Enum):
     """Valid operation types."""
