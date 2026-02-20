@@ -1,118 +1,152 @@
 from __future__ import annotations
 
-import datetime
-import gzip
-from typing import TYPE_CHECKING, TextIO
+from datetime import datetime, timezone, tzinfo
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.plugin import Plugin, arg, export
+from dissect.target.plugins.os.unix.packagemanager import (
+    PackageManagerLogRecord,
+    PackageManagerPackageFileRecord,
+    PackageManagerPackageRecord,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
-STATUS_FILE_NAME = "/var/lib/dpkg/status"
-LOG_FILES_GLOB = "/var/log/dpkg.log*"
-
-STATUS_FIELD_MAPPINGS = {
-    "Package": "name",
-    "Status": "status",
-    "Priority": "priority",
-    "Section": "section",
-    "Architecture": "arch",
-    "Version": "version",
-}
-
-STATUS_FIELDS_TO_EXTRACT = STATUS_FIELD_MAPPINGS.keys()
-
-DpkgPackageStatusRecord = TargetRecordDescriptor(
-    "linux/debian/dpkg/package/status",
-    [
-        ("string", "name"),
-        ("string", "status"),
-        ("string", "priority"),
-        ("string", "section"),
-        ("string", "arch"),
-        ("string", "version"),
-    ],
-)
-
-DpkgPackageLogRecord = TargetRecordDescriptor(
-    "linux/debian/dpkg/package/log",
-    [
-        ("datetime", "ts"),
-        ("string", "name"),
-        ("string", "operation"),
-        ("string", "status"),
-        ("string", "version_old"),
-        ("string", "version"),
-        ("string", "arch"),
-    ],
-)
+    from dissect.target.target import Target
 
 
 class DpkgPlugin(Plugin):
-    """Returns records for package details extracted from dpkg's status and log files."""
+    """Debian Package (dpkg) plugin.
+
+    Does not currently parse ``*-old`` files.
+
+    References:
+        - https://wiki.debian.org/dpkg
+    """
 
     __namespace__ = "dpkg"
 
+    def __init__(self, target: Target):
+        super().__init__(target)
+
+        self.log_files = list(self.target.fs.path("/var/log/").glob("dpkg.log*"))
+        self.info_list_files = list(target.fs.path("/var/lib/dpkg/info/").glob("*.list"))
+
+        self.status_file = None
+        if (status_file := self.target.fs.path("/var/lib/dpkg/status")).is_file():
+            self.status_file = status_file
+
     def check_compatible(self) -> None:
-        log_files = list(self.target.fs.glob(LOG_FILES_GLOB))
-        if not len(log_files) > 0 and not self.target.fs.path(STATUS_FILE_NAME).exists():
-            raise UnsupportedPluginError("No DPKG files found")
+        if not self.log_files and not self.info_list_files and not self.status_file:
+            raise UnsupportedPluginError("No Debian package file(s) found on target")
 
-    @export(record=DpkgPackageStatusRecord)
-    def status(self) -> Iterator[DpkgPackageStatusRecord]:
-        """Yield records for packages in dpkg's status database."""
+    @export(record=[PackageManagerPackageRecord, PackageManagerPackageFileRecord])
+    @arg("--output-files", action="store_true", help="output package file content records")
+    def packages(
+        self, output_files: bool = False
+    ) -> Iterator[PackageManagerPackageRecord | PackageManagerPackageFileRecord]:
+        """Yields information about installed Debian packages."""
 
-        status_file_path = self.target.fs.path(STATUS_FILE_NAME)
-
-        if not status_file_path.exists():
+        if not self.status_file:
+            self.target.log.warning("No dpkg status file found on target")
             return
 
-        for block_lines in read_status_blocks(status_file_path.open("rt")):
-            details = parse_status_block(block_lines)
+        for block in read_status_blocks(self.status_file.read_text()):
+            package = parse_status_block(block)
 
-            if not details or not details.get("Package"):
+            if not package.get("Package"):
+                self.target.log.warning("Failed to parse package block in %s", self.status_file)
                 continue
 
-            record_fields = {
-                STATUS_FIELD_MAPPINGS[field]: value
-                for field, value in details.items()
-                if field in STATUS_FIELD_MAPPINGS
-            }
+            if "installed" not in package.get("Status", ""):
+                self.target.log.info("Encountered non-installed package: %s", package)
+                continue
 
-            yield DpkgPackageStatusRecord(_target=self.target, **record_fields)
+            name = package["Package"]
+            version = package.get("Version", "")
+            full_name = f"{name}-{version}".strip("-")
 
-    @export(record=DpkgPackageLogRecord)
-    def log(self) -> Iterator[DpkgPackageLogRecord]:
+            if arch := package.get("Architecture", ""):
+                full_name += f".{arch}"
+
+            # See if we have a .list and .md5sums file for this package.
+            files = {}
+            for list_file in (f"/var/lib/dpkg/info/{name}.list", f"/var/lib/dpkg/info/{name}:{arch}.list"):
+                if (list_path := self.target.fs.path(list_file)).is_file():
+                    files = parse_list_file(list_path)
+                    break
+
+            ts = list_path.lstat().st_mtime if list_path.is_file() else None
+
+            yield PackageManagerPackageRecord(
+                ts=ts,
+                package_manager="dpkg",
+                package_name=name,
+                package_name_full=full_name,
+                package_version=version or None,
+                package_release=version.split("-", maxsplit=1)[-1] or None,
+                package_arch=package.get("Architecture"),
+                package_vendor=package.get("Maintainer"),
+                package_summary=package.get("Description"),
+                package_size=package.get("Size"),
+                package_archive=None,
+                package_files=files.keys(),
+                package_files_digests=[(digest, None, None) for digest in files.values() if digest],
+                source=self.status_file,
+                _target=self.target,
+            )
+
+            if output_files:
+                for file, stored_digest in files.items():
+                    actual_digest = file.get().hash(["md5"])[0] if file.is_file() else None
+
+                    yield PackageManagerPackageFileRecord(
+                        ts=ts,
+                        package_manager="dpkg",
+                        package_name=name,
+                        package_name_full=full_name,
+                        path=file,
+                        exists=file.exists(),
+                        stored_digest=(stored_digest, None, None),
+                        actual_digest=(actual_digest, None, None),
+                        digest_match=(stored_digest == actual_digest) if stored_digest else None,
+                        source=list_path,
+                        _target=self.target,
+                    )
+
+    @export(record=PackageManagerLogRecord)
+    def logs(self) -> Iterator[PackageManagerLogRecord]:
         """Yield records for actions logged in dpkg's logs."""
-        target_tz = self.target.datetime.tzinfo
 
-        for log_file in self.target.fs.glob(LOG_FILES_GLOB):
-            fh = self.target.fs.open(log_file)
-            if log_file.lower().endswith(".gz"):
-                fh = gzip.open(fh)  # noqa: SIM115
-
-            for line in fh:
-                line = line.decode("utf-8").strip()
+        for log_file in self.log_files:
+            for line in open_decompress(log_file, "rt"):
+                if not (line := line.strip()):
+                    continue
 
                 try:
-                    parsed_line = parse_log_line(line, target_tz)
+                    parsed_line = parse_log_line(line, self.target.datetime.tzinfo)
+                except NotImplementedError:
+                    continue
                 except ValueError:
                     self.target.log.debug("Can not parse dpkg log line `%s`", line, exc_info=True)
                     continue
 
-                if not parsed_line:
-                    continue
+                yield PackageManagerLogRecord(
+                    **parsed_line,
+                    package_manager="dpkg",
+                    source=log_file,
+                    _target=self.target,
+                )
 
-                yield DpkgPackageLogRecord(_target=self.target, **parsed_line)
 
-
-def read_status_blocks(fh: TextIO) -> Iterator[list[str]]:
+def read_status_blocks(input: str) -> Iterator[list[str]]:
     """Yield package status blocks read from ``fh`` text stream as the lists of lines."""
     block_lines = []
-    for line in fh:
+    for line in input.split("\n"):
         line = line.strip()
 
         # Package details blocks are separated by an empty line
@@ -131,64 +165,91 @@ def read_status_blocks(fh: TextIO) -> Iterator[list[str]]:
 def parse_status_block(block_lines: list[str]) -> dict[str, str]:
     """Parse package details block from dpkg status file."""
     result = {}
+    previous_key = None
+
     for line in block_lines:
-        field_name, _, value = line.partition(": ")
-        if field_name in STATUS_FIELDS_TO_EXTRACT:
-            result[field_name] = value.strip()
+        # Line can be part of previous value if it is indented.
+        if line.startswith(" "):
+            result[previous_key] += line
+            continue
+
+        key, _, value = line.partition(": ")
+        previous_key = key
+        result[key] = value.strip()
+
     return result
 
 
-def parse_log_date_time(date_str: str, time_str: str, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> datetime:
-    return datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=tzinfo)
+def parse_log_line(log_line: str, tzinfo: tzinfo = timezone.utc) -> dict[str, str]:
+    """Parse a single dpkg log file line.
 
+    Example status log line::
+        2022-01-03 12:47:24 status unpacked python3.8:amd64 3.8.10-0ubuntu1~20.04.2
 
-def parse_log_line(log_line: str, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> dict[str, str]:
-    """Parse dpkg log file line."""
+    Example install log line::
+        2022-01-03 12:47:41 install linux-modules-extra-5.11.0-43-generic:amd64 <none> 5.11.0-43.47~20.04.2
+    """
 
     parts = log_line.split(" ")
 
     # Skip lines that are not about operations on packages
     if len(parts) != 6:
-        return None
+        raise NotImplementedError
 
-    result = {}
     log_date, log_time, operation = parts[:3]
 
     result = {
-        "ts": parse_log_date_time(log_date, log_time, tzinfo=tzinfo),
+        "ts": datetime.strptime(f"{log_date} {log_time}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=tzinfo),
         "operation": operation,
+        "message": " ".join(parts[2:]),
     }
 
     if operation == "status":
-        # Example:
-        # 2022-01-03 12:47:24 status unpacked python3.8:amd64 3.8.10-0ubuntu1~20.04.2
-
-        status, package_arch, version = parts[3:]
-        name, _, arch = package_arch.partition(":")
+        _, package_arch, version = parts[3:]
+        name, _, _ = package_arch.partition(":")
         result.update(
             {
-                "name": name,
-                "status": status,
-                "arch": arch,
-                "version": version,
+                "package_name": name,
+                "package_version": version,
             }
         )
-    elif operation in ("install", "upgrade", "remove", "trigproc"):
-        # Example:
-        # 2022-01-03 12:47:41 install linux-modules-extra-5.11.0-43-generic:amd64 <none> 5.11.0-43.47~20.04.2
+        return result
+
+    if operation in ("install", "upgrade", "remove", "trigproc"):
         package_arch, version_old, version = parts[3:]
-        name, _, arch = package_arch.partition(":")
+        name, _, _ = package_arch.partition(":")
         version = None if version == "<none>" else version
         version_old = None if version_old == "<none>" else version_old
         result.update(
             {
-                "name": name,
-                "arch": arch,
-                "version": version,
-                "version_old": version_old,
+                "package_name": name,
+                "package_version": version,
             }
         )
-    else:
-        raise ValueError(f"Unrecognized operation `{operation}` in dpkg log file line: `{log_line}`")
+        return result
 
-    return result
+    raise ValueError(f"Unrecognized operation `{operation}` in dpkg log file line: `{log_line}`")
+
+
+def parse_list_file(list_path: Path) -> dict[Path, str | None]:
+    """Returns dict of file paths and digests of files for the given list_file."""
+
+    root = list_path.parents[-1]
+    md5sums_path = list_path.with_suffix(".md5sums")
+    map = {}
+
+    if md5sums_path.is_file():
+        for line in md5sums_path.open("rt"):
+            if not (line := line.strip()):
+                continue
+            hexdigest, _, rel_path = line.partition("  ")
+            map[root.joinpath(rel_path)] = hexdigest
+
+    for line in list_path.open("rt"):
+        if not (line := line.strip()) or line == "/.":
+            continue
+        path = root.joinpath(line)
+        if path not in map:
+            map[path] = None
+
+    return map
