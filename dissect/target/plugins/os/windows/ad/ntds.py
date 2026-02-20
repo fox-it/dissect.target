@@ -151,7 +151,7 @@ class NtdsPlugin(Plugin):
             )
 
     @export(record=NtdsGPORecord)
-    def group_policy(self) -> Iterator[NtdsGPORecord]:
+    def group_policies(self) -> Iterator[NtdsGPORecord]:
         """Extract all group policy objects (GPO) NTDS.dit database."""
 
         for gpo in self.ntds.group_policies():
