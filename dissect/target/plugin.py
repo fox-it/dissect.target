@@ -967,7 +967,10 @@ def _filter_tree_match(
 
 
 def _filter_compatible(
-    descriptors: list[FunctionDescriptor], target: Target, ignore_load_errors: bool = False
+    descriptors: list[FunctionDescriptor],
+    target: Target,
+    ignore_load_errors: bool = False,
+    ignore_namespace_plugins: bool = True,
 ) -> Iterator[FunctionDescriptor]:
     """Filter a list of function descriptors based on compatibility with a target."""
     compatible = set()
@@ -979,6 +982,9 @@ def _filter_compatible(
             continue
 
         if descriptor.qualname in incompatible:
+            continue
+
+        if ignore_namespace_plugins and descriptor.cls.__base__ == NamespacePlugin:
             continue
 
         try:
