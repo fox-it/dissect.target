@@ -192,3 +192,37 @@ def test_filesystems_tar(obj: str, base: str, request: pytest.FixtureRequest) ->
             tsymd.open()
 
         assert len(list(tsymd.listdir())) == 100
+
+
+def test_skip_folder_member_if_previously_mapped() -> None:
+    """Test if we skip a directory tar member if the path of said directory is already mapped."""
+
+    buf = io.BytesIO()
+    tf = tarfile.TarFile(fileobj=buf, mode="w")
+    _mkfile(tf, "folder/file", b"file contents")  # Write the file member first
+    _mkdir(tf, "folder")  # Then write the 'empty' directory member
+    tf.close()
+    buf.seek(0)
+    fs = TarFilesystem(buf)
+
+    # Sanity check
+    assert list(fs.get("/").iterdir()) == ["folder"]
+
+    # Make sure the /folder/file entry is mapped.
+    assert list(fs.get("/folder").iterdir()) == ["file"]
+
+    # Now the other way around, folder is created first and then folder/file
+
+    buf = io.BytesIO()
+    tf = tarfile.TarFile(fileobj=buf, mode="w")
+    _mkdir(tf, "folder")  # Write the empty folder first
+    _mkfile(tf, "folder/file", b"file contents")  # Then write the file member
+    tf.close()
+    buf.seek(0)
+    fs = TarFilesystem(buf)
+
+    # Sanity check
+    assert list(fs.get("/").iterdir()) == ["folder"]
+
+    # Make sure the /folder/file entry is mapped.
+    assert list(fs.get("/folder").iterdir()) == ["file"]
