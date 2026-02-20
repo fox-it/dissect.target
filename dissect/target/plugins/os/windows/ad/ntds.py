@@ -156,13 +156,13 @@ class NtdsPlugin(Plugin):
 
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
-                cn=gpo.get("cn"),
-                distinguished_name=gpo.get("distinguishedName"),
-                object_guid=gpo.get("guid"),
-                name=gpo.get("name"),
-                display_name=gpo.get("displayName"),
-                creation_time=gpo.get("whenCreated"),
-                last_modified_time=gpo.get("whenChanged"),
+                cn=gpo.cn,
+                distinguished_name=gpo.distinguished_name,
+                object_guid=gpo.guid,
+                name=gpo.name,
+                display_name=gpo.display_name,
+                creation_time=gpo.when_created,
+                last_modified_time=gpo.when_changed,
                 _target=self.target,
             )
 
@@ -186,7 +186,7 @@ def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
 
     # Extract supplemental credentials and yield records
     return {
-        "cn": user.get("cn"),
+        "cn": user.cn,
         "upn": user.get("userPrincipalName"),
         "sam_name": user.sam_account_name,
         "sam_type": user.sam_account_type.name,
