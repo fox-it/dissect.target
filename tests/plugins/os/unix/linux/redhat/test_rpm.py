@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
+import pytest
+
 from dissect.target.plugins.os.unix.linux.redhat.rpm._plugin import RpmPlugin
+from dissect.target.plugins.os.unix.linux.redhat.rpm.rpm import parse_blob
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -12,7 +16,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_redhat_rpm_fedora_sqlite(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_packages_sqlite(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can find and parse RPM SQLite3 database files.
 
     Test file originates from an unmodified Fedora docker image (docker.io/library/fedora:latest).
@@ -211,7 +215,7 @@ def test_redhat_rpm_fedora_sqlite(target_unix: Target, fs_unix: VirtualFilesyste
     assert records[0].source == "/usr/lib/sysimage/rpm/rpmdb.sqlite"
 
 
-def test_redhat_rpm_rocky_linux_bsddb(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_packages_bsddb(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can find and parse RPM BSD DB database files.
 
     Test file originates from an unmodified Rocky Linux docker image (docker.io/rockylinux/rockylinux:8).
@@ -379,7 +383,7 @@ def test_redhat_rpm_rocky_linux_bsddb(target_unix: Target, fs_unix: VirtualFiles
     )
 
 
-def test_redhat_rpm_opensuse_leap_ndb(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_packages_ndb(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can find and parse RPM NDB database files.
 
     Test file originates from an unmodified OpenSUSE Leap docker image (docker.io/opensuse/leap:latest).
@@ -539,7 +543,7 @@ def test_redhat_rpm_opensuse_leap_ndb(target_unix: Target, fs_unix: VirtualFiles
     )
 
 
-def test_redhat_rpm_package_files_output(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_package_files_output(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can output file records for packages."""
 
     fs_unix.map_dir("/usr/lib/sysimage/rpm", absolute_path("_data/plugins/os/unix/linux/redhat/rpm/ndb"))
@@ -564,3 +568,17 @@ def test_redhat_rpm_package_files_output(target_unix: Target, fs_unix: VirtualFi
     assert records[1].digest_match == False  # noqa: E712
     assert records[1].stored_size == 10536
     assert records[1].source == "/usr/lib/sysimage/rpm/Packages.db"
+
+
+@pytest.mark.parametrize(
+    "path_part",
+    ["simple"],
+)
+def test_blob_parsing(path_part: str) -> None:
+    """Test if we can parse RPM blob entries correctly."""
+
+    path = "_data/plugins/os/unix/linux/redhat/rpm/blob"
+    blob = absolute_path(f"{path}/{path_part}.bin").read_bytes()
+    expected_output = absolute_path(f"{path}/{path_part}.json").read_text()
+
+    assert json.dumps(parse_blob(blob), default=repr, indent=4) == expected_output

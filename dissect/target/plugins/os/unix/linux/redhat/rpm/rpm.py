@@ -3,8 +3,6 @@ from __future__ import annotations
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
-from dissect.cstruct.utils import u8, u16, u32, u64
-
 from dissect.target.helpers.logging import get_logger
 from dissect.target.plugins.os.unix.linux.redhat.rpm.c_rpm import c_rpm
 
@@ -58,15 +56,15 @@ def parse_blob(blob: bytes) -> dict:
 
 DESERIALIZE_MAP: dict[c_rpm.TagType, Callable] = {
     c_rpm.TagType.NULL: lambda _: None,
-    c_rpm.TagType.CHAR: lambda b, _: b,
-    c_rpm.TagType.INT8: lambda b, _: u8(b, "big"),
-    c_rpm.TagType.INT16: lambda b, _: u16(b, "big"),
-    c_rpm.TagType.INT32: lambda b, _: u32(b, "big"),
-    c_rpm.TagType.INT64: lambda b, _: u64(b, "big"),
-    c_rpm.TagType.STRING: lambda b, _: b.decode().strip("\x00"),
+    c_rpm.TagType.CHAR: lambda b, _: c_rpm.char(b),
+    c_rpm.TagType.INT8: lambda b, _: c_rpm.uint8(b),
+    c_rpm.TagType.INT16: lambda b, _: c_rpm.uint16(b),
+    c_rpm.TagType.INT32: lambda b, _: c_rpm.uint32(b),
+    c_rpm.TagType.INT64: lambda b, _: c_rpm.uint64(b),
+    c_rpm.TagType.STRING: lambda b, _: b.split(b"\x00", maxsplit=1)[0].decode().strip("\x00"),
     c_rpm.TagType.BIN: lambda b, _: b,
     c_rpm.TagType.STRING_ARRAY: lambda b, c: [i.decode().strip("\x00") for i in b.split(b"\x00", maxsplit=c - 1)],
-    c_rpm.TagType.I18NSTRING: lambda b, _: b.decode().strip("\x00"),
+    c_rpm.TagType.I18NSTRING: lambda b, _: b.split(b"\x00", maxsplit=1)[0].decode().strip("\x00"),
 }
 
 
