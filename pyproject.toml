@@ -116,6 +116,11 @@ smb = [
     "dissect.target[full]",
     "impacket==0.10.0",
 ]
+ssh = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "paramiko",
+]
 cb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
