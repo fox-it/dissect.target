@@ -27,7 +27,14 @@ class AndroidPlugin(LinuxPlugin):
 
         for build_prop in self.build_prop_paths:
             try:
-                self.props.update(configutil.parse(build_prop, separator=("=",), comment_prefixes=("#",)).parsed_data)
+                self.props.update(
+                    configutil.parse(
+                        build_prop,
+                        hint="meta_bare",
+                        separator=("=",),
+                        comment_prefixes=("#",),
+                    ).parsed_data
+                )
             except Exception as e:  # noqa: PERF203
                 self.target.log.warning("Unable to parse Android build.prop file %s: %s", build_prop, e)
 
