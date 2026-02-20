@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds import NTDS
 
-from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, UnsupportedPluginError, export, internal
 from dissect.target.plugins.os.windows.sam import des_decrypt
@@ -105,7 +104,6 @@ class NtdsPlugin(Plugin):
         super().__init__(target)
         self.path = None
 
-        # Fallback path
         if self.target.has_function("registry"):
             key = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE)
             self.path = self.target.fs.path(key.value)
@@ -158,13 +156,13 @@ class NtdsPlugin(Plugin):
 
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
-                cn=gpo.cn,
-                distinguished_name=gpo.distinguishedName,
-                object_guid=gpo.guid,
-                name=gpo.name,
-                display_name=gpo.displayName,
-                creation_time=gpo.whenCreated,
-                last_modified_time=gpo.whenChanged,
+                cn=gpo.get("cn"),
+                distinguished_name=gpo.get("distinguishedName"),
+                object_guid=gpo.get("guid"),
+                name=gpo.get("name"),
+                display_name=gpo.get("displayName"),
+                creation_time=gpo.get("whenCreated"),
+                last_modified_time=gpo.get("whenChanged"),
                 _target=self.target,
             )
 
