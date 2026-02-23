@@ -123,28 +123,29 @@ class DpkgPlugin(Plugin):
         """Yield records for actions logged in dpkg's logs."""
 
         for log_file in self.log_files:
-            for line in open_decompress(log_file, "rt"):
-                if not (line := line.strip()):
-                    continue
+            with open_decompress(log_file, "rt") as fh:
+                for line in fh:
+                    if not (line := line.strip()):
+                        continue
 
-                try:
-                    parsed_line = parse_log_line(line, self.target.datetime.tzinfo)
-                except NotImplementedError:
-                    continue
-                except ValueError:
-                    self.target.log.debug("Can not parse dpkg log line `%s`", line, exc_info=True)
-                    continue
+                    try:
+                        parsed_line = parse_log_line(line, self.target.datetime.tzinfo)
+                    except NotImplementedError:
+                        continue
+                    except ValueError:
+                        self.target.log.debug("Can not parse dpkg log line `%s`", line, exc_info=True)
+                        continue
 
-                yield PackageManagerLogRecord(
-                    **parsed_line,
-                    package_manager="dpkg",
-                    source=log_file,
-                    _target=self.target,
-                )
+                    yield PackageManagerLogRecord(
+                        **parsed_line,
+                        package_manager="dpkg",
+                        source=log_file,
+                        _target=self.target,
+                    )
 
 
 def read_status_blocks(input: str) -> Iterator[list[str]]:
-    """Yield package status blocks read from ``fh`` text stream as the lists of lines."""
+    """Yield package status blocks from ``input`` as lists of lines."""
     block_lines = []
     for line in input.split("\n"):
         line = line.strip()
@@ -194,7 +195,7 @@ def parse_log_line(log_line: str, tzinfo: tzinfo = timezone.utc) -> dict[str, st
 
     # Skip lines that are not about operations on packages
     if len(parts) != 6:
-        raise NotImplementedError
+        raise NotImplementedError("Provided log line is of unimplemented format")
 
     log_date, log_time, operation = parts[:3]
 
@@ -232,24 +233,26 @@ def parse_log_line(log_line: str, tzinfo: tzinfo = timezone.utc) -> dict[str, st
 
 
 def parse_list_file(list_path: Path) -> dict[Path, str | None]:
-    """Returns dict of file paths and digests of files for the given list_file."""
+    """Returns a dictionary of file paths and digests of files for the given list path."""
 
     root = list_path.parents[-1]
     md5sums_path = list_path.with_suffix(".md5sums")
     map = {}
 
     if md5sums_path.is_file():
-        for line in md5sums_path.open("rt"):
-            if not (line := line.strip()):
-                continue
-            hexdigest, _, rel_path = line.partition("  ")
-            map[root.joinpath(rel_path)] = hexdigest
+        with md5sums_path.open("rt") as fh:
+            for line in fh:
+                if not (line := line.strip()):
+                    continue
+                hexdigest, _, rel_path = line.partition("  ")
+                map[root.joinpath(rel_path)] = hexdigest
 
-    for line in list_path.open("rt"):
-        if not (line := line.strip()) or line == "/.":
-            continue
-        path = root.joinpath(line)
-        if path not in map:
-            map[path] = None
+    with list_path.open("rt") as fh:
+        for line in fh:
+            if not (line := line.strip()) or line == "/.":
+                continue
+            path = root.joinpath(line)
+            if path not in map:
+                map[path] = None
 
     return map
