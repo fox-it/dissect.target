@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 UnixApplicationRecord = TargetRecordDescriptor(
     "unix/application",
-    [*COMMON_APPLICATION_FIELDS, ("boolean", "autostart"), ("string", "exec")],
+    [*COMMON_APPLICATION_FIELDS],
 )
 
 
@@ -66,7 +66,7 @@ class UnixApplicationsPlugin(Plugin):
         if not (self.desktop_files or self.autostart_desktop_files):
             raise UnsupportedPluginError("No application .desktop files found")
 
-    def _parse_desktop_entry(self, path: TargetPath, is_autostart: bool = False) -> dict:
+    def _parse_desktop_entry(self, path: TargetPath, is_autostart: bool = False) -> UnixApplicationRecord:
         config = configutil.parse(path, hint="ini").get("Desktop Entry") or {}
         stat = path.lstat()
 
@@ -75,8 +75,8 @@ class UnixApplicationsPlugin(Plugin):
             ts_installed=stat.st_btime if hasattr(stat, "st_btime") else None,
             name=config.get("Name"),
             version=config.get("Version"),
-            exec=config.get("Exec"),
-            path=path,
+            command=config.get("Exec"),
+            source=path,
             type=("system" if config.get("Icon", "").startswith(self.SYSTEM_APPS) else "user"),
             autostart=is_autostart,
             _target=self.target,
@@ -108,8 +108,8 @@ class UnixApplicationsPlugin(Plugin):
             version      (string):   version of the application
             author       (string):   author of the application
             type         (string):   type of the application, either user or system
-            path         (string):   path to the desktop file entry of the application
-            exec         (string):   the commandline that will be invoked by the desktop environment
+            source       (path):     path to the desktop file entry of the application
+            command      (command):  the commandline that will be invoked by the desktop environment
             autostart    (boolean):  True when the application is an autostart desktop application, else False
         """
         for file in self.desktop_files:
