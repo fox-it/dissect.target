@@ -102,10 +102,8 @@ class MssqlPlugin(Plugin):
 
                         current_ts = ts_match
                         current_buf = line
-                    else:
-                        if current_buf:
-                            current_buf += line
-
+                    elif current_buf:
+                        current_buf += line
                 # For the last line
                 if current_ts and current_buf:
                     yield MssqlErrorlogRecord(
@@ -118,7 +116,7 @@ class MssqlPlugin(Plugin):
                         _target=self.target,
                     )
 
-    def _find_instances(self) -> set[str, TargetPath]:
+    def _find_instances(self) -> set[tuple[str, TargetPath]]:
         return {
             (subkey.name, self.target.fs.path(subkey.subkey("SQLServerAgent").value("ErrorLogFile").value).parent)
             for subkey in self.target.registry.glob_ext(self.MSSQL_KEY_GLOB)
