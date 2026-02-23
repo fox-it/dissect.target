@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 
 class SafariPlugin(BrowserPlugin):
@@ -37,7 +38,7 @@ class SafariPlugin(BrowserPlugin):
         "browser/safari/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.installs = list(self._find_installs())
 
