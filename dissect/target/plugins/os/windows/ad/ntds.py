@@ -69,6 +69,18 @@ NtdsComputerRecord = TargetRecordDescriptor(
     ],
 )
 
+NtdsGPORecord = TargetRecordDescriptor(
+    "windows/ad/gpo",
+    [
+        ("string", "cn"),
+        ("string", "distinguished_name"),
+        ("string", "object_guid"),
+        ("string", "name"),
+        ("string", "display_name"),
+        ("datetime", "creation_time"),
+        ("datetime", "last_modified_time"),
+    ],
+)
 
 # NTDS Registry consts
 NTDS_PARAMETERS_REGISTRY_PATH = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\NTDS\\Parameters"
@@ -138,6 +150,22 @@ class NtdsPlugin(Plugin):
                 _target=self.target,
             )
 
+    @export(record=NtdsGPORecord)
+    def group_policies(self) -> Iterator[NtdsGPORecord]:
+        """Extract all group policy objects (GPO) NTDS.dit database."""
+
+        for gpo in self.ntds.group_policies():
+            yield NtdsGPORecord(
+                cn=gpo.cn,
+                distinguished_name=gpo.distinguished_name,
+                object_guid=gpo.guid,
+                name=gpo.name,
+                display_name=gpo.display_name,
+                creation_time=gpo.when_created,
+                last_modified_time=gpo.when_changed,
+                _target=self.target,
+            )
+
 
 def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
@@ -158,7 +186,7 @@ def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
 
     # Extract supplemental credentials and yield records
     return {
-        "cn": user.get("cn"),
+        "cn": user.cn,
         "upn": user.get("userPrincipalName"),
         "sam_name": user.sam_account_name,
         "sam_type": user.sam_account_type.name,
