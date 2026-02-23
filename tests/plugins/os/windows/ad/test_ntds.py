@@ -95,3 +95,15 @@ def test_group_policies(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.group_policies())
 
     assert len(results) == 5
+
+
+def test_secretsdump(target_win_ntds: Target) -> None:
+    """Tests if ``ad.secretsdump`` outputs the correct credentials in secretsdump format"""
+    results = list(target_win_ntds.ad.secretsdump())
+
+    assert len(results) == 82  # 34 hashes and 38 Kerberos keys
+    assert (
+        results[0]
+        == "Administrator:500:aad3b435b51404eeaad3b435b51404ee:c66d72021a2d4744409969a581a1705e::: (pwdLastSet=2025-12-18 17:11:45.510290+00:00) (status=Enabled)"  # noqa: E501
+    )
+    assert results[-1] == "ESSOS$:des-cbc-md5:f715e30273382546"
