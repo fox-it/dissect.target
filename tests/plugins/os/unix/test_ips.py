@@ -252,51 +252,6 @@ def test_regression_ips_unique_strings(target_unix: Target, fs_unix: VirtualFile
     assert target_unix.ips == ["1.2.3.4"]
 
 
-def test_ips_nixos_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """Test statically defined ipv4 and ipv6 addresses in NixOS /etc/nixos/*.nix."""
-
-    nixos_dir = absolute_path("_data/plugins/os/unix/_os/ips/nixos")
-    fs_unix.map_file("/etc/nixos/configuration.nix", nixos_dir / "configuration.nix")
-    fs_unix.map_file("/etc/nixos/networking.nix", nixos_dir / "networking.nix")
-    # NixOS detection relies on /etc/NIXOS marker file
-    fs_unix.map_file_fh("/etc/NIXOS", BytesIO(b""))
-
-    target_unix_users.add_plugin(LinuxPlugin)
-    results = target_unix_users.ips
-
-    assert sorted(results) == sorted(["10.13.37.10", "2001:db8::1"])
-
-
-def test_ips_nixos_dns(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """Test DNS nameserver extraction from NixOS configuration."""
-
-    nixos_dir = absolute_path("_data/plugins/os/unix/_os/ips/nixos")
-    fs_unix.map_file("/etc/nixos/configuration.nix", nixos_dir / "configuration.nix")
-    fs_unix.map_file("/etc/nixos/networking.nix", nixos_dir / "networking.nix")
-    fs_unix.map_file_fh("/etc/NIXOS", BytesIO(b""))
-
-    target_unix_users.add_plugin(LinuxPlugin)
-    results = target_unix_users.dns
-
-    assert len(results) == 1
-    assert results == [{"10.13.37.1", "10.13.37.2"}]
-
-
-def test_ips_nixos_gateway(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """Test gateway extraction from NixOS configuration."""
-
-    nixos_dir = absolute_path("_data/plugins/os/unix/_os/ips/nixos")
-    fs_unix.map_file("/etc/nixos/configuration.nix", nixos_dir / "configuration.nix")
-    fs_unix.map_file("/etc/nixos/networking.nix", nixos_dir / "networking.nix")
-    fs_unix.map_file_fh("/etc/NIXOS", BytesIO(b""))
-
-    target_unix_users.add_plugin(LinuxPlugin)
-    results = target_unix_users.gateway
-
-    assert len(results) == 1
-    assert results == [{"10.13.37.0"}]
-
-
 def test_ips_dhcp_lease_files(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can detect DHCP lease files from NetworkManager and dhclient."""
 

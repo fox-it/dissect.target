@@ -16,6 +16,7 @@ from dissect.target.plugins.os.unix.linux.network import (
     LinuxNetworkPlugin,
     NetworkManagerConfigParser,
     NetworkManagerLeaseParser,
+    NixOSConfigParser,
     ProcConfigParser,
     SyslogConfigParser,
     SystemdNetworkConfigParser,
@@ -441,3 +442,63 @@ def test_syslog_config_parser_multiple_lines(target_unix_users: Target, fs_unix:
     assert results[2].cidr == [ip_interface("10.13.37.1/32")]
     assert results[1].cidr == [ip_interface("10.13.37.2/24")]
     assert results[0].cidr == [ip_interface("10.13.37.3/32")]
+
+
+def test_nixos_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    """Test NixOS declarative network configuration parsing."""
+    fixture_dir = absolute_path("_data/plugins/os/unix/linux/nixos")
+    fs_linux.map_file("/etc/nixos/configuration.nix", fixture_dir / "configuration.nix")
+    fs_linux.map_file("/etc/nixos/networking.nix", fixture_dir / "networking.nix")
+    fs_linux.map_file_fh("/etc/NIXOS", BytesIO(b""))
+
+    parser = NixOSConfigParser(target_linux)
+    interfaces = list(parser.interfaces())
+
+    assert len(interfaces) == 1
+    iface = interfaces[0]
+
+    assert iface.name == "eth0"
+    assert iface.type == "static"
+    assert iface.enabled is None
+    assert set(iface.cidr) == {ip_interface("10.13.37.10/24"), ip_interface("2001:db8::1/64")}
+    assert iface.gateway == [ip_address("10.13.37.0")]
+    assert set(iface.dns) == {ip_address("10.13.37.1"), ip_address("10.13.37.2")}
+    assert iface.source == "/etc/nixos/networking.nix"
+    assert not iface.dhcp_ipv4
+    assert not iface.dhcp_ipv6
+    assert iface.configurator == "nixos"
+
+
+def test_nixos_config_parser_dhcp(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    """Test NixOS DHCP configuration detection."""
+    nix_config = textwrap.dedent("""\
+        { ... }: {
+          networking = {
+            useDHCP = true;
+            interfaces = {
+              ens3 = {};
+            };
+          };
+        }
+    """)
+
+    fs_linux.map_file_fh("/etc/nixos/configuration.nix", BytesIO(nix_config.encode()))
+    fs_linux.map_file_fh("/etc/NIXOS", BytesIO(b""))
+
+    parser = NixOSConfigParser(target_linux)
+    interfaces = list(parser.interfaces())
+
+    assert len(interfaces) == 1
+    assert interfaces[0].name == "ens3"
+    assert interfaces[0].type == "dhcp"
+    assert interfaces[0].dhcp_ipv4
+    assert interfaces[0].dhcp_ipv6
+    assert interfaces[0].configurator == "nixos"
+
+
+def test_nixos_config_parser_not_nixos(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    """Test that NixOS parser yields nothing on non-NixOS systems."""
+    parser = NixOSConfigParser(target_linux)
+    interfaces = list(parser.interfaces())
+
+    assert len(interfaces) == 0

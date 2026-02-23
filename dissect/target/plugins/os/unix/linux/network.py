@@ -763,5 +763,142 @@ def parse_debian_centos_dhclient_lease(log_record: LogRecord) -> DhcpLease | Non
     return DhcpLease(None, ip_interface(ip), None) if (ip := match.group(1)) else None
 
 
-MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
+class NixOSConfigParser(LinuxNetworkConfigParser):
+    """NixOS declarative network configuration parser.
+
+    NixOS uses the Nix functional language for system configuration. Network settings
+    are declared in ``/etc/nixos/configuration.nix`` or imported ``.nix`` files
+    (commonly ``networking.nix``). This parser uses regex to extract IP addresses,
+    gateways, DNS servers, interface names, and DHCP settings from these files.
+
+    References:
+        - https://nixos.org/manual/nixos/stable/#sec-networking
+    """
+
+    config_paths: tuple[str, ...] = ("/etc/nixos/",)
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        # Only parse if this is actually a NixOS system
+        if not (
+            self._target.fs.path("/etc/NIXOS").exists()
+            or self._target.fs.path("/etc/nixos/configuration.nix").exists()
+        ):
+            return
+
+        for config_file in self._config_files(self.config_paths, "*.nix"):
+            try:
+                text = config_file.open("rt").read()
+            except Exception as e:
+                self._target.log.warning("Error reading NixOS config file %s", config_file)
+                self._target.log.debug("", exc_info=e)
+                continue
+
+            ip_interfaces: set[NetInterface] = set()
+            gateways: set[NetAddress] = set()
+            dns: set[NetAddress] = set()
+            iface_names: set[str] = set()
+            dhcp_ipv4 = False
+            dhcp_ipv6 = False
+
+            # Extract IP addresses from ipv4.addresses and ipv6.addresses blocks.
+            # Avoid matching address values inside .routes blocks or udev rules.
+            in_addresses_block = False
+            for line in text.split("\n"):
+                stripped = line.strip()
+                if re.search(r"\.addresses\s*=\s*\[", stripped):
+                    in_addresses_block = True
+                if in_addresses_block:
+                    for match in re.finditer(
+                        r'address\s*=\s*"([^"]+)";\s*prefixLength\s*=\s*(\d+)',
+                        stripped,
+                    ):
+                        addr, prefix = match.group(1), match.group(2)
+                        if addr and ("." in addr or ":" in addr):
+                            try:
+                                ip_interfaces.add(ip_interface(f"{addr}/{prefix}"))
+                            except ValueError:
+                                self._target.log.debug("Invalid NixOS address: %s/%s", addr, prefix)
+                    if "]" in stripped:
+                        in_addresses_block = False
+
+            # Extract default gateway: defaultGateway = "x.x.x.x"
+            gateway_match = re.search(r'defaultGateway\s*=\s*"([^"]+)"', text)
+            if gateway_match and gateway_match.group(1):
+                try:
+                    gateways.add(ip_address(gateway_match.group(1)))
+                except ValueError:
+                    self._target.log.debug("Invalid NixOS gateway: %s", gateway_match.group(1))
+
+            # Extract DNS nameservers: nameservers = [ "x.x.x.x" "y.y.y.y" ]
+            dns_match = re.search(r"nameservers\s*=\s*\[(.*?)\]", text, re.DOTALL)
+            if dns_match:
+                for server in re.findall(r'"([^"]+)"', dns_match.group(1)):
+                    try:
+                        dns.add(ip_address(server))
+                    except ValueError:
+                        self._target.log.debug("Invalid NixOS DNS server: %s", server)
+
+            # Extract interface names from interfaces.NAME.ipvX or interfaces = { NAME = { } }
+            for match in re.finditer(r"interfaces\.([a-zA-Z][a-zA-Z0-9_-]*)\.(?:ipv[46]|useDHCP)", text):
+                iface_names.add(match.group(1))
+
+            in_interfaces_block = False
+            brace_depth = 0
+            for line in text.split("\n"):
+                stripped = line.strip()
+                if re.search(r"interfaces\s*=\s*\{", stripped):
+                    in_interfaces_block = True
+                    brace_depth = 1
+                    continue
+                if in_interfaces_block:
+                    brace_depth += stripped.count("{") - stripped.count("}")
+                    iface_match = re.match(r"([a-zA-Z][a-zA-Z0-9_-]*)\s*=\s*\{", stripped)
+                    if iface_match and brace_depth == 2:
+                        iface_names.add(iface_match.group(1))
+                    if brace_depth <= 0:
+                        in_interfaces_block = False
+
+            # Extract DHCP setting
+            dhcp_match = re.search(r"(?:dhcpcd\.enable|useDHCP)\s*=\s*(true|false)", text)
+            if dhcp_match:
+                dhcp_ipv4 = dhcp_match.group(1) == "true"
+                dhcp_ipv6 = dhcp_match.group(1) == "true"
+
+            # Only yield if we found any network information
+            if not (ip_interfaces or gateways or dns or dhcp_ipv4 or dhcp_ipv6):
+                continue
+
+            # Yield one record per interface, or a single record if no interface names found
+            if iface_names:
+                for name in sorted(iface_names):
+                    yield UnixInterfaceRecord(
+                        name=name,
+                        type="static" if not (dhcp_ipv4 or dhcp_ipv6) else "dhcp",
+                        enabled=None,
+                        cidr=ip_interfaces,
+                        gateway=list(gateways),
+                        dns=list(dns),
+                        source=str(config_file),
+                        dhcp_ipv4=dhcp_ipv4,
+                        dhcp_ipv6=dhcp_ipv6,
+                        configurator="nixos",
+                        _target=self._target,
+                    )
+            else:
+                yield UnixInterfaceRecord(
+                    name=None,
+                    type="static" if not (dhcp_ipv4 or dhcp_ipv6) else "dhcp",
+                    enabled=None,
+                    cidr=ip_interfaces,
+                    gateway=list(gateways),
+                    dns=list(dns),
+                    source=str(config_file),
+                    dhcp_ipv4=dhcp_ipv4,
+                    dhcp_ipv6=dhcp_ipv6,
+                    configurator="nixos",
+                    _target=self._target,
+                )
+
+
+MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, NixOSConfigParser, ProcConfigParser]
 LEASERS = [DhclientLeaseParser, NetworkManagerLeaseParser]
