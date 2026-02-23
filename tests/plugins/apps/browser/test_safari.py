@@ -36,7 +36,7 @@ def test_safari_history(target_safari_mac: Target) -> None:
     assert r.title == "Example Domain"
     assert r.host == "example"
     assert r.visit_count == 3
-    assert r.hidden == False
+    assert not r.hidden
     assert r.from_visit is None
     assert r.from_url is None
 
@@ -50,5 +50,5 @@ def test_safari_history(target_safari_mac: Target) -> None:
 
     # Fifth visit: synthesized (hidden)
     r = records[4]
-    assert r.hidden == True
+    assert r.hidden
     assert r.title is None
