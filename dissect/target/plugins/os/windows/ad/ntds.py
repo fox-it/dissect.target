@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds import NTDS
 
+from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, UnsupportedPluginError, export, internal
 from dissect.target.plugins.os.windows.sam import des_decrypt
@@ -104,9 +105,15 @@ class NtdsPlugin(Plugin):
         super().__init__(target)
         self.path = None
 
+        ntds_path = "sysvol/windows/NTDS/ntds.dit"
         if self.target.has_function("registry"):
-            key = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE)
-            self.path = self.target.fs.path(key.value)
+            try:
+                key = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE)
+                ntds_path = key.value
+            except RegistryKeyNotFoundError:
+                pass
+
+        self.path = self.target.fs.path(ntds_path)
 
     def check_compatible(self) -> None:
         if not self.target.has_function("lsa"):
