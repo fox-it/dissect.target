@@ -79,6 +79,8 @@ class Template:
             config = self._parse_netplan_config(path)
         elif self.name == "wicked":
             config = self._parse_wicked_config(path)
+        elif self.name == "nixos":
+            config = self._parse_nixos_config(path)
         elif self.name == "interfaces":
             config = self._parse_text_config(("#"), " ", path)
         elif isinstance(self.parser, ConfigParser):
@@ -171,6 +173,91 @@ class Template:
                         option_dict[key].append(value) if isinstance(value, str) else option_dict[key].extend(value)
                     else:
                         option_dict[key] = [value] if isinstance(value, str) else value
+
+        for section in self.sections:
+            config[section] = option_dict
+
+        return dict(config)
+
+    def _parse_nixos_config(self, path: TargetPath) -> dict:
+        """Internal function to parse NixOS network configuration files.
+
+        NixOS uses the Nix functional language for system configuration. Network settings
+        are declared in ``/etc/nixos/configuration.nix`` or imported ``.nix`` files
+        (commonly ``networking.nix``). This parser uses regex to extract IP addresses,
+        gateways, DNS servers, interface names, and DHCP settings from these files.
+
+        Args:
+            path: A path to the NixOS configuration file.
+
+        Returns:
+            Dictionary containing parsed NixOS network configuration.
+        """
+        config = defaultdict(dict)
+        option_dict = {}
+
+        try:
+            text = path.open("rt").read()
+        except Exception:
+            log.debug("Failed to read NixOS config file %s", path)
+            return dict(config)
+
+        # Extract IP addresses from ipv4.addresses and ipv6.addresses blocks.
+        # We avoid matching address values inside .routes blocks or udev rules.
+        addresses = []
+        in_addresses_block = False
+        for line in text.split("\n"):
+            stripped = line.strip()
+            if re.search(r'\.addresses\s*=\s*\[', stripped):
+                in_addresses_block = True
+            if in_addresses_block:
+                for addr in re.findall(r'address\s*=\s*"([^"]+)"', stripped):
+                    if addr and ("." in addr or ":" in addr):
+                        addresses.append(addr)
+                if "]" in stripped:
+                    in_addresses_block = False
+        if addresses:
+            option_dict["address"] = addresses
+
+        # Extract default gateway: defaultGateway = "x.x.x.x"
+        gateway_match = re.search(r'defaultGateway\s*=\s*"([^"]+)"', text)
+        if gateway_match and gateway_match.group(1):
+            option_dict["gateway"] = gateway_match.group(1)
+
+        # Extract DNS nameservers: nameservers = [ "x.x.x.x" "y.y.y.y" ]
+        dns_match = re.search(r'nameservers\s*=\s*\[(.*?)\]', text, re.DOTALL)
+        if dns_match:
+            dns_servers = re.findall(r'"([^"]+)"', dns_match.group(1))
+            if dns_servers:
+                option_dict["dns"] = dns_servers
+
+        # Extract interface names from networking.interfaces.NAME or interfaces block
+        iface_names = set()
+        for match in re.finditer(r'interfaces\.([a-zA-Z][a-zA-Z0-9_-]*)\.(?:ipv[46]|useDHCP)', text):
+            iface_names.add(match.group(1))
+        lines = text.split("\n")
+        in_interfaces_block = False
+        brace_depth = 0
+        for line in lines:
+            stripped = line.strip()
+            if re.search(r'interfaces\s*=\s*\{', stripped):
+                in_interfaces_block = True
+                brace_depth = 1
+                continue
+            if in_interfaces_block:
+                brace_depth += stripped.count("{") - stripped.count("}")
+                iface_match = re.match(r'([a-zA-Z][a-zA-Z0-9_-]*)\s*=\s*\{', stripped)
+                if iface_match and brace_depth == 2:
+                    iface_names.add(iface_match.group(1))
+                if brace_depth <= 0:
+                    in_interfaces_block = False
+        if iface_names:
+            option_dict["name"] = list(iface_names)
+
+        # Extract DHCP setting
+        dhcp_match = re.search(r'(?:dhcpcd\.enable|useDHCP)\s*=\s*(true|false)', text)
+        if dhcp_match:
+            option_dict["dhcp"] = dhcp_match.group(1)
 
         for section in self.sections:
             config[section] = option_dict
@@ -679,6 +766,12 @@ MANAGERS = [
         ("/etc/sysconfig/network-scripts/ifcfg-*", "/usr/sbin/ifup", "/usr/sbin/ifdown"),
         ("/etc/sysconfig/network-scripts/ifcfg-*", "/etc/sysconfig/network/ifcfg-*"),
     ),
+    # NixOS declarative networking
+    NetworkManager(
+        "nixos",
+        ("/etc/NIXOS", "/etc/nixos/configuration.nix"),
+        ("/etc/nixos/*.nix",),
+    ),
     # Interfaces folder/files
     NetworkManager(
         "interfaces",
@@ -715,6 +808,9 @@ TEMPLATES = {
         ConfigParser(delimiters=("=", " "), comment_prefixes=("#"), dict_type=dict, strict=False),
         ["ifupdown"],
         ["ipaddr", "bootproto", "dns", "gateway", "name", "device", "dns1"],
+    ),
+    "nixos": Template(
+        "nixos", None, ["nixos"], ["address", "gateway", "dns", "dhcp", "name"]
     ),
     "interfaces": Template(
         "interfaces", None, ["interfaces"], ["iface", "address", "gateway", "netmask", "dns-nameservers"]
