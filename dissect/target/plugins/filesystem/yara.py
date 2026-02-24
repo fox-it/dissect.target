@@ -95,7 +95,10 @@ class YaraPlugin(Plugin):
         if no_decompress:
             self.target.log.info("Will not automatically check in compressed files")
         else:
-            self.target.log.info("Will check in compressed files automatically")
+            self.target.log.info(
+                "Will check in compressed files automatically (at most %s MB after decompression)",
+                max_size // 1024 // 1024,
+            )
 
         for _, _, files in self.target.fs.walk_ext(path):
             for file in files:
@@ -113,8 +116,17 @@ class YaraPlugin(Plugin):
                             fhandles.append(fh_decompress)
 
                     for fh in fhandles:
-                        buf = fh.read(max_size)
-                        fh.seek(0)  # ensure that the original file handle is reset for compressed reads
+                        buf = fh.read(max_size + 1)
+                        if len(buf) > max_size:
+                            self.target.log.warning(
+                                "Decompressed '%s' is larger than the maximum scan size, scanning up to %s bytes",
+                                file,
+                                max_size,
+                            )
+
+                        # ensure that the original file handle is reset for compressed reads
+                        fh_original.seek(0)
+
                         for match in compiled_rules.match(data=buf):
                             string_matches: list[str] = []
                             for string in match.strings:
