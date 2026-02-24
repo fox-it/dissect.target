@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds import NTDS
 
+from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, UnsupportedPluginError, export, internal
 from dissect.target.plugins.os.windows.sam import des_decrypt
@@ -102,17 +103,21 @@ class NtdsPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.path = None
-
+        path = "sysvol/windows/NTDS/ntds.dit"
         if self.target.has_function("registry"):
-            key = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE)
-            self.path = self.target.fs.path(key.value)
+            try:
+                key = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE)
+                path = key.value
+            except RegistryKeyNotFoundError:
+                pass
+
+        self.path = self.target.fs.path(path)
 
     def check_compatible(self) -> None:
         if not self.target.has_function("lsa"):
             raise UnsupportedPluginError("System Hive is not present or LSA function not available")
 
-        if self.path is None or not self.path.is_file():
+        if not self.path.is_file():
             raise UnsupportedPluginError("No NTDS.dit database found on target")
 
     @cached_property
