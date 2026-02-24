@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 from io import BytesIO
 from pathlib import Path
@@ -97,21 +98,22 @@ class YaraPlugin(Plugin):
 
         for _, _, files in self.target.fs.walk_ext(path):
             for file in files:
+                fhandles = []
                 try:
                     if (file_size := file.stat().st_size) > max_size:
                         self.target.log.info("Not scanning file of %s MB: '%s'", (file_size // 1024 // 1024), file)
                         continue
 
-                    # file handles to scan, original file and its decompressed content, if applicable and not disabled.
-                    fhandles = set()
                     fh_original = file.open()
-                    fhandles.add(fh_original)
+                    fhandles.append(fh_original)
                     if not no_decompress:
-                        fh_decompress = open_decompress(fileobj=fh_original)
-                        fhandles.add(fh_decompress)
+                        fh_decompress = open_decompress(fileobj=fh_original, mode="rb")
+                        if fh_decompress is not fh_original:
+                            fhandles.append(fh_decompress)
 
                     for fh in fhandles:
                         buf = fh.read()
+                        fh.seek(0)  # ensure that the original file handle is reset for compressed reads
                         for match in compiled_rules.match(data=buf):
                             string_matches: list[str] = []
                             for string in match.strings:
@@ -135,6 +137,10 @@ class YaraPlugin(Plugin):
                 except Exception as e:
                     self.target.log.error("Exception scanning file '%s'", file)  # noqa: TRY400
                     self.target.log.debug("", exc_info=e)
+                finally:
+                    for fh in reversed(fhandles):
+                        with contextlib.suppress(Exception):
+                            fh.close()
 
 
 def process_rules(paths: list[str | Path], check: bool = False) -> yara.Rules | None:

@@ -29,8 +29,9 @@ def main() -> int:
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
 
+    yara_parser = parser.add_argument_group("YARA plugin options")
     for args, kwargs in getattr(YaraPlugin.yara, "__args__", []):
-        parser.add_argument(*args, **kwargs)
+        yara_parser.add_argument(*args, **kwargs)
 
     configure_generic_arguments(parser)
 
@@ -48,7 +49,7 @@ def main() -> int:
     try:
         for target in open_targets(args):
             rs = record_output(args.strings, False)
-            for record in target.yara(args.rules, args.path, args.max_size, args.check):
+            for record in target.yara(args.rules, args.path, args.max_size, args.check, args.no_decompress):
                 rs.write(record)
 
     except TargetError as e:
