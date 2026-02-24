@@ -74,6 +74,7 @@ class YaraPlugin(Plugin):
             max_size: Files larger than this size will not be scanned.
             check: Check if provided rules are valid, only compiles valid rules.
             no_decompress: Do not automatically decompress compressed files before scanning.
+
         Returns:
             Iterator yields ``YaraMatchRecord``.
         """
