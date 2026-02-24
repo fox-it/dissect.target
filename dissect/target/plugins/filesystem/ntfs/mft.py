@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from dissect.ntfs.attr import FileName
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.hashutil import md5 as md5_hash
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from dissect.ntfs import MftRecord
-    from dissect.ntfs.attr import Attribute, FileName, StandardInformation
+    from dissect.ntfs.attr import StandardInformation
     from flow.record import Record
     from typing_extensions import Self
 
@@ -118,12 +120,14 @@ FilesystemMACBRecord = TargetRecordDescriptor(
 RECORD_TYPES = {
     InformationType.STANDARD_INFORMATION: FilesystemStdRecord,
     InformationType.FILE_INFORMATION: FilesystemFilenameRecord,
+    InformationType.ALTERNATE_DATA_STREAM: FilesystemFilenameRecord,
 }
 
 
 COMPACT_RECORD_TYPES = {
     InformationType.STANDARD_INFORMATION: FilesystemStdCompactRecord,
     InformationType.FILE_INFORMATION: FilesystemFilenameCompactRecord,
+    InformationType.ALTERNATE_DATA_STREAM: FilesystemFilenameCompactRecord,
 }
 
 FORMAT_INFO = {
@@ -146,44 +150,16 @@ class MftPlugin(Plugin):
         if not len(self.ntfs_filesystems):
             raise UnsupportedPluginError("No NTFS filesystems found")
 
-    @export(
-        record=[
-            FilesystemStdRecord,
-            FilesystemFilenameRecord,
-            FilesystemStdCompactRecord,
-            FilesystemFilenameCompactRecord,
-        ]
-    )
-    @arg(
-        "--compact",
-        group="fmt",
-        action="store_true",
-        help="compacts the MFT entry timestamps into a single record",
-    )
-    @arg("--fs", type=int, help="optional filesystem index, zero indexed")
-    @arg("--start", type=int, default=0, help="the first MFT segment number")
-    @arg("--end", type=int, default=-1, help="the last MFT segment number")
-    @arg(
-        "--macb",
-        group="fmt",
-        action="store_true",
-        help="compacts MFT timestamps into MACB bitfield (format: MACB[standard|ads]/MACB[filename])",
-    )
-    @arg("--ignore-dos", action="store_true", help="ignore DOS file names")
-    def records(
+    def __iterate_ntfs_filesystems(
         self,
-        compact: bool = False,
+        aggregator: Callable[[Iterator[Record]], Iterator[Record]],
+        formatter: Callable[[FileName | StandardInformation, InformationType], Iterator[Any]],
+        ignore_dos: bool,
         fs: int | None = None,
         start: int = 0,
         end: int = -1,
-        macb: bool = False,
-        ignore_dos: bool = False,
-    ) -> Iterator[
-        FilesystemStdRecord | FilesystemFilenameRecord | FilesystemStdCompactRecord | FilesystemFilenameCompactRecord
-    ]:
-        """Return the MFT records of all NTFS filesystems.
-
-        The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
+    ) -> Iterator[Any]:
+        """The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
 
         If the filesystem is part of a virtual NTFS filesystem (a ``VirtualFilesystem`` with the MFT properties
         added to it through a "fake" ``NtfsFilesystem``), the paths returned in the MFT records are based on the
@@ -191,22 +167,20 @@ class MftPlugin(Plugin):
         available.
         When no drive letter can be determined, the path will show as e.g. ``\\$fs$\\fs0``.
 
+        Args:
+            aggregator (Callable[[Iterator[Record]], Iterator[Record]]): Aggregator function
+            formatter (Callable[[FileName | StandardInformation, InformationType], Iterator[Any]]): Formatter function
+            ignore_dos (bool): Should ignore dos file names
+            fs (int | None, optional): fs index to ran on. Defaults to None.
+            start (int, optional): start segment. Defaults to 0.
+            end (int, optional): end segment. Defaults to -1.
+
+        Yields:
+            Iterator[Any]: Yields according to the formatter used (str, records etc).
+
         References:
             - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
         """
-
-        record_formatter = default_formatter
-
-        def noop_aggregator(records: Iterator[Record]) -> Iterator[Record]:
-            yield from records
-
-        aggregator = noop_aggregator
-
-        if compact:
-            record_formatter = compact_formatter
-        elif macb:
-            aggregator = macb_aggregator
-
         filesystems: list[NtfsFilesystem] = []
         if fs is not None:
             try:
@@ -225,23 +199,15 @@ class MftPlugin(Plugin):
                     try:
                         info.update(record, filesystem)
 
-                        for path in record.full_paths(ignore_dos):
-                            path = f"{info.drive_letter}{path}"
-                            yield from aggregator(
-                                iter_records(
-                                    record=record,
-                                    segment=record.segment,
-                                    path=path,
-                                    owner=info.owner,
-                                    size=info.size,
-                                    resident=info.resident,
-                                    inuse=info.in_use,
-                                    drive_letter=info.drive_letter,
-                                    volume_uuid=info.volume_uuid,
-                                    record_formatter=record_formatter,
-                                    target=self.target,
-                                )
+                        yield from aggregator(
+                            iter_records(
+                                record=record,
+                                ignore_dos=ignore_dos,
+                                info=info,
+                                formatter=formatter,
+                                target=self.target,
                             )
+                        )
                     except Exception as e:  # noqa: PERF203
                         self.target.log.warning("An error occured parsing MFT segment %d: %s", record.segment, str(e))
                         self.target.log.debug("", exc_info=e)
@@ -249,82 +215,76 @@ class MftPlugin(Plugin):
             except Exception:
                 self.target.log.exception("An error occured constructing FilesystemRecords")
 
-    # Make calling the `mft` namespace backwards compatible with the old `mft` function
-    __call__ = records
+    @export(
+        record=[
+            FilesystemStdRecord,
+            FilesystemFilenameRecord,
+            FilesystemStdCompactRecord,
+            FilesystemFilenameCompactRecord,
+        ]
+    )
+    @arg(
+        "--compact",
+        group="fmt",
+        action="store_true",
+        help="compacts the MFT entry timestamps into a single record",
+    )
+    @arg(
+        "--macb",
+        group="fmt",
+        action="store_true",
+        help="compacts MFT timestamps into MACB bitfield (format: MACB[standard|ads]/MACB[filename])",
+    )
+    @arg("--ignore-dos", action="store_true", help="ignore DOS file names")
+    @arg("--fs", type=int, help="optional filesystem index, zero indexed")
+    @arg("--start", type=int, default=0, help="the first MFT segment number")
+    @arg("--end", type=int, default=-1, help="the last MFT segment number")
+    def records(
+        self,
+        compact: bool = False,
+        macb: bool = False,
+        ignore_dos: bool = False,
+        fs: int | None = None,
+        start: int = 0,
+        end: int = -1,
+    ) -> Iterator[
+        FilesystemStdRecord | FilesystemFilenameRecord | FilesystemStdCompactRecord | FilesystemFilenameCompactRecord
+    ]:
+        """Return the MFT records of all NTFS filesystems.
+
+        Args:
+            compact (bool, optional): Should compact timestamps to one record. Defaults to False.
+            macb (bool, optional): Should generate records using macb. Defaults to False.
+            ignore_dos (bool): Should ignore dos file names
+            fs (int | None, optional): fs index to ran on. Defaults to None.
+            start (int, optional): start segment. Defaults to 0.
+            end (int, optional): end segment. Defaults to -1.
+
+        Yields:
+            Iterator[Record]: Yields all MFT records
+        """
+        record_formatter = default_formatter
+        aggregator = noop_aggregator
+
+        if compact:
+            record_formatter = compact_formatter
+        elif macb:
+            aggregator = macb_aggregator
+
+        yield from self.__iterate_ntfs_filesystems(aggregator, record_formatter, ignore_dos, fs, start, end)
 
     @export(output="yield")
     @arg("--ignore-dos", action="store_true", help="ignore DOS file names")
     def timeline(self, ignore_dos: bool = False) -> Iterator[str]:
         """Return the MFT records of all NTFS filesystems in a human readable format (unsorted).
 
-        The Master File Table (MFT) contains metadata about every file and folder on a NFTS filesystem.
+        Args:
+            ignore_dos (bool): Should ignore dos file names
 
-        If the filesystem is part of a virtual NTFS filesystem (a ``VirtualFilesystem`` with the MFT properties
-        added to it through a "fake" ``NtfsFilesystem``), the paths returned in the MFT records are based on the
-        mount point of the ``VirtualFilesystem``. This ensures that the proper original drive letter is used when
-        available.
-        When no drive letter can be determined, the path will show as e.g. ``\\$fs$\\fs0``.
-
-        References:
-            - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
+        Yields:
+            Iterator[Record]: Yields timeline info as string
         """
-        for fs in self.target.filesystems:
-            if fs.__type__ != "ntfs":
-                continue
-            fs: NtfsFilesystem
-
-            info = _Info.init(self.target, fs)
-
-            for record in fs.ntfs.mft.segments():
-                segment = record.segment
-
-                try:
-                    info.update(record, fs)
-
-                    for path in record.full_paths(ignore_dos):
-                        path = f"{info.drive_letter}{path}"
-
-                        for attr in record.attributes.STANDARD_INFORMATION:
-                            yield from format_timeline_info(
-                                segment,
-                                path,
-                                info,
-                                attr,
-                                InformationType.STANDARD_INFORMATION,
-                            )
-
-                        for idx, attr in enumerate(record.attributes.FILE_NAME):
-                            filepath = f"{info.drive_letter}{attr.full_path()}"
-
-                            yield from format_timeline_info(
-                                segment,
-                                filepath,
-                                info,
-                                attr,
-                                InformationType.FILE_INFORMATION,
-                                idx=idx,
-                            )
-
-                        ads_extras = replace(info)
-                        ads_info = record.attributes.FILE_NAME[0]
-
-                        for attr in record.attributes.DATA:
-                            if attr.name != "":  # ADS Data
-                                ads_extras.resident = attr.resident
-                                ads_extras.size = get_record_size(record, attr.name)
-
-                                adspath = f"{path}:{attr.name}"
-
-                                yield from format_timeline_info(
-                                    segment,
-                                    adspath,
-                                    ads_extras,
-                                    ads_info,
-                                    InformationType.ALTERNATE_DATA_STREAM,
-                                )
-                except Exception as e:
-                    self.target.log.warning("An error occured parsing MFT segment %d: %s", segment, str(e))
-                    self.target.log.debug("", exc_info=e)
+        yield from self.__iterate_ntfs_filesystems(noop_aggregator, format_timeline_info, ignore_dos=ignore_dos)
 
     @export(output="yield")
     def body(self) -> Iterator[str]:
@@ -333,149 +293,87 @@ class MftPlugin(Plugin):
         The file mode is not accurate. This value was only added to indicate
         if a record is a file or directory.
 
-        The Master File Table (MFT) contains metadata about every file and folder on a NFTS filesystem.
-
-        If the filesystem is part of a virtual NTFS filesystem (a ``VirtualFilesystem`` with the MFT properties
-        added to it through a "fake" ``NtfsFilesystem``), the paths returned in the MFT records are based on the
-        mount point of the ``VirtualFilesystem``. This ensures that the proper original drive letter is used when
-        available.
-        When no drive letter can be determined, the path will show as e.g. ``\\$fs$\\fs0``.
+        Yields:
+            Iterator[Record]: Yields NTFS bodyfile as string
 
         References:
-            - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
             - https://wiki.sleuthkit.org/index.php?title=Body_file
         """
-        for fs in self.target.filesystems:
-            if fs.__type__ != "ntfs":
-                continue
-            fs: NtfsFilesystem
-
-            info = _Info.init(self.target, fs)
-
-            for record in fs.ntfs.mft.segments():
-                # Just to make it clear when something is a file or a dir.
-                size = 0
-                file_mode = "d/drwxrwxrwx"
-                if not record.is_dir():
-                    size = get_record_size(record)
-                    file_mode = "r/rrwxrwxrwx"
-
-                try:
-                    for path in record.full_paths(False):
-                        path = f"{info.drive_letter}{path}"
-
-                        for attribute in record.attributes.STANDARD_INFORMATION:
-                            yield format_body_info(
-                                name=path,
-                                inode=record.segment,
-                                mode_as_string=file_mode,
-                                size=size,
-                                atime=int(attribute.last_access_time.timestamp()),
-                                mtime=int(attribute.last_modification_time.timestamp()),
-                                ctime=int(attribute.last_change_time.timestamp()),
-                                crtime=int(attribute.creation_time.timestamp()),
-                            )
-                except Exception as e:
-                    self.target.log.warning(
-                        "An error occured parsing the $STANDARD_INFORMATION attribute of MFT segment %d: %s",
-                        record.segment,
-                        str(e),
-                    )
-
-                try:
-                    for attribute in record.attributes.FILE_NAME:
-                        path = f"{info.drive_letter}{attribute.full_path()} ($FILE_NAME)"  # fls like output
-                        yield format_body_info(
-                            name=path,
-                            inode=record.segment,
-                            mode_as_string=file_mode,
-                            size=size,
-                            atime=int(attribute.last_access_time.timestamp()),
-                            mtime=int(attribute.last_modification_time.timestamp()),
-                            ctime=int(attribute.last_change_time.timestamp()),
-                            crtime=int(attribute.creation_time.timestamp()),
-                        )
-                except Exception as e:
-                    self.target.log.warning(
-                        "An error occured parsing the $FILE_NAME attribute of MFT segment %d: %s",
-                        record.segment,
-                        str(e),
-                    )
+        yield from self.__iterate_ntfs_filesystems(noop_aggregator, format_body_info, ignore_dos=False)
 
 
 def iter_records(
     record: MftRecord,
-    segment: int,
-    path: str,
-    owner: str,
-    size: int,
-    resident: bool,
-    inuse: bool,
-    drive_letter: str,
-    volume_uuid: str,
-    record_formatter: Callable,
+    ignore_dos: bool,
+    info: _Info,
+    formatter: Callable,
     target: Target,
 ) -> Iterator[Record]:
+    path = f"{info.drive_letter}{record.full_path(True)}"
+
     for attr in record.attributes.STANDARD_INFORMATION:
-        yield from record_formatter(
+        yield from formatter(
             attr=attr,
-            record_type=InformationType.STANDARD_INFORMATION,
-            segment=segment,
+            attr_type=InformationType.STANDARD_INFORMATION,
+            segment=record.segment,
             path=windows_path(path),
-            owner=owner,
-            filesize=size,
-            resident=resident,
-            inuse=inuse,
-            volume_uuid=volume_uuid,
+            owner=info.owner,
+            filesize=info.size,
+            resident=info.resident,
+            inuse=info.in_use,
+            volume_uuid=info.volume_uuid,
             _target=target,
         )
 
-    for idx, attr in enumerate(record.attributes.FILE_NAME):
-        filepath = f"{drive_letter}{attr.full_path()}"
+    for idx, filename_path in enumerate(record.full_paths(ignore_dos)):
+        attr = record.attributes.FILE_NAME[idx]
+        filepath = f"{info.drive_letter}{filename_path}"
 
-        yield from record_formatter(
+        yield from formatter(
             attr=attr,
-            record_type=InformationType.FILE_INFORMATION,
+            attr_type=InformationType.FILE_INFORMATION,
             filename_index=idx,
-            segment=segment,
+            segment=record.segment,
             path=windows_path(filepath),
-            owner=owner,
-            filesize=size,
-            resident=resident,
+            owner=info.owner,
+            filesize=info.size,
+            resident=info.resident,
             ads=False,
-            inuse=inuse,
-            volume_uuid=volume_uuid,
+            inuse=info.in_use,
+            volume_uuid=info.volume_uuid,
             _target=target,
         )
 
     ads_attributes = (data_attr for data_attr in record.attributes.DATA if data_attr.name != "")
-    ads_info = record.attributes.FILE_NAME[0]
+    if record.attributes.STANDARD_INFORMATION:
+        ads_info = record.attributes.STANDARD_INFORMATION[0]
+    else:
+        ads_info = record.attributes.FILE_NAME[0]
 
     for data_attr in ads_attributes:
-        resident = data_attr.resident
         size = get_record_size(record, data_attr.name)
         ads_path = f"{path}:{data_attr.name}"
 
-        yield from record_formatter(
+        yield from formatter(
             attr=ads_info,
-            record_type=InformationType.FILE_INFORMATION,
+            attr_type=InformationType.ALTERNATE_DATA_STREAM,
             filename_index=None,
-            segment=segment,
+            segment=record.segment,
             path=windows_path(ads_path),
-            owner=owner,
+            owner=info.owner,
             filesize=size,
-            resident=resident,
-            inuse=inuse,
+            resident=data_attr.resident,
+            inuse=info.in_use,
             ads=True,
-            volume_uuid=volume_uuid,
+            volume_uuid=info.volume_uuid,
             _target=target,
         )
 
 
 def compact_formatter(
-    attr: Attribute, record_type: InformationType, **kwargs
+    attr: FileName | StandardInformation, attr_type: InformationType, **kwargs
 ) -> Iterator[FilesystemStdCompactRecord | FilesystemFilenameCompactRecord]:
-    record_desc = COMPACT_RECORD_TYPES.get(record_type)
+    record_desc = COMPACT_RECORD_TYPES.get(attr_type)
     yield record_desc(
         creation_time=attr.creation_time,
         last_modification_time=attr.last_modification_time,
@@ -486,9 +384,9 @@ def compact_formatter(
 
 
 def default_formatter(
-    attr: Attribute, record_type: InformationType, **kwargs
+    attr: FileName | StandardInformation, attr_type: InformationType, **kwargs
 ) -> Iterator[FilesystemStdRecord | FilesystemFilenameRecord]:
-    record_desc = RECORD_TYPES.get(record_type)
+    record_desc = RECORD_TYPES.get(attr_type)
     for type, timestamp in [
         ("B", attr.creation_time),
         ("C", attr.last_change_time),
@@ -496,6 +394,80 @@ def default_formatter(
         ("A", attr.last_access_time),
     ]:
         yield record_desc(ts=timestamp, ts_type=type, **kwargs)
+
+
+def format_none_value(value: Any) -> str | Any:
+    """Format the value if it is ``None``."""
+
+    return value if value is not None else "No Data"
+
+
+def format_timeline_info(
+    attr: FileName | StandardInformation,
+    attr_type: InformationType,
+    info: _Info,
+    path: windows_path,
+    segment: int,
+    filesize: int,
+    inuse: bool,
+    resident: bool,
+    owner: str | None,
+    volume_uuid: str | None,
+    filename_index: str | None = None,
+    **kwargs,
+) -> Iterator[str]:
+    start_letter, postfix = FORMAT_INFO.get(attr_type, ("", ""))
+    timestamps = {
+        "B": attr.creation_time,
+        "C": attr.last_change_time,
+        "M": attr.last_modification_time,
+        "A": attr.last_access_time,
+    }
+
+    if filename_index is None:
+        filename_index = ""
+
+    info = (
+        f"InUse:{format_none_value(inuse)} "
+        f"Resident:{format_none_value(resident)} "
+        f"Owner:{format_none_value(owner)} "
+        f"Size:{format_none_value(filesize)} "
+        f"VolumeUUID:{format_none_value(volume_uuid)}"
+    )
+
+    for ts_type, ts in timestamps.items():
+        information_type = f"{start_letter}{filename_index}{ts_type}"
+        base_info = f"{ts} {information_type} {segment} {path}"
+
+        yield f"{base_info} - {info}{postfix}"
+
+
+def format_body_info(
+    attr: FileName | StandardInformation,
+    path: windows_path,
+    segment: int,
+    filesize: int,
+    **kwargs,
+) -> str:
+    # Just to make it clear when something is a file or a dir.
+    file_mode = "d/drwxrwxrwx"
+    if not attr.is_dir():
+        file_mode = "r/rrwxrwxrwx"
+
+    if isinstance(attr, FileName):
+        path = f"{path} ($FILE_NAME)"  # fls like output
+
+    md5 = md5_hash(attr.record.open(path.name))
+
+    return (
+        f"{md5}|{path}|{segment}|{file_mode}|{attr.owner_id}|{attr.security_id}|"
+        f"{filesize}|{attr.last_access_time}|{attr.last_modification_time}|"
+        f"{attr.last_change_time}|{attr.creation_time}"
+    )
+
+
+def noop_aggregator(records: Iterator[Record]) -> Iterator[Record]:
+    yield from records
 
 
 def macb_aggregator(records: Iterator[Record]) -> Iterator[Record]:
@@ -569,57 +541,3 @@ class _Info:
         self.resident = resident
         self.size = size
         self.owner = owner
-
-    def format(self) -> str:
-        return (
-            f"InUse:{format_none_value(self.in_use)} "
-            f"Resident:{format_none_value(self.resident)} "
-            f"Owner:{format_none_value(self.owner)} "
-            f"Size:{format_none_value(self.size)} "
-            f"VolumeUUID:{format_none_value(self.volume_uuid)}"
-        )
-
-
-def format_timeline_info(
-    segment: int,
-    path: str,
-    info: _Info,
-    attr: FileName | StandardInformation,
-    attr_type: InformationType,
-    idx: str = "",
-) -> Iterator[str]:
-    start_letter, postfix = FORMAT_INFO.get(attr_type, ("", ""))
-    timestamps = {
-        "B": attr.creation_time,
-        "C": attr.last_change_time,
-        "M": attr.last_modification_time,
-        "A": attr.last_access_time,
-    }
-
-    for ts_type, ts in timestamps.items():
-        information_type = f"{start_letter}{idx}{ts_type}"
-        base_info = f"{ts} {information_type} {segment} {path}"
-
-        yield f"{base_info} - {info.format()}{postfix}"
-
-
-def format_body_info(
-    md5: str = "0",
-    name: str = "0",
-    inode: int = 0,
-    mode_as_string: str = "0",
-    uid: int = 0,
-    gid: int = 0,
-    size: int = 0,
-    atime: int = 0,
-    mtime: int = 0,
-    ctime: int = 0,
-    crtime: int = 0,
-) -> str:
-    return f"{md5}|{name}|{inode}|{mode_as_string}|{uid}|{gid}|{size}|{atime}|{mtime}|{ctime}|{crtime}"
-
-
-def format_none_value(value: Any) -> str | Any:
-    """Format the value if it is ``None``."""
-
-    return value if value is not None else "No Data"

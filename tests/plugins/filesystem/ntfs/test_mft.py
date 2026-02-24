@@ -165,7 +165,7 @@ def test_volume_identifier_none_guid() -> None:
     ],
 )
 def test_mft_timeline(target_win_mft: Target, regex_pattern: str, expected_nr_of_records: int) -> None:
-    """Test whether the MFT timeline functions as inteded, same with the output."""
+    """Test whether the MFT timeline functions as intended, same with the output."""
     outputs = [entry for entry in target_win_mft.mft.timeline() if re.match(regex_pattern, entry)]
 
     # Check the MFT entries
@@ -178,12 +178,12 @@ def check_output_amount(number: int, compact_output: bool) -> int:
 
 
 def test_mft_plugin_entries(target_win_mft: Target, compact: bool) -> None:
-    mft_data = list(target_win_mft.mft(compact))
+    mft_data = list(target_win_mft.mft.records(compact=compact))
     assert len(mft_data) == check_output_amount(76, compact)
 
 
 def test_mft_plugin_macb(target_win_mft: Target) -> None:
-    mft_data = list(target_win_mft.mft(macb=True))
+    mft_data = list(target_win_mft.mft.records(macb=True))
     path = None
     ts = None
     macb = None
@@ -198,7 +198,7 @@ def test_mft_plugin_macb(target_win_mft: Target) -> None:
 
 
 def test_mft_plugin_macb_ads(target_win_mft: Target) -> None:
-    mft_data = list(target_win_mft.mft(macb=True))
+    mft_data = list(target_win_mft.mft.records(macb=True))
     ads_entries = 0
     for record in mft_data:
         if record.ads:
@@ -228,27 +228,31 @@ def test_mft_plugin_macb_nodup() -> None:
 
 def test_mft_plugin_disk_label(target_win_mft: Target) -> None:
     target_win_mft.fs.mounts = {"c:": target_win_mft.filesystems[0]}
-    for mft_entries in target_win_mft.mft():
+    for mft_entries in target_win_mft.mft.records():
         assert str(mft_entries.path).startswith("c:\\")
 
 
 def test_mft_plugin_ads(target_win_mft: Target, compact: bool) -> None:
-    mft_data = [mft_entry for mft_entry in target_win_mft.mft(compact) if hasattr(mft_entry, "ads") and mft_entry.ads]
+    mft_data = [
+        mft_entry
+        for mft_entry in target_win_mft.mft.records(compact=compact)
+        if hasattr(mft_entry, "ads") and mft_entry.ads
+    ]
     assert len(mft_data) == check_output_amount(6, compact)
 
 
 def test_mft_plugin_resident(target_win_mft: Target, compact: bool) -> None:
-    mft_data = [mft_entry for mft_entry in target_win_mft.mft(compact) if mft_entry.resident]
+    mft_data = [mft_entry for mft_entry in target_win_mft.mft.records(compact=compact) if mft_entry.resident]
     assert len(mft_data) == check_output_amount(19, compact)
 
 
 def test_mft_plugin_inuse(target_win_mft: Target, compact: bool) -> None:
-    mft_data = [mft_entry for mft_entry in target_win_mft.mft(compact) if mft_entry.inuse]
+    mft_data = [mft_entry for mft_entry in target_win_mft.mft.records(compact=compact) if mft_entry.inuse]
     assert len(mft_data) == check_output_amount(76, compact)
 
 
 def test_mft_plugin_last_entries(target_win_mft: Target) -> None:
-    mft_data = list(target_win_mft.mft())[-9:]
+    mft_data = list(target_win_mft.mft.records())[-9:]
     test_data = [
         "NamelessDirectory",
         "Food For Thought",
@@ -261,5 +265,5 @@ def test_mft_plugin_last_entries(target_win_mft: Target) -> None:
 
 
 def test_mft_plugin_owner(target_win_mft: Target) -> None:
-    for mft_entry in target_win_mft.mft():
+    for mft_entry in target_win_mft.mft.records():
         assert mft_entry.owner is None
