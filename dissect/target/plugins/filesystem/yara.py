@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 from io import BytesIO
 from pathlib import Path
-import contextlib
 
 from dissect.target.helpers import hashutil
 from dissect.target.helpers.fsutil import open_decompress
