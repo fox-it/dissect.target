@@ -217,7 +217,7 @@ COMMON_APPLICATION_FIELDS = [
     ("string", "version"),
     ("string", "author"),
     ("string", "type"),
-    ("path", "source"),
     ("command", "command"),
     ("boolean", "autostart"),
+    ("path", "source"),
 ]
