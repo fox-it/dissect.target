@@ -103,23 +103,21 @@ class NtdsPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.path = None
-
-        ntds_path = "sysvol/windows/NTDS/ntds.dit"
+        path = "sysvol/windows/NTDS/ntds.dit"
         if self.target.has_function("registry"):
             try:
                 key = self.target.registry.value(NTDS_PARAMETERS_REGISTRY_PATH, NTDS_PARAMETERS_DB_VALUE)
-                ntds_path = key.value
+                path = key.value
             except RegistryKeyNotFoundError:
                 pass
 
-        self.path = self.target.fs.path(ntds_path)
+        self.path = self.target.fs.path(path)
 
     def check_compatible(self) -> None:
         if not self.target.has_function("lsa"):
             raise UnsupportedPluginError("System Hive is not present or LSA function not available")
 
-        if self.path is None or not self.path.is_file():
+        if not self.path.is_file():
             raise UnsupportedPluginError("No NTDS.dit database found on target")
 
     @cached_property
