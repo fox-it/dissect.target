@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
     vfs = VirtualFilesystem()
     vfs.map_file_fh("test_file", BytesIO(b"hello there this is a test string!"))
@@ -56,7 +56,6 @@ def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: p
 
 @pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 @pytest.mark.parametrize("no_decompress", [False, True], ids=["decompress", "no-decompress"])
-@pytest.mark.parametrize(("")
 def test_yara_decompress(
     target_default: Target,
     monkeypatch: pytest.MonkeyPatch,
