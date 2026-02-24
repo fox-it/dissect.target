@@ -143,10 +143,10 @@ def test_volume_identifier_none_guid() -> None:
 @pytest.mark.parametrize(
     ("regex_pattern", "expected_nr_of_records"),
     [
-        (r".*", 304),
+        (r".*", 320),
         (r".+Size:(No Data)", 120),
         (r".+Is_ADS$", 24),
-        (r".+Size:\d+", 184),
+        (r".+Size:\d+", 200),
         (
             r"2021-08-04 ([+.:]?\d+)+ [SF]0?[BCMA] 43 NamelessDirectory - "
             r"In[uU]se:True Resident:No Data Owner:No Data Size:No Data VolumeUUID:No Data",
@@ -179,7 +179,7 @@ def check_output_amount(number: int, compact_output: bool) -> int:
 
 def test_mft_plugin_entries(target_win_mft: Target, compact: bool) -> None:
     mft_data = list(target_win_mft.mft.records(compact=compact))
-    assert len(mft_data) == check_output_amount(76, compact)
+    assert len(mft_data) == check_output_amount(80, compact)
 
 
 def test_mft_plugin_macb(target_win_mft: Target) -> None:
@@ -187,14 +187,16 @@ def test_mft_plugin_macb(target_win_mft: Target) -> None:
     path = None
     ts = None
     macb = None
+    segment = None
     field = "MACB/MACB"
     for record in mft_data:
-        assert record.macb != macb or record.ts != ts or record.path != path
+        assert record.segment != segment or record.macb != macb or record.ts != ts or record.path != path
         for bit in [0, 1, 2, 3, 5, 6, 7]:
             assert record.macb[bit : bit + 1] in (field[bit : bit + 1], ".")
         path = record.path
         macb = record.macb
         ts = record.ts
+        segment = record.segment
 
 
 def test_mft_plugin_macb_ads(target_win_mft: Target) -> None:
@@ -205,7 +207,7 @@ def test_mft_plugin_macb_ads(target_win_mft: Target) -> None:
             ads_entries += 1
             assert record.macb.endswith("/....")
             assert not record.macb.startswith("..../")
-    assert ads_entries == 6
+    assert ads_entries == 8
 
 
 def test_mft_plugin_macb_nodup() -> None:
@@ -243,12 +245,12 @@ def test_mft_plugin_ads(target_win_mft: Target, compact: bool) -> None:
 
 def test_mft_plugin_resident(target_win_mft: Target, compact: bool) -> None:
     mft_data = [mft_entry for mft_entry in target_win_mft.mft.records(compact=compact) if mft_entry.resident]
-    assert len(mft_data) == check_output_amount(19, compact)
+    assert len(mft_data) == check_output_amount(23, compact)
 
 
 def test_mft_plugin_inuse(target_win_mft: Target, compact: bool) -> None:
     mft_data = [mft_entry for mft_entry in target_win_mft.mft.records(compact=compact) if mft_entry.inuse]
-    assert len(mft_data) == check_output_amount(76, compact)
+    assert len(mft_data) == check_output_amount(80, compact)
 
 
 def test_mft_plugin_last_entries(target_win_mft: Target) -> None:

@@ -405,7 +405,6 @@ def format_none_value(value: Any) -> str | Any:
 def format_timeline_info(
     attr: FileName | StandardInformation,
     attr_type: InformationType,
-    info: _Info,
     path: windows_path,
     segment: int,
     filesize: int,
