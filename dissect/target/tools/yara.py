@@ -29,9 +29,9 @@ def main() -> int:
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
 
-    yara_parser = parser.add_argument_group("YARA plugin options")
+    plugin_parser = parser.add_argument_group("YARA plugin options")
     for args, kwargs in getattr(YaraPlugin.yara, "__args__", []):
-        yara_parser.add_argument(*args, **kwargs)
+        plugin_parser.add_argument(*args, **kwargs)
 
     configure_generic_arguments(parser)
 
