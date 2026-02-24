@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
-    from dissect.target.plugins.os.windows.credential.sam import SamRecord
+    from dissect.target.plugins.os.windows.sam import SamRecord
     from dissect.target.target import Target
 
 ARCH_MAP = {

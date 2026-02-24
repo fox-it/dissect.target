@@ -50,8 +50,9 @@ class MessagesPlugin(Plugin):
         log_dirs = ["/var/log/", "/var/log/installer/"]
         file_globs = ["syslog*", "messages*", "cloud-init.log*"]
         for log_dir in log_dirs:
+            base = self.target.fs.path(log_dir)
             for glob in file_globs:
-                yield from self.target.fs.path(log_dir).glob(glob)
+                yield from (p for p in base.glob(glob) if p.is_file())
 
     def check_compatible(self) -> None:
         if not self.log_files:

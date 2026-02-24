@@ -70,10 +70,14 @@ class FirefoxPlugin(BrowserPlugin):
         # Windows
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
-        # Linux
+        # Linux (146 and before)
         ".mozilla/firefox",
         "snap/firefox/common/.mozilla/firefox",
         ".var/app/org.mozilla.firefox/.mozilla/firefox",
+        # Linux (147 and newer) uses XDG_CONFIG_HOME by default
+        ".config/mozilla/firefox",
+        "snap/firefox/common/.config/mozilla/firefox",
+        ".var/app/org.mozilla.firefox/.config/mozilla/firefox",
         # macOS
         "Library/Application Support/Firefox",
     )

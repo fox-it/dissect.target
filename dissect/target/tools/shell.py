@@ -59,8 +59,6 @@ from dissect.target.tools.utils.fs import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-    from dissect.target.filesystem import FilesystemEntry
-
 
 log = get_logger(__name__)
 logging.lastResort = None
@@ -691,9 +689,16 @@ class TargetCli(TargetCmd):
 
     def check_file(self, path: str) -> fsutil.TargetPath | None:
         path = self.resolve_path(path)
+
         if not path.exists():
             print(f"{path}: No such file")
             return None
+
+        # Check a special case where a path can be both a file and directory (e.g. NTDS.dit)
+        # We need to check this on the entry, as the path methods can't detect this because of how stat.S_IS* works
+        entry = path.get()
+        if entry.is_file() and entry.is_dir():
+            return path
 
         if path.is_dir():
             print(f"{path}: Is a directory")
@@ -799,17 +804,19 @@ class TargetCli(TargetCmd):
             print("can't specify -c and -u at the same time")
             return False
 
-        if not path or not self.check_dir(path):
+        if not path:
             return False
 
-        if path.is_file():
-            print(args.path)  # mimic ls behaviour
+        if not path.exists():
+            print(f"ls: cannot access {path}: No such file or directory")
             return False
 
         # Disable color if output is redirected to a file
         use_color = False
         if hasattr(stdout, "isatty") and stdout.isatty():
             use_color = True
+        if os.getenv("NO_COLOR") in ["1", "True", "true"]:
+            use_color = False
 
         print_ls(
             path,
@@ -930,21 +937,22 @@ class TargetCli(TargetCmd):
     @arg("path")
     def cmd_file(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """determine file type"""
-
-        path = self.check_file(args.path)
-        if not path:
+        if not (path := self.check_file(args.path)):
             return False
 
-        fh = path.open()
-
-        # We could just alias this to cat <path> | file -, but this is slow for large files
-        # This way we can explicitly limit to just 512 bytes
         p = subprocess.Popen(["file", "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        p.stdin.write(fh.read(512))
+
+        with path.open() as fh:
+            # We could just alias this to cat <path> | file -, but this is slow for large files
+            # This way we can explicitly limit to just 512 bytes
+            p.stdin.write(fh.read(512))
+
         p.stdin.close()
         p.wait()
+
         filetype = p.stdout.read().decode().split(":", 1)[1].strip()
         print(f"{path}: {filetype}", file=stdout)
+
         return False
 
     @arg("path", nargs="+")
@@ -1094,12 +1102,11 @@ class TargetCli(TargetCmd):
 
         stdout = stdout.buffer
         for path in paths:
-            path = self.check_file(path)
-            if not path:
+            if not (path := self.check_file(path)):
                 continue
 
-            fh = path.open()
-            shutil.copyfileobj(fh, stdout)
+            with path.open() as fh:
+                shutil.copyfileobj(fh, stdout)
             stdout.flush()
         print()
         return False
@@ -1115,12 +1122,11 @@ class TargetCli(TargetCmd):
 
         stdout = stdout.buffer
         for path in paths:
-            path = self.check_file(path)
-            if not path:
+            if not (path := self.check_file(path)):
                 continue
 
-            fh = fsutil.open_decompress(path)
-            shutil.copyfileobj(fh, stdout)
+            with fsutil.open_decompress(path) as fh:
+                shutil.copyfileobj(fh, stdout)
             stdout.flush()
 
         return False
@@ -1157,12 +1163,42 @@ class TargetCli(TargetCmd):
     @alias("shasum")
     def cmd_hash(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """print the MD5, SHA1 and SHA256 hashes of a file"""
-        path = self.check_file(args.path)
-        if not path:
+        if not (path := self.check_file(args.path)):
             return False
 
         md5, sha1, sha256 = path.get().hash()
         print(f"MD5:\t{md5}\nSHA1:\t{sha1}\nSHA256:\t{sha256}", file=stdout)
+
+        return False
+
+    @arg("path")
+    def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the MD5 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (md5,) = path.get().hash(["md5"])
+        print(f"{md5}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the SHA1 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (sha1,) = path.get().hash(["sha1"])
+        print(f"{sha1}  {path!s}", file=stdout)
+        return False
+
+    @arg("path")
+    def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """print the SHA256 checksum of a file provided by a path"""
+        if not (path := self.check_file(args.path)):
+            return False
+
+        (sha256,) = path.get().hash(["sha256"])
+        print(f"{sha256}  {path!s}", file=stdout)
         return False
 
     @arg("path")
@@ -1170,11 +1206,12 @@ class TargetCli(TargetCmd):
     @alias("more")
     def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """open the first 10 MB of a file with less"""
-        path = self.check_file(args.path)
-        if not path:
+        if not (path := self.check_file(args.path)):
             return False
 
-        pydoc.pager(path.open("rt", errors="ignore").read(10 * 1024 * 1024))
+        with path.open("rt", errors="ignore") as fh:
+            pydoc.pager(fh.read(10 * 1024 * 1024))
+
         return False
 
     @arg("path")
@@ -1182,11 +1219,12 @@ class TargetCli(TargetCmd):
     @alias("zmore")
     def cmd_zless(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """open the first 10 MB of a compressed file with zless"""
-        path = self.check_file(args.path)
-        if not path:
+        if not (path := self.check_file(args.path)):
             return False
 
-        pydoc.pager(fsutil.open_decompress(path, "rt").read(10 * 1024 * 1024))
+        with fsutil.open_decompress(path, "rt") as fh:
+            pydoc.pager(fh.read(10 * 1024 * 1024))
+
         return False
 
     @arg("path", nargs="+")
@@ -1204,16 +1242,11 @@ class TargetCli(TargetCmd):
     @arg("path", nargs="?", help="load a hive from the given path")
     def cmd_registry(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """drop into a registry shell"""
-        if self.target.os == "linux":
-            run_cli(UnixConfigTreeCli(self.target))
-            return False
-
         hive = None
 
         clikey = "registry"
         if args.path:
-            path = self.check_file(args.path)
-            if not path:
+            if not (path := self.check_file(args.path)):
                 return False
 
             hive = regutil.RegfHive(path)
@@ -1249,6 +1282,7 @@ class TargetCli(TargetCmd):
             cli = self._clicache[clikey]
         except KeyError:
             targets = list(Target.open_all(paths))
+
             cli = create_cli(targets, RegistryCli if args.registry else TargetCli)
             if not cli:
                 return False
@@ -1258,53 +1292,6 @@ class TargetCli(TargetCmd):
         run_cli(cli)
         print()
         return False
-
-
-class UnixConfigTreeCli(TargetCli):
-    def __init__(self, target: Target):
-        TargetCmd.__init__(self, target)
-        self.config_tree = target.etc()
-        self.prompt_base = _target_name(target)
-
-        self.cwd = None
-        self.chdir("/")
-
-    @property
-    def prompt(self) -> str:
-        return f"(config tree) {self.prompt_base}:{self.cwd}$ "
-
-    def check_compatible(target: Target) -> bool:
-        return target.has_function("etc")
-
-    def resolve_path(self, path: str | fsutil.TargetPath | None) -> fsutil.TargetPath:
-        if not path:
-            return self.cwd
-
-        if isinstance(path, fsutil.TargetPath):
-            return path
-
-        # It uses the alt separator of the underlying fs
-        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
-        return self.config_tree.path(path)
-
-    def resolve_key(self, path: str) -> FilesystemEntry:
-        return self.config_tree.path(path).get()
-
-    def resolve_glob_path(self, path: fsutil.TargetPath) -> Iterator[fsutil.TargetPath]:
-        path = self.resolve_path(path)
-        if path.exists():
-            yield path
-        else:
-            # Strip the leading '/' as non-relative patterns are unsupported as glob patterns.
-            glob_path = str(path).lstrip("/")
-            try:
-                for path in self.config_tree.path("/").glob(glob_path):
-                    yield path
-            except ValueError as e:
-                # The generator returned by glob() will raise a
-                # ValueError if the '**' glob is not used as an entire path
-                # component
-                print(e)
 
 
 class RegistryCli(TargetCmd):
@@ -1482,7 +1469,6 @@ def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Ite
     On context exit the generator will close the input stream and wait for
     the subprocessess to finish.
     """
-
     if not pipe_parts:
         raise ValueError("No pipe components provided")
 
