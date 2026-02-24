@@ -113,7 +113,7 @@ class YaraPlugin(Plugin):
                             fhandles.append(fh_decompress)
 
                     for fh in fhandles:
-                        buf = fh.read()
+                        buf = fh.read(max_size)
                         fh.seek(0)  # ensure that the original file handle is reset for compressed reads
                         for match in compiled_rules.match(data=buf):
                             string_matches: list[str] = []
