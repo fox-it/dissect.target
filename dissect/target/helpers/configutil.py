@@ -938,8 +938,7 @@ class _NixTokenizer:
     """Character-by-character tokenizer for Nix configuration files.
 
     Produces a stream of tokens from ``.nix`` file text, handling string literals,
-    multiline strings (``'' ... ''``), line comments (``#``), and block comments
-    (``/* ... */``).
+    multiline strings (``'' ... ''``), and line comments (``#``).
     """
 
     def __init__(self, text: str) -> None:
@@ -963,13 +962,6 @@ class _NixTokenizer:
                 self._pos += 1
             elif ch == "#":
                 while self._pos < self._length and self._text[self._pos] != "\n":
-                    self._pos += 1
-            elif ch == "/" and self._peek(1) == "*":
-                self._pos += 2
-                while self._pos < self._length:
-                    if self._text[self._pos] == "*" and self._peek(1) == "/":
-                        self._pos += 2
-                        break
                     self._pos += 1
             else:
                 break
@@ -1006,32 +998,12 @@ class _NixTokenizer:
         self._pos += 2  # consume opening ''
         parts = []
         while self._pos < self._length:
-            ch = self._text[self._pos]
-            if ch == "'" and self._peek(1) == "'":
-                # Check for escape: ''' means literal ''
-                if self._peek(2) == "'":
-                    parts.append("''")
-                    self._pos += 3
-                else:
-                    self._pos += 2  # consume closing ''
-                    break
-            elif ch == "'" and self._peek(1) == "\\":
-                # ''\ escape sequences
-                self._pos += 2
-                if self._pos < self._length:
-                    escaped = self._text[self._pos]
-                    if escaped == "n":
-                        parts.append("\n")
-                    elif escaped == "t":
-                        parts.append("\t")
-                    else:
-                        parts.append(escaped)
-                    self._pos += 1
-            else:
-                parts.append(ch)
-                self._pos += 1
-        content = "".join(parts)
-        return textwrap.dedent(content)
+            if self._text[self._pos] == "'" and self._peek(1) == "'":
+                self._pos += 2  # consume closing ''
+                break
+            parts.append(self._text[self._pos])
+            self._pos += 1
+        return "".join(parts).strip()
 
     def _read_identifier(self) -> str:
         """Read a bare identifier: alphanumeric, ``_``, or ``-``."""
@@ -1042,16 +1014,6 @@ class _NixTokenizer:
                 self._pos += 1
             else:
                 break
-        return self._text[start : self._pos]
-
-    def _read_path(self) -> str:
-        """Read a path literal starting with ``./`` or ``/``."""
-        start = self._pos
-        while self._pos < self._length:
-            ch = self._text[self._pos]
-            if ch in (" ", "\t", "\n", "\r", ";", "]", "}"):
-                break
-            self._pos += 1
         return self._text[start : self._pos]
 
     def tokenize(self) -> list[_NixToken]:
@@ -1086,15 +1048,8 @@ class _NixTokenizer:
                 tokens.append(_NixToken(_NixTokenType.COLON, ":"))
                 self._advance()
             elif ch == ".":
-                if self._peek(1) == "/":
-                    # Path literal: ./foo/bar
-                    tokens.append(_NixToken(_NixTokenType.STRING, self._read_path()))
-                else:
-                    tokens.append(_NixToken(_NixTokenType.DOT, "."))
-                    self._advance()
-            elif ch == "/":
-                # Absolute path literal
-                tokens.append(_NixToken(_NixTokenType.STRING, self._read_path()))
+                tokens.append(_NixToken(_NixTokenType.DOT, "."))
+                self._advance()
             elif ch == '"':
                 tokens.append(_NixToken(_NixTokenType.STRING, self._read_string()))
             elif ch == "'" and self._peek(1) == "'":
@@ -1142,9 +1097,8 @@ class _NixParser:
         return token
 
     def parse(self) -> dict:
-        """Entry point. Handles optional function header, optional let-in, then parses body."""
+        """Entry point. Handles optional function header then parses body."""
         self._skip_function_header()
-        self._skip_let_in()
         if self._peek().type == _NixTokenType.LBRACE:
             return self._parse_attr_set()
         return {}
@@ -1171,26 +1125,6 @@ class _NixParser:
                         self._pos = scan_pos + 2  # skip past }:
                     return
             scan_pos += 1
-
-    def _skip_let_in(self) -> None:
-        """Skip ``let ... in`` binding blocks."""
-        while self._peek().type == _NixTokenType.IDENT and self._peek().value == "let":
-            self._advance()  # consume "let"
-            # Skip until we find "in" at the same depth
-            depth = 0
-            while self._pos < len(self._tokens):
-                t = self._peek()
-                if t.type == _NixTokenType.LBRACE:
-                    depth += 1
-                    self._advance()
-                elif t.type == _NixTokenType.RBRACE:
-                    depth -= 1
-                    self._advance()
-                elif t.type == _NixTokenType.IDENT and t.value == "in" and depth == 0:
-                    self._advance()  # consume "in"
-                    break
-                else:
-                    self._advance()
 
     def _parse_attr_set(self) -> dict:
         """Parse ``{ key = value; ... }`` into a dict."""
@@ -1264,8 +1198,6 @@ class _NixParser:
                 return True
             if value == "false":
                 return False
-            if value == "null":
-                return None
             try:
                 return int(value)
             except ValueError:
@@ -1299,22 +1231,10 @@ class _NixParser:
         return result
 
     def _unwrap_lib_call(self) -> str | int | bool | dict | list:
-        """Unwrap ``lib.mkForce value``, ``lib.mkDefault value``, ``lib.mkOverride N value``."""
+        """Unwrap ``lib.mkForce value`` and ``lib.mkDefault value``."""
         self._advance()  # consume "lib"
         self._advance()  # consume DOT
-        func_name = self._advance().value  # e.g., "mkForce", "mkDefault", "mkOverride", "mkIf"
-
-        if func_name == "mkOverride":
-            # lib.mkOverride <priority> <value> — skip priority, return value
-            self._parse_value()  # consume and discard priority
-            return self._parse_value()
-
-        if func_name == "mkIf":
-            # lib.mkIf <condition> <value> — skip condition, return value
-            self._parse_value()  # consume and discard condition
-            return self._parse_value()
-
-        # lib.mkForce / lib.mkDefault / others — next token is the value
+        self._advance()  # consume function name (mkForce, mkDefault, etc.)
         return self._parse_value()
 
     def _merge_dotted_key(self, target: dict, parts: list[str], value: ...) -> None:
@@ -1343,18 +1263,7 @@ class Nix(ConfigurationParser):
 
     Handles the subset of Nix used in declarative NixOS configurations:
     function headers, attribute sets (with dotted paths), lists, strings,
-    multiline strings, booleans, integers, and ``lib.mkForce``/``lib.mkDefault``
-    wrappers.
-
-    Examples:
-
-        .. code-block::
-
-            >>> nix_data = '{ ... }: { networking.hostName = "test"; }'
-            >>> parser = Nix()
-            >>> parser.read_file(io.StringIO(nix_data))
-            >>> parser.parsed_data
-            {"networking": {"hostName": "test"}}
+    booleans, integers, and ``lib.mkForce``/``lib.mkDefault`` wrappers.
     """
 
     def parse_file(self, fh: TextIO) -> None:
