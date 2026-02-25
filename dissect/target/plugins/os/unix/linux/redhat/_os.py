@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 
 if TYPE_CHECKING:
@@ -28,4 +29,13 @@ class RedHatPlugin(LinuxPlugin):
             for path in REDHAT_PATHS:
                 if fs.exists(path):
                     return fs
+        return None
+
+    @export(property=True)
+    def architecture(self) -> str | None:
+        """Return architecture this RHEL distribution runs on."""
+
+        for path in ["/usr/bin/coreutils", "/bin/sh", "/bin/bash"]:
+            if (bin := self.target.fs.path(path)).exists():
+                return self._get_architecture(path=bin)
         return None
