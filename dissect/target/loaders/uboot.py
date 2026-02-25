@@ -193,9 +193,9 @@ class UBootLoader(ScrapeLoader):
         if path.stat().st_size not in [mb * 1024 * 1024 for mb in (8, 16, 32, 64, 128, 256, 512)]:
             return False
 
-        # Assume that a firmware image will contain U-Boot image magic bytes somewhere in the first 8 MiB of the file
+        # Assume that a firmware image will contain U-Boot image magic bytes somewhere in the first 1 MiB of the file
         with path.open("rb") as fh:
-            buf = fh.read(8 * 1024 * 1024)
+            buf = fh.read(1 * 1024 * 1024)
 
         return any(needle in buf for needle in [IH_MAGIC_BYTES, b"U-Boot"])
 
