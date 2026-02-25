@@ -137,12 +137,12 @@ def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyP
     subfile_name = "subfile"
     subpath_mismatch = "mismatch"
 
-    def dummy_scandir(path: TargetPath) -> list[tuple[TargetPath | None, str]]:
+    def dummy_scandir(path: TargetPath) -> list[fs.ScanDirEntry]:
         assert str(path) == base_path
         return [
-            (mock_subfolder, subfolder_name),
-            (mock_subfile, subfile_name),
-            (None, subpath_mismatch),
+            fs.ScanDirEntry(mock_subfolder, subfolder_name),
+            fs.ScanDirEntry(mock_subfile, subfile_name),
+            fs.ScanDirEntry(None, subpath_mismatch),
         ]
 
     monkeypatch.setattr("dissect.target.tools.shell.ls_scandir", dummy_scandir)

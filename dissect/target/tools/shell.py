@@ -652,12 +652,12 @@ class TargetCli(TargetCmd):
         textlower = text.lower()
 
         suggestions = []
-        for fpath, fname in ls_scandir(path):
-            if not fname.lower().startswith(textlower):
+        for entry in ls_scandir(path):
+            if not entry.name.lower().startswith(textlower):
                 continue
 
             # Add a trailing slash to directories, to allow for easier traversal of the filesystem
-            suggestion = f"{fname}/" if fpath.is_dir() else fname
+            suggestion = f"{entry.name}/" if entry.path.is_dir() else entry.name
             suggestions.append(suggestion)
         return suggestions
 

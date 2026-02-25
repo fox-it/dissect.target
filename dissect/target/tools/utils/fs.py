@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import stat
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING, NamedTuple, TextIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
@@ -13,6 +13,14 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from dissect.target.helpers.fsutil import TargetPath
+
+
+class ScanDirEntry(NamedTuple):
+    path: TargetPath
+    name: str
+    entry: FilesystemEntry | None = None
+    lstat: fsutil.stat_result | None = None
+
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
 STAT_TEMPLATE = """  File: {path} {symlink}
@@ -106,7 +114,7 @@ def print_extensive_file_stat_listing(
     print(f"??????????    ?    ?{regular_spaces}?{hr_spaces}????-??-??T??:??:??.??????+??:?? {name}", file=stdout)
 
 
-def ls_scandir(path: fsutil.TargetPath, color: bool = False) -> list[tuple[fsutil.TargetPath, str]]:
+def ls_scandir(path: fsutil.TargetPath, *, color: bool = False) -> list[ScanDirEntry]:
     """List a directory for the given path."""
     result = []
     if not path.exists() or not path.is_dir():
@@ -122,7 +130,14 @@ def ls_scandir(path: fsutil.TargetPath, color: bool = False) -> list[tuple[fsuti
             elif file_.is_file():
                 file_type = "fi"
 
-        result.append((file_, fmt_ls_colors(file_type, file_.name) if color else file_.name))
+        result.append(
+            ScanDirEntry(
+                file_,
+                fmt_ls_colors(file_type, file_.name) if color else file_.name,
+                file_.get(),
+                file_.lstat(),
+            )
+        )
 
         # If we happen to scan an NTFS filesystem see if any of the
         # entries has an alternative data stream and also list them.
@@ -132,9 +147,16 @@ def ls_scandir(path: fsutil.TargetPath, color: bool = False) -> list[tuple[fsuti
             for data_stream in attrs.DATA:
                 if data_stream.name != "":
                     name = f"{file_.name}:{data_stream.name}"
-                    result.append((file_, fmt_ls_colors(file_type, name) if color else name))
+                    result.append(
+                        ScanDirEntry(
+                            file_,
+                            fmt_ls_colors(file_type, name) if color else name,
+                            file_.get(),
+                            file_.lstat(),
+                        )
+                    )
 
-    result.sort(key=lambda e: e[0].name)
+    result.sort(key=lambda e: e.name)
 
     return result
 
@@ -157,57 +179,52 @@ def print_ls(
     subdirs = []
 
     if path.is_dir():
-        contents = ls_scandir(path, color)
-    elif path.is_file():
-        contents = [(path, path.name)]
+        contents = ls_scandir(path, color=color)
+    else:
+        contents = [ScanDirEntry(path, path.name, path.get(), path.lstat())]
 
     if sort_by_time:
 
-        def sort_key(e: tuple[fsutil.TargetPath, str]) -> tuple[float, str]:
-            target_path, name = e
+        def sort_key(e: ScanDirEntry) -> tuple[float, str]:
             try:
-                entry = target_path.get()
-                entry_stat = entry.lstat()
+                show_time = e.lstat.st_mtime
                 if use_ctime:
-                    show_time = entry_stat.st_ctime
+                    show_time = e.lstat.st_ctime
                 elif use_atime:
-                    show_time = entry_stat.st_atime
-                else:
-                    show_time = entry_stat.st_mtime
+                    show_time = e.lstat.st_atime
             except FileNotFoundError:
                 show_time = 0
-            return show_time, name
+            return show_time, e.name
 
-        contents.sort(key=sort_key, reverse=not reverse_sort)
-    elif reverse_sort:
+        contents.sort(key=sort_key, reverse=True)
+
+    if reverse_sort:
         contents.reverse()
 
     if depth > 0:
         print(f"\n{path!s}:", file=stdout)
 
     if not long_listing:
-        for target_path, name in contents:
-            print(name, file=stdout)
-            if not target_path.is_symlink() and target_path.is_dir():
-                subdirs.append(target_path)
+        for entry in contents:
+            print(entry.name, file=stdout)
+            if not entry.path.is_symlink() and entry.path.is_dir():
+                subdirs.append(entry.path)
     else:
         if len(contents) > 1:
             print(f"total {len(contents)}", file=stdout)
-        for target_path, name in contents:
+        for entry in contents:
             try:
-                entry = target_path.get()
-                entry_stat = entry.lstat()
-                show_time = entry_stat.st_mtime
+                show_time = entry.lstat.st_mtime
                 if use_ctime:
-                    show_time = entry_stat.st_ctime
+                    show_time = entry.lstat.st_ctime
                 elif use_atime:
-                    show_time = entry_stat.st_atime
+                    show_time = entry.lstat.st_atime
             except FileNotFoundError:
                 entry = None
                 show_time = None
-            print_extensive_file_stat_listing(stdout, name, entry, show_time, human_readable)
-            if target_path.is_dir():
-                subdirs.append(target_path)
+            print_extensive_file_stat_listing(stdout, entry.name, entry.entry, show_time, human_readable)
+            if entry.path.is_dir():
+                subdirs.append(entry.path)
 
     if recursive and subdirs:
         for subdir in subdirs:
