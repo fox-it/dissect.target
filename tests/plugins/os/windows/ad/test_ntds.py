@@ -101,7 +101,7 @@ def test_secretsdump(target_win_ntds: Target) -> None:
     """Tests if ``ad.secretsdump`` outputs the correct credentials in secretsdump format"""
     results = list(target_win_ntds.ad.secretsdump())
 
-    assert len(results) == 82  # 34 hashes and 38 Kerberos keys
+    assert len(results) == 82  # 34 hashes and 48 Kerberos keys
     assert (
         results[0]
         == "Administrator:500:aad3b435b51404eeaad3b435b51404ee:c66d72021a2d4744409969a581a1705e::: (pwdLastSet=2025-12-18 17:11:45.510290+00:00) (status=Enabled)"  # noqa: E501
