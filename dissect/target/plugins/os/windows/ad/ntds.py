@@ -192,8 +192,8 @@ class NtdsPlugin(Plugin):
                 username = obj.sam_account_name
 
             rid = obj.rid
-            lm_hash = des_decrypt(lm_pwd, obj.rid).hex() if (lm_pwd := obj.get("dBCSPwd")) else DEFAULT_LM_HASH
-            nt_hash = des_decrypt(nt_pwd, obj.rid).hex() if (nt_pwd := obj.get("unicodePwd")) else DEFAULT_NT_HASH
+            lm_hash = des_decrypt(lm_pwd, rid).hex() if (lm_pwd := obj.get("dBCSPwd")) else DEFAULT_LM_HASH
+            nt_hash = des_decrypt(nt_pwd, rid).hex() if (nt_pwd := obj.get("unicodePwd")) else DEFAULT_NT_HASH
             pwd_last_set = obj.get("pwdLastSet")
             user_account_status = (
                 "Disabled" if UserAccountControl.ACCOUNTDISABLE in obj.user_account_control else "Enabled"
@@ -201,9 +201,12 @@ class NtdsPlugin(Plugin):
 
             yield f"{username}:{rid}:{lm_hash}:{nt_hash}::: (pwdLastSet={pwd_last_set}) (status={user_account_status})"
 
-            # Password history output doesn't match what secretsdump.py outputs, but that's because they dump it wrong
-            lm_history = [des_decrypt(lm, obj.rid).hex() for lm in obj.get("lmPwdHistory")]
-            nt_history = [des_decrypt(nt, obj.rid).hex() for nt in obj.get("ntPwdHistory")]
+            # Password history output doesn't match what secretsdump.py outputs, but that's because they parse it wrong.
+            # Their crypto is flawed and assumes the LM history is always RC4 encrypted. That's not the case,
+            # it's just another encrypted blob that has an USHORT AlgoritmId determining the encryption type.
+            # Our decryption is handled transparently by the NTDS implementation, so we don't have to worry about it.
+            lm_history = [des_decrypt(lm, rid).hex() for lm in obj.get("lmPwdHistory")]
+            nt_history = [des_decrypt(nt, rid).hex() for nt in obj.get("ntPwdHistory")]
             for i, (lm_hist, nt_hist) in enumerate(zip_longest(lm_history, nt_history, fillvalue="")):
                 yield f"{username}_history{i}:{rid}:{lm_hist}:{nt_hist}:::"
 
