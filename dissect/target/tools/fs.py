@@ -38,15 +38,17 @@ def ls(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     use_colors = sys.stdout.buffer.isatty()
 
     print_ls(
-        path,
-        0,
-        sys.stdout,
-        args.l,
-        args.human_readable,
-        args.recursive,
-        args.use_ctime,
-        args.use_atime,
-        use_colors,
+        path=path,
+        depth=0,
+        stdout=sys.stdout,
+        long_listing=args.l,
+        human_readable=args.human_readable,
+        recursive=args.recursive,
+        use_ctime=args.use_ctime,
+        use_atime=args.use_atime,
+        sort_by_time=args.sort_by_time,
+        reverse_sort=args.reverse_sort,
+        color=use_colors,
     )
 
 
@@ -124,6 +126,8 @@ def main() -> int:
         "-c", action="store_true", dest="use_ctime", help="show time when file status was last changed"
     )
     parser_ls.add_argument("-u", action="store_true", dest="use_atime", help="show time of last access")
+    parser_ls.add_argument("-t", action="store_true", dest="sort_by_time", help="sort by time (newest first)")
+    parser_ls.add_argument("-r", action="store_true", dest="reverse_sort", help="reverse the sort order")
     parser_ls.set_defaults(handler=ls)
 
     parser_cat = subparsers.add_parser("cat", help="dump file contents", parents=[baseparser])

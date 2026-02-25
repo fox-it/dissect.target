@@ -140,6 +140,7 @@ def ls_scandir(path: fsutil.TargetPath, color: bool = False) -> list[tuple[fsuti
 
 
 def print_ls(
+    *,
     path: fsutil.TargetPath,
     depth: int,
     stdout: TextIO,
@@ -148,6 +149,8 @@ def print_ls(
     recursive: bool = False,
     use_ctime: bool = False,
     use_atime: bool = False,
+    sort_by_time: bool = False,
+    reverse_sort: bool = False,
     color: bool = True,
 ) -> None:
     """Print ls output."""
@@ -157,6 +160,27 @@ def print_ls(
         contents = ls_scandir(path, color)
     elif path.is_file():
         contents = [(path, path.name)]
+
+    if sort_by_time:
+
+        def sort_key(e: tuple[fsutil.TargetPath, str]) -> tuple[float, str]:
+            target_path, name = e
+            try:
+                entry = target_path.get()
+                entry_stat = entry.lstat()
+                if use_ctime:
+                    show_time = entry_stat.st_ctime
+                elif use_atime:
+                    show_time = entry_stat.st_atime
+                else:
+                    show_time = entry_stat.st_mtime
+            except FileNotFoundError:
+                show_time = 0
+            return show_time, name
+
+        contents.sort(key=sort_key, reverse=not reverse_sort)
+    elif reverse_sort:
+        contents.reverse()
 
     if depth > 0:
         print(f"\n{path!s}:", file=stdout)
@@ -187,7 +211,19 @@ def print_ls(
 
     if recursive and subdirs:
         for subdir in subdirs:
-            print_ls(subdir, depth + 1, stdout, long_listing, human_readable, recursive, use_ctime, use_atime, color)
+            print_ls(
+                path=subdir,
+                depth=depth + 1,
+                stdout=stdout,
+                long_listing=long_listing,
+                human_readable=human_readable,
+                recursive=recursive,
+                use_ctime=use_ctime,
+                use_atime=use_atime,
+                reverse_sort=reverse_sort,
+                sort_by_time=sort_by_time,
+                color=color,
+            )
 
 
 def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = False) -> None:
