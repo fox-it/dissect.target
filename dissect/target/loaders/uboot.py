@@ -190,7 +190,7 @@ class UBootLoader(ScrapeLoader):
 
         # Assume that firmware images are always nice round sizes, and not too large
         # (This is a very arbitrary list)
-        if path.stat().st_size not in [mb * 1024 * 1024 for mb in (8, 16, 32, 64, 128, 256, 512)]:
+        if path.stat().st_size not in [mb * 1024 * 1024 for mb in (1, 2, 4, 8, 16, 32, 64, 128, 256, 512)]:
             return False
 
         # Assume that a firmware image will contain U-Boot image magic bytes somewhere in the first 1 MiB of the file
