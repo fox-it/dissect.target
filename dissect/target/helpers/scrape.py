@@ -60,7 +60,7 @@ def find_needles(
             expected_offset = offset
             offset = fh.tell()
 
-            # Reset the overlap length if the consumer seeked more than the overlap length forward
+            # Reset the overlap length if the consumer seeked more than the overlap length away
             if abs(offset - expected_offset) > overlap_len:
                 overlap_len = 0
 
