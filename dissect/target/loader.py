@@ -278,12 +278,12 @@ register("overlay2", "Overlay2Loader")
 register("overlay", "OverlayLoader")
 register("uac", "UacLoader")
 register("vmsupport", "VmSupportLoader")
-register("scrape", "ScrapeLoader")
 register("uboot", "UBootLoader")
 # tar and zip loaders should be low priority to give other loaders a chance first
 register("tar", "TarLoader")
 register("zip", "ZipLoader")
 # These are URI based loaders, so just put them low down the list since they don't do any detection anyway
+register("scrape", "ScrapeLoader")
 register("smb", "SmbLoader")
 register("cb", "CbLoader")
 register("cyber", "CyberLoader")
