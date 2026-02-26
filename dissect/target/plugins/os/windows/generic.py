@@ -45,14 +45,6 @@ KnownDllRecord = UserRegistryRecordDescriptor(
     ],
 )
 
-SessionManagerRecord = UserRegistryRecordDescriptor(
-    "filesystem/registry/sessionmanager",
-    [
-        ("datetime", "ts"),
-        ("path", "path"),
-    ],
-)
-
 NullSessionPipeRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/nullsessionpipes",
     [
@@ -295,58 +287,6 @@ class GenericPlugin(Plugin):
                     )
         except RegistryError:
             pass
-
-    @export(record=SessionManagerRecord)
-    def sessionmanager(self) -> Iterator[SessionManagerRecord]:
-        """Return interesting Session Manager (Smss.exe) registry key entries.
-
-        Session Manager (Smss.exe) is the first user-mode process started by the kernel and performs several tasks,
-        such as creating environment variables, starts the Windows Logon Manager (winlogon.exe), etc. The BootExecute
-        registry key holds the Windows tasks that cannot be performed when Windows is running, the Execute registry key
-        should never be populated when Windows is installed. Can be leveraged as persistence mechanisms.
-
-        References:
-            - https://en.wikipedia.org/wiki/Session_Manager_Subsystem
-            - https://www.microsoftpressstore.com/articles/article.aspx?p=2762082&seqNum=2
-        """
-        keys = [
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager", "BootExecute"),
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager", "Execute"),
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\SubSystems", "windows"),
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\WOW", "cmdline"),
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\WOW", "wowcmdline"),
-        ]
-
-        for key, name in keys:
-            for r in self.target.registry.keys(key):
-                try:
-                    value = r.value(name)
-                    data = value.value
-                except RegistryError:
-                    continue
-
-                user = self.target.registry.get_user(r)
-
-                if isinstance(data, list):
-                    for d in data:
-                        if d == "autocheck autochk *":
-                            continue
-
-                        yield SessionManagerRecord(
-                            ts=r.ts,
-                            path=self.target.fs.path(d),
-                            _target=self.target,
-                            _user=user,
-                            _key=r,
-                        )
-                else:
-                    yield SessionManagerRecord(
-                        ts=r.ts,
-                        path=self.target.fs.path(data.split(" ")[0]),
-                        _target=self.target,
-                        _user=user,
-                        _key=r,
-                    )
 
     @export(record=NullSessionPipeRecord)
     def nullsessionpipes(self) -> Iterator[NullSessionPipeRecord]:
