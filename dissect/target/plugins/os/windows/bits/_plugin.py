@@ -58,7 +58,7 @@ FILE_LIST_STORAGE_GUID = b"\x36\xda\x56\x77\x6f\x51\x5a\x43\xac\xac\x44\xa2\x48\
 
 
 class BitsPlugin(Plugin):
-    """Windows Bits (Background Intelligent Transfer Service) plugin. Only support post Win 10 format"""
+    """Windows Bits (Background Intelligent Transfer Service) plugin. Only support post Windows 10 format."""
 
     def __init__(self, target: Target):
         super().__init__(target)
