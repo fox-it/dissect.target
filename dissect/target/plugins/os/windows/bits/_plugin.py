@@ -109,7 +109,7 @@ class BitsPlugin(Plugin):
         return 21 + struct.unpack("<L", blob[4 * 5 + 2 : 4 * 5 + 6])[0] + 2
 
     @export(record=[BitsRecord])
-    def qmgr_ese(self) -> Iterator[BitsRecord]:
+    def bits(self) -> Iterator[BitsRecord]:
         """Return entries found in background intelligent transfer service ESE database. (Windows 10 or later).
 
         Version pre windows 10 use a different format
