@@ -784,7 +784,9 @@ class DifferentialCli(ExtendedCmd):
         return False
 
     def do_plugin(self, line: str) -> bool:
-        """Yield RecordCreated, RecordUnchanged and RecordDeleted Records by comparing plugin outputs for two targets."""
+        """Yield RecordCreated, RecordUnchanged and RecordDeleted Records
+        by comparing plugin outputs for two targets.
+        """
         argparts = arg_str_to_arg_list(line)
         pipeparts = []
         if "|" in argparts:

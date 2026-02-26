@@ -242,7 +242,7 @@ class Parser:
         return template
 
     def translate_network_config(self, config_dict: dict) -> list[tuple[str, Any]]:
-        """Translates a parsed network configuration property to its generalized form:
+        """Translates a parsed network configuration property to its generalized form.
 
         Returns:
             List containing the translated property and its value.
