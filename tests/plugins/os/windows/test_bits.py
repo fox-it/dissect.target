@@ -346,13 +346,7 @@ def test_bits_plugin_2019(target_win: Target, fs_win: VirtualFilesystem) -> None
 
 
 def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None:
-    """
-    Just test if direct mode works and return expected number of records
-
-    :param target_win:
-    :param fs_win:
-    :return:
-    """
+    """Test if direct mode works and return expected number of records"""
     data_path = absolute_path("_data/plugins/os/windows/bits/ese/windows_server_2019/qmgr.db")
     target = Target.open_direct([data_path])
     records = list(target.bits())
