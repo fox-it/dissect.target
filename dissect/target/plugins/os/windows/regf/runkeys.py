@@ -94,15 +94,15 @@ class RunKeysPlugin(Plugin):
             command (command): The run key command.
             source (string): The source registry key for this run key.
         """
-        for key_str in self.KEYS:
-            for key in self.target.registry.keys(key_str):
+        for key_path in self.KEYS:
+            for key in self.target.registry.keys(key_path):
                 user = self.target.registry.get_user(key)
                 for entry in key.values():
                     yield RunKeyRecord(
                         ts=key.ts,
                         name=entry.name,
                         command=entry.value or None,
-                        source=key_str,
+                        source=key_path,
                         _target=self.target,
                         _key=key,
                         _user=user,
