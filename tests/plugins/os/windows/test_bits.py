@@ -37,7 +37,7 @@ def test_bits_plugin_2019(target_win: Target, fs_win: VirtualFilesystem) -> None
     fs_win.map_file("ProgramData/Microsoft/Network/Downloader/qmgr.db", qmgr_db)
     target_win.add_plugin(BitsPlugin)
 
-    records = list(target_win.qmgr_ese())
+    records = list(target_win.bits())
 
     assert len(records) == 13
     assert Counter((r.name, r.job_id) for r in records) == {
@@ -355,7 +355,7 @@ def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None
     """
     data_path = absolute_path("_data/plugins/os/windows/bits/ese/windows_server_2019/qmgr.db")
     target = Target.open_direct([data_path])
-    records = list(target.qmgr_ese())
+    records = list(target.bits())
 
     assert len(records) == 13
 
@@ -384,7 +384,7 @@ def test_bits_plugin_2025(target_win: Target, fs_win: VirtualFilesystem) -> None
     fs_win.map_file("ProgramData/Microsoft/Network/Downloader/qmgr.db", qmgr_db)
     target_win.add_plugin(BitsPlugin)
 
-    records = list(target_win.qmgr_ese())
+    records = list(target_win.bits())
 
     assert len(records) == 18
     assert {
