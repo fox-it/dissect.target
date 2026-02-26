@@ -21,6 +21,7 @@ SessionManagerRecord = UserRegistryRecordDescriptor(
     ],
 )
 
+
 class SessionManagerPlugin(Plugin):
     """Windows Session Manager (smss.exe) plugin."""
 
@@ -41,7 +42,9 @@ class SessionManagerPlugin(Plugin):
         self.keys: list[tuple[RegistryKey, str]] = []
 
         if self.target.has_function("registry"):
-            self.keys = [(key, name_str) for key_str, name_str in self.KEYS for key in self.target.registry.keys(key_str)]
+            self.keys = [
+                (key, name_str) for key_str, name_str in self.KEYS for key in self.target.registry.keys(key_str)
+            ]
 
     def check_compatible(self) -> None:
         if not self.keys:
@@ -73,7 +76,6 @@ class SessionManagerPlugin(Plugin):
                 value = [value]
 
             for item in value:
-
                 # This is the default value of BootExecute in Windows.
                 if item == "autocheck autochk *":
                     continue
