@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 from dissect.extfs import extfs
 
 from dissect.target.exceptions import (
+    FileDecryptionError,
     FileNotFoundError,
     FilesystemError,
     IsADirectoryError,
@@ -18,6 +19,8 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.helpers.fscrypt import FSCrypt, FSCryptEntryDecryptor
+
 
 class ExtFilesystem(Filesystem):
     __type__ = "ext"
@@ -25,11 +28,19 @@ class ExtFilesystem(Filesystem):
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.extfs = extfs.ExtFS(fh)
+        self.fscrypt: FSCrypt | None = None
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         fh.seek(1024)
         return fh.read(512)[56:58] == b"\x53\xef"
+
+    def add_fscrypt(self, fscrypt: FSCrypt) -> None:
+        self.fscrypt = fscrypt
+        self.extfs._get_inode_decryptor = self.get_inode_decryptor
+
+    def get_inode_decryptor(self, inode: extfs.INode) -> ExtEntryDecryptor:
+        return ExtEntryDecryptor(inode, self)
 
     def get(self, path: str) -> FilesystemEntry:
         return ExtFilesystemEntry(self, path, self._get_node(path))
@@ -147,3 +158,32 @@ class ExtFilesystemEntry(FilesystemEntry):
 
     def lattr(self) -> Any:
         return self.entry.xattr
+
+
+class ExtEntryDecryptor:
+    def __init__(self, inode: extfs.INode, fs: ExtFilesystem):
+        self.inode = inode
+        self.fs = fs
+        self._decryptor: FSCryptEntryDecryptor | None = None
+
+    @property
+    def decryptor(self) -> FSCryptEntryDecryptor:
+        if self._decryptor is None:
+            if not self.inode.is_encrypted:
+                raise ValueError("Entry is not encrypted")
+            if self.fs.fscrypt is None:
+                raise FileDecryptionError("No fscrypt context provided to this filesystem")
+
+            encryption_context = next((attr.value for attr in self.inode.xattr if attr.name == "encryption.c"), None)
+
+            if encryption_context is None:
+                raise FileDecryptionError("No encryption context found for this inode")
+            # Will raise FileDecryptionError if no key was found
+            self._decryptor = self.fs.fscrypt.get_decryptor(encryption_context)
+        return self._decryptor
+
+    def open_decrypt(self) -> BinaryIO:
+        return self.decryptor.wrap_content_stream(self.inode.dataruns(), self.inode.size)
+
+    def decrypt_filename(self, encrypted_filename: bytes) -> bytes:
+        return self.decryptor.decrypt_filename(encrypted_filename)

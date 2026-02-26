@@ -133,3 +133,7 @@ class ConfigurationParsingError(Error):
 
 class TargetPathNotFoundError(TargetError):
     """The path to the target does not exist."""
+
+
+class FileDecryptionError(FilesystemError):
+    """An error occurred during file decryption."""

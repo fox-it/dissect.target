@@ -250,6 +250,7 @@ def open(path: str | Path, *, fallbacks: list[type[Loader]] | None = None, **kwa
 register("local", "LocalLoader")
 register("ad1", "AD1Loader")
 register("asdf", "AsdfLoader")
+register("avd", "AVDLoader")
 register("vmx", "VmxLoader")
 register("vmwarevm", "VmwarevmLoader")
 register("hyperv", "HyperVLoader")
