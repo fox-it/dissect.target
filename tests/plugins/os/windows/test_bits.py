@@ -21,7 +21,7 @@ BG_JOB_PRIORITY = c_bits.BG_JOB_PRIORITY
 
 def test_bits_plugin_2019(target_win: Target, fs_win: VirtualFilesystem) -> None:
     """
-    output of bitsadmin /list on collected machine (Windows Server 2019)
+    output of bitsadmin /list on collected machine (Windows Server 2019).
 
     {70B45DD7-2A8B-4476-B67E-393821BFE542} 'Basic Download Test' TRANSFERRED 1 / 1 1024 / 1024
     {7318A4AB-866F-48E0-A411-F485D786EA30} 'RangeDownload_20251226_071948' ERROR 0 / 3 0 / 84988
@@ -346,7 +346,7 @@ def test_bits_plugin_2019(target_win: Target, fs_win: VirtualFilesystem) -> None
 
 
 def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None:
-    """Test if direct mode works and return expected number of records"""
+    """Test if direct mode works and return expected number of records."""
     data_path = absolute_path("_data/plugins/os/windows/bits/ese/windows_server_2019/qmgr.db")
     target = Target.open_direct([data_path])
     records = list(target.bits())
@@ -356,7 +356,7 @@ def test_bits_direct_mode(target_win: Target, fs_win: VirtualFilesystem) -> None
 
 def test_bits_plugin_2025(target_win: Target, fs_win: VirtualFilesystem) -> None:
     """
-    output of bitsadmin /list on collected machine (Windows Server 2025)
+    output of bitsadmin /list on collected machine (Windows Server 2025).
 
     {D1540D02-2E9C-4805-9717-9E513C4AE201} 'Basic Download Test' TRANSFERRED 1 / 1 1024 / 1024
     {4AAD15A2-B0DA-4DDE-91EF-F0CED1FF7D27} 'Priority Test - Foreground' TRANSFERRED 1 / 1 2048 / 2048
