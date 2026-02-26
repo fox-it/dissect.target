@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive) -> None:
     """Test if we parse Windows Registry Firewall Rules correctly."""
-
     rules_name = "SYSTEM\\ControlSet001\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules"
     rules_key = VirtualKey(hive_hklm, rules_name)
 
@@ -136,7 +135,6 @@ def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive
 
 def test_windows_firewall_logs(target_win: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we parse Windows Firewall ``pfirewall.log`` files correctly."""
-
     buf = """\
     #Version: 1.5
     #Software: Microsoft Windows Firewall

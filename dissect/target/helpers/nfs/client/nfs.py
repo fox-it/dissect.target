@@ -100,18 +100,15 @@ class Client(AbstractContextManager):
                 Otherwise, bind to the specified port.
             timeout_in_seconds: The timeout for making the connection.
         """
-
         rpc_client = SunRpcClient.connect(hostname, port, auth, local_port, timeout_in_seconds)
         return Client(rpc_client)
 
     def rebind_auth(self, auth: AuthScheme[Credentials, Verifier]) -> None:
         """Change the authentication scheme of the underlying sunrpc client."""
-
         self._rpc_client = self._rpc_client.rebind_auth(auth)
 
     def readdir(self, dir: FileHandle) -> ReadDirResult | NfsStat:
         """Read the contents of a directory, including file attributes."""
-
         entries = list[EntryPlus]()
         cookie = 0
         cookieverf = CookieVerf(b"\x00")
@@ -150,7 +147,6 @@ class Client(AbstractContextManager):
 
     def lookup(self, name: str, parent: FileHandle) -> LookupResult:
         """Lookup a file by name in a directory."""
-
         args = DirOpArgs(parent, name)
         lookup_deserializer = NfsResultDeserializer(Lookup3ResultDeserializer())
         result = self._rpc_client.call(LookupProc, args, DirOpArgs3Serializer(), lookup_deserializer)
@@ -161,7 +157,6 @@ class Client(AbstractContextManager):
 
     def getattr(self, handle: FileHandle) -> FileAttributes:
         """Get the attributes of a file by its file handle."""
-
         attr_deserializer = NfsResultDeserializer(FileAttributesSerializer())
         result = self._rpc_client.call(GetAttrProc, handle.opaque, OpaqueVarLengthSerializer(), attr_deserializer)
         if isinstance(result, NfsStat):

@@ -75,7 +75,6 @@ class CommandHistoryPlugin(Plugin):
         When using a shell, history of the used commands can be kept on the system. These are usually written to
         a hidden file named ``.$SHELL_history`` and may expose commands that were used by an adversary.
         """
-
         for shell, history_path, user in self._history_files:
             if shell == "zsh":
                 yield from self.parse_zsh_history(history_path, user)
@@ -194,7 +193,6 @@ class CommandHistoryPlugin(Plugin):
         References:
             - https://github.com/fish-shell/fish-shell/blob/master/src/history.cpp
         """
-
         with history_file.open("r") as h_file:
             history_data = h_file.read()
 

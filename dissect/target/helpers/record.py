@@ -20,7 +20,6 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         """A RecordDescriptor with default fields for dissect targets
         automatically added.
         """
-
         fields = fields or []
         prepend_default_fields = []
         append_default_fields = []

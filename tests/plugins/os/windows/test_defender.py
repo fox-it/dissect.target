@@ -485,7 +485,6 @@ def test_recover_quarantined_file_streams(target_win: Target, fs_win: VirtualFil
 )
 def test_defender_mpcmdrunlog(target_win_users: Target, fs_win: VirtualFilesystem, path: str) -> None:
     """Test if we can parse a Windows Defender ``MpCmdRun.log`` file."""
-
     fs_win.map_file(path, absolute_path("_data/plugins/os/windows/defender/mpcmdrun/MpCmdRun.log"))
 
     target_win_users.add_plugin(MicrosoftDefenderPlugin)

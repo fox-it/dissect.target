@@ -370,7 +370,6 @@ def test_network_dhcp_and_static(
 )
 def test_regression_duplicate_ips(target_win: Target, hive_hklm: VirtualHive) -> None:
     """Regression test for https://github.com/fox-it/dissect.target/issues/877."""
-
     change_controlset(hive_hklm, 3)
 
     # register the interfaces

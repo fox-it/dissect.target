@@ -120,7 +120,6 @@ class NfsFilesystem(Filesystem):
             path: The path to the entry. The path is relative to ``relentry``, if provided.
             relentry: The relative entry to start from. If not provided, the root entry is used.
         """
-
         current_handle = relentry.entry if relentry else self._root_handle
         path = fsutil.normalize(path, self.alt_separator).strip("/")
 

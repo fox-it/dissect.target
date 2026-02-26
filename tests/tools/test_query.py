@@ -45,7 +45,6 @@ def test_list_target(
     target_fixture: str,
 ) -> None:
     """Tests whether ``--list`` and ``--list *`` on a target returns the same results."""
-
     args = ["target-query", "mock/path", "--list"]
 
     target: Target = request.getfixturevalue(target_fixture)
@@ -278,7 +277,6 @@ def test_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch)
 
 def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test if target-query --list --json output is formatted as we expect it to be."""
-
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "-l", "-j"])
         with pytest.raises(SystemExit):
@@ -363,7 +361,6 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
 
 def test_list_json_target_filter(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test if target-query --list "*" --json <target> returns functions we expect it to."""
-
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
@@ -416,7 +413,6 @@ def test_record_stream_write_exception_handling(
     caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test if we correctly print the function name of the iterator that failed to iterate."""
-
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",

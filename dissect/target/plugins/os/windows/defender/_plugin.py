@@ -209,7 +209,6 @@ class MicrosoftDefenderPlugin(Plugin):
     @export(record=DefenderLogRecord)
     def evtx(self) -> Iterator[DefenderLogRecord]:
         """Parse Microsoft Defender evtx log files."""
-
         defender_evtx_field_names = [field_name for _, field_name in DEFENDER_EVTX_FIELDS]
 
         evtx_records = self.target.evtx(logs_dir=DEFENDER_LOG_DIR, log_file_glob=DEFENDER_LOG_FILENAME_GLOB)
@@ -273,7 +272,6 @@ class MicrosoftDefenderPlugin(Plugin):
     @export(record=DefenderExclusionRecord)
     def exclusions(self) -> Iterator[DefenderExclusionRecord]:
         """Yield Microsoft Defender exclusions from the Registry."""
-
         # Iterate through all possible versions of the key for Defender exclusions
         for exclusions_registry_key in self.target.registry.keys(DEFENDER_EXCLUSION_KEY):
             # Every subkey of the exclusions key is a 'type' of exclusion, e.g. 'path' 'process' or 'extension'.

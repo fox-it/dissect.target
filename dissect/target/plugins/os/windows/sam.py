@@ -405,7 +405,6 @@ class SamPlugin(Plugin):
             lm (string): Parsed LM-hash.
             nt (string): Parsed NT-hash.
         """
-
         syskey = self.target.lsa.syskey  # aka. bootkey
         samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
 

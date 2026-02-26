@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 def test_winrar_windows(target_win_users: Target, hive_hku: VirtualHive) -> None:
     """Test if we detect WinRAR dialog artifacts."""
-
     key_path = "Software\\WinRAR\\DialogEditHistory\\ArcName"
     key = VirtualKey(hive_hku, key_path)
     key.add_value("0", "example.rar")

@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 def test_windows_usb(target_win_users: Target, hive_hklm: VirtualHive, hive_hku: VirtualHive) -> None:
     """Test discovery of windows usb connection history."""
-
     usbstor_name = "SYSTEM\\ControlSet001\\Enum\\USBSTOR\\Disk&Ven_SanDisk&Prod_Ultra&Rev_1.00"
     usbstor_key = VirtualKey(hive_hklm, usbstor_name)
 

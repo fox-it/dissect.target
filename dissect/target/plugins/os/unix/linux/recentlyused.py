@@ -61,7 +61,8 @@ ns = {
 def parse_ts(target: Target, ts: str) -> datetime | None:
     """Parse timestamp format from xbel file
 
-    Returns None if unable to parse the timestamp"""
+    Returns None if unable to parse the timestamp
+    """
     if ts is None:
         return None
 
@@ -162,6 +163,5 @@ class RecentlyUsedPlugin(Plugin):
     @export(record=RecentlyUsedRecord)
     def recently_used(self) -> Iterator[RecentlyUsedRecord | GroupedRecord]:
         """Parse recently-used.xbel files on Linux Desktops."""
-
         for user, xbel_file in self.users_files:
             yield from parse_recently_used_xbel(self.target, user.name, xbel_file)

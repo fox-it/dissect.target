@@ -143,7 +143,6 @@ def test_nginx_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesy
 
 def test_nginx_error_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we detect and parse nginx error logs correctly."""
-
     errors = """
     2025/01/31 13:37:01 [alert] 12345#12345: this is a message
     2025/01/31 13:37:02 [alert] 12345#12345: this is another message
@@ -164,7 +163,6 @@ def test_nginx_error_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> No
 
 def test_nginx_parse_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we parse config files and their include directives correctly."""
-
     base_conf = """
     user www www;
     server {
@@ -245,7 +243,6 @@ def test_nginx_parse_config(target_unix: Target, fs_unix: VirtualFilesystem) -> 
 
 def test_nginx_host_certificate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse NGINX host TLS certificates."""
-
     bar_conf = """
         server {
         listen              443 ssl;

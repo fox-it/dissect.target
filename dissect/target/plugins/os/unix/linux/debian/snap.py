@@ -59,7 +59,6 @@ class SnapPlugin(Plugin):
             version      (string):   version of the application
             path         (string):   path to the application snap file
         """
-
         for install_path in self.installs:
             for snap in install_path.glob("*.snap"):
                 try:

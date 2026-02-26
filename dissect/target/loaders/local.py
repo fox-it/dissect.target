@@ -315,7 +315,6 @@ def map_windows_mounted_drives(target: Target, force_dirfs: bool = False, fallba
 
     Some inspiration drawn from http://velisthoughts.blogspot.com/2012/02/enumerating-and-using-partitions-and.html
     """
-
     disks = {}
     for drive_volume, is_windrive, disk, disk_num in _get_windows_drive_volumes(target.log):
         if disk:

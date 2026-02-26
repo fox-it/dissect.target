@@ -297,7 +297,6 @@ class Filesystem:
     def glob_ext(self, pattern: str) -> Iterator[FilesystemEntry]:
         """Iterate over the directory part of ``pattern``, returning entries matching ``pattern`` as FilesysmteEntry's.
 
-
         Args:
             pattern: The pattern to match.
 
@@ -747,7 +746,8 @@ class FilesystemEntry:
         This means it follows the path a link points to, it tries to do it recursively.
 
         Returns:
-            The path the link points to."""
+            The path the link points to.
+        """
         raise NotImplementedError
 
     def readlink_ext(self) -> Self:
@@ -1339,7 +1339,6 @@ class VirtualFilesystem(Filesystem):
             tar_file: Source path of the tar file to map.
             map_single_file: Only mount a single file found inside the tar at the specified path.
         """
-
         if not isinstance(tar_file, pathlib.Path):
             try:
                 tar_file = pathlib.Path(tar_file)
@@ -1772,7 +1771,6 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
         class_name: The class to load.
         internal: Whether it is an internal module or not.
     """
-
     if internal:
         module = f"{MODULE_PATH}.{module}"
 

@@ -321,7 +321,6 @@ class RegistryPlugin(Plugin):
 
         Automatically resolves CurrentVersion keys. Also flattens ValueCollections.
         """
-
         values = [value] if isinstance(value, str) else value
 
         for key in self.keys(keys):

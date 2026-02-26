@@ -172,7 +172,6 @@ class ESXiPlugin(UnixPlugin):
 
     def _add_nfs(self, nfs_ip: str, remote_share: str, mount_alias: str) -> None:
         """Mount NFS share to the target."""
-
         if not self._is_nfs_enabled:
             self._log_nfs_mount_disabled(nfs_ip, remote_share, mount_alias)
             return
@@ -258,7 +257,6 @@ def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO | None:
     and stderr containing an I/O error message. The file does get properly decrypted, so we return
     ``None`` if there are no bytes in stdout which would indicate it actually failed.
     """
-
     result = subprocess.run(
         [
             "crypto-util",
@@ -434,7 +432,6 @@ def nfs_volume_uuid(host: str, path: str) -> str:
 
     This is used to create a unique identifier for NFS volumes in ESXi.
     """
-
     h1 = lookup8(host.encode(), 42)  # 42 is starting value
     h2 = lookup8(path.encode(), h1)
 

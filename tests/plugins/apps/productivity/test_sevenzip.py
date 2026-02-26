@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 def test_sevenzip_windows(target_win_users: Target, hive_hku: VirtualHive) -> None:
     """Test if we detect compression and extraction GUI dialog artifacts in 7-Zip."""
-
     # Compression dialog artifact
     key_path = "Software\\7-Zip\\Compression"
     key = VirtualKey(hive_hku, key_path)

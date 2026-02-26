@@ -64,7 +64,6 @@ def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
     Returns:
         Modified record with digests of path field types.
     """
-
     if not resolved_path.exists() or not resolved_path.is_file():
         raise FileNotFoundError(f"Path not found or is not a file: '{resolved_path}'")
 

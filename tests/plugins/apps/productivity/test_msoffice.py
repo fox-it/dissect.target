@@ -19,7 +19,6 @@ def test_office_startup_default_machine(
     target_win_users: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive
 ) -> None:
     """Test if machine-scoped startup items are found in default locations."""
-
     office_install_path = "C:/Office"
     key_path = "Software\\Microsoft\\Office\\16.0\\Word\\InstallRoot"
     startup_item_path = fsutil.join(office_install_path, "STARTUP/plugin.wll")
@@ -40,7 +39,6 @@ def test_office_startup_default_machine(
 
 def test_office_startup_default_user(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     """Test if user-scoped startup items are found in default locations."""
-
     startup_item_path = "C:/Users/John/AppData/Roaming/Microsoft/Templates/normal.dotx"
     fs_win.map_file_fh(startup_item_path.removeprefix("C:/"), io.BytesIO(b"Template Data"))
 
@@ -55,7 +53,6 @@ def test_office_startup_default_user(target_win_users: Target, fs_win: VirtualFi
 
 def test_office_startup_options(target_win_users: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive) -> None:
     """Test if startup items are found in custom specified locations."""
-
     startup_item_path = "C:/FUNWAREZ/innocent.dll"
     key_path = "Software\\Microsoft\\Office\\16.0\\Word\\Options"
 
@@ -87,7 +84,6 @@ def test_office_com_addin(
     caplog: pytest.CaplogFixture,
 ) -> None:
     """Test if COM add-ins are found."""
-
     addin_prog_id = "ExcelAddin"
     addin_key_path = f"Software\\Microsoft\\Office\\Excel\\Addins\\{addin_prog_id}"
     cls_id = "{ADC6CB82-424C-11D2-952A-00C04FA34F05}"
@@ -117,7 +113,6 @@ def test_office_com_addin(
 
 def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive) -> None:
     """Test if vsto add-ins are found."""
-
     addin_prog_id = "ExcelAddin"
     addin_key_path = f"Software\\Microsoft\\Office\\Excel\\Addins\\{addin_prog_id}"
 
@@ -143,7 +138,6 @@ def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, 
 
 def test_office_web_addin(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     """Test if web add-ins are found."""
-
     fs_win.map_dir(
         "users/John/AppData/local/Microsoft/Office/16.0/Wef", absolute_path("_data/plugins/apps/productivity/wef")
     )

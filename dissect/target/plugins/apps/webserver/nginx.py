@@ -146,7 +146,6 @@ class NginxPlugin(WebserverPlugin):
 
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
         """Parse the given NGINX ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
-
         seen = set() if seen is None else seen
 
         if path in seen:
@@ -304,7 +303,6 @@ class NginxPlugin(WebserverPlugin):
         References:
             - https://nginx.org/en/docs/http/ngx_http_core_module.html#server
         """
-
         for host_path in self.host_paths:
             server = {}
             seen_server_directive = False
@@ -390,7 +388,6 @@ def parse_json_line(line: str) -> dict[str, str] | None:
         - https://nginx.org/en/docs/http/ngx_http_log_module.html
         - https://github.com/elastic/examples/blob/master/Common%20Data%20Formats/nginx_json_logs/README.md
     """
-
     try:
         json_log = json.loads(line)
         return {

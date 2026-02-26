@@ -60,7 +60,6 @@ def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
 
 def get_volume_identifier(fs: NtfsFilesystem) -> str | None:
     """Return the filesystem GUID or serial, if available."""
-
     if fs.volume and (guid := getattr(fs.volume, "guid", None)):
         return guid
 

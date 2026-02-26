@@ -113,7 +113,6 @@ class CronjobPlugin(Plugin):
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/crontab.5.html
             - https://www.gnu.org/software/mcron/manual/mcron.html#Guile-Syntax
         """
-
         for file in self.crontabs:
             # Cronjobs in user crontab files do not have a user field specified.
             user = None

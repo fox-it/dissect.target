@@ -50,7 +50,6 @@ class ICatPlugin(Plugin):
                 # outputs contents of inode in filesystem 2 of target
                 target-query <TARGET> -f icat --fs 2 --inode 50947
         """
-
         open_as = None
         try:
             if fs is not None:

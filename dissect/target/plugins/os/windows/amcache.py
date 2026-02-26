@@ -654,7 +654,6 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         References:
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
         """
-
         if (path := self.target.resolve("%windir%/appcompat/pca/PcaAppLaunchDic.txt")).exists():
             for line in path.open("rt"):
                 if not (line := line.strip()):
@@ -682,7 +681,6 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
             - https://www.sygnia.co/blog/new-windows-11-pca-artifact/
         """
-
         for path in self.target.resolve("%windir%/appcompat/pca").glob("PcaGeneralDb*.txt"):
             for line in path.open("rt", encoding="utf-16-le"):
                 if not (line := line.strip()):

@@ -208,8 +208,17 @@ select = [
   "PERF",
   "FURB",
   "RUF",
+  "D200" # Pydocstyle related event, lot of rules are disable are
 ]
-ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003", "PLC0415"]
+ignore = [
+    "E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003", "PLC0415",
+    # undocumented related rules
+    "D1",
+    "D205"
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/_docs/**" = ["INP001"]

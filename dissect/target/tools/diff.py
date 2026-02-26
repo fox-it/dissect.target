@@ -92,7 +92,8 @@ class DifferentialEntry:
 @dataclasses.dataclass
 class DirectoryDifferential:
     """For a given directory, contains the unchanged, created, modified and deleted entries, as well as a list of
-    subdirectories."""
+    subdirectories.
+    """
 
     directory: str
     unchanged: list[FilesystemEntry] = dataclasses.field(default_factory=list)
@@ -152,7 +153,8 @@ class TargetComparison:
 
     def scandir(self, path: str) -> DirectoryDifferential:
         """Scan a given directory for files that have been unchanged, modified, created or deleted from one target to
-        the next. Add these results (as well as subdirectories) to a DirectoryDifferential object."""
+        the next. Add these results (as well as subdirectories) to a DirectoryDifferential object.
+        """
         unchanged = []
         modified = []
         exists_as_directory_src = self.src_target.fs.exists(path) and self.src_target.fs.get(path).is_dir()
@@ -402,7 +404,6 @@ class DifferentialCli(ExtendedCmd):
     @property
     def prompt(self) -> str:
         """Determine the prompt of the cli."""
-
         src_name = _target_name(self.comparison.src_target)
         dst_name = _target_name(self.comparison.dst_target)
 
@@ -423,7 +424,8 @@ class DifferentialCli(ExtendedCmd):
 
     def _select_source_and_dest(self, src_index: int, dst_index: int) -> None:
         """Set local variables according to newly selected source and destination index, and re-instatiate
-        TargetComparison."""
+        TargetComparison.
+        """
         self.src_index = src_index
         self.dst_index = dst_index
         if not self.src_target.fs.exists(self.cwd) and not self.dst_target.fs.exists(self.cwd):
@@ -444,7 +446,8 @@ class DifferentialCli(ExtendedCmd):
         absolute: bool = False,
     ) -> list[tuple[fsutil.TargetPath | DifferentialEntry], str]:
         """Given a DirectoryDifferential instance, construct a list of tuples where the first element is a Filesystem /
-        DifferentialEntry and the second a color-formatted string."""
+        DifferentialEntry and the second a color-formatted string.
+        """
         r = []
 
         attr = "path" if absolute else "name"
@@ -472,7 +475,8 @@ class DifferentialCli(ExtendedCmd):
 
     def _targets_with_directory(self, path: str, warn_when_incomplete: bool = False) -> int:
         """Return whether a given path is an existing directory for neither, one of, or both of the targets being
-        compared. Optionally log a warning if the directory only exists on one of the two targets."""
+        compared. Optionally log a warning if the directory only exists on one of the two targets.
+        """
         src_has_dir = False
         dst_has_dir = False
         try:
@@ -528,7 +532,7 @@ class DifferentialCli(ExtendedCmd):
         return suggestions
 
     def do_list(self, line: str) -> bool:
-        """print a list of targets to differentiate between
+        """Print a list of targets to differentiate between
 
         Useful when differentiating between three or more targets. Looks quite bad on small terminal screens.
         """
@@ -563,7 +567,7 @@ class DifferentialCli(ExtendedCmd):
     @alias("prev")
     @arg("-a", "--absolute", action="store_true", help="Only move the destination target one position back.")
     def cmd_previous(self, args: argparse.Namespace, line: str) -> bool:
-        """when three or more targets are available, move the 'comparison window' one position back"""
+        """When three or more targets are available, move the 'comparison window' one position back"""
         src_index = self.src_index - 1 if not args.absolute else 0
         if src_index < 0:
             src_index = len(self.targets) - 1
@@ -577,7 +581,7 @@ class DifferentialCli(ExtendedCmd):
 
     @arg("-a", "--absolute", action="store_true", help="Only move the destination target one position forward.")
     def cmd_next(self, args: argparse.Namespace, line: str) -> bool:
-        """when three or more targets are available, move the 'comparison window' one position forward"""
+        """When three or more targets are available, move the 'comparison window' one position forward"""
         dst_index = (self.dst_index + 1) % len(self.targets)
         src_index = self.src_index + 1 % len(self.targets) if not args.absolute else 0
 
@@ -587,7 +591,7 @@ class DifferentialCli(ExtendedCmd):
         return False
 
     def do_cd(self, path: str) -> bool:
-        """change directory to the given path"""
+        """Change directory to the given path"""
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.alt_separator)
         if self._targets_with_directory(path, warn_when_incomplete=True) != 0:
             self.cwd = path
@@ -598,7 +602,7 @@ class DifferentialCli(ExtendedCmd):
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """list contents of a directory for two targets"""
+        """List contents of a directory for two targets"""
         path = args.path if args.path is not None else self.cwd
         diff = self.comparison.scandir(path)
         results = self._annotate_differential(diff)
@@ -618,7 +622,7 @@ class DifferentialCli(ExtendedCmd):
 
     @arg("path", nargs="?")
     def cmd_cat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """output the contents of a file"""
+        """Output the contents of a file"""
         base_dir, _, name = args.path.rpartition("/")
         if not base_dir:
             base_dir = self.cwd
@@ -649,7 +653,7 @@ class DifferentialCli(ExtendedCmd):
     @arg("path", nargs="?")
     @arg("--hex", action="store_true")
     def cmd_diff(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """output the difference in file contents between two targets"""
+        """Output the difference in file contents between two targets"""
         stdout = stdout.buffer
         base_dir, _, name = args.path.rpartition("/")
         if not base_dir:
@@ -700,14 +704,14 @@ class DifferentialCli(ExtendedCmd):
     @arg("path", nargs="?")
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """output difference of the given file between targets in hexdump"""
+        """Output difference of the given file between targets in hexdump"""
         args.hex = True
         return self.cmd_diff(args, stdout)
 
     @arg("index")
     @arg("type", choices=["src", "dst"])
     def cmd_set(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """change either the source or destination target for differentiation
+        """Change either the source or destination target for differentiation
 
         Index can be given relative (when prefixed with '+' or '-', e.g. "set dst +1") or absolute (e.g. set src 0).
         """
@@ -732,7 +736,7 @@ class DifferentialCli(ExtendedCmd):
 
     @arg("target", choices=["src", "dst"])
     def cmd_enter(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """open a subshell for the source or destination target"""
+        """Open a subshell for the source or destination target"""
         target = self.src_target if args.target == "src" else self.dst_target
         cli = TargetCli(target)
         if target.fs.exists(self.cwd):
@@ -751,7 +755,7 @@ class DifferentialCli(ExtendedCmd):
     @arg("-d", "--deleted", action="store_true")
     @arg("-u", "--unchanged", action="store_true")
     def cmd_find(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """search for files in a directory hierarchy"""
+        """Search for files in a directory hierarchy"""
         path = fsutil.abspath(args.path, cwd=str(self.cwd), alt_separator=self.comparison.src_target.fs.alt_separator)
         if not path:
             return False
@@ -780,7 +784,7 @@ class DifferentialCli(ExtendedCmd):
         return False
 
     def do_plugin(self, line: str) -> bool:
-        """yield RecordCreated, RecordUnchanged and RecordDeleted Records by comparing plugin outputs for two targets"""
+        """Yield RecordCreated, RecordUnchanged and RecordDeleted Records by comparing plugin outputs for two targets"""
         argparts = arg_str_to_arg_list(line)
         pipeparts = []
         if "|" in argparts:
@@ -809,7 +813,7 @@ class DifferentialCli(ExtendedCmd):
         return False
 
     def do_python(self, line: str) -> bool:
-        """drop into a Python shell"""
+        """Drop into a Python shell"""
         python_shell(list(self.targets))
         return False
 
@@ -843,7 +847,6 @@ def differentiate_target_filesystems(
     """Given a list of targets, compare targets against one another and yield File[Created|Modified|Deleted]Records
     indicating the differences between them.
     """
-
     for target_pair in make_target_pairs(targets, absolute):
         # Unpack the tuple and initialize the comparison class
         src_target, dst_target = target_pair
@@ -880,7 +883,8 @@ def differentiate_target_plugin_outputs(
     *targets: tuple[Target], absolute: bool = False, only_changed: bool = False, plugin: str, plugin_args: str = ""
 ) -> Iterator[Record]:
     """Given a list of targets, yielding records indicating which records from this plugin are new, unmodified or
-    deleted."""
+    deleted.
+    """
     for target_pair in make_target_pairs(targets, absolute):
         src_target, dst_target = target_pair
         comparison = TargetComparison(src_target, dst_target)

@@ -58,7 +58,7 @@ PuTTYSessionRecord = PuTTYUserRecordDescriptor(
 class PuTTYPlugin(SSHPlugin):
     """Extract artifacts from the PuTTY client.
 
-    NOTE:
+    Note:
         - Does not parse ``$HOME/.putty/randomseed`` (GNU/Linux)
           and ``HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile`` (Windows)
 
@@ -100,7 +100,6 @@ class PuTTYPlugin(SSHPlugin):
     @export(record=KnownHostRecord)
     def known_hosts(self) -> Iterator[KnownHostRecord]:
         """Parse PuTTY saved SshHostKeys."""
-
         for putty_key, user_details in self.regf_installs:
             yield from self._regf_known_hosts(putty_key, user_details)
 
@@ -109,7 +108,6 @@ class PuTTYPlugin(SSHPlugin):
 
     def _regf_known_hosts(self, putty_key: RegistryKey, user_details: UserDetails) -> Iterator[KnownHostRecord]:
         """Parse PuTTY traces in Windows registry."""
-
         try:
             ssh_host_keys = putty_key.subkey("SshHostKeys")
         except RegistryKeyNotFoundError:
@@ -180,7 +178,6 @@ class PuTTYPlugin(SSHPlugin):
     @export(record=PuTTYSessionRecord)
     def sessions(self) -> Iterator[PuTTYSessionRecord]:
         """Parse PuTTY saved session configuration files."""
-
         for putty_key, user_details in self.regf_installs:
             yield from self._regf_sessions(putty_key, user_details)
 

@@ -29,7 +29,6 @@ class IOSApplicationsPlugin(Plugin):
     @export(record=IOSApplicationRecord)
     def applications(self) -> Iterator[IOSApplicationRecord]:
         """Yield installed iOS apps."""
-
         for app_dir in self.target.fs.path(self.PATH).glob("*"):
             if not app_dir.is_dir():
                 continue

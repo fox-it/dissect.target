@@ -50,7 +50,6 @@ class DpkgPlugin(Plugin):
         self, output_files: bool = False
     ) -> Iterator[PackageManagerPackageRecord | PackageManagerPackageFileRecord]:
         """Yields information about installed Debian packages."""
-
         if not self.status_file:
             self.target.log.warning("No dpkg status file found on target")
             return
@@ -121,7 +120,6 @@ class DpkgPlugin(Plugin):
     @export(record=PackageManagerLogRecord)
     def logs(self) -> Iterator[PackageManagerLogRecord]:
         """Yield records for actions logged in dpkg's logs."""
-
         for log_file in self.log_files:
             with open_decompress(log_file, "rt") as fh:
                 for line in fh:
@@ -190,7 +188,6 @@ def parse_log_line(log_line: str, tzinfo: tzinfo = timezone.utc) -> dict[str, st
     Example install log line::
         2022-01-03 12:47:41 install linux-modules-extra-5.11.0-43-generic:amd64 <none> 5.11.0-43.47~20.04.2
     """
-
     parts = log_line.split(" ")
 
     # Skip lines that are not about operations on packages
@@ -234,7 +231,6 @@ def parse_log_line(log_line: str, tzinfo: tzinfo = timezone.utc) -> dict[str, st
 
 def parse_list_file(list_path: Path) -> dict[Path, str | None]:
     """Returns a dictionary of file paths and digests of files for the given list path."""
-
     root = list_path.parents[-1]
     md5sums_path = list_path.with_suffix(".md5sums")
     map = {}

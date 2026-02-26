@@ -70,7 +70,6 @@ class Template:
         Returns:
             A dictionary based on the provided configured template, else None
         """
-
         if not path.exists() or path.is_dir():
             log.debug("Failed to get config file %s", path)
             config = None
@@ -230,7 +229,6 @@ class Parser:
         Returns:
             Dictionary containing network configuration properties for interface, dhcp, ips, gateways, dns, and netmask.
         """
-
         template = defaultdict(set)
 
         for path in self.expand_config_file_paths():

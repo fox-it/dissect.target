@@ -759,7 +759,6 @@ def test_expected_path(path: str | Path, expected: Path) -> None:
 
 def test_exception_invalid_path() -> None:
     """Test if we throw small and neat error messages and not long stack traces when giving invalid path(s)."""
-
     with pytest.raises(
         TargetError,
         match=r"Failed to initiate RawLoader for target [/\\]path[/\\]to[/\\]invalid.img: Provided target path does not exist",  # noqa: E501

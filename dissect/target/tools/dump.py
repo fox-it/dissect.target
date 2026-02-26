@@ -86,7 +86,6 @@ def execute_function(
 
     Only output type ``record`` is supported for plugin functions.
     """
-
     local_log = log.bind(func=function, target=target)
     local_log.debug("Function execution")
 
@@ -753,7 +752,6 @@ def execute_pipeline(
     limit: int | None = None,
 ) -> None:
     """Run the record generation, processing and sinking pipeline."""
-
     target_func_pairs_stream = produce_target_func_pairs(targets, state)
     record_stream = itertools.islice(execute_functions(target_func_pairs_stream, dry_run, arguments), limit)
     record_stream = sink_records(record_stream, state)

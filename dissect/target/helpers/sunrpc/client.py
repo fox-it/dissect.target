@@ -151,7 +151,6 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
                 Otherwise, bind to the specified port.
             timeout_in_seconds: The timeout for making the connection.
         """
-
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         if not sys.platform.startswith("darwin"):
@@ -227,7 +226,6 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         result_deserializer: Deserializer[Results],
     ) -> Results:
         """Synchronously call an RPC procedure and return the result."""
-
         call_body = sunrpc.CallBody(
             proc_desc.program,
             proc_desc.version,

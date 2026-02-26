@@ -292,7 +292,6 @@ class JournalMessagePriority(IntEnumMissing):
 
 def get_optional(value: str, to_type: Callable) -> Any | None:
     """Return the value if True, otherwise return None."""
-
     if not value:
         return None
 
@@ -338,8 +337,7 @@ class JournalFile:
         return key, value
 
     def __iter__(self) -> Iterator[dict[str, int | str]]:
-        "Iterate over the entry objects to read payloads."
-
+        """Iterate over the entry objects to read payloads."""
         offset = self.header.entry_array_offset
         while offset != 0:
             self.fh.seek(offset)

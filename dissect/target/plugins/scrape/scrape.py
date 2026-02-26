@@ -158,7 +158,6 @@ class ScrapePlugin(Plugin):
             chunk_reader: A function to read a chunk from a byte stream for provided needle, offset and chunk size.
             block_size: The block size to use for reading from the byte stream.
         """
-
         if needle_chunk_size_map and (needle or chunk_size):
             raise ValueError("Either `needle_chunk_size_map` or both `needle` and `chunk_size` must be provided")
 
@@ -191,7 +190,6 @@ class ScrapePlugin(Plugin):
             needle: A single byte needle to search for.
             block_size: The block size to use for reading from the byte stream.
         """
-
         if needle and needles:
             raise ValueError("Either `needles` values or a single `needle` value must be provided")
         elif not needle and not needles:

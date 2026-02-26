@@ -19,7 +19,6 @@ from dissect.target.target import Target
 )
 def test_unix_linux_redhat_os_detection(target_bare: Target, file_name: str) -> None:
     """Test if we detect RedHat OS correctly."""
-
     fs = VirtualFilesystem()
     fs.map_file_fh(file_name, BytesIO())
 

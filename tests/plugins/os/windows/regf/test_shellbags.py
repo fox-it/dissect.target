@@ -137,7 +137,6 @@ def test_shellbags_plugin(
     expected_path: list[str],
 ) -> None:
     """Test if shellbags mapped to a registry hive are found and parsed correctly."""
-
     key_name = "Software\\Microsoft\\Windows\\Shell\\BagMRU"
 
     for bag_key, bag_name, bag_value in bags:

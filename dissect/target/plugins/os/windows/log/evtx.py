@@ -64,7 +64,6 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
             Provider_Name (string): The Provider_Name field of the event.
             EventID (int): The EventID of the event.
         """
-
         if logs_dir:
             log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
         else:

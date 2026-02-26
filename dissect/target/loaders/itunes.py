@@ -167,7 +167,6 @@ class ITunesBackup:
 
     def files(self) -> Iterator[FileInfo]:
         """Iterate all the files in this backup."""
-
         if table := self.manifest_db.table("Files"):
             for row in table.rows():
                 yield FileInfo(self, row.fileID, row.domain, row.relativePath, row.flags, row.file)
@@ -382,7 +381,6 @@ def _create_cipher(key: bytes, iv: bytes = b"\x00" * 16, mode: str = "cbc") -> A
 
     Dynamic based on the available crypto module.
     """
-
     if HAS_PYSTANDALONE:
         key_size = len(key)
         if key_size not in (32, 24, 16):

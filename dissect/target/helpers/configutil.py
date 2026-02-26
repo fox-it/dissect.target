@@ -165,7 +165,6 @@ class ConfigurationParser:
         Raises:
             ConfigurationParsingError: If any exception occurs during during the parsing process.
         """
-
         try:
             self.parse_file(fh)
         except Exception as e:
@@ -187,7 +186,6 @@ class ConfigurationParser:
         Returns:
             The merged parser.
         """
-
         self._merge(self.parsed_data, other.parsed_data)
         return self
 
@@ -453,7 +451,6 @@ class ListUnwrapper:
     @staticmethod
     def _unwrap_dict(data: dict | list) -> dict | list:
         """Looks for dictionaries and unwraps its values."""
-
         if not isinstance(data, dict):
             return data
 
@@ -1037,7 +1034,6 @@ def parse(path: Path, hint: str | None = None, *args, **kwargs) -> Configuration
     Raises:
         FileNotFoundError: If the ``path`` is not a file.
     """
-
     if not path.is_file():
         raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 

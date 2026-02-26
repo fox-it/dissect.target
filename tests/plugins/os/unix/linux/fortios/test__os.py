@@ -10,7 +10,6 @@ from dissect.target.target import Target
 
 def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we detect FortiGate OS correctly."""
-
     global_config = """\
     #config-version=FGVM64-7.4.2-FW-build2571-231219:opmode=0:vdom=0
     config system global

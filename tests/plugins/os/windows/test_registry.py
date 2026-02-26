@@ -196,7 +196,6 @@ def test_registry_plugin_values_keys(
     expected_output: list[str],
 ) -> None:
     """Test if we can handle different input values for :meth:`RegistryPlugin.values`."""
-
     key_path = "SOFTWARE\\SomePath"
     key = VirtualKey(hive_hklm, key_path)
     key.add_value("Foo", VirtualValue(hive_hklm, "Foo", "FooValue"))

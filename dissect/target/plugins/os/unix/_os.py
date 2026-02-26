@@ -88,7 +88,6 @@ class UnixPlugin(OSPlugin):
         References:
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
-
         seen_users = set()
 
         # Yield users found in passwd files.
@@ -427,7 +426,6 @@ class UnixPlugin(OSPlugin):
         References:
             - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
         """
-
         if not isinstance(path, TargetPath):
             for fs in [self.target.fs, *self.target.filesystems]:
                 if (path := fs.path(path)).exists():
@@ -454,7 +452,6 @@ def parse_fstab(
     """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """
-
     SKIP_FS_TYPES = (
         "swap",
         "tmpfs",

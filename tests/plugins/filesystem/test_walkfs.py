@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 
 def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test basic walkfs plugin behavior."""
-
     fs_unix.map_file_fh("/path/to/some/file", BytesIO(bytes.fromhex("89504e470d0a1a0a")))
     fs_unix.map_file_fh("/path/to/some/other/file.ext", BytesIO(b""))
     fs_unix.map_file_fh("/root_file", BytesIO(b""))
@@ -77,7 +76,6 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 )
 def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture, params: dict) -> None:
     """Benchmark walkfs performance on a small tar archive with ~500 files."""
-
     loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine-docker.tar")))
     loader.map(target_bare)
     target_bare.apply()
@@ -87,7 +85,6 @@ def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture, para
 
 def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we detect a SUID binary correctly in the WalkFS plugin."""
-
     vfile = VirtualFile(fs_unix, "binary", None)
     vfile.lstat = Mock()
     vfile.lstat.return_value = fsutil.stat_result([stat.S_IFREG | stat.S_ISUID, 0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -106,7 +103,6 @@ def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
 def test_walkfs_xattr(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we parse xattrs correctly in the WalkFS plugin."""
-
     xattr1 = Mock()
     xattr1.name = "security.capability"
     xattr1.value = bytes.fromhex("010000010020f00000f00f0f")

@@ -52,7 +52,6 @@ class SyscachePlugin(Plugin):
         References:
             - https://dfir.ru/2018/12/02/the-cit-database-and-the-syscache-hive/
         """
-
         # Try to get the system volume
         mft = None
         sysvol = self.target.fs.mounts["sysvol"]

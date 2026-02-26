@@ -28,7 +28,6 @@ if TYPE_CHECKING:
 
 def parse_ip(addr: str | int, version: int = 4) -> IPv6Address | IPv4Address:
     """Convert ``/proc/net`` IPv4 or IPv6 hex address into their standard IP notation."""
-
     if version == 6:
         addr = unpack("!LLLL", bytes.fromhex(addr))
         return IPv6Address(pack("@IIII", *addr))
@@ -324,7 +323,6 @@ class Sockets:
             protocol: The protocol in ``/proc/net/`` to parse entries from.
             version: The version of the protocol to parse entries from.
         """
-
         entry = self.target.fs.path(f"/proc/net/{protocol}{version if version == 6 else ''}")
 
         contents = entry.open("rt")
@@ -363,7 +361,6 @@ class Sockets:
 
     def _parse_unix_sockets(self) -> Iterator[UnixSocket]:
         """Internal function to parse ``/proc/net/unix`` entries."""
-
         entry = self.target.fs.path("/proc/net/unix")
         contents = entry.open("rt")
 
@@ -600,7 +597,6 @@ class ProcProcess:
     @property
     def cmdline(self) -> str:
         """Return the command line of a process."""
-
         line = ""
         entry = self.get("cmdline")
 

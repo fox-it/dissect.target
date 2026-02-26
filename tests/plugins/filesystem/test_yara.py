@@ -104,7 +104,6 @@ def test_yara_plugin_compiled_rule(target_yara: Target, tmp_path: str) -> None:
 @pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara_plugin_multiple_matches(target_default: Target) -> None:
     """Test if we iterate ``yara.StringMatch`` results correctly."""
-
     vfs = VirtualFilesystem()
     vfs.map_file_fh("/files/first.txt", BytesIO(b"This is a t\x00e\x00s\x00t\x00 file\x00\xaa\xbb\xcc\xdd\xee\xff\x00"))
     vfs.map_file_fh("/files/second.txt", BytesIO(b"This is another test file!"))

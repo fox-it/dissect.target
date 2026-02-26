@@ -273,7 +273,6 @@ class WindowsPlugin(OSPlugin):
         Returns:
             Target triple string.
         """
-
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
 
         try:

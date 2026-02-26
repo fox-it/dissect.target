@@ -26,7 +26,6 @@ def test_android_os(target_android: Target) -> None:
 )
 def test_android_os_detect_props(target_bare: Target, build_prop_locations: list[tuple[str, str]]) -> None:
     """Test if we detect different build.prop locations correctly."""
-
     fs = VirtualFilesystem()
     fs.makedirs("/data")
     fs.makedirs("/system")

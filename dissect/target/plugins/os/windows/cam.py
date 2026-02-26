@@ -243,7 +243,6 @@ class CamPlugin(Plugin):
             file_id_hash (digest): Digest version of the file_id field.
             program_id (string): Program ID of application, unclear what this value means.
         """
-
         self.camdb = self._open_db()
 
         # Silently exit the function if no database object could be created.
@@ -339,7 +338,6 @@ class CamPlugin(Plugin):
             last_stopped (datetime): When the application last stopped using the device.
             duration (varint): How long the application used the device (seconds).
         """
-
         for key in self.yield_apps():
             last_started = None
             last_stopped = None

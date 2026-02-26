@@ -209,7 +209,6 @@ class UtmpPlugin(Plugin):
         References:
             - https://www.thegeekdiary.com/what-is-the-purpose-of-utmp-wtmp-and-btmp-files-in-linux/
         """
-
         for path in self.wtmp_paths + self.utmp_paths:
             if not path.is_file():
                 self.target.log.warning("Unable to parse wtmp file: %s is not a file", path)

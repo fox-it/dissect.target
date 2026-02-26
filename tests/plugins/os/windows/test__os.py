@@ -282,7 +282,6 @@ def test_windows_user_from_sam(target_win_users: Target) -> None:
     References:
         - https://learn.microsoft.com/en-us/previous-versions/troubleshoot/windows-client/renaming-user-account-not-change-profile-path
     """
-
     fake_sam_user = Mock()
     fake_sam_user.rid = 1002
     fake_sam_user.username = "Jane"  # Should override "John" from home folder
@@ -318,7 +317,6 @@ def test_windows_hostname(
     registry_value: bytes, expected_hostname: str, target_win_users: Target, hive_hklm: VirtualHive
 ) -> None:
     """Test if we can parse windows hostnames correctly."""
-
     key_name = "SYSTEM\\ControlSet001\\Control\\ComputerName\\ComputerName"
     key = VirtualKey(hive_hklm, key_name)
     key.add_value("ComputerName", VirtualValue(hive_hklm, "ComputerName", registry_value.decode()))

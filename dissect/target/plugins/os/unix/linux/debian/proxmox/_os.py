@@ -48,7 +48,6 @@ class ProxmoxPlugin(DebianPlugin):
     @export(property=True)
     def version(self) -> str:
         """Returns Proxmox VE version with underlying OS release."""
-
         for pkg in self.target.dpkg.status():
             if pkg.name == "proxmox-ve":
                 distro_name = self._os_release.get("PRETTY_NAME", "")

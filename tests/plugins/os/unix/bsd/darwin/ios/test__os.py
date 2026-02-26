@@ -25,7 +25,6 @@ def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
     References:
         - https://corp.digitalcorpora.org/corpora/mobile/iOS17/
     """
-
     fs_ios.map_dir("/", absolute_path("_data/plugins/os/unix/bsd/darwin/ios/_os"))
     target_ios.add_plugin(IOSPlugin)
     target_ios.add_plugin(LocalePlugin)

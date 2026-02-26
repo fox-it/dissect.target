@@ -271,7 +271,6 @@ class FortiOSPlugin(LinuxPlugin):
     @export(record=FortiOSUserRecord)
     def users(self) -> Iterator[FortiOSUserRecord | UnixUserRecord]:
         """Return local users of the FortiOS system."""
-
         # Possible unix-like users
         yield from super().users()
 
@@ -458,7 +457,6 @@ def parse_version(input: str) -> str:
     References:
         - https://support.fortinet.com/Download/VMImages.aspx
     """
-
     PREFIXES = {
         "FGV": "FortiGate VM",  # FGVM64
         "FGT": "FortiGate",  # can also be FGT-VM in 4.x/5.x
@@ -500,7 +498,7 @@ def decrypt_password(input: str) -> str:
 
     Works for FortiGate 5.x, 6.x and 7.x (CVE-2019-6693).
 
-    NOTE:
+    Note:
         - FortiManager uses a 16-byte IV and is not supported (CVE-2020-9289).
         - FortiGate 4.x uses DES and a static 8-byte key and is not supported.
 
@@ -509,7 +507,6 @@ def decrypt_password(input: str) -> str:
     References:
         - https://www.fortiguard.com/psirt/FG-IR-19-007
     """
-
     if not HAS_CRYPTO:
         raise RuntimeError("Missing pycryptodome dependency")
 
@@ -542,7 +539,6 @@ def key_iv_for_kernel_hash(kernel_hash: str) -> AesKey | ChaCha20Key:
     Raises:
         ValueError: When no decryption keys are available for the given kernel hash.
     """
-
     key = KERNEL_KEY_MAP.get(kernel_hash)
     if isinstance(key, ChaCha20Seed):
         # FortiOS 7.4.x uses a KDF to derive the key and IV
@@ -611,7 +607,6 @@ def chacha20_decrypt(fh: BinaryIO, key: ChaCha20Key) -> bytes:
     Returns:
         Decrypted bytes.
     """
-
     # First 8 bytes = counter, last 8 bytes = nonce
     # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple
     # We're interested in updating the position in the ChaCha20 internal state, so to make
@@ -646,7 +641,6 @@ def aes_decrypt(fh: BinaryIO, key: AesKey) -> bytes:
     Returns:
         Decrypted bytes.
     """
-
     data = bytearray(fh.read())
 
     # Calculate custom CTR increment from IV
@@ -700,7 +694,6 @@ def decrypt_rootfs(fh: BinaryIO, key: ChaCha20Key | AesKey) -> BinaryIO:
         ValueError: When decryption failed.
         RuntimeError: When PyCryptodome is not available.
     """
-
     if not HAS_CRYPTO:
         raise RuntimeError("Missing pycryptodome dependency")
 
@@ -723,7 +716,6 @@ def _kdf_7_4_x(key_data: str | bytes, offset_key: int = 4, offset_iv: int = 5) -
 
     As the IV needs to be 16 bytes, we return the first 16 bytes of the sha256 hash.
     """
-
     if isinstance(key_data, str):
         key_data = bytes.fromhex(key_data)
 

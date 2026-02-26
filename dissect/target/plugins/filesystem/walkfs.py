@@ -87,7 +87,6 @@ class WalkFsPlugin(Plugin):
             attr (string[]): list of key-value pair attributes separated by '='.
             fs_types (string[]): list of filesystem type(s) of the entry.
         """
-
         path = self.target.fs.path(walkfs_path)
 
         if not path.exists():

@@ -94,7 +94,6 @@ class WireGuardPlugin(Plugin):
     @export(record=[WireGuardInterfaceRecord, WireGuardPeerRecord])
     def config(self) -> Iterator[WireGuardInterfaceRecord | WireGuardPeerRecord]:
         """Parses interface config files from wireguard installations."""
-
         for config_path in self.configs:
             if self.target.os == OperatingSystem.WINDOWS and config_path.suffix == ".dpapi":
                 try:
@@ -157,7 +156,6 @@ def _parse_config(content: str) -> ConfigParser:
     'Interface', 'Peer1', 'Peer2', 'Peer2', etc.
     This way we prevent duplicate section keys.
     """
-
     cp = ConfigParser(defaults=None, dict_type=MultiDict, strict=False)
     # Set to use str so it doesn't do any lower operation on the keys.
     cp.optionxform = str

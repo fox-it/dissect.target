@@ -28,7 +28,6 @@ class EtlRecordBuilder:
 
     def _build_record(self, etl_event: Event, etl_path: Path, target: Target) -> Record:
         """Builds an ETL event record."""
-
         record_values = {}
         record_fields = [
             ("datetime", "ts"),
