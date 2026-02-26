@@ -106,9 +106,9 @@ class BitsPlugin(Plugin):
         Returns:
             int: size of the JobError structure.
         """
-        if blob[4 * 5: 4 * 5 + 1] == b"\x00":
+        if blob[4 * 5 : 4 * 5 + 1] == b"\x00":
             return 21
-        return 21 + struct.unpack("<L", blob[4 * 5 + 2: 4 * 5 + 6])[0] + 2
+        return 21 + struct.unpack("<L", blob[4 * 5 + 2 : 4 * 5 + 6])[0] + 2
 
     @export(record=[BitsRecord])
     def bits(self) -> Iterator[BitsRecord]:
