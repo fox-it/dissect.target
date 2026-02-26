@@ -112,7 +112,7 @@ class BitsPlugin(Plugin):
     def bits(self) -> Iterator[BitsRecord]:
         """Return entries found in background intelligent transfer service ESE database. (Windows 10 or later).
 
-        Version pre windows 10 use a different format
+        Version pre Windows 10 use a different format.
 
         References:
             - https://github.com/fireeye/BitsParser
