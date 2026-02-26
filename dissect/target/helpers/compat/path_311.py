@@ -416,6 +416,6 @@ class TargetPath(Path, PureDissectPath):
 
     def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
-        (as returned by os.path.expanduser)
+        (as returned by os.path.expanduser).
         """
         raise NotImplementedError("TargetPath.expanduser() is unsupported")

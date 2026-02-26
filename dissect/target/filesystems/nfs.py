@@ -51,7 +51,7 @@ class AuthFlavorNotSupported(Exception):
 
 
 class NfsFilesystem(Filesystem):
-    """Filesystem implementation of a NFS share
+    """Filesystem implementation of a NFS share.
 
     The connection is lazily established to not waste resources.
     Use the ``connect`` method to conveniently create a new instance.
@@ -159,7 +159,7 @@ class NfsFilesystemEntry(FilesystemEntry):
         return self._backing_attributes
 
     def get(self, path: str) -> NfsFilesystemEntry:
-        """Get a new filesystem entry relative to this entry"""
+        """Get a new filesystem entry relative to this entry."""
         if not self.is_dir():
             raise NotADirectoryError
 

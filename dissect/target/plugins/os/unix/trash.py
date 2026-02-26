@@ -40,7 +40,7 @@ class GnomeTrashPlugin(Plugin):
         self.trashes = set(self._garbage_collector())
 
     def _garbage_collector(self) -> Iterator[tuple[UserDetails, TargetPath]]:
-        """It aint much, but its honest work"""
+        """It aint much, but its honest work."""
         # home trash folders
         for user_details in self.target.user_details.all_with_home():
             for trash_path in self.PATHS:

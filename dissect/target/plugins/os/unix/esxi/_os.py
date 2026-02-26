@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 
 class ESXiPlugin(UnixPlugin):
-    """ESXi OS plugin
+    """ESXi OS plugin.
 
     ESXi partitioning varies between versions. Generally, specific partition numbers have special meaning.
 

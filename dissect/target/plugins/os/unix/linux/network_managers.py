@@ -207,7 +207,7 @@ class Template:
 
 class Parser:
     """Class that represents a parser. This class translates the config created from a Template into a generic
-    configuration dictionary
+    configuration dictionary.
 
     Args:
         target: Target to parse the config from.
@@ -338,7 +338,7 @@ class NetworkManager:
         self.detection_globs = (detection_globs,) if isinstance(detection_globs, str) else detection_globs
 
     def detect(self, target: Target | None = None) -> bool:
-        """Detects if the network manager is active on the target
+        """Detects if the network manager is active on the target.
 
         Returns:
             Whether a certain network manager is detected on the target

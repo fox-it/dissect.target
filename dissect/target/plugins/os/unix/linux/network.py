@@ -732,7 +732,7 @@ def parse_network_manager_dhcp_lease_new(log_record: LogRecord) -> DhcpLease | N
 
 
 def parse_network_manager_centos_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
-    """Parse DHCP centos information"""
+    """Parse DHCP centos information."""
     if not (match := re.search(r"dhcp[46] \((\S+)\):\s+address\s+(\S+)", log_record.message)):
         return None
     name, interface = match.groups()

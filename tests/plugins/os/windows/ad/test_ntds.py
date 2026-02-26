@@ -44,7 +44,7 @@ def target_win_ntds(target_win: Target, hive_hklm: VirtualHive) -> Target:
 
 
 def test_users(target_win_ntds: Target) -> None:
-    """Tests if ``ad.users`` outputs the correct amount of records and their content"""
+    """Tests if ``ad.users`` outputs the correct amount of records and their content."""
     cn_to_ntlm_hash_mapping = {
         "krbtgt": "988160b622eb37838dbff2523015e44c",  # Unknown Password
         "NORTH$": "8048b2621bb71945d6ca6e9a14084af1",  # Unknown Password
@@ -75,7 +75,7 @@ def test_users(target_win_ntds: Target) -> None:
 
 
 def test_computers(target_win_ntds: Target) -> None:
-    """Tests if ``ad.computers`` outputs the correct amount of records and their content"""
+    """Tests if ``ad.computers`` outputs the correct amount of records and their content."""
     cn_to_ntlm_hash_mapping = {
         "KINGSLANDING": "00e3201a59af7ecc72e939a8c9794c64",  # Unknown Password
     }
@@ -98,7 +98,7 @@ def test_group_policies(target_win_ntds: Target) -> None:
 
 
 def test_secretsdump(target_win_ntds: Target) -> None:
-    """Tests if ``ad.secretsdump`` outputs the correct credentials in secretsdump format"""
+    """Tests if ``ad.secretsdump`` outputs the correct credentials in secretsdump format."""
     results = list(target_win_ntds.ad.secretsdump())
 
     assert len(results) == 82  # 34 hashes and 48 Kerberos keys

@@ -59,7 +59,7 @@ ns = {
 
 
 def parse_ts(target: Target, ts: str) -> datetime | None:
-    """Parse timestamp format from xbel file
+    """Parse timestamp format from xbel file.
 
     Returns None if unable to parse the timestamp
     """

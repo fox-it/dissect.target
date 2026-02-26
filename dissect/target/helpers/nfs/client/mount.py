@@ -51,7 +51,7 @@ class Client(AbstractContextManager):
         local_port: int | LocalPortPolicy = 0,
         timeout_in_seconds: float | None = 5.0,
     ) -> Client:
-        """Utility function to setup a connection to a NFS Mount Server
+        """Utility function to setup a connection to a NFS Mount Server.
 
         Args:
             hostname: The remote hostname.

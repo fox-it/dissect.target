@@ -99,7 +99,7 @@ class CronjobPlugin(Plugin):
 
     @export(record=[CronjobRecord, EnvironmentVariableRecord])
     def cronjobs(self) -> Iterator[CronjobRecord | EnvironmentVariableRecord]:
-        """Yield cronjobs, and their configured environment variables on a Unix system
+        """Yield cronjobs, and their configured environment variables on a Unix system.
 
         A cronjob is a scheduled task/command on a Unix based system. Adversaries may use cronjobs to gain
         persistence on the system.

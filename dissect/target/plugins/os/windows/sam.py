@@ -377,7 +377,7 @@ class SamPlugin(Plugin):
 
     @export(record=SamRecord)
     def sam(self) -> Iterator[SamRecord]:
-        """Dump SAM entries
+        """Dump SAM entries.
 
         The Security Account Manager (SAM) registry hive contains registry keys that store usernames, full names and
         passwords in a hashed format, either an LM or NT hash.
