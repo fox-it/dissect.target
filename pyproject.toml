@@ -208,11 +208,11 @@ select = [
   "PERF",
   "FURB",
   "RUF",
-  "D" # Pydocstyle related event, lot of rules are disable are
+  "D"
 ]
 ignore = [
     "E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003", "PLC0415",
-    # undocumented related rules
+    # Pydocstyle related rules ignored as we need to fix the code base before activate these rules.
     "D1",
     "D205",
     "D301",
