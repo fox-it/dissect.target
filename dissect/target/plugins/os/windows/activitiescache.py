@@ -34,7 +34,7 @@ ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtensio
         ("uint32", "activity_type"),
         ("uint32", "activity_status"),
         ("uint32", "activity_priority"),
-        ("uint32", "match_id"),
+        ("string", "match_id"),
         ("uint32", "etag"),
         ("string", "tag"),
         ("boolean", "is_local_only"),
@@ -108,7 +108,7 @@ class ActivitiesCachePlugin(Plugin):
             activity_type (int): ActivityType field.
             activity_status (int): ActivityStatus field.
             activity_priority (int): Priority field.
-            match_id (int): MatchId field.
+            match_id (string): MatchId field.
             etag (int): ETag field.
             tag (string): Tag field.
             is_local_only (boolean): IsLocalOnly field.
@@ -120,41 +120,39 @@ class ActivitiesCachePlugin(Plugin):
             clipboard_payload (string): ClipboardPayload field.
         """
         for user, cache_file in self.cachefiles:
-            fh = cache_file.open()
-            db = SQLite3(fh)
-
-            if table := db.table("Activity"):
-                for r in table.rows():
-                    yield ActivitiesCacheRecord(
-                        start_time=mkts(r["[StartTime]"]),
-                        end_time=mkts(r["[EndTime]"]),
-                        last_modified_time=mkts(r["[LastModifiedTime]"]),
-                        last_modified_on_client=mkts(r["[LastModifiedOnClient]"]),
-                        original_last_modified_on_client=mkts(r["[OriginalLastModifiedOnClient]"]),
-                        expiration_time=mkts(r["[ExpirationTime]"]),
-                        activity_id=r["[Id]"].hex(),
-                        app_id=r["[AppId]"],
-                        enterprise_id=r["[EnterpriseId]"] or None,
-                        app_activity_id=r["[AppActivityId]"],
-                        group_app_activity_id=r["[GroupAppActivityId]"] or None,
-                        group=r["[Group]"],
-                        activity_type=r["[ActivityType]"],
-                        activity_status=r["[ActivityStatus]"],
-                        activity_priority=r["[Priority]"],
-                        match_id=r["[MatchId]"],
-                        etag=r["[ETag]"],
-                        tag=r["[Tag]"],
-                        is_local_only=r["[IsLocalOnly]"],
-                        created_in_cloud=r["[CreatedInCloud]"],
-                        platform_device_id=r["[PlatformDeviceId]"],
-                        package_id_hash=r["[PackageIdHash]"],
-                        payload=r["[Payload]"],
-                        original_payload=r["[OriginalPayload]"],
-                        clipboard_payload=r["[ClipboardPayload]"],
-                        source=cache_file,
-                        _target=self.target,
-                        _user=user,
-                    )
+            with SQLite3(cache_file) as db:
+                if table := db.table("Activity"):
+                    for r in table.rows():
+                        yield ActivitiesCacheRecord(
+                            start_time=mkts(r["[StartTime]"]),
+                            end_time=mkts(r["[EndTime]"]),
+                            last_modified_time=mkts(r["[LastModifiedTime]"]),
+                            last_modified_on_client=mkts(r["[LastModifiedOnClient]"]),
+                            original_last_modified_on_client=mkts(r["[OriginalLastModifiedOnClient]"]),
+                            expiration_time=mkts(r["[ExpirationTime]"]),
+                            activity_id=r["[Id]"].hex(),
+                            app_id=r["[AppId]"],
+                            enterprise_id=r["[EnterpriseId]"] or None,
+                            app_activity_id=r["[AppActivityId]"],
+                            group_app_activity_id=r["[GroupAppActivityId]"] or None,
+                            group=r["[Group]"],
+                            activity_type=r["[ActivityType]"],
+                            activity_status=r["[ActivityStatus]"],
+                            activity_priority=r["[Priority]"],
+                            match_id=r["[MatchId]"],
+                            etag=r["[ETag]"],
+                            tag=r["[Tag]"],
+                            is_local_only=r["[IsLocalOnly]"],
+                            created_in_cloud=r["[CreatedInCloud]"],
+                            platform_device_id=r["[PlatformDeviceId]"],
+                            package_id_hash=r["[PackageIdHash]"],
+                            payload=r["[Payload]"],
+                            original_payload=r["[OriginalPayload]"],
+                            clipboard_payload=r["[ClipboardPayload]"],
+                            source=cache_file,
+                            _target=self.target,
+                            _user=user,
+                        )
 
 
 def mkts(ts: int) -> datetime | None:

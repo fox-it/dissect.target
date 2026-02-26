@@ -96,8 +96,7 @@ class McAfeePlugin(Plugin):
         len_marker = len(self.MARKER_SUSPICIOUS_UDP_CONNECTION)
 
         for log_file in self.get_log_files():
-            with log_file.open() as open_log:
-                database = SQLite3(open_log)
+            with SQLite3(log_file) as database:
                 fields = defaultdict(dict)
                 fields_table = database.table(self.TABLE_FIELD)
 

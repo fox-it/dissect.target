@@ -392,3 +392,15 @@ def test_passwords_backup(target_win_users: Target, fs_win: VirtualFilesystem) -
         records[-1].source
         == "C:\\Users\\John\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\8jb1c7qs.default-release\\logins-backup.json"
     )
+
+
+def test_firefox_linux_xdg_config_home(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we find Mozilla Firefox Linux default XDG_CONFIG_HOME locations."""
+
+    fs_unix.map_dir(
+        "/home/user/.config/mozilla/firefox/g1rbw8y7.Profile Name",
+        absolute_path("_data/plugins/apps/browser/firefox/generic"),
+    )
+
+    plugin = target_unix_users.add_plugin(FirefoxPlugin)
+    assert str(plugin.installs[0][1]) == "/home/user/.config/mozilla/firefox"

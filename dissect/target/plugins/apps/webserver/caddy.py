@@ -150,6 +150,7 @@ class CaddyPlugin(WebserverPlugin):
                         log = match.groupdict()
                         yield WebserverAccessLogRecord(
                             ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
+                            webserver="caddy",
                             remote_ip=log["remote_ip"],
                             method=log["method"],
                             uri=log["uri"],

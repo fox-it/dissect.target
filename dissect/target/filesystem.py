@@ -269,7 +269,7 @@ class Filesystem:
         """
         return self.get(path).walk_ext(topdown, onerror, followlinks)
 
-    def recurse(self, path: str) -> Iterator[DirEntry]:
+    def recurse(self, path: str) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield contents as :class:`FilesystemEntry`.
 
         Does not follow symbolic links.
@@ -633,7 +633,7 @@ class FilesystemEntry:
         """
         yield from fsutil.walk_ext(self, topdown, onerror, followlinks)
 
-    def recurse(self) -> Iterator[DirEntry]:
+    def recurse(self) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield its contents as :class:`DirEntry`.
 
         Does not follow symbolic links.
@@ -1852,3 +1852,4 @@ register("vmtar", "VmtarFilesystem")
 register("cpio", "CpioFilesystem")
 register("vbk", "VbkFilesystem")
 register("ad1", "AD1Filesystem")
+register("ntds", "NtdsFilesystem")

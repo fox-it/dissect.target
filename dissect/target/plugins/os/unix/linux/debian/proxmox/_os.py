@@ -18,6 +18,8 @@ from dissect.target.plugins.os.unix._os import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from typing_extensions import Self
 
     from dissect.target.target import Target
@@ -37,8 +39,7 @@ class ProxmoxPlugin(DebianPlugin):
         obj = super().create(target, sysvol)
 
         if (config_db := target.fs.path("/var/lib/pve-cluster/config.db")).exists():
-            with config_db.open("rb") as fh:
-                vfs = _create_pmxcfs(fh, obj.hostname)
+            vfs = _create_pmxcfs(config_db, obj.hostname)
 
             target.fs.mount("/etc/pve", vfs)
 
@@ -63,41 +64,40 @@ DT_DIR = 4
 DT_REG = 8
 
 
-def _create_pmxcfs(fh: BinaryIO, hostname: str | None = None) -> VirtualFilesystem:
+def _create_pmxcfs(fh: Path, hostname: str | None = None) -> VirtualFilesystem:
     # https://pve.proxmox.com/wiki/Proxmox_Cluster_File_System_(pmxcfs)
-    db = SQLite3(fh)
+    with SQLite3(fh) as db:
+        entries = {row.inode: row for row in db.table("tree")}
 
-    entries = {row.inode: row for row in db.table("tree")}
+        vfs = VirtualFilesystem()
+        for entry in entries.values():
+            if entry.type == DT_DIR:
+                cls = ProxmoxConfigDirectoryEntry
+            elif entry.type == DT_REG:
+                cls = ProxmoxConfigFileEntry
+            else:
+                raise ValueError(f"Unknown pmxcfs file type: {entry.type}")
 
-    vfs = VirtualFilesystem()
-    for entry in entries.values():
-        if entry.type == DT_DIR:
-            cls = ProxmoxConfigDirectoryEntry
-        elif entry.type == DT_REG:
-            cls = ProxmoxConfigFileEntry
-        else:
-            raise ValueError(f"Unknown pmxcfs file type: {entry.type}")
-
-        parts = []
-        current = entry
-        while current.parent != 0:
+            parts = []
+            current = entry
+            while current.parent != 0:
+                parts.append(current.name)
+                current = entries[current.parent]
             parts.append(current.name)
-            current = entries[current.parent]
-        parts.append(current.name)
 
-        path = "/".join(parts[::-1])
-        vfs.map_file_entry(path, cls(vfs, path, entry))
+            path = "/".join(parts[::-1])
+            vfs.map_file_entry(path, cls(vfs, path, entry))
 
-    if hostname:
-        node_root = vfs.path(f"nodes/{hostname}")
-        vfs.symlink(str(node_root), "local")
-        vfs.symlink(str(node_root / "lxc"), "lxc")
-        vfs.symlink(str(node_root / "openvz"), "openvz")
-        vfs.symlink(str(node_root / "qemu-server"), "qemu-server")
+        if hostname:
+            node_root = vfs.path(f"nodes/{hostname}")
+            vfs.symlink(str(node_root), "local")
+            vfs.symlink(str(node_root / "lxc"), "lxc")
+            vfs.symlink(str(node_root / "openvz"), "openvz")
+            vfs.symlink(str(node_root / "qemu-server"), "qemu-server")
 
-    # TODO: .version, .members, .vmlist, maybe .clusterlog and .rrd?
+        # TODO: .version, .members, .vmlist, maybe .clusterlog and .rrd?
 
-    return vfs
+        return vfs
 
 
 class ProxmoxConfigFileEntry(VirtualFile):

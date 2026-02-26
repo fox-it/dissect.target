@@ -166,9 +166,7 @@ class SearchIndexPlugin(Plugin):
     def parse_sqlite(self, path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the SQLite3 ``SystemIndex_1_PropertyStore`` table."""
 
-        with path.open("rb") as fh:
-            db = SQLite3(fh)
-
+        with SQLite3(path) as db:
             # ``ColumnId`` is translated using the ``SystemIndex_1_PropertyStore_Metadata`` table.
             columns = {
                 row.get("Id"): row.get("UniqueKey", "").split("-", maxsplit=1)[-1]

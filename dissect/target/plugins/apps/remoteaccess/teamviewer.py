@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     GENERIC_LOG_RECORD_FIELDS,
@@ -49,6 +49,20 @@ RE_START = re.compile(
 )
 
 
+TeamviewerIncomingRecord = TargetRecordDescriptor(
+    "remoteaccess/teamviewer/incoming",
+    [
+        ("datetime", "ts"),
+        ("datetime", "end"),
+        ("string", "remote_id"),
+        ("string", "name"),
+        ("string", "user"),
+        ("string", "connection_type"),
+        ("string", "connection_id"),
+    ],
+)
+
+
 class TeamViewerPlugin(RemoteAccessPlugin):
     """TeamViewer client plugin.
 
@@ -66,6 +80,11 @@ class TeamViewerPlugin(RemoteAccessPlugin):
         "/var/log/teamviewer*/*.log",
     )
 
+    SYSTEM_INCOMING_GLOBS = (
+        "sysvol/Program Files/TeamViewer/*_incoming.txt",
+        "sysvol/Program Files (x86)/TeamViewer/*_incoming.txt",
+    )
+
     USER_GLOBS = (
         "AppData/Roaming/TeamViewer/teamviewer*_logfile.log",
         "Library/Logs/TeamViewer/teamviewer*_logfile*.log",
@@ -79,11 +98,17 @@ class TeamViewerPlugin(RemoteAccessPlugin):
         super().__init__(target)
 
         self.logfiles: set[tuple[str, UserDetails | None]] = set()
+        self.incoming_logfiles: set[str] = set()
 
         # Find system service log files.
         for log_glob in self.SYSTEM_GLOBS:
             for logfile in self.target.fs.glob(log_glob):
                 self.logfiles.add((logfile, None))
+
+        # Find system incoming connection log files.
+        for log_glob in self.SYSTEM_INCOMING_GLOBS:
+            for logfile in self.target.fs.glob(log_glob):
+                self.incoming_logfiles.add(logfile)
 
         # Find user log files.
         for user_details in self.target.user_details.all_with_home():
@@ -92,7 +117,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     self.logfiles.add((logfile, user_details))
 
     def check_compatible(self) -> None:
-        if not len(self.logfiles):
+        if not len(self.logfiles) and not len(self.incoming_logfiles):
             raise UnsupportedPluginError("No Teamviewer logs found on target")
 
     @export(record=RemoteAccessLogRecord)
@@ -167,6 +192,51 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     source=logfile,
                     _target=self.target,
                     _user=user_details.user if user_details else None,
+                )
+
+    @export(record=TeamviewerIncomingRecord)
+    def incoming(self) -> Iterator[TeamviewerIncomingRecord]:
+        """Yield TeamViewer incoming connection logs.
+
+        TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a system.
+        """
+        for logfile in self.incoming_logfiles:
+            logfile = self.target.fs.path(logfile)
+
+            for line in logfile.open("rt", errors="replace"):
+                if not (line := line.strip()) or line.startswith("# "):
+                    continue
+
+                fields = line.split("\t")
+                if len(fields) < 7:
+                    self.target.log.warning("Skipping TeamViewer incoming connection log line %r in %s", line, logfile)
+                    continue
+
+                try:
+                    start = datetime.strptime(fields[2], "%d-%m-%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+                    end = datetime.strptime(fields[3], "%d-%m-%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+                except Exception as e:
+                    self.target.log.warning(
+                        "Unable to parse timestamps in TeamViewer incoming connection log line %r in %s", line, logfile
+                    )
+                    self.target.log.debug("", exc_info=e)
+                    continue
+
+                remote_id = fields[0]
+                name = fields[1]
+                user = fields[4]
+                connection_type = fields[5]
+                connection_id = fields[6]
+
+                yield TeamviewerIncomingRecord(
+                    ts=start,
+                    end=end,
+                    remote_id=remote_id,
+                    name=name,
+                    user=user,
+                    connection_type=connection_type,
+                    connection_id=connection_id,
+                    _target=self.target,
                 )
 
 
