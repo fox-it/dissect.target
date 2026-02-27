@@ -707,10 +707,10 @@ def iter_zone_records(
                     this function catches and handles the exception by logging an error.
     """
     try:
-        zone_identifier = validate_ads_streams(record)
+        zone_identifier = validate_ads_streams(target, record, path)
         if not zone_identifier:
             return
-        zone_identifier_values = parse_zone_identifier_content(zone_identifier, target)
+        zone_identifier_values = parse_zone_identifier_content(zone_identifier, target, path)
     except ValueError:
         target.log.exception("Error processing Zone.Identifier for Path:%s", path)
         return
@@ -742,25 +742,24 @@ def iter_zone_records(
     )
 
 
-def validate_ads_streams(record: MftRecord) -> Attribute | None:
+def validate_ads_streams(target: Target, record: MftRecord, path: str) -> Attribute | None:
     """
     Returns the single 'Zone.Identifier' ADS attribute if exactly one is present.
 
     Args:
+        target: The Target object used for logging.
         record: The MFT record containing the attributes.
-        path: The file path (used only for the exception message).
+        path: The file path (used only for the error message).
 
     Returns:
         The single 'Zone.Identifier' attribute object if found, otherwise None.
-
-    Raises:
-        ValueError: If more than one 'Zone.Identifier' ADS is present.
     """
     zone_streams = [attr for attr in record.attributes.DATA if attr.name == "Zone.Identifier"]
     count = len(zone_streams)
     if count > 1:
         # Policy violation: Only one Zone.Identifier stream is allowed.
-        raise ValueError("more then 1 zone id")
+        target.log.error("more theen 1 zone identifier ADS for file %s", path)
+        return None
 
     if count == 1:
         return zone_streams[0]
@@ -770,7 +769,7 @@ def validate_ads_streams(record: MftRecord) -> Attribute | None:
 
 
 
-def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
+def parse_zone_identifier_content( target: Target, attr: Attribute, path:str) -> dict | None:
     """
     Reads, decodes, and parses the INI content from the Zone.Identifier ADS attribute.
 
@@ -778,17 +777,13 @@ def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
     the structure against basic INI formatting (key=value on each line).
 
     Args:
-        attr: The Attribute object containing the raw data of the ADS stream.
         target: The Target object used for logging unrecognized keys.
+        attr: The Attribute object containing the raw data of the ADS stream.
+        path: The file path (used only for the error message).
 
     Returns:
         A dictionary containing the parsed key-value pairs from the
-        [ZoneTransfer] section of the Zone.Identifier content.
-
-    Raises:
-        ValueError: If decoding fails, the content is missing the expected
-                    '[ZoneTransfer]' header, a line is malformed (missing '='),
-                    or the content has too many lines of data.
+        [ZoneTransfer] section of the Zone.Identifier content or None if there was an issue.
     """
 
     EXPECTED_KEYS = {"AppZoneId", "HostIpAddress", "HostUrl", "LastWriterPackageFamilyName", "ReferrerUrl", "ZoneId"}
@@ -796,7 +791,7 @@ def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
     content = attr.data()
     # verify the header and split into lines
     if not content.startswith(b"[ZoneTransfer]\r\n"):
-        target.log.error("Missing [ZoneTransfer] header")
+        target.log.error("Missing [ZoneTransfer] header for file %s", path)
         return None
     lines = content.split(b"\r\n")
     # remove the header line
@@ -804,7 +799,7 @@ def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
 
     # Check for excessive lines of data
     if len(lines) > len(EXPECTED_KEYS):
-        target.log.error("Too many data lines")
+        target.log.error("Too many data lines for file %s", path)
         return None
 
     # Simple, non-robust built-in parsing for Zone.Identifier format
@@ -814,17 +809,17 @@ def parse_zone_identifier_content(attr: Attribute, target: Target) -> dict:
         try:
             utf_line = line.decode("utf-8")
         except UnicodeDecodeError as exc:
-                target.log.error("Cannot decode attribute data")
+                target.log.error("Cannot decode attribute data for file %s", path)
                 return None
         if not utf_line.strip():  # Skip empty or whitespace-only lines
             continue
         if "=" not in utf_line:
-            target.log.error("Malformed key-value line")
+            target.log.error("Malformed key-value line for file %s", path)
             return None
         # split limited to one as URL can have = sign
         key, value = utf_line.split("=", 1)
         if key not in EXPECTED_KEYS:
-            target.log.error("Unrecognized Key in ZoneIdentifier: ", key)
+            target.log.error("Unrecognized Key in ZoneIdentifier: %s for file %s", key, path)
             continue
 
         config_data[key] = value
