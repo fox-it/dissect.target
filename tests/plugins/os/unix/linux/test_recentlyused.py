@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.recentlyused import RecentlyUsedPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_recently_used(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:

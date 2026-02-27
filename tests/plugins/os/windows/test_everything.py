@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.everything._plugin import EverythingPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 DIRECTORY = "directory"
 FILE = "file"

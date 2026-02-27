@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import plistlib
-from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.util.plist import NSKeyedArchiver
 
@@ -12,6 +12,9 @@ from dissect.target.helpers.record import (
     TargetRecordDescriptor,
 )
 from dissect.target.plugin import OperatingSystem, Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 IOSApplicationRecord = TargetRecordDescriptor(
     "ios/application",

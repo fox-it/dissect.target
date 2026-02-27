@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import gzip
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.fortios._os import FortiOSPlugin
 from dissect.target.plugins.os.unix.linux.fortios.generic import GenericPlugin
 from dissect.target.plugins.os.unix.linux.fortios.locale import FortiOSLocalePlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:

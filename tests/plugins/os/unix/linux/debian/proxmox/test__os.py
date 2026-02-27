@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.debian.proxmox._os import ProxmoxPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_proxmox_os(target_bare: Target) -> None:

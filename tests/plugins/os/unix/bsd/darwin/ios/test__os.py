@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from dissect.target.filesystem import VirtualFilesystem
+from typing import TYPE_CHECKING
+
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
 from dissect.target.plugins.os.unix.bsd.darwin.ios.applications import (
     IOSApplicationsPlugin,
 )
 from dissect.target.plugins.os.unix.bsd.darwin.ios.locale import LocalePlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_ios_detect(target_bare: Target, fs_ios: VirtualFilesystem) -> None:
