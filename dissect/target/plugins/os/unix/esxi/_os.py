@@ -5,12 +5,13 @@ import subprocess
 from configparser import ConfigParser
 from configparser import Error as ConfigParserError
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, NamedTuple, TextIO
 
 from dissect.util.hash.jenkins import lookup8
 
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.filesystems.vmtar import VmtarFilesystem
+from dissect.target.helpers.record import COMMON_UNIX_FIELDS, TargetRecordDescriptor
 from dissect.target.helpers.sunrpc import client
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 
@@ -31,11 +32,37 @@ from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem, VirtualFilesystem
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
+
+ESXiUserRecord = TargetRecordDescriptor(
+    "unix/esxi/user",
+    [
+        *COMMON_UNIX_FIELDS,
+        ("datetime", "modified_time"),  # From configstore, ESX7 + only
+        ("datetime", "creation_time"),  # From configstore, ESX7 + only
+        ("boolean", "shell_access"),
+    ],
+)
+
+
+class Users(NamedTuple):
+    name: str
+    passwd: str | None = None
+    uid: int | None = None
+    gid: int | None = None
+    gecos: str | None = None
+    home: str | None = None
+    shell: str | None = None
+    source: str | None = None
+    shell_access: bool | None = None
+    modified_time: str | None = None
+    creation_time: str | None = None
 
 
 class ESXiPlugin(UnixPlugin):
@@ -76,6 +103,7 @@ class ESXiPlugin(UnixPlugin):
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
         if sysvol.path("/etc/vmware/esx.conf").exists():
             target.fs.mount("/", sysvol)
+            _link_log_dir_live_system_collection(target)
             return cls(target)
 
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
@@ -95,28 +123,74 @@ class ESXiPlugin(UnixPlugin):
 
         obj = cls(target)
 
-        # Symlink the /var/log directory to the correct destination (if available)
-        _link_log_dir(target, cfg, obj)
+        # Symlink the /var/run/log directory to the correct destination (if available)
+        _link_log_dir_raw_disk(target)
 
         return obj
 
     @export(property=True)
     def hostname(self) -> str:
+        if self.target.has_function("configstore.get"):
+            # Configstore available on ESX7+, but not used to store hostname related information until 8+
+            hostname = (
+                self.target.configstore.get(
+                    component="esx",
+                    config_groupe="advanced_options",
+                    value_groupe_name="misc",
+                    identifier="",
+                    default={},
+                )
+                .get("vital_value", {})
+                .get("host_name", None)
+            )
+            if hostname:
+                return hostname
         if hostname := self.target.esxconf.get("/adv/Misc/HostName"):
             return hostname.split(".", 1)[0]
         return "localhost"
 
     @export(property=True)
     def domain(self) -> str | None:
-        if hostname := self.target.esxconf.get("/adv/Misc/HostName"):
+        if hostname := self.target.hostname:
             return hostname.partition(".")[2]
         return None
 
     @export(property=True)
     def ips(self) -> list[str]:
         result = set()
-        host_ip = self.target.esxconf.get("/adv/Misc/HostIPAddr")
-        mgmt_ip = self.target.esxconf.get("/adv/Net/ManagementAddr")
+        host_ip = None
+        mgmt_ip = None
+        if self.target.has_function("configstore.get"):
+            # Configstore available on ESX7+, but not used to store IP related information until 8+
+
+            mgmt_ip = (
+                self.target.configstore.get(
+                    component="esx",
+                    config_groupe="advanced_options",
+                    value_groupe_name="net",
+                    identifier="",
+                    default={},
+                )
+                .get("vital_value", {})
+                .get("management_addr", None)
+            )
+            host_ip = (
+                self.target.configstore.get(
+                    component="esx",
+                    config_groupe="advanced_options",
+                    value_groupe_name="misc",
+                    identifier="",
+                    default={},
+                )
+                .get("vital_value", {})
+                .get("host_IP_addr", None)
+            )
+
+        if mgmt_ip is None and host_ip is None:
+            # Before ESX8, Ip adresses are stored in esxconf
+
+            host_ip = self.target.esxconf.get("/adv/Misc/HostIPAddr")
+            mgmt_ip = self.target.esxconf.get("/adv/Net/ManagementAddr")
 
         if host_ip:
             result.add(host_ip)
@@ -137,12 +211,86 @@ class ESXiPlugin(UnixPlugin):
                 continue
 
             _, _, version = line.partition("=")
-            return f"VMware ESXi {version.strip()}"
+            return version.strip()
         return None
 
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.ESXI.value
+
+    @export(record=[ESXiUserRecord])
+    def users(self) -> Iterator[ESXiUserRecord]:
+        """
+        Return users from /etc/passwd (if available/collected) and from configstore (ESXi7+).
+        Both entries are merged.
+        Usually DCUI and vpxuser are not present in configstore in ESXi8+, but still present in the system.
+        Password hash are present in configstore, but are censored when collected using vmsupport (replaced with *****)
+        Configstore allows to retrieve the creation_time and last modification_time of the database entry.
+        """
+        # First we retrieve users from /etc/passwd if file is present
+        users_dict: dict[str, Users] = {
+            record.name: Users(
+                name=record.name,
+                passwd=record.passwd,
+                uid=record.uid,
+                gid=record.gid,
+                gecos=record.gecos,
+                home=record.home,
+                shell=record.shell,
+                source=record.source,
+                shell_access=record.shell != "/sbin/nologin",
+            )
+            for record in super().users(sessions=False)
+        }
+        if self.target.has_function("configstore.get"):
+            users = self.target.configstore.get(
+                component="esx", config_groupe="authentication", value_groupe_name="user_accounts", default={}
+            )
+            for v in users.values():
+                user_value = v.get("user_value", {})
+                vital_value = v.get("vital_value", {})
+                user_name = user_value.get("name", None)
+                if user_name in users_dict:
+                    user = users_dict[user_name]
+                    if user.uid != vital_value.get("uid", None):
+                        self.target.log.warning(
+                            "issue when merging users from /etc/passwd and configstore : %s has two differente Uid. "
+                            "From configstore : %s, from /etc/passwd : %s",
+                            user_name,
+                            user.uid,
+                            vital_value.get("uid", None),
+                        )
+                    users_dict[user_name] = Users(
+                        name=user.name,
+                        passwd=user_value.get("password_hash", None),
+                        uid=user.uid,
+                        gid=user.gid,
+                        gecos=user.gecos or user_value.get("description", None),
+                        home=user.home,
+                        shell=user.shell,
+                        source="+".join([str(user.source), str(self.target.configstore.path)]),
+                        # When shell access is disabled, this key is present with the value
+                        # DISABLED. This key is absent otherwise
+                        shell_access=user_value.get("shell_access", None) != "DISABLED",
+                        modified_time=v.get("modified_time", None),
+                        creation_time=v.get("creation_time", None),
+                    )
+                else:
+                    users_dict[user_name] = Users(
+                        name=user_value.get("name", None),
+                        gecos=user_value.get("description", None),
+                        passwd=user_value.get("password_hash", None),
+                        modified_time=v.get("modified_time", None),
+                        creation_time=v.get("creation_time", None),
+                        uid=vital_value.get("uid", None),
+                        source=self.target.configstore.path,
+                        shell_access=user_value.get("shell_access", None) != "DISABLED",
+                    )
+            for user in users_dict.values():
+                yield ESXiUserRecord(
+                    **user._asdict(),
+                    _target=self.target,
+                )
 
     def _mount_nfs_shares(self) -> None:
         """Mount NFS shares found in the configstore."""
@@ -150,8 +298,8 @@ class ESXiPlugin(UnixPlugin):
             self.target.log.warning("No configstore found, unable to mount NFS shares")
             return
 
-        nfs_shares: dict[str, Any] = (
-            self.target.configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
+        nfs_shares: dict[str, Any] = self.target.configstore.get(
+            component="esx", config_groupe="storage", value_groupe_name="nfs_v3_datastores", default={}
         )
         if not nfs_shares:
             if self._is_nfs_enabled:
@@ -297,7 +445,7 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
 
         if local_tgz is None:
             target.log.warning("Dynamic decryption of %s failed", local_tgz_ve)
-    else:
+    elif not local_tgz:
         target.log.warning("local.tgz is encrypted but static decryption failed and no dynamic decryption available!")
 
     if local_tgz:
@@ -346,14 +494,16 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
             target.fs.mount(f"/vmfs/volumes/{fs.vmfs.uuid}", fs)
             target.fs.symlink(f"/vmfs/volumes/{fs.vmfs.uuid}", f"/vmfs/volumes/{fs.vmfs.label}")
 
-            if fs.volume.name in ("OSDATA", "LOCKER"):
+            # in ESXi 8+, OSDATA volume is a physical volume (lvm), thus we need to identify the logical volume
+            if fs.volume.name in ("OSDATA", "LOCKER") or fs.vmfs.label == f"OSDATA-{str(fs.vmfs.uuid).lower()}":
                 target.fs.symlink(
                     f"/vmfs/volumes/{fs.vmfs.uuid}",
                     f"/vmfs/volumes/{fs.volume.name}-{fs.vmfs.uuid}",
                 )
 
-                if fs.volume.name == "OSDATA":
+                if fs.volume.name in ["OSDATA"] or fs.vmfs.label == f"OSDATA-{str(fs.vmfs.uuid).lower()}":
                     osdata_fs = fs
+                # It may not work, but we lack test data for this use case.
                 elif fs.volume.name == "LOCKER":
                     locker_fs = fs
 
@@ -378,23 +528,31 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
         target.fs.symlink(f"/vmfs/volumes/OSDATA-{osdata_fs.vmfs.uuid}", "/var/lib/vmware/osdata")
         target.fs.symlink("/var/lib/vmware/osdata/store", "/store")
         target.fs.symlink("/var/lib/vmware/osdata/locker", "/locker")
+        # In ESXI7+; /scratch is symlink to os data
+        # We just check if /scratch already exists
+        if not target.fs.exists("/scratch"):
+            target.fs.symlink("/var/lib/vmware/osdata", "/scratch")
 
     elif locker_fs:
         target.fs.symlink(f"/vmfs/volumes/LOCKER-{locker_fs.vmfs.uuid}", "/locker")
 
 
-def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin) -> None:
-    version = cfg["build"]
+def _get_log_dir_from_target(target: Target) -> str:
+    """Identify log dir from either configstore (ESXi7+) or /etc/vmsyslog.conf (ESXi6)."""
 
-    # Don't really know how ESXi does this, but let's just take a shortcut for now
-    log_dir = None
-    if version and version[0] == "7":
+    # After ESXi7, log dir location is stored in the configstore.
+    # As retrieving version is not easy, we just check if configstore exists.
+    log_dir = "/scratch/log"
+    if target.has_function("configstore.get"):
         try:
-            log_dir = target.configstore._configstore["esx"]["syslog"]["global_settings"][""]["user_value"]["log_dir"]
+            log_dir = target.configstore.get(
+                component="esx", config_groupe="syslog", value_groupe_name="global_settings", identifier="", default={}
+            )["user_value"]["log_dir"]
         except KeyError:
             target.log.warning("Failed to read log_dir from configstore, falling back to /scratch/log")
-            log_dir = "/scratch/log"
-    elif version and version[0] == "6":
+
+    else:
+        # If configstore is missing, we assume we are on a pre ESXi7 version
         vmsyslog_file = target.fs.path("/etc/vmsyslog.conf")
         if vmsyslog_file.exists():
             try:
@@ -409,10 +567,42 @@ def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin) -
                     "Failed to read log_dir from vmsyslog.conf, falling back to /scratch/log",
                     exc_info=e,
                 )
-                log_dir = "/scratch/log"
+    return log_dir
 
-    if log_dir:
-        target.fs.symlink(log_dir, "/var/log")
+
+def _link_log_dir_live_system_collection(target: Target) -> None:
+    """Link log directories on a live system collection.
+    Ensure symlink from log_dir (usually /scratch/log) to /var/run/log or vice versa
+    As sometime log_dir is collected, sometime only /var/run/log is collected
+
+    """
+    log_dir = _get_log_dir_from_target(target)
+    if target.fs.exists("/var/run/log") and target.fs.exists(log_dir):
+        pass
+    elif target.fs.exists("/var/run/log"):
+        target.fs.symlink("/var/run/log", log_dir)
+    elif target.fs.exists(log_dir):
+        target.fs.symlink(log_dir, "/var/run/log")
+    else:
+        target.log.warning("Failed to symlink log_dir neither /var/run/log or log_dir : %s exists", log_dir)
+
+
+def _link_log_dir_raw_disk(target: Target) -> None:
+    """Link log directory from a disk system : symlink from log_dir (usually /scratch/log) to /var/run/log"""
+
+    # Don't really know how ESXi does this, but let's just take a shortcut for now
+    log_dir = _get_log_dir_from_target(target)
+
+    # /var/log also contains some log files,
+    # but it symlinked file, by file (only currently append files, not <>.X.gz.
+    # Furthermore, it does not contain all log and may already contain some files/directories
+    # Not symlinked files seems to be RAM only.
+    # e.g tallylog
+    # Thus we only symlink the /var/run/log
+    if not target.fs.exists("/var/run/log"):
+        target.fs.symlink(log_dir, "/var/run/log")
+    else:
+        target.log.warning("/var/run/log already exists. Does not create symlink from log dir : %s", log_dir)
 
 
 def parse_boot_cfg(fh: TextIO) -> dict[str, str]:
