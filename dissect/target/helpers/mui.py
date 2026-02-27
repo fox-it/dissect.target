@@ -7,6 +7,7 @@ References:
     - https://learn.microsoft.com/en-us/windows/win32/intl/using-registry-string-redirection
     - https://learn.microsoft.com/en-us/windows/win32/api/winnls/ns-winnls-filemuiinfo
 """
+
 from __future__ import annotations
 
 MUI_TZ_MAP = {

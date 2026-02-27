@@ -1,4 +1,5 @@
 """Known folder IDs."""
+
 from __future__ import annotations
 
 DESCRIPTIONS = {
