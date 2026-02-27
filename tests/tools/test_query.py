@@ -325,7 +325,7 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
     sam_plugin = get_plugin(output, "sam")
     assert sam_plugin == {
         "name": "sam",
-        "description": "Dump SAM entries",
+        "description": "Dump SAM entries.",
         "output": "record",
         "arguments": [],
         "alias": False,
