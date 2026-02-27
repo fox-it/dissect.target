@@ -1,4 +1,5 @@
 """Known folder IDs."""
+from __future__ import annotations
 
 DESCRIPTIONS = {
     "00020d75-0000-0000-c000-000000000046": "Inbox",

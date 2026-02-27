@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.filesystem import VirtualFilesystem

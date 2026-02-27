@@ -6,6 +6,7 @@
 # Number of types:      766
 # References:           http://www.freedesktop.org/standards/shared-mime-info
 #                       https://gitlab.freedesktop.org/xdg/shared-mime-info/-/blob/master/data/freedesktop.org.xml.in
+from __future__ import annotations
 
 TYPES = [
     {"type": "application/x-atari-2600-rom", "name": "Atari 2600 ROM", "pattern": ["*.a26"], "magic": []},

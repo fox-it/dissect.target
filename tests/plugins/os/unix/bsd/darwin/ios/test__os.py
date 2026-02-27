@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
