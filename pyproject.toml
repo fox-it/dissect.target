@@ -217,7 +217,7 @@ ignore = [
     "D205",
     "D301",
     "D417",
-    "D402", # seems bugged
+    "D402", # seems bugged : https://github.com/astral-sh/ruff/issues/16824
 
 ]
 
