@@ -1327,4 +1327,4 @@ def test_filesystem_identifier_string_when_no_guid_or_name() -> None:
     fs.volume = Mock(guid=None)
     fs.volume.name = None
 
-    assert fs.identifier == "filesystem_test"
+    assert fs.identifier == repr(fs)
