@@ -710,7 +710,7 @@ def iter_zone_records(
         zone_identifier = validate_ads_streams(target, record, path)
         if not zone_identifier:
             return
-        zone_identifier_values = parse_zone_identifier_content(zone_identifier, target, path)
+        zone_identifier_values = parse_zone_identifier_content(target, zone_identifier, path)
     except ValueError:
         target.log.exception("Error processing Zone.Identifier for Path:%s", path)
         return
@@ -769,7 +769,7 @@ def validate_ads_streams(target: Target, record: MftRecord, path: str) -> Attrib
 
 
 
-def parse_zone_identifier_content( target: Target, attr: Attribute, path:str) -> dict | None:
+def parse_zone_identifier_content(target: Target, attr: Attribute, path: str) -> dict | None:
     """
     Reads, decodes, and parses the INI content from the Zone.Identifier ADS attribute.
 
@@ -779,7 +779,8 @@ def parse_zone_identifier_content( target: Target, attr: Attribute, path:str) ->
     Args:
         target: The Target object used for logging unrecognized keys.
         attr: The Attribute object containing the raw data of the ADS stream.
-        path: The file path (used only for the error message).
+        path: The file path (used only for the error messages).
+
 
     Returns:
         A dictionary containing the parsed key-value pairs from the
