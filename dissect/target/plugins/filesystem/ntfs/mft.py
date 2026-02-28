@@ -700,11 +700,6 @@ def iter_zone_records(
 
     Yields:
         A ZoneIdentifierRecord object.
-
-    Raises:
-        ValueError: Raised by internal calls to `validate_ads_streams` (if >1 stream) or 
-                    `parse_zone_identifier_content` (if content is malformed), though 
-                    this function catches and handles the exception by logging an error.
     """
     try:
         zone_identifier = validate_ads_streams(target, record, path)
