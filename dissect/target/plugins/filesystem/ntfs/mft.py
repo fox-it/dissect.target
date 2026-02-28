@@ -421,7 +421,7 @@ class MftPlugin(Plugin):
             try:
                 filesystems = [self.ntfs_filesystems[fs]]
             except KeyError:
-                self.target.log.error("NTFS filesystem with index number %s does not exist", fs)
+                self.target.log.exception("NTFS filesystem with index number %s does not exist", fs)
                 return
         else:
             filesystems = self.ntfs_filesystems.values()
@@ -430,27 +430,15 @@ class MftPlugin(Plugin):
 
             try:
                 for record in filesystem.ntfs.mft.segments(start, end):
-                    try:
-                        info.update(record, filesystem)
-
-                        for path in record.full_paths():
-                            path = f"{info.drive_letter}{path}"
-
-                            yield from iter_zone_records(
-                                record=record,
-                                segment=record.segment,
-                                path=path,
-                                volume_uuid=info.volume_uuid,
-                                target=self.target,
-                            )
-
-                    except Exception as e:
-                        self.target.log.warning(
-                            "An error occurred parsing MFT segment %d: %s",
-                            record.segment,
-                            str(e),
+                    info.update(record, filesystem)
+                    for path in record.full_paths():
+                        yield from iter_zone_records(
+                            record=record,
+                            segment=record.segment,
+                            path=f"{info.drive_letter}{path}",
+                            volume_uuid=info.volume_uuid,
+                            target=self.target,
                         )
-                        self.target.log.debug("", exc_info=e)
 
             except Exception:
                 self.target.log.exception("An error occurred constructing ZoneIdentifier records")
@@ -678,8 +666,6 @@ def format_none_value(value: Any) -> str | Any:
     return value if value is not None else "No Data"
 
 
-
-
 def iter_zone_records(
     record: MftRecord,
     segment: int,
@@ -758,10 +744,8 @@ def validate_ads_streams(target: Target, record: MftRecord, path: str) -> Attrib
 
     if count == 1:
         return zone_streams[0]
-    
+
     return None
-
-
 
 
 def parse_zone_identifier_content(target: Target, attr: Attribute, path: str) -> dict | None:
@@ -804,9 +788,9 @@ def parse_zone_identifier_content(target: Target, attr: Attribute, path: str) ->
     for line in lines:
         try:
             utf_line = line.decode("utf-8")
-        except UnicodeDecodeError as exc:
-                target.log.error("Cannot decode attribute data for file %s", path)
-                return None
+        except UnicodeDecodeError:
+            target.log.exception("Cannot decode attribute data for file %s", path)
+            return None
         if not utf_line.strip():  # Skip empty or whitespace-only lines
             continue
         if "=" not in utf_line:
@@ -820,4 +804,3 @@ def parse_zone_identifier_content(target: Target, attr: Attribute, path: str) ->
 
         config_data[key] = value
     return config_data
-
