@@ -5,11 +5,16 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
 
     from dissect.target.helpers.record import DynamicDescriptor
     from dissect.target.target import Target
@@ -50,9 +55,9 @@ class PowershellPlugin(Plugin):
     __namespace__ = "powershell"
 
     SCRIPTBLOCK_EVENTID = 4104
-    LOGS_DIR_PATH = "sysvol/windows/system32/winevt/logs/"
-    OPERATIONAL_LOG_PATH = "Microsoft-Windows-PowerShell%4Operational.evtx"
-    PATHS = (
+    OPERATIONAL_LOG_PATH = "*Microsoft-Windows-PowerShell%4Operational.evtx"
+
+    HISTORY_PATHS = (
         "AppData/Roaming/Microsoft/Windows/PowerShell/psreadline",
         ".local/share/powershell/PSReadLine",
     )
@@ -60,43 +65,57 @@ class PowershellPlugin(Plugin):
     def __init__(self, target: Target):
         super().__init__(target)
         # Used in scriptblocks
-        self.log_path = self.target.fs.path(self.LOGS_DIR_PATH + self.OPERATIONAL_LOG_PATH)
+        self.events: list[DynamicDescriptor] = []
+        if self.target.has_function("evtx"):
+            self.event = self.target.evtx(log_file_glob=self.OPERATIONAL_LOG_PATH)
 
         # Used in powershell_history
-        self._history = []
+        self._history: list[TargetPath] = []
 
         for user_details in target.user_details.all_with_home():
-            for ps_path in self.PATHS:
+            for ps_path in self.HISTORY_PATHS:
                 history_path = user_details.home_path.joinpath(ps_path)
                 for history_file in history_path.glob("*_history.txt"):
                     self._history.append((user_details.user, history_file))
 
     def check_compatible(self) -> None:
-        if not any([self.log_path.exists(), self._history]):
+        if not any([self.events, self._history]):
             raise UnsupportedPluginError("No Powershell Artifcats were found!")
 
-    def build_scriptblock(self, scriptblock_group: list[DynamicDescriptor]) -> PowershellScriptblockRecord:
-        script_complete = True
-        scriptblock_id = scriptblock_group[0].ScriptBlockId
-        group_msg_total = int(scriptblock_group[0].MessageTotal)
-        event_record_ids = [int(log.EventRecordID) for log in scriptblock_group]
-        if len(scriptblock_group) < group_msg_total:
-            self.target.log.warning("ScriptBlock with id %s is incomplete", scriptblock_id)
-            script_complete = False
+    def build_scriptblock(
+        self, scriptblocks: list[DynamicDescriptor]
+    ) -> PowershellScriptblockRecord:
+        """Build a PowershellScriptblockRecord from a list of DynamicDescriptors containing events with the same ScriptBlockId.
 
-        full_script = "".join([log.ScriptBlockText for log in scriptblock_group])
-        yield PowershellScriptblockRecord(
-            ts=scriptblock_group[0].ts,
-            activity_id=scriptblock_group[0].Correlation_ActivityID,
-            scriptblock_id=scriptblock_id,
+        Args:
+            scriptblocks (list[DynamicDescriptor]): List of DynamicDescriptors containing events with the same
+                ScriptBlockId, ordered by MessageNumber.
+
+        Returns:
+            PowershellScriptblockRecord: Record containing the combined information of the events.
+        """
+        script_block_id = scriptblocks[0].ScriptBlockId
+        message_total = int(scriptblocks[0].MessageTotal)
+        script_complete = len(scriptblocks) == message_total
+
+        if not script_complete:
+            self.target.log.warning(
+                "ScriptBlock with id: %s, is incomplete", script_block_id
+            )
+
+        full_script = "".join([log.ScriptBlockText for log in scriptblocks])
+        return PowershellScriptblockRecord(
+            ts=scriptblocks[0].ts,
+            activity_id=scriptblocks[0].Correlation_ActivityID,
+            scriptblock_id=script_block_id,
             scriptblock=full_script,
-            event_record_ids=event_record_ids,
-            pid=int(scriptblock_group[0].Execution_ProcessID),
-            tid=int(scriptblock_group[0].Execution_ThreadID),
-            total_messages=group_msg_total,
-            user_sid=scriptblock_group[0].Security_UserID,
+            event_record_ids=[int(log.EventRecordID) for log in scriptblocks],
+            pid=int(scriptblocks[0].Execution_ProcessID),
+            tid=int(scriptblocks[0].Execution_ThreadID),
+            total_messages=message_total,
+            user_sid=scriptblocks[0].Security_UserID,
             script_complete=script_complete,
-            script_path=scriptblock_group[0].Path,
+            script_path=scriptblocks[0].Path,
             _target=self.target,
         )
 
@@ -106,24 +125,30 @@ class PowershellPlugin(Plugin):
 
         Script Block Logging is a PowerShell feature that logs the contents of all script blocks processed
         by the PowerShell engine, including commands, scripts, functions, and code blocks.
-        These events are logged inWindows Event Log (Microsoft-Windows-PowerShell/Operational).
-        """
-        events = self.target.evtx(logs_dir=self.LOGS_DIR_PATH, log_file_glob=self.OPERATIONAL_LOG_PATH)
-
-        """The executed Scriptblocks are broken to multiple events if the size of the block is too large.
-        to get the entire script, the messages are grouped together and then combined to one record
+        These events are logged in Windows Event Log (Microsoft-Windows-PowerShell/Operational).
+        The executed Scriptblocks are broken to multiple events if the size of the block is too large.
         """
         scriptblock_group = []
-        for event in events:
-            if event.EventID == self.SCRIPTBLOCK_EVENTID:
-                if event.MessageTotal == event.MessageNumber:
-                    if not scriptblock_group:
-                        scriptblock_group = [event]
-                    yield from self.build_scriptblock(scriptblock_group)
-                else:
-                    scriptblock_group.append(event)
+        for event in self.events:
+            if event.EventID != self.SCRIPTBLOCK_EVENTID:
+                continue
 
-    @arg("-o", "--output", dest="output_dir", type=Path, required=True, help="path to extract scriptblocks to")
+            scriptblock_group.append(event)
+
+            if event.MessageTotal == event.MessageNumber:
+                yield self.build_scriptblock(scriptblock_group)
+                scriptblock_group.clear()
+
+        yield self.build_scriptblock(scriptblock_group)
+
+    @arg(
+        "-o",
+        "--output",
+        dest="output_dir",
+        type=Path,
+        required=True,
+        help="Path to extract scriptblocks to",
+    )
     @export(output="none")
     def export_scriptblocks(self, output_dir: Path) -> None:
         """Export PowerShell scriptblocks to files."""
@@ -132,14 +157,16 @@ class PowershellPlugin(Plugin):
             return
 
         for record in self.scriptblocks():
-            if not record.script_complete or record.total_messages <= 1:
+            if record.total_messages <= 1:
                 continue
 
             file_path = output_dir.joinpath(f"{record.scriptblock_id}.ps1")
-            file_path.write_text(record.scriptblock.replace("\\n", "\n").replace("\\r", "\r"))
+            file_path.write_text(
+                record.scriptblock.replace("\\n", "\n").replace("\\r", "\r")
+            )
 
     @export(record=ConsoleHostHistoryRecord)
-    def powershell_history(self) -> Iterator[ConsoleHostHistoryRecord]:
+    def history(self) -> Iterator[ConsoleHostHistoryRecord]:
         """Return PowerShell command history for all users.
 
         The PowerShell ``ConsoleHost_history.txt`` file contains information about the commands executed with PowerShell in
