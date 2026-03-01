@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -121,6 +122,21 @@ class PowershellPlugin(Plugin):
                     yield from self.build_scriptblock(scriptblock_group)
                 else:
                     scriptblock_group.append(event)
+
+    @arg("-o", "--output", dest="output_dir", type=Path, required=True, help="path to extract scriptblocks to")
+    @export(output="none")
+    def export_scriptblocks(self, output_dir: Path) -> None:
+        """Export PowerShell scriptblocks to files."""
+        if not output_dir.exists():
+            self.target.log.error("Destination folder does not exist: %s", output_dir)
+            return
+
+        for record in self.scriptblocks():
+            if not record.script_complete or record.total_messages <= 1:
+                continue
+
+            file_path = output_dir.joinpath(f"{record.scriptblock_id}.ps1")
+            file_path.write_text(record.scriptblock.replace("\\n", "\n").replace("\\r", "\r"))
 
     @export(record=ConsoleHostHistoryRecord)
     def powershell_history(self) -> Iterator[ConsoleHostHistoryRecord]:
