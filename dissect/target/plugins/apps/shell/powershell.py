@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.helpers.fsutil import TargetPath
-
     from dissect.target.helpers.record import DynamicDescriptor
     from dissect.target.target import Target
 
@@ -47,10 +46,7 @@ ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExten
 
 
 class PowershellPlugin(Plugin):
-    """Plugin for parsing Powershell Artifacts
-
-    Currently implemented are parsing of Powershell 4104 EventLogs and
-    """
+    """Plugin for parsing Powershell Artifacts"""
 
     __namespace__ = "powershell"
 
@@ -67,7 +63,7 @@ class PowershellPlugin(Plugin):
         # Used in scriptblocks
         self.events: list[DynamicDescriptor] = []
         if self.target.has_function("evtx"):
-            self.event = self.target.evtx(log_file_glob=self.OPERATIONAL_LOG_PATH)
+            self.events = self.target.evtx(log_file_glob=self.OPERATIONAL_LOG_PATH)
 
         # Used in powershell_history
         self._history: list[TargetPath] = []
@@ -80,12 +76,10 @@ class PowershellPlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not any([self.events, self._history]):
-            raise UnsupportedPluginError("No Powershell Artifcats were found!")
+            raise UnsupportedPluginError("No Powershell Artifacts were found!")
 
-    def build_scriptblock(
-        self, scriptblocks: list[DynamicDescriptor]
-    ) -> PowershellScriptblockRecord:
-        """Build a PowershellScriptblockRecord from a list of DynamicDescriptors containing events with the same ScriptBlockId.
+    def build_scriptblock(self, scriptblocks: list[DynamicDescriptor]) -> PowershellScriptblockRecord:
+        """Build a PowershellScriptblockRecord from a list containing events with the same ScriptBlockId.
 
         Args:
             scriptblocks (list[DynamicDescriptor]): List of DynamicDescriptors containing events with the same
@@ -99,9 +93,7 @@ class PowershellPlugin(Plugin):
         script_complete = len(scriptblocks) == message_total
 
         if not script_complete:
-            self.target.log.warning(
-                "ScriptBlock with id: %s, is incomplete", script_block_id
-            )
+            self.target.log.warning("ScriptBlock with id: %s, is incomplete", script_block_id)
 
         full_script = "".join([log.ScriptBlockText for log in scriptblocks])
         return PowershellScriptblockRecord(
@@ -139,7 +131,8 @@ class PowershellPlugin(Plugin):
                 yield self.build_scriptblock(scriptblock_group)
                 scriptblock_group.clear()
 
-        yield self.build_scriptblock(scriptblock_group)
+        if scriptblock_group:
+            yield self.build_scriptblock(scriptblock_group)
 
     @arg(
         "-o",
@@ -161,9 +154,7 @@ class PowershellPlugin(Plugin):
                 continue
 
             file_path = output_dir.joinpath(f"{record.scriptblock_id}.ps1")
-            file_path.write_text(
-                record.scriptblock.replace("\\n", "\n").replace("\\r", "\r")
-            )
+            file_path.write_text(record.scriptblock.replace("\\n", "\n").replace("\\r", "\r"))
 
     @export(record=ConsoleHostHistoryRecord)
     def history(self) -> Iterator[ConsoleHostHistoryRecord]:
