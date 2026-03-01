@@ -85,10 +85,12 @@ class SSHServerPlugin(SSHPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self.sshd_directory = find_sshd_directory(target)
-        self.sshd_config_path = self.sshd_directory.joinpath("sshd_config")
+        self.sshd_config_path = (
+            self.sshd_directory.joinpath("sshd_config") if self.sshd_directory else None
+        )
 
     def check_compatible(self) -> None:
-        if not self.sshd_config_path.exists():
+        if not (self.sshd_config_path and self.sshd_config_path.exists()):
             raise UnsupportedPluginError("No sshd config found")
 
     @export(record=DynamicDescriptor(["datetime", "path"]))
