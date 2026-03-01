@@ -181,7 +181,7 @@ class UalPlugin(Plugin):
         return [
             path
             for path in self.target.resolve(base).glob(f"*{glob}")
-            if path.exists() and path.name != self.IDENTITY_DB_FILENAME
+            if path.name != self.IDENTITY_DB_FILENAME
         ]
 
     def populate_role_guid_map(self) -> None:
