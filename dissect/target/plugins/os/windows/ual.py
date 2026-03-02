@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.tools import ual
@@ -11,7 +12,6 @@ from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -158,7 +158,7 @@ class UalPlugin(Plugin):
     __namespace__ = "ual"
     LOG_DIR = "%windir%/System32/LogFiles/Sum/"
     LOG_DB_GLOB = "*.mdb"
-    IDENTITY_FILE_NAME = f"SystemIdentity.mdb"
+    IDENTITY_FILE_NAME = "SystemIdentity.mdb"
 
     def __init__(self, target: Target):
         super().__init__(target)
