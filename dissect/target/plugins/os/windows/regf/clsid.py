@@ -71,7 +71,8 @@ class CLSIDPlugin(Plugin):
             "LocalServer",
             "LocalServer32",
         ]
-
+        print(dir(self.target.registry))
+        key = self.target.registry.key(key)
         for subkey in key.subkeys():
             try:
                 name = subkey.value("(default)").value
