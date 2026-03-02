@@ -67,12 +67,10 @@ class CLSIDPlugin(Plugin):
         Yields CLSIDRecords with fields:
 
         .. code-block:: text
-
-            hostname (string): The target hostname.
-            domain (string): The target domain.
             ts (datetime): Last modified timestamp of the registry key.
             clsid (string): The CLSID key name.
-            path (uri): The CLSID path value.
+            name (string): 
+            value (string): The target hostname.
         """
         names = [
             "InprocServer32",
