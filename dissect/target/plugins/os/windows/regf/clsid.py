@@ -47,31 +47,24 @@ class CLSIDPlugin(Plugin):
     """
 
     __namespace__ = "clsid"
-
-    KEYS: Final[dict[str, str]] = {
-        "user": "HKEY_CURRENT_USER\\Software\\Classes\\CLSID",
-        "machine": "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID",
-    }
+    USER_KEY = "HKEY_CURRENT_USER\\Software\\Classes\\CLSID"
+    MACHINE_KEY = "HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID"
 
     def __init__(self, target: Target):
         super().__init__(target)
 
     def check_compatible(self) -> None:
-        if not len(list(self.target.registry.keys(list(self.KEYS.values())))) > 0:
+        if not len(list(self.target.registry.keys((self.USER_KEY, self.MACHINE_KEY)))) > 0:
             raise UnsupportedPluginError("No CLSID key found")
 
-    def create_records(self, keys: list[RegistryKey]) -> Iterator[CLSIDRecord]:
-        """Iterate all CLSID keys from HKEY_CURRENT_USER\\Software\\Classes\\CLSID and
-        HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID.
-
-        Yields CLSIDRecords with fields:
-
-        .. code-block:: text
-            ts (datetime): Last modified timestamp of the registry key.
-            clsid (string): The CLSID key name.
-            name (string): 
-            value (string): The target hostname.
+    def create_records(self, key: RegistryKey) -> Iterator[CLSIDRecord]:
+        """Iterates all CLSID keys from any CLSID registry
+        Args:
+            key: the ``RegistryKey`` to run on
+        Yields:
+            ``CLSIDRecords`` for each entry
         """
+
         names = [
             "InprocServer32",
             "InprocServer",
@@ -79,38 +72,35 @@ class CLSIDPlugin(Plugin):
             "LocalServer32",
         ]
 
-        for reg in self.target.registry.keys(keys):
-            user = self.target.registry.get_user(reg)
+        for subkey in key.subkeys():
+            try:
+                name = subkey.value("(default)").value
+            except RegistryError:
+                name = None
 
-            for subkey in reg.subkeys():
-                try:
-                    name = subkey.value("(default)").value
-                except RegistryError:
-                    name = None
+            for entry in subkey.subkeys():
+                if entry.name in names:
+                    try:
+                        subkey_value = entry.value("(default)")
+                    except RegistryError:
+                        continue
 
-                for entry in subkey.subkeys():
-                    if entry.name in names:
-                        try:
-                            subkey_value = entry.value("(default)")
-                        except RegistryError:
-                            continue
-
-                        yield CLSIDRecord(
-                            ts=entry.ts,
-                            clsid=subkey.name,
-                            name=name,
-                            value=subkey_value.value,
-                            _target=self.target,
-                            _user=user,
-                            _key=entry,
-                        )
+                    yield CLSIDRecord(
+                        ts=entry.ts,
+                        clsid=subkey.name,
+                        name=name,
+                        value=subkey_value.value,
+                        _target=self.target,
+                        _user=user,
+                        _key=entry,
+                    )
 
     @export(record=CLSIDRecord)
     def user(self) -> Iterator[CLSIDRecord]:
         """Return only the user CLSID registry keys."""
-        yield from self.create_records(self.KEYS["user"])
+        yield from self.create_records(self.USER_KEY)
 
     @export(record=CLSIDRecord)
     def machine(self) -> Iterator[CLSIDRecord]:
         """Return only the machine CLSID registry keys."""
-        yield from self.create_records(self.KEYS["machine"])
+        yield from self.create_records(self.MACHINE_KEY)
