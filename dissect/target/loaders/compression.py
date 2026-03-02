@@ -14,11 +14,14 @@ if TYPE_CHECKING:
 
 log = get_logger(__name__)
 
-COMPRESSION_EXT = (".gz",".lzma",".bz2",".zst")
+COMPRESSION_EXT = (".gz", ".lzma", ".bz2", ".zst")
 
 
 class CompressionLoader(MiddlewareLoader):
-    """Allow loading compressed files. This does impact performance, so it's recommended to uncompress the file before passing it to Dissect."""
+    """
+    Allow loading compressed files.
+    This does impact performance, so it's recommended to uncompress the file before passing it to Dissect.
+    """
 
     def __init__(self, path: Path, **kwargs):
         super().__init__(path, **kwargs)
@@ -65,7 +68,4 @@ def is_compressed_magic(path: Path) -> bool:
         return True
 
     # ZSTD
-    if magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
-        return True
-
-    return False
+    return magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]
