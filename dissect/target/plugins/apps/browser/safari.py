@@ -35,7 +35,7 @@ class SafariPlugin(BrowserPlugin):
     )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/safari/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/safari/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     def __init__(self, target: Target):

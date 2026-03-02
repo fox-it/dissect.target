@@ -39,7 +39,7 @@ log = get_logger(__name__)
 
 PuTTYUserRecordDescriptor = create_extended_descriptor([UserRecordDescriptorExtension])
 PuTTYSessionRecord = PuTTYUserRecordDescriptor(
-    "application/putty/saved_session",
+    "application/ssh/putty/saved_session",
     [
         ("datetime", "ts"),
         ("string", "session_name"),

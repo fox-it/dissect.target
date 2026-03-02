@@ -27,17 +27,17 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 PodmanImageRecord = TargetRecordDescriptor(
-    "apps/containers/podman/image",
+    "application/container/podman/image",
     COMMON_IMAGE_FIELDS,
 )
 
 PodmanContainerRecord = TargetRecordDescriptor(
-    "apps/containers/podman/container",
+    "application/container/podman/container",
     COMMON_CONTAINER_FIELDS,
 )
 
 PodmanLogRecord = TargetRecordDescriptor(
-    "apps/containers/podman/log",
+    "application/container/podman/log",
     COMMON_LOG_FIELDS,
 )
 

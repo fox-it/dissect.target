@@ -86,23 +86,23 @@ class ChromiumMixin:
     DIRS = ()
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/cookie", GENERIC_COOKIE_FIELDS
+        "application/browser/chromium/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
+        "application/browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/extension", GENERIC_EXTENSION_RECORD_FIELDS
+        "application/browser/chromium/extension", GENERIC_EXTENSION_RECORD_FIELDS
     )
 
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/password", GENERIC_PASSWORD_RECORD_FIELDS
+        "application/browser/chromium/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     def __init__(self, target: Target) -> None:
