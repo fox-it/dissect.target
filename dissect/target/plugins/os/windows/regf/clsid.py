@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -57,10 +57,10 @@ class CLSIDPlugin(Plugin):
         if not len(list(self.target.registry.keys((self.USER_KEY, self.MACHINE_KEY)))) > 0:
             raise UnsupportedPluginError("No CLSID key found")
 
-    def create_records(self, key: RegistryKey) -> Iterator[CLSIDRecord]:
+    def create_records(self, key_path: RegistryKey) -> Iterator[CLSIDRecord]:
         """Iterates all CLSID keys from any CLSID registry
         Args:
-            key: the ``RegistryKey`` to run on
+            key: a ``str`` representing the path to the key
         Yields:
             ``CLSIDRecords`` for each entry
         """
@@ -71,8 +71,8 @@ class CLSIDPlugin(Plugin):
             "LocalServer",
             "LocalServer32",
         ]
-        print(dir(self.target.registry))
-        key = self.target.registry.key(key)
+        key = self.target.registry.key(key_path)
+        user = self.target.registry.get_user(key)
         for subkey in key.subkeys():
             try:
                 name = subkey.value("(default)").value
