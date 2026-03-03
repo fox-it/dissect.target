@@ -35,7 +35,7 @@ def target_yara(target_default: Target) -> Target:
     return target_default
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara_plugin(target_yara: Target) -> None:
     results = list(target_yara.yara(rules=[rule_file]))
 
@@ -53,7 +53,7 @@ def test_yara_plugin(target_yara: Target) -> None:
     assert results[1].digest.sha1 == "661295c9cbf9d6b2f6428414504a8deed3020641"
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 @pytest.mark.parametrize(
     ("rules", "expected_hits", "should_be_valid"),
     [
@@ -73,14 +73,14 @@ def test_yara_plugin_invalid_rules(
     assert len(results) == expected_hits
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara_plugin_invalid_rule_warn(target_yara: Target, caplog: pytest.CaptureFixture) -> None:
     results = list(target_yara.yara(rules=[invalid_rule, another_rule_file], check=True))
     assert "invalid.yar contains invalid rule(s)!" in caplog.text
     assert len(results) == 2
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara_plugin_compiled_rule(target_yara: Target, tmp_path: str) -> None:
     with tempfile.NamedTemporaryFile(mode="w", dir=tmp_path, delete=False) as tf:
         rules = yara.compile(str(rule_file))
@@ -101,7 +101,7 @@ def test_yara_plugin_compiled_rule(target_yara: Target, tmp_path: str) -> None:
         assert results[0].digest.sha256 == "d5579c46dfcc7f18207013e65b44e4cb4e2c2298f4ac457ba8f82743f31e930b"
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara_plugin_multiple_matches(target_default: Target) -> None:
     """Test if we iterate ``yara.StringMatch`` results correctly."""
 
