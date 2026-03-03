@@ -85,7 +85,7 @@ NtdsComputerRecord = TargetRecordDescriptor(
         ("string", "operating_system"),
         ("string", "operating_system_version"),
         ("string[]", "service_principal_name"),
-        ("bytes", "allowed_to_act"),
+        ("varint", "allowed_to_act"),
     ],
 )
 
@@ -196,9 +196,16 @@ class NtdsPlugin(Plugin):
     def groups(self) -> Iterator[NtdsGroupRecord]:
         """Extract all groups from the NTDS.dit database."""
         for group in self.ntds.groups():
+            try:
+                members = [member.sid for member in group.members()]
+            except Exception as e:
+                members = []
+                self.target.log.warning("Failed to extract group members for group %s: %s", group, e)
+                self.target.log.debug("", exc_info=e)
+
             yield NtdsGroupRecord(
                 **extract_security_info(group),
-                members=[member.sid for member in group.members()],
+                members=members,
                 _target=self.target,
             )
 
@@ -239,7 +246,7 @@ class NtdsPlugin(Plugin):
     def secretsdump(self) -> Iterator[str]:
         """Extract credentials in secretsdump format. Because it's a popular format."""
 
-        # Keep impacket defined constants in the method so we don't polute our own
+        # Keep impacket defined constants in the method so we don't pollute our own
         kerberos_key_type = {
             1: "dec-cbc-crc",
             3: "des-cbc-md5",
@@ -330,7 +337,6 @@ def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
     lm_hash = des_decrypt(lm_pwd, user.rid).hex() if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
     nt_hash = des_decrypt(nt_pwd, user.rid).hex() if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
 
-    # Decrypt password history
     lm_history = [des_decrypt(lm, user.rid).hex() for lm in user.get("lmPwdHistory")]
     nt_history = [des_decrypt(nt, user.rid).hex() for nt in user.get("ntPwdHistory")]
 
@@ -341,7 +347,6 @@ def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
         target.log.warning("Failed to extract group membership for user %s: %s", user, e)
         target.log.debug("", exc_info=e)
 
-    # Extract supplemental credentials and yield records
     return {
         **extract_security_info(user),
         "upn": user.get("userPrincipalName"),
