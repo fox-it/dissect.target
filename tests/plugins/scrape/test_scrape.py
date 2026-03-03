@@ -131,7 +131,9 @@ def test_find(target_bare: Target) -> None:
     target_bare.disks.add(mock_disk)
 
     mock_progress = Mock()
-    for disk, stream, needle, offset, match in target_bare.scrape.find(b"ABCD", progress=mock_progress):
+    for disk, stream, needle, offset, match in target_bare.scrape.find(
+        b"ABCD", block_size=8192, progress=mock_progress
+    ):
         assert disk.size == 1024 * 128
         assert stream.size == 1024 * 128
         assert needle == b"ABCD"
