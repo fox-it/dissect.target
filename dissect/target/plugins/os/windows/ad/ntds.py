@@ -153,10 +153,7 @@ class NtdsPlugin(Plugin):
         self.path = self.target.fs.path(path)
 
     def check_compatible(self) -> None:
-        if not self.target.has_function("lsa"):
-            raise UnsupportedPluginError("System Hive is not present or LSA function not available")
-
-        if not self.path.is_file():
+        if not self.path.is_file() or not self.path.exists():
             raise UnsupportedPluginError("No NTDS.dit database found on target")
 
     @cached_property
@@ -166,6 +163,8 @@ class NtdsPlugin(Plugin):
 
         if self.target.has_function("lsa"):
             ntds.pek.unlock(self.target.lsa.syskey)
+        else:
+            self.target.log.warning("LSA plugin not available, cannot unlock PEK and decrypt sensitive data")
 
         return ntds
 
@@ -334,11 +333,16 @@ def extract_container_info(container_object: OrganizationalUnit | DomainDNS) -> 
 def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
 
-    lm_hash = des_decrypt(lm_pwd, user.rid).hex() if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
-    nt_hash = des_decrypt(nt_pwd, user.rid).hex() if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
+    if target.ad.ntds.pek.unlocked:
+        decrypt_func = lambda encrypted_hash, rid: des_decrypt(encrypted_hash, rid).hex()  # noqa: E731
+    else:
+        decrypt_func = lambda *args, **kwargs: None  # noqa: E731
 
-    lm_history = [des_decrypt(lm, user.rid).hex() for lm in user.get("lmPwdHistory")]
-    nt_history = [des_decrypt(nt, user.rid).hex() for nt in user.get("ntPwdHistory")]
+    lm_hash = decrypt_func(lm_pwd, user.rid) if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
+    nt_hash = decrypt_func(nt_pwd, user.rid) if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
+
+    lm_history = [decrypt_func(lm, user.rid) for lm in user.get("lmPwdHistory")]
+    nt_history = [decrypt_func(nt, user.rid) for nt in user.get("ntPwdHistory")]
 
     try:
         member_of = [group.distinguished_name for group in user.groups()]
