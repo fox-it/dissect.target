@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 OBJECTS_FIELDS = [
     ("string", "cn"),
+    ("string", "sid"),
     ("string", "description"),
     ("string[]", "object_classes"),
     ("string", "distinguished_name"),
@@ -35,7 +36,6 @@ OBJECTS_FIELDS = [
 
 SECURITY_PRINCIPAL_FIELDS = [
     *OBJECTS_FIELDS,
-    ("string", "sid"),
     ("varint", "rid"),
     ("string", "sam_name"),
     ("string", "sam_type"),
@@ -67,6 +67,8 @@ ACCOUNT_FIELDS = [
 
 CONTAINER_FIELDS = [
     *OBJECTS_FIELDS,
+    ("string", "name"),
+    ("string", "display_name"),
     ("string", "gplink"),
 ]
 
@@ -116,9 +118,7 @@ NtdsOURecord = TargetRecordDescriptor(
 NtdsGPORecord = TargetRecordDescriptor(
     "windows/ad/gpo",
     [
-        *OBJECTS_FIELDS,
-        ("string", "name"),
-        ("string", "display_name"),
+        *CONTAINER_FIELDS,
     ],
 )
 
@@ -232,12 +232,9 @@ class NtdsPlugin(Plugin):
     @export(record=NtdsGPORecord)
     def group_policies(self) -> Iterator[NtdsGPORecord]:
         """Extract all group policy objects (GPO) NTDS.dit database."""
-
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
-                **extract_object_info(gpo),
-                name=gpo.name,
-                display_name=gpo.display_name,
+                **extract_container_info(gpo),
                 _target=self.target,
             )
 
@@ -298,6 +295,7 @@ def extract_object_info(obj: Object) -> dict[str, Any]:
     """Extract generic information from an Object."""
     return {
         "cn": obj.cn,
+        "sid": obj.sid,
         "description": obj.get("description"),
         "object_classes": obj.object_class,
         "distinguished_name": obj.distinguished_name,
@@ -313,7 +311,6 @@ def extract_security_info(security_obj: SecurityObject) -> dict[str, Any]:
     """Extract generic information from a Security Object."""
     return {
         **extract_object_info(security_obj),
-        "sid": security_obj.sid,
         "rid": security_obj.rid,
         "sam_name": security_obj.sam_account_name,
         "sam_type": security_obj.get("sAMAccountType"),
@@ -327,6 +324,8 @@ def extract_container_info(container_object: OrganizationalUnit | DomainDNS) -> 
     return {
         **extract_object_info(container_object),
         "gplink": container_object.get("gPLink"),
+        "name": container_object.name,
+        "display_name": container_object.display_name,
     }
 
 
