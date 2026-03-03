@@ -281,6 +281,7 @@ class EverythingDB:
 
 def read_varint(stream: BinaryIO) -> int:
     """Read an ``uint8``, if it's equal to ``0xFF``, read the next 4 bytes as an ``int32``.
+
     In decompiled-ish code:
 
     .. code-block:: c

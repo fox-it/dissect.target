@@ -20,6 +20,7 @@ TEMPLATE = """\
 # Number of types:      {count}
 # References:           http://www.freedesktop.org/standards/shared-mime-info
 #                       https://gitlab.freedesktop.org/xdg/shared-mime-info/-/blob/master/data/freedesktop.org.xml.in
+from __future__ import annotations
 
 TYPES = {types}
 """
