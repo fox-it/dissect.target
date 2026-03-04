@@ -91,6 +91,24 @@ def test_computers(target_win_ntds: Target) -> None:
         assert cn_to_ntlm_hash_mapping[result.cn] == result.nt
 
 
+def test_groups(target_win_ntds: Target) -> None:
+    results = list(target_win_ntds.ad.groups())
+
+    assert len(results) == 102
+
+
+def test_domains(target_win_ntds: Target) -> None:
+    results = list(target_win_ntds.ad.domains())
+
+    assert len(results) == 5
+
+
+def test_ous(target_win_ntds: Target) -> None:
+    results = list(target_win_ntds.ad.ous())
+
+    assert len(results) == 10
+
+
 def test_group_policies(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.group_policies())
 
