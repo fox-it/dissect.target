@@ -212,13 +212,13 @@ select = [
 ]
 ignore = [
     "E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003", "PLC0415",
-    # Pydocstyle related rules ignored as we need to fix the code base before activate these rules.
+    # Ignore some pydocstyle rules for now as they require a larger cleanup
     "D1",
     "D205",
     "D301",
     "D417",
-    "D402", # seems bugged : https://github.com/astral-sh/ruff/issues/16824
-
+    # Seems bugged: https://github.com/astral-sh/ruff/issues/16824
+    "D402",
 ]
 
 [tool.ruff.lint.pydocstyle]
