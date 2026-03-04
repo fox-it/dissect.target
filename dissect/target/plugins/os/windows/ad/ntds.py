@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 OBJECTS_FIELDS = [
     ("string", "cn"),
     ("string", "sid"),
+    ("string", "name"),
+    ("string", "display_name"),
     ("string", "description"),
     ("string[]", "object_classes"),
     ("string", "distinguished_name"),
@@ -32,6 +34,8 @@ OBJECTS_FIELDS = [
     ("datetime", "last_modified_time"),
     ("boolean", "is_deleted"),
     ("varint", "nt_security_descriptor"),
+    ("string", "parent_guid"),
+    ("string", "parent_type"),
 ]
 
 SECURITY_PRINCIPAL_FIELDS = [
@@ -49,7 +53,8 @@ ACCOUNT_FIELDS = [
     ("string", "user_account_control"),
     ("datetime", "password_last_set"),
     ("datetime", "logon_last_failed"),
-    ("datetime", "logon_last_success"),
+    ("datetime", "logon_last_success_observed"),
+    ("datetime", "logon_last_success_reported"),
     ("datetime", "account_expires"),
     ("uint32", "primary_group_id"),
     ("string[]", "member_of"),
@@ -61,14 +66,16 @@ ACCOUNT_FIELDS = [
     ("string", "supplemental_credentials"),
     ("string", "info"),
     ("string", "comment"),
+    ("string", "email"),
+    ("string", "title"),
     ("string", "telephone_number"),
     ("string", "home_directory"),
+    ("path", "logon_script"),
+    ("string[]", "service_principal_names"),
 ]
 
 CONTAINER_FIELDS = [
     *OBJECTS_FIELDS,
-    ("string", "name"),
-    ("string", "display_name"),
     ("string", "gplink"),
 ]
 
@@ -230,7 +237,7 @@ class NtdsPlugin(Plugin):
             )
 
     @export(record=NtdsGPORecord)
-    def group_policies(self) -> Iterator[NtdsGPORecord]:
+    def gpos(self) -> Iterator[NtdsGPORecord]:
         """Extract all group policy objects (GPO) NTDS.dit database."""
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
@@ -293,9 +300,12 @@ class NtdsPlugin(Plugin):
 
 def extract_object_info(obj: Object) -> dict[str, Any]:
     """Extract generic information from an Object."""
+    parent = obj.parent()
     return {
         "cn": obj.cn,
         "sid": obj.sid,
+        "name": obj.name,
+        "display_name": obj.display_name,
         "description": obj.get("description"),
         "object_classes": obj.object_class,
         "distinguished_name": obj.distinguished_name,
@@ -304,6 +314,8 @@ def extract_object_info(obj: Object) -> dict[str, Any]:
         "last_modified_time": obj.when_changed,
         "is_deleted": obj.is_deleted,
         "nt_security_descriptor": obj.get("nTSecurityDescriptor"),
+        "parent_guid": str(parent.guid).upper(),
+        "parent_type": parent.object_category.capitalize(),
     }
 
 
@@ -314,7 +326,7 @@ def extract_security_info(security_obj: SecurityObject) -> dict[str, Any]:
         "rid": security_obj.rid,
         "sam_name": security_obj.sam_account_name,
         "sam_type": security_obj.get("sAMAccountType"),
-        "admin_count": security_obj.get("adminCount"),
+        "admin_count": bool(security_obj.get("adminCount")),
         "sid_history": security_obj.get("sIDHistory"),
     }
 
@@ -324,8 +336,6 @@ def extract_container_info(container_object: OrganizationalUnit | DomainDNS) -> 
     return {
         **extract_object_info(container_object),
         "gplink": container_object.get("gPLink"),
-        "name": container_object.name,
-        "display_name": container_object.display_name,
     }
 
 
@@ -355,7 +365,8 @@ def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
         "upn": user.get("userPrincipalName"),
         "password_last_set": user.get("pwdLastSet"),
         "logon_last_failed": user.get("badPasswordTime"),
-        "logon_last_success": user.get("lastLogon"),
+        "logon_last_success_observed": user.get("lastLogon"),
+        "logon_last_success_reported": user.get("lastLogonTimestamp"),
         "account_expires": user.get("accountExpires") if isinstance(user.get("accountExpires"), datetime) else None,
         "lm": lm_hash,
         "lm_history": lm_history,
@@ -368,6 +379,10 @@ def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
         "allowed_to_delegate": user.get("msDS-AllowedToDelegateTo"),
         "info": user.get("info"),
         "comment": user.get("comment"),
+        "email": user.get("mail"),
+        "title": user.get("title"),
         "telephone_number": user.get("telephoneNumber"),
         "home_directory": user.get("homeDirectory"),
+        "logon_script": user.get("scriptPath"),
+        "service_principal_names": user.get("servicePrincipalName"),
     }
