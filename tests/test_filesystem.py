@@ -1312,7 +1312,6 @@ def test_filesystem_identifier_from_volume_guid() -> None:
 
 def test_filesystem_identifier_string_when_no_guid() -> None:
     """Filesystem.identifier returns the volume name when volume.guid is None."""
-
     fs = DummyMockFilesystem()
     fs.volume = Mock(guid=None)
     fs.volume.name = "TestVolume"
@@ -1322,7 +1321,6 @@ def test_filesystem_identifier_string_when_no_guid() -> None:
 
 def test_filesystem_identifier_string_when_no_guid_or_name() -> None:
     """Filesystem.identifier returns the fs type name when volume.guid and volume name are None."""
-
     fs = DummyMockFilesystem()
     fs.volume = Mock(guid=None)
     fs.volume.name = None
