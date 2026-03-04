@@ -4,15 +4,20 @@ import random
 from typing import TYPE_CHECKING
 
 from flow.record import RecordDescriptor
-from flow.record.base import Record, parse_def
+from flow.record.base import parse_def
 
 from dissect.target.helpers.descriptor_extensions import (
-    RecordDescriptorExtensionBase,
     TargetRecordDescriptorExtension,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from flow.record.base import Record
+
+    from dissect.target.helpers.descriptor_extensions import (
+        RecordDescriptorExtensionBase,
+    )
 
 
 class ExtendableRecordDescriptor(RecordDescriptor):

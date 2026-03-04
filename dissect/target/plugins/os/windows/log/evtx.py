@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException
-from flow.record import Record, utils
+from flow.record import utils
 
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -17,6 +17,8 @@ from dissect.target.plugins.os.windows.log.evt import WindowsEventlogsMixin
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
+
+    from flow.record import Record
 
     from dissect.target.target import Target
 

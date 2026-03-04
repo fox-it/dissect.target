@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.fsutil import TargetPath
 
+
 __all__ = ("Modifier", "ModifierFunc", "get_modifier_function")
 
 RECORD_NAME = "filesystem/file/digest"

@@ -17,7 +17,6 @@ from dissect.target.helpers.record import (
     create_extended_descriptor,
 )
 from dissect.target.helpers.regutil import (
-    RegistryKey,
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
@@ -29,6 +28,9 @@ if TYPE_CHECKING:
     from dissect.database.sqlite3 import Row
 
     from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.helpers.regutil import (
+        RegistryKey,
+    )
     from dissect.target.target import Target
 
 

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 SSHD_BOOLEAN_VALUES = (
     "yes",
     "no",

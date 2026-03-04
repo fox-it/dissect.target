@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.apps.productivity.sevenzip import SevenZipPlugin
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

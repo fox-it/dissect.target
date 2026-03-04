@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 AMCACHE_FILE_KEYS = {
     "0": "product_name",
     "1": "company_name",

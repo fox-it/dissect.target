@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 if sys.version_info >= (3, 14):
     from compression import zstd  # novermin
 else:

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 EnvironmentRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/environment",
     [

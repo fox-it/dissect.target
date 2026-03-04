@@ -4,7 +4,6 @@ from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, NamedTuple, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import (
     IOSUserRecord,
     MacOSUserRecord,

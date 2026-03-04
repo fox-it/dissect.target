@@ -4,17 +4,20 @@ from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import Error
-from dissect.target.helpers.nfs.nfs3 import MountOK, MountProc, MountStat
+from dissect.target.helpers.nfs.nfs3 import MountProc, MountStat
 from dissect.target.helpers.nfs.serializer import MountResultDeserializer
-from dissect.target.helpers.sunrpc.client import AbstractClient as SunRpcAbstractClient
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
-from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_null
+from dissect.target.helpers.sunrpc.client import auth_null
 from dissect.target.helpers.sunrpc.serializer import StringSerializer
 
 if TYPE_CHECKING:
     from types import TracebackType
 
     from typing_extensions import Self
+
+    from dissect.target.helpers.nfs.nfs3 import MountOK
+    from dissect.target.helpers.sunrpc.client import AbstractClient as SunRpcAbstractClient
+    from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 
 
 class MountError(Error):

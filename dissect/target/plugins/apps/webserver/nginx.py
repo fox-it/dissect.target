@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.certificate import parse_x509
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
 # Reference: https://nginx/org/en/docs/http/ngx_http_log_module.html#log_format

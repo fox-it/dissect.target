@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 UTMP_FIELDS = [
     ("datetime", "ts"),
     ("string", "ut_type"),

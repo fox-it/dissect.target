@@ -13,12 +13,9 @@ from dissect.target.helpers.sunrpc import sunrpc
 from dissect.target.helpers.sunrpc.serializer import (
     AuthFlavor,
     AuthNullSerializer,
-    AuthSerializer,
     AuthUnixSerializer,
-    Deserializer,
     MessageSerializer,
     PortMappingSerializer,
-    Serializer,
     UInt32Serializer,
 )
 
@@ -28,6 +25,11 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
+    from dissect.target.helpers.sunrpc.serializer import (
+        AuthSerializer,
+        Deserializer,
+        Serializer,
+    )
 
 
 Credentials = TypeVar("Credentials")

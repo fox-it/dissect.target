@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from enum import IntEnum
 from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
@@ -19,6 +19,7 @@ from dissect.target.plugin import Plugin, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from datetime import datetime
     from pathlib import Path
 
     from typing_extensions import Self

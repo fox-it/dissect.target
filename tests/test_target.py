@@ -21,12 +21,14 @@ from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
-from dissect.target.target import DiskCollection, Event, Target, TargetLogAdapter, log
+from dissect.target.target import Event, Target, TargetLogAdapter, log
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from logging import Logger
+
+    from dissect.target.target import DiskCollection
 
 
 class ErrorCounter(TargetLogAdapter):

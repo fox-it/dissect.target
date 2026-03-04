@@ -5,7 +5,7 @@ import json
 import re
 import sys
 from collections import deque
-from collections.abc import Callable, ItemsView, Iterable, Iterator, KeysView
+from collections.abc import Iterable
 from configparser import ConfigParser, MissingSectionHeaderError
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -24,6 +24,7 @@ from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import to_list
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, ItemsView, Iterator, KeysView
     from pathlib import Path
     from types import TracebackType
 

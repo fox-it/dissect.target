@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -14,6 +14,7 @@ from dissect.target.plugins.os.unix.packagemanager import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from datetime import tzinfo
     from pathlib import Path
 
     from dissect.target.target import Target

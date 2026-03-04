@@ -15,7 +15,7 @@ from flow.record.fieldtypes import posix_path, windows_path
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.helpers.regutil import RegistryKey
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target

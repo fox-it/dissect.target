@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import MappingStream
 
-from dissect.target.helpers.scrape import Needle, find_needles, scrape_chunks
+from dissect.target.helpers.scrape import find_needles, scrape_chunks
 from dissect.target.plugin import Plugin, internal
-from dissect.target.volume import EncryptedVolumeSystem, LogicalVolumeSystem, Volume
+from dissect.target.volume import EncryptedVolumeSystem, LogicalVolumeSystem
 
 if TYPE_CHECKING:
     import re
@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
     from dissect.target.container import Container
     from dissect.target.helpers.record import TargetRecordDescriptor
+    from dissect.target.helpers.scrape import Needle
+    from dissect.target.volume import Volume
 
 
 class ScrapePlugin(Plugin):

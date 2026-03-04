@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.firewall import WindowsFirewallPlugin
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

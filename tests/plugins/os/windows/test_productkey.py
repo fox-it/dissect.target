@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.productkey import WindowsProductKeyPlugin, decode_cd_key
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

@@ -18,7 +18,7 @@ from itertools import chain, zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeAlias
 
-from flow.record import Record, RecordDescriptor
+from flow.record import RecordDescriptor
 
 import dissect.target.plugins.os.default as default
 from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
@@ -31,6 +31,7 @@ from dissect.target.helpers.utils import StrEnum
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from flow.record import Record
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem

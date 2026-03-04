@@ -10,7 +10,7 @@ from dissect.ntfs.secure import ACL, SecurityDescriptor
 from flow.record.fieldtypes import command
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.defender._plugin import MicrosoftDefenderPlugin, parse_iso_datetime
 from dissect.target.plugins.os.windows.defender.quarantine import (
     STREAM_ID,
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from flow.record import Record
 
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

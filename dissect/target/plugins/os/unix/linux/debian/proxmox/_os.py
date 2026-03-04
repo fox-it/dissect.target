@@ -4,11 +4,10 @@ import stat
 from io import BytesIO
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.database.sqlite3 import Row, SQLite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.stream import BufferedStream
 
 from dissect.target.filesystem import (
-    Filesystem,
     VirtualDirectory,
     VirtualFile,
     VirtualFilesystem,
@@ -20,8 +19,12 @@ from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from dissect.database.sqlite3 import Row
     from typing_extensions import Self
 
+    from dissect.target.filesystem import (
+        Filesystem,
+    )
     from dissect.target.target import Target
 
 

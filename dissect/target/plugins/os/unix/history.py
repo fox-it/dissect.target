@@ -7,7 +7,7 @@ from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import UnixUserRecord, create_extended_descriptor
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, alias, export, internal
 
 if TYPE_CHECKING:
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.helpers.record import UnixUserRecord
     from dissect.target.target import Target
 
 CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(

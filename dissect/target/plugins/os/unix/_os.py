@@ -10,9 +10,8 @@ from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.logging import get_logger
-from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import NfsError
-from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
+from dissect.target.helpers.nfs.nfs3 import NfsStat
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
@@ -27,6 +26,8 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+    from dissect.target.helpers.nfs.nfs3 import FileHandle
     from dissect.target.target import Target
 
 

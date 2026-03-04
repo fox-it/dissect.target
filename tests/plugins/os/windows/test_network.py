@@ -7,12 +7,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.network import WindowsNetworkPlugin
 from tests.conftest import change_controlset
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

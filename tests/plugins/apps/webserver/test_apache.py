@@ -12,12 +12,14 @@ from dissect.target.plugins.apps.webserver.apache import (
     LOG_FORMAT_ACCESS_COMMON,
     LOG_FORMAT_ACCESS_VHOST_COMBINED,
     ApachePlugin,
-    LogFormat,
 )
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.plugins.apps.webserver.apache import (
+        LogFormat,
+    )
     from dissect.target.target import Target
 
 

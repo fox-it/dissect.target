@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 FILESYSTEMS: list[type[Filesystem]] = []
 MODULE_PATH = "dissect.target.filesystems"
 

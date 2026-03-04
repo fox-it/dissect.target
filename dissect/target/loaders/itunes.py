@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 try:
     import _pystandalone
 

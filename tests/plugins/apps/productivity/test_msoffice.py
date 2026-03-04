@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.helpers import fsutil
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.apps.productivity.msoffice import MSOffice
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

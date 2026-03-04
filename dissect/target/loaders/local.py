@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 SOLARIS_DEV_DIR = Path("/dev/dsk")
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
 

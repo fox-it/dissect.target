@@ -10,7 +10,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import VirtualFile
 from dissect.target.helpers import fsutil
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.plugins.filesystem.walkfs import WalkFsPlugin
@@ -19,6 +19,7 @@ from tests._utils import absolute_path
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
 
+    from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
 

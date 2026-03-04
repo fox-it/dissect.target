@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 APT_LOG_OPERATIONS = ["Install", "Reinstall", "Upgrade", "Downgrade", "Remove", "Purge"]
 REGEX_PACKAGE_NAMES = re.compile(r"(.*?\)),?")
 

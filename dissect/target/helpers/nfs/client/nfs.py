@@ -8,11 +8,8 @@ from dissect.target.helpers.nfs.nfs3 import (
     CookieVerf,
     DirOpArgs,
     EntryPlus,
-    FileAttributes,
-    FileHandle,
     GetAttrProc,
     LookupProc,
-    LookupResult,
     NfsStat,
     ReadDirPlusParams,
     ReadDirPlusProc,
@@ -33,8 +30,6 @@ from dissect.target.helpers.nfs.serializer import (
 from dissect.target.helpers.nfs.serializer import (
     ResultDeserializer as NfsResultDeserializer,
 )
-from dissect.target.helpers.sunrpc.client import AbstractClient as SunRpcAbstractClient
-from dissect.target.helpers.sunrpc.client import AuthScheme, LocalPortPolicy
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
 from dissect.target.helpers.sunrpc.serializer import OpaqueVarLengthSerializer
 
@@ -43,6 +38,14 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from typing_extensions import Self
+
+    from dissect.target.helpers.nfs.nfs3 import (
+        FileAttributes,
+        FileHandle,
+        LookupResult,
+    )
+    from dissect.target.helpers.sunrpc.client import AbstractClient as SunRpcAbstractClient
+    from dissect.target.helpers.sunrpc.client import AuthScheme, LocalPortPolicy
 
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")

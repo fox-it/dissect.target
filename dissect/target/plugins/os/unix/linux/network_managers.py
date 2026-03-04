@@ -5,7 +5,7 @@ from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
-from re import Match, compile, sub
+from re import compile, sub
 from typing import TYPE_CHECKING, Any
 
 from defusedxml import ElementTree
@@ -16,6 +16,7 @@ from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
+    from re import Match
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target

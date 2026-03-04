@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.certificate import parse_x509
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
@@ -22,6 +22,7 @@ from dissect.target.plugins.apps.webserver.webserver import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
 

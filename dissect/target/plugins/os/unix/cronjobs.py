@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 CronjobRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "unix/cronjob",
     [

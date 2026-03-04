@@ -35,7 +35,7 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
-from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
+from dissect.target.plugin import alias, arg, clone_alias
 from dissect.target.target import Target
 from dissect.target.tools.info import get_target_info, print_target_info
 from dissect.target.tools.utils.cli import (
@@ -58,6 +58,8 @@ from dissect.target.tools.utils.fs import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+
+    from dissect.target.plugin import FunctionDescriptor
 
 
 log = get_logger(__name__)

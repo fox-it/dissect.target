@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 SEPLogRecord = TargetRecordDescriptor(
     "application/av/symantec/sep/log",
     [

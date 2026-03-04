@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 LOG_RECORD_NAME = "filesystem/windows/iis/logs"
 
 BASIC_RECORD_FIELDS = [

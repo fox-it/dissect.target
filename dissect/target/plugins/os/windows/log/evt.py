@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
     from flow.record import Record
 
+
 re_illegal_characters = re.compile(r"[\(\): \.\-#]")
 
 EvtRecordDescriptor = TargetRecordDescriptor(

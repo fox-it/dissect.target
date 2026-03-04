@@ -15,7 +15,7 @@ from dissect.util.compression import xz
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.helpers.record import TargetRecordDescriptor, UnixUserRecord
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.fortios._keys import (
@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.record import UnixUserRecord
     from dissect.target.target import Target
 
 try:

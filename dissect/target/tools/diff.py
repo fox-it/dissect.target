@@ -14,7 +14,7 @@ from io import BytesIO
 from typing import TYPE_CHECKING, TextIO
 
 from dissect.cstruct import hexdump
-from flow.record import Record, RecordOutput, ignore_fields_for_comparison
+from flow.record import RecordOutput, ignore_fields_for_comparison
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers import fsutil
@@ -44,6 +44,8 @@ from dissect.target.tools.utils.fs import print_extensive_file_stat_listing
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from flow.record import Record
 
     from dissect.target.filesystem import FilesystemEntry
 

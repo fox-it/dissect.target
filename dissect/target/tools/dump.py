@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 import structlog
-from flow.record import Record, RecordDescriptor, RecordStreamWriter
+from flow.record import Record, RecordStreamWriter
 from flow.record.adapter.jsonfile import JsonfileWriter
 from flow.record.jsonpacker import JsonRecordPacker
 
@@ -55,7 +55,7 @@ from dissect.target.tools.utils.cli import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
 
-    from flow.record import Record
+    from flow.record import Record, RecordDescriptor
     from typing_extensions import Self
 
     from dissect.target.helpers.record import TargetRecordDescriptor

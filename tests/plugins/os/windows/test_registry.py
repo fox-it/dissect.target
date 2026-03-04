@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from dissect.target.helpers.logging import TRACE_LEVEL
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
 
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
 
 
 def test_missing_hives(fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:

@@ -16,10 +16,6 @@ from dissect.target.helpers.regutil import (
     HiveCollection,
     KeyCollection,
     RegfHive,
-    RegistryHive,
-    RegistryKey,
-    RegistryValue,
-    ValueCollection,
     VirtualHive,
     glob_ext,
     glob_split,
@@ -31,6 +27,12 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.helpers.record import WindowsUserRecord
+    from dissect.target.helpers.regutil import (
+        RegistryHive,
+        RegistryKey,
+        RegistryValue,
+        ValueCollection,
+    )
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 

@@ -10,7 +10,7 @@ from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
-from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.regf.shellbags import (
     FILE_ENTRY,
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
     from flow.record import Record
 
+    from dissect.target.helpers.record import TargetRecordDescriptor
     from dissect.target.helpers.regutil import RegistryKey
     from dissect.target.target import Target
 

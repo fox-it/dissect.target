@@ -12,7 +12,7 @@ import pytest
 
 from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import RegistryKeyNotFoundError
-from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
+from dissect.target.filesystem import VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
@@ -36,6 +36,7 @@ from tests._utils import absolute_path
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
+    from dissect.target.filesystem import Filesystem
     from dissect.target.plugin import OSPlugin
 
 

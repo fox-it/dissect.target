@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 from flow.record.fieldtypes import windows_path
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.generic import ComputerSidRecord
@@ -14,6 +14,7 @@ from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

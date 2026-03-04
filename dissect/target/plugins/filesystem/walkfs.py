@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import LayerFilesystemEntry
 from dissect.target.helpers.magic import magic
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
@@ -15,6 +15,7 @@ from dissect.target.plugins.filesystem.unix.capability import parse_entry as par
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.filesystem import FilesystemEntry
     from dissect.target.target import Target
 
 FilesystemRecord = TargetRecordDescriptor(

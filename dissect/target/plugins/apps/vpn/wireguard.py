@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 WireGuardInterfaceRecord = TargetRecordDescriptor(
     "application/vpn/wireguard/interface",
     [

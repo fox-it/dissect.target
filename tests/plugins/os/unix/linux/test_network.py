@@ -12,7 +12,6 @@ import pytest
 from dissect.target.plugins.os.default.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
     DhclientLeaseParser,
-    LinuxNetworkConfigParser,
     LinuxNetworkPlugin,
     NetworkManagerConfigParser,
     NetworkManagerLeaseParser,
@@ -24,6 +23,9 @@ from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.plugins.os.unix.linux.network import (
+        LinuxNetworkConfigParser,
+    )
     from dissect.target.target import Target
 
 

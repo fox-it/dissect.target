@@ -4,13 +4,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.ad.ntds import DEFAULT_NT_HASH
 from tests._utils import absolute_path
 from tests.plugins.os.windows.credential.test_credhist import md4
 from tests.plugins.os.windows.test_lsa import map_lsa_system_keys
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

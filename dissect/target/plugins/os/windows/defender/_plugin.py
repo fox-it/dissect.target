@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 DEFENDER_EVTX_FIELDS = [
     ("datetime", "ts"),
     ("uint32", "EventID"),
