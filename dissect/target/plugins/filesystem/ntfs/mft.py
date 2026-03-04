@@ -8,7 +8,6 @@ from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.hashutil import md5 as md5_hash
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
@@ -194,26 +193,22 @@ class MftPlugin(Plugin):
         for filesystem in filesystems:
             info = _Info.init(self.target, filesystem)
 
-            try:
-                for record in filesystem.ntfs.mft.segments(start, end):
-                    try:
-                        info.update(record, filesystem)
+            for record in filesystem.ntfs.mft.segments(start, end):
+                try:
+                    info.update(record, filesystem)
 
-                        yield from aggregator(
-                            iter_records(
-                                record=record,
-                                ignore_dos=ignore_dos,
-                                info=info,
-                                formatter=formatter,
-                                target=self.target,
-                            )
+                    yield from aggregator(
+                        iter_records(
+                            record=record,
+                            ignore_dos=ignore_dos,
+                            info=info,
+                            formatter=formatter,
+                            target=self.target,
                         )
-                    except Exception as e:  # noqa: PERF203
-                        self.target.log.warning("An error occured parsing MFT segment %d: %s", record.segment, str(e))
-                        self.target.log.debug("", exc_info=e)
-
-            except Exception:
-                self.target.log.exception("An error occured constructing FilesystemRecords")
+                    )
+                except Exception as e:  # noqa: PERF203
+                    self.target.log.warning("An error occured parsing MFT segment %d: %s", record.segment, str(e))
+                    self.target.log.debug("", exc_info=e)
 
     @export(
         record=[
@@ -447,21 +442,26 @@ def format_body_info(
     segment: int,
     filesize: int,
     **kwargs,
-) -> str:
-    # Just to make it clear when something is a file or a dir.
-    file_mode = "d/drwxrwxrwx"
-    if not attr.is_dir():
-        file_mode = "r/rrwxrwxrwx"
+) -> Iterator[str]:
+    md5 = 0
 
-    if isinstance(attr, FileName):
+    is_dir = False
+    if isinstance(attr.attribute, FileName):
         path = f"{path} ($FILE_NAME)"  # fls like output
+        is_dir = attr.is_dir()
 
-    md5 = md5_hash(attr.record.open(path.name))
+    # Just to make it clear when something is a file or a dir.
+    file_mode = "r/rrwxrwxrwx"
+    if is_dir:
+        file_mode = "d/drwxrwxrwx"
 
-    return (
-        f"{md5}|{path}|{segment}|{file_mode}|{attr.owner_id}|{attr.security_id}|"
-        f"{filesize}|{attr.last_access_time}|{attr.last_modification_time}|"
-        f"{attr.last_change_time}|{attr.creation_time}"
+    if filesize is None:
+        filesize = 0
+
+    yield (
+        f"{md5}|{path}|{segment}-{attr.type.value}-{attr.header.header.Instance}|{file_mode}|0|0|{filesize}|"
+        f"{int(attr.last_access_time.timestamp())}|{int(attr.last_modification_time.timestamp())}|"
+        f"{int(attr.last_change_time.timestamp())}|{int(attr.creation_time.timestamp())}"
     )
 
 

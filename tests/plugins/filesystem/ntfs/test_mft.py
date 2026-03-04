@@ -177,6 +177,13 @@ def test_mft_timeline(target_win_mft: Target, regex_pattern: str, expected_nr_of
     assert len(outputs) == expected_nr_of_records
 
 
+def test_mft_body(target_win_mft: Target) -> None:
+    """Test whether the MFT body functions as intended"""
+    body_content = absolute_path("_data/plugins/filesystem/ntfs/mft/mft.body").read_text()
+    for entry in target_win_mft.mft.body():
+        assert entry in body_content
+
+
 def check_output_amount(number: int, compact_output: bool) -> int:
     more_records = (0 if compact_output else 1) * 3
     return number + number * more_records
