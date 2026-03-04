@@ -6,7 +6,8 @@ from unittest.mock import Mock
 from dissect.extfs.c_ext import c_ext
 from dissect.extfs.extfs import INode
 
-from dissect.target.filesystems.extfs import ExtFilesystemEntry
+from dissect.target.filesystems.extfs import ExtFilesystem, ExtFilesystemEntry
+from tests._utils import absolute_path
 
 
 def test_stat_information() -> None:
@@ -51,3 +52,13 @@ def test_stat_information() -> None:
 
     assert stat_info.st_blksize == 0x1000
     assert stat_info.st_blocks == 8
+
+
+def test_ext_identifier_no_guid() -> None:
+    """EXT.identifier fallback using extfs.identifier when volume.guid is None."""
+    fs = ExtFilesystem(fh=absolute_path("_data/filesystems/symlink_disk.ext4").open("rb"))
+    fs.volume = Mock(guid=None)
+    fs.extfs = Mock(uuid="e0c3d987-a36c-4f9e-9b2f-90e633d7d7a1")
+
+    expected_uuid = "e0c3d987-a36c-4f9e-9b2f-90e633d7d7a1"
+    assert fs.identifier == expected_uuid
