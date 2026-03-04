@@ -11,13 +11,13 @@ from dissect.target.plugins.apps.browser.chrome import ChromePlugin
 from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from tests._utils import absolute_path
 from tests.conftest import add_win_user
-from tests.plugins.os.windows.credential.test_lsa import (
+from tests.plugins.os.windows.test__os import map_version_value
+from tests.plugins.os.windows.test_lsa import (
     POLICY_KEY_PATH_NT6,
     map_lsa_polkey,
     map_lsa_secrets,
     map_lsa_system_keys,
 )
-from tests.plugins.os.windows.test__os import map_version_value
 
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
