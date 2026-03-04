@@ -35,6 +35,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("string", "type"),
         ("string[]", "attr"),
         ("string[]", "fs_types"),
+        ("string[]", "volume_identifiers"),
     ],
 )
 
@@ -127,9 +128,16 @@ def generate_record(
     entry_stat = entry.lstat()
 
     if isinstance(entry, LayerFilesystemEntry):
-        fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
+        fs_types = []
+        volume_identifiers = []
+
+        for sub_entry in entry.entries:
+            fs_types.append(sub_entry.fs.__type__)
+            volume_identifiers.append(sub_entry.fs.identifier)
+
     else:
         fs_types = [entry.fs.__type__]
+        volume_identifiers = [entry.fs.identifier]
 
     ftype = "unknown"
     if entry.is_symlink():
@@ -153,6 +161,7 @@ def generate_record(
         "type": ftype,
         "is_suid": bool(entry_stat.st_mode & stat.S_ISUID),
         "fs_types": fs_types,
+        "volume_identifiers": volume_identifiers,
     }
 
     try:
