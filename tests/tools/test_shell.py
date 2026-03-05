@@ -153,6 +153,7 @@ def test_debug_mode_parsing() -> None:
 
 def test_run_cli_postmortem() -> None:
     """Test that we correctly start a pdb postmorten session."""
+
     class DummyCli:
         def __init__(self) -> None:
             self.debug = DebugMode.POST_MORTEM
@@ -168,10 +169,12 @@ def test_run_cli_postmortem() -> None:
 
     cli = DummyCli()
 
-    with patch("dissect.target.tools.shell._pdb.post_mortem") as mock_post_mortem:
+    mock_debugger = MagicMock()
+
+    with patch("dissect.target.tools.shell._get_debugger", return_value=mock_debugger):
         run_cli(cli)
 
-    mock_post_mortem.assert_called_once()
+    mock_debugger.post_mortem.assert_called_once()
 
 
 def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:

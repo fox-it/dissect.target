@@ -4,6 +4,7 @@ import argparse
 import cmd
 import contextlib
 import fnmatch
+import functools
 import io
 import itertools
 import logging
@@ -22,11 +23,6 @@ from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
-
-try:
-    import ipdb as _pdb  # noqa: T100
-except ImportError:
-    import pdb as _pdb  # noqa: T100
 
 from dissect.cstruct import hexdump
 from flow.record import RecordOutput
@@ -71,6 +67,18 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
+
+
+@functools.cache
+def _get_debugger() -> Any:
+    """Lazily import and cache ipdb (fallback to pdb)."""
+    try:
+        import ipdb as debugger  # noqa: T100
+    except ImportError:
+        import pdb as debugger  # noqa: T100
+
+    return debugger
+
 
 try:
     import readline
@@ -1633,7 +1641,7 @@ def run_cli(cli: cmd.Cmd) -> None:
                 log.exception("Unhandled error")
 
                 if debug_mode == DebugMode.POST_MORTEM:
-                    _pdb.post_mortem()
+                    _get_debugger().post_mortem()
             else:
                 log.info(e)
                 print(
