@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 import structlog
-from flow.record import Record, RecordDescriptor, RecordStreamWriter
+from flow.record import Record, RecordStreamWriter
 from flow.record.adapter.jsonfile import JsonfileWriter
 from flow.record.jsonpacker import JsonRecordPacker
 
@@ -55,7 +55,7 @@ from dissect.target.tools.utils.cli import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
 
-    from flow.record import Record
+    from flow.record import Record, RecordDescriptor
     from typing_extensions import Self
 
     from dissect.target.helpers.record import TargetRecordDescriptor
@@ -86,7 +86,6 @@ def execute_function(
 
     Only output type ``record`` is supported for plugin functions.
     """
-
     local_log = log.bind(func=function, target=target)
     local_log.debug("Function execution")
 
@@ -753,7 +752,6 @@ def execute_pipeline(
     limit: int | None = None,
 ) -> None:
     """Run the record generation, processing and sinking pipeline."""
-
     target_func_pairs_stream = produce_target_func_pairs(targets, state)
     record_stream = itertools.islice(execute_functions(target_func_pairs_stream, dry_run, arguments), limit)
     record_stream = sink_records(record_stream, state)

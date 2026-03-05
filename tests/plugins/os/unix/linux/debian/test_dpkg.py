@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 def test_packages(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse Debian dpkg status files."""
-
     fs_unix.map_file("/var/lib/dpkg/status", absolute_path("_data/plugins/os/unix/linux/debian/dpkg/dpkg-status"))
 
     target_unix.add_plugin(DpkgPlugin)
@@ -47,7 +46,6 @@ def test_packages(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
 def test_packages_file_output(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse Debian dpkg list and md5sums files."""
-
     fs_unix.map_file("/var/lib/dpkg/status", absolute_path("_data/plugins/os/unix/linux/debian/dpkg/dpkg-status"))
     fs_unix.map_file("/var/lib/dpkg/info/zstd.list", absolute_path("_data/plugins/os/unix/linux/debian/dpkg/zstd.list"))
     fs_unix.map_file(
@@ -127,7 +125,6 @@ def test_packages_file_output(target_unix: Target, fs_unix: VirtualFilesystem) -
 
 def test_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse Debian dpkg log files."""
-
     log_file = absolute_path("_data/plugins/os/unix/linux/debian/dpkg/dpkg.log")
     fs_unix.map_file("/var/log/dpkg.log", log_file)
 
@@ -152,7 +149,6 @@ def test_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
 def test_logs_compressed(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse Debian dpkg compressed log files."""
-
     log_file_gz = absolute_path("_data/plugins/os/unix/linux/debian/dpkg/dpkg.log.2.gz")
     fs_unix.map_file("/var/log/dpkg.log.2.gz", log_file_gz)
 

@@ -6,9 +6,8 @@ import stat
 import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
-from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
-from typing import Any, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 from unittest.mock import Mock, patch
 
 import pytest
@@ -22,7 +21,6 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     Filesystem,
-    FilesystemEntry,
     LayerFilesystem,
     MappedFile,
     NotASymlinkError,
@@ -46,6 +44,13 @@ except ImportError:
 
 from dissect.target.helpers import fsutil
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.filesystem import (
+        FilesystemEntry,
+    )
 
 
 @pytest.fixture
@@ -1312,7 +1317,6 @@ def test_filesystem_identifier_from_volume_guid() -> None:
 
 def test_filesystem_identifier_string_when_no_guid() -> None:
     """Filesystem.identifier returns the volume name when volume.guid is None."""
-
     fs = DummyMockFilesystem()
     fs.volume = Mock(guid=None)
     fs.volume.name = "TestVolume"
@@ -1322,7 +1326,6 @@ def test_filesystem_identifier_string_when_no_guid() -> None:
 
 def test_filesystem_identifier_string_when_no_guid_or_name() -> None:
     """Filesystem.identifier returns the fs type name when volume.guid and volume name are None."""
-
     fs = DummyMockFilesystem()
     fs.volume = Mock(guid=None)
     fs.volume.name = None

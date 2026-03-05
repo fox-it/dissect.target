@@ -18,7 +18,6 @@ def add_key(hive: VirtualHive, path: str, key_name: str, value: str | bytes) -> 
 
 def test_sessionmanager(target_win_users: Target, hive_hklm: VirtualHive) -> None:
     """Test if we can detect and parse Windows session manager run keys."""
-
     add_key(
         hive_hklm,
         "System\\ControlSet001\\Control\\Session Manager",

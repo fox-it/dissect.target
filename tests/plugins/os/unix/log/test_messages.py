@@ -120,7 +120,6 @@ def test_unix_log_messages_malformed_log_year_rollover(target_unix_users: Target
 
 def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we correctly parse plaintext and compressed cloud-init log files."""
-
     messages = """
     2005-08-09 11:55:21,000 - foo.py[DEBUG]: This is a cloud-init message!
     2005-08-09 11:55:21,001 - util.py[DEBUG]: Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds.
@@ -153,7 +152,6 @@ def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesyste
 
 def test_unix_messages_ts_iso_8601_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we correctly detect and parse ISO 8601 formatted syslog logs."""
-
     fs_unix.map_file_fh("/etc/hostname", BytesIO(b"hostname"))
     messages = """
     2024-12-31T13:37:00.123456+02:00 hostname systemd[1]: Started anacron.service - Run anacron jobs.
@@ -179,7 +177,6 @@ def test_unix_messages_ts_iso_8601_format(target_unix: Target, fs_unix: VirtualF
 
 def test_linux_messages_kernel_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse kernel ring buffer messages."""
-
     messages = """
     Dec 31 13:37:01 hostname kernel: [1337.1337] some example message
     Jan  1 13:37:02 kernel: [    0.000000] x86/fpu: Supporting feature 0x1337: 'message'

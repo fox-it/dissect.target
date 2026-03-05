@@ -18,7 +18,6 @@ from dissect.target.helpers.regutil import (
     RegistryHive,
     RegistryKey,
     RegistryValue,
-    ValueType,
 )
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
@@ -30,6 +29,9 @@ if TYPE_CHECKING:
 
     from cbc_sdk.live_response_api import LiveResponseSession
 
+    from dissect.target.helpers.regutil import (
+        ValueType,
+    )
     from dissect.target.target import Target
 
 try:

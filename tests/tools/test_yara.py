@@ -64,7 +64,8 @@ def test_yara_decompress(
     no_decompress: bool,
 ) -> None:
     """Test that the yara plugin can automatically decompress files for scanning,
-    and that this can be disabled with the --no-decompress flag."""
+    and that this can be disabled with the --no-decompress flag.
+    """
     vfs = VirtualFilesystem()
     target_default.fs.mount("/", vfs)
 

@@ -507,7 +507,6 @@ class ChromiumMixin:
             - https://chromium.googlesource.com/chromium/src/+/master/docs/linux/password_storage.md
             - https://chromium.googlesource.com/chromium/src/+/master/components/os_crypt/sync/os_crypt_linux.cc#40
         """
-
         for user, db_file, db in self._iter_db("Login Data"):
             keys = {}
 
@@ -676,7 +675,6 @@ class ChromiumMixin:
 
     def decrypt_value(self, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes:
         """Attempt to decrypt the given encrypted bytes."""
-
         DECRYPT_MAP = {
             OperatingSystem.WINDOWS.value: {
                 b"\x01\x00\x00": decrypt_dpapi,  # First three bytes of DPAPI blob signature.
@@ -765,7 +763,6 @@ def decrypt_v10_linux(
     References:
         - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_linux.cc
     """
-
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
@@ -814,7 +811,6 @@ def decrypt_v10_windows(target: Target, user: UserDetails, keys: ChromiumKeys, e
     Returns:
         Decrypted password string.
     """
-
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
@@ -884,7 +880,6 @@ def decrypt_dpapi(target: Target, user: UserDetails, keys: ChromiumKeys, encrypt
     References:
         - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
     """
-
     if not target.has_function("dpapi"):
         raise ValueError("Missing DPAPI plugin for DPAPI user secret decryption")
 

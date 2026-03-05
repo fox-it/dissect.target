@@ -8,7 +8,6 @@ import re
 import sys
 from collections import ChainMap
 from io import BytesIO, StringIO
-from pathlib import Path
 from typing import IO, TYPE_CHECKING, TextIO
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -27,6 +26,7 @@ from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -469,7 +469,6 @@ def test_shell_hostname_escaping(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path: Path
 ) -> None:
     """Test if we properly escape hostnames in the base prompt."""
-
     tmp_path.joinpath("etc").mkdir()
     tmp_path.joinpath("var").mkdir()
     tmp_path.joinpath("opt").mkdir()
@@ -488,7 +487,6 @@ def test_shell_hostname_escaping(
 )
 def test_shell_prompt_tab_autocomplete() -> None:
     """Test the prompt tab-autocompletion."""
-
     ANSI_ESCAPE = re.compile(rb"\x07|\x08|\x0d|\x7f|\x1b[@-_][0-?]*[ -/]*[@-~]")
     original_new_data = pexpect.expect.Expecter.new_data
 

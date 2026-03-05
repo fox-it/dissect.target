@@ -35,7 +35,7 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
-from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
+from dissect.target.plugin import alias, arg, clone_alias
 from dissect.target.target import Target
 from dissect.target.tools.info import get_target_info, print_target_info
 from dissect.target.tools.utils.cli import (
@@ -58,6 +58,8 @@ from dissect.target.tools.utils.fs import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+
+    from dissect.target.plugin import FunctionDescriptor
 
 
 log = get_logger(__name__)
@@ -271,7 +273,6 @@ class ExtendedCmd(cmd.Cmd):
 
     def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False) -> bool:
         """Command execution helper that chains initial command, piped subprocesses, and output redirection together."""
-
         argparts = []
         if command_args_str is not None:
             argparts = arg_str_to_arg_list(command_args_str)
@@ -351,7 +352,7 @@ class ExtendedCmd(cmd.Cmd):
         return self._exec(_exec_, command_args_str, no_cyber)
 
     def do_man(self, line: str) -> bool:
-        """alias for help"""
+        """Alias for help."""
         self.do_help(line)
         return False
 
@@ -359,7 +360,7 @@ class ExtendedCmd(cmd.Cmd):
         return cmd.Cmd.complete_help(self, *args)
 
     def do_unalias(self, line: str) -> bool:
-        """delete runtime alias"""
+        """Delete runtime alias."""
         aliases = list(shlex.shlex(line, posix=True))
         for aliased in aliases:
             if aliased in self._runtime_aliases:
@@ -369,7 +370,7 @@ class ExtendedCmd(cmd.Cmd):
         return False
 
     def do_alias(self, line: str) -> bool:
-        """create a runtime alias"""
+        """Create a runtime alias."""
         args = list(shlex.shlex(line, posix=True))
 
         if not args:
@@ -395,20 +396,20 @@ class ExtendedCmd(cmd.Cmd):
         return False
 
     def do_clear(self, line: str) -> bool:
-        """clear the terminal screen"""
+        """Clear the terminal screen."""
         os.system("cls||clear")
         return False
 
     def do_cls(self, line: str) -> bool:
-        """alias for clear"""
+        """Alias for clear."""
         return self.do_clear(line)
 
     def do_exit(self, line: str) -> bool:
-        """exit shell"""
+        """Exit shell."""
         return True
 
     def do_cyber(self, line: str) -> bool:
-        """cyber"""
+        """Cyber."""
         self.cyber = not self.cyber
         word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[self.cyber]
         with cyber.cyber(color=color):
@@ -416,7 +417,7 @@ class ExtendedCmd(cmd.Cmd):
         return False
 
     def do_debug(self, line: str) -> bool:
-        """toggle debug mode"""
+        """Toggle debug mode."""
         self.debug = not self.debug
         if self.debug:
             print("Debug mode on")
@@ -463,7 +464,6 @@ class TargetCmd(ExtendedCmd):
 
     def _get_targetrc_path(self) -> pathlib.Path:
         """Get the path to the run commands file."""
-
         return pathlib.Path(
             getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
         ).expanduser()
@@ -540,7 +540,7 @@ class TargetCmd(ExtendedCmd):
         return False
 
     def do_python(self, line: str) -> bool:
-        """drop into a Python shell"""
+        """Drop into a Python shell."""
         python_shell([self.target])
         return False
 
@@ -576,17 +576,16 @@ class TargetHubCli(cmd.Cmd):
         pass
 
     def do_exit(self, line: str) -> bool:
-        """exit shell"""
+        """Exit shell."""
         return True
 
     def do_list(self, line: str) -> bool:
-        """list the loaded targets"""
+        """List the loaded targets."""
         print("\n".join([f"{i:2d}: {e}" for i, e in enumerate(self._names)]))
         return False
 
     def do_enter(self, line: str) -> bool:
-        """enter a target by number or name"""
-
+        """Enter a target by number or name."""
         if line.isdigit():
             idx = int(line)
         else:
@@ -627,7 +626,7 @@ class TargetHubCli(cmd.Cmd):
         return compl
 
     def do_python(self, line: str) -> bool:
-        """drop into a Python shell"""
+        """Drop into a Python shell."""
         python_shell(self.targets)
         return False
 
@@ -740,47 +739,47 @@ class TargetCli(TargetCmd):
             self.cwd = dir
 
     def do_cd(self, line: str) -> bool:
-        """change directory"""
+        """Change directory."""
         self.chdir(line)
         return False
 
     def do_pwd(self, line: str) -> bool:
-        """print current directory"""
+        """Print current directory."""
         print(self.cwd)
         return False
 
     def do_disks(self, line: str) -> bool:
-        """print target disks"""
+        """Print target disks."""
         for d in self.target.disks:
             print(str(d))
         return False
 
     def do_volumes(self, line: str) -> bool:
-        """print target volumes"""
+        """Print target volumes."""
         for v in self.target.volumes:
             print(str(v))
         return False
 
     def do_filesystems(self, line: str) -> bool:
-        """print target filesystems"""
+        """Print target filesystems."""
         for fs in self.target.filesystems:
             print(str(fs))
         return False
 
     def do_mounts(self, line: str) -> bool:
-        """print target mounts"""
+        """Print target mounts."""
         for mount, fs in self.target.fs.mounts.items():
             print(f"<Mount fs={fs.__type__!r} path={mount!r}>")
         return False
 
     def do_info(self, line: str) -> bool:
-        """print target information"""
+        """Print target information."""
         target_info = get_target_info(self.target)
         print_target_info(self.target, target_info)
         return False
 
     def do_reload(self, line: str) -> bool:
-        """reload the target"""
+        """Reload the target."""
         self.target = self.target.reload()
         if self.cwd:
             self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
@@ -796,8 +795,7 @@ class TargetCli(TargetCmd):
     @alias("l")
     @alias("dir")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """list directory contents"""
-
+        """List directory contents."""
         path = self.resolve_path(args.path)
 
         if args.use_ctime and args.use_atime:
@@ -833,7 +831,7 @@ class TargetCli(TargetCmd):
 
     @arg("path", nargs="?")
     def cmd_ll(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """alias for ls -la"""
+        """Alias for ls -la."""
         args = extend_args(args, self.cmd_ls)
         args.l = True
         args.a = True
@@ -841,7 +839,7 @@ class TargetCli(TargetCmd):
 
     @arg("path", nargs="?")
     def cmd_tree(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """alias for ls -R"""
+        """Alias for ls -R."""
         args = extend_args(args, self.cmd_ls)
         args.recursive = True
         return self.cmd_ls(args, stdout)
@@ -854,7 +852,7 @@ class TargetCli(TargetCmd):
     @arg("-ctime", type=int, help="file (windows) or metadata (unix) was last changed n*24 hours ago")
     @arg("-btime", type=int, help="file was born n*24 hours ago (ext4)")
     def cmd_find(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """search for files in a directory hierarchy"""
+        """Search for files in a directory hierarchy."""
         path = self.resolve_path(args.path)
         if not path or not self.check_dir(path):
             return False
@@ -899,7 +897,7 @@ class TargetCli(TargetCmd):
     @arg("path")
     @arg("-L", "--dereference", action="store_true")
     def cmd_stat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """display file status"""
+        """Display file status."""
         path = self.resolve_path(args.path)
         if not path or not self.check_path(path):
             return False
@@ -912,7 +910,7 @@ class TargetCli(TargetCmd):
     @arg("-R", "--recursive", action="store_true")
     @alias("getfattr")
     def cmd_attr(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """display file attributes"""
+        """Display file attributes."""
         path = self.resolve_path(args.path)
         if not path or not self.check_path(path):
             return False
@@ -936,7 +934,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_file(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """determine file type"""
+        """Determine file type."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -959,7 +957,7 @@ class TargetCli(TargetCmd):
     @arg("-o", "--out", default=".")
     @arg("-v", "--verbose", action="store_true")
     def cmd_save(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """save a common file or directory to the host filesystem"""
+        """Save a common file or directory to the host filesystem."""
         dst_path = pathlib.Path(args.out).resolve()
 
         if len(args.path) > 1 and not dst_path.is_dir():
@@ -1005,7 +1003,6 @@ class TargetCli(TargetCmd):
             src_path is saved there. This can be useful to recreate a part of
             the directory hierarchy in src_path.
             """
-
             src_name = src_path.name
             src_path = src_path.resolve()
             if src_path.is_dir():
@@ -1093,7 +1090,7 @@ class TargetCli(TargetCmd):
     @arg("path")
     @alias("type")
     def cmd_cat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print file content"""
+        """Print file content."""
         paths = list(self.resolve_glob_path(args.path))
 
         if not paths:
@@ -1113,7 +1110,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_zcat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print file content from compressed files"""
+        """Print file content from compressed files."""
         paths = list(self.resolve_glob_path(args.path))
 
         if not paths:
@@ -1138,7 +1135,7 @@ class TargetCli(TargetCmd):
     @arg("-C", "--canonical", action="store_true")
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print a hexdump of file(s)"""
+        """Print a hexdump of file(s)."""
         paths = list(self.resolve_glob_path(args.path))
         if not paths:
             print(f"{args.path}: No such file or directory")
@@ -1162,7 +1159,7 @@ class TargetCli(TargetCmd):
     @alias("digest")
     @alias("shasum")
     def cmd_hash(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print the MD5, SHA1 and SHA256 hashes of a file"""
+        """Print the MD5, SHA1 and SHA256 hashes of a file."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1173,7 +1170,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print the MD5 checksum of a file provided by a path"""
+        """Print the MD5 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1183,7 +1180,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print the SHA1 checksum of a file provided by a path"""
+        """Print the SHA1 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1193,7 +1190,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print the SHA256 checksum of a file provided by a path"""
+        """Print the SHA256 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1205,7 +1202,7 @@ class TargetCli(TargetCmd):
     @alias("head")
     @alias("more")
     def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """open the first 10 MB of a file with less"""
+        """Open the first 10 MB of a file with less."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1218,7 +1215,7 @@ class TargetCli(TargetCmd):
     @alias("zhead")
     @alias("zmore")
     def cmd_zless(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """open the first 10 MB of a compressed file with zless"""
+        """Open the first 10 MB of a compressed file with zless."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1229,7 +1226,7 @@ class TargetCli(TargetCmd):
 
     @arg("path", nargs="+")
     def cmd_readlink(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print resolved symbolic links or canonical file names"""
+        """Print resolved symbolic links or canonical file names."""
         for path in args.path:
             path = self.resolve_path(path)
             if not path.is_symlink():
@@ -1241,7 +1238,7 @@ class TargetCli(TargetCmd):
 
     @arg("path", nargs="?", help="load a hive from the given path")
     def cmd_registry(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """drop into a registry shell"""
+        """Drop into a registry shell."""
         hive = None
 
         clikey = "registry"
@@ -1269,7 +1266,7 @@ class TargetCli(TargetCmd):
     @arg("-p", "--python", action="store_true", help="(I)Python shell")
     @arg("-r", "--registry", action="store_true", help="registry shell")
     def cmd_enter(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """load one or more files as sub-targets and drop into a sub-shell"""
+        """Load one or more files as sub-targets and drop into a sub-shell."""
         paths = [self.resolve_path(path) for path in args.targets]
 
         if args.python:
@@ -1371,7 +1368,7 @@ class RegistryCli(TargetCmd):
         return r
 
     def do_cd(self, line: str) -> bool:
-        """change subkey"""
+        """Change subkey."""
         if line == "..":
             try:
                 self.resolve_key(self.cwd + "\\..")
@@ -1383,7 +1380,7 @@ class RegistryCli(TargetCmd):
         return False
 
     def do_up(self, line: str) -> bool:
-        """go up a subkey"""
+        """Go up a subkey."""
         parent = self.cwd.rpartition("\\")[0]
         if not parent:
             parent = "\\"
@@ -1391,12 +1388,12 @@ class RegistryCli(TargetCmd):
         return False
 
     def do_pwd(self, line: str) -> bool:
-        """print current path"""
+        """Print current path."""
         print(self.cwd.lstrip("\\"))
         return False
 
     def do_recommend(self, line: str) -> bool:
-        """recommend a key"""
+        """Recommend a key."""
         print(random.choice([name for _, name in self.scandir(None)]))
         return False
 
@@ -1454,7 +1451,6 @@ def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
 
 def _target_name(target: Target) -> str:
     """Return a printable FQDN target name for cmd.Cmd base prompts."""
-
     if target.has_function("domain") and target.domain:
         return escape_str(f"{target.name}.{target.domain}")
 

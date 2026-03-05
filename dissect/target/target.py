@@ -221,7 +221,6 @@ class Target:
     @property
     def _generic_name(self) -> str:
         """Return a generic name for this target."""
-
         generic_name = (self.path and self.path.name) or None
 
         if not generic_name:
@@ -281,7 +280,6 @@ class Target:
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
         """
-
         spec = path
 
         # If the path is a URI-like string, separate the path component
@@ -586,7 +584,6 @@ class Target:
         Returns:
             A fresh ``Target`` object
         """
-
         if self._loader and self.path:
             return self._load(self.path, self._loader, apply=apply)
 
