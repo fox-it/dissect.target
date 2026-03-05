@@ -19,8 +19,14 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
+
+try:
+    import ipdb as _pdb  # noqa: T100
+except ImportError:
+    import pdb as _pdb  # noqa: T100
 
 from dissect.cstruct import hexdump
 from flow.record import RecordOutput
@@ -131,6 +137,12 @@ class AnsiColors(StrEnum):
         return {item.name: item.value for item in cls}
 
 
+class DebugMode(IntEnum):
+    OFF = 0
+    ON = 1
+    POST_MORTEM = 2
+
+
 # ANSI color escape sequences for readline prompt
 ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
 
@@ -160,7 +172,7 @@ class ExtendedCmd(cmd.Cmd):
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
-        self.debug = False
+        self.debug = DebugMode.OFF
         self.cyber = cyber
         self.identchars += "."
 
@@ -417,12 +429,30 @@ class ExtendedCmd(cmd.Cmd):
         return False
 
     def do_debug(self, line: str) -> bool:
-        """Toggle debug mode."""
-        self.debug = not self.debug
-        if self.debug:
+        """Toggle debug mode, or set one of: on, off, pm."""
+        mode = line.strip().lower()
+
+        if not mode:
+            if self.debug:
+                self.debug = DebugMode.OFF
+                print("Debug mode off")
+            else:
+                self.debug = DebugMode.ON
+                print("Debug mode on")
+            return False
+
+        if mode in {"on", "true", "1"}:
+            self.debug = DebugMode.ON
             print("Debug mode on")
-        else:
+        elif mode in {"off", "false", "0"}:
+            self.debug = DebugMode.OFF
             print("Debug mode off")
+        elif mode in {"pm", "postmortem"}:
+            self.debug = DebugMode.POST_MORTEM
+            print("Debug mode postmortem")
+        else:
+            print("Usage: debug [on|off|pm]")
+
         return False
 
 
@@ -1597,12 +1627,20 @@ def run_cli(cli: cmd.Cmd) -> None:
             print()
 
         except Exception as e:
-            if cli.debug:
+            debug_mode = getattr(cli, "debug", DebugMode.OFF)
+
+            if debug_mode:
                 log.exception("Unhandled error")
+
+                if debug_mode == DebugMode.POST_MORTEM:
+                    _pdb.post_mortem()
             else:
                 log.info(e)
-                print(f"*** Unhandled error: {e}")
-                print("If you wish to see the full debug trace, enable debug mode.")
+                print(
+                    f"*** Unhandled error: {e}\n\n"
+                    "Tip: type 'debug on' to enable debug mode and see full tracebacks.\n"
+                    "     type 'debug pm' to drop into a post-mortem debugger on unhandled exceptions.\n"
+                )
 
             cli.postloop()
         else:
