@@ -152,7 +152,7 @@ def test_debug_mode_parsing() -> None:
 
 
 def test_run_cli_postmortem() -> None:
-    """Test that we correctly start a pdb postmorten session."""
+    """Test that we correctly start a pdb post-mortem session."""
 
     class DummyCli:
         def __init__(self) -> None:
