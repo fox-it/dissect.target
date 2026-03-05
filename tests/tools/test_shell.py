@@ -127,6 +127,7 @@ def test_targethubcli_autocomplete_enter(make_mock_targets: Callable) -> None:
 
 
 def test_debug_mode_parsing() -> None:
+    """Test that we correctly parse various ways of toggling debug mode."""
     cli = ExtendedCmd()
 
     assert cli.debug == DebugMode.OFF
@@ -151,6 +152,7 @@ def test_debug_mode_parsing() -> None:
 
 
 def test_run_cli_postmortem() -> None:
+    """Test that we correctly start a pdb postmorten session."""
     class DummyCli:
         def __init__(self) -> None:
             self.debug = DebugMode.POST_MORTEM
