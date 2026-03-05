@@ -220,7 +220,6 @@ ignore = [
     # Seems bugged: https://github.com/astral-sh/ruff/issues/16824
     "D402",
 ]
-
 future-annotations = true
 
 [tool.ruff.lint.pydocstyle]
