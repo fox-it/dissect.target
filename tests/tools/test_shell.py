@@ -15,10 +15,13 @@ import pytest
 
 from dissect.target.helpers.fsutil import TargetPath, normalize
 from dissect.target.tools.shell import (
+    DebugMode,
+    ExtendedCmd,
     TargetCli,
     TargetHubCli,
     build_pipe,
     build_pipe_stdout,
+    run_cli,
 )
 from dissect.target.tools.shell import main as target_shell
 from dissect.target.tools.utils import fs
@@ -121,6 +124,57 @@ def test_targethubcli_autocomplete_enter(make_mock_targets: Callable) -> None:
 
     suggestions = hub_cli.complete_enter("1", "enter 1", 6, 7)
     assert suggestions == ["1"]
+
+
+def test_debug_mode_parsing() -> None:
+    """Test that we correctly parse various ways of toggling debug mode."""
+    cli = ExtendedCmd()
+
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("pm")
+    assert cli.debug == DebugMode.POST_MORTEM
+
+    cli.do_debug("on")
+    assert cli.debug == DebugMode.ON
+
+    cli.do_debug("off")
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("")
+    assert cli.debug == DebugMode.ON
+
+    cli.do_debug("")
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("postmortem")
+    assert cli.debug == DebugMode.POST_MORTEM
+
+
+def test_run_cli_postmortem() -> None:
+    """Test that we correctly start a pdb post-mortem session."""
+
+    class DummyCli:
+        def __init__(self) -> None:
+            self.debug = DebugMode.POST_MORTEM
+            self._calls = 0
+
+        def cmdloop(self) -> None:
+            self._calls += 1
+            if self._calls == 1:
+                raise RuntimeError("boom")
+
+        def postloop(self) -> None:
+            return None
+
+    cli = DummyCli()
+
+    mock_debugger = MagicMock()
+
+    with patch("dissect.target.tools.shell._get_debugger", return_value=mock_debugger):
+        run_cli(cli)
+
+    mock_debugger.post_mortem.assert_called_once()
 
 
 def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:

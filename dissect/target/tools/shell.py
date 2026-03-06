@@ -4,6 +4,7 @@ import argparse
 import cmd
 import contextlib
 import fnmatch
+import functools
 import io
 import itertools
 import logging
@@ -19,6 +20,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
@@ -65,6 +67,18 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
+
+
+@functools.cache
+def _get_debugger() -> Any:
+    """Lazily import and cache ipdb (fallback to pdb)."""
+    try:
+        import ipdb as debugger  # noqa: T100
+    except ImportError:
+        import pdb as debugger  # noqa: T100
+
+    return debugger
+
 
 try:
     import readline
@@ -131,6 +145,12 @@ class AnsiColors(StrEnum):
         return {item.name: item.value for item in cls}
 
 
+class DebugMode(IntEnum):
+    OFF = 0
+    ON = 1
+    POST_MORTEM = 2
+
+
 # ANSI color escape sequences for readline prompt
 ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
 
@@ -160,7 +180,7 @@ class ExtendedCmd(cmd.Cmd):
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
-        self.debug = False
+        self.debug = DebugMode.OFF
         self.cyber = cyber
         self.identchars += "."
 
@@ -417,12 +437,30 @@ class ExtendedCmd(cmd.Cmd):
         return False
 
     def do_debug(self, line: str) -> bool:
-        """Toggle debug mode."""
-        self.debug = not self.debug
-        if self.debug:
+        """Toggle debug mode, or set one of: on, off, pm."""
+        mode = line.strip().lower()
+
+        if not mode:
+            if self.debug:
+                self.debug = DebugMode.OFF
+                print("Debug mode off")
+            else:
+                self.debug = DebugMode.ON
+                print("Debug mode on")
+            return False
+
+        if mode in {"on", "true", "1"}:
+            self.debug = DebugMode.ON
             print("Debug mode on")
-        else:
+        elif mode in {"off", "false", "0"}:
+            self.debug = DebugMode.OFF
             print("Debug mode off")
+        elif mode in {"pm", "postmortem"}:
+            self.debug = DebugMode.POST_MORTEM
+            print("Debug mode postmortem")
+        else:
+            print("Usage: debug [on|off|pm]")
+
         return False
 
 
@@ -1580,8 +1618,8 @@ def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> cmd.Cmd | Non
     return cli
 
 
-def run_cli(cli: cmd.Cmd) -> None:
-    """Helper method for running a cmd.Cmd cli.
+def run_cli(cli: ExtendedCmd) -> None:
+    """Helper method for running a :class:`ExtendedCmd` cli.
 
     Loops cli.cmdloop(), skipping KeyboardInterrupts. This is done so
     that ctrl+c doesn't exit the shell but only resets the current line.
@@ -1599,10 +1637,16 @@ def run_cli(cli: cmd.Cmd) -> None:
         except Exception as e:
             if cli.debug:
                 log.exception("Unhandled error")
+
+                if cli.debug == DebugMode.POST_MORTEM:
+                    _get_debugger().post_mortem()
             else:
                 log.info(e)
-                print(f"*** Unhandled error: {e}")
-                print("If you wish to see the full debug trace, enable debug mode.")
+                print(
+                    f"*** Unhandled error: {e}\n\n"
+                    "Tip: type 'debug on' to enable debug mode and see full tracebacks.\n"
+                    "     type 'debug pm' to drop into a post-mortem debugger on unhandled exceptions.\n"
+                )
 
             cli.postloop()
         else:
