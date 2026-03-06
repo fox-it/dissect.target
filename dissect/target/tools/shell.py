@@ -1618,8 +1618,8 @@ def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> cmd.Cmd | Non
     return cli
 
 
-def run_cli(cli: cmd.Cmd) -> None:
-    """Helper method for running a cmd.Cmd cli.
+def run_cli(cli: ExtendedCmd) -> None:
+    """Helper method for running a :class:`ExtendedCmd` cli.
 
     Loops cli.cmdloop(), skipping KeyboardInterrupts. This is done so
     that ctrl+c doesn't exit the shell but only resets the current line.
@@ -1635,12 +1635,10 @@ def run_cli(cli: cmd.Cmd) -> None:
             print()
 
         except Exception as e:
-            debug_mode = getattr(cli, "debug", DebugMode.OFF)
-
-            if debug_mode:
+            if cli.debug:
                 log.exception("Unhandled error")
 
-                if debug_mode == DebugMode.POST_MORTEM:
+                if cli.debug == DebugMode.POST_MORTEM:
                     _get_debugger().post_mortem()
             else:
                 log.info(e)
