@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 VmwareDragAndDropRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "virtualization/vmware/clipboard",
+    "application/virtualization/vmware/clipboard",
     [
         ("datetime", "ts"),
         ("path", "path"),
@@ -26,7 +26,7 @@ VmwareDragAndDropRecord = create_extended_descriptor([UserRecordDescriptorExtens
 )
 
 VmwareVirtualMachineRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "virtualization/vmware/vm",
+    "application/virtualization/vmware/vm",
     [
         ("datetime", "ts"),
         ("string", "name"),
