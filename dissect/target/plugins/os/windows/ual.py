@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.tools import ual
@@ -11,7 +12,6 @@ from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -157,15 +157,13 @@ class UalPlugin(Plugin):
     """
 
     __namespace__ = "ual"
-
-    LOG_DB_GLOB = "%windir%/System32/LogFiles/Sum/*.mdb"
-
-    IDENTITY_DB_FILENAME = "SystemIdentity.mdb"
-    IDENTITY_DB_PATH = f"%windir%/System32/LogFiles/Sum/{IDENTITY_DB_FILENAME}"
+    LOG_DIR = "%windir%/System32/LogFiles/Sum/"
+    LOG_DB_GLOB = "*.mdb"
+    IDENTITY_FILE_NAME = "SystemIdentity.mdb"
 
     def __init__(self, target: Target):
         super().__init__(target)
-
+        self.identity_db_path = Path(self.LOG_DIR).joinpath(self.IDENTITY_FILE_NAME)
         self.mdb_paths = self.find_mdb_files()
 
         self.role_guid_map = {}
@@ -177,16 +175,14 @@ class UalPlugin(Plugin):
             raise UnsupportedPluginError("No MDB files found")
 
     def find_mdb_files(self) -> list[Path]:
-        base, _, glob = self.LOG_DB_GLOB.partition("*")
-
         return [
             path
-            for path in self.target.resolve(base).glob(f"*{glob}")
-            if path.exists() and path.name != self.IDENTITY_DB_FILENAME
+            for path in self.target.resolve(self.LOG_DIR).glob(self.LOG_DB_GLOB)
+            if path.name != self.identity_db_path.name
         ]
 
     def populate_role_guid_map(self) -> None:
-        identity_db = self.target.resolve(self.IDENTITY_DB_PATH)
+        identity_db = self.target.resolve(self.identity_db_path)
         if not identity_db.exists():
             return
 
@@ -271,7 +267,7 @@ class UalPlugin(Plugin):
         for record in self.identity_db_parser.get_table_records("SYSTEM_IDENTITY"):
             values = {FIELD_NAME_MAP.get(key, key): value for key, value in record.items()}
             yield SystemIdentityRecord(
-                path=self.target.fs.path(self.IDENTITY_DB_PATH),
+                path=self.target.fs.path(self.identity_db_path),
                 _target=self.target,
                 **values,
             )

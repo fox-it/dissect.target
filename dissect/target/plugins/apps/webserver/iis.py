@@ -120,8 +120,8 @@ class IISLogsPlugin(WebserverPlugin):
         try:
             xml_data = ElementTree.fromstring(self.config.read_bytes(), forbid_dtd=True)
             for log_file_element in xml_data.findall("*/sites/*/logFile"):
-                log_format = log_file_element.get("logFormat") or "W3C"
                 if log_dir := log_file_element.get("directory"):
+                    log_format = log_file_element.get("logFormat") or "W3C"
                     if log_format not in dirs:
                         self.target.log.warning("Unsupported log format %s, skipping %s", log_format, log_dir)
                         continue
