@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.productkey import WindowsProductKeyPlugin, decode_cd_key
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
@@ -33,7 +34,6 @@ def test_windows_product_key_base24_decode(encoded_key: str, decoded_key: str) -
 
 def test_windows_product_key_plugin(target_win: Target, hive_hklm: VirtualHive) -> None:
     """Test the Windows Product Key plugin on discovery of ProductId values from a Windows 11 24H2 VM."""
-
     key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
     key = VirtualKey(hive_hklm, key_name)
     key.add_value(

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 ClientAccessRecord = TargetRecordDescriptor(
     "filesystem/windows/ual/client_access",
     [

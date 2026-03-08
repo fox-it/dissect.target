@@ -183,13 +183,11 @@ def test_magic_detection(
     References:
         - https://en.wikipedia.org/wiki/List_of_file_signatures
     """
-
     assert getattr(magic, func)(input, mime=mime_out) == expected_output
 
 
 def test_magic_exception_handling() -> None:
     """Test if we throw sensible exception messages."""
-
     with pytest.raises(TypeError, match="Provided path is not a Path instance"):
         magic.from_file("not a Path")
 

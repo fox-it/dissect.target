@@ -47,7 +47,6 @@ class ShadowPlugin(Plugin):
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
             - https://linux.die.net/man/5/shadow
         """
-
         seen_hashes = set()
 
         for shadow_file in self.SHADOW_FILES:
@@ -127,7 +126,6 @@ def extract_crypt_details(shent: dict) -> dict:
     """Extract different parts of a shadow entry such as
     the used crypto algorithm, any parameters, the used salt and hash.
     """
-
     crypt = {"algo": None, "param": None, "salt": None, "hash": None}
     c_parts = shent.get(1).split("$")
 

@@ -10,13 +10,15 @@ import pytest
 from dissect.target.filesystem import (
     VirtualDirectory,
     VirtualFile,
-    VirtualFilesystem,
     VirtualSymlink,
 )
 from dissect.target.plugins.os.unix.locale import UnixLocalePlugin, timezone_from_path
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from dissect.target.filesystem import (
+        VirtualFilesystem,
+    )
     from dissect.target.target import Target
 
 

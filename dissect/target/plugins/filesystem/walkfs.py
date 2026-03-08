@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import LayerFilesystemEntry
 from dissect.target.helpers.magic import magic
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
@@ -15,6 +15,7 @@ from dissect.target.plugins.filesystem.unix.capability import parse_entry as par
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.filesystem import FilesystemEntry
     from dissect.target.target import Target
 
 FilesystemRecord = TargetRecordDescriptor(
@@ -35,6 +36,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("string", "type"),
         ("string[]", "attr"),
         ("string[]", "fs_types"),
+        ("string[]", "volume_identifiers"),
     ],
 )
 
@@ -87,7 +89,6 @@ class WalkFsPlugin(Plugin):
             attr (string[]): list of key-value pair attributes separated by '='.
             fs_types (string[]): list of filesystem type(s) of the entry.
         """
-
         path = self.target.fs.path(walkfs_path)
 
         if not path.exists():
@@ -127,9 +128,16 @@ def generate_record(
     entry_stat = entry.lstat()
 
     if isinstance(entry, LayerFilesystemEntry):
-        fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
+        fs_types = []
+        volume_identifiers = []
+
+        for sub_entry in entry.entries:
+            fs_types.append(sub_entry.fs.__type__)
+            volume_identifiers.append(sub_entry.fs.identifier)
+
     else:
         fs_types = [entry.fs.__type__]
+        volume_identifiers = [entry.fs.identifier]
 
     ftype = "unknown"
     if entry.is_symlink():
@@ -153,6 +161,7 @@ def generate_record(
         "type": ftype,
         "is_suid": bool(entry_stat.st_mode & stat.S_ISUID),
         "fs_types": fs_types,
+        "volume_identifiers": volume_identifiers,
     }
 
     try:

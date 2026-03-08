@@ -100,7 +100,6 @@ class OpenSSHPlugin(SSHPlugin):
     @export(record=KnownHostRecord)
     def known_hosts(self) -> Iterator[KnownHostRecord]:
         """Yields the content of the known_hosts files on a target for each user."""
-
         for user_details, known_hosts_file in self.ssh_directory_globs("known_hosts*", "ssh_known_hosts"):
             for line in known_hosts_file.open("rt"):
                 line = line.strip()
@@ -138,7 +137,6 @@ class OpenSSHPlugin(SSHPlugin):
     @export(record=PrivateKeyRecord)
     def private_keys(self) -> Iterator[PrivateKeyRecord]:
         """Yields OpenSSH private keys on a target for each user."""
-
         for user_details, file_path in self.ssh_directory_globs("*", "*"):
             if not file_path.is_file():
                 continue
@@ -184,7 +182,6 @@ class OpenSSHPlugin(SSHPlugin):
     @export(record=PublicKeyRecord)
     def public_keys(self) -> Iterator[PublicKeyRecord]:
         """Yields all OpenSSH public keys from all user home directories and the OpenSSH daemon directory."""
-
         for user_details, file_path in self.ssh_directory_globs("*.pub", "*.pub"):
             if not file_path.is_file():
                 continue
