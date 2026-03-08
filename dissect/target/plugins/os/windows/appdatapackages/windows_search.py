@@ -16,8 +16,8 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-WindowsSearchRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "os/windows/appdatapackages/windows_search_record",
+WindowsAppCacheRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "os/windows/appdata/packages/appcache",
     [
         ("string", "FileExtension"),
         ("string", "ProductVersion"),
@@ -45,7 +45,7 @@ def normalize_none(string: str | list) -> str | list | None:
     return None if string in ("", "N/A", "[]", []) else string
 
 
-class WindowsSearch(Plugin):
+class app_cache(Plugin):
     """Extract Windows Search AppCache records (Windows 10 only; may not work on Windows 11)."""
 
     def __init__(self, target: Target):
@@ -63,8 +63,8 @@ class WindowsSearch(Plugin):
         if len(self.cachefiles) == 0:
             raise UnsupportedPluginError("No AppCache files found")
 
-    @export(record=WindowsSearchRecord)
-    def appcache(self) -> Iterator[WindowsSearchRecord]:
+    @export(record=WindowsAppCacheRecord)
+    def appcache(self) -> Iterator[WindowsAppCacheRecord]:
         """Return Windows Search AppCache records for all users.
 
         Yields WindowsSearchRecord with the following fields:
@@ -102,7 +102,7 @@ class WindowsSearch(Plugin):
                     continue
 
             for entry in entries:
-                yield WindowsSearchRecord(
+                yield WindowsAppCacheRecord(
                     FileExtension=normalize_none(entry.get("System.FileExtension", {}).get("Value")),
                     ProductVersion=normalize_none(entry.get("System.Software.ProductVersion", {}).get("Value")),
                     IsSystemComponent=entry.get("System.AppUserModel.IsSystemComponent", {}).get("Value"),
