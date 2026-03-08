@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import json
-from dissect.util.ts import from_unix
+from typing import TYPE_CHECKING
+
+from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
@@ -14,7 +16,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-WindowsSearchRecord = TargetRecordDescriptor(
+WindowsSearchRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "os/windows/appdatapackages/windows_search_record",
     [
         ("string", "FileExtension"),
@@ -27,22 +29,24 @@ WindowsSearchRecord = TargetRecordDescriptor(
         ("string", "PackageFullName"),
         ("string", "Identity"),
         ("string", "FileName"),
-        ("string[]", "JumpList"),
-        ("string[]", "VoiceCommandExamples"),
+        ("string", "JumpList"),
+        ("string", "VoiceCommandExamples"),
         ("string", "ItemType"),
         ("datetime", "DateAccessed"),
         ("string", "EncodedTargetPath"),
         ("string", "SmallLogoPath"),
         ("string", "ItemNameDisplay"),
+        ("string", "CacheFilePath"),
     ],
 )
 
-def normalize_none(string: str):
-    return None if string in ("", "N/A", "[]") else string
+
+def normalize_none(string: str | list) -> str | list | None:
+    return None if string in ("", "N/A", "[]", []) else string
 
 
 class WindowsSearch(Plugin):
-    """Plugin that parses the Windows search json file under appdata. known to work on windows a few windows 10 machines, unknown oif works on other versions."""
+    """Extract Windows Search AppCache records (Windows 10 only; may not work on Windows 11)."""
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -61,15 +65,40 @@ class WindowsSearch(Plugin):
 
     @export(record=WindowsSearchRecord)
     def appcache(self) -> Iterator[WindowsSearchRecord]:
-        """
+        """Return Windows Search AppCache records for all users.
+
+        Yields WindowsSearchRecord with the following fields:
+
+            FileExtension (string): The file extension of the cached item.
+            ProductVersion (string): Version of the software related to the item.
+            IsSystemComponent (bool): Whether the item is a system component.
+            Kind (string): Kind/type of the item.
+            ParsingName (string): Internal parsing name of the item.
+            TimesUsed (varint): Number of times the item has been used.
+            Background (varint): Tile background type.
+            PackageFullName (string): Full package name of the app.
+            Identity (string): Identity string of the app/item.
+            FileName (string): Name of the file.
+            JumpList (list): List of jump list entries associated with the item.
+            VoiceCommandExamples (list): Examples of voice commands linked to the item.
+            ItemType (string): Item type description.
+            DateAccessed (datetime): Timestamp of last access (converted from Windows FILETIME).
+            EncodedTargetPath (string): Encoded target path of the tile.
+            SmallLogoPath (string): Path to the small logo image.
+            ItemNameDisplay (string): Display name of the item.
+            CacheFilePath (path): Path to the cache file where this record came from.
+
+        Notes:
+            - If a JSON cache file cannot be parsed, a warning is logged and processing continues.
+            - Fields with empty strings, "N/A", empty lists, or None are normalized to None.
+            - Timestamps are converted from Windows FILETIME format using `wintimestamp`.
         """
         for user, cache_file in self.cachefiles:
-            target_path = self.target.fs.path(cache_file)
-            with target_path.open("r", encoding="utf-8") as f:
+            with cache_file.open("r", encoding="utf-8") as cachefileIO:
                 try:
-                    entries = json.load(f)
+                    entries = json.load(cachefileIO)
                 except json.JSONDecodeError as e:
-                    self.target.log.warning(f"Failed to parse {cache_file}: {e}")
+                    self.target.log.warning("Failed to parse %s: %s", cache_file, e)
                     continue
 
             for entry in entries:
@@ -84,11 +113,16 @@ class WindowsSearch(Plugin):
                     PackageFullName=normalize_none(entry.get("System.AppUserModel.PackageFullName", {}).get("Value")),
                     Identity=normalize_none(entry.get("System.Identity", {}).get("Value")),
                     FileName=normalize_none(entry.get("System.FileName", {}).get("Value")),
-                    JumpList=entry.get("System.ConnectedSearch.JumpList", {}).get("Value", []),
-                    VoiceCommandExamples=entry.get("System.ConnectedSearch.VoiceCommandExamples", {}).get("Value", []),
+                    JumpList=normalize_none(entry.get("System.ConnectedSearch.JumpList", {}).get("Value", [])),
+                    VoiceCommandExamples=normalize_none(
+                        entry.get("System.ConnectedSearch.VoiceCommandExamples", {}).get("Value", [])
+                    ),
                     ItemType=normalize_none(entry.get("System.ItemType", {}).get("Value")),
-                    DateAccessed=from_unix(entry.get("System.DateAccessed", {}).get("Value")),
+                    DateAccessed=wintimestamp(entry.get("System.DateAccessed", {}).get("Value")),
                     EncodedTargetPath=normalize_none(entry.get("System.Tile.EncodedTargetPath", {}).get("Value")),
                     SmallLogoPath=normalize_none(entry.get("System.Tile.SmallLogoPath", {}).get("Value")),
                     ItemNameDisplay=normalize_none(entry.get("System.ItemNameDisplay", {}).get("Value")),
+                    CacheFilePath=cache_file,
+                    _target=self.target,
+                    _user=user,
                 )
