@@ -20,7 +20,6 @@ from dissect.target.plugins.filesystem.ntfs.mft import (
 from dissect.target.plugins.filesystem.ntfs.utils import (
     get_drive_letter,
     get_owner_and_group,
-    get_volume_identifier,
 )
 from tests._utils import absolute_path
 
