@@ -41,8 +41,8 @@ WindowsAppCacheRecord = create_extended_descriptor([UserRecordDescriptorExtensio
 )
 
 
-def normalize_none(string: str | list) -> str | list | None:
-    return None if string in ("", "N/A", "[]", []) else string
+def normalize_none(input: str | list) -> str | list | None:
+    return None if input in ("", "N/A", "[]", []) else input
 
 
 class app_cache(Plugin):
