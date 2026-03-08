@@ -57,7 +57,7 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert results[0].type == "dir"
     assert results[2].type == "symlink"
     assert results[3].type == "file"
-    
+
     # symlink test
     assert results[2].path == "/.test/.more.test.symlink.txt"
     assert results[2].link == "/.test/.more.test.txt"
