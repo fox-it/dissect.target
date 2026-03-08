@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import LayerFilesystemEntry
+from dissect.target.helpers.magic import magic
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.unix.capability import parse_entry as parse_capability_entry
@@ -14,6 +15,7 @@ from dissect.target.plugins.filesystem.unix.capability import parse_entry as par
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.filesystem import FilesystemEntry
     from dissect.target.target import Target
 
 FilesystemRecord = TargetRecordDescriptor(
@@ -29,9 +31,12 @@ FilesystemRecord = TargetRecordDescriptor(
         ("uint32", "mode"),
         ("uint32", "uid"),
         ("uint32", "gid"),
+        ("string", "mimetype"),
         ("boolean", "is_suid"),
+        ("string", "type"),
         ("string[]", "attr"),
         ("string[]", "fs_types"),
+        ("string[]", "volume_identifiers"),
     ],
 )
 
@@ -46,7 +51,10 @@ class WalkFsPlugin(Plugin):
     @export(record=FilesystemRecord)
     @arg("--walkfs-path", default="/", help="path to recursively walk")
     @arg("--capability", action="store_true", help="output capability records")
-    def walkfs(self, walkfs_path: str = "/", capability: bool = False) -> Iterator[FilesystemRecord]:
+    @arg("--mimetype", action="store_true", help="enable mimetype lookup of files")
+    def walkfs(
+        self, walkfs_path: str = "/", capability: bool = False, mimetype: bool = False
+    ) -> Iterator[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries.
 
         References:
@@ -59,6 +67,8 @@ class WalkFsPlugin(Plugin):
 
         Yields FilesystemRecords for every filesystem entry and CapabilityRecords if ``xattr`` security
         attributes were found in the filesystem entry and the ``--capability`` flag is set.
+
+        Mimetype lookup can be enabled using the ``--mimetype`` flag.
 
         .. code-block:: text
 
@@ -74,11 +84,11 @@ class WalkFsPlugin(Plugin):
             mode (uint32): contains the file type and mode.
             uid (uint32): the user id of the owner of the entry.
             gid (uint32): the group id of the owner of the entry.
+            mimetype (string): detected mimetype of the entry.
             is_suid (boolean): denotes if the entry has the set-user-id bit set.
             attr (string[]): list of key-value pair attributes separated by '='.
             fs_types (string[]): list of filesystem type(s) of the entry.
         """
-
         path = self.target.fs.path(walkfs_path)
 
         if not path.exists():
@@ -91,7 +101,7 @@ class WalkFsPlugin(Plugin):
 
         for entry in self.target.fs.recurse(walkfs_path):
             try:
-                yield from generate_record(self.target, entry, capability)
+                yield from generate_record(self.target, entry, capability, mimetype)
             except FileNotFoundError as e:  # noqa: PERF203
                 self.target.log.warning("File not found: %s", entry)
                 self.target.log.debug("", exc_info=e)
@@ -101,12 +111,16 @@ class WalkFsPlugin(Plugin):
                 continue
 
 
-def generate_record(target: Target, entry: FilesystemEntry, capability: bool) -> Iterator[FilesystemRecord]:
+def generate_record(
+    target: Target, entry: FilesystemEntry, capability: bool, mimetype: bool
+) -> Iterator[FilesystemRecord]:
     """Generate a :class:`WalkFsRecord` from the given :class:`FilesystemEntry`.
 
     Args:
         target: :class:`Target` instance
         entry: :class:`FilesystemEntry` instance
+        capability: bool
+        mimetype: bool
 
     Returns:
         Generator of :class:`FilesystemRecord` for the given :class:`FilesystemEntry`.
@@ -114,9 +128,24 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
     entry_stat = entry.lstat()
 
     if isinstance(entry, LayerFilesystemEntry):
-        fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
+        fs_types = []
+        volume_identifiers = []
+
+        for sub_entry in entry.entries:
+            fs_types.append(sub_entry.fs.__type__)
+            volume_identifiers.append(sub_entry.fs.identifier)
+
     else:
         fs_types = [entry.fs.__type__]
+        volume_identifiers = [entry.fs.identifier]
+
+    ftype = "unknown"
+    if entry.is_symlink():
+        ftype = "symlink"
+    elif entry.is_dir(follow_symlinks=False):
+        ftype = "dir"
+    elif entry.is_file(follow_symlinks=False):
+        ftype = "file"
 
     fields = {
         "atime": from_unix(entry_stat.st_atime),
@@ -129,8 +158,10 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
         "mode": entry_stat.st_mode,
         "uid": entry_stat.st_uid,
         "gid": entry_stat.st_gid,
+        "type": ftype,
         "is_suid": bool(entry_stat.st_mode & stat.S_ISUID),
         "fs_types": fs_types,
+        "volume_identifiers": volume_identifiers,
     }
 
     try:
@@ -143,6 +174,15 @@ def generate_record(target: Target, entry: FilesystemEntry, capability: bool) ->
     except Exception as e:
         target.log.warning("Unable to expand xattr for entry %s: %s", entry.path, e)
         target.log.debug("", exc_info=e)
+
+    if mimetype:
+        try:
+            fields["mimetype"] = magic.from_entry(entry, mime=True)
+        except (FileNotFoundError, IsADirectoryError):
+            pass
+        except Exception as e:
+            target.log.warning("Unable to determine mimetype for entry %s: %s", entry.path, e)
+            target.log.debug("", exc_info=e)
 
     yield FilesystemRecord(
         **fields,

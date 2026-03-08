@@ -79,7 +79,6 @@ def test_teamviewer_special_date_parsing(target_win_users: Target, fs_win: Virtu
 
 def test_teamviewer_timezone(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we correctly set the timezone in teamviewer logs."""
-
     log = """
     Start:          2024/12/31 01:02:03.123 (UTC+2:00)
     2024/12/31 01:02:03.200  1234  5678 G1   LanguageControl: device language is 'enUS'

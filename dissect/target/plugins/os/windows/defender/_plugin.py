@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 DEFENDER_EVTX_FIELDS = [
     ("datetime", "ts"),
     ("uint32", "EventID"),
@@ -140,8 +141,18 @@ DefenderMpCmdRunLogRecord = TargetRecordDescriptor(
 
 
 def parse_iso_datetime(datetime_value: str) -> datetime.datetime:
-    """Parse ISO8601 serialized datetime with ``Z`` ending."""
-    return datetime.datetime.strptime(datetime_value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
+    """Parse ISO8601 serialized datetime with optional ``Z`` or UTC offset ending.
+
+    MpLog timestamps may appear as:
+    - ``2025-11-26T22:01:52.403Z``
+    - ``2025-11-26T22:01:52.403+02:00``
+    - ``2025-11-26T22:01:52.403`` (no suffix, assumed UTC)
+    """
+    # Normalize Z to +00:00 so fromisoformat can handle all variants uniformly.
+    dt = datetime.datetime.fromisoformat(datetime_value.strip().replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
 
 
 def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iterator[DefenderLogRecord]:
@@ -199,7 +210,6 @@ class MicrosoftDefenderPlugin(Plugin):
     @export(record=DefenderLogRecord)
     def evtx(self) -> Iterator[DefenderLogRecord]:
         """Parse Microsoft Defender evtx log files."""
-
         defender_evtx_field_names = [field_name for _, field_name in DEFENDER_EVTX_FIELDS]
 
         evtx_records = self.target.evtx(logs_dir=DEFENDER_LOG_DIR, log_file_glob=DEFENDER_LOG_FILENAME_GLOB)
@@ -263,7 +273,6 @@ class MicrosoftDefenderPlugin(Plugin):
     @export(record=DefenderExclusionRecord)
     def exclusions(self) -> Iterator[DefenderExclusionRecord]:
         """Yield Microsoft Defender exclusions from the Registry."""
-
         # Iterate through all possible versions of the key for Defender exclusions
         for exclusions_registry_key in self.target.registry.keys(DEFENDER_EXCLUSION_KEY):
             # Every subkey of the exclusions key is a 'type' of exclusion, e.g. 'path' 'process' or 'extension'.
