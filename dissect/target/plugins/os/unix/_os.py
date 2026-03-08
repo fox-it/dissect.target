@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import shlex
 import uuid
 from typing import TYPE_CHECKING
@@ -464,6 +463,10 @@ def parse_fstab_entry(entry: str, log: logging.Logger = log) -> tuple[str, str, 
     if len(parts) < 2:
         log.warning("Invalid fstab entry, not enough fields: %s", entry)
         return None
+    if len(parts) > 6:
+        log.warning("Invalid fstab entry, too many fields: %s", entry)
+        return None
+
 
     # Pad with defaults
     parts.extend([""] * (6 - len(parts)))

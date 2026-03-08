@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
@@ -17,16 +17,13 @@ FstabEntryRecord = TargetRecordDescriptor(
         ("string", "fs_type"),
         ("string[]", "options"),
         ("boolean", "is_dump"),
-        ("varint", "pass_num")
+        ("varint", "pass_num"),
     ],
 )
 
 MountRecord = TargetRecordDescriptor(
     "linux/proc/mounts",
-    [
-        ("varint", "pid"),
-    ]
-    + FstabEntryRecord.target_fields,
+    [("varint", "pid"), *FstabEntryRecord.target_fields],
 )
 
 
@@ -43,25 +40,25 @@ class MountPlugin(Plugin):
 
         Yields MountRecord with the following fields:
 
-        .. code-block:: text
+        . code-block:: text
 
             pid (varint): The process id (pid) of the process.
             device_path (string): The device path.
             mount_path (string): The mount path.
             fs_type (string): The filesystem type.
-            fs_mntops (string): The mount options.
-            fs_freq (varint): The dump frequency.
-            fs_passno (varint): The pass number.
+            options (string[]): The mount options.
+            is_dump (boolean): The dump frequency flag.
+            pass_num (varint): The pass number.
         """
         for process in self.target.proc.processes():
             for mount_entry in process.mounts():
                 yield MountRecord(
-                    pid = process.pid,
-                    device_path = mount_entry.fs_spec,
-                    mount_path = mount_entry.mount_path,
-                    fs_type = mount_entry.fs_type,
-                    options = mount_entry.options,
-                    is_dump = mount_entry.is_dump,
-                    pass_num = mount_entry.pass_num,
+                    pid=process.pid,
+                    device_path=mount_entry.fs_spec,
+                    mount_path=mount_entry.mount_path,
+                    fs_type=mount_entry.fs_type,
+                    options=mount_entry.options,
+                    is_dump=mount_entry.is_dump,
+                    pass_num=mount_entry.pass_num,
                     _target=self.target,
                 )

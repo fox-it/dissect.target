@@ -8,7 +8,7 @@ from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
 from socket import htonl
 from struct import pack, unpack
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
@@ -17,13 +17,14 @@ from dissect.target.filesystem import fsutil
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import Plugin, internal
 from dissect.target.plugins.os.unix._os import parse_fstab_entry
-from dissect.target.helpers.fsutil import TargetPath
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from datetime import datetime
+
     from typing_extensions import Self
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
 
@@ -159,7 +160,7 @@ class FstabEntry:
     fs_spec: str
     mount_path: str
     fs_type: str
-    options: List[str]
+    options: list[str]
     is_dump: bool
     pass_num: int
 
