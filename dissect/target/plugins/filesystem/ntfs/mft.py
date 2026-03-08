@@ -539,7 +539,7 @@ class _Info:
         # the paths returned in the records are actually reachable.
         return cls(
             serial=fs.ntfs.serial,
-            volume_uuid=get_volume_identifier(fs),
+            volume_uuid=fs.identifier,
             drive_letter=get_drive_letter(target, fs),
         )
 
