@@ -57,7 +57,13 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert results[0].type == "dir"
     assert results[2].type == "symlink"
     assert results[3].type == "file"
+    
+    # symlink test
+    assert results[2].path == "/.test/.more.test.symlink.txt"
+    assert results[2].link == "/.test/.more.test.txt"
+    assert results[2].size == len("/.test/.more.test.txt")
 
+    # mimetype test
     separator = "\\" if platform.system() == "Windows" else ""
     assert {fsutil.normalize(str(r.path), alt_separator=separator): r.mimetype for r in results if r.mimetype} == {
         "/.test/.more.test.symlink.txt": "text/plain",  # inferred by txt extension
