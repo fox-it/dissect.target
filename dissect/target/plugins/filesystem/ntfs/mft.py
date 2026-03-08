@@ -14,7 +14,6 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
     get_drive_letter,
     get_owner_and_group,
     get_record_size,
-    get_volume_identifier,
 )
 
 if TYPE_CHECKING:
