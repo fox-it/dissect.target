@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 import uuid
 from typing import TYPE_CHECKING
 
@@ -446,6 +447,53 @@ class UnixPlugin(OSPlugin):
         return f"{arch}_32-{os}" if bits == 1 and arch[-2:] != "32" else f"{arch}-{os}"
 
 
+def parse_fstab_entry(entry: str, log: logging.Logger = log) -> tuple[str, str, str, str, bool, int] | None:
+    """Parse a single fstab entry according to the man page fstab(5).
+
+    At the man page, the structure of a fstab entry is:
+    <file system> <mount point>   <type>  <options>       <dump>  <pass>
+    """
+    entry = entry.strip()
+    if not entry or entry.startswith("#"):
+        return None
+
+    # Fields are separated by tabs or spaces.
+    parts = shlex.split(entry)
+
+    # <file system> <mount point> <type> <options> <dump> <pass>
+    if len(parts) < 2:
+        log.warning("Invalid fstab entry, not enough fields: %s", entry)
+        return None
+
+    # Pad with defaults
+    parts.extend([""] * (6 - len(parts)))
+    fs_spec, mount_point, fs_type, options, dump, pass_num = parts
+
+    if not fs_type:
+        fs_type = "auto"
+
+    if not options:
+        options = "defaults"
+
+    if dump == "1":
+        is_dump = True
+    elif not dump or dump == "0":
+        is_dump = False
+    else:
+        log.warning("Invalid dump: %s", dump)
+        return None
+
+    if not pass_num:
+        pass_num = 0
+    elif pass_num.isnumeric():
+        pass_num = int(pass_num)
+    else:
+        log.warning("Invalid pass num: %s", pass_num)
+        return None
+
+    return fs_spec, mount_point, fs_type, options, is_dump, pass_num
+
+
 def parse_fstab(
     fstab: TargetPath,
     log: logging.Logger = log,
@@ -465,17 +513,12 @@ def parse_fstab(
     if not fstab.exists():
         return
 
-    for entry in fstab.open("rt"):
-        entry = entry.strip()
-        if entry.startswith("#"):
+    for line in fstab.open("rt"):
+        entry = parse_fstab_entry(line, log)
+        if not entry:
             continue
 
-        entry_parts = re.split(r"\s+", entry)
-
-        if len(entry_parts) != 6:
-            continue
-
-        dev, mount_point, fs_type, options, _, _ = entry_parts
+        dev, mount_point, fs_type, options, _, _ = entry
 
         if fs_type in SKIP_FS_TYPES:
             log.warning("Skipped FS type: %s, %s, %s", fs_type, dev, mount_point)
@@ -492,9 +535,9 @@ def parse_fstab(
             # Emulate that here when combining the vg and lv names
             volume_name = "-".join(part.replace("-", "--") for part in dev.rsplit("/")[-2:])
         elif dev.startswith("UUID="):
-            dev_id = dev.split("=")[1]
+            dev_id = dev.split("=")[1].strip('"')
         elif dev.startswith("LABEL="):
-            volume_name = dev.split("=")[1]
+            volume_name = dev.split("=")[1].strip('"')
         elif fs_type == "nfs":
             # Put the nfs server address in dev_id and the root path in volume_name
             dev_id, sep, volume_name = dev.partition(":")

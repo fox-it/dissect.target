@@ -8,7 +8,7 @@ from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
 from socket import htonl
 from struct import pack, unpack
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from dissect.util.ts import from_unix
 
@@ -16,12 +16,12 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystem import fsutil
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import Plugin, internal
+from dissect.target.plugins.os.unix._os import parse_fstab_entry
+from dissect.target.helpers.fsutil import TargetPath
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from datetime import datetime
-    from pathlib import Path
-
     from typing_extensions import Self
 
     from dissect.target.target import Target
@@ -153,6 +153,15 @@ class PacketSocket:
 class Environ:
     variable: str
     contents: str
+
+@dataclass
+class FstabEntry:
+    fs_spec: str
+    mount_path: str
+    fs_type: str
+    options: List[str]
+    is_dump: bool
+    pass_num: int
 
 
 class ProcessStateEnum(StrEnum):
@@ -452,7 +461,7 @@ class ProcProcess:
 
             head = status[:start_name]
             tail = status[end_name:]
-            name = status[start_name + 1 : end_name]
+            name = status[start_name + 1: end_name]
             status = head + tail
 
             for idx, part in enumerate(status.split()[: len(PROC_STAT_NAMES)]):
@@ -501,7 +510,7 @@ class ProcProcess:
             return int(line.split()[1])
         return None
 
-    def get(self, path: str) -> Path:
+    def get(self, path: str) -> TargetPath:
         """Returns a TargetPath relative to this process."""
         return self.entry.joinpath(path)
 
@@ -608,6 +617,19 @@ class ProcProcess:
 
         return line
 
+    def mounts(self) -> Iterator[FstabEntry]:
+        """Yields the content of the mount file associated with the process."""
+        mount = self.get("mounts")
+        for line in mount.open("rt"):
+            entry = parse_fstab_entry(line)
+            if not entry:
+                continue
+
+            fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
+            options = options.split(",")
+
+            yield FstabEntry(fs_spec, mount_point, fs_type, options, is_dump, pass_num)
+
     def stat(self) -> fsutil.stat_result:
         """Return a stat entry of the process."""
         return self.entry.stat()
@@ -646,7 +668,7 @@ class ProcPlugin(Plugin):
         return map
 
     @internal
-    def iter_proc(self) -> Iterator[Path]:
+    def iter_proc(self) -> Iterator[TargetPath]:
         """Yields ``/proc/[pid]`` filesystems entries for every process id (pid) found in procfs."""
         yield from self.target.fs.path("/proc").glob("[0-9]*")
 
