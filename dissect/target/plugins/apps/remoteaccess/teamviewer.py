@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -132,6 +132,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
             logfile = self.target.fs.path(logfile)
 
             start_date = None
+            prev_timestamp = None
             for line in logfile.open("rt", errors="replace"):
                 if not (line := line.strip()) or line.startswith("# "):
                     continue
@@ -142,6 +143,15 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     except Exception as e:
                         self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
                         self.target.log.debug("", exc_info=e)
+
+                    if start_date is None:
+                        continue
+
+                    # See whether the utcoffset with the two different timezones are the same
+                    target_start_date = start_date.replace(tzinfo=target_tz)
+                    if target_start_date.utcoffset() == start_date.utcoffset():
+                        # Adjust the start_date so it uses the timezone known to target throughtout
+                        start_date = target_start_date
 
                     continue
 
@@ -178,13 +188,21 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     time += ".000000"
 
                 try:
-                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(
-                        tzinfo=start_date.tzinfo if start_date else target_tz
-                    )
+                    tz_info = start_date.tzinfo if start_date else target_tz
+                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(tzinfo=tz_info)
                 except Exception as e:
                     self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
                     self.target.log.debug("", exc_info=e)
                     timestamp = 0
+
+                if timestamp:
+                    if prev_timestamp and prev_timestamp > timestamp:
+                        # We might currently be in a grey area where the dst period ended.
+                        # During this time we adjust the timedelta to use the correct time.
+                        delta = (timestamp + timedelta(days=1)).utcoffset()
+                        timestamp = timestamp.replace(tzinfo=timezone(delta)) if delta else timestamp
+                    else:
+                        prev_timestamp = timestamp
 
                 yield self.RemoteAccessLogRecord(
                     ts=timestamp,
