@@ -26,12 +26,14 @@ FstabEntryRecord = TargetRecordDescriptor(
 class FstabPlugin(Plugin):
     """Linux fstab file plugin."""
 
+    __namespace__ = "etc"
+
     def check_compatible(self) -> None:
         if not self.target.fs.exists("/etc/fstab"):
             raise UnsupportedPluginError("fstab file isn't available")
 
     @export(record=FstabEntryRecord)
-    def entries(self) -> Iterator[FstabEntryRecord]:
+    def fstab(self) -> Iterator[FstabEntryRecord]:
         """Return the mount entries from /etc/fstab.
 
         Yields FstabEntryRecord with the following fields:
@@ -49,14 +51,17 @@ class FstabPlugin(Plugin):
 
         for line in fstab_path.open("rt"):
             entry = parse_fstab_entry(line, self.target.log)
-            if entry:
-                fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
-                yield FstabEntryRecord(
-                    device_path=fs_spec,
-                    mount_path=mount_point,
-                    fs_type=fs_type,
-                    options=options.split(","),
-                    is_dump=is_dump,
-                    pass_num=pass_num,
-                    _target=self.target,
-                )
+
+            if not entry:
+                continue
+
+            fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
+            yield FstabEntryRecord(
+                device_path=fs_spec,
+                mount_path=mount_point,
+                fs_type=fs_type,
+                options=options.split(","),
+                is_dump=is_dump,
+                pass_num=pass_num,
+                _target=self.target,
+            )
