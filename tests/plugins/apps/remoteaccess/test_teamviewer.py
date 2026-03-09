@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from textwrap import dedent
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from dissect.target.plugins.apps.remoteaccess.teamviewer import TeamViewerPlugin
+import pytest
+
+from dissect.target.plugins.apps.remoteaccess.teamviewer import TeamViewerPlugin, parse_start
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -162,3 +164,27 @@ def test_teamviewer_daylight_savings_time(target_win_tzinfo: Target, fs_win: Vir
     assert records[1].ts.astimezone(timezone.utc) == datetime(2025, 10, 26, 1, 0, 3, 400000, tzinfo=timezone.utc)
     assert records[2].ts.astimezone(timezone.utc) == datetime(2025, 10, 26, 1, 30, 3, 400000, tzinfo=timezone.utc)
     assert records[3].ts.astimezone(timezone.utc) == datetime(2025, 10, 27, 0, 2, 3, 500000, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize(
+    argnames=("line", "expected_date"),
+    argvalues=[
+        pytest.param(
+            "Start: 2021/11/11 12:34:56",
+            datetime(2021, 11, 11, 12, 34, 56),  # noqa DTZ001
+            id="Parse withouth timezone",
+        ),
+        pytest.param(
+            "Start: 2024/12/31 01:02:03.123 (UTC+2:00)",
+            datetime(2024, 12, 31, 1, 2, 3, tzinfo=timezone(timedelta(seconds=7200))),
+            id="Parse (UTC+2:00)",
+        ),
+        pytest.param(
+            "Start: 2025/01/01 12:28:41.436 (UTC)",
+            datetime(2025, 1, 1, 12, 28, 41, tzinfo=timezone.utc),
+            id="Parse UTC without offset",
+        ),
+    ],
+)
+def test_teamviewer_parse_start(line: str, expected_date: datetime) -> None:
+    assert parse_start(line) == expected_date

@@ -266,6 +266,7 @@ def parse_start(line: str) -> datetime | None:
 
         Start: 2021/11/11 12:34:56
         Start: 2024/12/31 01:02:03.123 (UTC+2:00)
+        Start: 2025/01/01 12:28:41.436 (UTC)
     """
     if match := RE_START.search(line):
         dt = match.groupdict()
@@ -275,13 +276,21 @@ def parse_start(line: str) -> datetime | None:
             dt["time"] = dt["time"].rsplit(".")[0]
 
         # Format timezone, e.g. "UTC+2:00" to "UTC+0200"
-        if dt["timezone"]:
-            name, operator, amount = re.split(r"(\+|\-)", dt["timezone"])
-            amount = int(amount.replace(":", ""))
-            dt["timezone"] = f"{name}{operator}{amount:0>4d}"
+        if timezone := dt["timezone"]:
+            identifier = " %Z%z"
+            # Handle just UTC timezone
+            if timezone.lower() == "utc":
+                timezone = " UTC+00:00"
+            else:
+                name, operator, amount = re.split(r"(\+|\-)", timezone)
+                amount = int(amount.replace(":", ""))
+                timezone = f" {name}{operator}{amount:0>4d}"
+        else:
+            timezone = ""
+            identifier = ""
 
         return datetime.strptime(  # noqa: DTZ007
-            f"{dt['date']} {dt['time']}" + (f" {dt['timezone']}" if dt["timezone"] else ""),
-            "%Y/%m/%d %H:%M:%S" + (" %Z%z" if dt["timezone"] else ""),
+            f"{dt['date']} {dt['time']}{timezone}",
+            f"%Y/%m/%d %H:%M:%S{identifier}",
         )
     return None
