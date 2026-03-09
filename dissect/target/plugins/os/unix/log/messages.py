@@ -116,7 +116,6 @@ class MessagesPlugin(Plugin):
 
         Returns: ``MessagesRecord``
         """
-
         ts_fmt = "%Y-%m-%d %H:%M:%S,%f"
 
         with open_decompress(log_file, "rt") as fh:

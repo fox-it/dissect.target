@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 def test_bsd_openbsd_os_detection(target_bare: Target) -> None:
     """Test if we detect OpenBSD correctly."""
-
     fs = VirtualFilesystem()
     fs.map_file_fh("/etc/myname", BytesIO(b"hostname"))
     fs.makedirs("/bsd")

@@ -47,7 +47,6 @@ class UnixLocalePlugin(LocalePlugin):
     @export(property=True)
     def timezone(self) -> str | None:
         """Get the timezone of the system."""
-
         # /etc/timezone should contain a simple timezone string
         # on most unix systems
         if (path := self.target.fs.path("/etc/timezone")).exists():
@@ -85,7 +84,6 @@ class UnixLocalePlugin(LocalePlugin):
     @export(property=True)
     def language(self) -> list[str]:
         """Get the configured locale(s) of the system."""
-
         # Although this purports to be a generic function for Unix targets, these paths are Linux specific.
         locale_paths = [
             "/etc/default/locale",
@@ -109,7 +107,6 @@ class UnixLocalePlugin(LocalePlugin):
     @export(record=UnixKeyboardRecord)
     def keyboard(self) -> Iterator[UnixKeyboardRecord]:
         """Get the keyboard layout(s) of the system."""
-
         paths = [
             "/etc/default/keyboard",
             "/etc/vconsole.conf",

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.certificate import parse_x509
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
@@ -22,6 +22,7 @@ from dissect.target.plugins.apps.webserver.webserver import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
 
@@ -263,7 +264,6 @@ class ApachePlugin(WebserverPlugin):
             - https://www.cyberciti.biz/faq/apache-logs/
             - https://unix.stackexchange.com/a/269090
         """
-
         # Check if any well known default Apache log locations exist
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ACCESS_LOG_NAMES):
             self.access_paths.update(self.target.fs.path(log_dir).glob(f"*{log_name}*"))
@@ -616,7 +616,6 @@ class ApachePlugin(WebserverPlugin):
 
 def clean_value(value: str | None) -> str | None:
     """Clean the given value by replacing empty strings and ``"-"`` with ``None``."""
-
     if value in ("-", ""):
         return None
 

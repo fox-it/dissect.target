@@ -41,7 +41,6 @@ def test_child_vmware_workstation(
     target_fixture: str, fs_fixture: str, inventory_path: str, request: pytest.FixtureRequest
 ) -> None:
     """Test if we detect VMware Workstation children from inventory files correctly on Windows and Unix targets."""
-
     target: Target = request.getfixturevalue(target_fixture)
     fs: VirtualFilesystem = request.getfixturevalue(fs_fixture)
 

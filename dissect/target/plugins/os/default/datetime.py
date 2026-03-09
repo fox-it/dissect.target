@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone, tzinfo
+from datetime import timezone
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from dissect.target.plugin import Plugin, internal
 
 if TYPE_CHECKING:
+    from datetime import datetime, tzinfo
+
     from dissect.target.target import Target
 
 

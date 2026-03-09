@@ -35,7 +35,7 @@ logging.raiseExceptions = False
 
 
 def indent(value: str, width: int = 1) -> None:
-    """Indent and print value"""
+    """Indent and print value."""
     print(textwrap.indent(str(value), " " * (width * 4)))
 
 
@@ -94,7 +94,7 @@ def _get_obj(t: Target, args: argparse.Namespace) -> Iterator[Container | Volume
 @arg("-s", "--skip", type=int, default=0, help="skip offset bytes from the beginning")
 @arg("-n", "--length", type=int, default=512, help="number of bytes to read")
 def cmd_hexdump(t: Target, args: argparse.Namespace) -> None:
-    """hexdump some bytes"""
+    """Hexdump some bytes."""
     for obj in _get_obj(t, args):
         print(f"# {obj}")
 
@@ -136,7 +136,7 @@ def _info_hdd(obj: HddContainer) -> None:
 
 @scope("disk", "volume")
 def cmd_info(t: Target, args: argparse.Namespace) -> None:
-    """print information"""
+    """Print information."""
     for obj in _get_obj(t, args):
         print(f"# {obj}")
 
@@ -146,7 +146,7 @@ def cmd_info(t: Target, args: argparse.Namespace) -> None:
 
 @scope("disk", "volume", "filesystem")
 def cmd_list(t: Target, args: argparse.Namespace) -> None:
-    """list available items"""
+    """List available items."""
     entries = _get_scope(t, args.scope)
 
     print(f"{args.scope.capitalize()}s:")
@@ -156,7 +156,7 @@ def cmd_list(t: Target, args: argparse.Namespace) -> None:
 
 @scope("disk", "volume", "filesystem")
 def cmd_shell(t: Target, args: argparse.Namespace) -> None:
-    """open (I)Python shell"""
+    """Open (I)Python shell."""
     try:
         python_shell([t])
     except TargetError as e:
