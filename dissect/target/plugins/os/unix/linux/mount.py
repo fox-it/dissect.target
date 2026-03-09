@@ -5,21 +5,10 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.etc.fstab import FstabEntryRecord
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-FstabEntryRecord = TargetRecordDescriptor(
-    "linux/etc/fstab",
-    [
-        ("string", "device_path"),
-        ("string", "mount_path"),
-        ("string", "fs_type"),
-        ("string[]", "options"),
-        ("boolean", "is_dump"),
-        ("varint", "pass_num"),
-    ],
-)
 
 MountRecord = TargetRecordDescriptor(
     "linux/proc/mounts",
