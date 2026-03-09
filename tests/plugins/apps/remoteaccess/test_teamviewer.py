@@ -142,7 +142,6 @@ def test_teamviewer_incoming(target_win_users: Target, fs_win: VirtualFilesystem
 
 def test_teamviewer_daylight_savings_time(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     """Test whether the teamviewer plugin handles dst correctly."""
-
     log = """
     Start:              2025/10/26 02:50:32.134 (UTC+2:00)
     2025/10/26 02:50:32.300  1234  5678 G1   Example DST timestamp
