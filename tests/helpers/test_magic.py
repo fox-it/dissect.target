@@ -110,7 +110,7 @@ entry = fs.get("example.png")
         ("from_buffer", b"Received:", True, "message/rfc822"),
         ("from_buffer", b"!BDN", True, "application/vnd.ms-outlook-pst"),
         # Executables
-        ("from_buffer", b"MZ", True, "application/x-dosexec"),
+        ("from_buffer", b"MZ", True, "application/x-ms-dos-executable"),
         ("from_buffer", bytes.fromhex("7F454C46"), True, "application/x-executable"),
         ("from_buffer", bytes.fromhex("cafebabe"), True, "application/x-java"),
         ("from_buffer", bytes.fromhex("feedface"), True, "application/x-mach-o"),
@@ -148,7 +148,7 @@ entry = fs.get("example.png")
         ("from_buffer", b"AFF", True, "application/x-aff"),
         ("from_buffer", b"EVF2", True, "application/x-encase"),
         ("from_buffer", b"EVF", True, "application/x-encase"),
-        ("from_buffer", b"QFI", True, "application/x-qemu-disk"),
+        ("from_buffer", b"QFI\xfb", True, "application/x-qemu-disk"),
         ("from_buffer", b"<<< Oracle VM VirtualBox Disk Image >>>", True, "application/x-oracle-virtualbox-vdi"),
         ("from_buffer", b"conectix", True, "application/x-vhd-disk"),
         ("from_buffer", b"vhdxfile", True, "application/x-vhdx-disk"),
