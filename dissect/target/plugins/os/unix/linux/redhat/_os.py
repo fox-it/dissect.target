@@ -34,7 +34,6 @@ class RedHatPlugin(LinuxPlugin):
     @export(property=True)
     def architecture(self) -> str | None:
         """Return architecture this RHEL distribution runs on."""
-
         for path in ["/usr/bin/coreutils", "/bin/sh", "/bin/bash"]:
             if (bin := self.target.fs.path(path)).exists():
                 return self._get_architecture(path=bin)
