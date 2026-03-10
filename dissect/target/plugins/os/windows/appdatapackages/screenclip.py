@@ -46,7 +46,7 @@ def normalize_none(input: str | list) -> str | list | None:
     return None if input in ("", "N/A", "[]", []) else input
 
 
-class settings_cache(Plugin):
+class screenclip(Plugin):
     """Extract Windows screenclip records (Windows 10 only for now; may not work on Windows 11)."""
 
     def __init__(self, target: Target):

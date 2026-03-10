@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
+from dissect.target.helpers import keychain
+from dissect.target.helpers.fsutil import TargetPath
 from tests._utils import absolute_path
 
 from dissect.target.plugins.os.windows.AppDataPackages.settings_cache import settings_cache
@@ -30,6 +33,7 @@ def test_settings_cache(target_settings_cache: Target):
     results = list(target_settings_cache.settingscache())
 
     assert len(results) == 2
+    print(results[0])
     assert results[0].ParsingName == 'examplesetting'
     assert results[0].ActivationContext == '%windir%\\system32\\rundll32.exe %windir%\\system32\\example\\setting.dll'
     assert results[0].SettingID == '{11223344-1234-ABCD-EFGH-123456789123}'
