@@ -46,8 +46,7 @@ class settings_cache(Plugin):
             # path location for windows 10. windows 11 path not implemented yet.
             cache_files = full_path.glob("Microsoft.Windows.Search_*/LocalState/DeviceSearchCache/SettingsCache.txt")
             for cache_file in cache_files:
-                if cache_file.exists():
-                    self.cachefiles.append((user_details.user, cache_file))
+                self.cachefiles.append((user_details.user, cache_file))
 
     def check_compatible(self) -> None:
         if len(self.cachefiles) == 0:
