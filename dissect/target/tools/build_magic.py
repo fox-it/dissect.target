@@ -62,6 +62,44 @@ IGNORED_TYPES = (
     "image/apng",
     # Too broad definition
     "video/mp2t",
+    # Although we love (retro) games and computers, ignore them for performance reasons.
+    "application/x-atari-",
+    "application/x-sega-",
+    "application/x-saturn-",
+    "application/x-dreamcast-",
+    "application/vnd.nintendo",
+    "application/x-nintendo-",
+    "application/x-pc-engine-rom",
+    "application/x-wii-",
+    "application/x-gamecube-",
+    "application/x-spectrum-",
+    "application/x-commodore-",
+    "application/x-gameboy-",
+    "application/x-gba-",
+    "application/x-virtual-boy-",
+    "application/x-genesis-",
+    "application/x-gamegear-",
+    "application/x-n64-",
+    "application/x-nes-",
+    "application/x-wonderswan-",
+    "application/vnd.chess-",
+    "application/x-pico8-",
+    "application/x-tic80-",
+    "application/vnd.palm",
+    # Legacy productivity software, ignored for performance reasons.
+    "application/vnd.stardivision.",
+    "application/x-starwriter",
+    "application/x-starmath",
+    "application/x-starmail",
+    "application/x-starimpress",
+    "application/x-stardraw",
+    "application/x-starchart",
+    "application/x-starcalc",
+    "application/vnd.lotus-",
+    "application/x-amipro",
+    "application/x-planperfect",
+    "application/x-pocket-word",
+    "application/vnd.wordperfect",
 )
 
 IGNORED_SUB_TYPES = (
@@ -93,7 +131,9 @@ def parse_freedesktop_xml(path: Path) -> str:
 
         # Ignore certain (sub) types if they are conflicting with other types.
         sub_class = mime_type.find("mime:sub-class-of", ns)
-        if mime_type_name in IGNORED_TYPES or (sub_class is not None and sub_class.get("type") in IGNORED_SUB_TYPES):
+        if sub_class is not None and sub_class.get("type") in IGNORED_SUB_TYPES:
+            continue
+        if any(mime_type_name.startswith(ignored_type) for ignored_type in IGNORED_TYPES):
             continue
 
         # Iterate over all 'main' magic match definitions in this mime type node.
