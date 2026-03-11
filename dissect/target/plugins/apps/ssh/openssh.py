@@ -58,8 +58,8 @@ class OpenSSHPlugin(SSHPlugin):
     def ssh_directory_globs(self, glob_user: str, glob_sshd: str) -> Iterator[tuple[UserDetails | None, TargetPath]]:
         for user_details in self.target.user_details.all_with_home():
             yield from product([user_details], user_details.home_path.glob(f".ssh/{glob_user}"))
-
-        yield from product([None], self.sshd_directory.glob(glob_sshd))
+        if self.sshd_directory is not None:
+            yield from product([None], self.sshd_directory.glob(glob_sshd))
 
     @export(record=AuthorizedKeysRecord)
     def authorized_keys(self) -> Iterator[AuthorizedKeysRecord]:
