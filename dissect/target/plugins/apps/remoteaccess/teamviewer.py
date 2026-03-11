@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -195,14 +195,12 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     self.target.log.debug("", exc_info=e)
                     timestamp = 0
 
-                if timestamp:
-                    if prev_timestamp and prev_timestamp > timestamp:
-                        # We might currently be in a grey area where the dst period ended.
-                        # During this time we adjust the timedelta to use the correct time.
-                        delta = (timestamp + timedelta(days=1)).utcoffset()
-                        timestamp = timestamp.replace(tzinfo=timezone(delta)) if delta else timestamp
-                    else:
-                        prev_timestamp = timestamp
+                if timestamp and prev_timestamp and prev_timestamp > timestamp:
+                    # We might currently be in a grey area where the dst period ended.
+                    # During this time we adjust the timedelta to use the correct time.
+                    timestamp = timestamp.replace(fold=1)
+
+                prev_timestamp = timestamp
 
                 yield self.RemoteAccessLogRecord(
                     ts=timestamp,
