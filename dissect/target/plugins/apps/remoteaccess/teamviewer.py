@@ -133,6 +133,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
 
             start_date = None
             prev_timestamp = None
+            fold = 0
             for line in logfile.open("rt", errors="replace"):
                 if not (line := line.strip()) or line.startswith("# "):
                     continue
@@ -140,6 +141,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                 if line.startswith("Start:"):
                     try:
                         start_date = parse_start(line)
+                        fold = 0
                     except Exception as e:
                         self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
                         self.target.log.debug("", exc_info=e)
@@ -197,8 +199,11 @@ class TeamViewerPlugin(RemoteAccessPlugin):
 
                 if timestamp and prev_timestamp and prev_timestamp > timestamp:
                     # We might currently be in a grey area where the dst period ended.
-                    # During this time we adjust the timedelta to use the correct time.
-                    timestamp = timestamp.replace(fold=1)
+                    # replace the fold value of the timestamp
+                    fold = 1
+
+                if timestamp:
+                    timestamp = timestamp.replace(fold=fold)
 
                 prev_timestamp = timestamp
 
