@@ -7,7 +7,7 @@ from flow.record.fieldtypes import datetime as dt
 
 from tests._utils import absolute_path
 
-from dissect.target.plugins.os.windows.AppDataPackages.settings_cache import settings_cache
+from dissect.target.plugins.os.windows.appdatapackages.settings_cache import settings_cache
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem

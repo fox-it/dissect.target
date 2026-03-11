@@ -7,7 +7,7 @@ from flow.record.fieldtypes import datetime as dt
 
 from tests._utils import absolute_path
 
-from dissect.target.plugins.os.windows.AppDataPackages.screenclip import screenclip, WindowsScreenClipJsonRecord, WindowsScreenClipPngRecord
+from dissect.target.plugins.os.windows.appdatapackages.screenclip import screenclip, WindowsScreenClipJsonRecord, WindowsScreenClipPngRecord
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
