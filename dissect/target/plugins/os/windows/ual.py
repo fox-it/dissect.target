@@ -163,7 +163,7 @@ class UalPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.identity_db_path = Path(self.LOG_DIR).joinpath(self.IDENTITY_FILE_NAME)
+        self.identity_db_path = f"{self.LOG_DIR}{self.IDENTITY_FILE_NAME}"
         self.mdb_paths = self.find_mdb_files()
 
         self.role_guid_map = {}
@@ -182,7 +182,7 @@ class UalPlugin(Plugin):
         ]
 
     def populate_role_guid_map(self) -> None:
-        identity_db = self.target.resolve(self.identity_db_path)
+        identity_db = self.target.resolve(str(self.identity_db_path))
         if not identity_db.exists():
             return
 
