@@ -81,6 +81,7 @@ class WalkFsPlugin(Plugin):
             btime (datetime): birth timestamp indicates the time when a file was created.
             ino (varint): number of the corresponding underlying filesystem inode.
             path (path): path location of the entry.
+            link (path): if the entry is a symlink, the target of the symlink.
             size (filesize): size of the file in bytes on the filesystem.
             mode (uint32): contains the file type and mode.
             uid (uint32): the user id of the owner of the entry.
