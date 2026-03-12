@@ -51,7 +51,6 @@ NAMEOID_TO_NAME = {
 
 def compute_pem_fingerprints(pem: str | bytes) -> tuple[str, str, str]:
     """Compute the MD5, SHA-1 and SHA-256 fingerprint hash of a x509 certificate PEM."""
-
     if pem is None:
         raise ValueError("No PEM provided")
 
@@ -105,7 +104,6 @@ def format_serial_number_as_hex(serial_number: int | None) -> str | None:
 
 def parse_x509(file: str | bytes | Path) -> CertificateRecord:
     """Parses a PEM file. Returns a CertificateREcord. Does not parse a public key embedded in a x509 certificate."""
-
     if isinstance(file, str):
         content = file.encode()
 

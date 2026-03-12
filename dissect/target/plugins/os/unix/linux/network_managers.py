@@ -5,7 +5,7 @@ from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
-from re import Match, compile, sub
+from re import compile, sub
 from typing import TYPE_CHECKING, Any
 
 from defusedxml import ElementTree
@@ -16,6 +16,7 @@ from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
+    from re import Match
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
@@ -70,7 +71,6 @@ class Template:
         Returns:
             A dictionary based on the provided configured template, else None
         """
-
         if not path.exists() or path.is_dir():
             log.debug("Failed to get config file %s", path)
             config = None
@@ -208,7 +208,7 @@ class Template:
 
 class Parser:
     """Class that represents a parser. This class translates the config created from a Template into a generic
-    configuration dictionary
+    configuration dictionary.
 
     Args:
         target: Target to parse the config from.
@@ -230,7 +230,6 @@ class Parser:
         Returns:
             Dictionary containing network configuration properties for interface, dhcp, ips, gateways, dns, and netmask.
         """
-
         template = defaultdict(set)
 
         for path in self.expand_config_file_paths():
@@ -244,7 +243,7 @@ class Parser:
         return template
 
     def translate_network_config(self, config_dict: dict) -> list[tuple[str, Any]]:
-        """Translates a parsed network configuration property to its generalized form:
+        """Translates a parsed network configuration property to its generalized form.
 
         Returns:
             List containing the translated property and its value.
@@ -340,7 +339,7 @@ class NetworkManager:
         self.detection_globs = (detection_globs,) if isinstance(detection_globs, str) else detection_globs
 
     def detect(self, target: Target | None = None) -> bool:
-        """Detects if the network manager is active on the target
+        """Detects if the network manager is active on the target.
 
         Returns:
             Whether a certain network manager is detected on the target

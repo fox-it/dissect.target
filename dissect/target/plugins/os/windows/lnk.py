@@ -164,7 +164,6 @@ class LnkPlugin(Plugin):
             target_atime (datetime): Access time of the target (linked) file.
             target_ctime (datetime): Creation time of the target (linked) file.
         """
-
         for entry in self.lnk_entries(path):
             try:
                 lnk_file = Lnk(entry.open())

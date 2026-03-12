@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 def test_child_virtualbox_linux(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we detect Oracle VirtualBox children on a Linux target."""
-
     fs_unix.map_file(
         "/home/user/.config/VirtualBox/VirtualBox.xml",
         absolute_path("_data/plugins/child/virtualbox/VirtualBox.xml"),

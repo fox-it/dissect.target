@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from dissect.regf import c_regf
 
 from dissect.target.helpers.regutil import (
     HiveCollection,
-    KeyCollection,
     RegFlex,
-    RegistryHive,
     RegistryKeyNotFoundError,
     RegistryValueType,
     VirtualHive,
@@ -19,6 +19,12 @@ from dissect.target.helpers.regutil import (
     has_glob_magic,
 )
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import (
+        KeyCollection,
+        RegistryHive,
+    )
 
 
 def test_regflex() -> None:

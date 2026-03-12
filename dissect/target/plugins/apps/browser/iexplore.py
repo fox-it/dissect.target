@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.database.ese import ESE, Record, Table
+from dissect.database.ese import ESE
 from dissect.database.ese.exception import KeyNotFoundError
 from dissect.util.ts import wintimestamp
 
@@ -20,6 +20,8 @@ from dissect.target.plugins.apps.browser.browser import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
+
+    from dissect.database.ese import Record, Table
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
