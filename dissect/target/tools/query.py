@@ -127,9 +127,9 @@ def main() -> int:
         excluded_func_paths=args.excluded_functions,
     ):
         plugin_args = func_desc.args
-        for arg in plugin_args:
-            opts, kwargs = arg
-            kwargs.pop("group", None)  # Remove 'group' if it exists, as this is a special argument used in dissect.
+        for opts, kwargs in plugin_args:
+            # Skip 'group' if it exists, as this is a special argument used in dissect.
+            kwargs = {k: v for k, v in kwargs.items() if k != "group"}
             parser.add_argument(*opts, **kwargs)
 
     # Re-parse arguments now that requested plugin arguments have been added.
