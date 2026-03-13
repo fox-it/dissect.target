@@ -139,7 +139,7 @@ class SSHServerPlugin(SSHPlugin):
             config[key] = _value
             record_fields.append((_type, key))
 
-        yield TargetRecordDescriptor("application/openssh/sshd_config", record_fields)(
+        yield TargetRecordDescriptor("application/ssh/opensshd/sshd_config", record_fields)(
             mtime=self.sshd_config_path.stat().st_mtime, source=self.sshd_config_path, **config, _target=self.target
         )
 
