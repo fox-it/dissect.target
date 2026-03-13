@@ -84,7 +84,6 @@ class VmwareWorkstationPlugin(Plugin):
     @export(record=VmwareDragAndDropRecord)
     def clipboard(self) -> Iterator[VmwareDragAndDropRecord]:
         """Yield cached VMware Workstation drag-and-drop file artifacts."""
-
         for user_details, dnd_dir in self.dnd_dirs:
             for file in dnd_dir.rglob("*/*"):
                 if file.is_dir():
@@ -107,7 +106,6 @@ class VmwareWorkstationPlugin(Plugin):
         References:
             - https://sanbarrow.com/vmx/vmx-network-advanced.html
         """
-
         for inventory, user_details in self.inventories:
             for config in parse_inventory_file(inventory).values():
                 vmx_config = {}
@@ -137,7 +135,6 @@ class VmwareWorkstationPlugin(Plugin):
 
 def find_vm_inventory(target: Target) -> Iterator[tuple[Path, UserDetails]]:
     """Search for ``inventory.vmls`` files in user home folders."""
-
     for user_details in target.user_details.all_with_home():
         for inv_path in INVENTORY_PATHS:
             if (inv_file := user_details.home_path.joinpath(inv_path)).exists():
@@ -146,7 +143,6 @@ def find_vm_inventory(target: Target) -> Iterator[tuple[Path, UserDetails]]:
 
 def parse_inventory_file(inventory: Path) -> dict[str, Any] | None:
     """Parse a single ``inventory.vmls`` (Windows, Linux) or ``vmInventory`` (macOS) file."""
-
     config = defaultdict(dict)
     with inventory.open("rt") as fh:
         for line in map(str.strip, fh):

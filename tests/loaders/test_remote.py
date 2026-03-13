@@ -46,7 +46,6 @@ def test_loader() -> None:
 
 def test_stream() -> None:
     """Test that we can create a ``RemoteStream`` with a ``RemoteStreamConnection``."""
-
     with (
         patch.object(ssl, "SSLContext", autospec=True) as mock_ssl_context,
         patch.object(socket, "socket", autospec=True) as mock_socket,

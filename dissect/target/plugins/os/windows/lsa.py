@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -52,6 +52,7 @@ class LSAPlugin(Plugin):
             raise UnsupportedPluginError("Registry key not found: %s", self.SYSTEM_KEY)
 
     @cached_property
+    @internal
     def syskey(self) -> bytes:
         """Return byte value of Windows system SYSKEY, also called BootKey."""
         lsa = self.target.registry.key(self.SYSTEM_KEY)
@@ -63,6 +64,7 @@ class LSAPlugin(Plugin):
         return bytes(r[i] for i in alterator)
 
     @cached_property
+    @internal
     def lsakey(self) -> bytes:
         """Decrypt and return the LSA key of the Windows system."""
         security_pol = self.target.registry.key(self.SECURITY_POLICY_KEY)

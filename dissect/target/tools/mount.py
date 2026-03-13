@@ -80,7 +80,19 @@ def main() -> int:
         vnames.setdefault(basename, []).append(v)
         vfs.map_file_fh(f"volumes/{fname}", v)
 
+    fake_ntfs = set()
     for i, fs in enumerate(t.filesystems):
+        ntfs_obj = getattr(fs, "ntfs", None)
+
+        if ntfs_obj in fake_ntfs:
+            continue
+
+        if ntfs_obj and fs.__type__ != "ntfs":
+            # A non ntfs filesystem with a "ntfs" object means that add_virtual_ntfs_filesystem was used.
+            # The fake ntfs object is added to the filesystem after its parent.
+            # We will mount an entry in filesystems/ for the virtual filesystem, not for the "fake" ntfs filesystem.
+            fake_ntfs.add(ntfs_obj)
+
         volumes = fs.volume if isinstance(fs.volume, list) else [fs.volume]
         for volume in volumes:
             default_name = f"fs_{i}"
