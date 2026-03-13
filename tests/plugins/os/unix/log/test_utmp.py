@@ -83,7 +83,6 @@ def test_utmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
 
 def test_wtmpdb(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     """Test if we can parse a /var/log/wtmp.db SQLite3 file from libpam-wtmpdb."""
-
     fs_linux.map_file("/var/log/wtmp.db", absolute_path("_data/plugins/os/unix/log/wtmp/wtmp.db"))
     fs_linux.map_file("/var/lib/wtmpdb/wtmp.db", absolute_path("_data/plugins/os/unix/log/wtmp/wtmp.db"))
     fs_linux.map_file("/var/lib/wtmpdb/wtmp_20261231.db", absolute_path("_data/plugins/os/unix/log/wtmp/wtmp.db"))
