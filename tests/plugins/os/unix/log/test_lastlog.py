@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 def test_lastlog_sparse(target_linux_users: Target, fs_linux: VirtualFilesystem) -> None:
     """Test if we can correctly parse a sparse lastlog file."""
-
     data_file = absolute_path("_data/plugins/os/unix/log/lastlog/lastlog")
     fs_linux.map_file("/var/log/lastlog", data_file)
 
@@ -46,7 +45,6 @@ def test_lastlog_sparse(target_linux_users: Target, fs_linux: VirtualFilesystem)
 
 def test_lastlog_sqlite(target_linux_users: Target, fs_linux: VirtualFilesystem) -> None:
     """Test if we can parse a lastlog2 SQLite3 database."""
-
     fs_linux.map_file("/var/lib/lastlog/lastlog2.db", absolute_path("_data/plugins/os/unix/log/lastlog/lastlog2.db"))
 
     target_linux_users.add_plugin(LastLogPlugin)
