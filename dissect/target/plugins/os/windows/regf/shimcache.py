@@ -7,7 +7,7 @@ from enum import IntEnum
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.cstruct import Structure, cstruct
+from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import Error, RegistryError, UnsupportedPluginError
@@ -16,6 +16,8 @@ from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+
+    from dissect.cstruct import Structure
 
 ShimcacheRecord = TargetRecordDescriptor(
     "windows/shimcache",

@@ -103,7 +103,6 @@ class CapabilityPlugin(Plugin):
         References:
             - https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
         """
-
         for entry in self.target.fs.recurse("/"):
             if not entry.is_file(follow_symlinks=False):
                 continue

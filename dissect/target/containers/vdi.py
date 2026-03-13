@@ -17,11 +17,9 @@ class VdiContainer(Container):
     __type__ = "vdi"
 
     def __init__(self, fh: BinaryIO | Path, *args, **kwargs):
-        f = fh
-        if not hasattr(fh, "read"):
-            f = fh.open("rb")
-        self.vdi = vdi.VDI(f)
+        self.vdi = vdi.VDI(fh)
 
+        self._stream = self.vdi.open()
         super().__init__(fh, self.vdi.size, *args, **kwargs)
 
     @staticmethod
@@ -33,13 +31,14 @@ class VdiContainer(Container):
         return path.suffix.lower() == ".vdi"
 
     def read(self, length: int) -> bytes:
-        return self.vdi.read(length)
+        return self._stream.read(length)
 
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
-        return self.vdi.seek(offset, whence)
+        return self._stream.seek(offset, whence)
 
     def tell(self) -> int:
-        return self.vdi.tell()
+        return self._stream.tell()
 
     def close(self) -> None:
-        pass
+        self._stream.close()
+        self.vdi.close()

@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 UTMP_FIELDS = [
     ("datetime", "ts"),
     ("datetime", "ts_logout"),
