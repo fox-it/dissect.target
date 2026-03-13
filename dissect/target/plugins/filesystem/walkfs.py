@@ -50,7 +50,7 @@ class WalkFsPlugin(Plugin):
             raise UnsupportedPluginError("No filesystems to walk")
 
     @export(record=FilesystemRecord)
-    @arg("--walkfs-path", default="/", help="path to recursively walk")
+    @arg("-p", "--walkfs-path", default="/", help="path to recursively walk")
     @arg("--capability", action="store_true", help="output capability records")
     @arg("--mimetype", action="store_true", help="enable mimetype lookup of files")
     def walkfs(

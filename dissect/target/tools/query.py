@@ -71,8 +71,10 @@ def main() -> int:
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
         add_help=False,
+        conflict_handler="resolve",
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
+    parser.add_argument("-h", "--help", action="store_true", help="show this help message and exit")
     parser.add_argument("--direct", action="store_true", help="treat TARGETS as paths to pass to plugins directly")
 
     configure_plugin_arguments(parser)
@@ -113,10 +115,31 @@ def main() -> int:
 
     args, rest = parser.parse_known_args()
 
-    # Show help for target-query
-    if not args.function and ("-h" in rest or "--help" in rest):
+    # Show help for target-query (when --help is specified without a function)
+    if not args.function and args.help:
         parser.print_help()
         return 0
+
+    # Dynamically add plugin arguments for the specified function(s)
+    for func_desc in find_and_filter_plugins(
+        functions=args.function or "",
+        target=None,
+        excluded_func_paths=args.excluded_functions,
+    ):
+        plugin_args = func_desc.args
+        for arg in plugin_args:
+            opts, kwargs = arg
+            kwargs.pop("group", None)  # Remove 'group' if it exists, as this is a special argument used in dissect.
+            parser.add_argument(*opts, **kwargs)
+
+    # Re-parse arguments now that requested plugin arguments have been added.
+    # Unknown args will automatically be shown to the user here to catch any misspelled or invalid arguments early on.
+    args = parser.parse_args()
+
+    # Propagate --help argument to plugin to show the help message of the plugin.
+    rest = []
+    if args.help:
+        rest.append("--help")
 
     process_generic_arguments(parser, args)
 
