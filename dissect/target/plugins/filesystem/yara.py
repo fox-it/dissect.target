@@ -78,7 +78,6 @@ class YaraPlugin(Plugin):
         Returns:
             Iterator yields ``YaraMatchRecord``.
         """
-
         compiled_rules = process_rules(rules, check)
 
         if not rules:

@@ -8,7 +8,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
 from dissect.target.plugins.os.windows.log.amcache import AmcacheInstallPlugin
 from tests._utils import absolute_path

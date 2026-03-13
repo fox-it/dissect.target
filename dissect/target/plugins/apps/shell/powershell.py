@@ -34,6 +34,7 @@ PowershellScriptblockRecord = TargetRecordDescriptor(
         ("path", "script_path"),
     ],
 )
+
 ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "powershell/history",
     [

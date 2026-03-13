@@ -6,11 +6,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.helpers.regutil import RegistryHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.datetime import WindowsDateTimePlugin, c_tz, parse_systemtime_transition
 from dissect.target.plugins.os.windows.locale import WindowsLocalePlugin
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import RegistryHive
     from dissect.target.target import Target
 
 

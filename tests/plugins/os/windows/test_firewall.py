@@ -5,17 +5,17 @@ from datetime import datetime, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.firewall import WindowsFirewallPlugin
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
 def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive) -> None:
     """Test if we parse Windows Registry Firewall Rules correctly."""
-
     rules_name = "SYSTEM\\ControlSet001\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules"
     rules_key = VirtualKey(hive_hklm, rules_name)
 
@@ -136,7 +136,6 @@ def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive
 
 def test_windows_firewall_logs(target_win: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we parse Windows Firewall ``pfirewall.log`` files correctly."""
-
     buf = """\
     #Version: 1.5
     #Software: Microsoft Windows Firewall

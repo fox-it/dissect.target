@@ -92,7 +92,6 @@ class CitrixPlugin(BsdPlugin):
         This implementation supports mapping a live ramdisk which is already mounted at ``/`` and also
         supports extracting the read-only kernel FFS filesystem from ``/flash/ns-*.gz`` and mounting at ``/``.
         """
-
         # When the ramdisk is already present within the target's filesystems, mount it accordingly.
         has_ramdisk = False
         for fs in target.filesystems:

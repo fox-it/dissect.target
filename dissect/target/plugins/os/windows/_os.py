@@ -56,10 +56,17 @@ class WindowsPlugin(OSPlugin):
         target.fs.alt_separator = "\\"
         target.fs.mount("sysvol", sysvol)
 
+        # Mount EFI
         if not sysvol.exists("boot/BCD"):
             for fs in target.filesystems:
                 if fs.exists("boot/BCD") or fs.exists("EFI/Microsoft/Boot/BCD"):
                     target.fs.mount("efi", fs)
+
+        # Mount WinRE
+        if not sysvol.exists("winre/Recovery/WindowsRE"):
+            for fs in target.filesystems:
+                if fs.exists("Recovery/WindowsRE"):
+                    target.fs.mount("winre", fs)
 
         return cls(target)
 
@@ -273,7 +280,6 @@ class WindowsPlugin(OSPlugin):
         Returns:
             Target triple string.
         """
-
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
 
         try:

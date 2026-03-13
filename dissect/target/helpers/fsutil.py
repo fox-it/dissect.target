@@ -366,7 +366,6 @@ def glob_ext(direntry: filesystem.FilesystemEntry, pattern: str) -> Iterator[fil
     Yields:
         Matching filesystem entries (files and/or directories).
     """
-
     # Split the pattern on the last path part. base_name will contain the last path part (which is
     # '' if pattern ends with a /) and dir_name will contain the other parts.
     dir_name, base_name = split(pattern, alt_separator=direntry.fs.alt_separator)
@@ -469,7 +468,6 @@ def resolve_link(
 
     It stops resolving once it detects an infinite recursion loop.
     """
-
     link = normalize(link, alt_separator=alt_separator)
     path = normalize(path, alt_separator=alt_separator)
 
@@ -597,7 +595,6 @@ def reverse_read(fh: BinaryIO, chunk_size: int = io.DEFAULT_BUFFER_SIZE, reverse
     Returns:
         An iterator of byte chunks, starting from the end of the file-like object and moving to the start.
     """
-
     offset = fh.seek(0, io.SEEK_END)
 
     while offset > 0:

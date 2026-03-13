@@ -82,7 +82,6 @@ def test_esxi_os_creation_version_7(target_bare: Target) -> None:
 
     Indirectly tests the ESXi configstore plugin.
     """
-
     fs1 = VirtualFilesystem()
     fs1.map_file_fh("boot.cfg", BytesIO(b"build=7.13.37-1.2.3.4\nmodules=example.v00 --- example.tgz\n"))
     fs1.map_file_fh("example.v00", BytesIO(b""))

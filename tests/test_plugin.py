@@ -1352,7 +1352,6 @@ def test_find_functions_linux(target_linux: Target) -> None:
 
 def test_find_functions_compatible_check(target_linux: Target) -> None:
     """Test if we correctly check for compatibility in ``find_functions`` and ``_filter_compatible``."""
-
     found, _ = find_functions("*", target_linux, compatibility=True)
     assert "os.unix.log.messages.syslog.syslog" not in [f"{f.path}.{f.name}" for f in found]
 
@@ -1371,7 +1370,6 @@ def test_benchmark_functions_compatible_check(target_unix_users: Target, benchma
 
 def test_function_aliases(target_default: Target) -> None:
     """Test if alias functions are tagged as such correctly."""
-
     # function that is an alias should have an alias property set to True
     syslog_fd = find_functions("syslog", target_default)[0][0]
     assert syslog_fd
@@ -1388,7 +1386,6 @@ def test_function_aliases(target_default: Target) -> None:
 
 def test_function_required_arguments(target_default: Target) -> None:
     """Test if functions with required arguments are tagged as such correctly."""
-
     # function without any arguments should have an args property with an empty list
     syslog_fd = find_functions("syslog", target_default)[0][0]
     assert syslog_fd
@@ -1868,7 +1865,6 @@ def test_plugin_record_field_and_name_consistency() -> None:
 
 def assert_valid_rst(src: str) -> None:
     """Attempts to compile the given string to rst."""
-
     try:
         publish_string(src, settings_overrides={"halt_level": 2})
 
@@ -1881,7 +1877,6 @@ def assert_valid_rst(src: str) -> None:
 
 def assert_compliant_rst(src: str) -> None:
     """Makes sure that the given rst docstring follows the project's conventions."""
-
     # Explicit message stating we want References instead of Resources to prevent confusion
     if "Resources:\n" in src:
         pytest.fail(f"Invalid rst: docstring contains 'Resources' instead of 'References': {src!r}", pytrace=False)
@@ -1902,7 +1897,6 @@ def assert_compliant_rst(src: str) -> None:
 )
 def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
     """Test whether all parts of nested namespaces exist and that there are no conflicts with other functions."""
-
     parts = descriptor.namespace.split(".")
     for i in range(len(parts)):
         part = ".".join(parts[: i + 1])
@@ -1937,7 +1931,6 @@ def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
     References:
         - https://github.com/fox-it/dissect.target/issues/1180
     """
-
     assert descriptor.cls.__subclasses__(), (
         f"NamespacePlugin {descriptor.module}.{descriptor.qualname} has no subclasses, are you sure you're using NamespacePlugin correctly?"  # noqa: E501
     )

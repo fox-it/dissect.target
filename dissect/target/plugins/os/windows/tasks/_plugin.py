@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
     [
