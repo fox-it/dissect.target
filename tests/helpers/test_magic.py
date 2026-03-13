@@ -110,7 +110,12 @@ entry = fs.get("example.png")
         ("from_buffer", b"Received:", True, "message/rfc822"),
         ("from_buffer", b"!BDN", True, "application/vnd.ms-outlook-pst"),
         ("from_buffer", (b"\x00" * 2112) + b"Microsoft Word document data", True, "application/msword"),
-        ("from_buffer", (b"\x00" * 592) + bytes.fromhex("108d81649b4fcf1186ea00aa00b929e8"), True, "application/vnd.ms-powerpoint"),  # noqa: E501
+        (
+            "from_buffer",
+            (b"\x00" * 592) + bytes.fromhex("108d81649b4fcf1186ea00aa00b929e8"),
+            True,
+            "application/vnd.ms-powerpoint",
+        ),
         # Executables
         ("from_buffer", b"MZ", True, "application/x-ms-dos-executable"),
         ("from_buffer", bytes.fromhex("7F454C46"), True, "application/x-executable"),
