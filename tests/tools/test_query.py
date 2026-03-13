@@ -562,8 +562,8 @@ def test_plugin_argument_handling(capsys: pytest.CaptureFixture, monkeypatch: py
         target_query()
 
     out, _ = capsys.readouterr()
-    assert "path='/path/to/symlink/target'" in out
-    assert "path='/path/to/symlink'" in out
+    assert "ino=14" in out
+    assert "ino=15" in out
     assert len(out.splitlines()) == 2
 
 
