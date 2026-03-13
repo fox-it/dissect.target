@@ -62,7 +62,12 @@ class Magic:
             end = offset + len(magic)
             if (overshoot := end - window_size) > 0:
                 # The current window is not large enough to compare against the magic signature, read more bytes
-                chunk = buf.read(((overshoot + WINDOW_CHUNK_SIZE - 1) // WINDOW_CHUNK_SIZE) * WINDOW_CHUNK_SIZE)
+                chunk = buf.read(
+                    min(
+                        ((overshoot + WINDOW_CHUNK_SIZE - 1) // WINDOW_CHUNK_SIZE) * WINDOW_CHUNK_SIZE,
+                        mimetypes.PATTERN_WINDOW_SIZE - window_size,
+                    )
+                )
                 window[window_size : window_size + len(chunk)] = chunk
                 window_size += len(chunk)
 
