@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from textwrap import dedent
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
-from dissect.target.plugins.apps.remoteaccess.teamviewer import TeamViewerPlugin
+import pytest
+
+from dissect.target.plugins.apps.remoteaccess.teamviewer import TeamViewerPlugin, parse_start
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -135,3 +138,52 @@ def test_teamviewer_incoming(target_win_users: Target, fs_win: VirtualFilesystem
     assert records[1].user == "Server"
     assert records[1].connection_type == "RemoteControl"
     assert records[1].connection_id == "{4BF22BA7-32BA-4F64-8755-97E6E45F9883}"
+
+
+def test_teamviewer_daylight_savings_time(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
+    """Test whether the teamviewer plugin handles dst correctly."""
+    log = """
+    Start:              2025/10/26 02:50:32.134 (UTC+2:00)
+    2025/10/26 02:50:32.300  1234  5678 G1   Example DST timestamp
+    2025/10/26 02:00:03.400  1234  5678 G1   Example non DST timestamp
+    2025/10/26 02:30:03.400  1234  5678 G1   Example continued timestamp
+    Start:              2025/10/27 01:02:03.123 (UTC+1:00)
+    2025/10/27 01:02:03.500  1234  5678 G1   Example non DST timestamp
+    """
+    fs_win.map_file_fh("Program Files/TeamViewer/Teamviewer_Log.log", BytesIO(dedent(log).encode()))
+    # set timezone to something that has a dst time record
+    eu_timezone = target_win_tzinfo.datetime.tz("W. Europe Standard Time")
+    target_win_tzinfo.add_plugin(TeamViewerPlugin)
+
+    with patch.object(target_win_tzinfo.datetime, "_tzinfo", eu_timezone):
+        records = list(target_win_tzinfo.teamviewer.logs())
+    assert len(records) == 4
+
+    assert records[0].ts.astimezone(timezone.utc) == datetime(2025, 10, 26, 0, 50, 32, 300000, tzinfo=timezone.utc)
+    assert records[1].ts.astimezone(timezone.utc) == datetime(2025, 10, 26, 1, 0, 3, 400000, tzinfo=timezone.utc)
+    assert records[2].ts.astimezone(timezone.utc) == datetime(2025, 10, 26, 1, 30, 3, 400000, tzinfo=timezone.utc)
+    assert records[3].ts.astimezone(timezone.utc) == datetime(2025, 10, 27, 0, 2, 3, 500000, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize(
+    argnames=("line", "expected_date"),
+    argvalues=[
+        pytest.param(
+            "Start: 2021/11/11 12:34:56",
+            datetime(2021, 11, 11, 12, 34, 56),  # noqa DTZ001
+            id="Parse withouth timezone",
+        ),
+        pytest.param(
+            "Start: 2024/12/31 01:02:03.123 (UTC+2:00)",
+            datetime(2024, 12, 31, 1, 2, 3, tzinfo=timezone(timedelta(seconds=7200))),
+            id="Parse (UTC+2:00)",
+        ),
+        pytest.param(
+            "Start: 2025/01/01 12:28:41.436 (UTC)",
+            datetime(2025, 1, 1, 12, 28, 41, tzinfo=timezone.utc),
+            id="Parse UTC without offset",
+        ),
+    ],
+)
+def test_teamviewer_parse_start(line: str, expected_date: datetime) -> None:
+    assert parse_start(line) == expected_date

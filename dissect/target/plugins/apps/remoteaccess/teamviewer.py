@@ -132,6 +132,8 @@ class TeamViewerPlugin(RemoteAccessPlugin):
             logfile = self.target.fs.path(logfile)
 
             start_date = None
+            prev_timestamp = None
+            fold = 0
             for line in logfile.open("rt", errors="replace"):
                 if not (line := line.strip()) or line.startswith("# "):
                     continue
@@ -139,9 +141,19 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                 if line.startswith("Start:"):
                     try:
                         start_date = parse_start(line)
+                        fold = 0
                     except Exception as e:
                         self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
                         self.target.log.debug("", exc_info=e)
+
+                    if start_date is None:
+                        continue
+
+                    # See whether the utcoffset with the two different timezones are the same
+                    target_start_date = start_date.replace(tzinfo=target_tz)
+                    if target_start_date.utcoffset() == start_date.utcoffset():
+                        # Adjust the start_date so it uses the timezone known to target throughtout
+                        start_date = target_start_date
 
                     continue
 
@@ -178,13 +190,22 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     time += ".000000"
 
                 try:
-                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(
-                        tzinfo=start_date.tzinfo if start_date else target_tz
-                    )
+                    tz_info = start_date.tzinfo if start_date else target_tz
+                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(tzinfo=tz_info)
                 except Exception as e:
                     self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
                     self.target.log.debug("", exc_info=e)
                     timestamp = 0
+
+                if timestamp and prev_timestamp and prev_timestamp > timestamp:
+                    # We might currently be in a grey area where the dst period ended.
+                    # replace the fold value of the timestamp
+                    fold = 1
+
+                if timestamp:
+                    timestamp = timestamp.replace(fold=fold)
+
+                prev_timestamp = timestamp
 
                 yield self.RemoteAccessLogRecord(
                     ts=timestamp,
@@ -248,6 +269,7 @@ def parse_start(line: str) -> datetime | None:
 
         Start: 2021/11/11 12:34:56
         Start: 2024/12/31 01:02:03.123 (UTC+2:00)
+        Start: 2025/01/01 12:28:41.436 (UTC)
     """
     if match := RE_START.search(line):
         dt = match.groupdict()
@@ -257,13 +279,21 @@ def parse_start(line: str) -> datetime | None:
             dt["time"] = dt["time"].rsplit(".")[0]
 
         # Format timezone, e.g. "UTC+2:00" to "UTC+0200"
-        if dt["timezone"]:
-            name, operator, amount = re.split(r"(\+|\-)", dt["timezone"])
-            amount = int(amount.replace(":", ""))
-            dt["timezone"] = f"{name}{operator}{amount:0>4d}"
+        if timezone := dt["timezone"]:
+            identifier = " %Z%z"
+            # Handle just UTC timezone
+            if timezone.lower() == "utc":
+                timezone = " UTC+00:00"
+            else:
+                name, operator, amount = re.split(r"(\+|\-)", timezone)
+                amount = int(amount.replace(":", ""))
+                timezone = f" {name}{operator}{amount:0>4d}"
+        else:
+            timezone = ""
+            identifier = ""
 
         return datetime.strptime(  # noqa: DTZ007
-            f"{dt['date']} {dt['time']}" + (f" {dt['timezone']}" if dt["timezone"] else ""),
-            "%Y/%m/%d %H:%M:%S" + (" %Z%z" if dt["timezone"] else ""),
+            f"{dt['date']} {dt['time']}{timezone}",
+            f"%Y/%m/%d %H:%M:%S{identifier}",
         )
     return None
