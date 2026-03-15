@@ -154,45 +154,43 @@ class Environ:
     variable: str
     contents: str
 
-@dataclass
 class FileDescriptor:
     def __init__(self, proc: Path, fd_num: str):
-        self.number = int(fd_num)
-        self.path = proc.joinpath(fd_num)
-        self.info_path = proc.parent.joinpath("fdinfo", fd_num)
-        self.target = None
-        self.fd_info = None
+        self.proc = proc
+        self.number = fd_num
 
     @property
+    def path(self) -> Path:
+        """The path to the file descriptor symlink."""
+        return self.proc.joinpath(self.number)
+
+    @property
+    def info_path(self) -> Path:
+        """The path to the fdinfo entry."""
+        return self.proc.parent.joinpath("fdinfo", self.number)
+
+    @cached_property
     def link(self) -> str:
-        """Returns the resolved symlink"""
-        if not self.target is None:
-            return self.target
+        """Returns the resolved symlink."""
         try:
-            self.target = self.path.readlink()
+            return  str(self.path.readlink())
         except Exception:
-            self.target = "unknown"
-        return self.target
+            return "unknown"
 
-    @property
-    def info(self) -> dict:
-        """Parsed key-value pairs from fdinfo"""
-        if self.fd_info is None:
-            self.fd_info = self._parse_fdinfo()
-        return self.fd_info
-
-    def _parse_fdinfo(self):
+    @cached_property
+    def info(self)-> dict[str, str]:
+        """Parsed key-value pairs from fdinfo."""
         data = {}
         if not self.info_path.exists():
             return data
 
-        for line in self.info_path.read_text().split('\n'):
+        for line in self.info_path.read_text().split("\n"):
             line = line.strip()
             if not line:
                 continue
 
             parts = line.split(None, 1)
-            if not len(parts) == 2:
+            if len(parts) != 2:
                 continue
             key, value = parts
             data[key] = value
