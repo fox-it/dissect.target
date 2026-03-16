@@ -31,7 +31,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from pathlib import Path
 
+    from pytest_benchmark.fixture import BenchmarkFixture
+
     from dissect.target.target import Target
+
 
 try:
     import pexpect
@@ -603,3 +606,27 @@ def test_shell_prompt_tab_autocomplete() -> None:
         child.expect_exact("ubuntu:/$ ", timeout=5)
         child.sendline("exit")
         child.expect(pexpect.EOF, timeout=5)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "args",
+    [
+        pytest.param(""),  # no flags
+        pytest.param("-l"),  # long listing
+    ],
+)
+def test_benchmark_ls_bin(
+    target_debian_ext4_raw: Target,
+    benchmark: BenchmarkFixture,
+    args: str,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    """Benchmark ls command with different parameters with a /bin directory containing ~1000 files."""
+
+    def run_ls() -> None:
+        target_cli = TargetCli(target_debian_ext4_raw)
+        target_cli.onecmd(f"ls {args} /bin")
+        capsys.readouterr()
+
+    benchmark(run_ls)

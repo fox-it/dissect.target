@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import importlib.util
 import pathlib
 import tempfile
@@ -626,3 +627,31 @@ def guarded_keychain() -> Iterator[None]:
     keychain.KEYCHAIN.clear()
     yield
     keychain.KEYCHAIN.clear()
+
+
+@pytest.fixture(scope="session")
+def path_debian_ext4_raw(tmp_path_factory: pytest.TempPathFactory) -> Iterator[pathlib.Path]:
+    """Fixture that provides a path to a Debian Trixie ext4 raw image.
+
+    The image only contains a /bin directory with ~1000 files and an /etc directory with some configuration files.
+    The rest of the filesystem is not included.
+
+    The /bin files are all sparse (filled with zeros).
+    The files in /etc do contain data.
+
+    The source image is stored compressed in the test data directory to save space.
+    Compressed size is 100kb and decompresses to 5mb.
+    """
+    tmp_path = tmp_path_factory.mktemp("data")
+
+    raw_path = tmp_path / "debian-trixie-bin-ext4.raw"
+    with gzip.open(absolute_path("_data/filesystems/ext4/debian-trixie-bin-ext4.raw.gz"), "rb") as fh:
+        raw_path.write_bytes(fh.read())
+
+    return raw_path
+
+
+@pytest.fixture
+def target_debian_ext4_raw(path_debian_ext4_raw: pathlib.Path) -> Target:
+    """Fixture that provides a Target for a Debian Trixie ext4 raw image."""
+    return Target.open(path_debian_ext4_raw)
