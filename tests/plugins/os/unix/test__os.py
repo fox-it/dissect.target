@@ -191,7 +191,6 @@ def test_users(target_unix_users: Target) -> None:
     assert users[1].gid == 1000
     assert users[1].home == posix_path("/home/user")
     assert users[1].shell == posix_path("/bin/bash")
-    breakpoint()
 
     assert users[2].name == "+@ngtest"
     assert users[2].uid is None
