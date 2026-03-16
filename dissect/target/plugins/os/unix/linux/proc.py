@@ -155,6 +155,7 @@ class Environ:
     variable: str
     contents: str
 
+
 @dataclass
 class FstabEntry:
     fs_spec: str
@@ -462,7 +463,7 @@ class ProcProcess:
 
             head = status[:start_name]
             tail = status[end_name:]
-            name = status[start_name + 1: end_name]
+            name = status[start_name + 1 : end_name]
             status = head + tail
 
             for idx, part in enumerate(status.split()[: len(PROC_STAT_NAMES)]):
@@ -620,16 +621,19 @@ class ProcProcess:
 
     def mounts(self) -> Iterator[FstabEntry]:
         """Yields the content of the mount file associated with the process."""
-        mount = self.get("mounts")
-        for line in mount.open("rt"):
-            entry = parse_fstab_entry(line)
-            if not entry:
-                continue
+        mount_path = self.get("mounts")
+        with mount_path.open("rt") as mount_file:
+            for line in mount_file:
+                try:
+                    entry = parse_fstab_entry(line)
+                except ValueError as e:
+                    self.target.log.warning("Failed to parse fstab entry: %s", e)
+                    continue
 
-            fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
-            options = options.split(",")
+                fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
+                options = options.split(",")
 
-            yield FstabEntry(fs_spec, mount_point, fs_type, options, is_dump, pass_num)
+                yield FstabEntry(fs_spec, mount_point, fs_type, options, is_dump, pass_num)
 
     def stat(self) -> fsutil.stat_result:
         """Return a stat entry of the process."""

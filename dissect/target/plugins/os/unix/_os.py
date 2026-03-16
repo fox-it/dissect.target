@@ -446,7 +446,7 @@ class UnixPlugin(OSPlugin):
         return f"{arch}_32-{os}" if bits == 1 and arch[-2:] != "32" else f"{arch}-{os}"
 
 
-def parse_fstab_entry(entry: str, log: logging.Logger = log) -> tuple[str, str, str, str, bool, int] | None:
+def parse_fstab_entry(entry: str) -> tuple[str, str, str, str, bool, int]:
     """Parse a single fstab entry according to the man page fstab(5).
 
     At the man page, the structure of a fstab entry is:
@@ -454,18 +454,17 @@ def parse_fstab_entry(entry: str, log: logging.Logger = log) -> tuple[str, str, 
     """
     entry = entry.strip()
     if not entry or entry.startswith("#"):
-        return None
+        raise ValueError("Empty or commented line")
 
     # Fields are separated by tabs or spaces.
     parts = shlex.split(entry)
 
     # <file system> <mount point> <type> <options> <dump> <pass>
     if len(parts) < 2:
-        log.warning("Invalid fstab entry, not enough fields: %s", entry)
-        return None
+        raise ValueError(f"Invalid fstab entry, not enough fields: {entry}")
+
     if len(parts) > 6:
-        log.warning("Invalid fstab entry, too many fields: %s", entry)
-        return None
+        raise ValueError(f"Invalid fstab entry, too many fields: {entry}")
 
 
     # Pad with defaults
@@ -483,16 +482,14 @@ def parse_fstab_entry(entry: str, log: logging.Logger = log) -> tuple[str, str, 
     elif not dump or dump == "0":
         is_dump = False
     else:
-        log.warning("Invalid dump: %s", dump)
-        return None
+        raise ValueError(f"Invalid dump: {dump}")
 
     if not pass_num:
         pass_num = 0
     elif pass_num.isnumeric():
         pass_num = int(pass_num)
     else:
-        log.warning("Invalid pass num: %s", pass_num)
-        return None
+        raise ValueError(f"Invalid pass num: {pass_num}")
 
     return fs_spec, mount_point, fs_type, options, is_dump, pass_num
 
@@ -517,8 +514,10 @@ def parse_fstab(
         return
 
     for line in fstab.open("rt"):
-        entry = parse_fstab_entry(line, log)
-        if not entry:
+        try:
+            entry = parse_fstab_entry(line)
+        except ValueError as e:
+            log.warning("Failed to parse fstab entry: %s", e)
             continue
 
         dev, mount_point, fs_type, options, _, _ = entry

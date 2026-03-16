@@ -48,20 +48,21 @@ class FstabPlugin(Plugin):
             pass_num (varint): The pass number.
         """
         fstab_path = self.target.fs.path("/etc/fstab")
+        with fstab_path.open("rt") as fstab_file:
+            for line in fstab_file:
+                try:
+                    entry = parse_fstab_entry(line)
+                except ValueError as e:
+                    self.target.log.warning("Failed to parse fstab entry: %s", e)
+                    continue
 
-        for line in fstab_path.open("rt"):
-            entry = parse_fstab_entry(line, self.target.log)
-
-            if not entry:
-                continue
-
-            fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
-            yield FstabEntryRecord(
-                device_path=fs_spec,
-                mount_path=mount_point,
-                fs_type=fs_type,
-                options=options.split(","),
-                is_dump=is_dump,
-                pass_num=pass_num,
-                _target=self.target,
-            )
+                fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
+                yield FstabEntryRecord(
+                    device_path=fs_spec,
+                    mount_path=mount_point,
+                    fs_type=fs_type,
+                    options=options.split(","),
+                    is_dump=is_dump,
+                    pass_num=pass_num,
+                    _target=self.target,
+                )

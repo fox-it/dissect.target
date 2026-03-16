@@ -12,12 +12,15 @@ if TYPE_CHECKING:
 
 MountRecord = TargetRecordDescriptor(
     "linux/proc/mounts",
-    [("varint", "pid"), *FstabEntryRecord.target_fields,],
+    [
+        ("varint", "pid"),
+        *FstabEntryRecord.target_fields,
+    ],
 )
 
 
-class MountPlugin(Plugin):
-    """Linux volatile proc environment plugin."""
+class MountsPlugin(Plugin):
+    """Linux volatile proc mounts plugin."""
 
     def check_compatible(self) -> None:
         if not self.target.has_function("proc"):
