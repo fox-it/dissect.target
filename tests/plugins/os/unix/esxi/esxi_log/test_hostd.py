@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 def test_esxi_6_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
-    """Test with log from an ESXi6"""
+    """Test with log from an ESXi6."""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi6/hostd.1.gz")
     fs_esxi.map_file("/var/run/log/hostd.1.gz", data_file)
 
@@ -55,7 +55,7 @@ def test_esxi_6_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
 
 def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
-    """Test with log from an ESXi 7"""
+    """Test with log from an ESXi 7."""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi7/hostd.0.gz")
     fs_esxi.map_file("/var/run/log/hostd.0.gz", data_file)
 
@@ -101,7 +101,7 @@ def test_esxi_7_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
 
 def test_esxi_8_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
-    """Test with log from an ESXi 7"""
+    """Test with log from an ESXi 8."""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi8/hostd.1.gz")
     fs_esxi.map_file("/var/run/log/hostd.1.gz", data_file)
 
@@ -130,7 +130,7 @@ def test_esxi_8_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> No
 
 
 def test_esxi_9_log_hostd(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
-    """Test with log from an ESXi 9"""
+    """Test with log from an ESXi 9."""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi9/hostd.0.gz")
     fs_esxi.map_file("/var/run/log/hostd.0.gz", data_file)
 

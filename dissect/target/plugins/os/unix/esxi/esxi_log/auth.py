@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -13,7 +15,7 @@ from dissect.target.plugins.os.unix.esxi.esxi_log import (
 
 
 class EsxiAuthPlugin(Plugin):
-    """ESXi auth.log plugins"""
+    """ESXi auth.log plugins."""
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -31,7 +33,6 @@ class EsxiAuthPlugin(Plugin):
 
     @export(record=ESXiLogRecord)
     def auth(self) -> Iterator[ESXiLogRecord]:
-        """
-        Records for auth log file (ESXi Shell authentication success and failure.) Seems to be empty in ESXi8+
+        """Records for auth log file (ESXi Shell authentication success and failure.) Seems to be empty in ESXi8+
         """
         yield from yield_log_records(self.target, self.log_paths, RE_LOG_FORMAT, "auth")

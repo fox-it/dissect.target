@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 def test_esxi_6_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
-    """Test with log from an ESXi6"""
+    """Test with log from an ESXi6."""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi6/auth.log.gz")
     fs_esxi.map_file("/var/run/log/auth.log.gz", data_file)
 
@@ -37,7 +37,7 @@ def test_esxi_6_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> Non
 
 
 def test_esxi_7_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
-    """Test with log from an ESXi7"""
+    """Test with log from an ESXi7."""
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi7/auth.log.gz")
     fs_esxi.map_file("/var/run/log/auth.log.gz", data_file)
 
@@ -66,9 +66,9 @@ def test_esxi_7_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> Non
 
 
 def test_esxi_9_log_auth(target_esxi: Target, fs_esxi: VirtualFilesystem) -> None:
-    """
-    Test with log from an ESXi9.
-    In ESXi8+, logs seems to be nearly empty/useless
+    """Test with log from an ESXi9.
+
+    In ESXi8+, logs seems to be nearly empty/useless.
     """
     data_file = absolute_path("_data/plugins/os/unix/esxi/log/esxi9/auth.log.gz")
     fs_esxi.map_file("/var/run/log/auth.log.gz", data_file)

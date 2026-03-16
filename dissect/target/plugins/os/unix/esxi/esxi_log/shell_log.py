@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -13,7 +15,7 @@ from dissect.target.plugins.os.unix.esxi.esxi_log import (
 
 
 class ShellLogPlugin(Plugin):
-    """ESXi shell.log plugins"""
+    """ESXi shell.log plugins."""
 
     # Mostly equal to EsxiLogBasePlugin.RE_LOG_FORMAT, but some difference in metadata part
     RE_LOG_FORMAT: re.Pattern = re.compile(
@@ -47,8 +49,7 @@ class ShellLogPlugin(Plugin):
 
     @export(record=ESXiLogRecord)
     def shell_log(self) -> Iterator[ESXiLogRecord]:
-        """
-        Records for shell.log files (ESXi Shell usage logs, including enable/disable and every command entered).
+        """Records for shell.log files (ESXi Shell usage logs, including enable/disable and every command entered).
 
         References:
             - https://knowledge.broadcom.com/external/article/321910

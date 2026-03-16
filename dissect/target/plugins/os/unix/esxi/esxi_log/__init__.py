@@ -47,8 +47,7 @@ RE_LOG_FORMAT: Pattern = re.compile(
 
 
 def get_esxi_log_path(target: Target, logname: str) -> Iterator[Path]:
-    """
-    Get log location, looking in most usual location, as well as in the osdata partition
+    """Get log location, looking in most usual location, as well as in the osdata partition
 
     References:
         - https://knowledge.broadcom.com/external/article/306962/location-of-esxi-log-files.html
