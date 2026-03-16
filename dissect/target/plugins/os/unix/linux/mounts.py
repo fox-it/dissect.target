@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 MountRecord = TargetRecordDescriptor(
     "linux/proc/mounts",
-    [("varint", "pid"), *FstabEntryRecord.target_fields],
+    [("varint", "pid"), *FstabEntryRecord.target_fields,],
 )
 
 

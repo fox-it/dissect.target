@@ -30,11 +30,11 @@ class FstabPlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not self.target.fs.exists("/etc/fstab"):
-            raise UnsupportedPluginError("fstab file isn't available")
+            raise UnsupportedPluginError("No fstab file found on target")
 
     @export(record=FstabEntryRecord)
     def fstab(self) -> Iterator[FstabEntryRecord]:
-        """Return the mount entries from /etc/fstab.
+        """Return the mount entries from ``/etc/fstab``.
 
         Yields FstabEntryRecord with the following fields:
 
