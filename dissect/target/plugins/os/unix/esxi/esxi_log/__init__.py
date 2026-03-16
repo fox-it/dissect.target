@@ -55,7 +55,6 @@ def get_esxi_log_path(target: Target, logname: str) -> Iterator[Path]:
     """
     # Esxi/loaders should ensure that logs are symlinked to /var/run/log, as on a live ESXi hosts.
     if (var_run_log := target.fs.path("/var/run/log")).exists():
-        print("HERE")
         for path in var_run_log.glob(f"{logname}.*"):
             try:
                 yield path.resolve(strict=True)
