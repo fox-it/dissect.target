@@ -220,8 +220,7 @@ class ESXiPlugin(UnixPlugin):
 
     @export(record=[ESXiUserRecord])
     def users(self) -> Iterator[ESXiUserRecord]:
-        """
-        Return users from /etc/passwd (if available/collected) and from configstore (ESXi7+).
+        """Return users from /etc/passwd (if available/collected) and from configstore (ESXi7+).
         Both entries are merged.
         Usually DCUI and vpxuser are not present in configstore in ESXi8+, but still present in the system.
         Password hash are present in configstore, but are censored when collected using vmsupport (replaced with *****)
@@ -443,7 +442,7 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
 
         if local_tgz is None:
             target.log.warning("Dynamic decryption of %s failed", local_tgz_ve)
-    elif not local_tgz:
+    else:
         target.log.warning("local.tgz is encrypted but static decryption failed and no dynamic decryption available!")
 
     if local_tgz:
@@ -537,7 +536,6 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
 
 def _get_log_dir_from_target(target: Target) -> str:
     """Identify log dir from either configstore (ESXi7+) or /etc/vmsyslog.conf (ESXi6)."""
-
     # After ESXi7, log dir location is stored in the configstore.
     # As retrieving version is not easy, we just check if configstore exists.
     log_dir = "/scratch/log"
@@ -587,7 +585,6 @@ def _link_log_dir_live_system_collection(target: Target) -> None:
 
 def _link_log_dir_raw_disk(target: Target) -> None:
     """Link log directory from a disk system : symlink from log_dir (usually /scratch/log) to /var/run/log"""
-
     # Don't really know how ESXi does this, but let's just take a shortcut for now
     log_dir = _get_log_dir_from_target(target)
 
