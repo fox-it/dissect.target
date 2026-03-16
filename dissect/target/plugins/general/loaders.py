@@ -17,7 +17,6 @@ class LoaderListPlugin(Plugin):
     @arg("-j", "--json", action="store_true", help="output in JSON format")
     def loaders(self, json: bool = False) -> None:
         """List the available loaders."""
-
         loaders_info = {}
         for key, loader in LOADERS_BY_SCHEME.items():
             try:

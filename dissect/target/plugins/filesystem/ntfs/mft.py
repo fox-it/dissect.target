@@ -187,7 +187,6 @@ class MftPlugin(Plugin):
         References:
             - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
         """
-
         record_formatter = default_formatter
 
         def noop_aggregator(records: Iterator[Record]) -> Iterator[Record]:
@@ -614,5 +613,4 @@ def format_body_info(
 
 def format_none_value(value: Any) -> str | Any:
     """Format the value if it is ``None``."""
-
     return value if value is not None else "No Data"

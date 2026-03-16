@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
-from dissect.target.target import Target
 
 if TYPE_CHECKING:
     from dissect.target.target import Target

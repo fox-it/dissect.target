@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 HitmanAlertRecord = TargetRecordDescriptor(
     "application/av/sophos/hitman/log",
     [
