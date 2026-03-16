@@ -5,7 +5,6 @@ import typing
 import uuid
 
 from dissect.database.ese import ESE
-from dissect.database.ese import Table as EseTable
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -17,6 +16,8 @@ from dissect.target.plugins.os.windows.bits.c_bits import c_bits
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
+
+    from dissect.database.ese import Table as EseTable
 
     from dissect.target import Target
 
@@ -80,8 +81,7 @@ class BitsPlugin(Plugin):
         return files_dict
 
     def get_job_error_len(self, blob: bytes) -> int:
-        """
-        Get length of a structure containing information related to error.
+        """Get length of a structure containing information related to error.
 
         Basic structure pattern
 
@@ -100,6 +100,7 @@ class BitsPlugin(Plugin):
                 }
             }
         };
+
         Args:
             blob: Byte starting with a JobError structure.
 
