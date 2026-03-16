@@ -466,7 +466,6 @@ def parse_fstab_entry(entry: str) -> tuple[str, str, str, str, bool, int]:
     if len(parts) > 6:
         raise ValueError(f"Invalid fstab entry, too many fields: {entry}")
 
-
     # Pad with defaults
     parts.extend([""] * (6 - len(parts)))
     fs_spec, mount_point, fs_type, options, dump, pass_num = parts
