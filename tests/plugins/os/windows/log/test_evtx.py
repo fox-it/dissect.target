@@ -121,7 +121,6 @@ def test_evtx_scraping(target_win: Target) -> None:
 
 def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we normalize certain evtx fields correctly."""
-
     # Example Security.evtx originates from Windows 10 22H2 Pro build 19045.2006,
     # events exported after clean virtual machine post-install.
     security_evtx = absolute_path("_data/plugins/os/windows/log/evtx/Security.evtx")
@@ -161,7 +160,6 @@ def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) ->
 )
 def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> None:
     """Test if ``unique_keys`` correctly deduplicates key values."""
-
     assert evtx.unique_key(key, keys) == expected_key
 
 
@@ -172,3 +170,20 @@ def test_evtx_direct_mode() -> None:
     records = list(target.evtx())
 
     assert len(records) == 5
+
+
+def test_evtx_build_record_illegal_characters(target_win: Target) -> None:
+    """Test that we correctly replace illegal characters in record field names."""
+    evtx_record = {
+        "Provider_Name": "Microsoft-Windows-Kernel-Boot",
+        "Provider_Guid": "{FF44CA15-7A4D-AA4B-BBA5-0998955E531E}",
+        "EventID": 85,
+        "pSubStatus->PrimaryBlob():.<#/Status": 1,
+    }
+
+    record = evtx.EvtxPlugin(target_win)._build_record(
+        evtx_record,
+        target_win.fs.path("C:/WINDOWS/system32/winevt/logs/Microsoft-Windows-Kernel-Boot%4Operational.evtx"),
+    )
+
+    assert record.pSubStatus__PrimaryBlob_______Status == "1"

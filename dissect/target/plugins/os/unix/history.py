@@ -7,7 +7,7 @@ from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import UnixUserRecord, create_extended_descriptor
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, alias, export, internal
 
 if TYPE_CHECKING:
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.helpers.record import UnixUserRecord
     from dissect.target.target import Target
 
 CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -75,7 +76,6 @@ class CommandHistoryPlugin(Plugin):
         When using a shell, history of the used commands can be kept on the system. These are usually written to
         a hidden file named ``.$SHELL_history`` and may expose commands that were used by an adversary.
         """
-
         for shell, history_path, user in self._history_files:
             if shell == "zsh":
                 yield from self.parse_zsh_history(history_path, user)
@@ -98,7 +98,7 @@ class CommandHistoryPlugin(Plugin):
             #1648598339
             echo "this is a test"
 
-        Resources:
+        References:
             - http://git.savannah.gnu.org/cgit/bash.git/tree/bashhist.c
         """
         next_cmd_ts = None
@@ -142,7 +142,7 @@ class CommandHistoryPlugin(Plugin):
             : 1673860722:0;sudo apt install sl
             : :;
 
-        Resources:
+        References:
             - https://sourceforge.net/p/zsh/code/ci/master/tree/Src/hist.c
         """
         i = 0
@@ -191,10 +191,9 @@ class CommandHistoryPlugin(Plugin):
         Note that the last ``- cmd: echo "test: test"`` is not valid YAML,
         which is why we cannot safely use the Python yaml module.
 
-        Resources:
+        References:
             - https://github.com/fish-shell/fish-shell/blob/master/src/history.cpp
         """
-
         with history_file.open("r") as h_file:
             history_data = h_file.read()
 

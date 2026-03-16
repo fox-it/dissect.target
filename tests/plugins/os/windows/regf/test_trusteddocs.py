@@ -3,17 +3,18 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.trusteddocs import TrustedDocumentsPlugin
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
 def test_trusteddocs_plugin(target_win_users: Target, hive_hku: VirtualHive) -> None:
     """Test if we detect and parse TrustedDocs entries.
 
-    Resources:
+    References:
         - https://github.com/Psmths/windows-forensic-artifacts/blob/main/file-activity/trustrecords-registry-key.md
     """
     trusteddocs_key_name = "Software\\Microsoft\\Office\\16.0\\Word\\Security\\Trusted Documents"

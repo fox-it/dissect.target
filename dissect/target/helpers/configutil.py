@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import io
 import json
-import logging
 import re
 import sys
 from collections import deque
-from collections.abc import ItemsView, Iterable, Iterator, KeysView
+from collections.abc import Iterable
 from configparser import ConfigParser, MissingSectionHeaderError
+from contextlib import nullcontext
 from dataclasses import dataclass
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Literal,
     TextIO,
 )
@@ -20,9 +20,11 @@ from typing import (
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import to_list
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, ItemsView, Iterator, KeysView
     from pathlib import Path
     from types import TracebackType
 
@@ -47,7 +49,7 @@ except ImportError:
     HAS_TOML = False
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -164,7 +166,6 @@ class ConfigurationParser:
         Raises:
             ConfigurationParsingError: If any exception occurs during during the parsing process.
         """
-
         try:
             self.parse_file(fh)
         except Exception as e:
@@ -186,7 +187,6 @@ class ConfigurationParser:
         Returns:
             The merged parser.
         """
-
         self._merge(self.parsed_data, other.parsed_data)
         return self
 
@@ -219,6 +219,9 @@ class ConfigurationParser:
 
     def items(self) -> ItemsView:
         return self.parsed_data.items()
+
+    def as_dict(self) -> dict:
+        return self.parsed_data
 
 
 class Default(ConfigurationParser):
@@ -264,8 +267,16 @@ class Default(ConfigurationParser):
         prev_key = None
         for line in self.line_reader(fh):
             if line.startswith((" ", "\t")):
-                # This part was indented so it is a continuation of the previous key
+                # This part was indented so it is assumed to be a continuation of the previous key
                 prev_value = information_dict.get(prev_key)
+                if not isinstance(prev_value, str):
+                    # If the previous value is not a string, some parsing already occured which would imply
+                    # that this line is not a continuation of the previous value.
+                    # Meaning we are in an unknown state and should not continue parsing.
+
+                    raise ConfigurationParsingError(
+                        "Unexpected state occurred when parsing using the `Default` parser."
+                    )
                 information_dict[prev_key] = f"{prev_value} {line.strip()}"
                 continue
 
@@ -294,7 +305,7 @@ class CSVish(Default):
             columns = re.split(self.SEPARATOR, line, maxsplit=self.maxsplit)
 
             # keep unparsed lines separate (often env vars)
-            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns))
+            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns, strict=False))
 
             information_dict[str(i)] = data
 
@@ -441,7 +452,6 @@ class ListUnwrapper:
     @staticmethod
     def _unwrap_dict(data: dict | list) -> dict | list:
         """Looks for dictionaries and unwraps its values."""
-
         if not isinstance(data, dict):
             return data
 
@@ -503,14 +513,14 @@ class Env(ConfigurationParser):
     strings. Does not support dynamic env files, e.g. ``foo=`bar```. Also does not support multi-line key/value
     assignments (yet).
 
-    Resources:
+    References:
         - https://docs.docker.com/compose/environment-variables/variable-interpolation/#env-file-syntax
         - https://github.com/theskumar/python-dotenv/blob/main/src/dotenv/parser.py
     """
 
     RE_KV = re.compile(r"^(?P<key>.+?)=(?P<value>(\".+?\")|(\'.+?\')|(.*?))?(?P<comment> \#.+?)?$")
 
-    def __init__(self, comments: bool = True, *args, **kwargs):
+    def __init__(self, comments: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.comments = comments
         self.parsed_data: dict | tuple[dict, str | None] = {}
@@ -828,9 +838,80 @@ class SystemD(Indentation):
         return [], None
 
 
+class Leases(Default):
+    """A :class:`ConfigurationParser` that specifically parses dhclient ``.leases`` files.
+
+    Examples:
+
+        .. code-block::
+
+            >>> Leases = textwrap.dedent(
+                    '''
+                    lease {
+                        interface "eth0"; # A comment that gets ignored
+                        fixed-address 1.2.3.4;
+                        option dhcp-lease-time 13337;
+                        option routers 0.0.0.0;
+                        option host-name "hostname";
+                        renew 1 2023/12/31 13:37:00;
+                        rebind 2 2023/01/01 01:00:00;
+                        expire 3 2024/01/01 13:37:00;
+                        # Another comment that gets ignored
+                    }
+                    '''
+                )
+            >>> parser = Leases(io.StringIO(lease))
+            >>> parser.parsed_data
+            {
+                "lease-0": {
+                    "interface": "eth0",
+                    "fixed-address": "1.2.3.4"
+                    "option": {
+                        "dhcp-lease-time": "13337",
+                        "routers": "0.0.0.0",
+                        "host-name": "hostname"
+                    },
+                    "renew": "1 2023/12/31 13:37:00",
+                    "rebind": "2 2023/01/01 01:00:00",
+                    "expire": "3 2024/01/01 13:37:00",
+            }
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, separator=(r"\s",))
+
+    def _parse_line(self, line: str) -> tuple[str, str]:
+        key, *value = self.SEPARATOR.split(line.strip(), 1)
+        value = value[0].strip() if value else ""
+        return key, value
+
+    def parse_file(self, fh: TextIO) -> None:
+        root = None
+
+        for line in self.line_reader(fh):
+            key, value = self._parse_line(line)
+
+            if key.startswith("}"):
+                continue
+
+            if key.startswith("lease"):
+                idx = len([key for key in self.parsed_data if "lease" in key])
+                root = f"{key}-{idx}"
+                self.parsed_data[root] = {}
+                continue
+
+            if root:
+                if key == "option":
+                    value = dict([value.split(maxsplit=1)])
+
+                _update_dictionary(self.parsed_data[root], key, value)
+            else:
+                _update_dictionary(self.parsed_data, key, value)
+
+
 @dataclass(frozen=True)
 class ParserOptions:
-    collapse: bool | set | None = None
+    collapse: bool | set[str] | None = None
     collapse_inverse: bool | None = None
     separator: tuple[str] | None = None
     comment_prefixes: tuple[str] | None = None
@@ -839,11 +920,11 @@ class ParserOptions:
 @dataclass(frozen=True)
 class ParserConfig:
     parser: type[ConfigurationParser] = Default
-    collapse: bool | set | None = None
+    collapse: bool | set[str] | None = None
     collapse_inverse: bool | None = None
     separator: tuple[str] | None = None
     comment_prefixes: tuple[str] | None = None
-    fields: tuple[str] | None = None
+    fields: tuple[str, ...] | None = None
 
     def create_parser(self, options: ParserOptions | None = None) -> ConfigurationParser:
         kwargs = {}
@@ -863,10 +944,12 @@ MATCH_MAP: dict[str, ParserConfig] = {
     "*/xml/*": ParserConfig(Xml),
     "*.bashrc": ParserConfig(Txt),
     "*/vim/vimrc*": ParserConfig(Txt),
+    "*/fonts/conf.*/*.conf": ParserConfig(Xml),
 }
 
-CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
+CONFIG_MAP: dict[str, ParserConfig] = {
     "ini": ParserConfig(Ini),
+    "env": ParserConfig(Env),
     "xml": ParserConfig(Xml),
     "json": ParserConfig(Json),
     "yml": ParserConfig(Yaml),
@@ -884,12 +967,15 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
     "toml": ParserConfig(Toml),
+    "leases": ParserConfig(Leases),
+    "meta_bare": ParserConfig(Default),  # Return the basic config parser
 }
 
 
-KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
+KNOWN_FILES: dict[str, ParserConfig] = {
     "ulogd.conf": ParserConfig(Ini),
     "sshd_config": ParserConfig(Indentation, separator=(r"\s",)),
+    "sensors3.conf": ParserConfig(Indentation, separator=(r"\s",)),
     "hosts.allow": ParserConfig(Default, separator=(":",), comment_prefixes=("#",)),
     "hosts.deny": ParserConfig(Default, separator=(":",), comment_prefixes=("#",)),
     "hosts": ParserConfig(Default, separator=(r"\s",)),
@@ -949,12 +1035,10 @@ def parse(path: Path, hint: str | None = None, *args, **kwargs) -> Configuration
     Raises:
         FileNotFoundError: If the ``path`` is not a file.
     """
-
     if not path.is_file():
         raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 
     options = ParserOptions(*args, **kwargs)
-
     return parse_config(path, hint, options)
 
 
@@ -966,8 +1050,10 @@ def parse_config(
     parser_type = _select_parser(entry, hint)
 
     parser = parser_type.create_parser(options)
-    with entry.open("rb") as fh:
-        open_file = io.TextIOWrapper(fh, encoding="utf-8") if not isinstance(parser, Bin) else io.BytesIO(fh.read())
+
+    cm = nullcontext if isinstance(parser, Bin) else partial(io.TextIOWrapper, encoding="utf-8")
+
+    with entry.open("rb") as fh, cm(fh) as open_file:
         parser.read_file(open_file)
 
     if isinstance(parser, SystemD):
@@ -1000,5 +1086,5 @@ def _select_parser(path: Path, hint: str | None = None) -> ParserConfig:
         if path.match(match):
             return value
 
-    extention_parser = CONFIG_MAP.get(path.suffix.lstrip("."), ParserConfig(Default))
+    extention_parser = CONFIG_MAP.get(path.suffix.lstrip("."), ParserConfig(Txt))
     return KNOWN_FILES.get(path.name, extention_parser)

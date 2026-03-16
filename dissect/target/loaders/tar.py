@@ -1,24 +1,27 @@
 from __future__ import annotations
 
-import logging
 import tarfile as tf
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target import filesystem, target
+from dissect.target import filesystem
 from dissect.target.filesystems.tar import (
     TarFilesystemDirectoryEntry,
     TarFilesystemEntry,
 )
 from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader, SubLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+    from dissect.target import target
+
+
+log = get_logger(__name__)
 
 TAR_EXT_COMP = (
     ".tar.gz",
@@ -67,12 +70,12 @@ WINDOWS_MEMBERS = (
 class TarSubLoader(SubLoader[tf.TarFile]):
     """Tar implementation of a :class:`SubLoader`."""
 
-    def __init__(self, tar: tf.TarFile, *args, **kwargs):
-        super().__init__(tar, *args, **kwargs)
+    def __init__(self, path: Path, tar: tf.TarFile, **kwargs):
+        super().__init__(path, tar, **kwargs)
         self.tar = tar
 
     @staticmethod
-    def detect(tarfile: tf.TarFile) -> bool:
+    def detect(path: Path, tarfile: tf.TarFile) -> bool:
         """Only to be called internally by :class:`TarLoader`."""
         raise NotImplementedError
 
@@ -85,7 +88,7 @@ class GenericTarSubLoader(TarSubLoader):
     """Generic tar sub loader."""
 
     @staticmethod
-    def detect(tarfile: tf.TarFile) -> bool:
+    def detect(path: Path, tarfile: tf.TarFile) -> bool:
         return True
 
     def map(self, target: target.Target) -> None:
@@ -135,6 +138,8 @@ class TarLoader(Loader):
         import_lazy("dissect.target.loaders.containerimage").ContainerImageTarSubLoader,
         import_lazy("dissect.target.loaders.acquire").AcquireTarSubLoader,
         import_lazy("dissect.target.loaders.uac").UacTarSubloader,
+        import_lazy("dissect.target.loaders.nscollector").NsCollectorTarSubLoader,
+        import_lazy("dissect.target.loaders.vmsupport").VmSupportTarSubloader,
         GenericTarSubLoader,  # should be last
     )
 
@@ -158,8 +163,8 @@ class TarLoader(Loader):
 
     def map(self, target: target.Target) -> None:
         for candidate in self.__subloaders__:
-            if candidate.detect(self.tar):
-                self.subloader = candidate(self.tar)
+            if candidate.detect(self.path, self.tar):
+                self.subloader = candidate(self.path, self.tar, parsed_path=self.parsed_path)
                 self.subloader.map(target)
                 break
 

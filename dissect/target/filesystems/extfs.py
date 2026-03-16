@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import stat
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.extfs import extfs
@@ -12,11 +13,12 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from uuid import UUID
 
 
 class ExtFilesystem(Filesystem):
@@ -46,8 +48,26 @@ class ExtFilesystem(Filesystem):
         except extfs.Error as e:
             raise FileNotFoundError(path) from e
 
+    @cached_property
+    def uuid(self) -> UUID | None:
+        return self.extfs.uuid
+
+
+class ExtDirEntry(DirEntry):
+    fs: ExtFilesystem
+    entry: extfs.INode
+
+    def get(self) -> ExtFilesystemEntry:
+        return ExtFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
 
 class ExtFilesystemEntry(FilesystemEntry):
+    fs: ExtFilesystem
+    entry: extfs.INode
+
     def get(self, path: str) -> FilesystemEntry:
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return ExtFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
@@ -57,34 +77,16 @@ class ExtFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def iterdir(self) -> Iterator[str]:
+    def scandir(self) -> Iterator[ExtDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if self.is_symlink():
-            for f in self.readlink_ext().iterdir():
-                yield f
-        else:
-            for f in self.entry.listdir():
-                if f in (".", ".."):
-                    continue
+        for fname, f in self._resolve().entry.listdir().items():
+            if fname in (".", ".."):
+                continue
 
-                yield f
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        if not self.is_dir():
-            raise NotADirectoryError(self.path)
-
-        if self.is_symlink():
-            for f in self.readlink_ext().scandir():
-                yield f
-        else:
-            for fname, f in self.entry.listdir().items():
-                if fname in (".", ".."):
-                    continue
-
-                path = fsutil.join(self.path, fname, alt_separator=self.fs.alt_separator)
-                yield ExtFilesystemEntry(self.fs, path, f)
+            # TODO: Separate INodes and DirEntry in dissect.extfs
+            yield ExtDirEntry(self.fs, self.path, fname, f)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

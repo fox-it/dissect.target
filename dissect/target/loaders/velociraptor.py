@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import zipfile
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
@@ -9,7 +8,9 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers.fsutil import basename, dirname, join
-from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
+from dissect.target.helpers.logging import get_logger
+from dissect.target.loader import Loader
+from dissect.target.loaders.dir import find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.apps.edr.velociraptor import VELOCIRAPTOR_RESULTS
 
@@ -18,7 +19,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 FILESYSTEMS_ROOT = "uploads"
 UNIX_ACCESSORS = ["file", "auto"]
@@ -78,7 +80,7 @@ def extract_drive_letter(name: str) -> str | None:
     return None
 
 
-class VelociraptorLoader(DirLoader):
+class VelociraptorLoader(Loader):
     """Load Rapid7 Velociraptor forensic image files.
 
     As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import logging
 from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
@@ -9,6 +8,7 @@ from dissect.hypervisor import hyperv
 
 from dissect.target import container
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DRIVE_CONTROLLER_GUIDS = [
     # Microsoft Emulated IDE Controller
@@ -162,4 +163,9 @@ class HyperVLoader(Loader):
                     try:
                         target.disks.add(container.open(disk_path))
                     except Exception:
-                        target.log.exception("Failed to load VHD: %s", drive)
+                        # In some situations we may have something like a .vhdx extension but a raw disk inside
+                        # Fall back on stream based container detection
+                        try:
+                            target.disks.add(container.open(disk_path.open("rb")))
+                        except Exception:
+                            target.log.exception("Failed to load VHD: %s", drive)

@@ -62,11 +62,11 @@ GENERIC_HISTORY_RECORD_FIELDS = [
     ("uri", "url"),
     ("string", "title"),
     ("string", "description"),
-    ("string", "rev_host"),
+    ("string", "host"),
     ("varint", "visit_type"),
     ("varint", "visit_count"),
     ("boolean", "hidden"),
-    ("string", "typed"),
+    ("boolean", "typed"),
     ("varint", "session"),
     ("varint", "from_visit"),
     ("uri", "from_url"),
@@ -142,4 +142,4 @@ def try_idna(url: str) -> bytes:
     try:
         return url.encode("idna")
     except Exception:
-        return url
+        return url.encode()

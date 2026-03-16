@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from datetime import datetime
 
-# Resources: https://linux.die.net/man/5/locate.db
+# References: https://linux.die.net/man/5/locate.db
 mlocate_def = """
 #define MAGIC 0x006d6c6f63617465             /* b'/x00mlocate' */
 
@@ -77,7 +77,7 @@ c_mlocate = cstruct(endian=">").load(mlocate_def)
 class MLocateFile:
     """Parser for mlocate files.
 
-    Resources:
+    References:
         - https://manpages.debian.org/testing/mlocate/mlocate.db.5.en.html
     """
 
@@ -135,7 +135,7 @@ class MLocatePlugin(BaseLocatePlugin):
         ``mlocate`` is a new implementation of GNU locate,
         but has been deprecated since Ubuntu 22.
 
-        Resources:
+        References:
             - https://manpages.debian.org/testing/mlocate/mlocate.db.5.en.html
         """
         mlocate_fh = self.target.fs.path(self.path).open()

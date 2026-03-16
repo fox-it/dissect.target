@@ -51,7 +51,6 @@ def test_podman_images(target_unix_podman: Target, fs_unix: VirtualFilesystem) -
                                              /=<BASE64>
                                              /manifest
     """
-
     target_unix_podman.add_plugin(PodmanPlugin)
     records = list(target_unix_podman.container.images())
 
@@ -72,11 +71,10 @@ def test_podman_images(target_unix_podman: Target, fs_unix: VirtualFilesystem) -
 
 def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can detect Podman containers on a target based on a SQLite3 database."""
-
     target_unix_podman.add_plugin(PodmanPlugin)
     records = list(target_unix_podman.container.containers())
 
-    assert sorted([r.names for r in records]) == [
+    assert sorted([r.name for r in records]) == [
         "boring_mirzakhani",
         "fervent_proskuriakova",
         "hardcore_khayyam",
@@ -93,7 +91,7 @@ def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesyste
     assert records[0].started == datetime(2025, 4, 9, 11, 37, 42, 68128, tzinfo=timezone.utc)
     assert records[0].finished == datetime(1, 1, 1, tzinfo=timezone.utc)
     assert records[0].ports == []
-    assert records[0].names == "hardcore_khayyam"
+    assert records[0].name == "hardcore_khayyam"
     assert records[0].volumes == ["/tmp/host-folder:/data"]
     assert records[0].environment == [
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
@@ -122,7 +120,6 @@ def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesyste
 
 def test_podman_logs(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse non-default Podman json-file log driver entries."""
-
     fs_unix.map_file(
         "/home/user/.local/share/containers/storage/overlay-containers/350f9f5489aebd1d33aa9ed17450270f5a5502d8548df8085d88eccccf2182f1/userdata/ctr.log",
         absolute_path("_data/plugins/apps/container/podman/ctr.log"),

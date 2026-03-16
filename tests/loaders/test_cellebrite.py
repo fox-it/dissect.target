@@ -1,26 +1,48 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
+
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.cellebrite import CellebriteFilesystem, CellebriteLoader
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from dissect.target.target import Target
+    from collections.abc import Callable
+    from pathlib import Path
 
 
-def test_cellebrite_loader(target_bare: Target) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+    """Test that we correctly use ``CellebriteLoader`` when opening a ``Target``."""
+    path = absolute_path("_data/loaders/cellebrite/EvidenceCollection.ufdx")
+
+    target = opener(path)
+    assert isinstance(target._loader, CellebriteLoader)
+    assert target.path == path
+
+
+def test_loader() -> None:
     """Test if we correctly detect and load a Cellebrite UFDX FFS zip extraction from DigitalCorpora (``iOS_17``).
 
     The content of the ``EXTRACTION_FFS.zip`` file has been replaced with a minimal linux folder structure
     for performance reasons.
 
-    Resources:
+    References:
         - https://corp.digitalcorpora.org/corpora/iOS17/
     """
-    path = Path(absolute_path("_data/loaders/cellebrite/EvidenceCollection.ufdx"))
-    loader = CellebriteLoader(path)
+    path = absolute_path("_data/loaders/cellebrite/EvidenceCollection.ufdx")
+
+    loader = loader_open(path)
+    assert isinstance(loader, CellebriteLoader)
 
     assert loader.ufdx.path.name == "EvidenceCollection.ufdx"
     assert loader.ufdx.evidence == "00f905b7-5131-42d9-9ccf-2227115d9536"
@@ -45,13 +67,14 @@ def test_cellebrite_loader(target_bare: Target) -> None:
     assert loader.ufd[0].dumps[0].path.name == "EXTRACTION_FFS.zip"
     assert loader.ufd[0].dumps[1].type == "Keychain"
 
-    loader.map(target_bare)
-    target_bare.apply()
+    t = Target()
+    loader.map(t)
+    t.apply()
 
-    assert len(target_bare.filesystems) == 1
-    assert isinstance(target_bare.filesystems[0], CellebriteFilesystem)
+    assert len(t.filesystems) == 1
+    assert isinstance(t.filesystems[0], CellebriteFilesystem)
 
-    assert sorted(map(str, target_bare.fs.path("/").iterdir())) == [
+    assert sorted(map(str, t.fs.path("/").iterdir())) == [
         "/$fs$",
         "/etc",
         "/home",
@@ -60,5 +83,5 @@ def test_cellebrite_loader(target_bare: Target) -> None:
         "/var",
     ]
 
-    assert target_bare.os == "linux"
-    assert target_bare.hostname == "example"
+    assert t.os == "linux"
+    assert t.hostname == "example"

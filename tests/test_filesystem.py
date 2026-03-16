@@ -6,9 +6,8 @@ import stat
 import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
-from pathlib import Path
 from tempfile import NamedTemporaryFile, TemporaryDirectory
-from typing import Any, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 from unittest.mock import Mock, patch
 
 import pytest
@@ -21,7 +20,7 @@ from dissect.target.exceptions import (
     SymlinkRecursionError,
 )
 from dissect.target.filesystem import (
-    FilesystemEntry,
+    Filesystem,
     LayerFilesystem,
     MappedFile,
     NotASymlinkError,
@@ -45,6 +44,13 @@ except ImportError:
 
 from dissect.target.helpers import fsutil
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.filesystem import (
+        FilesystemEntry,
+    )
 
 
 @pytest.fixture
@@ -1128,14 +1134,13 @@ def test_mapped_file_stat(mapped_file: MappedFile) -> None:
     with (
         patch("dissect.target.helpers.fsutil.stat_result.copy", autospec=True) as stat_copy,
         patch("pathlib.Path.stat", autospec=True, return_value=mock_stat) as path_stat,
-        patch("pathlib.Path.lstat", autospec=True, return_value=mock_stat) as path_lstat,
     ):
         mapped_file.stat(follow_symlinks=False)
-        path_lstat.assert_called_with(pathlib.Path(mapped_file.entry))
+        path_stat.assert_called_with(pathlib.Path(mapped_file.entry), follow_symlinks=False)
         stat_copy.assert_called_with(mock_stat)
 
         mapped_file.stat(follow_symlinks=True)
-        path_stat.assert_called_with(pathlib.Path(mapped_file.entry))
+        path_stat.assert_called_with(pathlib.Path(mapped_file.entry), follow_symlinks=True)
         stat_copy.assert_called_with(mock_stat)
 
 
@@ -1294,3 +1299,35 @@ def test_layer_filesystem_relative_link() -> None:
     lfs.mount("/mnt", vfs)
 
     assert lfs.path("/mnt/bye/world").read_text() == "o/"
+
+
+class DummyMockFilesystem(Filesystem):
+    __type__ = "test"
+
+
+def test_filesystem_identifier_from_volume_guid() -> None:
+    """Filesystem.identifier returns a string when volume.guid is set."""
+    guid = "test" * 4
+
+    fs = DummyMockFilesystem()
+    fs.volume = Mock(guid=guid)
+
+    assert fs.identifier == guid
+
+
+def test_filesystem_identifier_string_when_no_guid() -> None:
+    """Filesystem.identifier returns the volume name when volume.guid is None."""
+    fs = DummyMockFilesystem()
+    fs.volume = Mock(guid=None)
+    fs.volume.name = "TestVolume"
+
+    assert fs.identifier == "TestVolume"
+
+
+def test_filesystem_identifier_string_when_no_guid_or_name() -> None:
+    """Filesystem.identifier returns the fs type name when volume.guid and volume name are None."""
+    fs = DummyMockFilesystem()
+    fs.volume = Mock(guid=None)
+    fs.volume.name = None
+
+    assert fs.identifier == repr(fs)

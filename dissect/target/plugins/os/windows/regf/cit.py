@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-# Resources:
+# References:
 # - generaltel.dll
 # - win32k.sys (Windows 7)
 # - win32kbase.sys (Windows 10)
@@ -362,7 +362,7 @@ CITProgramBitmapForegroundRecord = TargetRecordDescriptor(
 )
 
 
-CITRecords = Union[
+CITRecords = Union[  # noqa: UP007
     CITSystemRecord,
     CITSystemBitmapDisplayPowerRecord,
     CITSystemBitmapDisplayRequestChangeRecord,
@@ -660,7 +660,6 @@ class CITPlugin(Plugin):
 
         Some of its values are still unknown. Generally only available before Windows 10.
         """
-
         for key in self.target.registry.keys(f"{self.KEY}\\System"):
             for value in key.values():
                 # The value name is a weird per-byte character-mirrored value that contains copies
@@ -787,7 +786,6 @@ class CITPlugin(Plugin):
 
         Generally only available since Windows 10.
         """
-
         keys = [
             self.KEY,
             "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
@@ -844,7 +842,6 @@ class CITPlugin(Plugin):
 
         Generally only available since Windows 10.
         """
-
         keys = [
             self.KEY,
             "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon",
@@ -889,7 +886,7 @@ class CITPlugin(Plugin):
                     _user=user,
                 )
 
-                for names, duration in zip(applications, dp.ForegroundDurations):
+                for names, duration in zip(applications, dp.ForegroundDurations, strict=False):
                     for name in names:
                         yield CITDPDurationRecord(
                             log_time_start=log_time_start,
@@ -908,7 +905,6 @@ class CITPlugin(Plugin):
 
         Generally only available before Windows 10.
         """
-
         for key in self.target.registry.keys(f"{self.KEY}\\win32k"):
             for version_key in key.subkeys():
                 for value in version_key.values():
@@ -941,7 +937,6 @@ class CITPlugin(Plugin):
 
         Generally only available since Windows 10.
         """
-
         for key in self.target.registry.keys(f"{self.KEY}\\Module"):
             for monitored_dll in key.subkeys():
                 try:

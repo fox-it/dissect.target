@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.vmfs import lvm
-from dissect.vmfs.c_vmfs import c_vmfs
+from dissect.vmfs.c_lvm import c_lvm
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
@@ -13,8 +12,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from typing_extensions import Self
-
-log = logging.getLogger(__name__)
 
 
 class VmfsVolumeSystem(LogicalVolumeSystem):
@@ -26,18 +23,20 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
 
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
-        lvm_extents = defaultdict(list)
+        lvm_volumes = defaultdict(list)
 
         for vol in volumes:
             if not cls.detect_volume(vol):
                 continue
 
-            extent = lvm.Extent(vol)
-            lvm_extents[extent.uuid].append(extent)
+            device = lvm.Device(vol)
+            for lv_meta in device.volumes:
+                lv_id = (bytes(lv_meta.volMeta.lvID.uuid), lv_meta.volMeta.lvID.snapID)
+                lvm_volumes[lv_id].append(device)
 
-        for pvs in lvm_extents.values():
+        for devices in lvm_volumes.values():
             try:
-                yield cls(pvs)
+                yield cls(devices)
             except Exception:  # noqa: PERF203
                 continue
 
@@ -47,25 +46,21 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
 
     @staticmethod
     def _detect_volume(fh: BinaryIO) -> bool:
-        fh.seek(c_vmfs.VMFS_LVM_DEVICE_META_BASE)
+        fh.seek(c_lvm.LVM_DEV_HEADER_OFFSET)
         sector = fh.read(512)
-        return int.from_bytes(sector[:4], "little") == c_vmfs.VMFS_LVM_DEVICE_META_MAGIC
+        return int.from_bytes(sector[:4], "little") == c_lvm.LVM_MAGIC_NUMBER
 
     def _volumes(self) -> Iterator[Volume]:
-        try:
-            name = next(extent.fh.name for extent in self.fh if hasattr(extent.fh, "name"))
-        except StopIteration:
-            name = None
-
-        yield Volume(
-            self.lvm,
-            1,
-            None,
-            self.lvm.size,
-            None,
-            name,
-            self.lvm.uuid,
-            raw=self.lvm,
-            disk=self.disk,
-            vs=self,
-        )
+        for i, volume in enumerate(self.lvm.volumes):
+            yield Volume(
+                fh=volume.open(),
+                number=i + 1,
+                offset=None,
+                size=volume.size,
+                vtype=None,
+                name=volume.name,
+                guid=volume.uuid,
+                raw=volume,
+                disk=self.disk,
+                vs=self,
+            )

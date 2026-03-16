@@ -5,9 +5,9 @@ from collections.abc import Iterator
 from datetime import datetime
 from enum import IntEnum
 from io import BytesIO
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING
 
-from dissect.cstruct import Structure, cstruct
+from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import Error, RegistryError, UnsupportedPluginError
@@ -15,7 +15,9 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
+
+    from dissect.cstruct import Structure
 
 ShimcacheRecord = TargetRecordDescriptor(
     "windows/shimcache",
@@ -181,7 +183,7 @@ class CRCMismatchException(Error):
     pass
 
 
-ShimCacheGeneratorType = Union[CRCMismatchException, tuple[Optional[datetime], str]]
+ShimCacheGeneratorType = CRCMismatchException | tuple[datetime | None, str]
 
 
 class ShimCache:

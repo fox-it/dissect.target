@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "powershell/history",
     [

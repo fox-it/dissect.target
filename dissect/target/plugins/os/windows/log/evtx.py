@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException
-from flow.record import Record, utils
+from flow.record import utils
 
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -18,9 +18,11 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from flow.record import Record
+
     from dissect.target.target import Target
 
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
+re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
 
 
 EVTX_GLOB = "*.evtx"
@@ -64,7 +66,6 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
             Provider_Name (string): The Provider_Name field of the event.
             EventID (int): The EventID of the event.
         """
-
         if logs_dir:
             log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
         else:
@@ -82,9 +83,16 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
                 continue
 
             self.target.log.info("Processing event log file %s", entry)
-
-            for event in evtx.Evtx(entry_data):
-                yield self._build_record(event, entry)
+            try:
+                for event in evtx.Evtx(entry_data):
+                    try:
+                        yield self._build_record(event, entry)
+                    except Exception as e:  # noqa: PERF203
+                        self.target.log.warning("Unable to parse event log event %s: %s", event, e)
+                        self.target.log.debug("", exc_info=e)
+            except EOFError as e:
+                self.target.log.warning("Unable to parse event log file %s: %s", entry, e)
+                self.target.log.debug("", exc_info=e)
 
     @export(record=DynamicDescriptor(["datetime"]))
     def scraped_evtx(self) -> Iterator[DynamicDescriptor]:

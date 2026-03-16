@@ -1,26 +1,28 @@
 from __future__ import annotations
 
-import logging
 import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
-from re import Match, compile, sub
-from typing import TYPE_CHECKING, Any, Callable
+from re import compile, sub
+from typing import TYPE_CHECKING, Any
 
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
+    from re import Match
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 try:
     from ruamel.yaml import YAML
@@ -69,7 +71,6 @@ class Template:
         Returns:
             A dictionary based on the provided configured template, else None
         """
-
         if not path.exists() or path.is_dir():
             log.debug("Failed to get config file %s", path)
             config = None
@@ -207,7 +208,7 @@ class Template:
 
 class Parser:
     """Class that represents a parser. This class translates the config created from a Template into a generic
-    configuration dictionary
+    configuration dictionary.
 
     Args:
         target: Target to parse the config from.
@@ -229,7 +230,6 @@ class Parser:
         Returns:
             Dictionary containing network configuration properties for interface, dhcp, ips, gateways, dns, and netmask.
         """
-
         template = defaultdict(set)
 
         for path in self.expand_config_file_paths():
@@ -243,7 +243,7 @@ class Parser:
         return template
 
     def translate_network_config(self, config_dict: dict) -> list[tuple[str, Any]]:
-        """Translates a parsed network configuration property to its generalized form:
+        """Translates a parsed network configuration property to its generalized form.
 
         Returns:
             List containing the translated property and its value.
@@ -339,7 +339,7 @@ class NetworkManager:
         self.detection_globs = (detection_globs,) if isinstance(detection_globs, str) else detection_globs
 
     def detect(self, target: Target | None = None) -> bool:
-        """Detects if the network manager is active on the target
+        """Detects if the network manager is active on the target.
 
         Returns:
             Whether a certain network manager is detected on the target
@@ -540,7 +540,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 
         # Ubuntu cloud-init
         if "Received dhcp lease on" in line:
-            interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+            _, ip, _ = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
             ips.add(ip)
             continue
 
@@ -575,9 +575,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             and " address " in line
             and " via " in line
         ):
-            interface, ip, netmask, gateway = re.search(
-                r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line
-            ).groups()
+            _, ip, _, _ = re.search(r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line).groups()
             ips.add(ip)
             continue
 
@@ -594,7 +592,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 def parse_unix_dhcp_leases(target: Target) -> set[str]:
     """Parse NetworkManager and dhclient DHCP ``.lease`` files.
 
-    Resources:
+    References:
         - https://linux.die.net/man/5/dhclient.conf
 
     Args:

@@ -4,15 +4,20 @@ import random
 from typing import TYPE_CHECKING
 
 from flow.record import RecordDescriptor
-from flow.record.base import Record, parse_def
+from flow.record.base import parse_def
 
 from dissect.target.helpers.descriptor_extensions import (
-    RecordDescriptorExtensionBase,
     TargetRecordDescriptorExtension,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from flow.record.base import Record
+
+    from dissect.target.helpers.descriptor_extensions import (
+        RecordDescriptorExtensionBase,
+    )
 
 
 class ExtendableRecordDescriptor(RecordDescriptor):
@@ -20,7 +25,6 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         """A RecordDescriptor with default fields for dissect targets
         automatically added.
         """
-
         fields = fields or []
         prepend_default_fields = []
         append_default_fields = []
@@ -116,6 +120,7 @@ ChildTargetRecord = TargetRecordDescriptor(
     "target/child",
     [
         ("string", "type"),
+        ("string", "name"),
         ("path", "path"),
     ],
 )

@@ -1,21 +1,22 @@
 from __future__ import annotations
 
-import logging
 import re
-import urllib.parse
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, timezone
 from enum import Enum, IntEnum
 from typing import TYPE_CHECKING, BinaryIO, TypeVar
 
 from dissect.util.ts import from_unix
 
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from datetime import tzinfo
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 def findall(buf: bytes, needle: bytes) -> Iterator[int]:
@@ -62,14 +63,6 @@ class IntEnumMissing(IntEnum):
         member._name_ = str(value)
         member._value_ = value
         return member
-
-
-def parse_path_uri(path: Path) -> tuple[str | None, str | None, str | None]:
-    if path is None:
-        return None, None, None
-    parsed_path = urllib.parse.urlparse(str(path))
-    parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True)
-    return parsed_path.scheme, parsed_path.path, parsed_query
 
 
 def parse_options_string(options: str) -> dict[str, str | bool]:

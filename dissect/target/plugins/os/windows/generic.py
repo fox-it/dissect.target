@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import struct
+from itertools import chain
 from typing import TYPE_CHECKING
 
 from dissect.util.sid import read_sid
@@ -38,14 +39,6 @@ AppInitRecord = UserRegistryRecordDescriptor(
 
 KnownDllRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/knowndlls",
-    [
-        ("datetime", "ts"),
-        ("path", "path"),
-    ],
-)
-
-SessionManagerRecord = UserRegistryRecordDescriptor(
-    "filesystem/registry/sessionmanager",
     [
         ("datetime", "ts"),
         ("path", "path"),
@@ -211,7 +204,6 @@ class GenericPlugin(Plugin):
             - https://winreg-kb.readthedocs.io/en/latest/_modules/winregrc/sysinfo.html?highlight=_ParseInstallDate
             - https://www.forensics-matters.com/2018/09/15/find-out-windows-installation-date/
         """
-
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
 
         try:
@@ -294,58 +286,6 @@ class GenericPlugin(Plugin):
                     )
         except RegistryError:
             pass
-
-    @export(record=SessionManagerRecord)
-    def sessionmanager(self) -> Iterator[SessionManagerRecord]:
-        """Return interesting Session Manager (Smss.exe) registry key entries.
-
-        Session Manager (Smss.exe) is the first user-mode process started by the kernel and performs several tasks,
-        such as creating environment variables, starts the Windows Logon Manager (winlogon.exe), etc. The BootExecute
-        registry key holds the Windows tasks that cannot be performed when Windows is running, the Execute registry key
-        should never be populated when Windows is installed. Can be leveraged as persistence mechanisms.
-
-        References:
-            - https://en.wikipedia.org/wiki/Session_Manager_Subsystem
-            - https://www.microsoftpressstore.com/articles/article.aspx?p=2762082&seqNum=2
-        """
-        keys = [
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager", "BootExecute"),
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager", "Execute"),
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\SubSystems", "windows"),
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\WOW", "cmdline"),
-            ("HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\WOW", "wowcmdline"),
-        ]
-
-        for key, name in keys:
-            for r in self.target.registry.keys(key):
-                try:
-                    value = r.value(name)
-                    data = value.value
-                except RegistryError:
-                    continue
-
-                user = self.target.registry.get_user(r)
-
-                if isinstance(data, list):
-                    for d in data:
-                        if d == "autocheck autochk *":
-                            continue
-
-                        yield SessionManagerRecord(
-                            ts=r.ts,
-                            path=self.target.fs.path(d),
-                            _target=self.target,
-                            _user=user,
-                            _key=r,
-                        )
-                else:
-                    yield SessionManagerRecord(
-                        ts=r.ts,
-                        path=self.target.fs.path(data.split(" ")[0]),
-                        _target=self.target,
-                        _user=user,
-                        _key=r,
-                    )
 
     @export(record=NullSessionPipeRecord)
     def nullsessionpipes(self) -> Iterator[NullSessionPipeRecord]:
@@ -552,7 +492,6 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def codepage(self) -> str | None:
         """Returns the current active codepage on the system."""
-
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"
 
         try:
@@ -561,26 +500,32 @@ class GenericPlugin(Plugin):
             pass
 
     @export(record=ComputerSidRecord)
-    def sid(self) -> Iterator[ComputerSidRecord]:
-        """Return the machine- and optional domain SID of the system."""
-
+    def machine_sid(self) -> Iterator[ComputerSidRecord]:
+        """Return the machine SID of the system."""
         try:
             key = self.target.registry.key("HKLM\\SAM\\SAM\\Domains\\Account")
 
             # The machine SID is stored in the last 12 bytes of the V value as little-endian
-            # The machine SID differs from a 'normal' binary SID as only holds 3 values and lacks a prefix / Revision
+            # The machine SID differs from a 'normal' binary SID as it only holds 3 values and lacks a prefix / Revision
             # NOTE: Consider moving this to dissect.util.sid if we encounter this more often
             sid = struct.unpack_from("<III", key.value("V").value, -12)
-
             yield ComputerSidRecord(
                 ts=key.timestamp,
                 sidtype="Machine",
                 sid=f"S-1-5-21-{sid[0]}-{sid[1]}-{sid[2]}",
                 _target=self.target,
             )
-        except (RegistryError, struct.error):
-            pass
+        except (RegistryError, struct.error) as e:
+            self.target.log.error("Cannot read machine SID from registry")  # noqa: TRY400
+            self.target.log.debug("", exc_info=e)
+            return None
 
+    @export(record=ComputerSidRecord)
+    def domain_sid(self) -> Iterator[ComputerSidRecord]:
+        """Return the domain SID of the system.
+
+        The domain SID is stored in the registry under HKLM\\SECURITY\\Policy\\PolMachineAccountS.
+        """
         try:
             key = self.target.registry.key("HKLM\\SECURITY\\Policy\\PolMachineAccountS")
             raw_sid = key.value("(Default)").value
@@ -592,4 +537,10 @@ class GenericPlugin(Plugin):
                 _target=self.target,
             )
         except (RegistryError, struct.error):
-            pass
+            self.target.log.exception("Cannot read domain SID from registry")
+            return None
+
+    @export(record=ComputerSidRecord)
+    def sid(self) -> Iterator[ComputerSidRecord]:
+        """Return the machine- and optional domain SID of the system."""
+        yield from chain(self.machine_sid(), self.domain_sid())

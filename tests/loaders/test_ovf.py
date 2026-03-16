@@ -1,27 +1,61 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.ovf import OvfLoader
+from dissect.target.target import Target
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
-    from dissect.target.target import Target
+
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
+    """Test that we correctly use ``OvfLoader`` when opening a ``Target``."""
+    path = tmp_path / "test.ovf"
+    path.touch()
+
+    with (
+        patch("dissect.hypervisor.descriptor.ovf.OVF") as mock_ovf,
+        patch("dissect.target.container.open"),
+        patch("dissect.target.target.Target.apply"),
+    ):
+        mock_ovf.return_value = MagicMock()
+        mock_ovf.disks.return_value = ["disk.vmdk"]
+
+        target = opener(path)
+        assert isinstance(target._loader, OvfLoader)
+        assert target.path == path
 
 
-@patch("dissect.target.loaders.ovf.container")
-@patch("dissect.target.loaders.ovf.ovf.OVF")
-def test_ovf_loader(OVF: MagicMock, container: MagicMock, target_bare: Target, tmp_path: Path) -> None:
-    (tmp_path / "test.ovf").touch()
+def test_loader(tmp_path: Path) -> None:
+    """Test that ``OvfLoader`` correctly loads an OVF file and its disks."""
+    path = tmp_path / "test.ovf"
+    path.touch()
 
-    OVF.return_value = OVF
-    OVF.disks.return_value = ["disk.vmdk"]
-    container.open.return_value = MagicMock()
+    with (
+        patch("dissect.hypervisor.descriptor.ovf.OVF") as mock_ovf,
+        patch("dissect.target.container.open") as mock_container_open,
+    ):
+        mock_ovf.return_value = mock_ovf
+        mock_ovf.disks.return_value = ["disk.vmdk"]
 
-    ovf_loader = OvfLoader(tmp_path / "test.ovf")
-    ovf_loader.map(target_bare)
+        loader = loader_open(path)
+        assert isinstance(loader, OvfLoader)
 
-    assert len(target_bare.disks) == 1
-    assert container.open.mock_calls == [call(tmp_path.resolve() / "disk.vmdk")]
+        t = Target()
+        loader.map(t)
+
+        assert len(t.disks) == 1
+        mock_container_open.assert_called_with(tmp_path.resolve() / "disk.vmdk")

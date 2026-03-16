@@ -63,7 +63,7 @@ class UsbPlugin(Plugin):
         - https://dfir.pubpub.org/pub/h78di10n/release/2
         - https://www.senturean.com/posts/19_08_03_usb_storage_forensics_1/#1-system-events
 
-    Resources:
+    References:
         - https://hatsoffsecurity.com/2014/06/05/usb-forensics-pt-1-serial-number/
         - http://www.swiftforensics.com/2013/11/windows-8-new-registry-artifacts-part-1.html
         - https://www.sans.org/blog/the-truth-about-usb-device-serial-numbers/
@@ -101,7 +101,6 @@ class UsbPlugin(Plugin):
         Also tries to find the past volume name and mount letters of the USB device and what user(s) interacted
         with them using ``explorer.exe``.
         """
-
         for key in self.target.registry.keys(self.USB_STOR):
             for usb_type in key.subkeys():
                 try:
@@ -183,7 +182,6 @@ class UsbPlugin(Plugin):
 
     def find_users(self, volume_guids: list[str]) -> Iterator[str]:
         """Attempt to find Windows users that have interacted with the given volume GUIDs."""
-
         for volume_guid in volume_guids:
             try:
                 for key in self.target.registry.key(self.USER_MOUNTS + "\\" + volume_guid):
@@ -201,7 +199,6 @@ def unpack_timestamps(usb_reg_properties: VirtualKey) -> dict[str, int]:
     Returns:
         A dict containing parsed timestamps within passed registry object.
     """
-
     usb_reg_properties = usb_reg_properties.subkey("{83da6326-97a6-4088-9453-a1923f573b29}")
     timestamps = {}
 
@@ -221,7 +218,6 @@ def unpack_timestamps(usb_reg_properties: VirtualKey) -> dict[str, int]:
 
 def parse_device_name(device_name: str) -> dict[str, str]:
     """Parse a registry device name into components."""
-
     match = RE_DEVICE_NAME.match(device_name)
     if not match:
         raise ValueError(f"Unable to parse USB device name: {device_name}")

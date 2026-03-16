@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from enum import Enum, auto
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from dissect.ntfs.exceptions import FileNotFoundError
 
@@ -25,7 +24,7 @@ class InformationType(Enum):
 
 
 def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
-    """Retrieve the drive letter from the loaded mounts
+    """Retrieve the drive letter from the loaded mounts.
 
     When the drive letter is not available for that filesystem it returns empty.
     """
@@ -60,14 +59,15 @@ def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
 
 
 def get_volume_identifier(fs: NtfsFilesystem) -> str | None:
-    """Return the filesystem GUID if available."""
-    try:
-        return f"{UUID(bytes_le=fs.volume.guid)}"
-    except (AttributeError, TypeError, ValueError):
-        # AttributeError is raised when volume is None
-        # TypeError is raised when guid is None
-        # ValueError is raised when the guid string is smaller than 16 bytes
-        return None
+    """Return the filesystem GUID or serial, if available."""
+    if fs.volume and (guid := getattr(fs.volume, "guid", None)):
+        return guid
+
+    # Fallback to NTFS serial if volume GUID is not available
+    if fs.ntfs.serial:
+        return str(fs.ntfs.serial)
+
+    return None
 
 
 def get_owner_and_group(entry: MftRecord, fs: NtfsFilesystem) -> tuple[str | None, str | None]:

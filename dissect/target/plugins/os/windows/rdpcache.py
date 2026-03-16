@@ -335,7 +335,7 @@ def extract_bmc(fh: BinaryIO) -> Iterator[BitmapTile]:
 class RdpCachePlugin(Plugin):
     """Plugin to extract the RDP Bitmap Cache from a Windows target.
 
-    Resources:
+    References:
         - https://www.cert.ssi.gouv.fr/actualite/CERTFR-2016-ACT-017/
     """
 
@@ -415,7 +415,6 @@ class RdpCachePlugin(Plugin):
         self, output_dir: Path, no_individual_tiles: bool, as_collage: bool, as_grid: bool, remnants: str
     ) -> None:
         """Extract bitmaps from Windows' RDP Client cache files."""
-
         if not output_dir.exists():
             self.target.log.error("Destination folder does not exist: %s", output_dir)
             return

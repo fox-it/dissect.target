@@ -68,7 +68,7 @@ class SplashtopPlugin(RemoteAccessPlugin):
         Splashtop is a remote desktop application that can be used to get (persistent) access to a machine.
         It might be used in combination with Atera Management Agent.
 
-        Refrences:
+        References:
             - https://www.synacktiv.com/en/publications/legitimate-rats-a-comprehensive-forensic-analysis-of-the-usual-suspects#atera-and-splashtop
         """
         target_tz = self.target.datetime.tzinfo
@@ -102,10 +102,9 @@ class SplashtopPlugin(RemoteAccessPlugin):
     def filetransfer(self) -> Iterator[RemoteAccessFileTransferRecord]:
         """Parse Splashtop filetransfers.
 
-        Splashtop is a remote desktop application and can be used by adversaries
-        to get (persistent) access to a machine.
-        File transfers as logged in the generic logfile (``SPLog.txt``)
-        show what files are downloaded to a system.
+        Splashtop is a remote desktop application and can be used by adversaries to get (persistent) access to a
+        machine. File transfers as logged in the generic logfile (``SPLog.txt``) show what files are downloaded
+        to a system.
         """
         methods = ("OnUploadRequest", "OnUploadFileCPRequest", "OnDownloadRequest")
         for log_record in self.logs():

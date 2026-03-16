@@ -55,7 +55,7 @@ def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> 
     Returns:
         Detected architecture (e.g. ``arm64``) or ``None``.
 
-    Resources:
+    References:
         - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
     """
     for path in paths:

@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, NewType, TextIO, Union
+from typing import TYPE_CHECKING, BinaryIO, NewType, TextIO
 
 from dissect.regf import c_regf, regf
 
@@ -26,17 +26,17 @@ if TYPE_CHECKING:
 GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
 GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 
-KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.KeyNode]
+KeyType = regf.IndexLeaf | regf.FastLeaf | regf.HashLeaf | regf.IndexRoot | regf.KeyNode
 """The possible key types that can be returned from the registry."""
 
-ValueType = Union[int, str, bytes, list[str], None]
+ValueType = int | str | bytes | list[str] | None
 """The possible value types that can be returned from the registry."""
 
 
 class RegistryValueType(IntEnumMissing):
     """Registry value types as defined in ``winnt.h``.
 
-    Resources:
+    References:
         - https://learn.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
         - https://github.com/fox-it/dissect.regf/blob/main/dissect/regf/c_regf.py
     """
@@ -867,7 +867,7 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
 
 
 def has_glob_magic(pattern: str) -> bool:
-    """Return whether ``pattern`` contains any glob patterns
+    """Return whether ``pattern`` contains any glob patterns.
 
     Args:
         pattern: The string to check on glob patterns.
@@ -879,7 +879,7 @@ def has_glob_magic(pattern: str) -> bool:
 
 
 def glob_split(pattern: str) -> tuple[str]:
-    """Split a key path with glob patterns on the first key path part with glob patterns
+    """Split a key path with glob patterns on the first key path part with glob patterns.
 
     Args:
         pattern: A key path with glob patterns to split.
@@ -899,7 +899,7 @@ def glob_split(pattern: str) -> tuple[str]:
 
 
 def glob_ext(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollection]:
-    """Yield all subkeys of ``key_collection`` that match the glob ``pattern``
+    """Yield all subkeys of ``key_collection`` that match the glob ``pattern``.
 
     Args:
         key_collection: The ``KeyCollection`` to start the path pattern glob matching on.
@@ -951,7 +951,7 @@ def glob_ext(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollect
 
 
 def glob_ext0(key_collection: KeyCollection, key_path: str) -> Iterator[KeyCollection]:
-    """Yield the subkey given by ``key_path`` relative to ``key_collection``
+    """Yield the subkey given by ``key_path`` relative to ``key_collection``.
 
     Args:
         key_collection: The ``KeyCollection`` to yield the subkey from.
@@ -967,7 +967,7 @@ def glob_ext0(key_collection: KeyCollection, key_path: str) -> Iterator[KeyColle
 
 
 def glob_ext1(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollection]:
-    """Yield all subkeys from ``key_collection`` which match the glob pattern ``pattern``
+    """Yield all subkeys from ``key_collection`` which match the glob pattern ``pattern``.
 
     Args:
         key_collection: The ``KeyCollection`` from which subkeys should be matched.

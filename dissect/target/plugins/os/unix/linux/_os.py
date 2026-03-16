@@ -34,11 +34,10 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         the Filesystem Hierarchy Standard (FHS). We can differentiate between Unix and Linux by checking for specific
         Linux kernel-only files not present on actual Unix filesystems (e.g. BSD, Solaris, IBM AIX and HP-UX).
 
-        Resources:
+        References:
             - https://refspecs.linuxfoundation.org/fhs.shtml
             - https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard
         """
-
         # NOTE: dirs like /opt, /mnt, /media, /tmp and /proc are not Linux-specific.
         LINUX_PATHS = {
             "/run",

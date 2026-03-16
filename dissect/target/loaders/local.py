@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import platform
 import re
+import urllib.parse
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
@@ -13,7 +14,6 @@ from dissect.target import filesystem, volume
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.dir import DirectoryFilesystem
-from dissect.target.helpers.utils import parse_path_uri
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
@@ -22,11 +22,12 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 SOLARIS_DEV_DIR = Path("/dev/dsk")
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
 
 LINUX_DEV_DIR = Path("/dev")
-LINUX_DRIVE_REGEX = re.compile(r"(([sh]|xv)d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
+LINUX_DRIVE_REGEX = re.compile(r"(([shv]|xv)d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
 VOLATILE_LINUX_PATHS = [
     Path("/proc"),
     Path("/sys"),
@@ -41,25 +42,30 @@ WINDOWS_DRIVE_FIXED = 3
 class LocalLoader(Loader):
     """Load local filesystem."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs, resolve=False)
+    def __init__(self, path: Path, **kwargs):
+        kwargs["parsed_path"] = urllib.parse.urlparse(str(path))
+        super().__init__(path, **kwargs, resolve=False)
 
     @staticmethod
     def detect(path: Path) -> bool:
-        _, path_part, _ = parse_path_uri(path)
-        return path_part == "local"
+        return urllib.parse.urlparse(str(path)).path == "local"
 
     def map(self, target: Target) -> None:
+        # For the local loader we abuse the path/URI parsing a bit, so fix it up here
+        target.parsed_path = urllib.parse.urlparse(str(target.path))
+        target.path_query = self.parsed_query
+        target.path = Path("local")
+
         os_name = _get_os_name()
 
-        force_dirfs = "force-directory-fs" in target.path_query
-        fallback_to_dirfs = "fallback-to-directory-fs" in target.path_query
+        force_dirfs = "force-directory-fs" in self.parsed_query
+        fallback_to_dirfs = "fallback-to-directory-fs" in self.parsed_query
 
         if os_name == "windows":
             map_windows_mounted_drives(target, force_dirfs=force_dirfs, fallback_to_dirfs=fallback_to_dirfs)
         else:
             if fallback_to_dirfs or force_dirfs:
-                # Where windos does some sophisticated fallback, for other
+                # Where Windows does some sophisticated fallback, for other
                 # operating systems we don't know anything yet about the
                 # relation between disks and mount points.
                 # Temporary solution until we support parsing of /proc/mounts
@@ -310,7 +316,6 @@ def map_windows_mounted_drives(target: Target, force_dirfs: bool = False, fallba
 
     Some inspiration drawn from http://velisthoughts.blogspot.com/2012/02/enumerating-and-using-partitions-and.html
     """
-
     disks = {}
     for drive_volume, is_windrive, disk, disk_num in _get_windows_drive_volumes(target.log):
         if disk:

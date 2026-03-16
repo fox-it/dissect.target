@@ -16,22 +16,31 @@ from getpass import getpass
 from pathlib import Path
 from struct import pack, unpack_from
 from threading import Thread
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
-import paho.mqtt.client as mqtt
 from dissect.util.stream import AlignedStream
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+try:
+    import paho.mqtt.client as mqtt
+
+    HAS_PAHO = True
+except ImportError:
+    HAS_PAHO = False
+
+
+log = get_logger(__name__)
 
 DISK_INDEX_OFFSET = 9
 
@@ -299,6 +308,9 @@ class Broker:
         self.password = password
         self.command = kwargs.get("command")
 
+        if not HAS_PAHO:
+            raise ImportError("Required dependency 'paho' is missing, install with 'pip install dissect.target[mqtt]'")
+
     def clear_cache(self) -> None:
         self.index = {}
 
@@ -460,12 +472,13 @@ def port(value: str) -> int:
 
     Args:
         value (str): The string representation of the port number.
+
     Returns:
         int: The port number as an integer.
+
     Raises:
         argparse.ArgumentTypeError: If the port number is not an integer or out of the valid range (1-65535).
     """
-
     try:
         port = int(value)
     except ValueError:
@@ -491,7 +504,6 @@ def case(value: str) -> str:
     Raises:
         argparse.ArgumentTypeError: If the case name does not match the required pattern.
     """
-
     if re.match(r"^[a-zA-Z0-9_]+$", value):
         return value
 

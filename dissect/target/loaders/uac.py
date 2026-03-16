@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystems.tar import TarFilesystem
-from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs, map_dirs
+from dissect.target.helpers.logging import get_logger
+from dissect.target.loader import Loader
+from dissect.target.loaders.dir import find_and_map_dirs, find_dirs, map_dirs
 from dissect.target.loaders.tar import TarSubLoader
 from dissect.target.loaders.zip import ZipSubLoader
 
@@ -15,13 +16,14 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 FILESYSTEMS_ROOT = "[root]"
 UAC_CHECK_FILE = "uac.log"
 
 
-class UacLoader(DirLoader):
+class UacLoader(Loader):
     """Loader for extracted UAC collections.
 
     References:
@@ -46,11 +48,11 @@ class UacTarSubloader(TarSubLoader):
         - https://tclahr.github.io/uac-docs/
     """
 
-    FS_ROOT_TUPLE = (f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/")
+    FS_ROOT_TUPLE = (f"/{FILESYSTEMS_ROOT}/", f"{FILESYSTEMS_ROOT}/", f"./{FILESYSTEMS_ROOT}/")
 
-    @classmethod
-    def detect(cls, tarfile: tf.TarFile) -> bool:
-        return any(member.name.startswith(cls.FS_ROOT_TUPLE) for member in tarfile.getmembers())
+    @staticmethod
+    def detect(path: Path, tarfile: tf.TarFile) -> bool:
+        return any(member.name.startswith(UacTarSubloader.FS_ROOT_TUPLE) for member in tarfile.getmembers())
 
     def map(self, target: Target) -> None:
         vol = TarFilesystem(tarfile=self.tar, base=FILESYSTEMS_ROOT, fh=self.tar.fileobj)
@@ -66,7 +68,7 @@ class UacZipSubLoader(ZipSubLoader):
     """
 
     @staticmethod
-    def detect(zipfile: zf.Path) -> bool:
+    def detect(path: Path, zipfile: zf.Path) -> bool:
         return zipfile.joinpath(FILESYSTEMS_ROOT).exists() and zipfile.joinpath(UAC_CHECK_FILE).exists()
 
     def map(self, target: Target) -> None:

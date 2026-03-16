@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dissect.target.helpers.certificate import COMMON_CERTIFICATE_FIELDS
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import NamespacePlugin, export
 
@@ -9,15 +10,17 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 WebserverAccessLogRecord = TargetRecordDescriptor(
-    "application/log/webserver/access",
+    "application/webserver/log/access",
     [
         ("datetime", "ts"),
+        ("string", "webserver"),
         ("string", "remote_user"),
         ("net.ipaddress", "remote_ip"),
         ("net.ipaddress", "local_ip"),
         ("varint", "pid"),
         ("string", "method"),
         ("uri", "uri"),
+        ("string", "query"),
         ("string", "protocol"),
         ("varint", "status_code"),
         ("varint", "bytes_sent"),
@@ -29,9 +32,10 @@ WebserverAccessLogRecord = TargetRecordDescriptor(
 )
 
 WebserverErrorLogRecord = TargetRecordDescriptor(
-    "application/log/webserver/error",
+    "application/webserver/log/error",
     [
         ("datetime", "ts"),
+        ("string", "webserver"),
         ("net.ipaddress", "remote_ip"),
         ("varint", "pid"),
         ("string", "module"),
@@ -44,14 +48,28 @@ WebserverErrorLogRecord = TargetRecordDescriptor(
 )
 
 WebserverHostRecord = TargetRecordDescriptor(
-    "application/log/webserver/host",
+    "application/webserver/host",
     [
         ("datetime", "ts"),
+        ("string", "webserver"),
         ("string", "server_name"),
         ("varint", "server_port"),
         ("path", "root_path"),
         ("path", "access_log_config"),
         ("path", "error_log_config"),
+        ("path", "tls_certificate"),
+        ("path", "tls_key"),
+        ("path", "source"),
+    ],
+)
+
+WebserverCertificateRecord = TargetRecordDescriptor(
+    "application/webserver/host/certificate",
+    [
+        ("datetime", "ts"),
+        ("string", "webserver"),
+        *COMMON_CERTIFICATE_FIELDS,
+        ("string", "host"),
         ("path", "source"),
     ],
 )

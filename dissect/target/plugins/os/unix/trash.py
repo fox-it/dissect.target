@@ -40,8 +40,7 @@ class GnomeTrashPlugin(Plugin):
         self.trashes = set(self._garbage_collector())
 
     def _garbage_collector(self) -> Iterator[tuple[UserDetails, TargetPath]]:
-        """it aint much, but its honest work"""
-
+        """It aint much, but its honest work."""
         # home trash folders
         for user_details in self.target.user_details.all_with_home():
             for trash_path in self.PATHS:
@@ -71,7 +70,7 @@ class GnomeTrashPlugin(Plugin):
         Also parses media trash locations such as ``/media/$USER/$Label/.Trash-*``, ``/mnt/$Label/.Trash-*`` and other
         locations as defined in ``/etc/fstab``.
 
-        Resources:
+        References:
             - https://specifications.freedesktop.org/trash-spec/latest/
             - https://github.com/GNOME/glib/blob/main/gio/glocalfile.c
             - https://specifications.freedesktop.org/basedir-spec/latest/
@@ -86,7 +85,6 @@ class GnomeTrashPlugin(Plugin):
             deleted_path (path):     path to the current location of the deleted file
             source       (path):     path to the .trashinfo file
         """  # noqa: E501
-
         for user_details, trash in self.trashes:
             for trash_info_file in trash.glob("info/*.trashinfo"):
                 trash_info = configutil.parse(trash_info_file, hint="ini").get("Trash Info", {})
@@ -132,7 +130,7 @@ class GnomeTrashPlugin(Plugin):
 
             # We also iterate expunged folders, they can contain files that could not be
             # deleted when the user pressed the "empty trash" button in the file manager.
-            # Resources:
+            # References:
             #   - https://gitlab.gnome.org/GNOME/glib/-/issues/1665
             #   - https://bugs.launchpad.net/ubuntu/+source/nautilus/+bug/422012
             for item in (trash / "expunged").rglob("*/*"):

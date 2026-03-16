@@ -44,10 +44,9 @@ class FortiOSLocalePlugin(LocalePlugin):
 def translate_timezone(timezone_num: str) -> str:
     """Translate a FortiOS timezone number to IANA TZ.
 
-    Resources:
+    References:
         - https://<fortios>/ng/system/settings
     """
-
     TZ_MAP = {
         "01": "Etc/GMT+11",  # (GMT-11:00) Midway Island, Samoa
         "02": "Pacific/Honolulu",  # (GMT-10:00) Hawaii

@@ -20,7 +20,7 @@ from __future__ import annotations
 import fnmatch
 import re
 from pathlib import Path, PurePath, _Accessor, _PosixFlavour
-from typing import IO, TYPE_CHECKING, Any, Callable, ClassVar
+from typing import IO, TYPE_CHECKING, Any, ClassVar
 
 from dissect.target import filesystem
 from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
@@ -28,7 +28,7 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from typing_extensions import Self
 
@@ -248,7 +248,7 @@ class PureDissectPath(PurePath):
 
 class TargetPath(Path, PureDissectPath):
     _accessor = _dissect_accessor
-    __slots__ = ("_entry",)
+    __slots__ = ("_direntry", "_entry")
 
     def _make_child_relpath(self, part: str) -> Self:
         child = super()._make_child_relpath(part)
@@ -257,11 +257,10 @@ class TargetPath(Path, PureDissectPath):
         return child
 
     def get(self) -> FilesystemEntry:
-        try:
-            return self._entry
-        except AttributeError:
-            self._entry = self._fs.get(str(self))
-            return self._entry
+        """Return the :class:`FilesystemEntry` for this path."""
+        if not hasattr(self, "_entry"):
+            self._entry = self._direntry.get() if hasattr(self, "_direntry") else self._fs.get(str(self))
+        return self._entry
 
     @classmethod
     def cwd(cls) -> Self:
@@ -286,7 +285,7 @@ class TargetPath(Path, PureDissectPath):
                 # Yielding a path object for these makes little sense
                 continue
             child_path = self._make_child_relpath(entry.name)
-            child_path._entry = entry
+            child_path._direntry = entry
             yield child_path
 
     # NOTE: Forward compatibility with CPython >= 3.12
@@ -347,12 +346,10 @@ class TargetPath(Path, PureDissectPath):
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
     def resolve(self, strict: bool = False) -> Self:
-        """
-        Make the path absolute, resolving all symlinks on the way and also
+        """Make the path absolute, resolving all symlinks on the way and also
         normalizing it (for example turning slashes into backslashes under
         Windows).
         """
-
         s = self._accessor.realpath(self, strict=strict)
         p = self._from_parts((self._fs, s))
 
@@ -367,8 +364,7 @@ class TargetPath(Path, PureDissectPath):
         return p
 
     def stat(self, *, follow_symlinks: bool = True) -> stat_result:
-        """
-        Return the result of the stat() system call on this path, like
+        """Return the result of the stat() system call on this path, like
         os.stat() does.
         """
         return self._accessor.stat(self, follow_symlinks=follow_symlinks)
@@ -391,35 +387,27 @@ class TargetPath(Path, PureDissectPath):
         return self._accessor.open(self, mode, buffering, encoding, errors, newline)
 
     def write_bytes(self, data: bytes) -> int:
-        """
-        Open the file in bytes mode, write to it, and close the file.
-        """
+        """Open the file in bytes mode, write to it, and close the file."""
         raise NotImplementedError("TargetPath.write_bytes() is unsupported")
 
     def write_text(
         self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None
     ) -> int:
-        """
-        Open the file in text mode, write to it, and close the file.
-        """
+        """Open the file in text mode, write to it, and close the file."""
         raise NotImplementedError("TargetPath.write_text() is unsupported")
 
     def readlink(self) -> Self:
-        """
-        Return the path to which the symbolic link points.
-        """
+        """Return the path to which the symbolic link points."""
         path = self._accessor.readlink(self)
         return self._from_parts((self._fs, path))
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def is_junction(self) -> bool:
-        """
-        Whether this path is a junction.
-        """
+        """Whether this path is a junction."""
         return self._accessor.isjunction(self)
 
     def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
-        (as returned by os.path.expanduser)
+        (as returned by os.path.expanduser).
         """
         raise NotImplementedError("TargetPath.expanduser() is unsupported")

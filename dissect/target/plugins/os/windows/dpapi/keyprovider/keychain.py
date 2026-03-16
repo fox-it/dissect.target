@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class KeychainKeyProviderPlugin(KeyProviderPlugin):
     """Keychain key provider plugin."""
 
-    __namespace__ = "_dpapi_keyprovider_keychain"
+    __namespace__ = "dpapi.keyprovider.keychain"
 
     def check_compatible(self) -> None:
         return

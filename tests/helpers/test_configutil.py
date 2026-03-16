@@ -10,12 +10,12 @@ import pytest
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.configutil import (
     Bin,
-    ConfigurationParser,
     CSVish,
     Default,
     Env,
     Indentation,
     Json,
+    Leases,
     ScopeManager,
     SystemD,
     parse,
@@ -24,6 +24,9 @@ from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.configutil import (
+        ConfigurationParser,
+    )
     from dissect.target.target import Target
 
 
@@ -373,5 +376,30 @@ def test_env_parser(input: str | Path, expected_output: dict) -> None:
         parser.parse_file(StringIO(input))
     else:
         parser.parse_file(input.open("r"))
+
+    assert parser.parsed_data == expected_output
+
+
+@pytest.mark.parametrize(
+    ("string_data", "expected_output"),
+    [
+        (
+            'default-duid "\\000\\001\\000\\001\\037\\305\\371\\341\\001\\002\\003\\004\\005\\006"\nlease {\ninterface "eth0"; # some comment\nfixed-address "1.2.3.4";\noption subnet-mask 255.255.255.0;\nrenew 2 2023/10/04 13:37:04;\n# some other comment}',  # noqa: E501
+            {
+                "default-duid": '"\\000\\001\\000\\001\\037\\305\\371\\341\\001\\002\\003\\004\\005\\006"',
+                "lease-0": {
+                    "interface": '"eth0"',
+                    "fixed-address": '"1.2.3.4"',
+                    "option": {"subnet-mask": "255.255.255.0"},
+                    "renew": "2 2023/10/04 13:37:04",
+                },
+            },
+        ),
+    ],
+)
+def test_leases_parser(string_data: str, expected_output: dict) -> None:
+    """Test the leases parser."""
+    parser = Leases()
+    parser.parse_file(StringIO(string_data))
 
     assert parser.parsed_data == expected_output
