@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import itertools
+import platform
 import stat
+from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 import pytest
 
-from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import VirtualFile
 from dissect.target.helpers import fsutil
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.plugins.filesystem.walkfs import WalkFsPlugin
@@ -16,24 +19,28 @@ from tests._utils import absolute_path
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
 
+    from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
 
 def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_entry("/path/to/some/file", VirtualFile(fs_unix, "file", None))
-    fs_unix.map_file_entry("/path/to/some/other/file.ext", VirtualFile(fs_unix, "file.ext", None))
-    fs_unix.map_file_entry("/root_file", VirtualFile(fs_unix, "root_file", None))
-    fs_unix.map_file_entry("/other_root_file.ext", VirtualFile(fs_unix, "other_root_file.ext", None))
-    fs_unix.map_file_entry("/.test/test.txt", VirtualFile(fs_unix, "test.txt", None))
-    fs_unix.map_file_entry("/.test/.more.test.txt", VirtualFile(fs_unix, ".more.test.txt", None))
+    """Test basic walkfs plugin behavior."""
+    fs_unix.map_file_fh("/path/to/some/file", BytesIO(bytes.fromhex("89504e470d0a1a0a")))
+    fs_unix.map_file_fh("/path/to/some/other/file.ext", BytesIO(b""))
+    fs_unix.map_file_fh("/root_file", BytesIO(b""))
+    fs_unix.map_file_fh("/other_root_file.ext", BytesIO(b""))
+    fs_unix.map_file_fh("/.test/test.txt", BytesIO(b""))
+    fs_unix.map_file_fh("/.test/.more.test.txt", BytesIO(b""))
+    fs_unix.symlink("/.test/.more.test.txt", "/.test/.more.test.symlink.txt")
 
     target_unix.add_plugin(WalkFsPlugin)
 
-    results = sorted(target_unix.walkfs(), key=lambda r: r.path)
-    assert len(results) == 14
+    results = sorted(target_unix.walkfs(mimetype=True), key=lambda r: r.path)
+    assert len(results) == 15
     assert [r.path for r in results] == [
         "/",
         "/.test",
+        "/.test/.more.test.symlink.txt",
         "/.test/.more.test.txt",
         "/.test/test.txt",
         "/etc",
@@ -47,24 +54,44 @@ def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
         "/root_file",
         "/var",
     ]
+    assert results[0].type == "dir"
+    assert results[2].type == "symlink"
+    assert results[3].type == "file"
+
+    # symlink test
+    assert results[2].path == "/.test/.more.test.symlink.txt"
+    assert results[2].link == "/.test/.more.test.txt"
+    assert results[2].size == len("/.test/.more.test.txt")
+
+    # mimetype test
+    separator = "\\" if platform.system() == "Windows" else ""
+    assert {fsutil.normalize(str(r.path), alt_separator=separator): r.mimetype for r in results if r.mimetype} == {
+        "/.test/.more.test.symlink.txt": "text/plain",  # inferred by txt extension
+        "/.test/.more.test.txt": "text/plain",  # inferred by txt extension
+        "/.test/test.txt": "text/plain",  # inferred by txt extension
+        "/path/to/some/file": "image/png",  # inferred by magic bytes
+    }
 
 
 @pytest.mark.benchmark
-def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture) -> None:
+@pytest.mark.parametrize(
+    "params",
+    [
+        pytest.param({}, id="default"),
+        pytest.param({"mimetype": True}, id="mimetype"),
+    ],
+)
+def test_benchmark_walkfs(target_bare: Target, benchmark: BenchmarkFixture, params: dict) -> None:
     """Benchmark walkfs performance on a small tar archive with ~500 files."""
-
     loader = TarLoader(Path(absolute_path("_data/loaders/containerimage/alpine-docker.tar")))
     loader.map(target_bare)
     target_bare.apply()
 
-    result = benchmark(lambda: next(WalkFsPlugin(target_bare).walkfs()))
-
-    assert result.path == "/"
+    benchmark(lambda: list(itertools.islice(WalkFsPlugin(target_bare).walkfs(**params), 100)))
 
 
 def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we detect a SUID binary correctly in the WalkFS plugin."""
-
     vfile = VirtualFile(fs_unix, "binary", None)
     vfile.lstat = Mock()
     vfile.lstat.return_value = fsutil.stat_result([stat.S_IFREG | stat.S_ISUID, 0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -83,7 +110,6 @@ def test_walkfs_suid(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
 def test_walkfs_xattr(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we parse xattrs correctly in the WalkFS plugin."""
-
     xattr1 = Mock()
     xattr1.name = "security.capability"
     xattr1.value = bytes.fromhex("010000010020f00000f00f0f")

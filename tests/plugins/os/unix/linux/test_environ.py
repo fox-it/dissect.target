@@ -12,4 +12,4 @@ if TYPE_CHECKING:
 def test_environ(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     results = list(target_linux_users.environ())
-    assert len(results) == 4
+    assert len(results) == 3

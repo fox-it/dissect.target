@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/activitiescache",
     [
@@ -34,7 +35,7 @@ ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtensio
         ("uint32", "activity_type"),
         ("uint32", "activity_status"),
         ("uint32", "activity_priority"),
-        ("uint32", "match_id"),
+        ("string", "match_id"),
         ("uint32", "etag"),
         ("string", "tag"),
         ("boolean", "is_local_only"),
@@ -108,7 +109,7 @@ class ActivitiesCachePlugin(Plugin):
             activity_type (int): ActivityType field.
             activity_status (int): ActivityStatus field.
             activity_priority (int): Priority field.
-            match_id (int): MatchId field.
+            match_id (string): MatchId field.
             etag (int): ETag field.
             tag (string): Tag field.
             is_local_only (boolean): IsLocalOnly field.

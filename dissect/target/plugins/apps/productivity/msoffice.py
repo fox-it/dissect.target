@@ -77,7 +77,6 @@ class ClickOnceDeploymentManifestParser:
 
     def find_codebases(self, manifest_path: str) -> set[Path]:
         """Dig for executables given a manifest."""
-
         assemblies = self._parse_manifest(manifest_path)
         # Ignore pre-installed assemblies
         return {assembly.codebase for assembly in assemblies if assembly.installed}
@@ -201,7 +200,6 @@ class MSOffice(Plugin):
             provider_name (string): The provider name of the add-in.
             source_locations (string[]): URLs referencing the web assets of the add-in (such as javascript and html files).
         """  # noqa: E501
-
         for manifest_file in self._wef_cache_folders():
             try:
                 yield self._parse_web_addin_manifest(manifest_file)
@@ -238,7 +236,6 @@ class MSOffice(Plugin):
             loaded (boolean): Whether the add-in is currently loaded.
             load_behavior (string): The load behavior of the add-in, e.g., "Autostart", "Manual", "OnDemand", "FirstTime".
         """  # noqa: E501
-
         addin_path_tuples = itertools.product(self.HIVES, [self.OFFICE_KEY], self.OFFICE_COMPONENTS, [self.ADD_IN_KEY])
         addin_paths = ["\\".join(addin_path_tuple) for addin_path_tuple in addin_path_tuples]
         for addin_key in self.target.registry.keys(addin_paths):
@@ -284,7 +281,6 @@ class MSOffice(Plugin):
             creation_time (datetime): The creation time of the startup item.
             modification_time (datetime): The modification time of the startup item.
         """  # noqa: E501
-
         # Get items from default machine-scoped startup folder
         for machine_startup_folder in self._machine_startup_folders():
             yield from self._walk_startup_folder(machine_startup_folder)
@@ -305,7 +301,6 @@ class MSOffice(Plugin):
 
     def _wef_cache_folders(self) -> Iterator[Path]:
         """List cache folders which contain office web-addin data."""
-
         WEB_ADDIN_MANIFEST_GLOB = "AppData/Local/Microsoft/Office/16.0/Wef/**/Manifests/**/*"
         for user_details in self.target.user_details.all_with_home():
             for manifest_path in user_details.home_path.glob(WEB_ADDIN_MANIFEST_GLOB):
@@ -314,7 +309,6 @@ class MSOffice(Plugin):
 
     def _walk_startup_folder(self, startup_folder: str, user_sid: str | None = None) -> Iterator[OfficeStartupItem]:
         """Resolve the given path and return all statup items."""
-
         resolved_startup_folder: Path = self.target.resolve(startup_folder, user_sid)
         if not resolved_startup_folder.is_dir():
             return
@@ -329,7 +323,6 @@ class MSOffice(Plugin):
 
     def _lookup_com_executable(self, prog_id: str) -> str | None:
         """Lookup the com executable given a prog id using the registry."""
-
         for classes_root in self.CLASSES_ROOTS:
             try:
                 cls_id = self.target.registry.value(f"{classes_root}\\{prog_id}\\CLSID", "(Default)").value
@@ -345,7 +338,6 @@ class MSOffice(Plugin):
 
         Non-local manifests, i.e. not ending with suffix "vstolocal" are listed but skipped.
         """
-
         if not manifest_path_str.endswith("vstolocal"):
             self.target.log.warning("Parsing of remote vsto manifest %s is not supported")
             return set(manifest_path_str)
@@ -356,7 +348,6 @@ class MSOffice(Plugin):
 
     def _parse_web_addin_manifest(self, manifest_path: Path) -> OfficeWebAddinRecord:
         """Parses a web addin manifest."""
-
         ns = {"": "http://schemas.microsoft.com/office/appforoffice/1.1"}
 
         manifest_tree: Element = ElementTree.fromstring(manifest_path.read_text("utf-8-sig"))
@@ -378,7 +369,6 @@ class MSOffice(Plugin):
 
     def _office_install_root(self, component: Literal["Word", "Excel"]) -> str:
         """Return the installation root for a office component."""
-
         # Typically, all components share the same root.
         # Curiously enough, the "Common" component has no InstallRoot defined.
         key = f"HKLM\\{self.OFFICE_KEY}\\16.0\\{component}\\InstallRoot"
@@ -389,7 +379,6 @@ class MSOffice(Plugin):
 
     def _machine_startup_folders(self) -> Iterator[str]:
         """Return machine-scoped office startup folders."""
-
         yield fsutil.join(self._office_install_root("Word"), "STARTUP", alt_separator="\\")
         yield fsutil.join(self._office_install_root("Excel"), "XLSTART", alt_separator="\\")
         yield fsutil.join(self._office_install_root("Word"), "Templates", alt_separator="\\")
@@ -400,7 +389,6 @@ class MSOffice(Plugin):
 
         See https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins?view=vs-2022#LoadBehavior
         """
-
         load_behavior = addin.value("LoadBehavior", None).value
 
         if load_behavior is None:

@@ -70,10 +70,14 @@ class FirefoxPlugin(BrowserPlugin):
         # Windows
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
-        # Linux
+        # Linux (146 and before)
         ".mozilla/firefox",
         "snap/firefox/common/.mozilla/firefox",
         ".var/app/org.mozilla.firefox/.mozilla/firefox",
+        # Linux (147 and newer) uses XDG_CONFIG_HOME by default
+        ".config/mozilla/firefox",
+        "snap/firefox/common/.config/mozilla/firefox",
+        ".var/app/org.mozilla.firefox/.config/mozilla/firefox",
         # macOS
         "Library/Application Support/Firefox",
     )
@@ -110,7 +114,6 @@ class FirefoxPlugin(BrowserPlugin):
 
     def find_installs(self) -> Iterator[tuple[UserDetails | None, Path]]:
         """Find Firefox install directories on the target."""
-
         for user_details in self.target.user_details.all_with_home():
             for directory in self.USER_DIRS:
                 if (install := user_details.home_path.joinpath(directory)).is_dir():
@@ -129,7 +132,6 @@ class FirefoxPlugin(BrowserPlugin):
 
         Currently does not parse ``$INSTALL/profiles.ini`` file.
         """
-
         seen = set()
 
         for user_details, install in self.installs:
@@ -154,7 +156,6 @@ class FirefoxPlugin(BrowserPlugin):
         Yields:
             Opened SQLite3 databases.
         """
-
         iter_system = ((None, system_dir, None) for user, system_dir in self.installs if user is None)
 
         for user_details, install, profile_dir in chain(iter_system, self._iter_profiles()):
@@ -453,7 +454,6 @@ class FirefoxPlugin(BrowserPlugin):
             - https://github.com/mozilla-firefox/firefox/tree/main/toolkit/components/passwordmgr
             - https://github.com/lclevy/firepwd
         """
-
         working_passwords = set()
 
         for user_details, _, profile_dir in self._iter_profiles():
@@ -568,7 +568,6 @@ def _decrypt_master_key_pbes2(decoded_item: core.Sequence, primary_password: byt
     Returns:
         Bytes of decrypted AES ciphertext.
     """
-
     # SEQUENCE {
     #   SEQUENCE {
     #     OBJECTIDENTIFIER 1.2.840.113549.1.5.13 => pkcs5 pbes2
@@ -638,7 +637,6 @@ def _decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, gl
     Returns:
         Tuple of decrypted bytes and a dotted ASN.1 string representation of the identified encryption algorithm.
     """
-
     # SEQUENCE {
     #     SEQUENCE {
     #         OBJECTIDENTIFIER ???
@@ -669,7 +667,6 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
     Returns:
         32 byte or 24 byte long decrypted and unpadded master key for AES or 3DES operations.
     """
-
     # Extract neccesary information from the key4.db file. Multiple values might exist for the
     # values we are interested in. Generally the last entry will be the currently active value,
     # which is why we need to iterate every row in the table to get the last entry.
@@ -749,7 +746,6 @@ def decrypt_value(b64_ciphertext: str, key: bytes) -> bytes | None:
         - https://github.com/mozilla-firefox/firefox/blob/main/security/manager/ssl/SecretDecoderRing.cpp
         - https://github.com/mozilla-firefox/firefox/blob/main/security/nss/lib/pk11wrap/pk11sdr.c#L156
     """
-
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency")
 

@@ -51,7 +51,6 @@ class ProcProcesses(Plugin):
             ppid (int): The parent process ID of the process.
             parent (string): The name of the parent process ID.
         """
-
         for process in self.target.proc.processes():
             yield ProcProcessRecord(
                 ts=process.starttime,
