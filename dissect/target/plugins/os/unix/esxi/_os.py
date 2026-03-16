@@ -568,9 +568,9 @@ def _get_log_dir_from_target(target: Target) -> str:
 
 def _link_log_dir_live_system_collection(target: Target) -> None:
     """Link log directories on a live system collection.
+
     Ensure symlink from log_dir (usually /scratch/log) to /var/run/log or vice versa
     As sometime log_dir is collected, sometime only /var/run/log is collected
-
     """
     log_dir = _get_log_dir_from_target(target)
     if target.fs.exists("/var/run/log") and target.fs.exists(log_dir):
@@ -584,7 +584,7 @@ def _link_log_dir_live_system_collection(target: Target) -> None:
 
 
 def _link_log_dir_raw_disk(target: Target) -> None:
-    """Link log directory from a disk system : symlink from log_dir (usually /scratch/log) to /var/run/log"""
+    """Link log directory from a disk system : symlink from log_dir (usually /scratch/log) to /var/run/log."""
     # Don't really know how ESXi does this, but let's just take a shortcut for now
     log_dir = _get_log_dir_from_target(target)
 

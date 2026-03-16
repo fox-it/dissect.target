@@ -214,8 +214,8 @@ def test_esxi_os_functions(
 
 
 def test_esxi9_os_log_dir_detection_vmsupport() -> None:
-    """Test is log_dir is properly identified and symlinked to/from /var/run/log if one of those folder does not exists.
-    :return:
+    """Test is log_dir is properly identified and symlinked to/from
+    /var/run/log if one of those folder does not exists.
     """
     target = Target.open(absolute_path("_data/loaders/uac/uac-testdissecthostname-esxi-20260120163519.tar.gz"))
     assert target.fs.path("/var/run/log").is_symlink()
@@ -223,8 +223,8 @@ def test_esxi9_os_log_dir_detection_vmsupport() -> None:
 
 
 def test_esxi9_os_log_dir_detection_uac() -> None:
-    """Test is log_dir is properly identified and symlinked to/from /var/run/log if one of those folder does not exists.
-    :return:
+    """Test is log_dir is properly identified and symlinked
+    to/from /var/run/log if one of those folder does not exists.
     """
     target = Target.open(absolute_path("_data/loaders/vmsupport/esx-testdissecthostname9-2026-01-20--16.28-133046.tgz"))
     assert target.fs.path("/scratch/log2").is_symlink()
