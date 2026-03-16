@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import OperatingSystem, Plugin, export
 from dissect.target.plugins.os.unix.esxi.esxi_log import (
@@ -12,6 +10,12 @@ from dissect.target.plugins.os.unix.esxi.esxi_log import (
     get_esxi_log_path,
     yield_log_records,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target import Target
 
 
 class ShellLogPlugin(Plugin):

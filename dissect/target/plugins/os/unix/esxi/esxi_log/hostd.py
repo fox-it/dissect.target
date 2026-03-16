@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import OperatingSystem, Plugin, export
 from dissect.target.plugins.os.unix.esxi.esxi_log import (
@@ -12,6 +10,12 @@ from dissect.target.plugins.os.unix.esxi.esxi_log import (
     get_esxi_log_path,
     yield_log_records,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target import Target
 
 
 class HostdPlugin(Plugin):
@@ -33,6 +37,5 @@ class HostdPlugin(Plugin):
 
     @export(record=ESXiLogRecord)
     def hostd(self) -> Iterator[ESXiLogRecord]:
-        """Records for hostd log file (Host management service logs, including virtual machine and host Task and Events).
-        """
+        """Records for hostd log file (Host management service, including virtual machine and host Task and Events)."""
         yield from yield_log_records(self.target, self.log_paths, RE_LOG_FORMAT, "hostd")

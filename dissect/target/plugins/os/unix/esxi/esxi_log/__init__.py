@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import typing
 from datetime import datetime
-from re import Pattern
 
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -11,6 +10,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
+    from re import Pattern
 
     from dissect.target import Target
 
@@ -47,7 +47,7 @@ RE_LOG_FORMAT: Pattern = re.compile(
 
 
 def get_esxi_log_path(target: Target, logname: str) -> Iterator[Path]:
-    """Get log location, looking in most usual location, as well as in the osdata partition
+    """Get log location, looking in most usual location, as well as in the osdata partition.
 
     References:
         - https://knowledge.broadcom.com/external/article/306962/location-of-esxi-log-files.html
@@ -67,7 +67,7 @@ def get_esxi_log_path(target: Target, logname: str) -> Iterator[Path]:
 def yield_log_records(
     target: Target, log_paths: list[Path], re_log_format: re.Pattern, logname: str
 ) -> Iterator[ESXiLogRecord]:
-    """Yield parsed log entries, iterate on identified log files"""
+    """Yield parsed log entries, iterate on identified log files."""
     for path in log_paths:
         try:
             current_record = None
