@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 SSHD_BOOLEAN_VALUES = (
     "yes",
     "no",
@@ -112,7 +113,6 @@ class SSHServerPlugin(SSHPlugin):
             - https://github.com/openssh/openssh-portable
             - https://www.man7.org/linux/man-pages/man5/sshd_config.5.html
         """
-
         record_fields = [
             ("datetime", "mtime"),
             ("path", "source"),

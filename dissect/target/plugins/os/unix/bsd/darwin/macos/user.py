@@ -39,7 +39,6 @@ class UserPlugin(Plugin):
     @export(record=AccountPolicyRecord)
     def account_policy(self) -> Iterator[AccountPolicyRecord]:
         """Yield user account policy information."""
-
         # The data is not retrieved from the home folder of the user
         for user_details in self.target.user_details.all():
             user = plistlib.load(self.target.fs.path(user_details.user.source).open())

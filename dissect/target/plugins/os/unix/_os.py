@@ -10,9 +10,8 @@ from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.logging import get_logger
-from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import NfsError
-from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
+from dissect.target.helpers.nfs.nfs3 import NfsStat
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
@@ -27,6 +26,8 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+    from dissect.target.helpers.nfs.nfs3 import FileHandle
     from dissect.target.target import Target
 
 
@@ -88,7 +89,6 @@ class UnixPlugin(OSPlugin):
         References:
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
-
         seen_users = set()
 
         # Yield users found in passwd files.
@@ -427,7 +427,6 @@ class UnixPlugin(OSPlugin):
         References:
             - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
         """
-
         if not isinstance(path, TargetPath):
             for fs in [self.target.fs, *self.target.filesystems]:
                 if (path := fs.path(path)).exists():
@@ -454,7 +453,6 @@ def parse_fstab(
     """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """
-
     SKIP_FS_TYPES = (
         "swap",
         "tmpfs",

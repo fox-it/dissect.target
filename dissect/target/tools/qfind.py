@@ -12,7 +12,7 @@ from dissect.cstruct import utils
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.scrape import recover_string
-from dissect.target.plugins.scrape.qfind import QFindMatchRecord, QFindPlugin
+from dissect.target.plugins.scrape.qfind import QFindPlugin
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dissect.target.container import Container
+    from dissect.target.plugins.scrape.qfind import QFindMatchRecord
     from dissect.target.target import Target
     from dissect.target.volume import Volume
 

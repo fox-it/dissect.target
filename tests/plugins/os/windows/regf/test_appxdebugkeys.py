@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.regutil import RegistryHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.regf.appxdebugkeys import AppxDebugKeysPlugin
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import RegistryHive
 
 
 def strip_hive(key_path: str) -> str:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timezone, tzinfo
+from datetime import timezone
 from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfoNotFoundError
 
@@ -8,6 +8,8 @@ from dissect.target.plugin import internal
 from dissect.target.plugins.os.default.datetime import DateTimePlugin
 
 if TYPE_CHECKING:
+    from datetime import tzinfo
+
     from dissect.target.target import Target
 
 

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/activitiescache",
     [

@@ -10,7 +10,6 @@ from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record_modifier import (
     Modifier,
-    ModifierFunc,
     get_modifier_function,
 )
 from tests.helpers.test_hashutil import HASHES
@@ -18,6 +17,9 @@ from tests.helpers.test_hashutil import HASHES
 if TYPE_CHECKING:
     from flow.record import Record
 
+    from dissect.target.helpers.record_modifier import (
+        ModifierFunc,
+    )
     from dissect.target.target import Target
 
 
