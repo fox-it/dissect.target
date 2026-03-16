@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
+
+from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
+
+import plistlib
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target import Target
+
+OSXShadowRecord = TargetRecordDescriptor(
+    "osx/shadow",
+    [
+        ("string", "name"),
+        ("string", "hash"),
+        ("string", "salt"),
+        ("varint", "iterations"),
+        ("string", "algorithm"),
+        ("path", "source")
+    ],
+)
+
+
+class ShadowPlugin(Plugin):
+    """Unix shadow passwords plugin."""
+
+    SHADOW_FILES = ("/etc/shadow", "/etc/shadow-")
+    GLOB_PATTERN = "/var/db/dslocal/nodes/Default/users/*.plist"
+    USER_FILES = set()
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self._resolve_files()
+
+    def check_compatible(self) -> None:
+        if not self.USER_FILES:
+            raise UnsupportedPluginError("No shadow file found")
+
+    def _resolve_files(self) -> None:
+        for file in self.target.fs.glob(self.GLOB_PATTERN):
+            self.USER_FILES.add(file)
+
+    @export(record=OSXShadowRecord)
+    def passwords(self) -> Iterator[OSXShadowRecord]:
+        """Yield shadow records from /etc/shadow files.
+
+        References:
+            - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
+            - https://linux.die.net/man/5/shadow
+        """
+
+        try:
+            for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
+                user = plistlib.load(path.open())
+                if user.get("ShadowHashData") is None:
+                    continue
+
+                shadow = plistlib.loads(user["ShadowHashData"][0])
+                username = user["name"][0]
+
+                for key in shadow:
+                    if shadow[key].get("entropy") is None:
+                        continue
+
+                    hash = shadow[key]["entropy"].hex()
+                    salt = shadow[key]["salt"].hex()
+                    iterations = shadow[key]["iterations"]
+
+
+                    yield OSXShadowRecord(
+                        name=username,
+                        hash=hash,
+                        salt=salt,
+                        iterations=iterations,
+                        algorithm=key,
+                        source=path,
+                        _target=self.target,
+                    )
+        except FileNotFoundError:
+            pass
