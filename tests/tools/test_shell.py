@@ -627,6 +627,6 @@ def test_benchmark_ls_bin(
     def run_ls() -> None:
         target_cli = TargetCli(target_debian_ext4_raw)
         target_cli.onecmd(f"ls {args} /bin")
-        capsys.readouterr()
 
     benchmark(run_ls)
+    capsys.readouterr()
