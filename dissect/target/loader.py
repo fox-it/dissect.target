@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import os
 import urllib.parse
 from pathlib import Path
@@ -18,6 +17,7 @@ if TYPE_CHECKING:
 __all__ = [
     "Loader",
     "RawLoader",
+    "infer_loader",
     "open",
     "register",
 ]
@@ -67,7 +67,13 @@ class Loader:
     """
 
     def __init__(
-        self, path: Path, *, parsed_path: urllib.parse.ParseResult | None = None, resolve: bool = True, **kwargs
+        self,
+        path: Path,
+        *,
+        parsed_path: urllib.parse.ParseResult | None = None,
+        resolve: bool = True,
+        loader_kwargs: dict | None = None,
+        **kwargs,
     ):
         self.path = path
         self.absolute_path = None
@@ -82,26 +88,7 @@ class Loader:
         self.parsed_query = (
             dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True)) if parsed_path else {}
         )
-
-        self._parser = self._create_parser(self.__class__)
-
-    @classmethod
-    def print_help(cls) -> None:
-        """Prints the help message for this loader's specific arguments."""
-        cls._create_parser(cls).print_help()
-
-    @staticmethod
-    def _create_parser(cls: type[Loader]) -> argparse.ArgumentParser:
-        """Creates the argument parser for this loader."""
-        # Do like generate_argparse_for_method in cli.py
-        parser = argparse.ArgumentParser(
-            prog=f"loader:{cls.__name__.lower()}",
-            description=f"Options for the '{cls.__name__}' loader.",
-            add_help=False,
-        )
-        for args, kwargs in getattr(cls, "__args__", []):
-            parser.add_argument(*args, **kwargs)
-        return parser
+        self._loader_kwargs = loader_kwargs or {}
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self.path)!r})"
@@ -136,21 +123,20 @@ class Loader:
         yield path
 
     def map(self, target: Target) -> None:
-        """Wrapper around the _map function that handles argument passing."""
-        # The loader parses its own arguments from argv
-        loader_options, _ = self._parser.parse_known_args()
+        """Maps the loaded path into a ``Target``.
 
-        # The query string can act as a default for any arguments not provided on the command line
-        for key, value in self.parsed_query.items():
-            # argparse sets missing optional arguments to None. We only want to override if it's None.
-            if getattr(loader_options, key, None) is None:
-                setattr(loader_options, key, value)
+        Delegates to :meth:`_map` with any loader-specific keyword arguments set at instantiation time.
 
-        # Pass the parsed options directly to the implementation map function
-        return self._map(target, **vars(loader_options))
+        Args:
+            target: The target that we're mapping into.
+        """
+        return self._map(target, **self._loader_kwargs)
 
     def _map(self, target: Target, **kwargs) -> None:
-        """Maps the loaded path into a ``Target``.
+        """Implementation hook for :meth:`map`.
+
+        Subclasses that accept loader-specific arguments (declared via ``@arg`` decorators)
+        should override this method instead of :meth:`map`.
 
         Args:
             target: The target that we're mapping into.
@@ -185,6 +171,32 @@ class SubLoader(Loader, Generic[T]):
 
     def map(self, target: Target) -> None:
         raise NotImplementedError
+
+
+def infer_loader(
+    spec: str | Path,
+) -> tuple[type[Loader], Path, urllib.parse.ParseResult | None] | None:
+    """Infer the loader class for a given target specification.
+
+    Uses the same logic as :meth:`Target.open_all <dissect.target.target.Target.open_all>` to determine
+    which :class:`Loader` class would be used for the given ``spec``.
+
+    Args:
+        spec: A target path or URI to infer the loader for.
+
+    Returns:
+        A tuple of ``(loader_cls, path, parsed_path)`` if a suitable loader was found, or ``None`` otherwise.
+    """
+    adjusted_path, parsed_path = parse_path_uri(spec)
+    path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+    if parsed_path is not None and (loader_cls := find_loader_by_scheme(parsed_path.scheme)):
+        return loader_cls, adjusted_path, parsed_path
+
+    if loader_cls := find_loader(path, fallbacks=[DirLoader, RawLoader]):
+        return loader_cls, path, None
+
+    return None
 
 
 def register(module_name: str, class_name: str, internal: bool = True) -> None:

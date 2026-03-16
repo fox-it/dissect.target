@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
-from dissect.target.loader import LOADERS_BY_SCHEME
+from dissect.target.loader import LOADERS_BY_SCHEME, Loader
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
@@ -233,16 +233,22 @@ def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
     return target
 
 
-def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Target]:
+def open_targets(
+    args: argparse.Namespace,
+    *,
+    apply: bool = True,
+    loader_instance: Loader | None = None,
+) -> Iterator[Target]:
     direct: bool = getattr(args, "direct", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
 
-    targets: Iterable[Target] = (
-        [Target.open_direct(args.targets)]
-        if direct
-        else Target.open_all(args.targets, include_children=children, apply=apply)
-    )
+    if direct:
+        targets: Iterable[Target] = [Target.open_direct(args.targets)]
+    elif loader_instance is not None:
+        targets = Target.with_loader(args.targets, loader_instance, include_children=children, apply=apply)
+    else:
+        targets = Target.open_all(args.targets, include_children=children, apply=apply)
 
     for target in targets:
         if child:
@@ -343,6 +349,26 @@ def generate_argparse_for_method(
     func_name = method.__name__
     usage_tmpl = usage_tmpl or "{prog} {usage}"
     parser.usage = usage_tmpl.format(prog=parser.prog, name=func_name, usage=usage[offset:])
+
+    return parser
+
+
+def generate_argparse_for_loader_class(
+    loader_cls: type[Loader],
+    usage_tmpl: str | None = None,
+) -> argparse.ArgumentParser:
+    """Generate an ``argparse.ArgumentParser`` for a :class:`~dissect.target.loader.Loader` class."""
+    desc = get_docstring(loader_cls)
+
+    help_formatter = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(
+        prog=f"target-query -L {loader_cls.__name__.lower().removesuffix('loader')}",
+        description=desc,
+        formatter_class=help_formatter,
+        add_help=False,
+    )
+
+    _add_args_to_parser(parser, getattr(loader_cls, "__args__", []))
 
     return parser
 

@@ -453,6 +453,86 @@ class Target:
         """
         return cls._load("direct", DirectLoader(paths))
 
+    @classmethod
+    def with_loader(
+        cls,
+        paths: str | Path | list[str | Path],
+        loader_instance: loader.Loader,
+        include_children: bool = False,
+        *,
+        apply: bool = True,
+    ) -> Iterator[Self]:
+        """Yield all targets from one or more paths using an already-instantiated loader.
+
+        This is the same as :meth:`open_all`, but the loader is provided directly instead of being inferred
+        from the target paths.  The caller is responsible for instantiating the loader with the appropriate
+        arguments (including any loader-specific keyword arguments).
+
+        Args:
+            paths: A list of paths to load ``Targets`` from.
+            loader_instance: An already-instantiated :class:`~dissect.target.loader.Loader` to use.
+            include_children: Whether to recursively open child targets.
+            apply: Whether to apply the target after loading.
+
+        Raises:
+            TargetError: Raised when not a single ``Target`` can be loaded.
+        """
+        if isinstance(paths, (str, Path)):
+            paths = [paths]
+
+        loader_cls = type(loader_instance)
+        at_least_one_loaded = False
+
+        for spec in paths:
+            adjusted_path, parsed_path = parse_path_uri(spec)
+            path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+            # Use the parsed_path from the spec if available, otherwise use the path as-is
+            found_path = adjusted_path if parsed_path is not None else path
+            load_parsed_path = parsed_path
+
+            get_target_logger(spec).debug("Using provided loader: %s", loader_cls)
+
+            for sub_path in loader_cls.find_all(found_path, parsed_path=load_parsed_path):
+                if sub_path is found_path:
+                    load_spec = spec
+                    load_path = found_path
+                    ldr = loader_instance
+                else:
+                    load_spec = sub_path
+                    if isinstance(sub_path, str):
+                        load_path, load_parsed_path = parse_path_uri(sub_path)
+                    else:
+                        load_path = sub_path
+
+                    # For sub-paths, create a new loader instance of the same type
+                    try:
+                        ldr = loader_cls(load_path, parsed_path=load_parsed_path, loader_kwargs=loader_instance._loader_kwargs)
+                    except Exception as e:
+                        message = "%s" if isinstance(e, TargetPathNotFoundError) else "Failed to initiate loader: %s"
+                        get_target_logger(load_spec).error(message, e)
+                        get_target_logger(load_spec).debug("", exc_info=e)
+                        continue
+
+                try:
+                    target = cls._load(load_spec, ldr, apply=include_children or apply)
+                except Exception as e:
+                    get_target_logger(load_spec).error("Failed to load target with loader %s", ldr)
+                    get_target_logger(load_spec).debug("", exc_info=e)
+                    continue
+                else:
+                    at_least_one_loaded = True
+                    yield target
+
+                if include_children:
+                    try:
+                        yield from target.open_children(apply=apply)
+                    except Exception as e:
+                        get_target_logger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
+
+        if not at_least_one_loaded:
+            raise TargetError(f"Failed to load any target with loader {loader_cls.__name__} for: {paths}")
+
     @property
     def is_direct(self) -> bool:
         """Check if the target is a direct target."""
