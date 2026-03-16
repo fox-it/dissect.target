@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+import plistlib
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
+from dissect.target.helpers.localeutil import normalize_language
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.default.locale import LocalePlugin
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from datetime import datetime, timezone
-import plistlib
+
 if TYPE_CHECKING:
-    from collections.abc import Iterator
 
     from dissect.target.target import Target
 
@@ -39,7 +39,6 @@ class OSXLocalePlugin(LocalePlugin):
     @export(property=True)
     def timezone(self) -> str | None:
         """Get the configured timezone of the system in IANA TZ standard format."""
-
         preferences = plistlib.load(self.target.fs.path(self.GLOBAL).open())
         tz_data = preferences["com.apple.TimeZonePref.Last_Selected_City"]
         tz = None

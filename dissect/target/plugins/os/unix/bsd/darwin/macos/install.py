@@ -65,7 +65,6 @@ class InstallLog(Plugin):
         References:
             - https://sansorg.egnyte.com/dl/m9ftGF7heI
         """
-
         logfile = self.target.fs.path(self.INSTALL_LOG_PATH).open(mode="rt")
 
         current_ts: re.Match[str] | None = None

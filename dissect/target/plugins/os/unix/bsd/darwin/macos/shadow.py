@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import plistlib
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-
-import plistlib
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -22,7 +20,7 @@ OSXShadowRecord = TargetRecordDescriptor(
         ("string", "salt"),
         ("varint", "iterations"),
         ("string", "algorithm"),
-        ("path", "source")
+        ("path", "source"),
     ],
 )
 
@@ -30,12 +28,11 @@ OSXShadowRecord = TargetRecordDescriptor(
 class ShadowPlugin(Plugin):
     """Unix shadow passwords plugin."""
 
-    SHADOW_FILES = ("/etc/shadow", "/etc/shadow-")
-    GLOB_PATTERN = "/var/db/dslocal/nodes/Default/users/*.plist"
-    USER_FILES = set()
+    USER_FILE_GLOB = "/var/db/dslocal/nodes/Default/users/*.plist"
 
     def __init__(self, target: Target):
         super().__init__(target)
+        self.user_files = set()
         self._resolve_files()
 
     def check_compatible(self) -> None:
@@ -44,43 +41,33 @@ class ShadowPlugin(Plugin):
 
     def _resolve_files(self) -> None:
         for file in self.target.fs.glob(self.GLOB_PATTERN):
-            self.USER_FILES.add(file)
+            self.user_files.add(file)
 
     @export(record=OSXShadowRecord)
     def passwords(self) -> Iterator[OSXShadowRecord]:
-        """Yield shadow records from /etc/shadow files.
+        """Yield shadow records from OS X user plist files."""
+        for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
+            user = plistlib.load(path.open())
+            if user.get("ShadowHashData") is None:
+                continue
 
-        References:
-            - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
-            - https://linux.die.net/man/5/shadow
-        """
+            shadow = plistlib.loads(user["ShadowHashData"][0])
+            username = user["name"][0]
 
-        try:
-            for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
-                user = plistlib.load(path.open())
-                if user.get("ShadowHashData") is None:
+            for key in shadow:
+                if shadow[key].get("entropy") is None:
                     continue
 
-                shadow = plistlib.loads(user["ShadowHashData"][0])
-                username = user["name"][0]
+                hash = shadow[key]["entropy"].hex()
+                salt = shadow[key]["salt"].hex()
+                iterations = shadow[key]["iterations"]
 
-                for key in shadow:
-                    if shadow[key].get("entropy") is None:
-                        continue
-
-                    hash = shadow[key]["entropy"].hex()
-                    salt = shadow[key]["salt"].hex()
-                    iterations = shadow[key]["iterations"]
-
-
-                    yield OSXShadowRecord(
-                        name=username,
-                        hash=hash,
-                        salt=salt,
-                        iterations=iterations,
-                        algorithm=key,
-                        source=path,
-                        _target=self.target,
-                    )
-        except FileNotFoundError:
-            pass
+                yield OSXShadowRecord(
+                    name=username,
+                    hash=hash,
+                    salt=salt,
+                    iterations=iterations,
+                    algorithm=key,
+                    source=path,
+                    _target=self.target,
+                )
