@@ -51,7 +51,6 @@ def get_esxi_log_path(target: Target, logname: str) -> Iterator[Path]:
 
     References:
         - https://knowledge.broadcom.com/external/article/306962/location-of-esxi-log-files.html
-    :return:
     """
     # Esxi/loaders should ensure that logs are symlinked to /var/run/log, as on a live ESXi hosts.
     if (var_run_log := target.fs.path("/var/run/log")).exists():
