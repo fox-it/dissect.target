@@ -232,7 +232,6 @@ class SSHPrivateKey:
 
         Source: https://coolaj86.com/articles/the-openssh-private-key-format/
         """
-
         key_data = decode_rfc4716(data)
         private_key = c_rfc4716.ssh_private_key(key_data)
 

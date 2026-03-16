@@ -50,7 +50,6 @@ def test_intunemanagementextension_check_compatible_success(target_win: Target, 
 
 def test_intunemanagementextension_parsing_main_and_rotated(target_win: Target, fs_win: VirtualFilesystem) -> None:
     """Should parse valid IntuneManagementExtension log entries."""
-
     base = "_data/plugins/os/windows/log/intunemanagementextension"
 
     fs_win.map_file(

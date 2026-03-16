@@ -47,7 +47,6 @@ class ServicesPlugin(Plugin):
             - http://0pointer.de/blog/projects/systemd-for-admins-3.html
             - https://www.freedesktop.org/software/systemd/man/latest/systemd.syntax.html
         """
-
         return chain(self.systemd(), self.initd())
 
     @internal

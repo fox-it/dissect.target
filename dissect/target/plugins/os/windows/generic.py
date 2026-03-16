@@ -204,7 +204,6 @@ class GenericPlugin(Plugin):
             - https://winreg-kb.readthedocs.io/en/latest/_modules/winregrc/sysinfo.html?highlight=_ParseInstallDate
             - https://www.forensics-matters.com/2018/09/15/find-out-windows-installation-date/
         """
-
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
 
         try:
@@ -493,7 +492,6 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def codepage(self) -> str | None:
         """Returns the current active codepage on the system."""
-
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"
 
         try:
@@ -504,7 +502,6 @@ class GenericPlugin(Plugin):
     @export(record=ComputerSidRecord)
     def machine_sid(self) -> Iterator[ComputerSidRecord]:
         """Return the machine SID of the system."""
-
         try:
             key = self.target.registry.key("HKLM\\SAM\\SAM\\Domains\\Account")
 
@@ -529,7 +526,6 @@ class GenericPlugin(Plugin):
 
         The domain SID is stored in the registry under HKLM\\SECURITY\\Policy\\PolMachineAccountS.
         """
-
         try:
             key = self.target.registry.key("HKLM\\SECURITY\\Policy\\PolMachineAccountS")
             raw_sid = key.value("(Default)").value
@@ -547,5 +543,4 @@ class GenericPlugin(Plugin):
     @export(record=ComputerSidRecord)
     def sid(self) -> Iterator[ComputerSidRecord]:
         """Return the machine- and optional domain SID of the system."""
-
         yield from chain(self.machine_sid(), self.domain_sid())
