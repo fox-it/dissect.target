@@ -222,7 +222,7 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
             """
             UUID=1349-vbay-as78-efeh  /home  ext4  defaults  0  2
             /dev/sdc1  /mnt/windows  ntfs-3g  ro,uid=1000  0  0
-            """
+            """,
         ),
         (
             "proc/2",
@@ -233,7 +233,7 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
             192.168.1.50:/exports/share  /mnt/nfs  nfs  _netdev,auto  0  0
             UUID=1234-abcd  /data  ext4  defaults
             /dev/sdc2  /mnt/usb  ext3  sw  2  0
-            """
+            """,
         ),
         (
             "proc/3",
@@ -244,7 +244,7 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
             /dev/sdb2  none  swap  sw  0  0
             /dev/sdc2  /mnt/usb  ext3  sw  1  0
             /dev/sdd1  /  ext4  sw  0  a
-            """
+            """,
         ),
         (
             "proc/1337",
@@ -253,7 +253,7 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
             "",
             """
             /dev/sdb1  /mnt/my backup  ext4  defaults  0  0
-            """
+            """,
         ),
     )
     stat_files_data = (
@@ -274,7 +274,6 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
             fs.map_file_fh(dir + "/environ", BytesIO(environ.encode()))
         if mounts:
             fs.map_file_fh(dir + "/mounts", BytesIO(mounts.encode()))
-
 
     # symlink acquire process to self
     fs.link("/proc/1337", "/proc/self")

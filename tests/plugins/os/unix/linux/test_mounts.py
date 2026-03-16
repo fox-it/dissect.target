@@ -27,4 +27,3 @@ def test_mounts(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) ->
     assert sum_pid_results[3] == 2
 
     assert sum_pid_results[4] == 0
-

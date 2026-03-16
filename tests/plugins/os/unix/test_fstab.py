@@ -23,7 +23,6 @@ def test_etc_fstab_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem)
     assert len(results) == 13
 
 
-
 def test_etc_fstab_plugin_invalid(
     caplog: pytest.LogCaptureFixture, target_unix_users: Target, fs_unix: VirtualFilesystem
 ) -> None:
