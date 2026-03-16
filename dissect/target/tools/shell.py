@@ -1489,7 +1489,7 @@ def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
 
 def _target_name(target: Target) -> str:
     """Return a printable FQDN target name for cmd.Cmd base prompts."""
-    if target.has_function("domain") and target.domain:
+    if target.has_function("domain") and target.domain is not None and not target.name.endswith(target.domain):
         return escape_str(f"{target.name}.{target.domain}")
 
     return escape_str(target.name)
