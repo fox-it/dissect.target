@@ -94,7 +94,6 @@ def test_compressed_tar(data_path: str) -> None:
 
 def test_dir(mock_vmsupport_dir: Path) -> None:
     """Test if we map an extracted vm support directory correctly."""
-
     loader = loader_open(mock_vmsupport_dir)
     assert isinstance(loader, VmSupportLoader)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING, BinaryIO, Final
 
-from dissect.etl.etl import ETL, Event
+from dissect.etl.etl import ETL
 from flow.record.base import Record
 
 from dissect.target.exceptions import FilesystemError, UnsupportedPluginError
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from dissect.etl.etl import Event
     from flow.record import Record
 
     from dissect.target.target import Target
@@ -28,7 +29,6 @@ class EtlRecordBuilder:
 
     def _build_record(self, etl_event: Event, etl_path: Path, target: Target) -> Record:
         """Builds an ETL event record."""
-
         record_values = {}
         record_fields = [
             ("datetime", "ts"),

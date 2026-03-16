@@ -117,7 +117,6 @@ def test_compressed_zip() -> None:
 
 def test_dir(mock_uac_dir: Path) -> None:
     """Test if we map an extracted UAC directory correctly."""
-
     loader = loader_open(mock_uac_dir)
     assert isinstance(loader, UacLoader)
 

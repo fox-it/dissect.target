@@ -8,13 +8,14 @@ from typing import TYPE_CHECKING
 import pytest
 from flow.record import GroupedRecord
 
-from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord, TasksPlugin
+from dissect.target.plugins.os.windows.tasks._plugin import TasksPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord
     from dissect.target.target import Target
 
 

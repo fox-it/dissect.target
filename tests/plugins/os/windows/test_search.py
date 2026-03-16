@@ -21,7 +21,6 @@ def test_windows_search_esedb(
     Resources:
         - https://github.com/strozfriedberg/sidr/tree/main/tests/testdata
     """
-
     user_sid = "S-1-5-21-29705265-400737687-482427116-1001"
 
     add_win_user(
@@ -121,7 +120,6 @@ def test_windows_search_sqlite(
     Resources:
         - https://github.com/strozfriedberg/sidr/tree/main/tests/testdata
     """
-
     user_sid = "S-1-5-21-4268361623-692440835-3372367631-1001"
 
     add_win_user(
