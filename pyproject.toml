@@ -170,6 +170,7 @@ target-yara = "dissect.target.tools.yara:main"
 [tool.ruff]
 line-length = 120
 required-version = ">=0.13.1"
+extend-exclude = ["tests/_data/**"]
 
 [tool.ruff.format]
 docstring-code-format = true

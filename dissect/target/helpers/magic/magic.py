@@ -11,6 +11,9 @@ MagicSignature: TypeAlias = tuple[str, str, bytes]
 MagicResult: TypeAlias = str | None
 
 
+WINDOW_CHUNK_SIZE = 4096
+
+
 class Magic:
     """Magic is a helper class for identifying files to a file type by magic bytes.
 
@@ -51,9 +54,28 @@ class Magic:
             raise TypeError("Provided suffix is not a string")
 
         res_attr = "type" if mime else "name"
-        for index, offset, magic in mimetypes.MAP:
-            buf.seek(offset)
-            if buf.read(len(magic)) == magic:
+
+        window = memoryview(bytearray(mimetypes.PATTERN_WINDOW_SIZE))
+        window_size = 0
+
+        for offset, index, magic in mimetypes.MAP:
+            end = offset + len(magic)
+            if (overshoot := end - window_size) > 0:
+                # The current window is not large enough to compare against the magic signature, read more bytes
+                chunk = buf.read(
+                    min(
+                        ((overshoot + WINDOW_CHUNK_SIZE - 1) // WINDOW_CHUNK_SIZE) * WINDOW_CHUNK_SIZE,
+                        mimetypes.PATTERN_WINDOW_SIZE - window_size,
+                    )
+                )
+                window[window_size : window_size + len(chunk)] = chunk
+                window_size += len(chunk)
+
+            if window_size < end:
+                # Not enough bytes to compare against the magic signature
+                continue
+
+            if window[offset:end] == magic:
                 return mimetypes.TYPES[index][res_attr]
 
         if suffix:
