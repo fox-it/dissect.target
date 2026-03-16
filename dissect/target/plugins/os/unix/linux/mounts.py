@@ -30,7 +30,7 @@ class MountsPlugin(Plugin):
     def mounts(self) -> Iterator[MountRecord]:
         """Return the mount points for all processes.
 
-        Yields MountRecord with the following fields:
+        Yields ``MountRecord`` with the following fields:
 
         . code-block:: text
 

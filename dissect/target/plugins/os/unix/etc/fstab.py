@@ -36,7 +36,7 @@ class FstabPlugin(Plugin):
     def fstab(self) -> Iterator[FstabEntryRecord]:
         """Return the mount entries from ``/etc/fstab``.
 
-        Yields FstabEntryRecord with the following fields:
+        Yields ``FstabEntryRecord`` with the following fields:
 
         . code-block:: text
 

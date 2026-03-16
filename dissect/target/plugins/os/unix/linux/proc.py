@@ -622,6 +622,10 @@ class ProcProcess:
     def mounts(self) -> Iterator[FstabEntry]:
         """Yields the content of the mount file associated with the process."""
         mount_path = self.get("mounts")
+
+        if not (mount_path.exists() and mount_path.is_file()):
+            return
+
         with mount_path.open("rt") as mount_file:
             for line in mount_file:
                 try:
