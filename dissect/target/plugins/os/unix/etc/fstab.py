@@ -10,7 +10,7 @@ from dissect.target.plugins.os.unix._os import parse_fstab_entry
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-FstabEntryRecord = TargetRecordDescriptor(
+FstabRecord = TargetRecordDescriptor(
     "linux/etc/fstab",
     [
         ("string", "device_path"),
@@ -32,11 +32,11 @@ class FstabPlugin(Plugin):
         if not self.target.fs.exists("/etc/fstab"):
             raise UnsupportedPluginError("No fstab file found on target")
 
-    @export(record=FstabEntryRecord)
-    def fstab(self) -> Iterator[FstabEntryRecord]:
+    @export(record=FstabRecord)
+    def fstab(self) -> Iterator[FstabRecord]:
         """Return the mount entries from ``/etc/fstab``.
 
-        Yields ``FstabEntryRecord`` with the following fields:
+        Yields ``FstabRecord`` with the following fields:
 
         . code-block:: text
 
@@ -57,7 +57,7 @@ class FstabPlugin(Plugin):
                     continue
 
                 fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
-                yield FstabEntryRecord(
+                yield FstabRecord(
                     device_path=fs_spec,
                     mount_path=mount_point,
                     fs_type=fs_type,

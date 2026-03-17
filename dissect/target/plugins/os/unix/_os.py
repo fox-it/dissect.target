@@ -449,8 +449,9 @@ class UnixPlugin(OSPlugin):
 def parse_fstab_entry(entry: str) -> tuple[str, str, str, str, bool, int]:
     """Parse a single fstab entry according to the man page fstab(5).
 
-    At the man page, the structure of a fstab entry is:
-    <file system> <mount point>   <type>  <options>       <dump>  <pass>
+    According to the man page, the structure of a fstab entry is::
+    
+        <file system> <mount point>   <type>  <options>       <dump>  <pass>
     """
     entry = entry.strip()
     if not entry or entry.startswith("#"):
