@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "powershell/history",
+    "application/shell/powershell/history",
     [
         ("datetime", "mtime"),
         ("varint", "order"),
@@ -28,7 +28,9 @@ class PowerShellHistoryPlugin(Plugin):
     """Windows PowerShell history plugin."""
 
     PATHS = (
+        # Windows
         "AppData/Roaming/Microsoft/Windows/PowerShell/psreadline",
+        # Linux
         ".local/share/powershell/PSReadLine",
     )
 

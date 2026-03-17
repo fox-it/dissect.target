@@ -90,19 +90,19 @@ GENERIC_PASSWORD_RECORD_FIELDS = [
 ]
 
 BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+    "application/browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
 )
 BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/extension", GENERIC_EXTENSION_RECORD_FIELDS
+    "application/browser/extension", GENERIC_EXTENSION_RECORD_FIELDS
 )
 BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/history", GENERIC_HISTORY_RECORD_FIELDS
+    "application/browser/history", GENERIC_HISTORY_RECORD_FIELDS
 )
 BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/cookie", GENERIC_COOKIE_FIELDS
+    "application/browser/cookie", GENERIC_COOKIE_FIELDS
 )
 BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/password", GENERIC_PASSWORD_RECORD_FIELDS
+    "application/browser/password", GENERIC_PASSWORD_RECORD_FIELDS
 )
 
 
