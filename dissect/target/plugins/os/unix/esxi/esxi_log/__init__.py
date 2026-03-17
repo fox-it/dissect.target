@@ -35,7 +35,7 @@ RE_LOG_FORMAT: Pattern = re.compile(
     ((?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)\s)? # ts, moslty including milliseconds, but not always
     (
         ((?P<log_level>[\w()]+)\s)? # info, warning, of In(166), Wa(164), Er(163) in esxi8+, sometime missing
-        ((?P<application>(\w+|-))\[(?P<pid>(\d+))\]|-):?\s  # hostd[pid] < esxi8, Hostd[pid]: esxi8+
+        ((?P<application>([-\w]+|-))\[(?P<pid>(\d+))\]|-):?\s  # hostd[pid] < esxi8, Hostd[pid]: esxi8+
 
     )?
    (?P<newline_delimiter>--> ?)? # in Exi8+, newline marker is positionned after the ts loglevel application part
