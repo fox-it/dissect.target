@@ -16,20 +16,30 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test__create_tar_fs_no_envelope(target_linux: Target, fs_unix: VirtualFilesystem) -> None:
+def test__create_local_fs_local_no_envelope(
+    target_linux: Target, fs_unix: VirtualFilesystem, caplog: pytest.LogCaptureFixture
+) -> None:
     with (
         patch("dissect.target.plugins.os.unix.esxi._os.HAS_ENVELOPE", False),
         patch("dissect.target.plugins.os.unix.esxi._os.tar") as mocked_tar,
         patch("dissect.target.plugins.os.unix.esxi._os._decrypt_crypto_util") as decrypt_func,
+        caplog.at_level(logging.DEBUG),
     ):
         target_linux._name = "local"
         _create_local_fs(target_linux, fs_unix.path("local.tgz.ve"), fs_unix.path("encryption.info"))
+
+        assert len(caplog.messages) == 2
+        assert "Skipping static decryption because of missing crypto module" in caplog.messages[0]
+        assert (
+            "local.tgz is encrypted but static decryption failed, attempting dynamic decryption using crypto-util"
+            in caplog.messages[1]
+        )
 
         decrypt_func.assert_called()
         mocked_tar.TarFilesystem.assert_called()
 
 
-def test__create_tar_fs_envelope(
+def test__create_local_fs_envelope(
     target_linux: Target, fs_unix: VirtualFilesystem, caplog: pytest.LogCaptureFixture
 ) -> None:
     with (
@@ -48,7 +58,7 @@ def test__create_tar_fs_envelope(
         mocked_tar.TarFilesystem.assert_called()
 
 
-def test__create_tar_fs_failed_envelope(target_linux: Target, fs_unix: VirtualFilesystem) -> None:
+def test__create_local_fs_failed_envelope(target_linux: Target, fs_unix: VirtualFilesystem) -> None:
     with (
         patch("dissect.target.plugins.os.unix.esxi._os.HAS_ENVELOPE", True),
         patch("dissect.target.plugins.os.unix.esxi._os.tar") as mocked_tar,
@@ -62,7 +72,7 @@ def test__create_tar_fs_failed_envelope(target_linux: Target, fs_unix: VirtualFi
         mocked_tar.TarFilesystem.assert_called()
 
 
-def test__decrypt_crypto_not_local(
+def test__create_local_fs_non_local_target(
     target_linux: Target, fs_unix: VirtualFilesystem, caplog: pytest.LogCaptureFixture
 ) -> None:
     target_linux._name = "not_local"
@@ -74,7 +84,7 @@ def test__decrypt_crypto_not_local(
         assert "local.tgz is encrypted but static decryption failed and no dynamic decryption available!" in caplog.text
 
 
-def test__decrypt_crypto_local(fs_unix: VirtualFilesystem) -> None:
+def test__decrypt_crypto_util(fs_unix: VirtualFilesystem) -> None:
     with patch("dissect.target.plugins.os.unix.esxi._os.subprocess.run") as mocked_run:
         mocked_run.return_value.stdout = b"data"
 
