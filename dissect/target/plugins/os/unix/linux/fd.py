@@ -17,8 +17,8 @@ FileDescriptorRecord = TargetRecordDescriptor(
         ("varint", "pid"),
         ("string", "name"),
         ("varint", "fd"),
-        ("string", "path"),
-        ("uint64", "pos"),
+        ("string", "link"),
+        ("varint", "pos"),
         ("string", "flags"),
     ],
 )
@@ -50,7 +50,7 @@ class ProcFdPlugin(Plugin):
             flags (string): The access flags from fdinfo.
         """
         for process in self.target.proc.processes():
-            for fd_obj in process.fds:
+            for fd_obj in process.fd():
                 try:
                     ts = fd_obj.path.stat().st_mtime
                 except Exception:
@@ -60,7 +60,7 @@ class ProcFdPlugin(Plugin):
                     pid=process.pid,
                     name=process.name,
                     fd=fd_obj.number,
-                    path=fd_obj.target,
+                    link=fd_obj.link,
                     pos=int(fd_obj.info.get("pos", 0)),
                     flags=fd_obj.info.get("flags", "0"),
                     _target=self.target,

@@ -12,4 +12,4 @@ if TYPE_CHECKING:
 def test_fd(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     results = list(target_linux_users.fd())
-    assert len(results) == 3
+    assert len(results) == 4
