@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import os
 import pathlib
 import platform
@@ -13,7 +14,9 @@ from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
+from dissect.target.containers.raw import RawContainer
 from dissect.target.helpers.fsutil import TargetPath, normalize
+from dissect.target.target import Target
 from dissect.target.tools.shell import (
     DebugMode,
     ExtendedCmd,
@@ -32,8 +35,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pytest_benchmark.fixture import BenchmarkFixture
-
-    from dissect.target.target import Target
 
 
 try:
@@ -617,16 +618,25 @@ def test_shell_prompt_tab_autocomplete() -> None:
     ],
 )
 def test_benchmark_ls_bin(
-    target_debian_ext4_raw: Target,
     benchmark: BenchmarkFixture,
     args: str,
     capsys: pytest.CaptureFixture,
 ) -> None:
     """Benchmark ls command with different parameters with a /bin directory containing ~1000 files."""
+    with gzip.open(absolute_path("_data/filesystems/ext4/debian-trixie-bin-ext4.raw.gz"), "rb") as fh:
+        container = RawContainer(fh)
 
-    def run_ls() -> None:
-        target_cli = TargetCli(target_debian_ext4_raw)
-        target_cli.onecmd(f"ls {args} /bin")
+        t = Target()
+        t.disks.add(container)
+        t.apply()
 
-    benchmark(run_ls)
-    capsys.readouterr()
+        def run_ls() -> None:
+            target_cli = TargetCli(t)
+            target_cli.onecmd(f"ls {args} /bin")
+
+        benchmark(run_ls)
+
+        out, err = capsys.readouterr()
+        assert not err
+        assert "bash" in out
+        assert "zgrep" in out
