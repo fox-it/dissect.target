@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
@@ -11,6 +13,9 @@ from dissect.target.plugins.apps.browser.browser import (
 from dissect.target.plugins.apps.browser.chromium import (
     ChromiumMixin,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class OperaPlugin(ChromiumMixin, BrowserPlugin):
