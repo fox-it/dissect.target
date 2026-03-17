@@ -6,13 +6,13 @@ import tempfile
 import textwrap
 from io import BytesIO
 from itertools import chain
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import RegistryKeyNotFoundError
-from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
+from dissect.target.filesystem import VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
@@ -34,8 +34,9 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
+    from dissect.target.filesystem import Filesystem
     from dissect.target.plugin import OSPlugin
 
 
@@ -94,7 +95,6 @@ def clear_caches() -> None:
 @pytest.fixture(autouse=True)
 def clear_lazy_imports() -> None:
     """Clear lazy imports before each test to ensure a clean state."""
-
     for lazy_attr in chain(
         loader.LOADERS_BY_SCHEME.values(),
         filesystem.FILESYSTEMS,
@@ -236,7 +236,7 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
             "proc/1337",
             VirtualSymlink(fs, "/proc/1337/fd/4", "socket:[1337]"),
             "acquire\x00-p\x00full\x00--proc\x00",
-            "VAR=1",
+            "",
         ),
     )
     stat_files_data = (
@@ -253,7 +253,8 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
 
         fs.map_file_fh(dir + "/stat", BytesIO(stat_files_data[idx].encode()))
         fs.map_file_fh(dir + "/cmdline", BytesIO(cmdline.encode()))
-        fs.map_file_fh(dir + "/environ", BytesIO(environ.encode()))
+        if environ:
+            fs.map_file_fh(dir + "/environ", BytesIO(environ.encode()))
 
     # symlink acquire process to self
     fs.link("/proc/1337", "/proc/self")
@@ -299,6 +300,13 @@ def fs_bsd() -> VirtualFilesystem:
 
 
 @pytest.fixture
+def fs_esxi() -> VirtualFilesystem:
+    fs = VirtualFilesystem()
+    fs.map_file("/etc/vmware/esx.conf", absolute_path("_data/plugins/os/unix/esxi/_os/etc/vmware/esx.conf"))
+    return fs
+
+
+@pytest.fixture
 def fs_android() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("/data")
@@ -326,7 +334,6 @@ def hive_hklm() -> VirtualHive:
 
 def change_controlset(hive: VirtualHive, num: int) -> None:
     """Update the current control set of the given HKLM hive."""
-
     if not isinstance(num, int) or num > 999 or num < 1:
         raise ValueError("ControlSet integer must be between 1 and 999")
 
@@ -442,7 +449,6 @@ def target_android(tmp_path: pathlib.Path, fs_android: Filesystem) -> Target:
 
 def add_win_user(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Target, sid: str, home: str) -> None:
     """Add a user to the provided Windows target."""
-
     profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
     try:
         profile_list_key = hive_hklm.key(profile_list_key_name)
@@ -609,7 +615,8 @@ class TargetUnixFactory:
 @pytest.fixture
 def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
     """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
-    to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
+    to create a fixture for the source target and the desination target, without them 'bleeding' into each other.
+    """
     return TargetUnixFactory(tmp_path)
 
 

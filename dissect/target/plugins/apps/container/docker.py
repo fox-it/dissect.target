@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -10,6 +9,7 @@ from dissect.util import ts
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.protobuf import ProtobufVarint
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import arg, export
@@ -26,7 +26,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DockerContainerRecord = TargetRecordDescriptor(
     "apps/containers/docker/container",
@@ -108,7 +109,6 @@ class DockerPlugin(ContainerPlugin):
     @export(record=DockerImageRecord)
     def images(self) -> Iterator[DockerImageRecord]:
         """Returns any pulled docker images on the target system."""
-
         for data_root in self.installs:
             images_path = data_root.joinpath("image/overlay2/repositories.json")
 
@@ -151,7 +151,6 @@ class DockerPlugin(ContainerPlugin):
     @export(record=DockerContainerRecord)
     def containers(self) -> Iterator[DockerContainerRecord]:
         """Returns any docker containers present on the target system."""
-
         for data_root in self.installs:
             for config_path in data_root.joinpath("containers").glob("**/config.v2.json"):
                 try:
@@ -200,7 +199,7 @@ class DockerPlugin(ContainerPlugin):
                     started=convert_timestamp(config.get("State", {}).get("StartedAt")),
                     finished=convert_timestamp(config.get("State", {}).get("FinishedAt")),
                     ports=list(convert_ports(ports)),
-                    names=config.get("Name", "").replace("/", "", 1),
+                    name=config.get("Name", "").replace("/", "", 1),
                     volumes=volumes,
                     environment=config.get("Config", {}).get("Env", []),
                     mount_path=mount_path,
@@ -235,7 +234,6 @@ class DockerPlugin(ContainerPlugin):
             - https://docs.docker.com/config/containers/logging/json-file/
             - https://docs.docker.com/config/containers/logging/local/
         """
-
         for data_root in self.installs:
             containers_path = data_root.joinpath("containers")
 
@@ -319,7 +317,6 @@ def find_installs(target: Target) -> Iterator[Path]:
     References:
         - https://docs.docker.com/config/daemon/
     """
-
     default_data_paths = [
         # Linux
         "/var/lib/docker",
@@ -371,7 +368,6 @@ def convert_timestamp(timestamp: str | None) -> str | None:
     strip the last three digits from the timestamp to force
     compatbility with the 6 digit %f microsecond directive.
     """
-
     if not timestamp:
         return None
 
@@ -401,7 +397,6 @@ def convert_ports(ports: dict[str, list | dict]) -> Iterator[str]:
 
     Returns an iterator of strings in the format ``0.0.0.0:1234->5678/tcp``.
     """
-
     for key, value in ports.items():
         if isinstance(value, list):
             for v in value:
@@ -425,7 +420,6 @@ def strip_log(input: str | bytes, exc_backspace: bool = False) -> str:
     References:
         - https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#general-ascii-codes
     """
-
     if isinstance(input, bytes):
         input = input.decode("utf-8", errors="backslashreplace")
 

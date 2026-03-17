@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.esedb import esedb, record, table
-from dissect.esedb.exceptions import KeyNotFoundError
+from dissect.database.ese import ESE
+from dissect.database.ese.exception import KeyNotFoundError
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from dissect.database.ese import Record, Table
+
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
@@ -30,9 +32,9 @@ class WebCache:
 
     def __init__(self, target: Target, fh: BinaryIO):
         self.target = target
-        self.db = esedb.EseDB(fh)
+        self.db = ESE(fh)
 
-    def find_containers(self, name: str) -> Iterator[table.Table]:
+    def find_containers(self, name: str) -> Iterator[Table]:
         """Look up all ``ContainerId`` values for a given container name.
 
         Args:
@@ -55,7 +57,7 @@ class WebCache:
             self.target.log.warning("Exception while parsing EseDB Containers table")
             self.target.log.debug("", exc_info=e)
 
-    def _iter_records(self, name: str) -> Iterator[record.Record]:
+    def _iter_records(self, name: str) -> Iterator[Record]:
         """Yield records from a Webcache container.
 
         Args:
@@ -72,11 +74,11 @@ class WebCache:
                 self.target.log.debug("", exc_info=e)
                 continue
 
-    def history(self) -> Iterator[record.Record]:
+    def history(self) -> Iterator[Record]:
         """Yield records from the history webcache container."""
         yield from self._iter_records("history")
 
-    def downloads(self) -> Iterator[record.Record]:
+    def downloads(self) -> Iterator[Record]:
         """Yield records from the iedownload webcache container."""
         yield from self._iter_records("iedownload")
 

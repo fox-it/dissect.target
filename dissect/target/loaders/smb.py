@@ -19,7 +19,6 @@ from dissect.target.helpers.regutil import (
     RegistryHive,
     RegistryKey,
     RegistryValue,
-    ValueType,
 )
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
@@ -30,12 +29,16 @@ if TYPE_CHECKING:
     from pathlib import Path
     from urllib.parse import ParseResult
 
+    from impacket.dcerpc.v5 import rpcrt
     from impacket.dcerpc.v5.srvs import SHARE_INFO_1
 
+    from dissect.target.helpers.regutil import (
+        ValueType,
+    )
     from dissect.target.target import Target
 
 try:
-    from impacket.dcerpc.v5 import rpcrt, rrp, scmr, transport
+    from impacket.dcerpc.v5 import rrp, scmr, transport
     from impacket.dcerpc.v5.rpcrt import DCERPCException
     from impacket.smbconnection import SessionError, SMBConnection
 
@@ -107,9 +110,9 @@ class SmbLoader(Loader):
         if not self._password:
             self._nt, self._lm = self._get_hashes()
 
-        krb_ticketparsed_query = self.parsed_query.get("ticket", self.parsed_query.get("ccache", ""))
+        krb_ticket_params = self.parsed_query.get("ticket", self.parsed_query.get("ccache", ""))
         krb_ticket_env = os.getenv("SMB_KERBEROS_TICKET", os.getenv("KRB5CCNAME", ""))
-        self._krb_ticket = krb_ticketparsed_query or krb_ticket_env
+        self._krb_ticket = krb_ticket_params or krb_ticket_env
         self._krb_aes = self.parsed_query.get("aes", os.getenv("SMB_KERBEROS_AES_KEY", ""))
         self._krb_dc = self.parsed_query.get("dc", os.getenv("SMB_KERBEROS_DC", ""))
         self._krb_dc_ip = self.parsed_query.get("dc-ip", os.getenv("SMB_KERBEROS_DC_IP", ""))

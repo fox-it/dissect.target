@@ -5,8 +5,8 @@ import re
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from dissect.sql import Error as SQLError
-from dissect.sql import SQLite3
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -173,10 +173,9 @@ class PodmanPlugin(ContainerPlugin):
 
         Gets info from the ``ContainerConfig`` and ``ContainerState`` tables.
         """
-
         try:
-            db = SQLite3(path.open("rb"))
-        except (ValueError, SQLError) as e:
+            db = SQLite3(path)
+        except (ValueError, DBError) as e:
             self.target.log.warning("Unable to read Podman database %s: %s", path, e)
             self.target.log.debug("", exc_info=e)
             return
@@ -221,7 +220,7 @@ class PodmanPlugin(ContainerPlugin):
                 started=container.get("startedTime"),
                 finished=container.get("finishedTime"),
                 ports=list(convert_ports(container.get("newPortMappings", []))),  # TODO: research "exposedPorts"
-                names=container.get("name"),
+                name=container.get("name"),
                 volumes=volumes,
                 environment=container.get("spec", {}).get("process", {}).get("env", []),
                 mount_path=mount_path,
@@ -235,7 +234,6 @@ class PodmanPlugin(ContainerPlugin):
 
     def _find_containers_fs(self, path: Path) -> Iterator[PodmanContainerRecord]:
         """Find Podman containers based on the ``$PODMAN/storage/overlay-containers/containers.json`` file."""
-
         containers = {}
         if (containers_file := path.joinpath("storage/overlay-containers/containers.json")).is_file():
             containers = json.loads(containers_file.read_text())
@@ -271,7 +269,7 @@ class PodmanPlugin(ContainerPlugin):
                 image_id=other_config.get("image"),
                 command=" ".join(config.get("process", {}).get("args", [])),
                 created=other_config.get("created"),
-                names=other_config.get("names"),
+                name=other_config.get("names"),
                 environment=config.get("process", {}).get("env", []),
                 mount_path=path.joinpath(f"storage/overlay/{other_config.get('layer')}") if other_config else None,
                 config_path=config_path,
@@ -294,7 +292,6 @@ class PodmanPlugin(ContainerPlugin):
         References:
             - https://docs.podman.io/en/latest/markdown/podman-create.1.html#log-driver-driver
         """
-
         for install, _ in self.installs:
             for log_file in install.glob("storage/overlay-containers/*/userdata/ctr.log*"):
                 buf = ""

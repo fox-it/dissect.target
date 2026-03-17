@@ -63,7 +63,7 @@ def test_brave_cookies(target_brave: Target) -> None:
     assert all(record.host == ".tweakers.net" for record in records)
 
 
-def test_windows_edge_passwords_plugin(target_brave: Target) -> None:
+def test_brave_passwords(target_brave: Target) -> None:
     records = list(target_brave.brave.passwords())
 
     assert len(records) == 4

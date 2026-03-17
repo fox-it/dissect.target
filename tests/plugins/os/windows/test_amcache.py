@@ -8,7 +8,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
 from dissect.target.plugins.os.windows.log.amcache import AmcacheInstallPlugin
 from tests._utils import absolute_path
@@ -196,7 +195,7 @@ def test_amcache_install_entry(target_win: Target) -> None:
     ]
     assert len(entries) == 8
 
-    for create, entry in zip(created_order, entries):
+    for create, entry in zip(created_order, entries, strict=False):
         assert str(entry.create) == create
         assert str(entry.path) == r"C:\Users\JohnCena"
         assert str(entry.longname) == r"7z2201-x64.exe"

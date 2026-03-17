@@ -9,40 +9,36 @@ import fnmatch
 import functools
 import importlib
 import importlib.util
-import logging
 import os
 import sys
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import chain, zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, TypeAlias
 
-try:
-    from typing import TypeAlias  # novermin
-except ImportError:
-    # COMPAT: Remove this when we drop Python 3.9
-    TypeAlias = Any
-
-from flow.record import Record, RecordDescriptor
+from flow.record import RecordDescriptor
 
 import dissect.target.plugins.os.default as default
 from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.helpers.utils import StrEnum
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from flow.record import Record
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
     from dissect.target.helpers.record import ChildTargetRecord
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 MODULE_PATH = "dissect.target.plugins"
 """The base module path to the in-tree plugins."""
@@ -74,11 +70,8 @@ class OperatingSystem(StrEnum):
     WINDOWS = "windows"
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class PluginDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("exports", "findable", "functions", "module", "namespace", "path", "qualname")
-
     module: str
     qualname: str
     namespace: str
@@ -92,23 +85,8 @@ class PluginDescriptor:
         return load(self)
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FunctionDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = (
-        "alias",
-        "exported",
-        "findable",
-        "internal",
-        "method_name",
-        "module",
-        "name",
-        "namespace",
-        "output",
-        "path",
-        "qualname",
-    )
-
     name: str
     namespace: str
     path: str
@@ -138,18 +116,13 @@ class FunctionDescriptor:
         return getattr(self.func, "__args__", [])
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, slots=True)
 class FailureDescriptor:
-    # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("module", "stacktrace")
-
     module: str
     stacktrace: list[str]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginDescriptorLookup:
     # All regular plugins
     # {"<module_path>": PluginDescriptor}
@@ -162,9 +135,7 @@ class PluginDescriptorLookup:
     __child__: dict[str, PluginDescriptor] = field(default_factory=dict)
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FunctionDescriptorLookup:
     # All regular plugins
     # {"<function_name>": {"<module_path>": FunctionDescriptor}}
@@ -180,9 +151,7 @@ class FunctionDescriptorLookup:
 _OSTree: TypeAlias = dict[str, "_OSTree"]
 
 
-# COMPAT: Add slots=True when we drop Python 3.9
-# We can't manually define __slots__ here because we use have to use field() for the default_factory
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PluginRegistry:
     # Plugin descriptor lookup
     __plugins__: PluginDescriptorLookup = field(default_factory=PluginDescriptorLookup)
@@ -317,7 +286,6 @@ def arg(*args, **kwargs) -> Callable[..., Any]:
 
 def alias(*args, **kwargs: dict[str, Any]) -> Callable[..., Any]:
     """Decorator to be used on :class:`Plugin` functions to register an alias of that function."""
-
     if not kwargs.get("name") and not args:
         raise ValueError("Missing argument 'name'")
 
@@ -335,7 +303,6 @@ def alias(*args, **kwargs: dict[str, Any]) -> Callable[..., Any]:
 
 def clone_alias(cls: type, attr: Callable[..., Any], alias: str) -> None:
     """Clone the given attribute to an alias in the provided class."""
-
     # Clone the function object
     clone = type(attr)(attr.__code__, attr.__globals__, alias, attr.__defaults__, attr.__closure__)
     clone.__kwdefaults__ = attr.__kwdefaults__
@@ -491,10 +458,21 @@ class Plugin:
                 self.target.log.debug("", exc_info=e)
 
     def get_paths(self) -> Iterator[Path]:
+        """Return all artifact paths."""
         if self.target.is_direct:
             yield from self._get_paths_direct()
         else:
             yield from self._get_paths()
+
+    def get_all_paths(self) -> Iterator[Path]:
+        """Return all artifact and auxiliary paths.
+
+        The implementation of this function will
+        probably change in the future, but the interface
+        should stay the same.
+        """
+        yield from self.get_paths()
+        yield from self._get_auxiliary_paths()
 
     def _get_paths_direct(self) -> Iterator[Path]:
         """Return all paths as given by the user."""
@@ -502,7 +480,14 @@ class Plugin:
             yield self.target.fs.path(str(path))
 
     def _get_paths(self) -> Iterator[Path]:
-        """Return all files of interest to the plugin.
+        """Return all artifact files of interest to the plugin.
+
+        To be implemented by the plugin subclass.
+        """
+        raise NotImplementedError
+
+    def _get_auxiliary_paths(self) -> Iterator[Path]:
+        """Return all auxiliary files of interest to the plugin.
 
         To be implemented by the plugin subclass.
         """
@@ -655,7 +640,7 @@ def register(plugincls: type[Plugin]) -> None:
             for part in module_parts[:-2]:
                 obj = obj.setdefault(part, {})
 
-        log.debug("Plugin registered: %s", module_key)
+        log.trace("Plugin registered: %s", module_key)
 
 
 def _get_plugins() -> PluginRegistry:
@@ -729,7 +714,6 @@ def plugins(osfilter: type[OSPlugin] | None = None, *, index: str = "__regular__
     Yields:
         Plugin descriptors in the plugin registry based on the given filter criteria.
     """
-
     plugin_index: dict[str, PluginDescriptor] = getattr(_get_plugins().__plugins__, index, {})
 
     # This is implemented as a list comprehension for performance reasons!
@@ -761,7 +745,6 @@ def functions(osfilter: type[OSPlugin] | None = None, *, index: str = "__regular
     Yields:
         Function descriptors in the plugin registry based on the given filter criteria.
     """
-
     function_index: dict[str, dict[str, FunctionDescriptor]] = getattr(_get_plugins().__functions__, index, {})
 
     # This is implemented as a list comprehension for performance reasons!
@@ -786,7 +769,6 @@ def lookup(
     Yields:
         Function descriptors that match the given function name and filter criteria.
     """
-
     function_index: dict[str, FunctionDescriptor] = getattr(_get_plugins().__functions__, index, {}).get(
         function_name, {}
     )
@@ -1284,7 +1266,6 @@ class OSPlugin(Plugin):
         Example:
             ("c:/Windows/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
         """
-
         # Consider moving this to the UsersPlugin class, and create separate UsersPlugin subclasses for each OS
         # when the machinery concerning users and user_paths becomes more complex.
         raise NotImplementedError

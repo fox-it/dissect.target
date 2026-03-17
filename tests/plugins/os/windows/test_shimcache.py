@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import binascii
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
@@ -23,9 +23,10 @@ from dissect.target.plugins.os.windows.regf.shimcache import (
 
 if TYPE_CHECKING:
     import datetime
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
+
 
 TEST_ARGUMENTS = {
     SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER: {"path_len": 1},

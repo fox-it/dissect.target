@@ -46,7 +46,7 @@ ChatAttachmentRecord = create_extended_descriptor([UserRecordDescriptorExtension
     GENERIC_ATTACHMENT_FIELDS,
 )
 
-ChatRecord = Union[ChatUserRecord, ChatMessageRecord, ChatAttachmentRecord]
+ChatRecord = Union[ChatUserRecord, ChatMessageRecord, ChatAttachmentRecord]  # noqa: UP007
 
 
 class ChatPlugin(NamespacePlugin):

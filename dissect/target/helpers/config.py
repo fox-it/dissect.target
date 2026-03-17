@@ -3,21 +3,22 @@ from __future__ import annotations
 import ast
 import importlib.machinery
 import importlib.util
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from types import ModuleType
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 CONFIG_NAME = ".targetcfg.py"
 
 
 def load(paths: list[Path | str] | Path | str | None) -> ModuleType:
     """Attempt to load one configuration from the provided path(s)."""
-
     if isinstance(paths, (Path, str)):
         paths = [paths]
 
@@ -66,7 +67,6 @@ def _find_config_file(paths: list[Path | str] | None) -> Path | None:
     This algorithm allows parts of the path to not exist or the last part to be a filename.
     It also does not look in the root directory ('/') for config files.
     """
-
     if not paths:
         return None
 

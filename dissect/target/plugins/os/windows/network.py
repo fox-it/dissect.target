@@ -269,7 +269,6 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
     def _interfaces(self) -> Iterator[WindowsInterfaceRecord]:
         """Yields found Windows interfaces used by :meth:`NetworkPlugin.interfaces() <dissect.target.plugins.general.network.NetworkPlugin.interfaces>`."""  # noqa: E501
-
         # Get all the network interfaces
         for key in self.target.registry.keys(
             "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
@@ -341,7 +340,6 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
     def _extract_network_device_config(self, interface_id: str) -> list[dict[str, set | bool | None]]:
         """Extract network device configuration from the given interface_id for all ControlSets on the system."""
-
         dhcp_config = {
             "cidr": set(),
             "gateway": set(),

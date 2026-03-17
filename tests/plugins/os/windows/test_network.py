@@ -7,12 +7,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.network import WindowsNetworkPlugin
 from tests.conftest import change_controlset
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
@@ -338,7 +339,7 @@ def test_network_dhcp_and_static(
         gateways = set()
         macs = set()
 
-        for interface, expected in zip(interfaces, expected_values):
+        for interface, expected in zip(interfaces, expected_values, strict=False):
             ips.update({iface.ip for iface in interface.cidr})
             dns.update(interface.dns)
             gateways.update(interface.gateway)
@@ -370,7 +371,6 @@ def test_network_dhcp_and_static(
 )
 def test_regression_duplicate_ips(target_win: Target, hive_hklm: VirtualHive) -> None:
     """Regression test for https://github.com/fox-it/dissect.target/issues/877."""
-
     change_controlset(hive_hklm, 3)
 
     # register the interfaces

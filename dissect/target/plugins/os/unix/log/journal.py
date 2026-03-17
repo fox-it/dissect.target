@@ -1,25 +1,32 @@
 from __future__ import annotations
 
-import logging
 import lzma
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable
+import sys
+from typing import TYPE_CHECKING, Any, BinaryIO
 
-import zstandard
 from dissect.cstruct import cstruct
 from dissect.util import ts
 from dissect.util.compression import lz4
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import IntEnumMissing
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+if sys.version_info >= (3, 14):
+    from compression import zstd  # novermin
+else:
+    from backports import zstd
+
+
+log = get_logger(__name__)
 
 # The events have undocumented fields that are not part of the record
 JournalRecord = TargetRecordDescriptor(
@@ -286,7 +293,6 @@ class JournalMessagePriority(IntEnumMissing):
 
 def get_optional(value: str, to_type: Callable) -> Any | None:
     """Return the value if True, otherwise return None."""
-
     if not value:
         return None
 
@@ -332,8 +338,7 @@ class JournalFile:
         return key, value
 
     def __iter__(self) -> Iterator[dict[str, int | str]]:
-        "Iterate over the entry objects to read payloads."
-
+        """Iterate over the entry objects to read payloads."""
         offset = self.header.entry_array_offset
         while offset != 0:
             self.fh.seek(offset)
@@ -400,7 +405,7 @@ class JournalFile:
                     data = lz4.decompress(data[8:])
 
                 elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
-                    data = zstandard.decompress(data)
+                    data = zstd.decompress(data)
 
                 key, value = self.decode_value(data)
                 event[key] = value

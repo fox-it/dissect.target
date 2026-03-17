@@ -4,7 +4,7 @@ import socket
 import ssl
 from pathlib import Path
 from struct import unpack
-from typing import Callable
+from typing import TYPE_CHECKING
 from unittest.mock import call, patch
 
 import pytest
@@ -12,6 +12,9 @@ import pytest
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.remote import RemoteLoader, RemoteStream, RemoteStreamConnection
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @pytest.mark.parametrize(
@@ -43,7 +46,6 @@ def test_loader() -> None:
 
 def test_stream() -> None:
     """Test that we can create a ``RemoteStream`` with a ``RemoteStreamConnection``."""
-
     with (
         patch.object(ssl, "SSLContext", autospec=True) as mock_ssl_context,
         patch.object(socket, "socket", autospec=True) as mock_socket,

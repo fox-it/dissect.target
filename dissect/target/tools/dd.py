@@ -9,14 +9,15 @@ import sys
 from dissect.util.stream import RangeStream
 
 from dissect.target.exceptions import TargetError
-from dissect.target.target import Target
-from dissect.target.tools.utils import (
+from dissect.target.helpers.logging import get_logger
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    open_target,
     process_generic_arguments,
 )
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -36,10 +37,10 @@ def main() -> int:
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
-    process_generic_arguments(args)
+    process_generic_arguments(parser, args)
 
     try:
-        t = Target.open(args.target)
+        t = open_target(args)
     except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)

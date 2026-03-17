@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -9,6 +9,7 @@ from dissect.target.loader import open as loader_open
 from dissect.target.loaders.overlay2 import Overlay2Loader
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 

@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import logging
 import re
 import uuid
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.nfs.client.nfs import NfsError
-from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
+from dissect.target.helpers.nfs.nfs3 import NfsStat
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
@@ -20,15 +19,19 @@ from dissect.target.loaders.local import LocalLoader
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export, internal
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    import logging
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+    from dissect.target.helpers.nfs.nfs3 import FileHandle
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 # https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
@@ -86,7 +89,6 @@ class UnixPlugin(OSPlugin):
         References:
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
-
         seen_users = set()
 
         # Yield users found in passwd files.
@@ -425,7 +427,6 @@ class UnixPlugin(OSPlugin):
         References:
             - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
         """
-
         if not isinstance(path, TargetPath):
             for fs in [self.target.fs, *self.target.filesystems]:
                 if (path := fs.path(path)).exists():
@@ -452,7 +453,6 @@ def parse_fstab(
     """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """
-
     SKIP_FS_TYPES = (
         "swap",
         "tmpfs",

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import stat
 import zipfile
 from datetime import datetime, timezone
@@ -22,11 +21,17 @@ from dissect.target.filesystem import (
     VirtualFilesystem,
 )
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-log = logging.getLogger(__name__)
+    from dissect.target.filesystem import (
+        DirEntry,
+    )
+
+
+log = get_logger(__name__)
 
 
 class ZipFilesystem(Filesystem):
@@ -97,25 +102,13 @@ class ZipFilesystemEntry(VirtualDirectory):
         except Exception:
             raise FileNotFoundError(self.path)
 
-    def iterdir(self) -> Iterator[str]:
+    def scandir(self) -> Iterator[DirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        entry = self._resolve()
-        if isinstance(entry, ZipFilesystemEntry):
-            yield from super(ZipFilesystemEntry, entry).iterdir()
-        else:
-            yield from entry.iterdir()
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        if not self.is_dir():
-            raise NotADirectoryError(self.path)
-
-        entry = self._resolve()
-        if isinstance(entry, ZipFilesystemEntry):
-            yield from super(ZipFilesystemEntry, entry).scandir()
-        else:
-            yield from entry.scandir()
+        if isinstance(entry := self._resolve(), ZipFilesystemEntry):
+            return super(ZipFilesystemEntry, entry).scandir()
+        return entry.scandir()
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

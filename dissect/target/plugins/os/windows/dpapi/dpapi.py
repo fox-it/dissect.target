@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import re
 from functools import cache, cached_property
 from typing import TYPE_CHECKING
@@ -80,7 +81,6 @@ class DPAPIPlugin(InternalPlugin):
 
     def _load_master_keys_from_path(self, sid: str, path: Path) -> Iterator[tuple[str, MasterKeyFile]]:
         """Iterate over the provided ``path`` and search for master key files for the given user SID."""
-
         if not path.exists():
             self.target.log.info("Unable to load master keys from path as it does not exist: %s", path)
             return
@@ -135,6 +135,12 @@ class DPAPIPlugin(InternalPlugin):
                         pass
 
                     try:
+                        # NOTE: This is a workaround for a PyPy bug
+                        # `bytes.fromhex` errors on subclasses of `str`
+                        # (see https://github.com/pypy/pypy/issues/5327)
+                        if platform.python_implementation() == "PyPy":
+                            mk_pass = str(mk_pass)
+
                         if mkf.decrypt_with_hash(sid, bytes.fromhex(mk_pass)):
                             self.target.log.info(
                                 "Decrypted SID %s master key %s with hash '%s' from provider %s",
@@ -187,7 +193,6 @@ class DPAPIPlugin(InternalPlugin):
         Returns:
             Decrypted bytes.
         """  # noqa: E501
-
         if not sid and not username:
             raise ValueError("Either sid or username argument is required")
 

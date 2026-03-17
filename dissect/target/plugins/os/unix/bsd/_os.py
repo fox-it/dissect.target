@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
 
@@ -31,12 +30,14 @@ class BsdPlugin(UnixPlugin):
 
     @export(property=True)
     def hostname(self) -> str | None:
-        fh = self.target.fs.path("/etc/rc.conf")
+        for name in ("/etc/rc.conf", "/etc/rc.conf.defaults"):
+            if (file := self.target.fs.path(name)).is_file():
+                with file.open("rt") as fh:
+                    for line in fh:
+                        if line.startswith("hostname"):
+                            return line.rstrip().split("=", maxsplit=1)[1].replace('"', "")
 
-        for line in fh.open("rt").readlines():
-            if line.startswith("hostname"):
-                return line.rstrip().split("=", maxsplit=1)[1].replace('"', "")
-        return None
+        return super().hostname
 
     @export(property=True)
     def ips(self) -> list[str] | None:

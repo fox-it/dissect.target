@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import base64
 from base64 import b64decode
 from typing import TYPE_CHECKING
 
@@ -15,7 +15,8 @@ from flow.record.fieldtypes import posix_path, windows_path
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.ssh.ssh import (
@@ -29,11 +30,13 @@ if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.helpers.regutil import RegistryKey
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 PuTTYUserRecordDescriptor = create_extended_descriptor([UserRecordDescriptorExtension])
 PuTTYSessionRecord = PuTTYUserRecordDescriptor(
@@ -56,7 +59,7 @@ PuTTYSessionRecord = PuTTYUserRecordDescriptor(
 class PuTTYPlugin(SSHPlugin):
     """Extract artifacts from the PuTTY client.
 
-    NOTE:
+    Note:
         - Does not parse ``$HOME/.putty/randomseed`` (GNU/Linux)
           and ``HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile`` (Windows)
 
@@ -98,7 +101,6 @@ class PuTTYPlugin(SSHPlugin):
     @export(record=KnownHostRecord)
     def known_hosts(self) -> Iterator[KnownHostRecord]:
         """Parse PuTTY saved SshHostKeys."""
-
         for putty_key, user_details in self.regf_installs:
             yield from self._regf_known_hosts(putty_key, user_details)
 
@@ -107,7 +109,6 @@ class PuTTYPlugin(SSHPlugin):
 
     def _regf_known_hosts(self, putty_key: RegistryKey, user_details: UserDetails) -> Iterator[KnownHostRecord]:
         """Parse PuTTY traces in Windows registry."""
-
         try:
             ssh_host_keys = putty_key.subkey("SshHostKeys")
         except RegistryKeyNotFoundError:
@@ -117,14 +118,20 @@ class PuTTYPlugin(SSHPlugin):
             key_type, host = entry.name.split("@")
             port, host = host.split(":")
 
-            public_key, fingerprints = construct_public_key(key_type, entry.value)
+            try:
+                public_key, fingerprints = construct_public_key(key_type, entry.value)
+                public_key_pem = base64.b64decode(public_key)
+            except Exception as e:
+                self.target.log.warning("Failed to parse PuTTY public key %r in registry %s: %s", entry.value, entry, e)
+                self.target.log.debug("", exc_info=e)
+                continue
 
             yield KnownHostRecord(
                 mtime_ts=ssh_host_keys.ts,
                 host=host,
                 port=port,
                 key_type=key_type,
-                public_key=public_key,
+                public_key_pem=public_key_pem,
                 fingerprint=fingerprints,
                 comment="",
                 marker=None,
@@ -145,14 +152,22 @@ class PuTTYPlugin(SSHPlugin):
                 key_type, host = parts[0].split("@")
                 port, host = host.split(":")
 
-                public_key, fingerprints = construct_public_key(key_type, parts[1])
+                try:
+                    public_key, fingerprints = construct_public_key(key_type, parts[1])
+                    public_key_pem = base64.b64decode(public_key)
+                except Exception as e:
+                    self.target.log.warning(
+                        "Failed to parse PuTTY public key %r in file %s: %s", line, ssh_host_keys_path, e
+                    )
+                    self.target.log.debug("", exc_info=e)
+                    continue
 
                 yield KnownHostRecord(
                     mtime_ts=ts,
                     host=host,
                     port=port,
                     key_type=key_type,
-                    public_key=public_key,
+                    public_key_pem=public_key_pem,
                     fingerprint=fingerprints,
                     comment="",
                     marker=None,
@@ -164,7 +179,6 @@ class PuTTYPlugin(SSHPlugin):
     @export(record=PuTTYSessionRecord)
     def sessions(self) -> Iterator[PuTTYSessionRecord]:
         """Parse PuTTY saved session configuration files."""
-
         for putty_key, user_details in self.regf_installs:
             yield from self._regf_sessions(putty_key, user_details)
 
@@ -195,7 +209,7 @@ class PuTTYPlugin(SSHPlugin):
 
     def _build_session_record(
         self, ts: float, name: float | datetime, source: Path, cfg: dict, user_details: UserDetails
-    ) -> PuTTYSessionRecord:
+    ) -> Iterator[PuTTYSessionRecord]:
         host, user = parse_host_user(cfg.get("HostName"), cfg.get("UserName"))
 
         yield PuTTYSessionRecord(
@@ -224,7 +238,7 @@ def parse_host_user(host: str, user: str) -> tuple[str, str]:
     return host, user
 
 
-def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, str]]:
+def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str | None, str | None, str | None]]:
     """Returns OpenSSH format public key calculated from PuTTY SshHostKeys format and set of fingerprints.
 
     PuTTY stores raw public key components instead of OpenSSH-formatted public keys
