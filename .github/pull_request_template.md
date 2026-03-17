@@ -14,10 +14,8 @@ Thank you for submitting a Pull Request. Please:
   For an example, look at the following link:
   https://docs.dissect.tools/en/latest/contributing/style-guide.html#example-commit-message
 
-* Ensure or verify that an issue exists for your PR:
-    * In case of a new feature, make a new issue labeled `feature`
-
-* Associate the PR with an issue. Use closing keywords in the body during creation, e.g.:
+* Associate the PR with an issue. If it doesn't exist, create it. Use 
+  closing keywords in the body during creation, e.g.:
     * close(|s|d) #<nr>
     * fix(|es|ed) #<nr>
     * resolve(|s|d) #<nr>
