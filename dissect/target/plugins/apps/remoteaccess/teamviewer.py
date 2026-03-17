@@ -141,18 +141,18 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                 if line.startswith("Start:"):
                     try:
                         start_date = parse_start(line)
-                        fold = 0
                     except Exception as e:
                         self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
                         self.target.log.debug("", exc_info=e)
 
+                    fold = 0
                     if start_date is None:
                         continue
 
                     # See whether the utcoffset with the two different timezones are the same
                     target_start_date = start_date.replace(tzinfo=target_tz)
                     if target_start_date.utcoffset() == start_date.utcoffset():
-                        # Adjust the start_date so it uses the timezone known to target throughtout
+                        # Adjust the start_date so it uses the timezone known to target throughout
                         start_date = target_start_date
 
                     continue
@@ -195,7 +195,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                 except Exception as e:
                     self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
                     self.target.log.debug("", exc_info=e)
-                    timestamp = 0
+                    continue
 
                 if timestamp and prev_timestamp and prev_timestamp > timestamp:
                     # We might currently be in a grey area where the dst period ended.
