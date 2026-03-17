@@ -12,6 +12,7 @@ from dissect.target.plugins.apps.browser.chromium import (
     ChromiumMixin,
 )
 
+
 class OperaPlugin(ChromiumMixin, BrowserPlugin):
     """Opera (Stable and Opera GX) browser plugin."""
 
@@ -22,12 +23,12 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
         "AppData/Roaming/Opera Software/Opera Stable/Default",
         "AppData/Local/Opera Software/Opera Stable/Default",
         # Windows (GX)
-        "AppData/Roaming/Opera Software/Opera GX Stable",
-        "AppData/Local/Opera Software/Opera GX Stable",
+        "AppData/Roaming/Opera Software/Opera GX Stable/Default",
+        "AppData/Local/Opera Software/Opera GX Stable/Default",
         # MacOS (Stable)
         "Library/Application Support/com.operasoftware.Opera/Default",
         # MacOS (GX)
-        "Library/Application Support/com.operasoftware.OperaGX",
+        "Library/Application Support/com.operasoftware.OperaGX/Default",
     ]
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
