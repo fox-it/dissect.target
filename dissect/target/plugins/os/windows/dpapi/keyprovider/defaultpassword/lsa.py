@@ -24,6 +24,5 @@ class LSADefaultPasswordKeyProviderPlugin(DefaultPasswordKeyProvider):
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
         """Yield Windows LSA DefaultPassword strings."""
-
         for record in self.target.credential.defaultpassword():
             yield self.__namespace__, record.default_password

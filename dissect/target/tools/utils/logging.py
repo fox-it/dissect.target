@@ -44,7 +44,6 @@ def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = 
 
     If ``be_quiet`` is set to ``True``, logging level is set to the least noisy ``CRITICAL`` level.
     """
-
     styles = structlog.dev.ConsoleRenderer.get_default_level_styles()
     renderer = (
         structlog.dev.ConsoleRenderer(colors=True, pad_event=10, level_styles=styles)

@@ -24,7 +24,6 @@ def find_wsl_installs(target: Target) -> Iterator[str, Path]:
         - https://learn.microsoft.com/en-us/windows/wsl/use-custom-distro
         - https://learn.microsoft.com/en-us/windows/wsl/enterprise
     """
-
     try:
         for lxss_key in target.registry.keys("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss"):
             for distribution_key in lxss_key.subkeys():

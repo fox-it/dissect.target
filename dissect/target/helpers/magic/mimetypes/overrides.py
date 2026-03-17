@@ -1,6 +1,6 @@
+# Manual overrides for types freedesktop does not (yet) support.
 from __future__ import annotations
 
-# Manual overrides for types freedesktop does not (yet) support.
 TYPES = [
     {
         "type": "application/x-compress",

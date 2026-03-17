@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 import gzip
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.fortios._os import FortiOSPlugin
 from dissect.target.plugins.os.unix.linux.fortios.generic import GenericPlugin
 from dissect.target.plugins.os.unix.linux.fortios.locale import FortiOSLocalePlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we detect FortiGate OS correctly."""
-
     global_config = """\
     #config-version=FGVM64-7.4.2-FW-build2571-231219:opmode=0:vdom=0
     config system global

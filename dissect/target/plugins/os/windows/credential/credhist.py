@@ -146,7 +146,6 @@ class CredHistFile:
 
     def decrypt(self, password_hash: bytes) -> None:
         """Decrypt a CREDHIST chain using the provided password SHA1 hash."""
-
         for entry in reversed(self.entries):
             try:
                 entry.decrypt(password_hash)
@@ -189,7 +188,6 @@ class CredHistPlugin(WindowsCredentialPlugin):
     @export(record=CredHistRecord)
     def credhist(self) -> Iterator[CredHistRecord]:
         """Yield and decrypt all Windows CREDHIST entries on the target."""
-
         passwords = keychain_passwords()
 
         if not passwords:

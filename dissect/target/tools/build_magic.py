@@ -20,6 +20,7 @@ TEMPLATE = """\
 # Number of types:      {count}
 # References:           http://www.freedesktop.org/standards/shared-mime-info
 #                       https://gitlab.freedesktop.org/xdg/shared-mime-info/-/blob/master/data/freedesktop.org.xml.in
+from __future__ import annotations
 
 TYPES = {types}
 """
@@ -72,7 +73,6 @@ def parse_freedesktop_xml(path: Path) -> str:
 
     Does not yet parse nested magic values.
     """
-
     ns = {"mime": "http://www.freedesktop.org/standards/shared-mime-info"}
     types = []
 
@@ -154,7 +154,6 @@ def parse_freedesktop_xml(path: Path) -> str:
 
 def convert_value(type: str, value: str) -> bytes:
     """Convert a value to bytes."""
-
     # Regular string conversion to bytes
     # e.g. "PK\\003\\004"       -> b"PK\x03\x04"
     # e.g. "\\x00\\x01"         -> b"\x00\x01"

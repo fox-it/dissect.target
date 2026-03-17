@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from enum import IntEnum
 from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
@@ -19,6 +19,7 @@ from dissect.target.plugin import Plugin, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from datetime import datetime
     from pathlib import Path
 
     from typing_extensions import Self
@@ -28,7 +29,6 @@ if TYPE_CHECKING:
 
 def parse_ip(addr: str | int, version: int = 4) -> IPv6Address | IPv4Address:
     """Convert ``/proc/net`` IPv4 or IPv6 hex address into their standard IP notation."""
-
     if version == 6:
         addr = unpack("!LLLL", bytes.fromhex(addr))
         return IPv6Address(pack("@IIII", *addr))
@@ -154,45 +154,43 @@ class Environ:
     variable: str
     contents: str
 
-@dataclass
 class FileDescriptor:
     def __init__(self, proc: Path, fd_num: str):
-        self.number = int(fd_num)
-        self.path = proc.joinpath(fd_num)
-        self.info_path = proc.parent.joinpath("fdinfo", fd_num)
-        self.target = None
-        self.fd_info = None
+        self.proc = proc
+        self.number = fd_num
 
     @property
+    def path(self) -> Path:
+        """The path to the file descriptor symlink."""
+        return self.proc.joinpath(self.number)
+
+    @property
+    def info_path(self) -> Path:
+        """The path to the fdinfo entry."""
+        return self.proc.parent.joinpath("fdinfo", self.number)
+
+    @cached_property
     def link(self) -> str:
-        """Returns the resolved symlink"""
-        if not self.target is None:
-            return self.target
+        """Returns the resolved symlink."""
         try:
-            self.target = self.path.readlink()
+            return  str(self.path.readlink())
         except Exception:
-            self.target = "unknown"
-        return self.target
+            return "unknown"
 
-    @property
-    def info(self) -> dict:
-        """Parsed key-value pairs from fdinfo"""
-        if self.fd_info is None:
-            self.fd_info = self._parse_fdinfo()
-        return self.fd_info
-
-    def _parse_fdinfo(self):
+    @cached_property
+    def info(self)-> dict[str, str]:
+        """Parsed key-value pairs from fdinfo."""
         data = {}
         if not self.info_path.exists():
             return data
 
-        for line in self.info_path.read_text().split('\n'):
+        for line in self.info_path.read_text().split("\n"):
             line = line.strip()
             if not line:
                 continue
 
             parts = line.split(None, 1)
-            if not len(parts) == 2:
+            if len(parts) != 2:
                 continue
             key, value = parts
             data[key] = value
@@ -368,7 +366,6 @@ class Sockets:
             protocol: The protocol in ``/proc/net/`` to parse entries from.
             version: The version of the protocol to parse entries from.
         """
-
         entry = self.target.fs.path(f"/proc/net/{protocol}{version if version == 6 else ''}")
 
         contents = entry.open("rt")
@@ -407,7 +404,6 @@ class Sockets:
 
     def _parse_unix_sockets(self) -> Iterator[UnixSocket]:
         """Internal function to parse ``/proc/net/unix`` entries."""
-
         entry = self.target.fs.path("/proc/net/unix")
         contents = entry.open("rt")
 
@@ -657,7 +653,6 @@ class ProcProcess:
     @property
     def cmdline(self) -> str:
         """Return the command line of a process."""
-
         line = ""
         entry = self.get("cmdline")
 

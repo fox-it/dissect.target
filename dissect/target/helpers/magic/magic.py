@@ -66,7 +66,6 @@ class Magic:
 
 def from_file(path: Path, *, mime: bool = False) -> MagicResult:
     """Detect file type from a :class:`Path` instance."""
-
     if not isinstance(path, Path):
         raise TypeError("Provided path is not a Path instance")
 
@@ -76,7 +75,6 @@ def from_file(path: Path, *, mime: bool = False) -> MagicResult:
 
 def from_entry(entry: FilesystemEntry, *, mime: bool = False) -> MagicResult:
     """Detect file type from a :class:`FilesystemEntry` instance."""
-
     if not isinstance(entry, FilesystemEntry):
         raise TypeError("Provided entry is not a FilesystemEntry instance")
 
@@ -86,7 +84,6 @@ def from_entry(entry: FilesystemEntry, *, mime: bool = False) -> MagicResult:
 
 def from_descriptor(fh: BinaryIO, suffix: str | None = None, *, mime: bool = False) -> MagicResult:
     """Detect file type from a file descriptor or handle."""
-
     if not hasattr(fh, "read") or not hasattr(fh, "seek"):
         raise TypeError("Provided fh does not have a read or seek method")
 
@@ -99,7 +96,6 @@ from_fh = from_descriptor
 
 def from_buffer(buf: bytes, suffix: str | None = None, *, mime: bool = False) -> MagicResult:
     """Detect file type from provided bytes or buffer of bytes."""
-
     if not isinstance(buf, bytes):
         raise TypeError("Provided buf is not bytes")
 

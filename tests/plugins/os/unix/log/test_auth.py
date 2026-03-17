@@ -366,7 +366,6 @@ def test_auth_additional_fields(
 
 def test_auth_iso_date_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we correctly handle Ubuntu 24.04 ISO formatted dates."""
-
     fs_unix.map_file("/var/log/auth.log", absolute_path("_data/plugins/os/unix/log/auth/iso.log"))
     target_unix.add_plugin(AuthPlugin)
 
