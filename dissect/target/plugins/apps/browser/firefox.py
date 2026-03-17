@@ -88,24 +88,24 @@ class FirefoxPlugin(BrowserPlugin):
     )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/cookie", GENERIC_COOKIE_FIELDS
+        "application/browser/firefox/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+        "application/browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/extension",
+        "application/browser/firefox/extension",
         GENERIC_EXTENSION_RECORD_FIELDS + FIREFOX_EXTENSION_RECORD_FIELDS,
     )
 
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
+        "application/browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     def __init__(self, target: Target):
