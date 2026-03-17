@@ -144,6 +144,8 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     except Exception as e:
                         self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
                         self.target.log.debug("", exc_info=e)
+                        # Unset start_date if it was already defined
+                        start_date = None
 
                     fold = 0
                     if start_date is None:
@@ -195,7 +197,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                 except Exception as e:
                     self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
                     self.target.log.debug("", exc_info=e)
-                    continue
+                    timestamp = start_date
 
                 if timestamp and prev_timestamp and prev_timestamp > timestamp:
                     # We might currently be in a grey area where the dst period ended.
