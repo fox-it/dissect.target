@@ -450,7 +450,7 @@ def parse_fstab_entry(entry: str) -> tuple[str, str, str, str, bool, int]:
     """Parse a single fstab entry according to the man page fstab(5).
 
     According to the man page, the structure of a fstab entry is::
-    
+
         <file system> <mount point>   <type>  <options>       <dump>  <pass>
     """
     entry = entry.strip()
@@ -513,7 +513,10 @@ def parse_fstab(
     if not fstab.exists():
         return
 
-    for line in fstab.open("rt"):
+    with fstab.open("rt") as fstab_file:
+        fstab_data = fstab_file.readlines()
+
+    for line in fstab_data:
         try:
             entry = parse_fstab_entry(line)
         except ValueError as e:
