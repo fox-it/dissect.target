@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from dissect.util.ts import webkittimestamp
+
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
@@ -17,7 +19,6 @@ from dissect.target.plugins.apps.browser.chromium import (
     CHROMIUM_DOWNLOAD_RECORD_FIELDS,
     ChromiumMixin,
 )
-from dissect.util.ts import webkittimestamp
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -33,7 +34,7 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
 
     __namespace__ = "opera"
 
-    DIRS = [
+    DIRS = (
         # Windows (Stable)
         "AppData/Roaming/Opera Software/Opera Stable/Default",
         "AppData/Roaming/Opera Software/Opera Stable/_side_profiles/*/Default",
@@ -50,7 +51,7 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
         # MacOS (GX)
         "Library/Application Support/com.operasoftware.OperaGX/_side_profiles/*/Default",
         "Library/Application Support/com.operasoftware.OperaGX/Default",
-    ]
+    )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "application/browser/opera/history",
@@ -121,18 +122,14 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
             try:
                 extensions = content.get("extensions").get("opsettings")
                 for extension_id, extension_data in extensions.items():
-
                     # Opera includes a bunch of empty (prefilled) blacklisted extensions with only one key called
                     # 'blacklist_state'. If no other metadata is present, it's not installed. Filtering based on if
                     # the extension itself is blacklisted is a no-go as you can still install blacklisted extensions.
-                    blacklisted = bool(
-                        extension_data.get("blacklist_state", 0)
-                    )
+                    blacklisted = bool(extension_data.get("blacklist_state", 0))
                     if blacklisted and len(extension_data.keys()) == 1:
                         continue
 
-                    ts_install = extension_data.get(
-                        "first_install_time") or extension_data.get("install_time")
+                    ts_install = extension_data.get("first_install_time") or extension_data.get("install_time")
                     ts_update = extension_data.get("last_update_time")
 
                     if ts_install:
@@ -153,8 +150,7 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
                         manifest_version = manifest.get("manifest_version")
 
                         if manifest.get("browser_action"):
-                            default_title = manifest.get(
-                                "browser_action").get("default_title")
+                            default_title = manifest.get("browser_action").get("default_title")
                         else:
                             default_title = None
 
@@ -179,17 +175,15 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
                         description=description,
                         version=ext_version,
                         ext_path=ext_path,
-                        from_webstore=extensions.get(
-                            extension_id).get("from_webstore"),
+                        from_webstore=extensions.get(extension_id).get("from_webstore"),
                         permissions=ext_permissions,
                         manifest_version=manifest_version,
                         source=json_file,
                         _target=self.target,
                         _user=user.user,
                     )
-            except (AttributeError, KeyError) as e:  # noqa: PERF203
-                self.target.log.warning(
-                    "No browser extensions found in: %s", json_file)
+            except (AttributeError, KeyError) as e:
+                self.target.log.warning("No browser extensions found in: %s", json_file)
                 self.target.log.debug("", exc_info=e)
 
     @export(record=BrowserPasswordRecord)

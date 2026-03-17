@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from tests._utils import absolute_path
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.plugins.apps.browser.opera import OperaPlugin
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
@@ -20,7 +20,10 @@ def target_opera_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Tar
         absolute_path("_data/plugins/apps/browser/opera/"),
     )
     fs_win.map_dir(
-        "Users\\John\\AppData\\Roaming\\Opera Software\\Opera Stable\\_side_profiles\\31303232385F31323239343834393136\\Default",
+        (
+            "Users\\John\\AppData\\Roaming\\Opera Software\\Opera Stable"
+            "\\_side_profiles\\31303232385F31323239343834393136\\Default"
+        ),
         absolute_path("_data/plugins/apps/browser/opera/"),
     )
 
@@ -35,7 +38,10 @@ def target_operagx_win(target_win_users: Target, fs_win: VirtualFilesystem) -> T
         absolute_path("_data/plugins/apps/browser/opera/"),
     )
     fs_win.map_dir(
-        "Users\\John\\AppData\\Roaming\\Opera Software\\Opera GX Stable\\_side_profiles\\31303232385F31323239343834393136\\Default\\",
+        (
+            "Users\\John\\AppData\\Roaming\\Opera Software\\Opera GX Stable"
+            "\\_side_profiles\\31303232385F31323239343834393136\\Default\\"
+        ),
         absolute_path("_data/plugins/apps/browser/opera/"),
     )
 
