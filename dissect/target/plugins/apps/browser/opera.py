@@ -36,13 +36,19 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
     DIRS = [
         # Windows (Stable)
         "AppData/Roaming/Opera Software/Opera Stable/Default",
+        "AppData/Roaming/Opera Software/Opera Stable/_side_profiles/*/Default",
         "AppData/Local/Opera Software/Opera Stable/Default",
+        "AppData/Local/Opera Software/Opera Stable/_side_profiles/*/Default",
         # Windows (GX)
         "AppData/Roaming/Opera Software/Opera GX Stable/Default",
+        "AppData/Roaming/Opera Software/Opera GX Stable/_side_profiles/*/Default",
         "AppData/Local/Opera Software/Opera GX Stable/Default",
+        "AppData/Local/Opera Software/Opera GX Stable/_side_profiles/*/Default",
         # MacOS (Stable)
         "Library/Application Support/com.operasoftware.Opera/Default",
+        "Library/Application Support/com.operasoftware.Opera/_side_profiles/*/Default",
         # MacOS (GX)
+        "Library/Application Support/com.operasoftware.OperaGX/_side_profiles/*/Default",
         "Library/Application Support/com.operasoftware.OperaGX/Default",
     ]
 
