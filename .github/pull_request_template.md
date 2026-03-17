@@ -35,6 +35,6 @@ _A description of the proposed changes and how to test them_
 
 - [ ] PR Title is descriptive of the changes
 - [ ] The description is descriptive of the changes
-- [ ] Tests are included in
+- [ ] Tests are included and pass
 - [ ] Closes `related issue number`
 
