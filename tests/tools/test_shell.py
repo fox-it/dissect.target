@@ -622,7 +622,17 @@ def test_benchmark_ls_bin(
     args: str,
     capsys: pytest.CaptureFixture,
 ) -> None:
-    """Benchmark ls command with different parameters with a /bin directory containing ~1000 files."""
+    """Benchmark ls command with different parameters with a /bin directory containing ~1000 files.
+
+    The image only contains a /bin directory with ~1000 files and an /etc directory with some configuration files.
+    The rest of the filesystem is not included.
+
+    The /bin files are all sparse (filled with zeros).
+    The files in /etc do contain data.
+
+    The source image is stored compressed in the test data directory to save space.
+    Compressed size is 100kb and decompresses to 5mb.
+    """
     with gzip.open(absolute_path("_data/filesystems/ext4/debian-trixie-bin-ext4.raw.gz"), "rb") as fh:
         raw_image = fh.read()
 
