@@ -10,6 +10,7 @@ import pytest
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.network_managers import NetworkManager
 from dissect.target.tools.query import main as target_query
+from dissect.target.tools.utils.logging import configure_logging
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -94,8 +95,12 @@ def test_ips_dhcp_arg(
     if flag:
         argv.append(flag)
 
+    def noop(*args, **kwargs) -> None:
+        pass
+
     with patch("dissect.target.Target.open_all", return_value=[target_unix]), monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
+        m.setattr(configure_logging, "__code__", noop.__code__)
         target_query()
         out, _ = capsys.readouterr()
         assert expected_out in out
