@@ -308,7 +308,10 @@ class ChromiumMixin:
                             )
 
                         # Strip extra data
-                        if cookie_value and encrypted_cookie[0:3] == b"v20":
+                        if cookie_value and (
+                            encrypted_cookie[0:3] == b"v20"
+                            or (encrypted_cookie[0:3] == b"v10" and browser_name == "opera")
+                        ):
                             cookie_value = cookie_value[32:]
 
                     yield self.BrowserCookieRecord(
