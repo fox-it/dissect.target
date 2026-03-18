@@ -66,7 +66,7 @@ def test_ini_missing_path_logs_error(target_ini: Target, caplog: pytest.LogCaptu
 
 
 def test_ini_parses_utf16_encoded_file(target_ini: Target) -> None:
-    """Test parsing UTF-16 encoded INI files with BOM markers."""
+    """Test parsing UTF-16 encoded INI files."""
     records = list(target_ini.ini("/etc/config/sub/utf16.ini"))
 
     assert len(records) == 2

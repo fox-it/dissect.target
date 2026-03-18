@@ -121,9 +121,8 @@ class IniPlugin(Plugin):
 def _parse_ini(source: TargetPath) -> configutil.ConfigurationParser:
     """Parse an INI file, with automatic fallback for UTF-16 encoded files.
 
-    First attempts to parse the file with the default UTF-8 encoding. If a UnicodeDecodeError
-    occurs (often wrapped in ConfigurationParsingError), retries using UTF-16 decoding, which
-    handles Windows INI files with BOM markers.
+    First attempts to parse the file with the default UTF-8 encoding. If a ConfigurationParsingError,
+    retries using UTF-16 decoding
 
     Args:
         source: TargetPath to the INI file to parse.
@@ -133,12 +132,8 @@ def _parse_ini(source: TargetPath) -> configutil.ConfigurationParser:
     """
     try:
         return configutil.parse(source, hint="ini")
-    except (UnicodeDecodeError, ConfigurationParsingError) as e:
-        # ConfigurationParsingError may wrap a UnicodeDecodeError
-        if isinstance(e, ConfigurationParsingError) and not isinstance(e.__cause__, UnicodeDecodeError):
-            raise
-
-        # Many Windows INI files are UTF-16 with BOM; parse those explicitly.
+    except (UnicodeDecodeError, ConfigurationParsingError):
+        # Many Windows INI files are UTF-16
         raw_data = source.open("rb").read()
         text_data = raw_data.decode("utf-16")
 
