@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import io
 from typing import TYPE_CHECKING
 
-from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError, UnsupportedPluginError
+from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
