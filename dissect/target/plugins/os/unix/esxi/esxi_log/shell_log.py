@@ -6,6 +6,10 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import OperatingSystem, Plugin, export
 from dissect.target.plugins.os.unix.esxi.esxi_log import (
+    RE_APPLICATION,
+    RE_LOG_LEVEL,
+    RE_NEW_LINE,
+    RE_TIMESTAMP,
     ESXiLogRecord,
     get_esxi_log_path,
     yield_log_records,
@@ -23,15 +27,13 @@ class ShellLogPlugin(Plugin):
 
     # Mostly equal to EsxiLogBasePlugin.RE_LOG_FORMAT, but some difference in metadata part
     RE_LOG_FORMAT: re.Pattern = re.compile(
-        r"""
-        ((?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z)\s)? # ts, moslty including milliseconds, but not always
-        (
-            ((?P<log_level>[\w()]+)\s)? # info, warning, of In(166), Wa(164), Er(163) in esxi8+, sometime missing
-            ((?P<application>(\w+))\[(?P<pid>(\d+))\]):?\s  # hostd[pid] < esxi8, Hostd[pid]: esxi8+
-
-        )?
-       (?P<newline_delimiter>--> ?)? # in Exi8+, newline marker is positionned after the ts loglevel application part
-       # but for some log this marker is missing...
+        rf"""
+            {RE_TIMESTAMP}?
+            (
+                {RE_LOG_LEVEL}?
+                {RE_APPLICATION}\s
+            )?
+       {RE_NEW_LINE}?
        (\[(?P<metadata>(.+?))\]:\s)? # Metadata = user. Instead of \s, metadata is followed by a ":"
        (?P<message>.*?)""",
         re.VERBOSE,
