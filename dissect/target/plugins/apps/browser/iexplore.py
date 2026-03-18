@@ -96,11 +96,11 @@ class InternetExplorerPlugin(BrowserPlugin):
     CACHE_FILENAME = "WebCacheV01.dat"
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/ie/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+        "application/browser/ie/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
     def __init__(self, target: Target):

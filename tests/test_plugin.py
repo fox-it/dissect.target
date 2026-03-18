@@ -1857,6 +1857,12 @@ def test_plugin_record_field_and_name_consistency() -> None:
                     seen_field_names.add(name)
                     seen_field_types[name] = (field_typename, record)
 
+            # Record(s) from function descriptor(s) naming convention, limited to apps for now.
+            if descriptor.path.startswith("apps.") and not record.name.startswith("application/"):
+                inconsistencies.add(
+                    f"<{record.name}> record name does not start with 'application/' (from function {descriptor.path})"
+                )
+
     if inconsistencies:
         pytest.fail(
             f"Found {len(inconsistencies)} inconsistencies in RecordDescriptors:\n" + "\n".join(inconsistencies)
