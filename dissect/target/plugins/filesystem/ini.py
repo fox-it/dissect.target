@@ -22,7 +22,7 @@ IniRecord = TargetRecordDescriptor(
         ("string", "section"),
         ("string", "key"),
         ("string", "value"),
-        ("path", "source"),
+        ("path", "path"),
     ],
 )
 
@@ -113,7 +113,7 @@ class IniPlugin(Plugin):
                         section=section_name,
                         key=key,
                         value="" if value is None else str(value),
-                        source=source,
+                        path=source,
                         _target=self.target,
                     )
 

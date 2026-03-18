@@ -42,10 +42,10 @@ def test_ini_parses_records(target_ini: Target) -> None:
     assert by_key[("Display", "Theme")].value == "Dark"
     assert by_key[("Shutdown", "Script")].value == "cleanup.cmd"
 
-    sources = {str(record.source).lower() for record in records}
-    assert any(source.endswith("startup.ini") for source in sources)
-    assert any(source.endswith("shutdown.ini") for source in sources)
-    assert all(not source.endswith("not_ini.txt") for source in sources)
+    paths = {str(record.path).lower() for record in records}
+    assert any(path.endswith("startup.ini") for path in paths)
+    assert any(path.endswith("shutdown.ini") for path in paths)
+    assert all(not path.endswith("not_ini.txt") for path in paths)
 
 
 def test_ini_parses_explicit_file(target_ini: Target) -> None:
@@ -54,7 +54,7 @@ def test_ini_parses_explicit_file(target_ini: Target) -> None:
 
     assert len(records) == 3
     assert {record.section for record in records} == {"Run", "Display"}
-    assert all(str(record.source).lower().endswith("startup.ini") for record in records)
+    assert all(str(record.path).lower().endswith("startup.ini") for record in records)
 
 
 def test_ini_missing_path_logs_error(target_ini: Target, caplog: pytest.LogCaptureFixture) -> None:
@@ -73,4 +73,4 @@ def test_ini_parses_utf16_encoded_file(target_ini: Target) -> None:
     by_key = {(record.section, record.key): record for record in records}
     assert by_key[("Setting", "Timeout")].value == "30"
     assert by_key[("Setting", "Delay")].value == "60"
-    assert all(str(record.source).lower().endswith("utf16.ini") for record in records)
+    assert all(str(record.path).lower().endswith("utf16.ini") for record in records)
