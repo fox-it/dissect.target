@@ -165,6 +165,26 @@ def test_teamviewer_daylight_savings_time(target_win_tzinfo: Target, fs_win: Vir
     assert records[3].ts.astimezone(timezone.utc) == datetime(2025, 10, 27, 0, 2, 3, 500000, tzinfo=timezone.utc)
 
 
+def test_teamviewer_invalid_datetimes(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    log = """
+    Start:              2025/10/26 02:50:32.134 (UTC)
+    2025/10/26 02:50:90.300  1234  5678 G1   Should use start timestamp
+    2025/10/26 02:50:34.300  1234  5678 G1   Normal timestamp
+    2025/10/26 02:50:90.300  1234  5678 G1   Should use previous timestamp
+    Start:              2025/10/26 02:x:32.134 (UTC)
+    2025/10/26 02:50:90.300  1234  5678 G1   Should use previous timestamp
+    """
+    fs_win.map_file_fh("Program Files/TeamViewer/Teamviewer_Log.log", BytesIO(dedent(log).encode()))
+
+    records = list(target_win.teamviewer.logs())
+    assert len(records) == 4
+
+    assert records[0].ts == datetime(2025, 10, 26, 2, 50, 32, tzinfo=timezone.utc)
+    assert records[1].ts == datetime(2025, 10, 26, 2, 50, 34, 300000, tzinfo=timezone.utc)
+    assert records[2].ts == datetime(2025, 10, 26, 2, 50, 34, 300000, tzinfo=timezone.utc)
+    assert records[3].ts == datetime(2025, 10, 26, 2, 50, 34, 300000, tzinfo=timezone.utc)
+
+
 @pytest.mark.parametrize(
     argnames=("line", "expected_date"),
     argvalues=[
