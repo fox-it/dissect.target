@@ -624,19 +624,21 @@ def test_benchmark_ls_bin(
 ) -> None:
     """Benchmark ls command with different parameters with a /bin directory containing ~1000 files."""
     with gzip.open(absolute_path("_data/filesystems/ext4/debian-trixie-bin-ext4.raw.gz"), "rb") as fh:
-        container = RawContainer(fh)
+        raw_image = fh.read()
 
-        t = Target()
-        t.disks.add(container)
-        t.apply()
+    container = RawContainer(BytesIO(raw_image))
 
-        def run_ls() -> None:
-            target_cli = TargetCli(t)
-            target_cli.onecmd(f"ls {args} /bin")
+    t = Target()
+    t.disks.add(container)
+    t.apply()
 
-        benchmark(run_ls)
+    def run_ls() -> None:
+        target_cli = TargetCli(t)
+        target_cli.onecmd(f"ls {args} /bin")
 
-        out, err = capsys.readouterr()
-        assert not err
-        assert "bash" in out
-        assert "zgrep" in out
+    benchmark(run_ls)
+
+    out, err = capsys.readouterr()
+    assert not err
+    assert "bash" in out
+    assert "zgrep" in out
