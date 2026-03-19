@@ -1066,7 +1066,7 @@ class WuaHistoryPlugin(Plugin):
             if isinstance(value, bytes):
                 value = value.decode(errors="ignore")
             format_data[mapped_column_name] = value
-            if kb := re.search(r"(KB\d+)", value):
+            if kb := re.search(r"(KB.[0-9]*)", value):
                 format_data["kb"] = kb.group(1)        
         elif mapped_column_name == "status_id":
             format_data[mapped_column_name] = value
