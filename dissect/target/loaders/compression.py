@@ -18,8 +18,7 @@ COMPRESSION_EXT = (".gz", ".lzma", ".bz2", ".zst")
 
 
 class CompressionLoader(MiddlewareLoader):
-    """
-    Allow loading compressed files.
+    """Allow loading compressed files.
     This does impact performance, so it's recommended to uncompress the file before passing it to Dissect.
     """
 
@@ -45,11 +44,9 @@ class CompressionLoader(MiddlewareLoader):
 
 
 def is_compressed_magic(path: Path) -> bool:
+    """Check if this is a compressed file based on the magic
+    Based on the magic check from fsutil.open_decompress.
     """
-    Check if this is a compressed file based on the magic
-        Based on the magic check from fsutil.open_decompress
-    """
-
     file = path.open("rb")
 
     magic = file.read(5)
