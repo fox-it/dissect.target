@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from sphinx.application import Sphinx
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sphinx.application import Sphinx
 
 project = "dissect.target"
 
