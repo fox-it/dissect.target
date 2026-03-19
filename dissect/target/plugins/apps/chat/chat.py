@@ -32,17 +32,17 @@ GENERIC_MESSAGE_FIELDS = [
 ]
 
 ChatUserRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "chat/user",
+    "application/chat/user",
     GENERIC_USER_FIELDS,
 )
 
 ChatMessageRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "chat/message",
+    "application/chat/message",
     GENERIC_MESSAGE_FIELDS,
 )
 
 ChatAttachmentRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "chat/attachment",
+    "application/chat/attachment",
     GENERIC_ATTACHMENT_FIELDS,
 )
 

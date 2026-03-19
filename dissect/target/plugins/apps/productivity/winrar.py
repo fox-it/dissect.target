@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 WinRarRecord = UserRegistryRecordDescriptor(
-    "application/productivity/winrar",
+    "application/productivity/winrar/history",
     [
         ("datetime", "ts"),
         ("path", "path"),

@@ -30,10 +30,10 @@ def test_winrar_windows(target_win_users: Target, hive_hku: VirtualHive) -> None
     results = list(target_win_users.winrar())
     assert len(results) == 2
 
-    assert results[0]._desc.name == "application/productivity/winrar"
+    assert results[0]._desc.name == "application/productivity/winrar/history"
     assert results[0].ts == datetime(2025, 12, 31, 12, 34, 0, tzinfo=timezone.utc)
     assert results[0].path == "example.rar"
 
-    assert results[1]._desc.name == "application/productivity/winrar"
+    assert results[1]._desc.name == "application/productivity/winrar/history"
     assert results[1].ts == datetime(2025, 12, 31, 13, 37, 0, tzinfo=timezone.utc)
     assert results[1].path == "C:\\Users\\Administrator\\Desktop\\example-rar"
