@@ -64,15 +64,38 @@ def walk(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
 
 def cp(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     output = pathlib.Path(args.output).expanduser().resolve()
+    preserve_links = _preserve_links(args)
 
-    if path.is_file():
+    if path.is_symlink() and preserve_links:
+        _extract_path(path, output.joinpath(path.name), preserve_links=True)
+    elif path.is_file():
         _extract_path(path, output.joinpath(path.name))
     elif path.is_dir():
         for extract_path in path.rglob("*"):
             out_path = output.joinpath(str(extract_path.relative_to(path)))
-            _extract_path(extract_path, out_path)
+            _extract_path(extract_path, out_path, preserve_links=preserve_links)
     else:
         print(f"[!] Failed, unsuported file type: {path}")
+
+
+def _preserve_links(args: argparse.Namespace) -> bool:
+    """Return True if symlinks should be preserved based on the given arguments.
+
+    Symlink preservation is enabled by any of:
+    - ``-P`` / ``--no-dereference``
+    - ``--preserve=links`` or ``--preserve=all``
+    - ``-d`` (equivalent to ``--no-dereference --preserve=links``)
+    """
+    if getattr(args, "no_dereference", False) or getattr(args, "d", False):
+        return True
+    preserve = getattr(args, "preserve", None)
+    if preserve is not None:
+        attrs = {a.strip() for a in preserve.split(",")}
+        unsupported = attrs - {"links", "all"}
+        if unsupported:
+            log.warning("Unsupported --preserve attributes (will be ignored): %s", ", ".join(sorted(unsupported)))
+        return "links" in attrs or "all" in attrs
+    return False
 
 
 def stat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
@@ -81,7 +104,7 @@ def stat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     print_stat(path, sys.stdout, args.dereference)
 
 
-def _extract_path(path: TargetPath, output_path: pathlib.Path) -> None:
+def _extract_path(path: TargetPath, output_path: pathlib.Path, preserve_links: bool = False) -> None:
     print(f"{path} -> {output_path}")
 
     out_dir = output_path if path.is_dir() else output_path.parent
@@ -90,7 +113,10 @@ def _extract_path(path: TargetPath, output_path: pathlib.Path) -> None:
         if not out_dir.exists():
             out_dir.mkdir(parents=True)
 
-        if path.is_file():
+        if preserve_links and path.is_symlink():
+            if sys.platform != "win32":
+                output_path.symlink_to(path.readlink())
+        elif path.is_file():
             with output_path.open("wb") as fh:
                 shutil.copyfileobj(path.open(), fh)
 
@@ -142,6 +168,25 @@ def main() -> int:
         parents=[baseparser],
     )
     parser_cp.add_argument("-o", "--output", default=".", help="output directory")
+    parser_cp.add_argument(
+        "-P",
+        "--no-dereference",
+        action="store_true",
+        dest="no_dereference",
+        help="never follow symbolic links in SOURCE, preserve them as symlinks in the output (UNIX only)",
+    )
+    parser_cp.add_argument(
+        "--preserve",
+        metavar="ATTR_LIST",
+        dest="preserve",
+        help="preserve the specified attributes (supported: links); --preserve=links preserves symlinks (UNIX only)",
+    )
+    parser_cp.add_argument(
+        "-d",
+        action="store_true",
+        dest="d",
+        help="same as --no-dereference --preserve=links",
+    )
     parser_cp.set_defaults(handler=cp)
     configure_generic_arguments(parser)
 
