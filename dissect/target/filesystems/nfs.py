@@ -1,32 +1,37 @@
 from __future__ import annotations
 
 import stat
+from collections.abc import Callable
 from functools import cached_property
-from typing import TYPE_CHECKING, BinaryIO, Callable, TypeVar
+from typing import TYPE_CHECKING, BinaryIO, TypeVar
 
 from dissect.util.stream import AlignedStream
 
 from dissect.target.exceptions import NotADirectoryError
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.nfs.client.mount import Client as MountClient
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.nfs3 import (
-    EntryPlus,
-    FileAttributes,
     FileHandle,
     FileType,
     MountProc,
     NfsProgram,
     NfsVersion,
 )
-from dissect.target.helpers.sunrpc.client import AuthScheme, LocalPortPolicy, auth_null
+from dissect.target.helpers.sunrpc.client import AuthScheme, auth_null
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from typing_extensions import Self
+
+    from dissect.target.helpers.nfs.nfs3 import (
+        EntryPlus,
+        FileAttributes,
+    )
+    from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 
 ConCredentials = TypeVar("ConCredentials")
 ConVerifier = TypeVar("ConVerifier")
@@ -50,7 +55,7 @@ class AuthFlavorNotSupported(Exception):
 
 
 class NfsFilesystem(Filesystem):
-    """Filesystem implementation of a NFS share
+    """Filesystem implementation of a NFS share.
 
     The connection is lazily established to not waste resources.
     Use the ``connect`` method to conveniently create a new instance.
@@ -119,7 +124,6 @@ class NfsFilesystem(Filesystem):
             path: The path to the entry. The path is relative to ``relentry``, if provided.
             relentry: The relative entry to start from. If not provided, the root entry is used.
         """
-
         current_handle = relentry.entry if relentry else self._root_handle
         path = fsutil.normalize(path, self.alt_separator).strip("/")
 
@@ -131,6 +135,17 @@ class NfsFilesystem(Filesystem):
             current_handle = result.object
 
         return NfsFilesystemEntry(self, path, result.object, result.obj_attributes)
+
+
+class NfsDirEntry(DirEntry):
+    fs: NfsFilesystem
+    entry: EntryPlus
+
+    def get(self) -> NfsFilesystemEntry:
+        return NfsFilesystemEntry(self.fs, self.path, self.entry.handle, self.entry.attributes)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
 
 
 class NfsFilesystemEntry(FilesystemEntry):
@@ -148,7 +163,7 @@ class NfsFilesystemEntry(FilesystemEntry):
         return self._backing_attributes
 
     def get(self, path: str) -> NfsFilesystemEntry:
-        """Get a new filesystem entry relative to this entry"""
+        """Get a new filesystem entry relative to this entry."""
         if not self.is_dir():
             raise NotADirectoryError
 
@@ -178,19 +193,12 @@ class NfsFilesystemEntry(FilesystemEntry):
         target = self.fs._client.readlink(self.entry)
         return self.fs.get(target)  # The target is an absolute path
 
-    def _iterdir(self) -> Iterator[EntryPlus]:
+    def scandir(self) -> Iterator[NfsDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        yield from self.fs._client.readdir(self.entry).entries
-
-    def iterdir(self) -> Iterator[str]:
-        for entry in self._iterdir():
-            yield entry.name
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        for entry in self._iterdir():
-            yield NfsFilesystemEntry(self.fs, entry.name, entry.handle, entry.attributes)
+        for entry in self.fs._client.readdir(self.entry).entries:
+            yield NfsDirEntry(self.fs, self.path, entry.name, entry)
 
     def open(self) -> NfsStream:
         # Pass size if available but don't sweat it

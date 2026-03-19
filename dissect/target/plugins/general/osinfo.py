@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Generator, Iterator
-from typing import Callable
+from collections.abc import Callable, Generator
+from typing import TYPE_CHECKING
 
 from flow.record import GroupedRecord
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 OSInfoRecord = TargetRecordDescriptor(
     "generic/osinfo",
@@ -28,7 +31,7 @@ class OSInfoPlugin(Plugin):
     @export(record=OSInfoRecord)
     def osinfo(self) -> Iterator[OSInfoRecord | GroupedRecord]:
         """Yield grouped records with target OS info."""
-        for os_func in self.target._os.__functions__:
+        for os_func in self.target._os.__exports__:
             value = getattr(self.target._os, os_func)
             record = OSInfoRecord(name=os_func, value=None, _target=self.target)
             if isinstance(value, Callable) and isinstance(subrecords := value(), Generator):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
@@ -11,6 +11,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path, mkdirs
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 
@@ -66,8 +67,8 @@ def test_dir(mock_kape_dir: Path) -> None:
 
     # The 3 found drive letter directories + the fake NTFS filesystem
     assert len(t.filesystems) == 4
-    # The 3 found drive letters + sysvol + the fake NTFS filesystem at /$fs$
-    assert len(t.fs.mounts) == 5
+    # The 3 found drive letters + sysvol
+    assert len(t.fs.mounts) == 4
     assert len(list(t.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
 
 

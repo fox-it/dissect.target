@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sphinx.application import Sphinx
 
 project = "dissect.target"

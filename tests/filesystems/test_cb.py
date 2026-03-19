@@ -10,6 +10,9 @@ from dissect.target.exceptions import NotADirectoryError
 
 def test_cb_filesystem_windows(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
+        if "dissect.target.filesystems.cb" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.filesystems.cb")
+
         mock_cbc_sdk = MagicMock()
         m.setitem(sys.modules, "cbc_sdk", mock_cbc_sdk)
         m.setitem(sys.modules, "cbc_sdk.live_response_api", mock_cbc_sdk.live_response_api)
@@ -70,9 +73,9 @@ def test_cb_filesystem_windows(monkeypatch: pytest.MonkeyPatch) -> None:
         assert not entries[0].is_symlink()
 
         with pytest.raises(NotADirectoryError):
-            entries[0].listdir()
+            entries[0].get().listdir()
 
-        entries[0].open()
+        entries[0].get().open()
         mock_session.get_raw_file.assert_called_with("c:\\windows\\system32\\myfile.txt")
 
         stat_result = entries[0].stat()

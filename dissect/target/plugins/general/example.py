@@ -157,3 +157,22 @@ class ExamplePlugin(Plugin):
         Use the ``@internal`` plugin to mark your plugin as internal and hide it from the plugin overview.
         """
         return "Example internal plugin."
+
+
+class ExampleNamespacePlugin(Plugin):
+    """Example namespace plugin."""
+
+    __namespace__ = "example_namespace"
+    __findable__ = False
+
+    def check_compatible(self) -> None:
+        pass
+
+    @export(record=ExampleRecordRecord)
+    def example_record(self) -> Iterator[ExampleRecordRecord]:
+        """Example namespace export."""
+        yield ExampleRecordRecord(
+            field_a="namespace_example",
+            field_b="record",
+            _target=self.target,
+        )

@@ -61,23 +61,24 @@ COMMON_ELLEMENTS = [
 ]
 
 AuthorizedKeysRecord = OpenSSHUserRecordDescriptor(
-    "application/openssh/authorized_keys",
+    "application/ssh/openssh/authorized_keys",
     [
         *COMMON_ELLEMENTS,
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
+        ("digest", "fingerprint"),
         ("string", "options"),
     ],
 )
 
 
 KnownHostRecord = OpenSSHUserRecordDescriptor(
-    "application/openssh/known_host",
+    "application/ssh/openssh/known_host",
     [
         ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
         ("string", "host"),
         ("varint", "port"),
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
         ("string", "marker"),
         ("digest", "fingerprint"),
     ],
@@ -85,22 +86,24 @@ KnownHostRecord = OpenSSHUserRecordDescriptor(
 
 
 PrivateKeyRecord = OpenSSHUserRecordDescriptor(
-    "application/openssh/private_key",
+    "application/ssh/openssh/private_key",
     [
         ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
         ("string", "key_format"),
-        ("string", "public_key"),
+        ("bytes", "private_key_pem"),
+        ("bytes", "public_key_pem"),
+        ("digest", "fingerprint"),
         ("boolean", "encrypted"),
     ],
 )
 
 PublicKeyRecord = OpenSSHUserRecordDescriptor(
-    "application/openssh/public_key",
+    "application/ssh/openssh/public_key",
     [
         ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
-        ("string", "public_key"),
+        ("bytes", "public_key_pem"),
         ("digest", "fingerprint"),
     ],
 )
@@ -229,7 +232,6 @@ class SSHPrivateKey:
 
         Source: https://coolaj86.com/articles/the-openssh-private-key-format/
         """
-
         key_data = decode_rfc4716(data)
         private_key = c_rfc4716.ssh_private_key(key_data)
 

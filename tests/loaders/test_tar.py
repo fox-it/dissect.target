@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import platform
 import tarfile
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -15,6 +15,7 @@ from tests._utils import absolute_path
 from tests.filesystems.test_tar import _mkdir
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 
@@ -157,7 +158,6 @@ def test_detect_extension(should_detect: bool, filename: str, buffer: str, tmp_p
 )
 def test_detect_buffer(file: str, tmp_path: Path) -> None:
     """Test if we detect the given files as a (compressed) tar file or not."""
-
     if file == "small.tar.lz" and (platform.python_implementation() == "PyPy" or platform.system() == "Windows"):
         pytest.skip(reason="LZMA is flaky on PyPy and/or Windows")
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,7 +10,7 @@ import pytest
 from dissect.target.target import Target
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 
 @pytest.fixture
@@ -23,6 +23,8 @@ def mock_cbc_sdk(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
         # function that is running.
         if "dissect.target.loaders.cb" in sys.modules:
             m.delitem(sys.modules, "dissect.target.loaders.cb")
+        if "dissect.target.filesystems.cb" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.filesystems.cb")
 
         mock_cbc_sdk = MagicMock()
         m.setitem(sys.modules, "cbc_sdk", mock_cbc_sdk)

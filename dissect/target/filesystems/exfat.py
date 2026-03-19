@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import stat
 from datetime import timedelta, timezone
+from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO, Optional
 
 from dissect.fat import exfat
@@ -9,7 +10,7 @@ from dissect.util.stream import RunlistStream
 from dissect.util.ts import dostimestamp
 
 from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
-from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
@@ -58,6 +59,21 @@ class ExfatFilesystem(Filesystem):
 
         return dirent
 
+    @cached_property
+    def serial(self) -> int | str | None:
+        return self.exfat.vbr.volume_serial
+
+
+class ExfatDirEntry(DirEntry):
+    fs: ExfatFilesystem
+    entry: ExfatFileTree
+
+    def get(self) -> ExfatFilesystemEntry:
+        return ExfatFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
 
 class ExfatFilesystemEntry(FilesystemEntry):
     def __init__(
@@ -82,25 +98,15 @@ class ExfatFilesystemEntry(FilesystemEntry):
             runlist = self.fs.exfat.runlist(self.cluster, False)
         return RunlistStream(self.fs.exfat.filesystem, runlist, self.size, self.fs.cluster_size)
 
-    def _iterdir(self) -> Iterator[tuple[str, ExfatFileTree]]:
+    def scandir(self) -> Iterator[ExfatDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        for entry_name, entry_file_tree in self.entry[1].items():
-            if entry_name in (".", ".."):
+        for name, file_tree in self.entry[1].items():
+            if name in (".", ".."):
                 continue
-            yield (entry_name, entry_file_tree)
 
-    def iterdir(self) -> Iterator[str]:
-        """List the directory contents of a directory. Returns a generator of strings."""
-        for entry_name, _ in self._iterdir():
-            yield entry_name
-
-    def scandir(self) -> Iterator[ExfatFilesystemEntry]:
-        """List the directory contents of this directory. Returns a generator of filesystem entries."""
-        for entry_name, entry_file_tree in self._iterdir():
-            path = fsutil.join(self.path, entry_name, alt_separator=self.fs.alt_separator)
-            yield ExfatFilesystemEntry(self.fs, path, entry_file_tree)
+            yield ExfatDirEntry(self.fs, self.path, name, file_tree)
 
     def is_symlink(self) -> bool:
         """Return whether this entry is a link."""

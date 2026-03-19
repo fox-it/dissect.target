@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from dissect.sql import SQLite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -92,12 +92,10 @@ class McAfeePlugin(Plugin):
             keywords (string): Unparsed fields that might be visible in user interface.
             fkey (string): Foreign key for reference for further investigation.
         """
-
         len_marker = len(self.MARKER_SUSPICIOUS_UDP_CONNECTION)
 
         for log_file in self.get_log_files():
-            with log_file.open() as open_log:
-                database = SQLite3(open_log)
+            with SQLite3(log_file) as database:
                 fields = defaultdict(dict)
                 fields_table = database.table(self.TABLE_FIELD)
 

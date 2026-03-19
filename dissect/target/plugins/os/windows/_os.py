@@ -4,6 +4,7 @@ import operator
 import struct
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
-    from dissect.target.plugins.os.windows.credential.sam import SamRecord
+    from dissect.target.plugins.os.windows.sam import SamRecord
     from dissect.target.target import Target
 
 ARCH_MAP = {
@@ -55,10 +56,17 @@ class WindowsPlugin(OSPlugin):
         target.fs.alt_separator = "\\"
         target.fs.mount("sysvol", sysvol)
 
+        # Mount EFI
         if not sysvol.exists("boot/BCD"):
             for fs in target.filesystems:
                 if fs.exists("boot/BCD") or fs.exists("EFI/Microsoft/Boot/BCD"):
                     target.fs.mount("efi", fs)
+
+        # Mount WinRE
+        if not sysvol.exists("winre/Recovery/WindowsRE"):
+            for fs in target.filesystems:
+                if fs.exists("Recovery/WindowsRE"):
+                    target.fs.mount("winre", fs)
 
         return cls(target)
 
@@ -76,7 +84,7 @@ class WindowsPlugin(OSPlugin):
                         drive = p[1]
 
                         if value.startswith(b"DMIO:ID:"):
-                            guid = value[8:]
+                            guid = str(UUID(bytes_le=value[8:]))
 
                             for volume in self.target.volumes:
                                 if volume.guid == guid and volume.fs:
@@ -272,7 +280,6 @@ class WindowsPlugin(OSPlugin):
         Returns:
             Target triple string.
         """
-
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
 
         try:

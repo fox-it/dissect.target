@@ -415,7 +415,6 @@ class RdpCachePlugin(Plugin):
         self, output_dir: Path, no_individual_tiles: bool, as_collage: bool, as_grid: bool, remnants: str
     ) -> None:
         """Extract bitmaps from Windows' RDP Client cache files."""
-
         if not output_dir.exists():
             self.target.log.error("Destination folder does not exist: %s", output_dir)
             return

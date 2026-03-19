@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import platform
+import sys
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
-from dissect.util.stream import RangeStream
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -15,11 +14,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 try:
-    from zstandard import (
-        DECOMPRESSION_RECOMMENDED_OUTPUT_SIZE,
-        ZstdCompressionDict,
-        ZstdDecompressor,
-    )
+    if sys.version_info >= (3, 14):
+        from compression import zstd  # novermin
+    else:
+        from backports import zstd
 
     HAS_ZSTD = True
 except ImportError:
@@ -53,10 +51,6 @@ struct header {
     // Only if max_version >= 2.
     uint8_t check_visibility;
     char padding[7];                         /* padding for alignment */
-};
-
-struct file {
-    char path[];
 };
 """  # noqa : E501
 
@@ -97,7 +91,6 @@ class PLocateFile:
     HEADER_SIZE = 0x70  # 0x8 bytes magic + 0x68 bytes header
     NUM_OVERFLOW_SLOTS = 16
     TRIGRAM_SIZE_BYTES = 16
-    DOCID_SIZE_BYTES = 8
 
     def __init__(self, fh: BinaryIO):
         self.fh = fh
@@ -107,56 +100,27 @@ class PLocateFile:
             raise ValueError(f"Invalid plocate file magic. Expected b'/x00plocate', got {magic}")
 
         self.header = c_plocate.header(self.fh)
-        self.dict_data = None
+        self.zstd_dict = None
 
         if self.header.zstd_dictionary_offset_bytes:
-            self.dict_data = ZstdCompressionDict(self.fh.read(self.header.zstd_dictionary_length_bytes))
+            self.zstd_dict = zstd.ZstdDict(self.fh.read(self.header.zstd_dictionary_length_bytes))
 
         self.compressed_length_bytes = (
             self.header.filename_index_offset_bytes - self.HEADER_SIZE - self.header.zstd_dictionary_length_bytes
         )
-        self.ctx = ZstdDecompressor(dict_data=self.dict_data)
-        self.buf = RangeStream(self.fh, self.fh.tell(), self.compressed_length_bytes)
 
-    def __iter__(self) -> Iterator[PLocateFile]:
-        # NOTE: This is a workaround for a PyPy bug
-        # We don't know what breaks, but PyPy + zstandard = unhappy times
-        # You just get random garbage data back instead of the decompressed data
-        # This weird dance of using a decompressobj and unused data is the only way that seems to work
-        # It's more expensive on memory, but at least it doesn't break
-        if platform.python_implementation() == "PyPy":
-            buf = self.buf.read()
-
-            def reader(ctx: ZstdDecompressor) -> Iterator[bytes]:
-                obj = ctx.decompressobj()
-
-                yield obj.decompress(buf)
-                while unused_data := obj.unused_data:
-                    obj = self.ctx.decompressobj()
-                    yield obj.decompress(unused_data)
-
-            it = reader(self.ctx)
-        else:
-            # NOTE: The end of a zstandard frame does not include a final `0x00`.
-            # This causes the c_plocate `file` struct to parse the last path and the first path on the next frame as one
-            # since cstruct will read it across frame boundaries waiting for a `0x00`.
-            def reader() -> Iterator[bytes]:
-                with self.ctx.stream_reader(self.buf) as reader:
-                    while chunk := reader.read(DECOMPRESSION_RECOMMENDED_OUTPUT_SIZE):
-                        yield chunk
-
-            it = reader()
-
-        for chunk in it:
-            for path in chunk.split(b"\x00"):
+    def __iter__(self) -> Iterator[str]:
+        offsets = self.filename_index()
+        for i in range(self.header.num_docids):
+            self.fh.seek(offsets[i])
+            block = zstd.decompress(self.fh.read(offsets[i + 1] - offsets[i]), zstd_dict=self.zstd_dict)
+            for path in block.split(b"\x00"):
                 yield path.decode(errors="surrogateescape")
 
-    def filename_index(self) -> bytes:
+    def filename_index(self) -> list[int]:
         """Return the filename index of the plocate.db file."""
         self.fh.seek(self.header.filename_index_offset_bytes)
-        num_docids = self.header.num_docids
-        filename_index_size = num_docids * self.DOCID_SIZE_BYTES
-        return self.fh.read(filename_index_size)
+        return c_plocate.uint64[self.header.num_docids + 1](self.fh)
 
     def hashtable(self) -> bytes:
         """Return the hashtable of the plocate.db file."""
@@ -178,7 +142,7 @@ class PLocatePlugin(BaseLocatePlugin):
 
         if not HAS_ZSTD:
             raise UnsupportedPluginError(
-                "Please install `python-zstandard` or `pip install zstandard` to use the PLocatePlugin"
+                "Required dependency 'backports.zstd' is missing, install with `pip install backports.zstd` to use the PLocatePlugin"  # noqa: E501
             )
 
     @export(record=PLocateRecord)

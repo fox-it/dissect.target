@@ -15,12 +15,13 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 if HAS_YARA:
     import yara
 
-rule_file = absolute_path("_data/plugins/filesystem/yara/rule.yar")
-another_rule_file = absolute_path("_data/plugins/filesystem/yara/another.yar")
-invalid_rule = absolute_path("_data/plugins/filesystem/yara/invalid.yar")
+rule_file = absolute_path("_data/plugins/filesystem/yara/rule-dir/rule.yar")
+another_rule_file = absolute_path("_data/plugins/filesystem/yara/rule-dir/another.yar")
+invalid_rule = absolute_path("_data/plugins/filesystem/yara/rule-dir/invalid.yar")
 rule_dir = rule_file.parent
 
 
@@ -35,17 +36,25 @@ def target_yara(target_default: Target) -> Target:
     return target_default
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara_plugin(target_yara: Target) -> None:
     results = list(target_yara.yara(rules=[rule_file]))
 
     assert len(results) == 2
     assert results[0].path == "/test_file"
-    assert results[1].path == "/test/dir/to/test_file"
     assert results[0].rule == "test_rule_name"
+    assert results[0].matches == ["$=test string"]
+    assert results[1].tags == ["tag1", "tag2", "tag3"]
+    assert results[0].digest.sha1 == "661295c9cbf9d6b2f6428414504a8deed3020641"
+
+    assert results[1].path == "/test/dir/to/test_file"
+    assert results[1].rule == "test_rule_name"
+    assert results[1].matches == ["$=test string"]
+    assert results[1].tags == ["tag1", "tag2", "tag3"]
+    assert results[1].digest.sha1 == "661295c9cbf9d6b2f6428414504a8deed3020641"
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 @pytest.mark.parametrize(
     ("rules", "expected_hits", "should_be_valid"),
     [
@@ -65,14 +74,14 @@ def test_yara_plugin_invalid_rules(
     assert len(results) == expected_hits
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara_plugin_invalid_rule_warn(target_yara: Target, caplog: pytest.CaptureFixture) -> None:
     results = list(target_yara.yara(rules=[invalid_rule, another_rule_file], check=True))
     assert "invalid.yar contains invalid rule(s)!" in caplog.text
     assert len(results) == 2
 
 
-@pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 def test_yara_plugin_compiled_rule(target_yara: Target, tmp_path: str) -> None:
     with tempfile.NamedTemporaryFile(mode="w", dir=tmp_path, delete=False) as tf:
         rules = yara.compile(str(rule_file))
@@ -85,8 +94,28 @@ def test_yara_plugin_compiled_rule(target_yara: Target, tmp_path: str) -> None:
 
         assert results[0].path == "/test_file"
         assert results[0].rule == "test_rule_name"
+        assert results[0].matches == ["$=test string"]
         assert results[0].tags == ["tag1", "tag2", "tag3"]
         assert results[0].namespace == "default"
         assert results[0].digest.md5 == "6f8db599de986fab7a21625b7916589c"
         assert results[0].digest.sha1 == "661295c9cbf9d6b2f6428414504a8deed3020641"
         assert results[0].digest.sha256 == "d5579c46dfcc7f18207013e65b44e4cb4e2c2298f4ac457ba8f82743f31e930b"
+
+
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
+def test_yara_plugin_multiple_matches(target_default: Target) -> None:
+    """Test if we iterate ``yara.StringMatch`` results correctly."""
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("/files/first.txt", BytesIO(b"This is a t\x00e\x00s\x00t\x00 file\x00\xaa\xbb\xcc\xdd\xee\xff\x00"))
+    vfs.map_file_fh("/files/second.txt", BytesIO(b"This is another test file!"))
+    vfs.map_file_fh("/files/third.txt", BytesIO(b"This is some other file!"))
+    target_default.fs.mount("/", vfs)
+    target_default.add_plugin(YaraPlugin)
+
+    rule = absolute_path("_data/plugins/filesystem/yara/multi.yar")
+    results = list(target_default.yara(rules=[str(rule)]))
+
+    assert len(results) == 3
+
+    assert results[0].path == "/files/first.txt"
+    assert results[0].matches == ["$a=t\x00e\x00s\x00t\x00", "$b=This", "$c=\\xaa\\xbb\\xcc\\xdd\\xee\\xff"]

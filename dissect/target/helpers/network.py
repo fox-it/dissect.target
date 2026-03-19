@@ -6,7 +6,7 @@ from enum import IntEnum
 class IANAProtocol(IntEnum):
     """Enum of IANA Protocol numbers.
 
-    Resources:
+    References:
         - https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
     """
 

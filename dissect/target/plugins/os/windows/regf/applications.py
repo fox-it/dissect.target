@@ -50,7 +50,7 @@ class WindowsApplicationsPlugin(Plugin):
         .. code-block:: text
 
             ts_modified  (datetime): timestamp when the installation was modified according to the registry
-            ts_installed (datetime): timestamp when the application was installed according to the application
+            ts_installed (datetime): the date when the application was installed according to the application
             name         (string):   name of the application
             version      (string):   version of the application
             author       (string):   author of the application

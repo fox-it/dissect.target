@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from dissect.esedb.c_esedb import decode_guid
-from dissect.esedb.esedb import EseDB
+from dissect.database.ese import ESE
+from dissect.database.ese.util import decode_guid
 from dissect.util.ts import oatimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -35,8 +35,8 @@ WuaHistoryRecord = TargetRecordDescriptor(
         ("string", "uninstall_notes"),
         ("string", "support_url"),
         ("string", "uninstall_steps"),
-        ("string", "categories"),
-        ("string", "more_info_url"),
+        ("string[]", "categories"),
+        ("string[]", "more_info_url"),
         ("string", "path"),
         ("varint", "id_user"),
         ("string", "is_service_is_additional"),
@@ -954,7 +954,7 @@ class WuaHistoryPlugin(Plugin):
 
         if (path := target.resolve(self.DATASTORE_PATH)).exists():
             try:
-                self._datastore = EseDB(path.open())
+                self._datastore = ESE(path.open())
                 self._update_table = self._datastore.table(self.DATASTORE_UPDATE_TABLE)
             except Exception as e:
                 self.target.log.warning("Error opening Windows Update Agent datastore")
@@ -1008,7 +1008,7 @@ class WuaHistoryPlugin(Plugin):
         .. code-block:: text
 
             ts (datetime): The timestamp (UTC) of when the Windows Update Agent operation was finished.
-            categories (string): Category of the update.
+            categories (string[]): Category of the update.
             classification (string): Unique ID indicating which classification the update has.
             classification_mapped (string): Mapping of the 'classification' field, giving an understandable classification.
             client_id (string): Client that initiated the Windows Update Agent operation.

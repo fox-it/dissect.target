@@ -64,7 +64,6 @@ class MSNPlugin(ChatPlugin):
             - ``$HOME/My Documents/My Received Files/MsnMsgr.txt``
             - ``$HOME/My Documents/My Received Files/$username$PassportID/History/*.xml``
         """
-
         for user_details, profile in self.installs:
             if not (hist_root := self.target.fs.path(user_details.user.home).joinpath(self.HIST_PATH)).exists():
                 self.target.log.warning(

@@ -3,16 +3,16 @@ from __future__ import annotations
 import io
 import re
 import string
-from typing import TYPE_CHECKING, BinaryIO, Callable, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 if TYPE_CHECKING:
     import logging
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dissect.target.helpers.record import TargetRecordDescriptor
 
 
-Needle = Union[bytes, re.Pattern]
+Needle = bytes | re.Pattern
 
 
 def find_needles(
@@ -37,7 +37,6 @@ def find_needles(
         block_size: The block size to use for reading from the byte stream.
         progress: A function to call with the current offset.
     """
-
     if not isinstance(needles, list):
         needles = [needles]
 
@@ -148,7 +147,6 @@ def scrape_chunks(
         block_size: The block size to use for reading from the byte stream.
         log: A logger to use for logging.
     """
-
     chunk_count = 0
     record_count = 0
 

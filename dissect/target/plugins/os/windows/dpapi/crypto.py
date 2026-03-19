@@ -43,7 +43,6 @@ class CipherAlgorithm:
         References:
             - https://github.com/tijldeneut/DPAPIck3/blob/main/dpapick3/crypto.py#L185
         """
-
         if len(key) > hash_algorithm.block_length:
             key = hashlib.new(hash_algorithm.name, key).digest()
 
@@ -223,7 +222,7 @@ def pbkdf2(passphrase: bytes, salt: bytes, key_len: int, iterations: int, digest
         derived = hmac.new(passphrase, U, digestmod=digest).digest()
         for _ in range(iterations - 1):
             actual = hmac.new(passphrase, derived, digestmod=digest).digest()
-            derived = bytes(x ^ y for x, y in zip(derived, actual))
+            derived = bytes(x ^ y for x, y in zip(derived, actual, strict=False))
         key.extend(derived)
 
     return bytes(key[:key_len])
