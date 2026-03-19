@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import TargetPath
 
 IniRecord = TargetRecordDescriptor(
-    "filesystem/ini",
+    "filesystem/iniFileRecord",
     [
         ("datetime", "atime"),
         ("datetime", "mtime"),
@@ -38,17 +38,32 @@ class IniPlugin(Plugin):
         if not len(self.target.fs.mounts):
             raise UnsupportedPluginError("No filesystems found on target")
 
-    def _iter_ini_files(self, path: str) -> Iterator:
+    def on_error(self, error: Exception) -> None:
+        """Error handler for filesystem traversal. Logs warnings for permission errors and other exceptions,
+        but continues traversal.
+
+        Args:
+            error: ''Exception'' the exception thrown during filesystem traversal.
+        """
+        if isinstance(error, PermissionError):
+            self.target.log.warning("Permission denied while scanning for ini files: %s", error)
+            self.target.log.debug("", exc_info=error)
+            return
+
+        self.target.log.warning("Exception while scanning for ini files: %s", error)
+        self.target.log.debug("", exc_info=error)
+
+    def _iter_ini_files(self, path: str) -> Iterator[TargetPath]:
         """Find all INI files under the given path.
 
         Handles both explicit file paths and directory traversal. Continues traversal even if
         permission errors are encountered on individual directories.
 
         Args:
-            path: Target filesystem path to scan. Can be a file or directory.
+            path: ''string'' of Target filesystem path to scan. Can be a file or directory.
 
         Returns:
-            TargetPath objects for each discovered .ini file.
+            Iterator yields ``TargetPath``
         """
         target_path = self.target.fs.path(path)
         if not target_path.exists():
@@ -60,16 +75,7 @@ class IniPlugin(Plugin):
                 yield target_path
             return
 
-        def on_error(error: Exception) -> None:
-            if isinstance(error, PermissionError):
-                self.target.log.warning("Permission denied while scanning for ini files: %s", error)
-                self.target.log.debug("", exc_info=error)
-                return
-
-            self.target.log.warning("Exception while scanning for ini files: %s", error)
-            self.target.log.debug("", exc_info=error)
-
-        for root, _dirs, files in self.target.fs.walk(path, onerror=on_error):
+        for root, _dirs, files in self.target.fs.walk(path, onerror=self.on_error):
             root_path = self.target.fs.path(root)
             for file_name in files:
                 if file_name.lower().endswith(".ini"):
@@ -85,22 +91,22 @@ class IniPlugin(Plugin):
         key-value pair found.
 
         Args:
-            path: Target filesystem path to scan (default "/"). Can be a file or directory.
+            path: ''string'' of Target filesystem path to scan (default "/"). Can be a file or directory.
 
         Returns:
-            IniRecord: One record per key-value pair in discovered INI files.
+            Iterator yields ``IniRecord``: One record per key-value pair in discovered INI files.
         """
-        for source in self._iter_ini_files(path):
+        for ini_file_path in self._iter_ini_files(path):
             try:
-                config = _parse_ini(source)
-                stat = source.stat()
+                config = _parse_ini(ini_file_path)
+                stat = ini_file_path.stat()
             except FileNotFoundError as e:
                 # File may disappear between compatibility check and parse.
-                self.target.log.warning("File not found: %s", source)
+                self.target.log.warning("File not found: %s", ini_file_path)
                 self.target.log.debug("", exc_info=e)
                 continue
             except Exception as e:
-                self.target.log.warning("Exception generating ini record for %s: %s", source, e)
+                self.target.log.warning("Exception generating ini record for %s: %s", ini_file_path, e)
                 self.target.log.debug("", exc_info=e)
                 continue
 
@@ -112,29 +118,29 @@ class IniPlugin(Plugin):
                         ctime=stat.st_ctime,
                         section=section_name,
                         key=key,
-                        value="" if value is None else str(value),
-                        path=source,
+                        value=str(value),
+                        path=ini_file_path,
                         _target=self.target,
                     )
 
 
-def _parse_ini(source: TargetPath) -> configutil.ConfigurationParser:
+def _parse_ini(ini_file_path: TargetPath) -> configutil.ConfigurationParser:
     """Parse an INI file, with automatic fallback for UTF-16 encoded files.
 
     First attempts to parse the file with the default UTF-8 encoding. If a ConfigurationParsingError,
     retries using UTF-16 decoding
 
     Args:
-        source: TargetPath to the INI file to parse.
+        ini_file_path: ''TargetPath'' to the INI file to parse.
 
     Returns:
-        ConfigurationParser: Parsed INI configuration object.
+        ConfigurationParser: ''ConfigurationParser'' Parsed INI configuration object.
     """
     try:
-        return configutil.parse(source, hint="ini")
+        return configutil.parse(ini_file_path, hint="ini")
     except (UnicodeDecodeError, ConfigurationParsingError):
         # Many Windows INI files are UTF-16
-        raw_data = source.open("rb").read()
+        raw_data = ini_file_path.open("rb").read()
         text_data = raw_data.decode("utf-16")
 
         parser = configutil.Ini()

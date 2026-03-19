@@ -12,18 +12,9 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-startup_ini_file = absolute_path("_data/plugins/filesystem/ini/startup.ini")
-shutdown_ini_file = absolute_path("_data/plugins/filesystem/ini/shutdown.ini")
-ignored_text_file = absolute_path("_data/plugins/filesystem/ini/not_ini.txt")
-utf16_ini_file = absolute_path("_data/plugins/filesystem/ini/utf16.ini")
-
-
 @pytest.fixture
 def target_ini(target_unix: Target, fs_unix: VirtualFilesystem) -> Target:
-    fs_unix.map_file("/etc/config/startup.ini", startup_ini_file)
-    fs_unix.map_file("/etc/config/sub/shutdown.ini", shutdown_ini_file)
-    fs_unix.map_file("/etc/config/sub/not_ini.txt", ignored_text_file)
-    fs_unix.map_file("/etc/config/sub/utf16.ini", utf16_ini_file)
+    fs_unix.map_dir("/etc/config", absolute_path("_data/plugins/filesystem/ini"))
 
     target_unix.add_plugin(IniPlugin)
     return target_unix
@@ -38,7 +29,7 @@ def test_ini_parses_records(target_ini: Target) -> None:
     by_key = {(record.section, record.key): record for record in records}
 
     assert by_key[("Run", "Program")].value == "calc.exe"
-    assert by_key[("Run", "NoValue")].value == ""
+    assert by_key[("Run", "NoValue")].value == "None"
     assert by_key[("Display", "Theme")].value == "Dark"
     assert by_key[("Shutdown", "Script")].value == "cleanup.cmd"
 
@@ -67,7 +58,7 @@ def test_ini_missing_path_logs_error(target_ini: Target, caplog: pytest.LogCaptu
 
 def test_ini_parses_utf16_encoded_file(target_ini: Target) -> None:
     """Test parsing UTF-16 encoded INI files."""
-    records = list(target_ini.ini("/etc/config/sub/utf16.ini"))
+    records = list(target_ini.ini("/etc/config/utf16.ini"))
 
     assert len(records) == 2
     by_key = {(record.section, record.key): record for record in records}
