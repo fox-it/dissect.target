@@ -116,7 +116,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     self.logfiles.add((logfile, user_details))
 
     def check_compatible(self) -> None:
-        if not len(self.logfiles) and not len(self.incoming_logfiles):
+        if not self.logfiles and not self.incoming_logfiles:
             raise UnsupportedPluginError("No Teamviewer logs found on target")
 
     @export(record=RemoteAccessLogRecord)
