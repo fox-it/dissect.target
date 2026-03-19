@@ -46,7 +46,7 @@ def configure_logging(verbose_value: int, be_quiet: bool, as_plain_text: bool = 
     """
     styles = structlog.dev.ConsoleRenderer.get_default_level_styles()
     renderer = (
-        structlog.dev.ConsoleRenderer(colors=True, pad_event=10, level_styles=styles)
+        structlog.dev.ConsoleRenderer(colors=True, pad_event_to=10, level_styles=styles)
         if as_plain_text
         else structlog.processors.JSONRenderer(sort_keys=True)
     )

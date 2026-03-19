@@ -49,20 +49,6 @@ RE_START = re.compile(
 )
 
 
-TeamviewerIncomingRecord = TargetRecordDescriptor(
-    "remoteaccess/teamviewer/incoming",
-    [
-        ("datetime", "ts"),
-        ("datetime", "end"),
-        ("string", "remote_id"),
-        ("string", "name"),
-        ("string", "user"),
-        ("string", "connection_type"),
-        ("string", "connection_id"),
-    ],
-)
-
-
 class TeamViewerPlugin(RemoteAccessPlugin):
     """TeamViewer client plugin.
 
@@ -91,7 +77,20 @@ class TeamViewerPlugin(RemoteAccessPlugin):
     )
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/teamviewer/log", GENERIC_LOG_RECORD_FIELDS
+        "application/remoteaccess/teamviewer/log", GENERIC_LOG_RECORD_FIELDS
+    )
+
+    IncomingConnectionRecord = TargetRecordDescriptor(
+        "application/remoteaccess/teamviewer/connection/incoming",
+        [
+            ("datetime", "ts"),
+            ("datetime", "end"),
+            ("string", "remote_id"),
+            ("string", "name"),
+            ("string", "user"),
+            ("string", "connection_type"),
+            ("string", "connection_id"),
+        ],
     )
 
     def __init__(self, target: Target):
@@ -217,8 +216,8 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     _user=user_details.user if user_details else None,
                 )
 
-    @export(record=TeamviewerIncomingRecord)
-    def incoming(self) -> Iterator[TeamviewerIncomingRecord]:
+    @export(record=IncomingConnectionRecord)
+    def incoming(self) -> Iterator[IncomingConnectionRecord]:
         """Yield TeamViewer incoming connection logs.
 
         TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a system.
@@ -251,7 +250,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                 connection_type = fields[5]
                 connection_id = fields[6]
 
-                yield TeamviewerIncomingRecord(
+                yield self.IncomingConnectionRecord(
                     ts=start,
                     end=end,
                     remote_id=remote_id,

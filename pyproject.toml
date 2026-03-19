@@ -36,7 +36,7 @@ dependencies = [
     "dissect.util>=3,<4",
     "dissect.volume>=3.17,<4",
     "flow.record>=3.22.dev10", #TODO: Update at release
-    "structlog",
+    "structlog>=25.5.0",
 ]
 dynamic = ["version"]
 
@@ -170,6 +170,7 @@ target-yara = "dissect.target.tools.yara:main"
 [tool.ruff]
 line-length = 120
 required-version = ">=0.13.1"
+extend-exclude = ["tests/_data/**"]
 
 [tool.ruff.format]
 docstring-code-format = true
