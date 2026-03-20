@@ -63,7 +63,9 @@ if TYPE_CHECKING:
 
     import dissect.target.filesystem as filesystem
 
-if sys.version_info >= (3, 13):
+if sys.version_info >= (3, 14):
+    from dissect.target.helpers.compat.path_314 import PureDissectPath, TargetPath
+elif sys.version_info >= (3, 13):
     from dissect.target.helpers.compat.path_313 import PureDissectPath, TargetPath
 elif sys.version_info >= (3, 12):
     from dissect.target.helpers.compat.path_312 import PureDissectPath, TargetPath
