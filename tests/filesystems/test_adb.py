@@ -26,11 +26,11 @@ def test_adb_filesystem(monkeypatch: pytest.MonkeyPatch) -> None:
 
         from dissect.target.filesystems.adb import AdbFilesystem
 
-        with pytest.raises(FilesystemError, match="Device does not support shell_v2 feature"):
+        with pytest.raises(FilesystemError, match="Device does not support 'shell_v2' feature"):
             fs = AdbFilesystem("127.0.0.1", 5037, None, "linux")
 
         mock_device.get_features.return_value = "shell_v2"
-        with pytest.raises(FilesystemError, match="Device with serial unknown-serial not found"):
+        with pytest.raises(FilesystemError, match="Device with serial 'unknown-serial' not found"):
             fs = AdbFilesystem("127.0.0.1", 5037, "unknown-serial", "linux")
 
         fs = AdbFilesystem("127.0.0.1", 5037, None, "linux")

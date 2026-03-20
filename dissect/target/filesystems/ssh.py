@@ -5,15 +5,19 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 from dissect.util.stream import AlignedStream
 
 from dissect.target import exceptions
-from dissect.target.filesystems.shell import Dialect, ShellFilesystem, ShellFilesystemEntry, ttl_cache
+from dissect.target.filesystems.shell import Dialect, ShellFilesystem, ttl_cache
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
+    from paramiko import SFTPAttributes, SFTPFile
+
+    from dissect.target.filesystems.shell import ShellFilesystemEntry
+
 
 try:
-    from paramiko import AutoAddPolicy, SFTPAttributes, SFTPFile, SSHClient, SSHException, Transport
+    from paramiko import AutoAddPolicy, SSHClient, SSHException, Transport
 
     class DissectTransport(Transport):
         _CLIENT_ID = "DISSECT"
@@ -97,8 +101,8 @@ class SshFilesystem(ShellFilesystem):
     def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on SshFilesystem class")
 
-    def execute(self, command: str) -> tuple[bytes, bytes]:
-        _, stdout, stderr = self.client.exec_command(command)
+    def execute(self, command: list[str]) -> tuple[bytes, bytes]:
+        _, stdout, stderr = self.client.exec_command(" ".join(command))
         return stdout.read(), stderr.read()
 
     def get(self, path: str) -> ShellFilesystemEntry:

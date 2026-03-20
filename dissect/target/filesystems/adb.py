@@ -35,14 +35,16 @@ class AdbFilesystem(ShellFilesystem):
         devices = self.client.list(extended=True)
 
         if serial is not None:
-            if (matching_device := next((d for d in devices if d.serial == serial), None)) is None:
-                raise FilesystemError(f"Device with serial {serial} not found")
+            if not any(d.serial == serial for d in devices):
+                raise FilesystemError(f"Device with serial {serial!r} not found")
         else:
             if not devices:
                 raise FilesystemError("No connected ADB devices found")
 
             if len(devices) > 1:
-                raise FilesystemError("Multiple ADB devices connected; please specify a serial")
+                raise FilesystemError(
+                    f"Multiple ADB devices connected; please specify a serial: ({', '.join(d.serial for d in devices)})"
+                )
 
             serial = devices[0].serial
 
@@ -50,9 +52,9 @@ class AdbFilesystem(ShellFilesystem):
 
         # Only shell_v2 seperates stdout and stderr
         if "shell_v2" not in self.device.get_features():
-            raise FilesystemError("Device does not support shell_v2 feature")
+            raise FilesystemError("Device does not support 'shell_v2' feature")
 
-        log.info("Connection established with %s", self.device.serial)
+        log.info("Connection established with: %s", self.device.serial)
 
         super().__init__(dialect, *args, **kwargs)
 
@@ -60,6 +62,6 @@ class AdbFilesystem(ShellFilesystem):
     def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on AdbFilesystem class")
 
-    def execute(self, command: str) -> tuple[bytes, bytes]:
+    def execute(self, command: list[str]) -> tuple[bytes, bytes]:
         ret = self.device.shell2(command, encoding=None, v2=True)
         return ret.stdout, ret.stderr

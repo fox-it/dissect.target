@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from urllib.parse import ParseResult, parse_qsl
+from urllib.parse import parse_qsl
 
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader, find_loader
@@ -12,6 +12,7 @@ from dissect.target.plugin import os_plugins
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from urllib.parse import ParseResult
 
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
