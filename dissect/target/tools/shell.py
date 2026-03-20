@@ -689,12 +689,12 @@ class TargetCli(TargetCmd):
         textlower = text.lower()
 
         suggestions = []
-        for fpath, fname in ls_scandir(path):
-            if not fname.lower().startswith(textlower):
+        for entry in ls_scandir(path):
+            if not entry.name.lower().startswith(textlower):
                 continue
 
             # Add a trailing slash to directories, to allow for easier traversal of the filesystem
-            suggestion = f"{fname}/" if fpath.is_dir() else fname
+            suggestion = f"{entry.name}/" if entry.path.is_dir() else entry.name
             suggestions.append(suggestion)
         return suggestions
 
@@ -830,6 +830,8 @@ class TargetCli(TargetCmd):
     @arg("-R", "--recursive", action="store_true", help="recursively list subdirectories encountered")
     @arg("-c", action="store_true", dest="use_ctime", help="show time when file status was last changed")
     @arg("-u", action="store_true", dest="use_atime", help="show time of last access")
+    @arg("-t", action="store_true", dest="sort_by_time", help="sort by time, newest first")
+    @arg("-r", action="store_true", dest="reverse_sort", help="reverse sort order")
     @alias("l")
     @alias("dir")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -855,14 +857,16 @@ class TargetCli(TargetCmd):
             use_color = False
 
         print_ls(
-            path,
-            0,
-            stdout,
-            args.l,
-            args.human_readable,
-            args.recursive,
-            args.use_ctime,
-            args.use_atime,
+            path=path,
+            depth=0,
+            stdout=stdout,
+            long_listing=args.l,
+            human_readable=args.human_readable,
+            recursive=args.recursive,
+            use_ctime=args.use_ctime,
+            use_atime=args.use_atime,
+            sort_by_time=args.sort_by_time,
+            reverse_sort=args.reverse_sort,
             color=use_color,
         )
         return False
