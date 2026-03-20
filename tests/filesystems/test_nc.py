@@ -11,7 +11,7 @@ def test_nc_filesystem() -> None:
         mock_client = Mock()
 
         mock_socket.return_value = mock_socket
-        mock_socket.accept.return_value = (mock_client, ("10.69.69.10", 420))
+        mock_socket.accept.return_value = (mock_client, ("10.69.67.10", 420))
 
         queue = []
 
@@ -28,7 +28,7 @@ def test_nc_filesystem() -> None:
 
         queue.append(
             (
-                b"\necho -n 7ccb8c0925cb8818$((700)); (stat '/') 2> >(sed 's/^/4ea81111ab65e99a/;s/$/4ea81111ab65e99a/'); echo -n 7c0328cdc8edba2a$((700))\n",  # noqa: E501
+                b"\necho -n 7ccb8c0925cb8818$((700)); (stat /) 2> >(sed 's/^/4ea81111ab65e99a/;s/$/4ea81111ab65e99a/'); echo -n 7c0328cdc8edba2a$((700))\n",  # noqa: E501
                 b"7ccb8c0925cb8818700  File: /\n  Size: 254       \tBlocks: 0          IO Block: 4096   directory\nDevice: 0,38\tInode: 901167      Links: 1\nAccess: (0755/drwxr-xr-x)  Uid: (    0/    root)   Gid: (    0/    root)\nAccess: 2025-05-16 22:42:18.000000000 +0200\nModify: 2025-08-22 11:43:56.903048665 +0200\nChange: 2025-08-22 11:43:56.903048665 +0200\n Birth: 2025-05-19 13:58:46.909076358 +0200\n7c0328cdc8edba2a700",  # noqa: E501
             )
         )

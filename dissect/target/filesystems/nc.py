@@ -37,13 +37,14 @@ class NetcatListenerFilesystem(ShellFilesystem):
     def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on NetcatListenerFilesystem class")
 
-    def execute(self, command: str) -> tuple[bytes, bytes]:
+    def execute(self, command: list[str]) -> tuple[bytes, bytes]:
         n = random.randint(0, 1000)
         start_token = random.randbytes(8).hex()
         end_token = random.randbytes(8).hex()
         stderr_token = random.randbytes(8).hex()
 
         # Some shell magic to separate stdout and stderr
+        command = " ".join(command)
         command = f"({command}) 2> >(sed 's/^/{stderr_token}/;s/$/{stderr_token}/')"
         command = f"\necho -n {start_token}$(({n})); {command}; echo -n {end_token}$(({n}))\n"
 

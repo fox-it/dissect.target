@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shlex
 import stat
 import time
 from datetime import datetime, timezone
@@ -36,7 +37,9 @@ def ttl_cache(ttl: int = 60) -> Callable[[Callable[..., Any]], Callable[..., Any
         cache = {}
 
         def wrapper(*args, **kwargs) -> Any:
-            if (key := (args, frozenset(kwargs.items()))) in cache:
+            if (
+                key := (tuple(tuple(arg) if isinstance(arg, list) else arg for arg in args), frozenset(kwargs.items()))
+            ) in cache:
                 ts, result = cache[key]
                 if time.monotonic() - ts < ttl:
                     return result
@@ -94,13 +97,13 @@ class ShellFilesystem(Filesystem):
                 raise FilesystemError(f"Invalid dialect specified: {name}")
             if (obj := DIALECT_MAP[name](self)).detect():
                 return obj
-        raise FilesystemError(f"No compatible dialect found from {dialect}")
+        raise FilesystemError(f"No compatible dialect found from {list(dialect)}")
 
     @staticmethod
     def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on ShellFilesystem class")
 
-    def execute(self, command: str) -> tuple[bytes, bytes]:
+    def execute(self, command: list[str]) -> tuple[bytes, bytes]:
         """Execute a shell command and return its stdout and stderr streams.
 
         Args:
@@ -116,7 +119,7 @@ class ShellFilesystem(Filesystem):
         except FilesystemError:
             raise
         except Exception as e:
-            raise FilesystemError(f"Failed to get entry for {path}: {e}") from e
+            raise FilesystemError(f"Failed to get entry for {path!r}: {e}") from e
 
 
 class Dialect:
@@ -254,12 +257,12 @@ class LinuxDialect(Dialect):
         return DdStream(self.fs, path, size)
 
     def iterdir(self, path: str) -> Iterator[str]:
-        path = _escape_path(path)
-        stdout, stderr = self.fs.execute(f"find {path}/ -mindepth 1 -maxdepth 1 -print0")
+        path = shlex.quote(path)
+        stdout, stderr = self.fs.execute(["find", f"{path}/", "-mindepth", "1", "-maxdepth", "1", "-print0"])
 
         if not stdout and stderr:
             exc, msg = _stderr_to_exception(stderr.decode())
-            raise exc(f"Failed to list directory {path}: {msg}")
+            raise exc(f"Failed to list directory {path!r}: {msg}")
 
         for line in stdout.decode().split("\x00"):
             if not (line := line.strip()) or line in (".", ".."):
@@ -273,23 +276,23 @@ class LinuxDialect(Dialect):
             yield name, self.lstat(entry_path)
 
     def readlink(self, path: str) -> str:
-        path = _escape_path(path)
-        stdout, stderr = self.fs.execute(f"readlink -n {path}")
+        path = shlex.quote(path)
+        stdout, stderr = self.fs.execute(["readlink", "-n", path])
         if not stdout:
             exc, msg = _stderr_to_exception(stderr.decode())
-            raise exc(f"Failed to read symlink {path}: {msg}")
+            raise exc(f"Failed to read symlink {path!r}: {msg}")
         return stdout.decode().strip()
 
     def lstat(self, path: str) -> str:
-        path = _escape_path(path)
-        stdout, stderr = self.fs.execute(f"stat {path}")
+        path = shlex.quote(path)
+        stdout, stderr = self.fs.execute(["stat", path])
 
         if not stdout:
             exc, msg = _stderr_to_exception(stderr.decode())
-            raise exc(f"Failed to list directory {path}: {msg}")
+            raise exc(f"Failed to list directory {path!r}: {msg}")
 
         if not (match := RE_LINUX_STAT.match(stdout.decode())):
-            raise FilesystemError(f"Failed to parse stat output for {path}")
+            raise FilesystemError(f"Failed to parse stat output for {path!r}")
 
         return self._parse_stat(match)
 
@@ -351,8 +354,10 @@ class LinuxDialect(Dialect):
 
 
 class LinuxFastDialect(LinuxDialect):
-    """A faster Linux shell dialect, using a ``stat 'path'/*`` wildcard expansion trick to list directories and get
-    stat information in a single command."""
+    """A faster Linux shell dialect.
+
+    Uses a ``stat 'path'/*`` wildcard expansion trick to list directories and get stat information in a single command.
+    """
 
     __type__ = "linux-fast"
 
@@ -363,12 +368,12 @@ class LinuxFastDialect(LinuxDialect):
             return False
 
     def scandir(self, path: str) -> Iterator[tuple[str, fsutil.stat_result]]:
-        path = _escape_path(path)
-        stdout, stderr = self.fs.execute(f"stat {path}/*")
+        path = shlex.quote(path)
+        stdout, stderr = self.fs.execute(["stat", f"{path}/*"])
 
         if not stdout and stderr:
             exc, msg = _stderr_to_exception(stderr.decode())
-            raise exc(f"Failed to list directory {path}: {msg}")
+            raise exc(f"Failed to list directory {path!r}: {msg}")
 
         for match in RE_LINUX_STAT.finditer(stdout.decode()):
             filename = fsutil.basename(match.group("filename"), self.fs.alt_separator)
@@ -377,21 +382,16 @@ class LinuxFastDialect(LinuxDialect):
 
 def _blockdev_size(fs: ShellFilesystem, path: str) -> int:
     """Get the size of a block device using ``blockdev --getsize64``."""
-    path = _escape_path(path)
-    stdout, stderr = fs.execute(f"blockdev --getsize64 {path}")
+    path = shlex.quote(path)
+    stdout, stderr = fs.execute(["blockdev", "--getsize64", path])
     if not stdout:
         exc, msg = _stderr_to_exception(stderr.decode())
-        raise exc(f"Failed to get size of block device {path}: {msg}")
+        raise exc(f"Failed to get size of block device {path!r}: {msg}")
 
     try:
         return int(stdout.decode().strip())
     except ValueError as e:
-        raise FilesystemError(f"Invalid size for block device {path}: {e}") from e
-
-
-def _escape_path(path: str) -> str:
-    escaped = path.replace("'", "\\'")
-    return f"'{escaped}'"
+        raise FilesystemError(f"Invalid size for block device {path!r}: {e}") from e
 
 
 DIALECT_MAP: dict[str, type[Dialect]] = {
@@ -419,18 +419,18 @@ def _stderr_to_exception(stderr: str) -> tuple[type[FilesystemError], str]:
         return FilesystemError, "Unknown error"
 
     # Extract the error message from the stderr output
-    err_msg = stderr.strip().rsplit(":", 1)[-1].strip()
+    match err_msg := stderr.strip().rsplit(":", 1)[-1].strip():
+        case "No such file or directory":
+            return FileNotFoundError, err_msg
 
-    if err_msg == "No such file or directory":
-        return FileNotFoundError, err_msg
+        case "Not a directory":
+            return NotADirectoryError, err_msg
 
-    if err_msg == "Not a directory":
-        return NotADirectoryError, err_msg
+        case "Is a directory":
+            return IsADirectoryError, err_msg
 
-    if err_msg == "Is a directory":
-        return IsADirectoryError, err_msg
-
-    return FilesystemError, f"Filesystem error: {err_msg}"
+        case _:
+            return FilesystemError, f"Filesystem error: {err_msg}"
 
 
 class ShellDirEntry(DirEntry):
@@ -493,7 +493,7 @@ class ShellFilesystemEntry(FilesystemEntry):
             # Patch up the size if we can
             try:
                 self.entry.st_size = _blockdev_size(self.fs, self.path)
-            except Exception as e:
+            except FilesystemError as e:
                 log.info("Failed to get size of block device %r", self.path)
                 log.debug("", exc_info=e)
         return self.entry
@@ -504,14 +504,16 @@ class DdStream(AlignedStream):
 
     def __init__(self, fs: ShellFilesystem, path: str, size: int):
         self.fs = fs
-        self.path = _escape_path(path)
+        self.path = shlex.quote(path)
         super().__init__(size)
 
     def _read(self, offset: int, length: int) -> bytes:
         count = (length + self.align - 1) // self.align
         skip = offset // self.align
 
-        stdout, stderr = self.fs.execute(f"dd if={self.path} bs={self.align} skip={skip} count={count} status=none")
+        stdout, stderr = self.fs.execute(
+            ["dd", f"if={self.path}", f"bs={self.align}", f"skip={skip}", f"count={count}", "status=none"]
+        )
         if stderr:
             exc, msg = _stderr_to_exception(stderr.decode())
             raise exc(f"Failed to read from {self.path}: {msg}")
