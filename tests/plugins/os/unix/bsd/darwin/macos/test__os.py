@@ -4,8 +4,6 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
-from flow.record.fieldtypes import posix_path
-
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
@@ -39,7 +37,7 @@ def test_macos_os(target_macos_users: Target, fs_macos: VirtualFilesystem) -> No
     assert dissect_user._desc.name == "macos/user"
     assert dissect_user.name == "_dissect"
     assert dissect_user.passwd == "*"
-    assert dissect_user.home == posix_path("/Users/dissect")
+    assert str(dissect_user.home) == "/Users/dissect"
     assert dissect_user.shell == "/usr/bin/false"
     assert dissect_user.source == "/var/db/dslocal/nodes/Default/users/_dissect.plist"
 
