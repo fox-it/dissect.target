@@ -632,6 +632,41 @@ def test_benchmark_ls_bin(
 
     The source image is stored compressed in the test data directory to save space.
     Compressed size is 100kb and decompresses to 5mb.
+
+    How to reproduce the test image
+    ===============================
+
+    source: debian-live-13.3.0-amd64-standard.iso
+    sha256: ee2b3d5f9bc67d801eefeddbd5698efbb0b35358724b7ed3db461be3f5e7ecd6
+    extract /run/live/medium/filesystem.squashfs from the ISO
+    sha256 of filesystem.squashfs: 12a5feba804e23823917fa85a86814ec9953e2321c1bc4fc67c729d023ba115c
+
+    Extract walkfs for /bin so we can recreate the same file structure with sparse files.
+    Save some files from /etc to have some non-sparse files as well:
+
+        $ target-shell filesystem.squashfs
+        localhost.localdomain:/$ walkfs --walkfs-path /bin > /tmp/walkfs-bin.records
+        localhost.localdomain:/$ save -o /tmp/etc /etc/debian_version /etc/group /etc/hostname
+        localhost.localdomain:/$ save -o /tmp/etc /etc/hosts /etc/os-release /etc/passwd /etc/shadow
+
+    Create a raw image and format it with ext4, then mount it:
+
+        $ qemu-img create -f raw debian-trixie-bin-ext4.raw 5M
+        $ sudo qemu-nbd --connect=/dev/nbd0 debian-trixie-bin-ext4.raw -f raw
+        $ sudo mkfs.ext4 -m 0 /dev/nbd0
+        $ sudo mount /dev/nbd0 /mnt/debian-rw
+
+    Use a small Python script to recreate the files (sparse) from walkfs input, preserving permissions and timestamps
+    Copy the files from /etc to the mount:
+
+        $ python3 create-walkfs-sparse.py /tmp/walkfs-bin.records /mnt/debian-rw /tmp/etc
+
+    Finally, gzip the raw image to save space:
+
+        $ sync
+        $ sudo umount /mnt/debian-rw
+        $ sudo qemu-nbd --disconnect /dev/nbd0
+        $ gzip debian-trixie-bin-ext4.raw
     """
     with gzip.open(absolute_path("_data/filesystems/ext4/debian-trixie-bin-ext4.raw.gz"), "rb") as fh:
         raw_image = fh.read()
