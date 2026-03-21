@@ -617,9 +617,11 @@ def test_shell_prompt_tab_autocomplete() -> None:
         pytest.param("-l"),  # long listing
     ],
 )
+@pytest.mark.parametrize("warm_cache", [True, False], ids=["warm_cache", "cold_cache"])
 def test_benchmark_ls_bin(
     benchmark: BenchmarkFixture,
     args: str,
+    warm_cache: bool,
     capsys: pytest.CaptureFixture,
 ) -> None:
     """Benchmark ls command with different parameters with a /bin directory containing ~1000 files.
@@ -677,11 +679,13 @@ def test_benchmark_ls_bin(
     t.disks.add(container)
     t.apply()
 
-    def run_ls() -> None:
-        target_cli = TargetCli(t)
-        target_cli.onecmd(f"ls {args} /bin")
+    target_cli = TargetCli(t)
+    cmd = f"ls {args} /bin"
 
-    benchmark(run_ls)
+    if warm_cache:
+        target_cli.onecmd(cmd)
+
+    benchmark(target_cli.onecmd, cmd)
 
     out, err = capsys.readouterr()
     assert not err
