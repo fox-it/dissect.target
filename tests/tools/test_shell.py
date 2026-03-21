@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import os
 import pathlib
 import platform
@@ -13,7 +14,9 @@ from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
+from dissect.target.containers.raw import RawContainer
 from dissect.target.helpers.fsutil import TargetPath, normalize
+from dissect.target.target import Target
 from dissect.target.tools.shell import (
     DebugMode,
     ExtendedCmd,
@@ -31,7 +34,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from pathlib import Path
 
-    from dissect.target.target import Target
+    from pytest_benchmark.fixture import BenchmarkFixture
+
 
 try:
     import pexpect
@@ -603,3 +607,87 @@ def test_shell_prompt_tab_autocomplete() -> None:
         child.expect_exact("ubuntu:/$ ", timeout=5)
         child.sendline("exit")
         child.expect(pexpect.EOF, timeout=5)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "args",
+    [
+        pytest.param(""),  # no flags
+        pytest.param("-l"),  # long listing
+    ],
+)
+@pytest.mark.parametrize("warm_cache", [True, False], ids=["warm_cache", "cold_cache"])
+def test_benchmark_ls_bin(
+    benchmark: BenchmarkFixture,
+    args: str,
+    warm_cache: bool,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    """Benchmark ls command with different parameters with a /bin directory containing ~1000 files.
+
+    The image only contains a /bin directory with ~1000 files and an /etc directory with some configuration files.
+    The rest of the filesystem is not included.
+
+    The /bin files are all sparse (filled with zeros).
+    The files in /etc do contain data.
+
+    The source image is stored compressed in the test data directory to save space.
+    Compressed size is 100kb and decompresses to 5mb.
+
+    How to reproduce the test image
+    ===============================
+
+    source: debian-live-13.3.0-amd64-standard.iso
+    sha256: ee2b3d5f9bc67d801eefeddbd5698efbb0b35358724b7ed3db461be3f5e7ecd6
+    extract /run/live/medium/filesystem.squashfs from the ISO
+    sha256 of filesystem.squashfs: 12a5feba804e23823917fa85a86814ec9953e2321c1bc4fc67c729d023ba115c
+
+    Extract walkfs for /bin so we can recreate the same file structure with sparse files.
+    Save some files from /etc to have some non-sparse files as well:
+
+        $ target-shell filesystem.squashfs
+        localhost.localdomain:/$ walkfs --walkfs-path /bin > /tmp/walkfs-bin.records
+        localhost.localdomain:/$ save -o /tmp/etc /etc/debian_version /etc/group /etc/hostname
+        localhost.localdomain:/$ save -o /tmp/etc /etc/hosts /etc/os-release /etc/passwd /etc/shadow
+
+    Create a raw image and format it with ext4, then mount it:
+
+        $ qemu-img create -f raw debian-trixie-bin-ext4.raw 5M
+        $ sudo qemu-nbd --connect=/dev/nbd0 debian-trixie-bin-ext4.raw -f raw
+        $ sudo mkfs.ext4 -m 0 /dev/nbd0
+        $ sudo mount /dev/nbd0 /mnt/debian-rw
+
+    Use a small Python script to recreate the files (sparse) from walkfs input, preserving permissions and timestamps
+    Copy the files from /etc to the mount:
+
+        $ python3 create-walkfs-sparse.py /tmp/walkfs-bin.records /mnt/debian-rw /tmp/etc
+
+    Finally, gzip the raw image to save space:
+
+        $ sync
+        $ sudo umount /mnt/debian-rw
+        $ sudo qemu-nbd --disconnect /dev/nbd0
+        $ gzip debian-trixie-bin-ext4.raw
+    """
+    with gzip.open(absolute_path("_data/filesystems/ext4/debian-trixie-bin-ext4.raw.gz"), "rb") as fh:
+        raw_image = fh.read()
+
+    container = RawContainer(BytesIO(raw_image))
+
+    t = Target()
+    t.disks.add(container)
+    t.apply()
+
+    target_cli = TargetCli(t)
+    cmd = f"ls {args} /bin"
+
+    if warm_cache:
+        target_cli.onecmd(cmd)
+
+    benchmark(target_cli.onecmd, cmd)
+
+    out, err = capsys.readouterr()
+    assert not err
+    assert "bash" in out
+    assert "zgrep" in out
