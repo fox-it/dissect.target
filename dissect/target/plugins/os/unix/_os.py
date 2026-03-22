@@ -514,52 +514,50 @@ def parse_fstab(
         return
 
     with fstab.open("rt") as fstab_file:
-        fstab_data = fstab_file.readlines()
-
-    for line in fstab_data:
-        try:
-            entry = parse_fstab_entry(line)
-        except ValueError as e:
-            log.warning("Failed to parse fstab entry: %s", e)
-            continue
-
-        dev, mount_point, fs_type, options, _, _ = entry
-
-        if fs_type in SKIP_FS_TYPES:
-            log.warning("Skipped FS type: %s, %s, %s", fs_type, dev, mount_point)
-            continue
-
-        dev_id = None
-        volume_name = None
-        if dev.startswith(("/dev/mapper", "/dev/gpt")):
-            volume_name = dev.rsplit("/")[-1]
-        elif dev.startswith("/dev/disk/by-uuid"):
-            dev_id = dev.rsplit("/")[-1]
-        elif dev.startswith("/dev/") and dev.count("/") == 3:
-            # When composing a vg-lv name, LVM2 replaces hyphens with double hyphens in the vg and lv names
-            # Emulate that here when combining the vg and lv names
-            volume_name = "-".join(part.replace("-", "--") for part in dev.rsplit("/")[-2:])
-        elif dev.startswith("UUID="):
-            dev_id = dev.split("=")[1].strip('"')
-        elif dev.startswith("LABEL="):
-            volume_name = dev.split("=")[1].strip('"')
-        elif fs_type == "nfs":
-            # Put the nfs server address in dev_id and the root path in volume_name
-            dev_id, sep, volume_name = dev.partition(":")
-            if sep != ":":
-                log.warning("Invalid NFS mount: %s", dev)
-                continue
-        else:
-            log.warning("Unsupported mount device: %s %s", dev, mount_point)
-            continue
-
-        if mount_point == "/":
-            continue
-
-        if dev_id:
+        for line in fstab_file:
             try:
-                dev_id = uuid.UUID(dev_id)
-            except ValueError:
-                pass
+                entry = parse_fstab_entry(line)
+            except ValueError as e:
+                log.warning("Failed to parse fstab entry: %s", e)
+                continue
 
-        yield dev_id, volume_name, mount_point, fs_type, options
+            dev, mount_point, fs_type, options, _, _ = entry
+
+            if fs_type in SKIP_FS_TYPES:
+                log.warning("Skipped FS type: %s, %s, %s", fs_type, dev, mount_point)
+                continue
+
+            dev_id = None
+            volume_name = None
+            if dev.startswith(("/dev/mapper", "/dev/gpt")):
+                volume_name = dev.rsplit("/")[-1]
+            elif dev.startswith("/dev/disk/by-uuid"):
+                dev_id = dev.rsplit("/")[-1]
+            elif dev.startswith("/dev/") and dev.count("/") == 3:
+                # When composing a vg-lv name, LVM2 replaces hyphens with double hyphens in the vg and lv names
+                # Emulate that here when combining the vg and lv names
+                volume_name = "-".join(part.replace("-", "--") for part in dev.rsplit("/")[-2:])
+            elif dev.startswith("UUID="):
+                dev_id = dev.split("=")[1].strip('"')
+            elif dev.startswith("LABEL="):
+                volume_name = dev.split("=")[1].strip('"')
+            elif fs_type == "nfs":
+                # Put the nfs server address in dev_id and the root path in volume_name
+                dev_id, sep, volume_name = dev.partition(":")
+                if sep != ":":
+                    log.warning("Invalid NFS mount: %s", dev)
+                    continue
+            else:
+                log.warning("Unsupported mount device: %s %s", dev, mount_point)
+                continue
+
+            if mount_point == "/":
+                continue
+
+            if dev_id:
+                try:
+                    dev_id = uuid.UUID(dev_id)
+                except ValueError:
+                    pass
+
+            yield dev_id, volume_name, mount_point, fs_type, options
