@@ -36,17 +36,18 @@ class ShadowPlugin(Plugin):
         self._resolve_files()
 
     def check_compatible(self) -> None:
-        if not self.USER_FILES:
-            raise UnsupportedPluginError("No shadow file found")
+        if not self.user_files:
+            raise UnsupportedPluginError("No shadow files found")
 
     def _resolve_files(self) -> None:
-        for file in self.target.fs.glob(self.GLOB_PATTERN):
+        for file in self.target.fs.glob(self.USER_FILE_GLOB):
             self.user_files.add(file)
 
     @export(record=OSXShadowRecord)
     def passwords(self) -> Iterator[OSXShadowRecord]:
         """Yield shadow records from OS X user plist files."""
-        for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
+        for path in self.user_files:
+            path = self.target.fs.path(path)
             user = plistlib.load(path.open())
             if user.get("ShadowHashData") is None:
                 continue

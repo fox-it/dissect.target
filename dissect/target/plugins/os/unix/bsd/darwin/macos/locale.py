@@ -12,7 +12,6 @@ from dissect.target.plugin import export
 from dissect.target.plugins.os.default.locale import LocalePlugin
 
 if TYPE_CHECKING:
-
     from dissect.target.target import Target
 
 WindowsKeyboardRecord = TargetRecordDescriptor(
@@ -46,7 +45,7 @@ class OSXLocalePlugin(LocalePlugin):
         for entry in tz_data:
             try:
                 tz = ZoneInfo(entry).key
-            except ZoneInfoNotFoundError:
+            except ZoneInfoNotFoundError:  # noqa: PERF203
                 continue
 
         return tz
@@ -54,8 +53,6 @@ class OSXLocalePlugin(LocalePlugin):
     @export(property=True)
     def language(self) -> str | None:
         """Get a list of installed languages on the system."""
-        # HKCU\\Control Panel\\International\\User Profile" Languages
-
         preferences = plistlib.load(self.target.fs.path(self.GLOBAL).open())
         languages = preferences["AppleLanguages"]
         clean_languages = []
