@@ -30,17 +30,17 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 DockerContainerRecord = TargetRecordDescriptor(
-    "apps/containers/docker/container",
+    "application/container/docker/container",
     COMMON_CONTAINER_FIELDS,
 )
 
 DockerImageRecord = TargetRecordDescriptor(
-    "apps/containers/docker/image",
+    "application/container/docker/image",
     COMMON_IMAGE_FIELDS,
 )
 
 DockerLogRecord = TargetRecordDescriptor(
-    "apps/containers/docker/log",
+    "application/container/docker/log",
     COMMON_LOG_FIELDS,
 )
 

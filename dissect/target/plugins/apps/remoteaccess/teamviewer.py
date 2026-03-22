@@ -49,20 +49,6 @@ RE_START = re.compile(
 )
 
 
-TeamviewerIncomingRecord = TargetRecordDescriptor(
-    "remoteaccess/teamviewer/incoming",
-    [
-        ("datetime", "ts"),
-        ("datetime", "end"),
-        ("string", "remote_id"),
-        ("string", "name"),
-        ("string", "user"),
-        ("string", "connection_type"),
-        ("string", "connection_id"),
-    ],
-)
-
-
 class TeamViewerPlugin(RemoteAccessPlugin):
     """TeamViewer client plugin.
 
@@ -91,7 +77,20 @@ class TeamViewerPlugin(RemoteAccessPlugin):
     )
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/teamviewer/log", GENERIC_LOG_RECORD_FIELDS
+        "application/remoteaccess/teamviewer/log", GENERIC_LOG_RECORD_FIELDS
+    )
+
+    IncomingConnectionRecord = TargetRecordDescriptor(
+        "application/remoteaccess/teamviewer/connection/incoming",
+        [
+            ("datetime", "ts"),
+            ("datetime", "end"),
+            ("string", "remote_id"),
+            ("string", "name"),
+            ("string", "user"),
+            ("string", "connection_type"),
+            ("string", "connection_id"),
+        ],
     )
 
     def __init__(self, target: Target):
@@ -117,7 +116,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     self.logfiles.add((logfile, user_details))
 
     def check_compatible(self) -> None:
-        if not len(self.logfiles) and not len(self.incoming_logfiles):
+        if not self.logfiles and not self.incoming_logfiles:
             raise UnsupportedPluginError("No Teamviewer logs found on target")
 
     @export(record=RemoteAccessLogRecord)
@@ -132,6 +131,8 @@ class TeamViewerPlugin(RemoteAccessPlugin):
             logfile = self.target.fs.path(logfile)
 
             start_date = None
+            prev_timestamp = None
+            fold = 0
             for line in logfile.open("rt", errors="replace"):
                 if not (line := line.strip()) or line.startswith("# "):
                     continue
@@ -142,6 +143,18 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     except Exception as e:
                         self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
                         self.target.log.debug("", exc_info=e)
+                        # Unset start_date if it was already defined
+                        start_date = None
+
+                    fold = 0
+                    if start_date is None:
+                        continue
+
+                    # See whether the utcoffset with the two different timezones are the same
+                    target_start_date = start_date.replace(tzinfo=target_tz)
+                    if target_start_date.utcoffset() == start_date.utcoffset():
+                        # Adjust the start_date so it uses the timezone known to target throughout
+                        start_date = target_start_date
 
                     continue
 
@@ -178,13 +191,22 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     time += ".000000"
 
                 try:
-                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(
-                        tzinfo=start_date.tzinfo if start_date else target_tz
-                    )
+                    tz_info = start_date.tzinfo if start_date else target_tz
+                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(tzinfo=tz_info)
                 except Exception as e:
                     self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
                     self.target.log.debug("", exc_info=e)
-                    timestamp = 0
+                    timestamp = prev_timestamp or start_date
+
+                if timestamp and prev_timestamp and prev_timestamp > timestamp:
+                    # We might currently be in a grey area where the dst period ended.
+                    # replace the fold value of the timestamp
+                    fold = 1
+
+                if timestamp:
+                    timestamp = timestamp.replace(fold=fold)
+
+                prev_timestamp = timestamp
 
                 yield self.RemoteAccessLogRecord(
                     ts=timestamp,
@@ -194,8 +216,8 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     _user=user_details.user if user_details else None,
                 )
 
-    @export(record=TeamviewerIncomingRecord)
-    def incoming(self) -> Iterator[TeamviewerIncomingRecord]:
+    @export(record=IncomingConnectionRecord)
+    def incoming(self) -> Iterator[IncomingConnectionRecord]:
         """Yield TeamViewer incoming connection logs.
 
         TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a system.
@@ -228,7 +250,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                 connection_type = fields[5]
                 connection_id = fields[6]
 
-                yield TeamviewerIncomingRecord(
+                yield self.IncomingConnectionRecord(
                     ts=start,
                     end=end,
                     remote_id=remote_id,
@@ -248,6 +270,7 @@ def parse_start(line: str) -> datetime | None:
 
         Start: 2021/11/11 12:34:56
         Start: 2024/12/31 01:02:03.123 (UTC+2:00)
+        Start: 2025/01/01 12:28:41.436 (UTC)
     """
     if match := RE_START.search(line):
         dt = match.groupdict()
@@ -257,13 +280,21 @@ def parse_start(line: str) -> datetime | None:
             dt["time"] = dt["time"].rsplit(".")[0]
 
         # Format timezone, e.g. "UTC+2:00" to "UTC+0200"
-        if dt["timezone"]:
-            name, operator, amount = re.split(r"(\+|\-)", dt["timezone"])
-            amount = int(amount.replace(":", ""))
-            dt["timezone"] = f"{name}{operator}{amount:0>4d}"
+        if timezone := dt["timezone"]:
+            identifier = " %Z%z"
+            # Handle just UTC timezone
+            if timezone.lower() == "utc":
+                timezone = " UTC+00:00"
+            else:
+                name, operator, amount = re.split(r"(\+|\-)", timezone)
+                amount = int(amount.replace(":", ""))
+                timezone = f" {name}{operator}{amount:0>4d}"
+        else:
+            timezone = ""
+            identifier = ""
 
         return datetime.strptime(  # noqa: DTZ007
-            f"{dt['date']} {dt['time']}" + (f" {dt['timezone']}" if dt["timezone"] else ""),
-            "%Y/%m/%d %H:%M:%S" + (" %Z%z" if dt["timezone"] else ""),
+            f"{dt['date']} {dt['time']}{timezone}",
+            f"%Y/%m/%d %H:%M:%S{identifier}",
         )
     return None

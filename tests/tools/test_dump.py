@@ -107,7 +107,7 @@ def test_execute_pipeline(
         serialization_ext = SERIALIZERS[serialization]["ext"]
         compression_ext = COMPRESSION_TO_EXT[compression]
 
-        iis_sink_filename = f"filesystem_windows_iis_logs.{serialization_ext}"
+        iis_sink_filename = f"application_webserver_iis_log.{serialization_ext}"
         if compression_ext:
             iis_sink_filename += f".{compression_ext}"
 
@@ -200,7 +200,7 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
         assert (output_dir / target_name / "iis").exists()
 
         serialization_ext = SERIALIZERS[Serialization.JSONLINES]["ext"]
-        iis_sink_filename = f"filesystem_windows_iis_logs.{serialization_ext}"
+        iis_sink_filename = f"application_webserver_iis_log.{serialization_ext}"
 
         assert (output_dir / target_name / "iis" / iis_sink_filename).exists()
 
