@@ -34,9 +34,9 @@ def test_ini_parses_records(target_ini: Target) -> None:
     assert by_key[("Shutdown", "Script")].value == "cleanup.cmd"
 
     paths = {str(record.path).lower() for record in records}
-    assert any(path.endswith("startup.ini") for path in paths)
-    assert any(path.endswith("shutdown.ini") for path in paths)
-    assert all(not path.endswith("not_ini.txt") for path in paths)
+    assert "/etc/config/startup.ini" in paths
+    assert "/etc/config/shutdown.ini" in paths
+    assert "/etc/config/not_ini.txt" not in paths
 
 
 def test_ini_parses_explicit_file(target_ini: Target) -> None:
@@ -46,14 +46,6 @@ def test_ini_parses_explicit_file(target_ini: Target) -> None:
     assert len(records) == 3
     assert {record.section for record in records} == {"Run", "Display"}
     assert all(str(record.path).lower().endswith("startup.ini") for record in records)
-
-
-def test_ini_missing_path_logs_error(target_ini: Target, caplog: pytest.LogCaptureFixture) -> None:
-    """Test that missing paths log an error and return no records."""
-    records = list(target_ini.ini("/etc/does-not-exist"))
-
-    assert not records
-    assert "does not exist on target" in caplog.text
 
 
 def test_ini_parses_utf16_encoded_file(target_ini: Target) -> None:

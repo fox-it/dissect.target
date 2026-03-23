@@ -43,7 +43,7 @@ class IniPlugin(Plugin):
         but continues traversal.
 
         Args:
-            error: ''Exception'' the exception thrown during filesystem traversal.
+            error: ``Exception`` the exception thrown during filesystem traversal.
         """
         if isinstance(error, PermissionError):
             self.target.log.warning("Permission denied while scanning for ini files: %s", error)
@@ -60,7 +60,7 @@ class IniPlugin(Plugin):
         permission errors are encountered on individual directories.
 
         Args:
-            path: ''string'' of Target filesystem path to scan. Can be a file or directory.
+            path: ``string`` of Target filesystem path to scan. Can be a file or directory.
 
         Returns:
             Iterator yields ``TargetPath``
@@ -91,7 +91,7 @@ class IniPlugin(Plugin):
         key-value pair found.
 
         Args:
-            path: ''string'' of Target filesystem path to scan (default "/"). Can be a file or directory.
+            path: ``string`` of Target filesystem path to scan (default "/"). Can be a file or directory.
 
         Returns:
             Iterator yields ``IniRecord``: One record per key-value pair in discovered INI files.
@@ -131,10 +131,10 @@ def _parse_ini(ini_file_path: TargetPath) -> configutil.ConfigurationParser:
     retries using UTF-16 decoding
 
     Args:
-        ini_file_path: ''TargetPath'' to the INI file to parse.
+        ini_file_path: ``TargetPath`` to the INI file to parse.
 
     Returns:
-        ConfigurationParser: ''ConfigurationParser'' Parsed INI configuration object.
+        ConfigurationParser: ``ConfigurationParser`` Parsed INI configuration object.
     """
     try:
         return configutil.parse(ini_file_path, hint="ini")
