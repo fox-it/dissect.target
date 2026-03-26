@@ -140,7 +140,8 @@ def _parse_ini(ini_file_path: TargetPath) -> configutil.ConfigurationParser:
         return configutil.parse(ini_file_path, hint="ini")
     except (UnicodeDecodeError, ConfigurationParsingError):
         # Many Windows INI files are UTF-16
-        raw_data = ini_file_path.open("rb").read()
+        with ini_file_path.open("rb") as f:
+            raw_data = f.read()
         text_data = raw_data.decode("utf-16")
 
         parser = configutil.Ini()
