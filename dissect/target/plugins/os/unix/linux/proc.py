@@ -178,7 +178,7 @@ class FileDescriptor:
             return "unknown"
 
     @cached_property
-    def info(self)-> dict[str, str]:
+    def info(self) -> dict[str, str]:
         """Parsed key-value pairs from fdinfo."""
         data = {}
         if not self.info_path.exists():
