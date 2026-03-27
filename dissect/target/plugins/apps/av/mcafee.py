@@ -59,7 +59,7 @@ McAfeeAtpRemediationRecord = TargetRecordDescriptor(
     ],
 )
 
-re_cdata = re.compile(r"<!$begin:math:display$CDATA\\\[\(\.\*\?\)$end:math:display$\]>", flags=re.MULTILINE)
+re_cdata = re.compile(r"<!\[CDATA\[(.*?)\]\]>", flags=re.MULTILINE)
 re_strip_tags = re.compile(r"<[^!][^>]*>")
 
 
@@ -116,28 +116,25 @@ class McAfeePlugin(Plugin):
             for item in value:
                 yield from self._walk_dicts(item)
 
-    def _parse_atp_timestamp(self, value: Any):
-        if value in (None, ""):
+    def _parse_atp_timestamp(self, value: Any) -> datetime | None:
+        if not value:
             return None
 
-        if isinstance(value, (int, float)):
-            if value > 10_000_000_000:
-                value = value / 1000
-            try:
-                return from_unix(value)
-            except Exception:
-                return None
+        try:
+            # Force everything to an integer immediately
+            # This cleanly handles strings ("1609459200"), floats (1609459200.0), and ints
+            ts = int(value)
 
-        if isinstance(value, str) and value.isdigit():
-            value = int(value)
-            if value > 10_000_000_000:
-                value = value / 1000
-            try:
-                return from_unix(value)
-            except Exception:
-                return None
+            # Auto-detect magnitude based on digit length
+            if ts >= 10**15:  # 16+ digits: Microseconds
+                ts //= 1_000_000
+            elif ts >= 10**12:  # 13+ digits: Milliseconds
+                ts //= 1_000
 
-        return None
+            return from_unix(ts)
+        except (ValueError, TypeError, OverflowError):
+            # Catches bad strings ("invalid"), None types, or numbers too big for datetime
+            return None
 
     def _iter_remediation_entries(self, data: dict[str, Any]) -> Iterator[dict[str, Any]]:
         remediation = data.get("Remediation")
@@ -145,7 +142,8 @@ class McAfeePlugin(Plugin):
             return
 
         for item in self._walk_dicts(remediation):
-            if any(key in item for key in ("AlertID", "AlertId", "ThreatName", "DetectionName", "Action", "Status")):
+            # Strict filtering: Require an actual identifier to avoid junk records
+            if any(key in item for key in ("AlertID", "AlertId", "ThreatName", "DetectionName")):
                 yield item
 
     @export(record=McAfeeMscLogRecord)
