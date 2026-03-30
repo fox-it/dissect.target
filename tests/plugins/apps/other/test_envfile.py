@@ -12,11 +12,14 @@ if TYPE_CHECKING:
 
 
 def test_envfile(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    target_unix.add_plugin(EnvironmentFilePlugin)
+    """Test if we find and parse ``.env`` files correctly."""
     fs_unix.map_file("/root/foo.env", absolute_path("_data/plugins/apps/other/env/test.env"))
     fs_unix.map_file("/root/foo/bar/test.env", absolute_path("_data/plugins/apps/other/env/test.env"))
 
-    records = list(target_unix.envfile(env_path="/root"))
+    target_unix.rest_args = ["--path=/root"]
+    target_unix.add_plugin(EnvironmentFilePlugin)
+
+    records = list(target_unix.envfile())
 
     assert len(records) == 4 * 2
 

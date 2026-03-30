@@ -236,7 +236,7 @@ def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
     return target
 
 
-def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Target]:
+def open_targets(args: argparse.Namespace, *, apply: bool = True, rest: list[str] | None = None) -> Iterator[Target]:
     direct: bool = getattr(args, "direct", False) or getattr(args, "direct_sensitive", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
@@ -244,7 +244,7 @@ def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Ta
     targets: Iterable[Target] = (
         [Target.open_direct(args.targets, case_sensitive=getattr(args, "direct_sensitive", False))]
         if direct
-        else Target.open_all(args.targets, include_children=children, apply=apply)
+        else Target.open_all(args.targets, include_children=children, apply=apply, rest=rest)
     )
 
     for target in targets:
@@ -531,3 +531,13 @@ def find_and_filter_plugins(
 def escape_str(value: str) -> str:
     """Escape non-ASCII, unicode characters and bytes to a printable form."""
     return repr(value)[1:-1]
+
+
+class LenientNamespace(argparse.Namespace):
+    """:class:`argparse.Namespace` implementation with lienient attribute access."""
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return object.__getattribute__(self, name)
+        except AttributeError:
+            return None
