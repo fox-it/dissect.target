@@ -190,8 +190,7 @@ class CimPlugin(Plugin):
         """Yield consumer bindings from ``__filtertoconsumerbinding`` of all namespaces.
 
         Yields:
-            consumer_binding (Iterator[tuple[cim.Instance, str]]): An iterator of tuples containing
-                the consumer instance and its associated filter name.
+            consumer_filter_mapping (tuple[cim.Instance, str]): Containing the instance and its associated filter name.
         """
         try:
             for ns in self._iter_namespaces():
