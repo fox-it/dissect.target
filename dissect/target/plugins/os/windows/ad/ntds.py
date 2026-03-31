@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds import NTDS
 from dissect.database.ese.ntds.util import UserAccountControl
+from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 OBJECTS_FIELDS = [
     ("string", "cn"),
     ("string", "sid"),
+    ("varint", "rid"),
     ("string", "name"),
     ("string", "display_name"),
     ("string", "description"),
@@ -40,7 +42,6 @@ OBJECTS_FIELDS = [
 
 SECURITY_PRINCIPAL_FIELDS = [
     *OBJECTS_FIELDS,
-    ("varint", "rid"),
     ("string", "sam_name"),
     ("string", "sam_type"),
     ("boolean", "admin_count"),
@@ -95,6 +96,11 @@ NtdsComputerRecord = TargetRecordDescriptor(
         ("string", "operating_system_version"),
         ("string[]", "service_principal_name"),
         ("varint", "allowed_to_act"),
+        ("boolean", "has_laps"),
+        ("string", "legacy_laps"),
+        ("datetime", "legacy_laps_expiration"),
+        ("string", "windows_laps"),
+        ("datetime", "windows_laps_expiration"),
     ],
 )
 
@@ -111,6 +117,7 @@ NtdsDomainRecord = TargetRecordDescriptor(
     [
         *CONTAINER_FIELDS,
         ("uint32", "machine_account_quota"),
+        ("uint32", "behavior_version"),
     ],
 )
 
@@ -180,16 +187,65 @@ class NtdsPlugin(Plugin):
         """Extract all user accounts from the NTDS.dit database."""
         for user in self.ntds.users():
             yield NtdsUserRecord(
-                **extract_user_info(user, self.target),
+                **extract_account_info(user, self.target),
                 _target=self.target,
             )
+
+    @staticmethod
+    def extract_laps(computer: Computer) -> dict[str, Any]:
+        """Extract LAPS information from the NTDS.dit database.
+        LAPS information can be stored in multiple attributes depending on the Windows version and LAPS configuration.
+
+        Args:
+            computer (Computer): The computer object to extract LAPS information from.
+
+        Returns:
+            laps (dict[str, Any]): Dictionary containing LAPS information
+        """
+        has_laps = False
+        try:
+            legacy_laps = computer.get("ms-MCS-AdmPwd")
+            has_laps = True
+        except Exception:
+            legacy_laps = None
+
+        try:
+            windows_laps = computer.get("msLAPS-Password")
+            has_laps = True
+        except Exception:
+            windows_laps = None
+
+        try:
+            windows_laps = computer.get("msLAPS-EncryptedPassword")
+            has_laps = True
+        except Exception:
+            windows_laps = None
+
+        try:
+            windows_laps_expiration = wintimestamp(int(computer.get("msLAPS-PasswordExpirationTime")))
+        except Exception:
+            windows_laps_expiration = None
+
+        try:
+            legacy_laps_expiration = wintimestamp(int(computer.get("ms-MCS-AdmPwdExpirationTime")))
+        except Exception:
+            legacy_laps_expiration = None
+
+        return {
+            "has_laps": has_laps,
+            "legacy_laps": legacy_laps,
+            "legacy_laps_expiration": legacy_laps_expiration,
+            "windows_laps": windows_laps,
+            "windows_laps_expiration": windows_laps_expiration,
+        }
 
     @export(record=NtdsComputerRecord)
     def computers(self) -> Iterator[NtdsComputerRecord]:
         """Extract all computer accounts from the NTDS.dit database."""
         for computer in self.ntds.computers():
             yield NtdsComputerRecord(
-                **extract_user_info(computer, self.target),
+                **extract_account_info(computer, self.target),
+                **self.extract_laps(computer),
                 dns_hostname=computer.get("dNSHostName"),
                 operating_system=computer.get("operatingSystem"),
                 operating_system_version=computer.get("operatingSystemVersion"),
@@ -222,6 +278,7 @@ class NtdsPlugin(Plugin):
             yield NtdsDomainRecord(
                 **extract_container_info(domain),
                 machine_account_quota=domain.get("ms-DS-MachineAccountQuota"),
+                behavior_version=domain.get("msDS-Behavior-Version"),
                 _target=self.target,
             )
 
@@ -304,6 +361,7 @@ def extract_object_info(obj: Object) -> dict[str, Any]:
     return {
         "cn": obj.cn,
         "sid": obj.sid,
+        "rid": obj.rid,
         "name": obj.name,
         "display_name": obj.display_name,
         "description": obj.get("description"),
@@ -315,7 +373,7 @@ def extract_object_info(obj: Object) -> dict[str, Any]:
         "is_deleted": obj.is_deleted,
         "nt_security_descriptor": obj.get("nTSecurityDescriptor"),
         "parent_guid": str(parent.guid).upper(),
-        "parent_type": parent.object_category.capitalize(),
+        "parent_type": parent.object_category.capitalize() if parent.object_category else None,
     }
 
 
@@ -323,7 +381,6 @@ def extract_security_info(security_obj: SecurityObject) -> dict[str, Any]:
     """Extract generic information from a Security Object."""
     return {
         **extract_object_info(security_obj),
-        "rid": security_obj.rid,
         "sam_name": security_obj.sam_account_name,
         "sam_type": security_obj.get("sAMAccountType"),
         "admin_count": bool(security_obj.get("adminCount")),
@@ -339,9 +396,8 @@ def extract_container_info(container_object: OrganizationalUnit | DomainDNS) -> 
     }
 
 
-def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
+def extract_account_info(user: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
-
     if target.ad.ntds.pek.unlocked:
         decrypt_func = lambda encrypted_hash, rid: des_decrypt(encrypted_hash, rid).hex()  # noqa: E731
     else:
