@@ -305,7 +305,6 @@ class NtdsPlugin(Plugin):
     @export(output="yield")
     def secretsdump(self) -> Iterator[str]:
         """Extract credentials in secretsdump format. Because it's a popular format."""
-
         # Keep impacket defined constants in the method so we don't pollute our own
         kerberos_key_type = {
             1: "dec-cbc-crc",
