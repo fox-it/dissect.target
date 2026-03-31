@@ -143,7 +143,7 @@ def produce_target_func_pairs(
 
     for target in targets:
         for func_def in find_and_filter_plugins(state.functions, target, state.excluded_functions):
-            if state and (target.path, func_def.name) in pairs_to_skip:
+            if state and (str(target.path), func_def.name) in pairs_to_skip:
                 log.info(
                     "Skipping target/func pair since its marked as done in provided state",
                     target=target.path,
@@ -409,13 +409,14 @@ class DumpState:
         """Return sinks that have a mismatch between recorded size and a real file size."""
         invalid_sinks = []
         for sink in self.sinks:
+            full_sink_path = self.get_full_sink_path(sink)
             # sink file does not exist
-            if not self.get_full_sink_path(sink).exists():
+            if not full_sink_path.exists():
                 invalid_sinks.append(sink)
                 continue
 
             # recorded file size for a clean sink is incorrect
-            if not sink.is_dirty and sink.size_bytes != sink.path.stat().st_size:
+            if not sink.is_dirty and sink.size_bytes != full_sink_path.stat().st_size:
                 invalid_sinks.append(sink)
                 continue
 
