@@ -14,8 +14,10 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from cbc_sdk.live_response_api import LiveResponseSession
+
 try:
-    from cbc_sdk.live_response_api import LiveResponseError, LiveResponseSession
+    from cbc_sdk.live_response_api import LiveResponseError
 
     HAS_CARBON_BLACK = True
 except ImportError:

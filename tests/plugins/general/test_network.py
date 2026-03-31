@@ -10,9 +10,10 @@ from dissect.target.helpers.record import (
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
-from dissect.target.plugins.os.default.network import InterfaceRecord, NetworkPlugin
+from dissect.target.plugins.os.default.network import NetworkPlugin
 
 if TYPE_CHECKING:
+    from dissect.target.plugins.os.default.network import InterfaceRecord
     from dissect.target.target import Target
 
 

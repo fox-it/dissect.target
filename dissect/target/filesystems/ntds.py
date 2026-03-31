@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.database.ese import ESE
 from dissect.database.ese.c_ese import ulDAEMagic
-from dissect.database.ese.ntds import NTDS, Object
+from dissect.database.ese.ntds import NTDS
 
 from dissect.target.exceptions import FileNotFoundError, NotASymlinkError
 from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
@@ -14,6 +14,8 @@ from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.database.ese.ntds import Object
 
 
 class NtdsFilesystem(Filesystem):

@@ -9,6 +9,7 @@ import pytest
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.tools.fs import _extract_path, cp
 from dissect.target.tools.fs import main as target_fs
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,7 +38,9 @@ def test_target_fs(
     path: str, expected_files: int, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-fs", "tests/_data/tools/info/image.tar", "cp", path, "-o", str(tmp_path)])
+        m.setattr(
+            "sys.argv", ["target-fs", str(absolute_path("_data/tools/info/image.tar")), "cp", path, "-o", str(tmp_path)]
+        )
 
         target_fs()
         stdout, _ = capsys.readouterr()

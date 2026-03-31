@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.certificate import parse_x509
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
 # Reference: https://nginx/org/en/docs/http/ngx_http_log_module.html#log_format
@@ -146,7 +147,6 @@ class NginxPlugin(WebserverPlugin):
 
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
         """Parse the given NGINX ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
-
         seen = set() if seen is None else seen
 
         if path in seen:
@@ -304,7 +304,6 @@ class NginxPlugin(WebserverPlugin):
         References:
             - https://nginx.org/en/docs/http/ngx_http_core_module.html#server
         """
-
         for host_path in self.host_paths:
             server = {}
             seen_server_directive = False
@@ -390,7 +389,6 @@ def parse_json_line(line: str) -> dict[str, str] | None:
         - https://nginx.org/en/docs/http/ngx_http_log_module.html
         - https://github.com/elastic/examples/blob/master/Common%20Data%20Formats/nginx_json_logs/README.md
     """
-
     try:
         json_log = json.loads(line)
         return {

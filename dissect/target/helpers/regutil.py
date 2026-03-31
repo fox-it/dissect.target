@@ -867,7 +867,7 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
 
 
 def has_glob_magic(pattern: str) -> bool:
-    """Return whether ``pattern`` contains any glob patterns
+    """Return whether ``pattern`` contains any glob patterns.
 
     Args:
         pattern: The string to check on glob patterns.
@@ -879,7 +879,7 @@ def has_glob_magic(pattern: str) -> bool:
 
 
 def glob_split(pattern: str) -> tuple[str]:
-    """Split a key path with glob patterns on the first key path part with glob patterns
+    """Split a key path with glob patterns on the first key path part with glob patterns.
 
     Args:
         pattern: A key path with glob patterns to split.
@@ -899,7 +899,7 @@ def glob_split(pattern: str) -> tuple[str]:
 
 
 def glob_ext(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollection]:
-    """Yield all subkeys of ``key_collection`` that match the glob ``pattern``
+    """Yield all subkeys of ``key_collection`` that match the glob ``pattern``.
 
     Args:
         key_collection: The ``KeyCollection`` to start the path pattern glob matching on.
@@ -951,7 +951,7 @@ def glob_ext(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollect
 
 
 def glob_ext0(key_collection: KeyCollection, key_path: str) -> Iterator[KeyCollection]:
-    """Yield the subkey given by ``key_path`` relative to ``key_collection``
+    """Yield the subkey given by ``key_path`` relative to ``key_collection``.
 
     Args:
         key_collection: The ``KeyCollection`` to yield the subkey from.
@@ -967,7 +967,7 @@ def glob_ext0(key_collection: KeyCollection, key_path: str) -> Iterator[KeyColle
 
 
 def glob_ext1(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollection]:
-    """Yield all subkeys from ``key_collection`` which match the glob pattern ``pattern``
+    """Yield all subkeys from ``key_collection`` which match the glob pattern ``pattern``.
 
     Args:
         key_collection: The ``KeyCollection`` from which subkeys should be matched.
