@@ -396,8 +396,8 @@ class BloodHound(Plugin):
         for domain in self.target.ad.domains():
             yield {
                 **self.extract_container_info(domain),
-                "ChildObjects": [],
-                "Trusts": [],
+                "ChildObjects": [],  # TODO: Parse ntds.dit for trust information to populate this
+                "Trusts": [],  # TODO: Parse ntds.dit for trust information to populate this
                 "Links": self.parse_gplink_for_bloodhound(domain.gplink),
                 "GPOChanges": {  # TODO: Parse extra SYSVOL files for this
                     "LocalAdmins": [],
@@ -425,8 +425,8 @@ class BloodHound(Plugin):
                 "Members": group.members,
             }
 
-    def translate_ous(self) -> Iterator[dict[str, Any]]:
-        for ou in self.target.ad.ous():
+    def translate_organizational_units(self) -> Iterator[dict[str, Any]]:
+        for ou in self.target.ad.organizational_units():
             yield {
                 "ObjectIdentifier": ou.sid,
                 "Properties": {
@@ -439,8 +439,8 @@ class BloodHound(Plugin):
                 "Links": [],
             }
 
-    def translate_gpos(self) -> Iterator[dict[str, Any]]:
-        for gpo in self.target.ad.gpos():
+    def translate_group_policies(self) -> Iterator[dict[str, Any]]:
+        for gpo in self.target.ad.group_policies():
             yield {
                 "ObjectIdentifier": gpo.sid,
                 "Properties": {
