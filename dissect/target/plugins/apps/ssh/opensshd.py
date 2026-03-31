@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.configutil import parse
-from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.ssh.openssh import find_sshd_directory
 from dissect.target.plugins.apps.ssh.ssh import SSHPlugin
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
     from dissect.target.target import Target
+
 
 SSHD_BOOLEAN_VALUES = (
     "yes",
@@ -76,6 +77,14 @@ SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS = (
     "Port",
 )
 
+OpenSshdConfigRecord = TargetRecordDescriptor(
+    "application/ssh/opensshd/sshd_config",
+    [
+        ("datetime", "mtime"),
+        ("path", "source"),
+    ],
+)
+
 
 class SSHServerPlugin(SSHPlugin):
     """OpenSSHd server plugin."""
@@ -91,8 +100,8 @@ class SSHServerPlugin(SSHPlugin):
         if not self.sshd_config_path.exists():
             raise UnsupportedPluginError("No sshd config found")
 
-    @export(record=DynamicDescriptor(["datetime", "path"]))
-    def config(self) -> Iterator[DynamicDescriptor]:
+    @export(record=OpenSshdConfigRecord)
+    def config(self) -> Iterator[OpenSshdConfigRecord]:
         """Parse all fields in the SSH server config in /etc/ssh/sshd_config.
 
         This function parses each line (not starting with '#') as a key-value
@@ -112,11 +121,7 @@ class SSHServerPlugin(SSHPlugin):
             - https://github.com/openssh/openssh-portable
             - https://www.man7.org/linux/man-pages/man5/sshd_config.5.html
         """
-
-        record_fields = [
-            ("datetime", "mtime"),
-            ("path", "source"),
-        ]
+        record_fields = OpenSshdConfigRecord.target_fields
 
         # Parse sshd_config
         sshd_config = parse(
@@ -139,7 +144,7 @@ class SSHServerPlugin(SSHPlugin):
             config[key] = _value
             record_fields.append((_type, key))
 
-        yield TargetRecordDescriptor("application/openssh/sshd_config", record_fields)(
+        yield TargetRecordDescriptor(OpenSshdConfigRecord.name, record_fields)(
             mtime=self.sshd_config_path.stat().st_mtime, source=self.sshd_config_path, **config, _target=self.target
         )
 

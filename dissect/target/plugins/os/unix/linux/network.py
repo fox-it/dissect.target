@@ -277,7 +277,6 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 
     def _parse_virtual_networks(self) -> VlanIdByInterface:
         """Parse virtual network configurations from systemd network configuration files."""
-
         virtual_networks: VlanIdByInterface = {}
         for config_file in self._config_files(self.config_paths, "*.netdev"):
             try:
@@ -367,7 +366,6 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
         The optional brackets and port number make this hard to parse.
         See https://www.freedesktop.org/software/systemd/man/latest/systemd.network.html and search for DNS.
         """
-
         if match := self.dns_ip_patttern.search(address):
             return ip_address(match.group("withoutBrackets") or match.group("withBrackets"))
 
@@ -375,7 +373,6 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 
     def _parse_dhcp(self, value: str | None) -> DhcpConfig:
         """Parse DHCP value from systemd network configuration file to a named tuple (ipv4, ipv6)."""
-
         if value is None or value == "no":
             return self.DhcpConfig(ipv4=False, ipv6=False)
         if value == "yes":
@@ -403,7 +400,6 @@ class DhclientLeaseParser(LinuxNetworkConfigParser):
 
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
         """Parse network interfaces from dhclient DHCP ``.leases`` files."""
-
         # TODO: Add support for renew, rebind, expire events.
         for file in self._config_files(["/var/lib/dhclient/", "/var/lib/dhcp/"], "*.leases"):
             try:
@@ -547,7 +543,6 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         interfaces: dict[str, ProcConfigParser.ParserContext],
     ) -> None:
         """Correlate routes with local bound addresses."""
-
         for iface_name, route_ifaces in routes.items():
             iface = interfaces.setdefault(iface_name, ProcConfigParser.ParserContext(name=iface_name))
             for route_iface in route_ifaces:
@@ -611,11 +606,9 @@ class ProcConfigParser(LinuxNetworkConfigParser):
         return local_ips
 
     def _parse_proc_fib_trie(self) -> set[IPv4Address]:
-        """
-        Parse a fib_trie-like text and return a set of IPv4Address objects
+        """Parse a fib_trie-like text and return a set of IPv4Address objects
         for addresses ending in '/32 host LOCAL'.
         """
-
         try:
             with self._target.fs.path("/proc/net/fib_trie").open("r") as f:
                 lines = f.readlines()
@@ -696,7 +689,6 @@ class DhcpLease(NamedTuple):
 
 def parse_ubuntu_cloud_init_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
     """Parse DHCP lease information from Ubuntu cloud-init logs."""
-
     if not (match := re.search(r"Received dhcp lease on (\w*) for (\S+)", log_record.message)):
         return None
     name, interface = match.groups()
@@ -706,7 +698,6 @@ def parse_ubuntu_cloud_init_dhcp_lease(log_record: LogRecord) -> DhcpLease | Non
 
 def parse_networkd_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
     """Parse DHCP lease information from systemd-networkd."""
-
     if not (match := re.search(r"(\S+): DHCPv[4|6] address (\S+) via (\S+)", log_record.message)):
         return None
 
@@ -717,7 +708,6 @@ def parse_networkd_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
 
 def parse_network_manager_dhcp_lease_old(log_record: LogRecord) -> DhcpLease | None:
     """Parse DHCP lease information from NetworkManager logs old style."""
-
     # dhcp4 (eth0): option ip_address           => '10.13.37.1'
     if not (match := re.search(r"dhcp[46] \((\S+)\): option ip_address\s+=>\s+'(\S+)'", log_record.message)):
         return None
@@ -728,7 +718,6 @@ def parse_network_manager_dhcp_lease_old(log_record: LogRecord) -> DhcpLease | N
 
 def parse_network_manager_dhcp_lease_new(log_record: LogRecord) -> DhcpLease | None:
     """Parse DHCP lease information from NetworkManager logs new style."""
-
     # dhcp4 (eth0): state changed new lease, address=10.13.37.1
     if not (
         match := re.search(
@@ -743,8 +732,7 @@ def parse_network_manager_dhcp_lease_new(log_record: LogRecord) -> DhcpLease | N
 
 
 def parse_network_manager_centos_dhcp_lease(log_record: LogRecord) -> DhcpLease | None:
-    """Parse DHCP centos information"""
-
+    """Parse DHCP centos information."""
     if not (match := re.search(r"dhcp[46] \((\S+)\):\s+address\s+(\S+)", log_record.message)):
         return None
     name, interface = match.groups()
@@ -753,7 +741,6 @@ def parse_network_manager_centos_dhcp_lease(log_record: LogRecord) -> DhcpLease 
 
 def parse_debian_centos_dhclient_lease(log_record: LogRecord) -> DhcpLease | None:
     """Parse DHCP lease information from dhclient bound log lines."""
-
     if getattr(log_record, "service", None) != "dhclient":
         return None
 

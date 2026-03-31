@@ -1,14 +1,19 @@
-from collections.abc import Iterator
-from typing import ClassVar
+from __future__ import annotations
 
-from dissect.target import Target
+from typing import TYPE_CHECKING, ClassVar
+
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.everything.parser import (
     EverythingDB,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target import Target
+    from dissect.target.helpers.fsutil import TargetPath
 
 EverythingRecord = TargetRecordDescriptor(
     "windows/everything/record",
