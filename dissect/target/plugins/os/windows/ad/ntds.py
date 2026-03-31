@@ -350,15 +350,17 @@ def extract_container_info(container_object: OrganizationalUnit | DomainDNS) -> 
 def extract_account_info(user: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
     if target.ad.ntds.pek.unlocked:
-        decrypt_func = lambda encrypted_hash, rid: des_decrypt(encrypted_hash, rid).hex()  # noqa: E731
+        lm_hash = des_decrypt(lm_pwd, user.rid).hex() if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
+        nt_hash = des_decrypt(nt_pwd, user.rid).hex() if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
+
+        lm_history = [des_decrypt(lm, user.rid).hex() for lm in user.get("lmPwdHistory")]
+        nt_history = [des_decrypt(nt, user.rid).hex() for nt in user.get("ntPwdHistory")]
     else:
-        decrypt_func = lambda *args, **kwargs: None  # noqa: E731
+        lm_hash = None
+        nt_hash = None
 
-    lm_hash = decrypt_func(lm_pwd, user.rid) if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
-    nt_hash = decrypt_func(nt_pwd, user.rid) if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
-
-    lm_history = [decrypt_func(lm, user.rid) for lm in user.get("lmPwdHistory")]
-    nt_history = [decrypt_func(nt, user.rid) for nt in user.get("ntPwdHistory")]
+        lm_history = None
+        nt_history = None
 
     try:
         member_of = [group.distinguished_name for group in user.groups()]
