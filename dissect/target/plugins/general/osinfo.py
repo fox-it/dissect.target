@@ -28,7 +28,11 @@ class OSInfoPlugin(Plugin):
 
     @export(record=OSInfoRecord)
     def osinfo(self) -> Iterator[OSInfoRecord]:
-        """Yield one aggregated OS info record for the current target."""
+        """Yield one aggregated OS info record for the current target.
+
+        Returns:
+            Iterator yields ``OSInfoRecord`` containing a JSON-serialized string of all OS values.
+        """
         values = {}
 
         for os_func in self.target._os.__exports__:
