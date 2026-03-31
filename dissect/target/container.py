@@ -182,7 +182,6 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
         class_name: The class to load.
         internal: Whether it is an internal module or not.
     """
-
     if internal:
         module = f"{MODULE_PATH}.{module}"
 

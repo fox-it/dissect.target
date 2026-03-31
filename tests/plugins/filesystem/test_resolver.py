@@ -6,10 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import VirtualFile
 from dissect.target.plugins.filesystem.resolver import ResolverPlugin
 
 if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
 

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.regutil import RegistryKey
 
+
 NetworkHistoryRecord = TargetRecordDescriptor(
     "windows/registry/nethist",
     [

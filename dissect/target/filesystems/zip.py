@@ -15,7 +15,6 @@ from dissect.target.exceptions import (
     NotASymlinkError,
 )
 from dissect.target.filesystem import (
-    DirEntry,
     Filesystem,
     FilesystemEntry,
     VirtualDirectory,
@@ -26,6 +25,10 @@ from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.target.filesystem import (
+        DirEntry,
+    )
 
 
 log = get_logger(__name__)
