@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -20,16 +21,57 @@ if TYPE_CHECKING:
 
 
 # Standard BloodHound GUID Mappings
-BH_EXTENDED_RIGHTS = {
+ACL_EXTENDED_RIGHTS = {
     "00299570-246d-11d0-a768-00aa006e0529": "ForceChangePassword",
     "1131f6aa-9c07-11d1-f79f-00c04fc2dcd2": "DCSync",
     "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2": "DCSync",
     "89e95b76-ce4a-45c9-bbc6-5d6133112a4e": "DCSync",
 }
 
-BH_WRITE_PROPERTIES = {
+ACL_WRITE_PROPERTIES = {
     "bf9679c0-0de6-11d0-a285-00aa003049e2": "AddMember",
     "f3a64788-5306-11d1-a9c5-0000f80367c1": "AddAllowedToAct",
+}
+
+BEHAVIOR_VERSION_TO_FUNCTIONAL_LEVEL_MAP = {
+    0: "2000",
+    1: "2003 Interim",
+    2: "2003",
+    3: "2008",
+    4: "2008 R2",
+    5: "2012",
+    6: "2012 R2",
+    7: "2016",
+    10: "2025",
+}
+
+DOMAIN_HIGH_VALUE_RIDS = {
+    500,  # Administrator
+    502,  # krbtgt
+    512,  # Domain Admins
+    516,  # Domain Controllers
+    518,  # Schema Admins
+    519,  # Enterprise Admins
+    520,  # Group Policy Creator Owners
+    521,  # Read-only Domain Controllers
+    526,  # Key Admins
+    527,  # Enterprise Key Admins
+}
+
+# Built-in High-Value RIDs
+BUILTIN_HIGH_VALUE_RIDS = {
+    544,  # Administrators
+    548,  # Account Operators
+    549,  # Server Operators
+    550,  # Print Operators
+    551,  # Backup Operators
+}
+
+HIGH_VALUE_RIDS = {*DOMAIN_HIGH_VALUE_RIDS, *BUILTIN_HIGH_VALUE_RIDS}
+
+DEFAULT_GOP_POLICIES = {
+    "31B2F340-016D-11D2-945F-00C04FB984F9",  # Domain Policy
+    "6AC1786C-016F-11D2-945F-00C04FB984F9",  # DC Policy
 }
 
 
@@ -120,12 +162,12 @@ def extract_sd_data(ntds: NTDS, nt_security_descriptor: int | None) -> tuple[boo
 
             # ADS_RIGHT_DS_CONTROL_ACCESS (Extended Rights) - 0x00000100
             if mask & 0x00000100:
-                if guid_str in BH_EXTENDED_RIGHTS:
+                if guid_str in ACL_EXTENDED_RIGHTS:
                     aces.append(
                         {
                             "PrincipalSID": sid,
                             "PrincipalType": principal_type,
-                            "RightName": BH_EXTENDED_RIGHTS[guid_str],
+                            "RightName": ACL_EXTENDED_RIGHTS[guid_str],
                             "IsInherited": is_inherited,
                         }
                     )
@@ -141,12 +183,12 @@ def extract_sd_data(ntds: NTDS, nt_security_descriptor: int | None) -> tuple[boo
                     )
 
             # ADS_RIGHT_DS_WRITE_PROP (Write Property) - 0x00000020
-            if mask & 0x00000020 and guid_str in BH_WRITE_PROPERTIES:
+            if mask & 0x00000020 and guid_str in ACL_WRITE_PROPERTIES:
                 aces.append(
                     {
                         "PrincipalSID": sid,
                         "PrincipalType": principal_type,
-                        "RightName": BH_WRITE_PROPERTIES[guid_str],
+                        "RightName": ACL_WRITE_PROPERTIES[guid_str],
                         "IsInherited": is_inherited,
                     }
                 )
@@ -155,13 +197,34 @@ def extract_sd_data(ntds: NTDS, nt_security_descriptor: int | None) -> tuple[boo
 
 
 class BloodHound(Plugin):
+    def __init__(self, target):
+        super().__init__(target)
+        self.gp_link_pattern: re.Pattern = re.compile(r"\[LDAP://CN=({[A-Fa-f0-9\-]+}),.*?;(\d+)\]")
+
     def check_compatible(self) -> None:
         if not self.target.has_function("ad"):
             raise UnsupportedPluginError("ad plugin is not initialized")
 
     @staticmethod
     def extract_high_value(record: Record) -> str | None:
-        return record.admin_count.value or record.rid in (512, 516)
+        domain_check = False
+
+        domain_split: list[str] = record.domain.split(".")
+        distinguished_name_split: list[str] = record.distinguished_name.split(",")
+        for domain_component, dn_component in zip(domain_split, distinguished_name_split, strict=False):
+            domain_check = f"DC={domain_component.upper()}" == dn_component.upper()
+
+        rid_check = record.rid in HIGH_VALUE_RIDS
+
+        ou_check = record.name.upper() == "DOMAIN CONTROLLERS" and "organizationalUnit" in record.object_class
+
+        gpo_check = record.object_guid in DEFAULT_GOP_POLICIES
+
+        admin_check = False
+        if hasattr(record, "admin_count"):
+            admin_check = record.admin_count
+
+        return domain_check or rid_check or ou_check or gpo_check or admin_check
 
     @staticmethod
     def extract_domain_id(record: Record) -> str | None:
@@ -207,7 +270,7 @@ class BloodHound(Plugin):
         return {
             **self.extract_generic_properties(record),
             "samaccountname": record.sam_name,
-            "admincount": record.admin_count.value,
+            "admincount": record.admin_count,
             "sidhistory": record.sid_history,
         }
 
@@ -243,6 +306,17 @@ class BloodHound(Plugin):
             "sfupassword": None,
             "logonscript": record.logon_script,
             "serviceprincipalnames": record.service_principal_names,
+        }
+
+    def extract_container_info(self, record: Record) -> dict[str, Any]:
+        return {
+            **self.extract_generic_info(record),
+        }
+
+    def extract_container_properties(self, record: Record) -> dict[str, Any]:
+        return {
+            **self.extract_generic_properties(record),
+            "highvalue": self.extract_high_value(record),
         }
 
     def translate_users(self) -> Iterator[dict[str, Any]]:
@@ -285,20 +359,57 @@ class BloodHound(Plugin):
                 },
             }
 
+    def parse_gplink_for_bloodhound(self, gplink_string: str) -> list[dict[str, str | bool]]:
+        """Parses an Active Directory gPLink string and extracts the active GPO links
+        into a BloodHound-compatible dictionary format.
+
+        Args:
+            gplink_string (str): Raw gPLink string from an OU or domain record.
+
+        Returns:
+            bloodhound_links (list[dict[str, str | bool]]): List of dictionaries, each containing the GUID of the
+                linked GPO and whether it's enforced.
+        """
+        bloodhound_links = []
+
+        if not gplink_string:
+            return bloodhound_links
+
+        matches: list[str] = self.gp_link_pattern.findall(gplink_string)
+
+        for guid_string, options_str in matches:
+            options = int(options_str)
+
+            is_enforced = options == 2
+            is_disabled = options == 1
+
+            # BloodHound only tracks active links in its graph
+            if not is_disabled:
+                # Strip the curly braces and ensure it's uppercase for BloodHound standards
+                clean_guid = guid_string.strip("{}").upper()
+
+                bloodhound_links.append({"GUID": clean_guid, "IsEnforced": is_enforced})
+
+        return bloodhound_links
+
     def translate_domains(self) -> Iterator[dict[str, Any]]:
         for domain in self.target.ad.domains():
             yield {
-                "ObjectIdentifier": domain.sid,
-                "Properties": {
-                    "name": domain.name,
-                    "domain": domain.name,
-                    "distinguishedname": domain.distinguished_name,
-                    "description": domain.description,
-                },
-                "Aces": extract_sd_data(self.ntds, domain.nt_security_descriptor),
+                **self.extract_container_info(domain),
                 "ChildObjects": [],
                 "Trusts": [],
-                "Links": [],
+                "Links": self.parse_gplink_for_bloodhound(domain.gplink),
+                "GPOChanges": {  # TODO: Parse extra SYSVOL files for this
+                    "LocalAdmins": [],
+                    "RemoteDesktopUsers": [],
+                    "DcomUsers": [],
+                    "PSRemoteUsers": [],
+                    "AffectedComputers": [],
+                },
+                "Properties": {
+                    **self.extract_container_properties(domain),
+                    "functionallevel": BEHAVIOR_VERSION_TO_FUNCTIONAL_LEVEL_MAP.get(domain.behavior_version),
+                },
             }
 
     def translate_groups(self) -> Iterator[dict[str, Any]]:
@@ -348,7 +459,7 @@ class BloodHound(Plugin):
         TYPE_TO_FUNCTION_MAPPING = {
             "users": self.translate_users,
             "computers": self.translate_computers,
-            # "domains": self.translate_domains,
+            "domains": self.translate_domains,
             # "groups": self.translate_groups,
             # "ous": self.translate_ous,
             # "gpos": self.translate_gpos,
