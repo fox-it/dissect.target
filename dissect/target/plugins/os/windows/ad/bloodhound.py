@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from dissect.database.ese.ntds.sd import SecurityDescriptor
     from flow.record import Record
 
+    from dissect.target import Target
+
 
 # Standard BloodHound GUID Mappings
 ACL_EXTENDED_RIGHTS = {
@@ -197,7 +199,7 @@ def extract_sd_data(ntds: NTDS, nt_security_descriptor: int | None) -> tuple[boo
 
 
 class BloodHound(Plugin):
-    def __init__(self, target):
+    def __init__(self, target: Target) -> None:
         super().__init__(target)
         self.gp_link_pattern: re.Pattern = re.compile(r"\[LDAP://CN=({[A-Fa-f0-9\-]+}),.*?;(\d+)\]")
 
@@ -324,7 +326,7 @@ class BloodHound(Plugin):
         for user in self.target.ad.users():
             yield {
                 **self.extract_account_info(user),
-                "SPNTargets": user.service_principal_names,  # TODO: Verify this is correct for SPN targeting in BloodHound
+                "SPNTargets": user.service_principal_names,  # TODO: Verify this is correct for SPN targeting in BH
                 "Properties": {
                     **self.extract_account_properties(user),
                     "hasspn": bool(user.service_principal_names),
@@ -455,7 +457,6 @@ class BloodHound(Plugin):
     @export(output="none")
     def bloodhound(self, output_dir: Path) -> None:
         """Extract AD objects in BloodHound format and write them iteratively to disk."""
-
         TYPE_TO_FUNCTION_MAPPING = {
             "users": self.translate_users,
             "computers": self.translate_computers,
