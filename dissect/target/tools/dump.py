@@ -546,30 +546,14 @@ def get_nested_attr(obj: Any, nested_attr: str) -> Any:
     return functools.reduce(getattr, [obj, *parts])
 
 
-@functools.lru_cache(maxsize=DEST_DIR_CACHE_SIZE)
-def get_sink_dir_by_target(target: Target, function: FunctionDescriptor) -> Path:
-    func_first_name, _, _ = function.name.partition(".")
-    return Path(target.name) / func_first_name
-
-
-@functools.lru_cache(maxsize=DEST_DIR_CACHE_SIZE)
-def get_sink_dir_by_func(target: Target, function: FunctionDescriptor) -> Path:
-    func_first_name, _, _ = function.name.partition(".")
-    return Path(func_first_name) / target.name
-
-
-def slugify_descriptor_name(descriptor_name: str) -> str:
-    return descriptor_name.replace("/", "_")
-
-
 @functools.lru_cache(maxsize=DEST_FILENAME_CACHE_SIZE)
 def get_sink_filename(
-    record_descriptor: RecordDescriptor,
+    function_descriptor: FunctionDescriptor,
     serialization: Serialization,
     compression: Compression | None = None,
 ) -> str:
     """Return a sink filename for provided record descriptor, serialization and compression."""
-    record_type = slugify_descriptor_name(record_descriptor.name)
+    record_type = function_descriptor.name.replace(".", "_")
 
     serialization_details = SERIALIZERS[serialization]
     serialization_ext = serialization_details["ext"]
@@ -587,8 +571,8 @@ def get_relative_sink_path(
     element: RecordStreamElement, serialization: str, compression: Compression | None = None
 ) -> Path:
     """Return a sink path relative to an output directory."""
-    sink_dir = get_sink_dir_by_target(element.target, element.func)
-    sink_filename = get_sink_filename(element.record._desc, serialization, compression)
+    sink_dir = Path(element.target.name)
+    sink_filename = get_sink_filename(element.func, serialization, compression)
     return sink_dir / sink_filename
 
 
