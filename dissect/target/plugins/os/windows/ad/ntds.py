@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-OBJECTS_FIELDS = [
+OBJECT_FIELDS = [
     ("string", "cn"),
     ("string", "sid"),
     ("varint", "rid"),
@@ -41,7 +41,7 @@ OBJECTS_FIELDS = [
 ]
 
 SECURITY_PRINCIPAL_FIELDS = [
-    *OBJECTS_FIELDS,
+    *OBJECT_FIELDS,
     ("string", "sam_name"),
     ("string", "sam_type"),
     ("boolean", "admin_count"),
@@ -76,7 +76,7 @@ ACCOUNT_FIELDS = [
 ]
 
 CONTAINER_FIELDS = [
-    *OBJECTS_FIELDS,
+    *OBJECT_FIELDS,
     ("string", "gplink"),
 ]
 
@@ -191,61 +191,13 @@ class NtdsPlugin(Plugin):
                 _target=self.target,
             )
 
-    @staticmethod
-    def extract_laps(computer: Computer) -> dict[str, Any]:
-        """Extract LAPS information from the NTDS.dit database.
-        LAPS information can be stored in multiple attributes depending on the Windows version and LAPS configuration.
-
-        Args:
-            computer (Computer): The computer object to extract LAPS information from.
-
-        Returns:
-            laps (dict[str, Any]): Dictionary containing LAPS information
-        """
-        has_laps = False
-        try:
-            legacy_laps = computer.get("ms-MCS-AdmPwd")
-            has_laps = True
-        except Exception:
-            legacy_laps = None
-
-        try:
-            windows_laps = computer.get("msLAPS-Password")
-            has_laps = True
-        except Exception:
-            windows_laps = None
-
-        try:
-            windows_laps = computer.get("msLAPS-EncryptedPassword")
-            has_laps = True
-        except Exception:
-            windows_laps = None
-
-        try:
-            windows_laps_expiration = wintimestamp(int(computer.get("msLAPS-PasswordExpirationTime")))
-        except Exception:
-            windows_laps_expiration = None
-
-        try:
-            legacy_laps_expiration = wintimestamp(int(computer.get("ms-MCS-AdmPwdExpirationTime")))
-        except Exception:
-            legacy_laps_expiration = None
-
-        return {
-            "has_laps": has_laps,
-            "legacy_laps": legacy_laps,
-            "legacy_laps_expiration": legacy_laps_expiration,
-            "windows_laps": windows_laps,
-            "windows_laps_expiration": windows_laps_expiration,
-        }
-
     @export(record=NtdsComputerRecord)
     def computers(self) -> Iterator[NtdsComputerRecord]:
         """Extract all computer accounts from the NTDS.dit database."""
         for computer in self.ntds.computers():
             yield NtdsComputerRecord(
                 **extract_account_info(computer, self.target),
-                **self.extract_laps(computer),
+                **extract_laps(computer),
                 dns_hostname=computer.get("dNSHostName"),
                 operating_system=computer.get("operatingSystem"),
                 operating_system_version=computer.get("operatingSystemVersion"),
@@ -283,8 +235,8 @@ class NtdsPlugin(Plugin):
             )
 
     @export(record=NtdsOURecord)
-    def ous(self) -> Iterator[NtdsOURecord]:
-        """Extract all ou's from the NTDS.dit database."""
+    def organizational_units(self) -> Iterator[NtdsOURecord]:
+        """Extract all organizational units from the NTDS.dit database."""
         for ou in self.ntds.search(objectClass="organizationalUnit"):
             gp_options = ou.get("gPOptions")
             yield NtdsOURecord(
@@ -294,7 +246,7 @@ class NtdsPlugin(Plugin):
             )
 
     @export(record=NtdsGPORecord)
-    def gpos(self) -> Iterator[NtdsGPORecord]:
+    def group_policies(self) -> Iterator[NtdsGPORecord]:
         """Extract all group policy objects (GPO) NTDS.dit database."""
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
@@ -440,4 +392,52 @@ def extract_account_info(user: User | Computer, target: Target) -> dict[str, Any
         "home_directory": user.get("homeDirectory"),
         "logon_script": user.get("scriptPath"),
         "service_principal_names": user.get("servicePrincipalName"),
+    }
+
+
+def extract_laps(computer: Computer) -> dict[str, Any]:
+    """Extract LAPS information from the NTDS.dit database.
+    LAPS information can be stored in multiple attributes depending on the Windows version and LAPS configuration.
+
+    Args:
+        computer (Computer): The computer object to extract LAPS information from.
+
+    Returns:
+        laps (dict[str, Any]): Dictionary containing LAPS information
+    """
+    has_laps = False
+    try:
+        legacy_laps = computer.get("ms-MCS-AdmPwd")
+        has_laps = True
+    except Exception:
+        legacy_laps = None
+
+    try:
+        windows_laps = computer.get("msLAPS-Password")
+        has_laps = True
+    except Exception:
+        windows_laps = None
+
+    try:
+        windows_laps = computer.get("msLAPS-EncryptedPassword")
+        has_laps = True
+    except Exception:
+        windows_laps = None
+
+    try:
+        windows_laps_expiration = wintimestamp(int(computer.get("msLAPS-PasswordExpirationTime")))
+    except Exception:
+        windows_laps_expiration = None
+
+    try:
+        legacy_laps_expiration = wintimestamp(int(computer.get("ms-MCS-AdmPwdExpirationTime")))
+    except Exception:
+        legacy_laps_expiration = None
+
+    return {
+        "has_laps": has_laps,
+        "legacy_laps": legacy_laps,
+        "legacy_laps_expiration": legacy_laps_expiration,
+        "windows_laps": windows_laps,
+        "windows_laps_expiration": windows_laps_expiration,
     }
