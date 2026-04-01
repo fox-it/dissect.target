@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from functools import cache
+from uuid import UUID
+from functools import cache, cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -34,6 +35,15 @@ ACL_WRITE_PROPERTIES = {
     "bf9679c0-0de6-11d0-a285-00aa003049e2": "AddMember",
     "f3a64788-5306-11d1-a9c5-0000f80367c1": "AddAllowedToAct",
 }
+
+# Active Directory Trust Attribute Bitmasks
+TRUST_ATTRIBUTE_NON_TRANSITIVE = 0x0001
+TRUST_ATTRIBUTE_QUARANTINED_DOMAIN = 0x0004  # SID Filtering Enabled
+TRUST_ATTRIBUTE_FOREST_TRANSITIVE = 0x0008
+TRUST_ATTRIBUTE_WITHIN_FOREST = 0x0020
+
+TRUST_DIRECTION_MAP = {1: "Inbound", 2: "Outbound", 3: "Bidirectional"}
+TRUST_TYPE_MAP = {1: "External", 2: "Uplevel", 3: "External"}
 
 BEHAVIOR_VERSION_TO_FUNCTIONAL_LEVEL_MAP = {
     0: "2000",
@@ -75,6 +85,14 @@ DEFAULT_GOP_POLICIES = {
     "31B2F340-016D-11D2-945F-00C04FB984F9",  # Domain Policy
     "6AC1786C-016F-11D2-945F-00C04FB984F9",  # DC Policy
 }
+
+
+def trust_type_uplevel_to_actual_type(trust_attributes: int) -> str:
+    if trust_attributes & TRUST_ATTRIBUTE_WITHIN_FOREST:
+        return "ParentChild"
+    if trust_attributes & TRUST_ATTRIBUTE_FOREST_TRANSITIVE:
+        return "Forest"
+    return "External"
 
 
 @cache
@@ -198,6 +216,19 @@ def extract_sd_data(ntds: NTDS, nt_security_descriptor: int | None) -> tuple[boo
     return c_sd.SECURITY_DESCRIPTOR_CONTROL.SE_DACL_PROTECTED.name in sd.header.Control.name.split("|"), aces
 
 
+def extract_fqdn_from_dn(distinguished_name: str | None) -> str | None:
+    """Parses a Distinguished Name and returns the uppercase FQDN."""
+    if not distinguished_name:
+        return None
+
+    # Split the DN by commas and filter for parts that start with 'DC='
+    dc_parts = [
+        part.split("=", 1)[1] for part in distinguished_name.split(",") if part.strip().upper().startswith("DC=")
+    ]
+
+    return ".".join(dc_parts).lower()
+
+
 class BloodHound(Plugin):
     def __init__(self, target: Target) -> None:
         super().__init__(target)
@@ -211,7 +242,7 @@ class BloodHound(Plugin):
     def extract_high_value(record: Record) -> str | None:
         domain_check = False
 
-        domain_split: list[str] = record.domain.split(".")
+        domain_split: list[str] = extract_fqdn_from_dn(record.distinguished_name).split(".")
         distinguished_name_split: list[str] = record.distinguished_name.split(",")
         for domain_component, dn_component in zip(domain_split, distinguished_name_split, strict=False):
             domain_check = f"DC={domain_component.upper()}" == dn_component.upper()
@@ -227,6 +258,13 @@ class BloodHound(Plugin):
             admin_check = record.admin_count
 
         return domain_check or rid_check or ou_check or gpo_check or admin_check
+
+    def get_children(self, record: Record) -> list[dict[str, str]]:
+        parent_object = next(self.target.ad.ntds.search(DNT=record.dnt))
+        return [
+            {"ObjectIdentifier": str(child.guid), "ObjectType": child.object_category.capitalize()}
+            for child in parent_object.children()
+        ]
 
     @staticmethod
     def extract_domain_id(record: Record) -> str | None:
@@ -253,7 +291,7 @@ class BloodHound(Plugin):
 
     def extract_generic_properties(self, record: Record) -> dict[str, Any]:
         return {
-            "domain": record.domain,  # TODO: Make sure this is robust because it's not from ntds.dit
+            "domain": extract_fqdn_from_dn(record.distinguished_name),
             "name": record.name,
             "displayname": record.display_name,
             "distinguishedname": record.distinguished_name,
@@ -394,12 +432,59 @@ class BloodHound(Plugin):
 
         return bloodhound_links
 
+    @cached_property
+    def trusts(self) -> list[dict[str, str | dict[str, Any]]]:
+        trusts = []
+        for trusted_domain in self.target.ad.trusted_domains():
+            trust_type = TRUST_TYPE_MAP[trusted_domain.trust_type]
+            if trust_type == "Uplevel":
+                trust_type = trust_type_uplevel_to_actual_type(trusted_domain.trust_attributes)
+
+            trusts.append(
+                {
+                    "DistinguishedName": trusted_domain.distinguished_name,
+                    "Data": {
+                        "TargetDomainName": trusted_domain.trust_partner,
+                        "TargetDomainSid": trusted_domain.security_identifier,
+                        "TrustDirection": TRUST_DIRECTION_MAP[trusted_domain.trust_direction],
+                        "TrustType": trust_type,
+                        "IsTransitive": not bool(trusted_domain.trust_attributes & TRUST_ATTRIBUTE_NON_TRANSITIVE),
+                        "SidFilteringEnabled": bool(
+                            trusted_domain.trust_attributes & TRUST_ATTRIBUTE_QUARANTINED_DOMAIN
+                        ),
+                    },
+                }
+            )
+
+        return trusts
+
+    def get_trusts(self, domain: Record) -> list[dict[str, Any]]:
+        """Given a domain record, return a list of trusts in BloodHound format."""
+        current_domain_fqdn = extract_fqdn_from_dn(domain.distinguished_name)
+        domain_specific_trusts = []
+        for trust_item in self.trusts:
+            # Check if the trust belongs to this domain's System container
+            if not trust_item["DistinguishedName"].endswith(domain.distinguished_name):
+                continue
+
+            # Prevent Self-Looping Trusts
+            if trust_item["Data"]["TargetDomainName"] == current_domain_fqdn:
+                continue
+
+            domain_specific_trusts.append(trust_item["Data"])
+
+        return domain_specific_trusts
+
     def translate_domains(self) -> Iterator[dict[str, Any]]:
         for domain in self.target.ad.domains():
+            dn = domain.distinguished_name.lower()
+            if "dc=domaindnszones" in dn or "dc=forestdnszones" in dn:
+                continue
+
             yield {
                 **self.extract_container_info(domain),
-                "ChildObjects": [],  # TODO: Parse ntds.dit for trust information to populate this
-                "Trusts": [],  # TODO: Parse ntds.dit for trust information to populate this
+                "ChildObjects": self.get_children(domain),
+                "Trusts": self.get_trusts(domain),
                 "Links": self.parse_gplink_for_bloodhound(domain.gplink),
                 "GPOChanges": {  # TODO: Parse extra SYSVOL files for this
                     "LocalAdmins": [],
