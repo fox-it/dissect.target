@@ -17,7 +17,15 @@ from dissect.target.plugins.os.windows.sam import des_decrypt
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dissect.database.ese.ntds.objects import Computer, DomainDNS, Object, OrganizationalUnit, SecurityObject, User
+    from dissect.database.ese.ntds.objects import (
+        Computer,
+        DomainDNS,
+        Object,
+        OrganizationalUnit,
+        SecurityObject,
+        TrustedDomain,
+        User,
+    )
 
     from dissect.target.target import Target
 
@@ -26,6 +34,7 @@ OBJECT_FIELDS = [
     ("string", "cn"),
     ("string", "sid"),
     ("varint", "rid"),
+    ("varint", "dnt"),
     ("string", "name"),
     ("string", "display_name"),
     ("string", "description"),
@@ -118,6 +127,18 @@ NtdsDomainRecord = TargetRecordDescriptor(
         *CONTAINER_FIELDS,
         ("uint32", "machine_account_quota"),
         ("uint32", "behavior_version"),
+    ],
+)
+
+NtdsTrustedDomainRecord = TargetRecordDescriptor(
+    "windows/ad/trusted_domain",
+    [
+        *NtdsDomainRecord.target_fields,
+        ("string", "trust_partner"),
+        ("uint32", "trust_direction"),
+        ("uint32", "trust_type"),
+        ("uint32", "trust_attributes"),
+        ("string", "security_identifier"),
     ],
 )
 
@@ -228,9 +249,21 @@ class NtdsPlugin(Plugin):
         """Extract all domains from the NTDS.dit database."""
         for domain in self.ntds.search(objectClass="domainDNS"):
             yield NtdsDomainRecord(
-                **extract_container_info(domain),
-                machine_account_quota=domain.get("ms-DS-MachineAccountQuota"),
-                behavior_version=domain.get("msDS-Behavior-Version"),
+                **extract_domain_info(domain),
+                _target=self.target,
+            )
+
+    @export(record=NtdsTrustedDomainRecord)
+    def trusted_domains(self) -> Iterator[NtdsTrustedDomainRecord]:
+        """Extract all trusted domains from the NTDS.dit database."""
+        for trusted_domain in self.ntds.trusts():
+            yield NtdsTrustedDomainRecord(
+                **extract_domain_info(trusted_domain),
+                trust_partner=trusted_domain.get("trustPartner"),
+                trust_direction=trusted_domain.get("trustDirection"),
+                trust_type=trusted_domain.get("trustType"),
+                trust_attributes=trusted_domain.get("trustAttributes"),
+                security_identifier=trusted_domain.get("securityIdentifier"),
                 _target=self.target,
             )
 
@@ -313,6 +346,7 @@ def extract_object_info(obj: Object) -> dict[str, Any]:
         "cn": obj.cn,
         "sid": obj.sid,
         "rid": obj.rid,
+        "dnt": obj.dnt,
         "name": obj.name,
         "display_name": obj.display_name,
         "description": obj.get("description"),
@@ -339,11 +373,20 @@ def extract_security_info(security_obj: SecurityObject) -> dict[str, Any]:
     }
 
 
-def extract_container_info(container_object: OrganizationalUnit | DomainDNS) -> dict[str, Any]:
+def extract_container_info(container_object: OrganizationalUnit | DomainDNS | TrustedDomain) -> dict[str, Any]:
     """Extract generic information from a Container Object."""
     return {
         **extract_object_info(container_object),
         "gplink": container_object.get("gPLink"),
+    }
+
+
+def extract_domain_info(domain: DomainDNS | TrustedDomain) -> dict[str, Any]:
+    """Extract generic information from a domain Object."""
+    return {
+        **extract_container_info(domain),
+        "machine_account_quota": domain.get("ms-DS-MachineAccountQuota"),
+        "behavior_version": domain.get("msDS-Behavior-Version"),
     }
 
 

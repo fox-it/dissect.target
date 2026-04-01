@@ -98,14 +98,23 @@ def test_groups(target_win_ntds: Target) -> None:
     assert len(results) == 102
 
 
+def test_trusted_domains(target_win_ntds: Target) -> None:
+    """Tests if ``ad.trusted_domains`` outputs the correct amount of records and their content."""
+    results = list(target_win_ntds.ad.trusted_domains())
+
+    assert len(results) == 3
+    assert results[0].trust_partner == "north.sevenkingdoms.local"
+    assert results[0].security_identifier == "S-1-5-21-459184689-3312531310-188885708"
+
+
 def test_domains(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.domains())
 
     assert len(results) == 5
 
 
-def test_ous(target_win_ntds: Target) -> None:
-    results = list(target_win_ntds.ad.ous())
+def test_organizational_units(target_win_ntds: Target) -> None:
+    results = list(target_win_ntds.ad.organizational_units())
 
     assert len(results) == 10
 
