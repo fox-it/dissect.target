@@ -553,13 +553,13 @@ def get_sink_filename(
     serialization: Serialization,
     compression: Compression | None = None,
 ) -> str:
-    """Return a sink filename for provided record descriptor, serialization and compression."""
-    record_type = function_descriptor.name.replace(".", "_")
+    """Return a sink filename for provided function name, serialization and compression."""
+    function_name = function_descriptor.name.replace(".", "_")
 
     serialization_details = SERIALIZERS[serialization]
     serialization_ext = serialization_details["ext"]
 
-    parts = [record_type, serialization_ext]
+    parts = [function_name, serialization_ext]
 
     compression_ext = COMPRESSION_TO_EXT[compression]
     if compression_ext:
