@@ -35,6 +35,7 @@ OBJECT_FIELDS = [
     ("string", "sid"),
     ("varint", "rid"),
     ("varint", "dnt"),
+    ("varint", "pdnt"),
     ("string", "name"),
     ("string", "display_name"),
     ("string", "description"),
@@ -45,8 +46,6 @@ OBJECT_FIELDS = [
     ("datetime", "last_modified_time"),
     ("boolean", "is_deleted"),
     ("varint", "nt_security_descriptor"),
-    ("string", "parent_guid"),
-    ("string", "parent_type"),
 ]
 
 SECURITY_PRINCIPAL_FIELDS = [
@@ -341,12 +340,12 @@ class NtdsPlugin(Plugin):
 
 def extract_object_info(obj: Object) -> dict[str, Any]:
     """Extract generic information from an Object."""
-    parent = obj.parent()
     return {
         "cn": obj.cn,
         "sid": obj.sid,
         "rid": obj.rid,
         "dnt": obj.dnt,
+        "pdnt": obj.pdnt,
         "name": obj.name,
         "display_name": obj.display_name,
         "description": obj.get("description"),
@@ -357,8 +356,6 @@ def extract_object_info(obj: Object) -> dict[str, Any]:
         "last_modified_time": obj.when_changed,
         "is_deleted": obj.is_deleted,
         "nt_security_descriptor": obj.get("nTSecurityDescriptor"),
-        "parent_guid": str(parent.guid).upper(),
-        "parent_type": parent.object_category.capitalize() if parent.object_category else None,
     }
 
 
