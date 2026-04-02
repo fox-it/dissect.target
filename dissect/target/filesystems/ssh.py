@@ -140,7 +140,12 @@ class SftpDialect(Dialect):
         return self.sftp is not None
 
     def open(self, path: str, size: int) -> SftpStream:
-        return SftpStream(self.sftp.open(path, "r"), size)
+        try:
+            return SftpStream(self.sftp.open(path, "r"), size)
+        except FileNotFoundError as e:
+            raise exceptions.FileNotFoundError(path) from e
+        except IOError as e:
+            raise exceptions.FilesystemError(path) from e
 
     def iterdir(self, path: str) -> Iterator[str]:
         try:
