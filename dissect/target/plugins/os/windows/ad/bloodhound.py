@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import json
 import re
-from uuid import UUID
 from functools import cache, cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dissect.database.ese.ntds import NTDS
 from dissect.database.ese.ntds.c_sd import c_sd
 from dissect.database.ese.ntds.util import UserAccountControl
 
@@ -16,7 +14,7 @@ from dissect.target.plugin import Plugin, UnsupportedPluginError, arg, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dissect.database.ese.ntds import NTDS
+    from dissect.database.ese.ntds import NTDS, Object
     from dissect.database.ese.ntds.sd import SecurityDescriptor
     from flow.record import Record
 
@@ -259,12 +257,33 @@ class BloodHound(Plugin):
 
         return domain_check or rid_check or ou_check or gpo_check or admin_check
 
-    def get_children(self, record: Record) -> list[dict[str, str]]:
-        parent_object = next(self.target.ad.ntds.search(DNT=record.dnt))
-        return [
-            {"ObjectIdentifier": str(child.guid), "ObjectType": child.object_category.capitalize()}
-            for child in parent_object.children()
-        ]
+    def get_object_identifier(self, ad_object: Object | Record) -> str | None:
+        if ad_object.sid is None and ad_object.guid is None:
+            return None
+
+        return ad_object.sid if ad_object.sid else str(ad_object.guid)
+
+    def build_container_info(self, ad_object: Object) -> dict[str, str] | None:
+        object_id = self.get_object_identifier(ad_object)
+        if object_id is None:
+            return None
+
+        return {
+            "ObjectIdentifier": object_id,
+            "ObjectType": ad_object.object_category,
+        }
+
+    def extract_children_info(self, record: Record) -> list[dict[str, str]]:
+        current_object = next(self.target.ad.ntds.search(DNT=record.dnt))
+        return [self.build_container_info(child) for child in current_object.children()]
+
+    def extract_parent_info(self, record: Record) -> dict[str, str] | None:
+        if record.pdnt is None:
+            return None
+
+        parent_object = next(self.target.ad.ntds.search(DNT=record.pdnt))
+
+        return self.build_container_info(parent_object)
 
     @staticmethod
     def extract_domain_id(record: Record) -> str | None:
@@ -277,16 +296,12 @@ class BloodHound(Plugin):
     def extract_generic_info(self, record: Record) -> dict[str, Any]:
         is_acl_protected, aces = extract_sd_data(self.target.ad.ntds, record.nt_security_descriptor)
 
-        contained_by = None
-        if record.parent_guid and record.parent_type:
-            contained_by = {"ObjectIdentifier": record.parent_guid, "ObjectType": record.parent_type}
-
         return {
-            "ObjectIdentifier": record.sid,
+            "ObjectIdentifier": self.get_object_identifier(record),
             "IsDeleted": record.is_deleted.value,
             "IsACLProtected": is_acl_protected,
             "Aces": aces,
-            "ContainedBy": contained_by,
+            "ContainedBy": self.extract_parent_info(record),
         }
 
     def extract_generic_properties(self, record: Record) -> dict[str, Any]:
@@ -483,7 +498,7 @@ class BloodHound(Plugin):
 
             yield {
                 **self.extract_container_info(domain),
-                "ChildObjects": self.get_children(domain),
+                "ChildObjects": self.extract_children_info(domain),
                 "Trusts": self.get_trusts(domain),
                 "Links": self.parse_gplink_for_bloodhound(domain.gplink),
                 "GPOChanges": {  # TODO: Parse extra SYSVOL files for this
