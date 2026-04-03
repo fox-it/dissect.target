@@ -1105,7 +1105,7 @@ class TargetCli(TargetCmd):
                     add_to_tar(
                         tar,
                         child,
-                        str(Path(arcname) / child.name),
+                        str(self.target.fs.path(arcname) / child.name),
                         dereference=dereference,
                         inodes=inodes,
                     )
