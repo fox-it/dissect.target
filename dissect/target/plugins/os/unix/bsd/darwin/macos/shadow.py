@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 
     from dissect.target import Target
 
-OSXShadowRecord = TargetRecordDescriptor(
-    "osx/shadow",
+macOSShadowRecord = TargetRecordDescriptor(
+    "macos/shadow",
     [
         ("string", "name"),
         ("string", "hash"),
@@ -43,9 +43,9 @@ class ShadowPlugin(Plugin):
         for file in self.target.fs.glob(self.USER_FILE_GLOB):
             self.user_files.add(file)
 
-    @export(record=OSXShadowRecord)
-    def passwords(self) -> Iterator[OSXShadowRecord]:
-        """Yield shadow records from OS X user plist files."""
+    @export(record=macOSShadowRecord)
+    def passwords(self) -> Iterator[macOSShadowRecord]:
+        """Yield shadow records from macOS user plist files."""
         for path in self.user_files:
             path = self.target.fs.path(path)
             user = plistlib.load(path.open())
@@ -63,7 +63,7 @@ class ShadowPlugin(Plugin):
                 salt = shadow[key]["salt"].hex()
                 iterations = shadow[key]["iterations"]
 
-                yield OSXShadowRecord(
+                yield macOSShadowRecord(
                     name=username,
                     hash=hash,
                     salt=salt,

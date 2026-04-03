@@ -15,17 +15,16 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-# Do we call it macos or osx?
-OSXInstallLogRecord = TargetRecordDescriptor(
-    "osx/system",
+macOSSystemLogRecord = TargetRecordDescriptor(
+    "macos/system",
     [("datetime", "ts"), ("string", "host"), ("string", "component"), ("string", "message"), ("path", "source")],
 )
 
 RE_TIMESTAMP_PATTERN = re.compile(r"^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}")
 
 
-class SystemLog(Plugin):
-    """Return information related software installations and updates on OS X.
+class SystemLogPlugin(Plugin):
+    """Return information related software installations and updates on macOS.
 
     References:
         - https://sansorg.egnyte.com/dl/m9ftGF7heI
@@ -46,11 +45,11 @@ class SystemLog(Plugin):
         for file in self.target.fs.glob(self.SYSTEM_LOG_GLOB):
             self.log_files.add(file)
 
-    @export(record=OSXInstallLogRecord)
-    def systemlog(self) -> Iterator[OSXInstallLogRecord]:
-        """Return all OS X install log messages.
+    @export(record=macOSSystemLogRecord)
+    def systemlog(self) -> Iterator[macOSSystemLogRecord]:
+        """Return all macOS install log messages.
 
-        Yields OSXInstallLogRecord instances with fields:
+        Yields macOSSystemLogRecord instances with fields:
 
         .. code-block:: text
 
@@ -80,12 +79,12 @@ class SystemLog(Plugin):
                         asdf = current_buf[len(current_ts.group()) + 1 :]
                         hostname, component, message = asdf.split(" ", 2)
 
-                        yield OSXInstallLogRecord(
-                            ts=self.parse_timestamp(current_ts),
+                        yield macOSSystemLogRecord(
+                            ts=parse_timestamp(current_ts),
                             host=hostname.strip(),
                             component=component.strip(),
                             message=message.strip(),
-                            source=filepath,
+                            source=filepath,  # What benefit does this field have???
                             _target=self.target,
                         )
 
@@ -99,12 +98,12 @@ class SystemLog(Plugin):
                 asdf = current_buf[len(current_ts.group()) + 1 :]
                 hostname, component, message = asdf.split(" ", 2)
 
-                yield OSXInstallLogRecord(
-                    ts=self.parse_timestamp(current_ts),
+                yield macOSSystemLogRecord(
+                    ts=parse_timestamp(current_ts),
                     host=hostname.strip(),
                     component=component.strip(),
                     message=message.strip(),
-                    source=filepath,
+                    source=filepath,  # What benefit does this field have???
                     _target=self.target,
                 )
 

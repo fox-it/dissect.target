@@ -13,9 +13,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-# Do we call it macos or osx?
-OSXInstallLogRecord = TargetRecordDescriptor(
-    "osx/install",
+macOSInstallLogRecord = TargetRecordDescriptor(
+    "macos/install",
     [
         ("datetime", "ts"),
         ("string", "host"),
@@ -33,8 +32,8 @@ RE_TIMESTAMP_PATTERN = re.compile(
 )
 
 
-class InstallLog(Plugin):
-    """Return information related software installations and updates on OS X.
+class InstallLogPlugin(Plugin):
+    """Return information related software installations and updates on macOS.
 
     References:
         - https://sansorg.egnyte.com/dl/m9ftGF7heI
@@ -49,11 +48,11 @@ class InstallLog(Plugin):
         if not self.target.fs.exists(self.INSTALL_LOG_PATH):
             raise UnsupportedPluginError("No install.log file found.")
 
-    @export(record=OSXInstallLogRecord)
-    def installlog(self) -> Iterator[OSXInstallLogRecord]:
-        """Return all OS X install log messages.
+    @export(record=macOSInstallLogRecord)
+    def installlog(self) -> Iterator[macOSInstallLogRecord]:
+        """Return all macOS install log messages.
 
-        Yields OSXInstallLogRecord instances with fields:
+        Yields macOSInstallLogRecord instances with fields:
 
         .. code-block:: text
 
@@ -80,7 +79,7 @@ class InstallLog(Plugin):
                     asdf = current_buf[len(current_ts.group()) + 1 :]
                     hostname, component, message = asdf.split(" ", 2)
 
-                    yield OSXInstallLogRecord(
+                    yield macOSInstallLogRecord(
                         ts=parse_timestamp(current_ts),
                         host=hostname.strip(),
                         component=component.strip(),
@@ -98,7 +97,7 @@ class InstallLog(Plugin):
             asdf = current_buf[len(current_ts.group()) + 1 :]
             hostname, component, message = asdf.split(" ", 2)
 
-            yield OSXInstallLogRecord(
+            yield macOSInstallLogRecord(
                 ts=parse_timestamp(current_ts),
                 host=hostname.strip(),
                 component=component.strip(),

@@ -23,7 +23,7 @@ WindowsKeyboardRecord = TargetRecordDescriptor(
 )
 
 
-class OSXLocalePlugin(LocalePlugin):
+class macOSLocalePlugin(LocalePlugin):
     """Windows locale plugin."""
 
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"

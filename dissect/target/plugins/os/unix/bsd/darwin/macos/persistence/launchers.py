@@ -14,23 +14,28 @@ if TYPE_CHECKING:
 
     from flow.record.base import Record
 
+    from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
 
 
-class UserPlugin(Plugin):
-    """macOS user plugin."""
+class LaunchersPlugin(Plugin):
+    """macOS launchers plugin."""
 
-    LAUNCH_AGENT_PATHS = (
+    SYSTEM_LAUNCH_AGENT_PATHS = (
         "/System/Library/LaunchAgents/*.plist",
         "/Library/LaunchAgents/*.plist",
-        "~/Library/LaunchAgents/*.plist",
     )
-    LAUNCH_DAEMON_PATHS = (
+
+    SYSTEM_LAUNCH_DAEMON_PATHS = (
         "/System/Library/LaunchDaemons/*.plist",
         "/Library/LaunchDaemons/*.plist",
     )
+
+    USER_LAUNCH_AGENT_PATHS = ("Library/LaunchAgents/*.plist",)
+
+    USER_LAUNCH_DAEMON_PATHS = ("Library/LaunchDaemons/*.plist",)
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -39,39 +44,72 @@ class UserPlugin(Plugin):
         self.launch_daemon_files = set()
         self._find_files()
 
+    def _build_userdirs(self, hist_paths: list[str]) -> set[tuple[UserDetails, Path]]:
+        """Join the selected browser dirs with the user home path.
+
+        Args:
+            hist_paths: A list with browser paths as strings.
+
+        Returns:
+            List of tuples containing user and unique file path objects.
+        """
+        users_dirs: set[tuple] = set()
+        for user_details in self.target.user_details.all_with_home():
+            for d in hist_paths:
+                home_dir: Path = user_details.home_path
+                for cur_dir in home_dir.glob(d):
+                    cur_dir = cur_dir.resolve()
+                    if cur_dir.exists():
+                        users_dirs.add((user_details, cur_dir))
+        return users_dirs
+
     def check_compatible(self) -> None:
-        if not (self.LAUNCH_AGENT_FILES or self.LAUNCH_DAEMON_FILES):
+        if not (self.launch_agent_files or self.launch_daemon_files):
             raise UnsupportedPluginError("No Agent or Deamon files found")
 
     def _find_files(self) -> None:
-        for glob in self.LAUNCH_AGENT_PATHS:
-            for path in self.target.fs.glob(glob):
+        # --- System-wide LaunchAgents ---
+        for pattern in self.SYSTEM_LAUNCH_AGENT_PATHS:
+            for path in self.target.fs.glob(pattern):
                 self.launch_agent_files.add(path)
 
-        for glob in self.LAUNCH_DAEMON_PATHS:
-            for path in self.target.fs.glob(glob):
+        # --- Per-user LaunchAgents ---
+        for _, path in self._build_userdirs(self.USER_LAUNCH_AGENT_PATHS):
+            self.launch_agent_files.add(path)
+
+        # --- System-wide LaunchDaemons ---
+        for pattern in self.SYSTEM_LAUNCH_DAEMON_PATHS:
+            for path in self.target.fs.glob(pattern):
                 self.launch_daemon_files.add(path)
+
+        # --- Per-user LaunchDaemons ---
+        for _, path in self._build_userdirs(self.USER_LAUNCH_DAEMON_PATHS):
+            self.launch_daemon_files.add(path)
 
     @export(record=DynamicDescriptor(["string"]))
     # @export(output="yield")
     def launch_agents(self) -> Iterator[DynamicDescriptor]:
-        """Yield OS X launch agent plist files."""
-        for file in self.LAUNCH_AGENT_FILES:
+        """Yield macOS launch agent plist files."""
+        for file in self.launch_agent_files:
             file = self.target.fs.path(file)
-            fh = file.open(mode="rb")
+            try:
+                fh = file.open(mode="rb")
+            except FileNotFoundError:
+                self.target.log.exception("LaunchAgent missing target: %s", {file})
+                continue
             try:
                 data = plistlib.load(fh)
                 flat_data = {}
                 extract_nested_dict(flat_data, data)
 
-                yield self._build_record("osx/launch_agent", flat_data, file)
+                yield self.build_record("macos/launch_agent", flat_data, file)
             except Exception:
                 self.target.log.exception("Failed to parse %s", file)
 
     @export(record=DynamicDescriptor(["string"]))
     def launch_daemons(self) -> Iterator[DynamicDescriptor]:
-        """Yield OS X launch daemon plist files."""
-        for file in self.LAUNCH_DAEMON_FILES:
+        """Yield macOS launch daemon plist files."""
+        for file in self.launch_daemon_files:
             file = self.target.fs.path(file)
             fh = file.open(mode="rb")
             try:
@@ -79,7 +117,7 @@ class UserPlugin(Plugin):
                 flat_data = {}
                 extract_nested_dict(flat_data, data)
 
-                yield self._build_record("osx/launch_daemon", flat_data, file)
+                yield self.build_record("macos/launch_daemon", flat_data, file)
             except Exception:
                 self.target.log.exception("Failed to parse %s", file)
 
@@ -87,6 +125,8 @@ class UserPlugin(Plugin):
         # predictable order of fields in the list is important, since we'll
         # be constructing a record descriptor from it.
         record_fields = sorted(rdict.items())
+
+        print(record_fields)
 
         record_values = {
             "_target": self.target,
@@ -109,7 +149,7 @@ class UserPlugin(Plugin):
         record_fields.append(("path", "source"))
 
         # tuple conversion here is needed for lru_cache
-        desc = self._create_event_descriptor(record_name, tuple(record_fields))
+        desc = self.create_event_descriptor(record_name, tuple(record_fields))
         return desc(**record_values)
 
     def create_event_descriptor(self, record_name: str, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
