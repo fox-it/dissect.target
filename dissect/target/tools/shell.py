@@ -16,12 +16,15 @@ import random
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
+import tarfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from pathlib import Path
+from tarfile import BLKTYPE, CHRTYPE, DIRTYPE, FIFOTYPE, LNKTYPE, REGTYPE, SYMTYPE
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
@@ -988,6 +991,153 @@ class TargetCli(TargetCmd):
 
         filetype = p.stdout.read().decode().split(":", 1)[1].strip()
         print(f"{path}: {filetype}", file=stdout)
+
+        return False
+
+    @arg("path", nargs="+")
+    @arg(
+        "-f",
+        "--file",
+        default="-",
+        help="file to write the tar archive to, defaults to stdout",
+    )
+    @arg("-z", "--gzip", action="store_true", help="compress the tar archive with gzip")
+    @arg("-j", "--bzip2", action="store_true", help="compress the tar archive with bzip2")
+    @arg(
+        "-c",
+        "--create",
+        required=True,
+        action="store_true",
+        help="create a tar archive (only this mode is supported)",
+    )
+    @arg(
+        "-L",
+        "--dereference",
+        action="store_true",
+        help="follow symlinks and archive the files they point to instead of the symlinks themselves",
+    )
+    @arg("-v", "--verbose", action="store_true")
+    def cmd_tar(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Archive one or more files or directories into a tar archive.
+
+        By default, the archive is written to stdout, allowing it to be piped to other commands or redirected to a file.
+        To write to a file directly, use the -f option with the desired filename.
+        """
+
+        def get_tarinfo(
+            path: fsutil.TargetPath,
+            arcname: str,
+            dereference: bool,
+            inodes: dict[int, str],
+        ) -> tarfile.TarInfo:
+            """This function is heavily inspired by tarfile.TarFile.gettarinfo, but adapted to work with TargetPath.
+            Additional features like storing creation time in PAX headers is also added.
+            """
+            tarinfo = tarfile.TarInfo()
+
+            statres = path.lstat() if not dereference else path.stat()
+            linkname = ""
+
+            stmd = statres.st_mode
+            if stat.S_ISREG(stmd):
+                inode = (statres.st_ino, statres.st_dev)
+                if not dereference and statres.st_nlink > 1 and inode in inodes and arcname != inodes[inode]:
+                    # Is it a hardlink to an already archived file?
+                    type = LNKTYPE
+                    linkname = inodes[inode]
+                else:
+                    # The inode is added only if its valid. For win32 it is always 0.
+                    type = REGTYPE
+                    if inode[0]:
+                        inodes[inode] = arcname
+
+            elif stat.S_ISDIR(stmd):
+                type = DIRTYPE
+            elif stat.S_ISFIFO(stmd):
+                type = FIFOTYPE
+            elif stat.S_ISLNK(stmd):
+                type = SYMTYPE
+                linkname = str(path.readlink())
+            elif stat.S_ISCHR(stmd):
+                type = CHRTYPE
+            elif stat.S_ISBLK(stmd):
+                type = BLKTYPE
+            else:
+                return None
+
+            # Fill the TarInfo object with all information we can get.
+            tarinfo.name = arcname
+            tarinfo.mode = stmd
+            tarinfo.uid = statres.st_uid
+            tarinfo.gid = statres.st_gid
+            if type == REGTYPE:
+                tarinfo.size = statres.st_size
+            else:
+                tarinfo.size = 0
+            tarinfo.mtime = statres.st_mtime
+            tarinfo.type = type
+            tarinfo.linkname = linkname
+
+            # Store additional timestamps in PAX headers, as the standard tar format only supports mtime.
+            tarinfo.pax_headers["atime"] = str(statres.st_atime)
+            tarinfo.pax_headers["ctime"] = str(statres.st_ctime)
+            if hasattr(statres, "st_birthtime") and statres.st_birthtime is not None:
+                tarinfo.pax_headers["LIBARCHIVE.creationtime"] = str(statres.st_birthtime)
+            return tarinfo
+
+        def add_to_tar(
+            tar: tarfile.TarFile,
+            path: fsutil.TargetPath,
+            arcname: str,
+            dereference: bool,
+            inodes: dict[int, str],
+        ) -> None:
+            """This function is heavily inspired by tarfile.TarFile.add, but adapted to work with TargetPath."""
+            if args.verbose:
+                print(f"a {arcname}", file=sys.stderr)
+            info = get_tarinfo(path, arcname, dereference=dereference, inodes=inodes)
+            if info.isreg():
+                with path.open("rb") as f:
+                    tar.addfile(info, fileobj=f)
+            elif info.isdir():
+                tar.addfile(info)
+                for child in path.iterdir():
+                    add_to_tar(
+                        tar,
+                        child,
+                        str(Path(arcname) / child.name),
+                        dereference=dereference,
+                        inodes=inodes,
+                    )
+            else:
+                tar.addfile(info)
+
+        fobj = stdout.buffer if args.file == "-" else pathlib.Path(args.file).open("wb")  # noqa: SIM115
+        mode = "w|"
+        if args.gzip:
+            mode = "w|gz"
+        elif args.bzip2:
+            mode = "w|bz2"
+
+        try:
+            inodes_cache = {}
+            with tarfile.open(fileobj=fobj, mode=mode, format=tarfile.PAX_FORMAT) as tar:
+                for arg_path in args.path:
+                    base_path = self.target.fs.path("/") if Path(arg_path).is_absolute() else self.cwd
+                    paths = list(base_path.glob(arg_path.lstrip("/")))
+
+                    if not paths:
+                        print(f"tar: {arg_path}: No such file or directory")
+                        continue
+
+                    for path in paths:
+                        arcname = str(path.relative_to("/"))
+                        if not Path(arg_path).is_absolute():
+                            arcname = "/".join(p for p in path.relative_to(self.cwd).parts if p not in (".", ".."))
+                        add_to_tar(tar, path, arcname, dereference=args.dereference, inodes=inodes_cache)
+        finally:
+            if fobj is not stdout.buffer:
+                fobj.close()
 
         return False
 

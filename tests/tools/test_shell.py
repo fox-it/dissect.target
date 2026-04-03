@@ -7,6 +7,7 @@ import pathlib
 import platform
 import re
 import sys
+import tarfile
 from collections import ChainMap
 from io import BytesIO, StringIO
 from typing import IO, TYPE_CHECKING, TextIO
@@ -15,6 +16,7 @@ from unittest.mock import MagicMock, call, mock_open, patch
 import pytest
 
 from dissect.target.containers.raw import RawContainer
+from dissect.target import Target
 from dissect.target.helpers.fsutil import TargetPath, normalize
 from dissect.target.target import Target
 from dissect.target.tools.shell import (
@@ -691,3 +693,65 @@ def test_benchmark_ls_bin(
     assert not err
     assert "bash" in out
     assert "zgrep" in out
+
+
+@pytest.mark.parametrize(
+    ("tar_args", "outname"),
+    [
+        ("-cvf", "out.tar"),
+        ("-cvzf", "out.tar.gz"),
+        ("-cvjf", "out.tar.bz2"),
+    ],
+)
+def test_target_cli_tar(tmp_path: Path, tar_args: str, outname: str, capsys: pytest.CaptureFixture) -> None:
+    target = Target.open(absolute_path("_data/filesystems/symlink_disk.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / outname
+    cli.onecmd(f"tar {tar_args} {outpath} /path")
+    captured = capsys.readouterr()
+    assert (
+        captured.err
+        == """\
+a path
+a path/to
+a path/to/symlink
+a path/to/symlink/target
+a path/to/target
+"""
+    )
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            "path",
+            "path/to",
+            "path/to/symlink",
+            "path/to/symlink/target",
+            "path/to/target",
+        ]
+        tarinfo = tar.getmember("path/to/symlink")
+        assert tarinfo.isdir()
+        assert tarinfo.gid == 1000
+        assert tarinfo.uid == 1000
+        assert tarinfo.mtime == 1638257842.0
+        assert tarinfo.pax_headers["atime"] == "1638257842.0"
+        assert tarinfo.pax_headers["ctime"] == "1638257842.0"
+
+        tarinfo = tar.getmember("path/to/symlink/target")
+        assert tarinfo.issym()
+        assert tarinfo.gid == 1000
+        assert tarinfo.uid == 1000
+        assert tarinfo.linkname == "../target"
+        assert tarinfo.mtime == 1638257842.0
+        assert tarinfo.pax_headers["atime"] == "1638257842.0"
+        assert tarinfo.pax_headers["ctime"] == "1638257842.0"
+
+        tarinfo = tar.getmember("path/to/target")
+        assert tarinfo.issym()
+        assert tarinfo.gid == 1000
+        assert tarinfo.uid == 1000
+        assert tarinfo.linkname == "symlink/target"
+        assert tarinfo.mtime == 1638257842.0
+        assert tarinfo.pax_headers["atime"] == "1638257842.0"
+        assert tarinfo.pax_headers["ctime"] == "1638257842.0"
