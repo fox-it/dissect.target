@@ -707,7 +707,7 @@ def test_target_cli_tar(tmp_path: Path, tar_args: str, outname: str, capsys: pyt
     target = Target.open(absolute_path("_data/filesystems/symlink_disk.ext4"), apply=True)
     cli = TargetCli(target)
 
-    outpath = tmp_path / outname
+    outpath = (tmp_path / outname).as_posix()
     cli.onecmd(f"tar {tar_args} {outpath} /path")
     captured = capsys.readouterr()
     assert (
