@@ -212,8 +212,8 @@ def test_linux_drive_regex(drive_path: Path, expected: bool) -> None:
         (Path("/dev/da2"), True),  # SCSI
         (Path("/dev/ada0"), True),  # SATA
         (Path("/dev/ada1"), True),  # SATA
-        (Path("/dev/nvd0"), True),  # SATA
-        (Path("/dev/nvd1"), True),  # SATA
+        (Path("/dev/nvd0"), True),  # NVME
+        (Path("/dev/nvd1"), True),  # NVME
         (Path("/dev/da0p1"), False),  # Partition
         (Path("/dev/ada1p2"), False),  # Partition
         (Path("/dev/nvd0p3"), False),  # Partition
