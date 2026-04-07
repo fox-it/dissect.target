@@ -1008,3 +1008,16 @@ sudo mkfifo ./files/pipes/fifo
 sudo socat UNIX-LISTEN:./files/pipes/unix.sock,fork,unlink-close=0 -
 """
         )
+
+
+def test_target_cli_tar_unknown_path(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we correctly handle unknown paths when trying to tar."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} missing.txt")
+    captured = capsys.readouterr()
+    assert captured.err == "tar: missing.txt: No such file or directory\n"
+    assert outpath.is_file()

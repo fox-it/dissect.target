@@ -1136,7 +1136,7 @@ class TargetCli(TargetCmd):
                     paths = [base_path.joinpath(".")] if glob_path in (".", "") else list(base_path.glob(glob_path))
 
                     if not paths:
-                        print(f"tar: {arg_path}: No such file or directory")
+                        print(f"tar: {arg_path}: No such file or directory", file=sys.stderr)
                         continue
 
                     for path in paths:
