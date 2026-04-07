@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 from dissect.target import plugin
 from dissect.target.plugins.general.loaders import LoaderListPlugin
@@ -9,6 +10,9 @@ from dissect.target.plugins.general.plugins import (
     _categorize_functions,
     _generate_plugin_tree_overview,
 )
+
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
 
 
 def test_plugin_description() -> None:

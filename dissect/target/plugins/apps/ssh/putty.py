@@ -15,7 +15,7 @@ from flow.record.fieldtypes import posix_path, windows_path
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.helpers.regutil import RegistryKey
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -39,7 +40,7 @@ log = get_logger(__name__)
 
 PuTTYUserRecordDescriptor = create_extended_descriptor([UserRecordDescriptorExtension])
 PuTTYSessionRecord = PuTTYUserRecordDescriptor(
-    "application/putty/saved_session",
+    "application/ssh/putty/saved_session",
     [
         ("datetime", "ts"),
         ("string", "session_name"),
@@ -58,7 +59,7 @@ PuTTYSessionRecord = PuTTYUserRecordDescriptor(
 class PuTTYPlugin(SSHPlugin):
     """Extract artifacts from the PuTTY client.
 
-    NOTE:
+    Note:
         - Does not parse ``$HOME/.putty/randomseed`` (GNU/Linux)
           and ``HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile`` (Windows)
 
@@ -100,7 +101,6 @@ class PuTTYPlugin(SSHPlugin):
     @export(record=KnownHostRecord)
     def known_hosts(self) -> Iterator[KnownHostRecord]:
         """Parse PuTTY saved SshHostKeys."""
-
         for putty_key, user_details in self.regf_installs:
             yield from self._regf_known_hosts(putty_key, user_details)
 
@@ -109,7 +109,6 @@ class PuTTYPlugin(SSHPlugin):
 
     def _regf_known_hosts(self, putty_key: RegistryKey, user_details: UserDetails) -> Iterator[KnownHostRecord]:
         """Parse PuTTY traces in Windows registry."""
-
         try:
             ssh_host_keys = putty_key.subkey("SshHostKeys")
         except RegistryKeyNotFoundError:
@@ -180,7 +179,6 @@ class PuTTYPlugin(SSHPlugin):
     @export(record=PuTTYSessionRecord)
     def sessions(self) -> Iterator[PuTTYSessionRecord]:
         """Parse PuTTY saved session configuration files."""
-
         for putty_key, user_details in self.regf_installs:
             yield from self._regf_sessions(putty_key, user_details)
 

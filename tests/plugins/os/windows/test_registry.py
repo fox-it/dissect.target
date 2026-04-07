@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from dissect.target.helpers.logging import TRACE_LEVEL
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
 
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
 
 
 def test_missing_hives(fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:
@@ -196,7 +197,6 @@ def test_registry_plugin_values_keys(
     expected_output: list[str],
 ) -> None:
     """Test if we can handle different input values for :meth:`RegistryPlugin.values`."""
-
     key_path = "SOFTWARE\\SomePath"
     key = VirtualKey(hive_hklm, key_path)
     key.add_value("Foo", VirtualValue(hive_hklm, "Foo", "FooValue"))

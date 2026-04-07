@@ -8,6 +8,8 @@ References:
     - https://learn.microsoft.com/en-us/windows/win32/api/winnls/ns-winnls-filemuiinfo
 """
 
+from __future__ import annotations
+
 MUI_TZ_MAP = {
     10: "(UTC-01:00) Azores",
     11: "Azores Daylight Time",

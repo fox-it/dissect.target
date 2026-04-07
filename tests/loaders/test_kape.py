@@ -67,8 +67,8 @@ def test_dir(mock_kape_dir: Path) -> None:
 
     # The 3 found drive letter directories + the fake NTFS filesystem
     assert len(t.filesystems) == 4
-    # The 3 found drive letters + sysvol + the fake NTFS filesystem at /$fs$
-    assert len(t.fs.mounts) == 5
+    # The 3 found drive letters + sysvol
+    assert len(t.fs.mounts) == 4
     assert len(list(t.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
 
 

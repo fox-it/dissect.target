@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.fsutil import TargetPath
 
+
 GENERIC_THUMBCACHE_FIELDS = [
     ("string", "identifier"),
     ("string", "hash"),

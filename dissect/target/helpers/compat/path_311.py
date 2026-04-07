@@ -252,11 +252,9 @@ class TargetPath(Path, PureDissectPath):
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
     def resolve(self, strict: bool = False) -> Self:
-        """
-        Make the path absolute, resolving all symlinks on the way and also
+        """Make the path absolute, resolving all symlinks on the way and also
         normalizing it.
         """
-
         s = path_common.realpath(self, strict=strict)
         p = self._from_parts((self._fs, s))
 
@@ -271,8 +269,7 @@ class TargetPath(Path, PureDissectPath):
         return p
 
     def stat(self, *, follow_symlinks: bool = True) -> stat_result:
-        """
-        Return the result of the stat() system call on this path, like
+        """Return the result of the stat() system call on this path, like
         os.stat() does.
         """
         if follow_symlinks:
@@ -280,15 +277,11 @@ class TargetPath(Path, PureDissectPath):
         return self.get().lstat()
 
     def owner(self) -> str:
-        """
-        Return the login name of the file owner.
-        """
+        """Return the login name of the file owner."""
         raise NotImplementedError("TargetPath.owner() is unsupported")
 
     def group(self) -> str:
-        """
-        Return the group name of the file gid.
-        """
+        """Return the group name of the file gid."""
         raise NotImplementedError("TargetPath.group() is unsupported")
 
     def open(
@@ -309,66 +302,49 @@ class TargetPath(Path, PureDissectPath):
         return path_common.io_open(self, mode, buffering, encoding, errors, newline)
 
     def write_bytes(self, data: bytes) -> int:
-        """
-        Open the file in bytes mode, write to it, and close the file.
-        """
+        """Open the file in bytes mode, write to it, and close the file."""
         raise NotImplementedError("TargetPath.write_bytes() is unsupported")
 
     def write_text(
         self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None
     ) -> int:
-        """
-        Open the file in text mode, write to it, and close the file.
-        """
+        """Open the file in text mode, write to it, and close the file."""
         raise NotImplementedError("TargetPath.write_text() is unsupported")
 
     def readlink(self) -> Self:
-        """
-        Return the path to which the symbolic link points.
-        """
+        """Return the path to which the symbolic link points."""
         return self._from_parts((self._fs, self.get().readlink()))
 
     def touch(self, mode: int = 0o666, exist_ok: bool = True) -> None:
-        """
-        Create this file with the given access mode, if it doesn't exist.
-        """
+        """Create this file with the given access mode, if it doesn't exist."""
         raise NotImplementedError("TargetPath.touch() is unsupported")
 
     def mkdir(self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
-        """
-        Create a new directory at this given path.
-        """
+        """Create a new directory at this given path."""
         raise NotImplementedError("TargetPath.mkdir() is unsupported")
 
     def chmod(self, mode: int, *, follow_symlinks: bool = True) -> None:
-        """
-        Change the permissions of the path, like os.chmod().
-        """
+        """Change the permissions of the path, like os.chmod()."""
         raise NotImplementedError("TargetPath.chmod() is unsupported")
 
     def lchmod(self, mode: int) -> None:
-        """
-        Like chmod(), except if the path points to a symlink, the symlink's
+        """Like chmod(), except if the path points to a symlink, the symlink's
         permissions are changed, rather than its target's.
         """
         raise NotImplementedError("TargetPath.lchmod() is unsupported")
 
     def unlink(self, missing_ok: bool = False) -> None:
-        """
-        Remove this file or link.
+        """Remove this file or link.
         If the path is a directory, use rmdir() instead.
         """
         raise NotImplementedError("TargetPath.unlink() is unsupported")
 
     def rmdir(self) -> None:
-        """
-        Remove this directory.  The directory must be empty.
-        """
+        """Remove this directory.  The directory must be empty."""
         raise NotImplementedError("TargetPath.rmdir() is unsupported")
 
     def rename(self, target: str) -> Self:
-        """
-        Rename this path to the target path.
+        """Rename this path to the target path.
 
         The target path may be absolute or relative. Relative paths are
         interpreted relative to the current working directory, *not* the
@@ -379,8 +355,7 @@ class TargetPath(Path, PureDissectPath):
         raise NotImplementedError("TargetPath.rename() is unsupported")
 
     def replace(self, target: str) -> Self:
-        """
-        Rename this path to the target path, overwriting if that path exists.
+        """Rename this path to the target path, overwriting if that path exists.
 
         The target path may be absolute or relative. Relative paths are
         interpreted relative to the current working directory, *not* the
@@ -391,23 +366,20 @@ class TargetPath(Path, PureDissectPath):
         raise NotImplementedError("TargetPath.replace() is unsupported")
 
     def symlink_to(self, target: str, target_is_directory: bool = False) -> None:
-        """
-        Make this path a symlink pointing to the target path.
+        """Make this path a symlink pointing to the target path.
         Note the order of arguments (link, target) is the reverse of os.symlink.
         """
         raise NotImplementedError("TargetPath.symlink_to() is unsupported")
 
     def hardlink_to(self, target: str) -> None:
-        """
-        Make this path a hard link pointing to the same file as *target*.
+        """Make this path a hard link pointing to the same file as *target*.
 
         Note the order of arguments (self, target) is the reverse of os.link's.
         """
         raise NotImplementedError("TargetPath.hardlink_to() is unsupported")
 
     def link_to(self, target: str) -> None:
-        """
-        Make the target path a hard link pointing to this path.
+        """Make the target path a hard link pointing to this path.
 
         Note this function does not make this path a hard link to *target*,
         despite the implication of the function and argument names. The order
@@ -420,9 +392,7 @@ class TargetPath(Path, PureDissectPath):
         raise NotImplementedError("TargetPath.link_to() is unsupported")
 
     def is_mount(self) -> bool:
-        """
-        Check if this path is a POSIX mount point
-        """
+        """Check if this path is a POSIX mount point."""
         # Need to exist and be a dir
         if not self.exists() or not self.is_dir():
             return False
@@ -441,13 +411,11 @@ class TargetPath(Path, PureDissectPath):
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def is_junction(self) -> bool:
-        """
-        Whether this path is a junction.
-        """
+        """Whether this path is a junction."""
         return path_common.isjunction(self)
 
     def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
-        (as returned by os.path.expanduser)
+        (as returned by os.path.expanduser).
         """
         raise NotImplementedError("TargetPath.expanduser() is unsupported")

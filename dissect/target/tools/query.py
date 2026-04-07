@@ -8,7 +8,7 @@ import sys
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from flow.record import Record, RecordPrinter, RecordStreamWriter, RecordWriter
+from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 
 from dissect.target.exceptions import (
     FatalError,
@@ -20,7 +20,6 @@ from dissect.target.helpers import cache, record_modifier
 from dissect.target.helpers.logging import get_logger
 from dissect.target.plugin import (
     PLUGINS,
-    FunctionDescriptor,
 )
 from dissect.target.target import Target
 from dissect.target.tools.utils.cli import (
@@ -39,7 +38,12 @@ from dissect.target.tools.utils.report import ExecutionReport
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from flow.record import Record
     from flow.record.adapter import AbstractWriter
+
+    from dissect.target.plugin import (
+        FunctionDescriptor,
+    )
 
 
 log = get_logger(__name__)
@@ -99,6 +103,12 @@ def main() -> int:
         type=pathlib.Path,
         help="write the query report file to the given directory",
     )
+
+    advanced_group = parser.add_argument_group("Advanced options")
+    advanced_group.add_argument(
+        "--direct-sensitive", action="store_true", help="same as --direct, but paths will be case-sensitive"
+    )
+
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()

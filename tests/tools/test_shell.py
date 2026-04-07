@@ -8,7 +8,6 @@ import re
 import sys
 from collections import ChainMap
 from io import BytesIO, StringIO
-from pathlib import Path
 from typing import IO, TYPE_CHECKING, TextIO
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -16,10 +15,13 @@ import pytest
 
 from dissect.target.helpers.fsutil import TargetPath, normalize
 from dissect.target.tools.shell import (
+    DebugMode,
+    ExtendedCmd,
     TargetCli,
     TargetHubCli,
     build_pipe,
     build_pipe_stdout,
+    run_cli,
 )
 from dissect.target.tools.shell import main as target_shell
 from dissect.target.tools.utils import fs
@@ -27,6 +29,7 @@ from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -121,6 +124,57 @@ def test_targethubcli_autocomplete_enter(make_mock_targets: Callable) -> None:
 
     suggestions = hub_cli.complete_enter("1", "enter 1", 6, 7)
     assert suggestions == ["1"]
+
+
+def test_debug_mode_parsing() -> None:
+    """Test that we correctly parse various ways of toggling debug mode."""
+    cli = ExtendedCmd()
+
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("pm")
+    assert cli.debug == DebugMode.POST_MORTEM
+
+    cli.do_debug("on")
+    assert cli.debug == DebugMode.ON
+
+    cli.do_debug("off")
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("")
+    assert cli.debug == DebugMode.ON
+
+    cli.do_debug("")
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("postmortem")
+    assert cli.debug == DebugMode.POST_MORTEM
+
+
+def test_run_cli_postmortem() -> None:
+    """Test that we correctly start a pdb post-mortem session."""
+
+    class DummyCli:
+        def __init__(self) -> None:
+            self.debug = DebugMode.POST_MORTEM
+            self._calls = 0
+
+        def cmdloop(self) -> None:
+            self._calls += 1
+            if self._calls == 1:
+                raise RuntimeError("boom")
+
+        def postloop(self) -> None:
+            return None
+
+    cli = DummyCli()
+
+    mock_debugger = MagicMock()
+
+    with patch("dissect.target.tools.shell._get_debugger", return_value=mock_debugger):
+        run_cli(cli)
+
+    mock_debugger.post_mortem.assert_called_once()
 
 
 def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -255,6 +309,44 @@ def test_redirect_simple_ls(tmp_path: Path, target_win: Target, monkeypatch: pyt
     # Should contain expected output
     assert "c:" in content
     assert "sysvol" in content
+
+
+def test_target_cli_ls_file(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    # disable colorful output in `target-shell`
+    monkeypatch.setattr(fs, "LS_COLORS", {})
+
+    # ls on a file gives ls output
+    out, _ = run_target_shell(
+        monkeypatch,
+        capsys,
+        str(absolute_path("_data/filesystems/squashfs/gzip.sqfs")),
+        "ls -l small-file",
+    )
+    assert "1000 1000          9 2022-12-05T18:53:05.000000+00:00" in out
+
+    # ls on a non-existing path does not break
+    out, _ = run_target_shell(
+        monkeypatch,
+        capsys,
+        str(absolute_path("_data/filesystems/squashfs/gzip.sqfs")),
+        "ls -l this-path-does-not-exist",
+    )
+    assert out == "gzip.sqfs:/$ ls: cannot access /this-path-does-not-exist: No such file or directory\ngzip.sqfs:/$ \n"
+
+
+def test_target_cli_hash_checksums(target_unix: Target, capsys: pytest.CaptureFixture) -> None:
+    target_unix.fs.map_file_fh("/test-file", BytesIO(b"Hello world!"))
+
+    cli = TargetCli(target_unix)
+
+    cli.onecmd("md5sum /test-file")
+    assert "86fb269d190d2c85f6e0468ceca42a20  /test-file" in capsys.readouterr().out
+
+    cli.onecmd("sha1sum /test-file")
+    assert "d3486ae9136e7856bc42212385ea797094475802  /test-file" in capsys.readouterr().out
+
+    cli.onecmd("sha256sum /test-file")
+    assert "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a  /test-file" in capsys.readouterr().out
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test")
@@ -431,7 +523,6 @@ def test_shell_hostname_escaping(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path: Path
 ) -> None:
     """Test if we properly escape hostnames in the base prompt."""
-
     tmp_path.joinpath("etc").mkdir()
     tmp_path.joinpath("var").mkdir()
     tmp_path.joinpath("opt").mkdir()
@@ -450,7 +541,6 @@ def test_shell_hostname_escaping(
 )
 def test_shell_prompt_tab_autocomplete() -> None:
     """Test the prompt tab-autocompletion."""
-
     ANSI_ESCAPE = re.compile(rb"\x07|\x08|\x0d|\x7f|\x1b[@-_][0-?]*[ -/]*[@-~]")
     original_new_data = pexpect.expect.Expecter.new_data
 

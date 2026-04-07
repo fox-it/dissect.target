@@ -366,7 +366,6 @@ def glob_ext(direntry: filesystem.FilesystemEntry, pattern: str) -> Iterator[fil
     Yields:
         Matching filesystem entries (files and/or directories).
     """
-
     # Split the pattern on the last path part. base_name will contain the last path part (which is
     # '' if pattern ends with a /) and dir_name will contain the other parts.
     dir_name, base_name = split(pattern, alt_separator=direntry.fs.alt_separator)
@@ -469,7 +468,6 @@ def resolve_link(
 
     It stops resolving once it detects an infinite recursion loop.
     """
-
     link = normalize(link, alt_separator=alt_separator)
     path = normalize(path, alt_separator=alt_separator)
 
@@ -563,14 +561,20 @@ def open_decompress(
     if magic[:2] == b"\x1f\x8b":
         return gzip.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    if HAS_XZ and magic[:5] == b"\xfd7zXZ":
+    if magic[:5] == b"\xfd7zXZ":
+        if not HAS_XZ:
+            raise RuntimeError("lzma compression detected, but missing optional python module")
         return lzma.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    if HAS_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+    if magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
         # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
+        if not HAS_BZ2:
+            raise RuntimeError("bz2 compression detected, but missing optional python module")
         return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    if HAS_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
+    if magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
+        if not HAS_ZSTD:
+            raise RuntimeError("zstd compression detected, but missing optional python module")
         return zstd.open(file, mode=mode, encoding=encoding, errors=errors, newline=newline)
 
     if path:
@@ -591,7 +595,6 @@ def reverse_read(fh: BinaryIO, chunk_size: int = io.DEFAULT_BUFFER_SIZE, reverse
     Returns:
         An iterator of byte chunks, starting from the end of the file-like object and moving to the start.
     """
-
     offset = fh.seek(0, io.SEEK_END)
 
     while offset > 0:

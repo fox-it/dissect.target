@@ -10,6 +10,7 @@ import pytest
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.network_managers import NetworkManager
 from dissect.target.tools.query import main as target_query
+from dissect.target.tools.utils.logging import configure_logging
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -46,7 +47,6 @@ def test_ips_dhcp(
     target_unix_users: Target, fs_unix: VirtualFilesystem, expected_ips: list[str], messages: str
 ) -> None:
     """Test DHCP lease messages from /var/log/syslog."""
-
     fs_unix.map_file_fh(
         "/var/log/syslog",
         BytesIO(textwrap.dedent(messages).encode()),
@@ -77,7 +77,6 @@ def test_ips_dhcp_arg(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test --dhcp-all flag behaviour."""
-
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
     messages = """
@@ -96,8 +95,12 @@ def test_ips_dhcp_arg(
     if flag:
         argv.append(flag)
 
+    def noop(*args, **kwargs) -> None:
+        pass
+
     with patch("dissect.target.Target.open_all", return_value=[target_unix]), monkeypatch.context() as m:
         m.setattr("sys.argv", argv)
+        m.setattr(configure_logging, "__code__", noop.__code__)
         target_query()
         out, _ = capsys.readouterr()
         assert expected_out in out
@@ -105,7 +108,6 @@ def test_ips_dhcp_arg(
 
 def test_ips_cloud_init(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test cloud-init dhcp.py lease messages."""
-
     messages = """
     2022-12-31 13:37:00,000 - dhcp.py[DEBUG]: Received dhcp lease on eth0 for 10.13.37.5/24
     """
@@ -124,7 +126,6 @@ def test_ips_cloud_init(target_unix_users: Target, fs_unix: VirtualFilesystem) -
 
 def test_ips_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test statically defined ipv4 and ipv6 addresses in /etc/network/interfaces."""
-
     fs_unix.map_file("/etc/network/interfaces", absolute_path("_data/plugins/os/unix/_os/ips/interfaces"))
     target_unix_users.add_plugin(LinuxPlugin)
     results = target_unix_users.ips
@@ -134,7 +135,6 @@ def test_ips_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> No
 
 def test_ips_wicked_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test statically defined ipv4 addresses in /etc/wicked/ifconfig/."""
-
     fs_unix.map_file("/etc/wicked/ifconfig/eth0.xml", absolute_path("_data/plugins/os/unix/_os/ips/eth0.xml"))
     target_unix_users.add_plugin(LinuxPlugin)
     results = target_unix_users.ips
@@ -144,7 +144,6 @@ def test_ips_wicked_static(target_unix_users: Target, fs_unix: VirtualFilesystem
 
 def test_dns_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test statically defined ipv4 and ipv6 dns-nameservers in /etc/network/interfaces."""
-
     fs_unix.map_file("/etc/network/interfaces", absolute_path("_data/plugins/os/unix/_os/ips/interfaces"))
     target_unix_users.add_plugin(LinuxPlugin)
     results = target_unix_users.dns
@@ -154,7 +153,6 @@ def test_dns_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> No
 
 def test_ips_netplan_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test statically defined ipv4 and ipv6 ip addresses in /etc/netplan/*.yaml."""
-
     config = """
     # This file describes the network interfaces available on your system
     # For more information, see netplan(5).
@@ -224,13 +222,11 @@ def test_ips_netplan_static_empty_regression(target_unix_users: Target, fs_unix:
 )
 def test_clean_ips(input: str, expected_output: set) -> None:
     """Test the cleaning of dirty ip addresses."""
-
     assert NetworkManager.clean_ips({input}) == expected_output
 
 
 def test_regression_ips_unique_strings(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Regression test for https://github.com/fox-it/dissect.target/issues/877."""
-
     config = """
     network:
         ethernets:
@@ -254,7 +250,6 @@ def test_regression_ips_unique_strings(target_unix: Target, fs_unix: VirtualFile
 
 def test_ips_dhcp_lease_files(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can detect DHCP lease files from NetworkManager and dhclient."""
-
     lease1 = """
     # This is private data. Do not parse.
     ADDRESS=1.2.3.4
