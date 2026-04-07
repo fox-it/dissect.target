@@ -59,7 +59,7 @@ SECURITY_PRINCIPAL_FIELDS = [
 ACCOUNT_FIELDS = [
     *SECURITY_PRINCIPAL_FIELDS,
     ("string", "upn"),
-    ("string", "user_account_control"),
+    ("string[]", "user_account_control"),
     ("datetime", "password_last_set"),
     ("datetime", "logon_last_failed"),
     ("datetime", "logon_last_success_observed"),
@@ -426,7 +426,7 @@ def extract_account_info(user: User | Computer, target: Target) -> dict[str, Any
         "nt": nt_hash,
         "nt_history": nt_history,
         "supplemental_credentials": user.get("supplementalCredentials"),
-        "user_account_control": user.user_account_control.name,
+        "user_account_control": user.user_account_control.name.split("|"),
         "primary_group_id": user.primary_group_id,
         "member_of": member_of,
         "allowed_to_delegate": user.get("msDS-AllowedToDelegateTo"),
