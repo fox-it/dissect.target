@@ -547,13 +547,11 @@ class BloodHound(Plugin):
     def translate_group_policies(self) -> Iterator[dict[str, Any]]:
         for gpo in self.target.ad.group_policies():
             yield {
-                "ObjectIdentifier": gpo.sid,
+                **self.extract_generic_info(gpo),
                 "Properties": {
-                    "domain": self.extract_domain_id(gpo),
-                    "name": gpo.name,
-                    "distinguishedname": gpo.distinguished_name,
+                    **self.extract_container_properties(gpo),
+                    "gpcpath": str(gpo.gpc_path),
                 },
-                "Aces": extract_sd_data(self.ntds, gpo.nt_security_descriptor),
             }
 
     @arg("-o", "--output", dest="output_dir", type=Path, required=True, help="Path to extract BloodHound files to")
@@ -566,7 +564,7 @@ class BloodHound(Plugin):
             "domains": self.translate_domains,
             "groups": self.translate_groups,
             "ous": self.translate_organizational_units,
-            # "gpos": self.translate_group_policies,
+            "gpos": self.translate_group_policies,
         }
 
         output_dir.mkdir(parents=True, exist_ok=True)
