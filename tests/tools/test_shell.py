@@ -875,7 +875,7 @@ a ./links/README-hardlink.txt
 a ./pipes
 a ./pipes/fifo
 a ./pipes/unix.sock
-tar: /files/./pipes/unix.sock: unsupported file type, skipping
+tar: /files/pipes/unix.sock: unsupported file type, skipping
 """
     )
 

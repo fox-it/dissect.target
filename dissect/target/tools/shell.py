@@ -1098,7 +1098,7 @@ class TargetCli(TargetCmd):
                 print(f"a {arcname}", file=sys.stderr)
             info = get_tarinfo(path, arcname, dereference=dereference, inodes=inodes)
             if not info:
-                print(f"tar: {path}: unsupported file type, skipping", file=sys.stderr)
+                print(f"tar: {PurePosixPath(path)}: unsupported file type, skipping", file=sys.stderr)
                 return
             if info.isreg():
                 with path.open("rb") as f:
@@ -1130,7 +1130,10 @@ class TargetCli(TargetCmd):
             with tarfile.open(fileobj=fobj, mode=mode, format=tarfile.PAX_FORMAT) as tar:
                 for arg_path in args.path:
                     base_path = self.target.fs.path("/") if Path(arg_path).is_absolute() else self.cwd
-                    paths = list(base_path.glob(arg_path.lstrip("/")))
+                    glob_path = arg_path.lstrip("/")
+
+                    # This is a workaround for Python 3.12 and lower
+                    paths = [base_path.joinpath(".")] if glob_path in (".", "") else list(base_path.glob(glob_path))
 
                     if not paths:
                         print(f"tar: {arg_path}: No such file or directory")
