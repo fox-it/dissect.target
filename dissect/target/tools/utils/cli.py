@@ -273,7 +273,7 @@ def list_plugins(
 ) -> None:
     functions = None
     if targets:
-        for target in Target.open_all(targets, include_children):
+        for target in Target.open_all(targets, include_children=include_children):
             functions, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
     elif patterns:
         functions, _ = find_functions(patterns, Target(), show_hidden=True)

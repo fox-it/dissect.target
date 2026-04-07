@@ -321,9 +321,9 @@ class Target:
     def open_all(
         cls,
         paths: str | Path | list[str | Path],
+        *,
         include_children: bool = False,
         recursive: bool = False,
-        *,
         apply: bool = True,
     ) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
