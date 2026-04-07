@@ -84,6 +84,8 @@ DEFAULT_GOP_POLICIES = {
     "6AC1786C-016F-11D2-945F-00C04FB984F9",  # DC Policy
 }
 
+BLOODHOUND_TIMESTAMP_NEVER = -1
+
 
 def trust_type_uplevel_to_actual_type(trust_attributes: int) -> str:
     if trust_attributes & TRUST_ATTRIBUTE_WITHIN_FOREST:
@@ -247,7 +249,7 @@ class BloodHound(Plugin):
 
         rid_check = record.rid in HIGH_VALUE_RIDS
 
-        ou_check = record.name.upper() == "DOMAIN CONTROLLERS" and "organizationalUnit" in record.object_class
+        ou_check = record.name.upper() == "DOMAIN CONTROLLERS" and "organizationalUnit" in record.object_classes
 
         gpo_check = record.object_guid in DEFAULT_GOP_POLICIES
 
@@ -311,14 +313,8 @@ class BloodHound(Plugin):
             "displayname": record.display_name,
             "distinguishedname": record.distinguished_name,
             "domainsid": self.extract_domain_id(record),
-            "whencreated": record.creation_time.isoformat(),
+            "whencreated": int(record.creation_time.timestamp()),
             "description": record.description,
-        }
-
-    def extract_security_info(self, record: Record) -> dict[str, Any]:
-        return {
-            **self.extract_generic_info(record),
-            "HasSIDHistory": record.sid_history,
         }
 
     def extract_security_properties(self, record: Record) -> dict[str, Any]:
@@ -326,20 +322,20 @@ class BloodHound(Plugin):
             **self.extract_generic_properties(record),
             "samaccountname": record.sam_name,
             "admincount": record.admin_count,
-            "sidhistory": record.sid_history,
+            "highvalue": self.extract_high_value(record),
         }
 
     def extract_account_info(self, record: Record) -> dict[str, Any]:
         return {
-            **self.extract_security_info(record),
+            **self.extract_generic_info(record),
             "PrimaryGroupSID": record.sid.replace(f"-{record.rid}", f"-{record.primary_group_id}"),
             "AllowedToDelegate": record.allowed_to_delegate,
+            "HasSIDHistory": record.sid_history,
         }
 
     def extract_account_properties(self, record: Record) -> dict[str, Any]:
         return {
             **self.extract_security_properties(record),
-            "highvalue": self.extract_high_value(record),
             "sensitive": self.extract_flag_from_enum(record, UserAccountControl.NOT_DELEGATED),
             "passwordnotreqd": self.extract_flag_from_enum(record, UserAccountControl.PASSWD_NOTREQD),
             "pwdneverexpires": self.extract_flag_from_enum(record, UserAccountControl.DONT_EXPIRE_PASSWORD),
@@ -347,20 +343,25 @@ class BloodHound(Plugin):
             "unconstraineddelegation": self.extract_flag_from_enum(record, UserAccountControl.TRUSTED_FOR_DELEGATION),
             "trustedtoauth": bool(record.allowed_to_delegate)
             and self.extract_flag_from_enum(record, UserAccountControl.TRUSTED_TO_AUTHENTICATE_FOR_DELEGATION),
-            "lastlogon": record.logon_last_success_observed.isoformat() if record.logon_last_success_observed else 0,
-            "lastlogontimestamp": record.logon_last_success_reported.isoformat()
+            "lastlogon": int(record.logon_last_success_observed.timestamp())
+            if record.logon_last_success_observed
+            else BLOODHOUND_TIMESTAMP_NEVER,
+            "lastlogontimestamp": int(record.logon_last_success_reported.timestamp())
             if record.logon_last_success_reported
-            else -1,
-            "pwdlastset": record.password_last_set.isoformat() if record.password_last_set else 0,
+            else BLOODHOUND_TIMESTAMP_NEVER,
+            "pwdlastset": int(record.password_last_set.timestamp())
+            if record.password_last_set
+            else BLOODHOUND_TIMESTAMP_NEVER,
             "email": record.email,
             "title": record.title,
             "homedirectory": record.home_directory,
             "userpassword": None,
             "unixpassword": None,
-            "unicodepassword": record.nt,  # TODO: Figure out lm hash goes here or not
+            "unicodepassword": record.nt,  # TODO: Figure out if lm hash goes here or not
             "sfupassword": None,
             "logonscript": record.logon_script,
             "serviceprincipalnames": record.service_principal_names,
+            "sidhistory": record.sid_history,
         }
 
     def extract_container_info(self, record: Record) -> dict[str, Any]:
@@ -514,17 +515,22 @@ class BloodHound(Plugin):
                 },
             }
 
+    def extract_group_members(self, group_record: Record) -> list[dict[str, str]]:
+        members = []
+        for member_sid in group_record.members:
+            member_object = next(self.target.ad.ntds.search(objectSid=member_sid))
+            members.append(self.build_container_info(member_object))
+
+        return members
+
     def translate_groups(self) -> Iterator[dict[str, Any]]:
         for group in self.target.ad.groups():
             yield {
-                "ObjectIdentifier": group.sid,
+                **self.extract_generic_info(group),
                 "Properties": {
-                    "domain": self.extract_domain_id(group),
-                    "name": group.sam_name,
-                    "distinguishedname": group.distinguished_name,
+                    **self.extract_security_properties(group),
                 },
-                "Aces": extract_sd_data(self.ntds, group.nt_security_descriptor),
-                "Members": group.members,
+                "Members": self.extract_group_members(group),
             }
 
     def translate_organizational_units(self) -> Iterator[dict[str, Any]]:
@@ -561,7 +567,7 @@ class BloodHound(Plugin):
             "users": self.translate_users,
             "computers": self.translate_computers,
             "domains": self.translate_domains,
-            # "groups": self.translate_groups,
+            "groups": self.translate_groups,
             # "ous": self.translate_ous,
             # "gpos": self.translate_gpos,
         }
