@@ -126,8 +126,6 @@ class LaunchersPlugin(Plugin):
         # be constructing a record descriptor from it.
         record_fields = sorted(rdict.items())
 
-        print(record_fields)
-
         record_values = {
             "_target": self.target,
             "source": source,
