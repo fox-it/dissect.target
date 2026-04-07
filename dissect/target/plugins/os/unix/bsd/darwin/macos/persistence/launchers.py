@@ -45,10 +45,10 @@ class LaunchersPlugin(Plugin):
         self._find_files()
 
     def _build_userdirs(self, hist_paths: list[str]) -> set[tuple[UserDetails, Path]]:
-        """Join the selected browser dirs with the user home path.
+        """Join the selected dirs with the user home path.
 
         Args:
-            hist_paths: A list with browser paths as strings.
+            hist_paths: A list with paths as strings.
 
         Returns:
             List of tuples containing user and unique file path objects.
