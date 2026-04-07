@@ -251,11 +251,11 @@ class BloodHound(Plugin):
 
         ou_check = record.name.upper() == "DOMAIN CONTROLLERS" and "organizationalUnit" in record.object_classes
 
-        gpo_check = record.object_guid in DEFAULT_GOP_POLICIES
+        gpo_check = record.guid in DEFAULT_GOP_POLICIES
 
         admin_check = False
         if hasattr(record, "admin_count"):
-            admin_check = record.admin_count
+            admin_check = record.admin_count.value
 
         return domain_check or rid_check or ou_check or gpo_check or admin_check
 
@@ -321,7 +321,7 @@ class BloodHound(Plugin):
         return {
             **self.extract_generic_properties(record),
             "samaccountname": record.sam_name,
-            "admincount": record.admin_count,
+            "admincount": record.admin_count.value,
             "highvalue": self.extract_high_value(record),
         }
 
@@ -367,6 +367,16 @@ class BloodHound(Plugin):
     def extract_container_info(self, record: Record) -> dict[str, Any]:
         return {
             **self.extract_generic_info(record),
+            "Links": self.parse_gplink_for_bloodhound(record.gplink),
+            "ChildObjects": self.extract_children_info(record),
+            # TODO: Parse extra SYSVOL files for this
+            "GPOChanges": {
+                "LocalAdmins": [],
+                "RemoteDesktopUsers": [],
+                "DcomUsers": [],
+                "PSRemoteUsers": [],
+                "AffectedComputers": [],
+            },
         }
 
     def extract_container_properties(self, record: Record) -> dict[str, Any]:
@@ -398,7 +408,7 @@ class BloodHound(Plugin):
                         computer, UserAccountControl.TRUSTED_FOR_DELEGATION
                     ),
                     "operatingsystem": computer.operating_system,
-                    "haslaps": computer.has_laps,
+                    "haslaps": computer.has_laps.value,
                     "DumpSMSAPassword": None,  # TODO: Resolve this
                     # We can't populate Sessions without session data (Offline collection),
                     # so we'll just put a placeholder here for now
@@ -499,16 +509,7 @@ class BloodHound(Plugin):
 
             yield {
                 **self.extract_container_info(domain),
-                "ChildObjects": self.extract_children_info(domain),
                 "Trusts": self.get_trusts(domain),
-                "Links": self.parse_gplink_for_bloodhound(domain.gplink),
-                "GPOChanges": {  # TODO: Parse extra SYSVOL files for this
-                    "LocalAdmins": [],
-                    "RemoteDesktopUsers": [],
-                    "DcomUsers": [],
-                    "PSRemoteUsers": [],
-                    "AffectedComputers": [],
-                },
                 "Properties": {
                     **self.extract_container_properties(domain),
                     "functionallevel": BEHAVIOR_VERSION_TO_FUNCTIONAL_LEVEL_MAP.get(domain.behavior_version),
@@ -536,15 +537,11 @@ class BloodHound(Plugin):
     def translate_organizational_units(self) -> Iterator[dict[str, Any]]:
         for ou in self.target.ad.organizational_units():
             yield {
-                "ObjectIdentifier": ou.sid,
+                **self.extract_container_info(ou),
                 "Properties": {
-                    "domain": self.extract_domain_id(ou),
-                    "name": ou.name,
-                    "distinguishedname": ou.distinguished_name,
-                    "blocksinheritance": ou.blocks_inheritance,
+                    **self.extract_container_properties(ou),
+                    "blocksinheritance": ou.blocks_inheritance.value,
                 },
-                "Aces": extract_sd_data(self.ntds, ou.nt_security_descriptor),
-                "Links": [],
             }
 
     def translate_group_policies(self) -> Iterator[dict[str, Any]]:
@@ -568,8 +565,8 @@ class BloodHound(Plugin):
             "computers": self.translate_computers,
             "domains": self.translate_domains,
             "groups": self.translate_groups,
-            # "ous": self.translate_ous,
-            # "gpos": self.translate_gpos,
+            "ous": self.translate_organizational_units,
+            # "gpos": self.translate_group_policies,
         }
 
         output_dir.mkdir(parents=True, exist_ok=True)
