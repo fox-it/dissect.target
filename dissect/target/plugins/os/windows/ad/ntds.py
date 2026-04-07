@@ -5,6 +5,7 @@ from functools import cached_property
 from itertools import zip_longest
 from typing import TYPE_CHECKING, Any
 
+from dissect.cstruct import cstruct
 from dissect.database.ese.ntds import NTDS
 from dissect.database.ese.ntds.util import UserAccountControl
 from dissect.util.ts import wintimestamp
@@ -62,8 +63,8 @@ ACCOUNT_FIELDS = [
     ("string[]", "user_account_control"),
     ("datetime", "password_last_set"),
     ("datetime", "logon_last_failed"),
-    ("datetime", "logon_last_success_observed"),
-    ("datetime", "logon_last_success_reported"),
+    ("datetime", "logon_last_local"),
+    ("datetime", "logon_last_replicated"),
     ("datetime", "account_expires"),
     ("uint32", "primary_group_id"),
     ("string[]", "member_of"),
@@ -72,7 +73,10 @@ ACCOUNT_FIELDS = [
     ("string[]", "lm_history"),
     ("string", "nt"),
     ("string[]", "nt_history"),
-    ("string", "supplemental_credentials"),
+    ("string", "user_password"),
+    ("string", "unix_password"),
+    ("string", "sfu_password"),
+    ("string[]", "supplemental_credentials"),
     ("string", "info"),
     ("string", "comment"),
     ("string", "email"),
@@ -109,6 +113,7 @@ NtdsComputerRecord = TargetRecordDescriptor(
         ("datetime", "legacy_laps_expiration"),
         ("string", "windows_laps"),
         ("datetime", "windows_laps_expiration"),
+        ("string", "dump_smsa_password"),
     ],
 )
 
@@ -165,6 +170,18 @@ NTDS_PARAMETERS_DB_VALUE = "DSA Database file"
 DEFAULT_LM_HASH = "aad3b435b51404eeaad3b435b51404ee"
 DEFAULT_NT_HASH = "31d6cfe0d16ae931b73c59d7e0c089c0"
 
+# MS-DS-ManagedPassword attribute structure
+MS_DS_MANAGED_PASSWORD_DEF = """
+struct gms_managed_password {
+    uint16 version;
+    uint16 reserved;
+    uint32 length;
+    char password[length];
+};
+"""
+
+MS_DS_MANAGED_PASSWORD = cstruct().load(MS_DS_MANAGED_PASSWORD_DEF)
+
 
 class NtdsPlugin(Plugin):
     """Plugin to parse NTDS.dit Active Directory database and extract user credentials.
@@ -216,6 +233,12 @@ class NtdsPlugin(Plugin):
     def computers(self) -> Iterator[NtdsComputerRecord]:
         """Extract all computer accounts from the NTDS.dit database."""
         for computer in self.ntds.computers():
+            try:
+                blob = computer.get("msDS-ManagedPassword")
+                dump_smsa_password = MS_DS_MANAGED_PASSWORD.gms_managed_password(blob).hex()
+            except Exception:
+                dump_smsa_password = None
+
             yield NtdsComputerRecord(
                 **extract_account_info(computer, self.target),
                 **extract_laps(computer),
@@ -224,6 +247,7 @@ class NtdsPlugin(Plugin):
                 operating_system_version=computer.get("operatingSystemVersion"),
                 service_principal_name=computer.get("servicePrincipalName"),
                 allowed_to_act=computer.get("msDS-AllowedToActOnBehalfOfOtherIdentity"),
+                dump_smsa_password=dump_smsa_password,
                 _target=self.target,
             )
 
@@ -291,15 +315,6 @@ class NtdsPlugin(Plugin):
     @export(output="yield")
     def secretsdump(self) -> Iterator[str]:
         """Extract credentials in secretsdump format. Because it's a popular format."""
-        # Keep impacket defined constants in the method so we don't pollute our own
-        kerberos_key_type = {
-            1: "dec-cbc-crc",
-            3: "des-cbc-md5",
-            17: "aes128-cts-hmac-sha1-96",
-            18: "aes256-cts-hmac-sha1-96",
-            0xFFFFFF74: "rc4_hmac",
-        }
-
         for obj in self.ntds.query(
             # For now just use the same filter as secretsdump.py
             "(&(|(sAMAccountType=805306368)(sAMAccountType=805306369)(sAMAccountType=805306370))(instanceType=4))"
@@ -329,15 +344,37 @@ class NtdsPlugin(Plugin):
             for i, (lm_hist, nt_hist) in enumerate(zip_longest(lm_history, nt_history, fillvalue="")):
                 yield f"{username}_history{i}:{rid}:{lm_hist}:{nt_hist}:::"
 
-            for supplemental in obj.get("supplementalCredentials") or []:
-                if "Primary:Kerberos-Newer-Keys" in supplemental:
-                    for cred in supplemental["Primary:Kerberos-Newer-Keys"]["Credentials"]:
-                        key_type = kerberos_key_type.get(cred["KeyType"], hex(cred["KeyType"]))
-                        key = cred["Key"].hex()
-                        yield f"{username}:{key_type}:{key}"
+            for supplemental_credential in get_supplemental_credentials(obj):
+                yield f"{username}:{supplemental_credential}"
 
-                if "Primary:CLEARTEXT" in supplemental:
-                    yield f"{username}:CLEARTEXT:{supplemental['Primary:CLEARTEXT']}"
+
+def get_supplemental_credentials(account: User | Computer) -> Iterator[str]:
+    """Extract supplemental credentials from a user object.
+
+    Args:
+        account (User | Computer): The user or computer object to extract supplemental credentials from.
+
+    Yields:
+        supplemental_credential (str): Supplemental credential in the secrets dump format
+    """
+    # Keep impacket defined constants in the method so we don't pollute our own
+    kerberos_key_type = {
+        1: "dec-cbc-crc",
+        3: "des-cbc-md5",
+        17: "aes128-cts-hmac-sha1-96",
+        18: "aes256-cts-hmac-sha1-96",
+        0xFFFFFF74: "rc4_hmac",
+    }
+
+    for supplemental in account.get("supplementalCredentials") or []:
+        if "Primary:Kerberos-Newer-Keys" in supplemental:
+            for cred in supplemental["Primary:Kerberos-Newer-Keys"]["Credentials"]:
+                key_type = kerberos_key_type.get(cred["KeyType"], hex(cred["KeyType"]))
+                key = cred["Key"].hex()
+                yield f"{key_type}:{key}"
+
+        if "Primary:CLEARTEXT" in supplemental:
+            yield f"CLEARTEXT:{supplemental['Primary:CLEARTEXT']}"
 
 
 def extract_object_info(obj: Object) -> dict[str, Any]:
@@ -391,14 +428,14 @@ def extract_domain_info(domain: DomainDNS | TrustedDomain) -> dict[str, Any]:
     }
 
 
-def extract_account_info(user: User | Computer, target: Target) -> dict[str, Any]:
+def extract_account_info(account: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
     if target.ad.ntds.pek.unlocked:
-        lm_hash = des_decrypt(lm_pwd, user.rid).hex() if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
-        nt_hash = des_decrypt(nt_pwd, user.rid).hex() if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
+        lm_hash = des_decrypt(lm_pwd, account.rid).hex() if (lm_pwd := account.get("dBCSPwd")) else DEFAULT_LM_HASH
+        nt_hash = des_decrypt(nt_pwd, account.rid).hex() if (nt_pwd := account.get("unicodePwd")) else DEFAULT_NT_HASH
 
-        lm_history = [des_decrypt(lm, user.rid).hex() for lm in user.get("lmPwdHistory")]
-        nt_history = [des_decrypt(nt, user.rid).hex() for nt in user.get("ntPwdHistory")]
+        lm_history = [des_decrypt(lm, account.rid).hex() for lm in account.get("lmPwdHistory")]
+        nt_history = [des_decrypt(nt, account.rid).hex() for nt in account.get("ntPwdHistory")]
     else:
         lm_hash = None
         nt_hash = None
@@ -407,37 +444,57 @@ def extract_account_info(user: User | Computer, target: Target) -> dict[str, Any
         nt_history = None
 
     try:
-        member_of = [group.distinguished_name for group in user.groups()]
+        member_of = [group.distinguished_name for group in account.groups()]
     except Exception as e:
         member_of = []
-        target.log.warning("Failed to extract group membership for user %s: %s", user, e)
+        target.log.warning("Failed to extract group membership for user %s: %s", account, e)
         target.log.debug("", exc_info=e)
 
+    try:
+        sfu_password = account.get("msSFU30Password")
+    except Exception:
+        sfu_password = None
+
+    try:
+        user_password = account.get("userPassword")
+    except Exception:
+        user_password = None
+
+    try:
+        unix_password = account.get("unixPassword")
+    except Exception:
+        unix_password = None
+
+    account_expires = account.get("accountExpires")
+
     return {
-        **extract_security_info(user),
-        "upn": user.get("userPrincipalName"),
-        "password_last_set": user.get("pwdLastSet"),
-        "logon_last_failed": user.get("badPasswordTime"),
-        "logon_last_success_observed": user.get("lastLogon"),
-        "logon_last_success_reported": user.get("lastLogonTimestamp"),
-        "account_expires": user.get("accountExpires") if isinstance(user.get("accountExpires"), datetime) else None,
+        **extract_security_info(account),
+        "upn": account.get("userPrincipalName"),
+        "password_last_set": account.get("pwdLastSet"),
+        "logon_last_failed": account.get("badPasswordTime"),
+        "logon_last_local": account.get("lastLogon"),
+        "logon_last_replicated": account.get("lastLogonTimestamp"),
+        "account_expires": account_expires if isinstance(account_expires, datetime) else None,
         "lm": lm_hash,
         "lm_history": lm_history,
         "nt": nt_hash,
         "nt_history": nt_history,
-        "supplemental_credentials": user.get("supplementalCredentials"),
-        "user_account_control": user.user_account_control.name.split("|"),
-        "primary_group_id": user.primary_group_id,
+        "user_password": user_password if user_password else None,
+        "unix_password": unix_password if unix_password else None,
+        "sfu_password": sfu_password,
+        "supplemental_credentials": list(get_supplemental_credentials(account)),
+        "user_account_control": account.user_account_control.name.split("|"),
+        "primary_group_id": account.primary_group_id,
         "member_of": member_of,
-        "allowed_to_delegate": user.get("msDS-AllowedToDelegateTo"),
-        "info": user.get("info"),
-        "comment": user.get("comment"),
-        "email": user.get("mail"),
-        "title": user.get("title"),
-        "telephone_number": user.get("telephoneNumber"),
-        "home_directory": user.get("homeDirectory"),
-        "logon_script": user.get("scriptPath"),
-        "service_principal_names": user.get("servicePrincipalName"),
+        "allowed_to_delegate": account.get("msDS-AllowedToDelegateTo"),
+        "info": account.get("info"),
+        "comment": account.get("comment"),
+        "email": account.get("mail"),
+        "title": account.get("title"),
+        "telephone_number": account.get("telephoneNumber"),
+        "home_directory": account.get("homeDirectory"),
+        "logon_script": account.get("scriptPath"),
+        "service_principal_names": account.get("servicePrincipalName"),
     }
 
 
