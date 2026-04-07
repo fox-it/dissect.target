@@ -5,12 +5,15 @@ import re
 from functools import cached_property, lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 from dissect.database.ese.ntds.c_sd import c_sd
 from dissect.database.ese.ntds.sd import ACCESS_MASK, ACE_FLAGS, ACE_TYPE
 from dissect.database.ese.ntds.util import UserAccountControl
 
+from dissect.target.exceptions import RegistryKeyNotFoundError, RegistryValueNotFoundError
 from dissect.target.plugin import Plugin, UnsupportedPluginError, arg, export
+from dissect.target.plugins.os.windows.ad.ntds import DEFAULT_LM_HASH, DEFAULT_NT_HASH
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -95,6 +98,13 @@ DEFAULT_GOP_POLICIES = {
 BLOODHOUND_TIMESTAMP_NEVER = -1
 
 
+KERBEROS_REGISTRY_PATH = "HKLM\\System\\CurrentControlSet\\Control\\Lsa\\Kerberos\\Parameters"
+KERBEROS_CERTIFICATE_VALUE = "CertificateMappingMethods"
+
+KDC_REGISTRY_PATH = "HKLM\\System\\CurrentControlSet\\Services\\Kdc"
+KDC_CERTIFICATE_VALUE = "StrongCertificateBindingEnforcement"
+
+
 def extract_high_value(record: Record) -> bool:
     """Determines if a given AD record is high-value based on various heuristics.
 
@@ -154,7 +164,7 @@ def extract_fqdn_from_dn(distinguished_name: str | None) -> str | None:
         return None
 
     dc_parts = []
-    # Split the DN by commas and filter for parts that start with 'DC='
+
     for part in distinguished_name.split(","):
         part = part.strip().upper()
 
@@ -205,6 +215,35 @@ class BloodHound(Plugin):
 
         return trusts
 
+    @cached_property
+    def dc_registry_data(self) -> dict[str, dict[str, str | None]]:
+        """Get DC registry data.
+
+        Returns:
+            dc_data (dict[str, dict[str, str | None]]): Dictionary containing DC registry data.
+        """
+        dc_data = {"DCRegistryData": {"CertificateMappingMethods": None, "StrongCertificateBindingEnforcement": None}}
+        reg_data = dc_data["DCRegistryData"]
+
+        if not self.target.has_function("registry"):
+            return dc_data
+
+        try:
+            reg_data["CertificateMappingMethods"] = self.target.registry.value(
+                KERBEROS_REGISTRY_PATH, KERBEROS_CERTIFICATE_VALUE
+            ).value
+        except (RegistryKeyNotFoundError, RegistryValueNotFoundError):
+            pass
+
+        try:
+            reg_data["StrongCertificateBindingEnforcement"] = self.target.registry.value(
+                KDC_REGISTRY_PATH, KDC_CERTIFICATE_VALUE
+            ).value
+        except (RegistryKeyNotFoundError, RegistryValueNotFoundError):
+            pass
+
+        return dc_data
+
     def get_trusts(self, domain: Record) -> list[dict[str, Any]]:
         """Given a domain record, return a list of trusts in BloodHound format.
 
@@ -245,20 +284,15 @@ class BloodHound(Plugin):
         if not gplink_string:
             return bloodhound_links
 
-        matches: list[str] = self.gp_link_pattern.findall(gplink_string)
-
-        for guid_string, options_str in matches:
-            options = int(options_str)
+        for guid, options in self.gp_link_pattern.findall(gplink_string):
+            options = int(options)
 
             is_enforced = options == 2
             is_disabled = options == 1
 
             # BloodHound only tracks active links in its graph
             if not is_disabled:
-                # Strip the curly braces and ensure it's uppercase for BloodHound standards
-                clean_guid = guid_string.strip("{}").upper()
-
-                bloodhound_links.append({"GUID": clean_guid, "IsEnforced": is_enforced})
+                bloodhound_links.append({"GUID": str(UUID(guid)), "IsEnforced": is_enforced})
 
         return bloodhound_links
 
@@ -479,7 +513,7 @@ class BloodHound(Plugin):
             record (Record): Record representing an AD object to extract account information from.
 
         Returns:
-            acoount_info (dict[str, Any]): The account information.
+            account_info (dict[str, Any]): The account information.
         """
         return {
             **self.extract_generic_info(record),
@@ -506,11 +540,11 @@ class BloodHound(Plugin):
             "unconstraineddelegation": UserAccountControl.TRUSTED_FOR_DELEGATION.name in record.user_account_control,
             "trustedtoauth": bool(record.allowed_to_delegate)
             and UserAccountControl.TRUSTED_TO_AUTHENTICATE_FOR_DELEGATION.name in record.user_account_control,
-            "lastlogon": int(record.logon_last_success_observed.timestamp())
-            if record.logon_last_success_observed
+            "lastlogon": int(record.logon_last_local.timestamp())
+            if record.logon_last_local
             else BLOODHOUND_TIMESTAMP_NEVER,
-            "lastlogontimestamp": int(record.logon_last_success_reported.timestamp())
-            if record.logon_last_success_reported
+            "lastlogontimestamp": int(record.logon_last_replicated.timestamp())
+            if record.logon_last_replicated
             else BLOODHOUND_TIMESTAMP_NEVER,
             "pwdlastset": int(record.password_last_set.timestamp())
             if record.password_last_set
@@ -518,10 +552,14 @@ class BloodHound(Plugin):
             "email": record.email,
             "title": record.title,
             "homedirectory": record.home_directory,
-            "userpassword": None,
-            "unixpassword": None,
-            "unicodepassword": record.nt,  # TODO: Figure out if lm hash goes here or not
-            "sfupassword": None,
+            "userpassword": record.user_password,
+            "unixpassword": record.unix_password,
+            "unicodepassword": record.nt
+            if record.nt != DEFAULT_NT_HASH
+            else record.lm
+            if record.lm != DEFAULT_LM_HASH
+            else None,
+            "sfupassword": record.sfu_password,
             "logonscript": record.logon_script,
             "serviceprincipalnames": record.service_principal_names,
             "sidhistory": record.sid_history,
@@ -573,7 +611,7 @@ class BloodHound(Plugin):
         for user in self.target.ad.users():
             yield {
                 **self.extract_account_info(user),
-                "SPNTargets": user.service_principal_names,  # TODO: Verify this is correct for SPN targeting in BH
+                "SPNTargets": user.service_principal_names,
                 "Properties": {
                     **self.extract_account_properties(user),
                     "hasspn": bool(user.service_principal_names),
@@ -596,7 +634,7 @@ class BloodHound(Plugin):
                     in computer.user_account_control,
                     "operatingsystem": computer.operating_system,
                     "haslaps": computer.has_laps.value,
-                    "DumpSMSAPassword": None,  # TODO: Resolve this
+                    "DumpSMSAPassword": computer.dump_smsa_password,
                     # TODO:
                     # We can't populate Sessions without session data (Offline collection),
                     # so we'll just put a placeholder here for now
@@ -604,11 +642,10 @@ class BloodHound(Plugin):
                     "Sessions": {"Results": [], "Collected": False, "FailureReason": None},
                     "PrivilegedSessions": {"Results": [], "Collected": False, "FailureReason": None},
                     "RegistrySessions": {"Results": [], "Collected": False, "FailureReason": None},
-                    # Same with local groups and user rights
+                    # TODO: Same as last with local groups and user rights
                     "LocalGroups": [],
                     "UserRights": [],
-                    # TODO: We can probably collect because we have the registry of the DC
-                    "DCRegistryData": {"CertificateMappingMethods": None, "StrongCertificateBindingEnforcement": None},
+                    **self.dc_registry_data,
                     "Status": None,
                 },
             }
