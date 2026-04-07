@@ -41,7 +41,7 @@ OBJECT_FIELDS = [
     ("string", "description"),
     ("string[]", "object_classes"),
     ("string", "distinguished_name"),
-    ("string", "object_guid"),
+    ("string", "guid"),
     ("datetime", "creation_time"),
     ("datetime", "last_modified_time"),
     ("boolean", "is_deleted"),
@@ -153,6 +153,7 @@ NtdsGPORecord = TargetRecordDescriptor(
     "windows/ad/gpo",
     [
         *CONTAINER_FIELDS,
+        ("path", "gpc_path"),
     ],
 )
 
@@ -273,7 +274,7 @@ class NtdsPlugin(Plugin):
             gp_options = ou.get("gPOptions")
             yield NtdsOURecord(
                 **extract_container_info(ou),
-                blocks_inheritance=gp_options == 1 if gp_options is not None else None,
+                blocks_inheritance=bool(gp_options & 1) if gp_options is not None else False,
                 _target=self.target,
             )
 
@@ -283,6 +284,7 @@ class NtdsPlugin(Plugin):
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
                 **extract_container_info(gpo),
+                gpc_path=gpo.get("gPCFileSysPath"),
                 _target=self.target,
             )
 
@@ -340,6 +342,8 @@ class NtdsPlugin(Plugin):
 
 def extract_object_info(obj: Object) -> dict[str, Any]:
     """Extract generic information from an Object."""
+    description = obj.get("description")
+    description = description.pop() if description else None
     return {
         "cn": obj.cn,
         "sid": obj.sid,
@@ -348,10 +352,10 @@ def extract_object_info(obj: Object) -> dict[str, Any]:
         "pdnt": obj.pdnt,
         "name": obj.name,
         "display_name": obj.display_name,
-        "description": obj.get("description"),
+        "description": description,
         "object_classes": obj.object_class,
         "distinguished_name": obj.distinguished_name,
-        "object_guid": obj.guid,
+        "guid": obj.guid,
         "creation_time": obj.when_created,
         "last_modified_time": obj.when_changed,
         "is_deleted": obj.is_deleted,
