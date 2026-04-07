@@ -23,7 +23,7 @@ import tarfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from tarfile import BLKTYPE, CHRTYPE, DIRTYPE, FIFOTYPE, LNKTYPE, REGTYPE, SYMTYPE
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
@@ -1003,6 +1003,7 @@ class TargetCli(TargetCmd):
     )
     @arg("-z", "--gzip", action="store_true", help="compress the tar archive with gzip")
     @arg("-j", "--bzip2", action="store_true", help="compress the tar archive with bzip2")
+    @arg("-J", "--xz", action="store_true", help="compress the tar archive with xz")
     @arg(
         "-c",
         "--create",
@@ -1029,7 +1030,7 @@ class TargetCli(TargetCmd):
             arcname: str,
             dereference: bool,
             inodes: dict[int, str],
-        ) -> tarfile.TarInfo:
+        ) -> tarfile.TarInfo | None:
             """This function is heavily inspired by tarfile.TarFile.gettarinfo, but adapted to work with TargetPath.
             Additional features like storing creation time in PAX headers is also added.
             """
@@ -1096,6 +1097,9 @@ class TargetCli(TargetCmd):
             if args.verbose:
                 print(f"a {arcname}", file=sys.stderr)
             info = get_tarinfo(path, arcname, dereference=dereference, inodes=inodes)
+            if not info:
+                print(f"tar: {path}: unsupported file type, skipping", file=sys.stderr)
+                return
             if info.isreg():
                 with path.open("rb") as f:
                     tar.addfile(info, fileobj=f)
@@ -1105,7 +1109,7 @@ class TargetCli(TargetCmd):
                     add_to_tar(
                         tar,
                         child,
-                        str(self.target.fs.path(arcname) / child.name),
+                        f"{arcname}/{child.name}",
                         dereference=dereference,
                         inodes=inodes,
                     )
@@ -1118,6 +1122,8 @@ class TargetCli(TargetCmd):
             mode = "w|gz"
         elif args.bzip2:
             mode = "w|bz2"
+        elif args.xz:
+            mode = "w|xz"
 
         try:
             inodes_cache = {}
@@ -1131,9 +1137,11 @@ class TargetCli(TargetCmd):
                         continue
 
                     for path in paths:
-                        arcname = str(path.relative_to("/"))
+                        arcname = str(PurePosixPath(path).relative_to("/"))
                         if not Path(arg_path).is_absolute():
-                            arcname = "/".join(p for p in path.relative_to(self.cwd).parts if p not in (".", ".."))
+                            pure_path = PurePosixPath(path).relative_to(PurePosixPath(self.cwd))
+                            arcname = "/".join(p for p in pure_path.parts if p not in (".", ".."))
+                            arcname = arcname or "."
                         add_to_tar(tar, path, arcname, dereference=args.dereference, inodes=inodes_cache)
         finally:
             if fobj is not stdout.buffer:
