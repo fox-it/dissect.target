@@ -96,6 +96,14 @@ def test_groups(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.groups())
 
     assert len(results) == 102
+    assert results[0].members == [
+        "S-1-5-21-227512471-3105770690-3802255443-500",
+        "S-1-5-21-227512471-3105770690-3802255443-1000",
+        "S-1-5-21-227512471-3105770690-3802255443-519",
+        "S-1-5-21-227512471-3105770690-3802255443-512",
+        "S-1-5-21-227512471-3105770690-3802255443-1111",
+        "S-1-5-21-227512471-3105770690-3802255443-1115",
+    ]
 
 
 def test_trusted_domains(target_win_ntds: Target) -> None:
@@ -111,18 +119,25 @@ def test_domains(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.domains())
 
     assert len(results) == 5
+    assert results[0].machine_account_quota == 10
+    assert results[0].behavior_version == 7
 
 
 def test_organizational_units(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.organizational_units())
 
     assert len(results) == 10
+    assert not results[0].blocks_inheritance
 
 
 def test_group_policies(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.group_policies())
 
     assert len(results) == 5
+    assert (
+        str(results[0].gpc_path)
+        == r"\\sevenkingdoms.local\sysvol\sevenkingdoms.local\Policies\{31B2F340-016D-11D2-945F-00C04FB984F9}"
+    )
 
 
 def test_secretsdump(target_win_ntds: Target) -> None:
