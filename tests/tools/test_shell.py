@@ -17,7 +17,6 @@ from unittest.mock import MagicMock, call, mock_open, patch
 import pytest
 
 from dissect.target.containers.raw import RawContainer
-from dissect.target import Target
 from dissect.target.helpers.fsutil import TargetPath, normalize
 from dissect.target.target import Target
 from dissect.target.tools.shell import (
