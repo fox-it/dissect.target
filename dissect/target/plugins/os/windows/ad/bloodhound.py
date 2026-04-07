@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds.c_sd import c_sd
+from dissect.database.ese.ntds.sd import ACCESS_MASK, ACE_FLAGS, ACE_TYPE
 from dissect.database.ese.ntds.util import UserAccountControl
 
 from dissect.target.plugin import Plugin, UnsupportedPluginError, arg, export
@@ -21,12 +22,19 @@ if TYPE_CHECKING:
     from dissect.target import Target
 
 
-# Standard BloodHound GUID Mappings
+ACL_STANDARD_RIGHTS = {
+    ACCESS_MASK.GENERIC_ALL: "GenericAll",
+    ACCESS_MASK.GENERIC_WRITE: "GenericWrite",
+    ACCESS_MASK.WRITE_DACL: "WriteDacl",
+    ACCESS_MASK.WRITE_OWNER: "WriteOwner",
+}
+
 ACL_EXTENDED_RIGHTS = {
     "00299570-246d-11d0-a768-00aa006e0529": "ForceChangePassword",
     "1131f6aa-9c07-11d1-f79f-00c04fc2dcd2": "DCSync",
     "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2": "DCSync",
     "89e95b76-ce4a-45c9-bbc6-5d6133112a4e": "DCSync",
+    "00000000-0000-0000-0000-000000000000": "AllExtendedRights",
 }
 
 ACL_WRITE_PROPERTIES = {
@@ -36,7 +44,7 @@ ACL_WRITE_PROPERTIES = {
 
 # Active Directory Trust Attribute Bitmasks
 TRUST_ATTRIBUTE_NON_TRANSITIVE = 0x0001
-TRUST_ATTRIBUTE_QUARANTINED_DOMAIN = 0x0004  # SID Filtering Enabled
+TRUST_ATTRIBUTE_QUARANTINED_DOMAIN = 0x0004
 TRUST_ATTRIBUTE_FOREST_TRANSITIVE = 0x0008
 TRUST_ATTRIBUTE_WITHIN_FOREST = 0x0020
 
@@ -96,124 +104,86 @@ def trust_type_uplevel_to_actual_type(trust_attributes: int) -> str:
 
 
 @cache
-def extract_sd_data(ntds: NTDS, nt_security_descriptor: int | None) -> tuple[bool, list[dict[str, Any]]]:
+def extract_sd_data(ntds: NTDS, record: Record) -> dict[str, bool | list[dict[str, Any]]]:
     """Translate an NT Security Descriptor into BloodHound ACE format.
 
     Args:
-        nt_security_descriptor: Raw nTSecurityDescriptor from dissect.
+        record (Record): The record containing the security descriptor.
 
     Returns:
-        A list of dictionaries representing BloodHound Access Control Entries.
+        sd_data (dict[str, bool | list[dict[str, Any]]]): Dictionary containingthe "IsACLProtected" flag
+            and a list of ACEs.
     """
-    if nt_security_descriptor is None:
-        return []
-
     aces = []
 
-    sd: SecurityDescriptor = ntds.db.sd.sd(nt_security_descriptor)
+    sd: SecurityDescriptor = ntds.db.sd.sd(record.nt_security_descriptor)
+
+    is_acl_protected = c_sd.SECURITY_DESCRIPTOR_CONTROL.SE_DACL_PROTECTED.name in sd.header.Control.name.split("|")
+
     if sd.dacl is None:
-        return []
+        return {
+            "IsACLProtected": is_acl_protected,
+            "Aces": aces,
+        }
+
+    principal_type = "Unknown"
+    if "msDS-GroupManagedServiceAccount" in record.object_classes:
+        principal_type = "User"
+    elif "computer" in record.object_classes:
+        principal_type = "Computer"
+    elif "user" in record.object_classes:
+        principal_type = "User"
+    elif "group" in record.object_classes:
+        principal_type = "Group"
+    elif {"domain", "domainDNS", "trustedDomain"}.intersection(record.object_classes):
+        principal_type = "Domain"
 
     for ace in sd.dacl.ace:
-        # We generally only care about ACCESS_ALLOWED_ACE_TYPE (0) and ACCESS_ALLOWED_OBJECT_ACE_TYPE (5)
-        # You can check the integer value safely regardless of the Enum naming
-        if ace.type.value not in (0, 5):
+        if ace.type not in (ACE_TYPE.ACCESS_ALLOWED, ACE_TYPE.ACCESS_ALLOWED_OBJECT):
             continue
 
-        # 1. Determine Inheritance
-        # INHERITED_ACE flag is 0x10
-        is_inherited = False
-        if ace.flags and (ace.flags.value & 0x10):
-            is_inherited = True
+        is_inherited = bool(ace.flags & ACE_FLAGS.INHERITED_ACE)
 
-        # Extract the raw integer mask for bitwise comparison
-        mask = ace.mask.value if ace.mask else 0
-        sid = ace.sid
-
-        # BloodHound will often resolve "Unknown" internally based on the SID,
-        # or you can write a helper function to check well-known SIDs later.
-        principal_type = "Unknown"
-
-        # 2. Check Standard Rights
-        # GENERIC_ALL
-        if mask & 0x10000000:
-            aces.append(
-                {
-                    "PrincipalSID": sid,
-                    "PrincipalType": principal_type,
-                    "RightName": "GenericAll",
-                    "IsInherited": is_inherited,
-                }
-            )
-        # GENERIC_WRITE
-        if mask & 0x40000000:
-            aces.append(
-                {
-                    "PrincipalSID": sid,
-                    "PrincipalType": principal_type,
-                    "RightName": "GenericWrite",
-                    "IsInherited": is_inherited,
-                }
-            )
-        # WRITE_DAC
-        if mask & 0x00040000:
-            aces.append(
-                {
-                    "PrincipalSID": sid,
-                    "PrincipalType": principal_type,
-                    "RightName": "WriteDacl",
-                    "IsInherited": is_inherited,
-                }
-            )
-        # WRITE_OWNER
-        if mask & 0x00080000:
-            aces.append(
-                {
-                    "PrincipalSID": sid,
-                    "PrincipalType": principal_type,
-                    "RightName": "WriteOwner",
-                    "IsInherited": is_inherited,
-                }
-            )
-
-        # 3. Check Object-Specific Rights (Extended Rights and Properties)
-        if ace.is_object_ace and ace.object_type:
-            guid_str = str(ace.object_type).lower()
-
-            # ADS_RIGHT_DS_CONTROL_ACCESS (Extended Rights) - 0x00000100
-            if mask & 0x00000100:
-                if guid_str in ACL_EXTENDED_RIGHTS:
-                    aces.append(
-                        {
-                            "PrincipalSID": sid,
-                            "PrincipalType": principal_type,
-                            "RightName": ACL_EXTENDED_RIGHTS[guid_str],
-                            "IsInherited": is_inherited,
-                        }
-                    )
-                # All zeros means All Extended Rights
-                elif guid_str == "00000000-0000-0000-0000-000000000000":
-                    aces.append(
-                        {
-                            "PrincipalSID": sid,
-                            "PrincipalType": principal_type,
-                            "RightName": "AllExtendedRights",
-                            "IsInherited": is_inherited,
-                        }
-                    )
-
-            # ADS_RIGHT_DS_WRITE_PROP (Write Property) - 0x00000020
-            if mask & 0x00000020 and guid_str in ACL_WRITE_PROPERTIES:
+        for mask_flag, right_name in ACL_STANDARD_RIGHTS.items():
+            if ace.mask & mask_flag:
                 aces.append(
                     {
-                        "PrincipalSID": sid,
+                        "PrincipalSID": ace.sid,
                         "PrincipalType": principal_type,
-                        "RightName": ACL_WRITE_PROPERTIES[guid_str],
+                        "RightName": right_name,
                         "IsInherited": is_inherited,
                     }
                 )
 
-    return c_sd.SECURITY_DESCRIPTOR_CONTROL.SE_DACL_PROTECTED.name in sd.header.Control.name.split("|"), aces
+        if not ace.is_object_ace or not ace.object_type:
+            continue
+
+        guid = str(ace.object_type).lower()
+
+        if ace.mask & ACCESS_MASK.ADS_RIGHT_DS_CONTROL_ACCESS and guid in ACL_EXTENDED_RIGHTS:
+            aces.append(
+                {
+                    "PrincipalSID": ace.sid,
+                    "PrincipalType": principal_type,
+                    "RightName": ACL_EXTENDED_RIGHTS[guid],
+                    "IsInherited": is_inherited,
+                }
+            )
+
+        if ace.mask & ACCESS_MASK.ADS_RIGHT_DS_WRITE_PROP and guid in ACL_WRITE_PROPERTIES:
+            aces.append(
+                {
+                    "PrincipalSID": ace.sid,
+                    "PrincipalType": principal_type,
+                    "RightName": ACL_WRITE_PROPERTIES[guid],
+                    "IsInherited": is_inherited,
+                }
+            )
+
+    return {
+        "IsACLProtected": is_acl_protected,
+        "Aces": aces,
+    }
 
 
 def extract_fqdn_from_dn(distinguished_name: str | None) -> str | None:
@@ -296,13 +266,10 @@ class BloodHound(Plugin):
         return flag.name in record.user_account_control.split("|")
 
     def extract_generic_info(self, record: Record) -> dict[str, Any]:
-        is_acl_protected, aces = extract_sd_data(self.target.ad.ntds, record.nt_security_descriptor)
-
         return {
             "ObjectIdentifier": self.get_object_identifier(record),
             "IsDeleted": record.is_deleted.value,
-            "IsACLProtected": is_acl_protected,
-            "Aces": aces,
+            **extract_sd_data(self.target.ad.ntds, record),
             "ContainedBy": self.extract_parent_info(record),
         }
 
