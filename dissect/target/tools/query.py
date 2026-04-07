@@ -154,7 +154,7 @@ def main() -> int:
     execution_report.set_event_callbacks(Target)
 
     try:
-        for target in open_targets(args):
+        for target in open_targets(args, rest=rest):
             record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []

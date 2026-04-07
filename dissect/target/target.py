@@ -69,11 +69,13 @@ class Target:
 
     Args:
         path: The path of a target.
+        rest: Optional list of argument strings not consumed by the tool calling :class:`Target`.
     """
 
-    def __init__(self, path: str | Path | None = None):
+    def __init__(self, path: str | Path | None = None, rest: list[str] | None = None):
         self.path_scheme = None
         self.path_query = {}
+        self.rest_args = rest
 
         self.path, self.parsed_path = parse_path_uri(path)
         if self.parsed_path:
@@ -319,7 +321,12 @@ class Target:
 
     @classmethod
     def open_all(
-        cls, paths: str | Path | list[str | Path], include_children: bool = False, *, apply: bool = True
+        cls,
+        paths: str | Path | list[str | Path],
+        include_children: bool = False,
+        *,
+        apply: bool = True,
+        rest: list[str] | None = None,
     ) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
 
@@ -336,7 +343,9 @@ class Target:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
-        def _open_all(spec: str | Path, include_children: bool = False, *, apply: bool = True) -> Iterator[Target]:
+        def _open_all(
+            spec: str | Path, include_children: bool = False, *, apply: bool = True, rest: list[str] | None = None
+        ) -> Iterator[Target]:
             # If the path is a URI-like string, separate the path component
             adjusted_path, parsed_path = parse_path_uri(spec)
             # We always need a path to work with, so convert the spec into one if it's not one already
@@ -392,7 +401,7 @@ class Target:
                     # For file/dir-like paths it's a Path object
                     # If include_children is True, we override the apply parameter so we can find child targets
                     # The apply parameter will then be used on the children
-                    target = cls._load(load_spec, ldr, apply=include_children or apply)
+                    target = cls._load(load_spec, ldr, apply=include_children or apply, rest=rest)
                 except Exception as e:
                     get_target_logger(load_spec).error("Failed to load target with loader %s", ldr)
                     get_target_logger(load_spec).debug("", exc_info=e)
@@ -415,7 +424,7 @@ class Target:
         for spec in paths:
             loaded = False
 
-            for target in _open_all(spec, include_children=include_children, apply=apply):
+            for target in _open_all(spec, include_children=include_children, apply=apply, rest=rest):
                 loaded = True
                 at_least_one_loaded = True
                 yield target
@@ -590,7 +599,9 @@ class Target:
         raise TargetError("Target has no path and/or loader")
 
     @classmethod
-    def _load(cls, path: str | Path | None, ldr: loader.Loader, *, apply: bool = True) -> Self:
+    def _load(
+        cls, path: str | Path | None, ldr: loader.Loader, *, apply: bool = True, rest: list[str] | None = None
+    ) -> Self:
         """Internal function that attemps to load a path using a given loader.
 
         Args:
@@ -603,7 +614,7 @@ class Target:
         Returns:
             A ``Target`` object with disks, volumes and/or filesystems mapped by the ``ldr`` from the given ``path``.
         """
-        target = cls(path)
+        target = cls(path, rest)
 
         try:
             ldr.map(target)

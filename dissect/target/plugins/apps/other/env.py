@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.configutil import Env
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+from dissect.target.target import Target
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -21,33 +24,36 @@ EnvironmentFileRecord = TargetRecordDescriptor(
 )
 
 
+@arg("--path", required=True, help="path to scan environment files in")
+@arg("--extension", default="env", help="extension of files to scan")
 class EnvironmentFilePlugin(Plugin):
     """Environment file plugin."""
 
+    def __init__(self, target: Target):
+        super().__init__(target)
+
+        args = self.get_args()
+        self.path = args.path
+        self.extension = args.extension
+        self.files: list[Path] = []
+
+        if args.path and (dir := self.target.fs.path(args.path)).is_dir():
+            self.files.extend(path for path in dir.glob(f"**/*.{args.extension}"))
+
     def check_compatible(self) -> None:
-        # `--env-path` is required at runtime
-        pass
+        if not self.files:
+            raise UnsupportedPluginError(f"No environment variable files found in {self.path}/**/*.{self.extension}")
 
     @export(record=EnvironmentFileRecord)
-    @arg("--env-path", required=True, help="path to scan environment files in")
-    @arg("--extension", default="env", help="extension of files to scan")
-    def envfile(self, env_path: str, extension: str = "env") -> Iterator[EnvironmentFileRecord]:
+    def envfile(self) -> Iterator[EnvironmentFileRecord]:
         """Yield environment variables found in ``.env`` files at the provided path."""
-        if not env_path:
-            self.target.log.error("No ``--path`` provided!")
-            return
-
-        if not (path := self.target.fs.path(env_path)).exists():
-            self.target.log.error("Provided path %s does not exist!", path)
-            return
-
-        for file in path.glob("**/*." + extension):
+        for file in self.files:
             if not file.is_file():
                 continue
 
             mtime = file.lstat().st_mtime
 
-            with file.open("r") as fh:
+            with file.open("rt") as fh:
                 parser = Env(comments=True)
                 parser.read_file(fh)
 
