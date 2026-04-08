@@ -26,19 +26,22 @@ def cleanup_modules(modules: list[str], monkeypatch: pytest.MonkeyPatch) -> Iter
     """Removes or reverts modules back into sys.modules.
 
     There can be cases that a "tainted" module gets imported using monkeypatch.
-    This still has references to the mock objects and effects other tests.
+    This still has references to the mock objects and affects other tests.
     """
     prev_modules: dict[str, ModuleType | None] = {}
-    with monkeypatch.context() as m:
-        for mod in modules:
-            prev_modules.update({mod: sys.modules.get(mod)})
-            # Remove the module inside this monkeypatch context
-            if mod in sys.modules:
-                m.delitem(sys.modules, mod)
 
-        yield
+    try:
+        with monkeypatch.context() as m:
+            for mod in modules:
+                prev_modules.update({mod: sys.modules.get(mod)})
+                # Remove the module inside this monkeypatch context
+                if mod in sys.modules:
+                    m.delitem(sys.modules, mod)
 
-    for name, module in prev_modules.items():
-        if module is None and name in sys.modules:
-            # Delete the module if it was created during the test
-            del sys.modules[name]
+            yield
+
+    finally:
+        for name, module in prev_modules.items():
+            if module is None and name in sys.modules:
+                # Delete the module if it was created during the test
+                del sys.modules[name]
