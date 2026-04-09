@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import os
 import pathlib
 import platform
 import re
 import sys
+import tarfile
 from collections import ChainMap
 from io import BytesIO, StringIO
 from typing import IO, TYPE_CHECKING, TextIO
@@ -691,3 +693,330 @@ def test_benchmark_ls_bin(
     assert not err
     assert "bash" in out
     assert "zgrep" in out
+
+
+@pytest.mark.parametrize(
+    ("tar_args", "outname"),
+    [
+        ("-cvf", "out.tar"),
+        ("-cvzf", "out.tar.gz"),
+        ("-cvjf", "out.tar.bz2"),
+        ("-cvJf", "out.tar.xz"),
+    ],
+)
+def test_target_cli_tar_symlink(tmp_path: Path, tar_args: str, outname: str, capsys: pytest.CaptureFixture) -> None:
+    """Test that we can correctly tar symlinks, and that the metadata of the symlink and its target are preserved."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / outname
+    cli.onecmd(f"tar {tar_args} {outpath.as_posix()} /path")
+    captured = capsys.readouterr()
+    assert (
+        captured.err
+        == """\
+a path
+a path/to
+a path/to/symlink
+a path/to/symlink/target
+a path/to/target
+"""
+    )
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            "path",
+            "path/to",
+            "path/to/symlink",
+            "path/to/symlink/target",
+            "path/to/target",
+        ]
+        tarinfo = tar.getmember("path/to/symlink")
+        assert tarinfo.isdir()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        assert tarinfo.mtime == 1775548971.2269073
+        assert tarinfo.pax_headers["atime"] == "1775548971.198906"
+        assert tarinfo.pax_headers["ctime"] == "1775548971.2269073"
+
+        tarinfo = tar.getmember("path/to/symlink/target")
+        assert tarinfo.issym()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        assert tarinfo.linkname == "../target"
+        assert tarinfo.mtime == 1775548971.2269073
+        assert tarinfo.pax_headers["atime"] == "1775548971.2269073"
+        assert tarinfo.pax_headers["ctime"] == "1775548971.2269073"
+
+        tarinfo = tar.getmember("path/to/target")
+        assert tarinfo.issym()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        assert tarinfo.linkname == "symlink/target"
+        assert tarinfo.mtime == 1775548971.214906
+        assert tarinfo.pax_headers["atime"] == "1775548971.214906"
+        assert tarinfo.pax_headers["ctime"] == "1775548971.214906"
+
+
+def test_target_cli_tar_file_types(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we can correctly tar different file types, and that the metadata of the files are preserved."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+    cli.onecmd(f"tar -cf {outpath.as_posix()} /files")
+    captured = capsys.readouterr()
+
+    # tar should skip the unix socket and print warning, but should still include the other files and directories
+    assert captured.err == "tar: /files/pipes/unix.sock: unsupported file type, skipping\n"
+
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            "files",
+            "files/block",
+            "files/block/md0",
+            "files/block/ram0",
+            "files/char",
+            "files/char/zero",
+            "files/links",
+            "files/links/README-hardlink.txt",
+            "files/links/README-symlink.txt",
+            "files/pipes",
+            "files/pipes/fifo",
+        ]
+        # Block devices
+        tarinfo = tar.getmember("files/block/md0")
+        assert tarinfo.isblk()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        tarinfo = tar.getmember("files/block/ram0")
+        assert tarinfo.isblk()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+
+        # Char device
+        tarinfo = tar.getmember("files/char/zero")
+        assert tarinfo.ischr()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+
+        # Regular files
+        tarinfo = tar.getmember("files/links/README-hardlink.txt")
+        assert tarinfo.isreg()
+        assert tarinfo.gid == 1000
+        assert tarinfo.uid == 1000
+        tarinfo = tar.getmember("files/links/README-symlink.txt")
+        assert tarinfo.issym()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+
+        # FIFO pipe
+        tarinfo = tar.getmember("files/pipes/fifo")
+        assert tarinfo.isfifo()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        assert tarinfo.mtime == 1775548986.923013
+        assert tarinfo.pax_headers["atime"] == "1775548986.923013"
+        assert tarinfo.pax_headers["ctime"] == "1775548986.923013"
+        assert tarinfo.pax_headers["LIBARCHIVE.creationtime"] == "1775548986.923013"
+
+
+def test_target_cli_tar_hardlink(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we can correctly tar hardlinks, and that the metadata of the hardlink and its target are preserved."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} README.txt /files/links/README-hardlink.txt")
+    captured = capsys.readouterr()
+    assert captured.err == "a README.txt\na files/links/README-hardlink.txt\n"
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == ["README.txt", "files/links/README-hardlink.txt"]
+        tarinfo = tar.getmember("README.txt")
+        assert tarinfo.isreg()
+        assert (
+            hashlib.sha256(tar.extractfile(tarinfo).read()).hexdigest()
+            == "1e340358aabb36cb3bf24d8adb0060bf54b0b9fcad94a79d0e8ca96c7930dc6a"
+        )
+        tarinfo = tar.getmember("files/links/README-hardlink.txt")
+        assert tarinfo.islnk()
+        assert tarinfo.linkname == "README.txt"
+
+
+def test_target_cli_tar_relative_paths(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we can use relative paths, and it's correctly resolved based on the current working directory."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+    cli.onecmd("cd /files")
+
+    # test that we can tar the current directory with relative paths
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} .")
+    captured = capsys.readouterr()
+    assert (
+        captured.err
+        == """\
+a .
+a ./block
+a ./block/ram0
+a ./block/md0
+a ./char
+a ./char/zero
+a ./links
+a ./links/README-symlink.txt
+a ./links/README-hardlink.txt
+a ./pipes
+a ./pipes/fifo
+a ./pipes/unix.sock
+tar: /files/pipes/unix.sock: unsupported file type, skipping
+"""
+    )
+
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            ".",
+            "./block",
+            "./block/md0",
+            "./block/ram0",
+            "./char",
+            "./char/zero",
+            "./links",
+            "./links/README-hardlink.txt",
+            "./links/README-symlink.txt",
+            "./pipes",
+            "./pipes/fifo",
+        ]
+
+    # test that we can also use relative paths that go up the directory tree
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} ../files")
+    captured = capsys.readouterr()
+    assert (
+        captured.err
+        == """\
+a files
+a files/block
+a files/block/ram0
+a files/block/md0
+a files/char
+a files/char/zero
+a files/links
+a files/links/README-symlink.txt
+a files/links/README-hardlink.txt
+a files/pipes
+a files/pipes/fifo
+a files/pipes/unix.sock
+tar: /files/../files/pipes/unix.sock: unsupported file type, skipping
+"""
+    )
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            "files",
+            "files/block",
+            "files/block/md0",
+            "files/block/ram0",
+            "files/char",
+            "files/char/zero",
+            "files/links",
+            "files/links/README-hardlink.txt",
+            "files/links/README-symlink.txt",
+            "files/pipes",
+            "files/pipes/fifo",
+        ]
+
+    # check if leading `../` is correctly stripped
+    cli.onecmd("cd /files/block")
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} ../../README.txt")
+    captured = capsys.readouterr()
+    assert captured.err == "a README.txt\n"
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == ["README.txt"]
+
+
+def test_target_cli_tar_dereference(tmp_path: Path) -> None:
+    """Test archiving of symlink with and without dereference option."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+
+    # without dereference, the symlink should be archived as a symlink
+    cli.onecmd(f"tar -cf {outpath.as_posix()} /files/links/README-symlink.txt")
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == ["files/links/README-symlink.txt"]
+        tarinfo = tar.getmember("files/links/README-symlink.txt")
+        assert tarinfo.issym()
+        assert tarinfo.linkname == "../../README.txt"
+
+    # with dereference, the symlink should be archived as a regular file with the content of the target
+    cli.onecmd(f"tar --dereference -cf {outpath.as_posix()} /files/links/README-symlink.txt")
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == ["files/links/README-symlink.txt"]
+        tarinfo = tar.getmember("files/links/README-symlink.txt")
+        assert tarinfo.isreg()
+        assert (
+            tar.extractfile(tarinfo).read()
+            == b"""\
+# Creating this image
+
+qemu-img create -f raw image.ext4 140k
+sudo mkfs.ext4 -I 256 -b 1024 -i 2048 image.ext4 -U e0c3d987-a36c-4f9e-9b2f-90e633d7d7a1
+
+## Mounting the image
+
+sudo modprobe nbd
+sudo qemu-nbd --connect=/dev/nbd0 image.ext4 --format=raw
+sudo mkdir /mnt/image
+sudo mount /dev/nbd0 /mnt/image -o noatime
+
+## Create symlink data
+
+cd /mnt/image
+sudo mkdir -p ./path/to/symlink
+sudo ln -s symlink/target ./path/to/target
+sudo ln -s ../target ./path/to/symlink/target
+
+## Create files data
+
+cd /mnt/image
+sudo mkdir -p ./files/{block,char,links,pipes}
+sudo mknod ./files/block/ram0 b 1 0
+sudo mknod ./files/block/md0 b 9 0
+
+sudo mknod ./files/char/zero c 1 5
+
+sudo ln -s ../../README.txt ./files/links/README-symlink.txt
+sudo ln ./README.txt ./files/links/README-hardlink.txt
+
+sudo mkfifo ./files/pipes/fifo
+sudo socat UNIX-LISTEN:./files/pipes/unix.sock,fork,unlink-close=0 -
+"""
+        )
+
+
+def test_target_cli_tar_unknown_path(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we correctly handle unknown paths when trying to tar."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} missing.txt")
+    captured = capsys.readouterr()
+    assert captured.err == "tar: missing.txt: No such file or directory\n"
+    assert outpath.is_file()
