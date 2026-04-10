@@ -494,7 +494,9 @@ class ExtendedCmd(cmd.Cmd):
             line = os.path.expandvars(line)
             os.chdir(line)
             print("Local directory changed to", Path.cwd())
-            self._local_prev_dir = str(prev)  # only update after successful chdir
+            # only update after successful chdir and only if it's a different directory
+            if prev != Path.cwd():
+                self._local_prev_dir = str(prev)  
         except FileNotFoundError:
             print(f"cd: no such file or directory: {line}")
         except PermissionError:
