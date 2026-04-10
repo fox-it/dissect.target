@@ -352,10 +352,10 @@ def get_supplemental_credentials(account: User | Computer) -> Iterator[str]:
     """Extract supplemental credentials from a user object.
 
     Args:
-        account (User | Computer): The user or computer object to extract supplemental credentials from.
+        account: The user or computer object to extract supplemental credentials from.
 
     Yields:
-        supplemental_credential (str): Supplemental credential in the secrets dump format
+        Supplemental credentials in the secrets dump format.
     """
     # Keep impacket defined constants in the method so we don't pollute our own
     kerberos_key_type = {
@@ -500,13 +500,14 @@ def extract_account_info(account: User | Computer, target: Target) -> dict[str, 
 
 def extract_laps(computer: Computer) -> dict[str, Any]:
     """Extract LAPS information from the NTDS.dit database.
+
     LAPS information can be stored in multiple attributes depending on the Windows version and LAPS configuration.
 
     Args:
-        computer (Computer): The computer object to extract LAPS information from.
+        computer: The computer object to extract LAPS information from.
 
     Returns:
-        laps (dict[str, Any]): Dictionary containing LAPS information
+        Dictionary containing LAPS information.
     """
     has_laps = False
     try:
