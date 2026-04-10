@@ -5,7 +5,6 @@ from functools import cached_property
 from itertools import zip_longest
 from typing import TYPE_CHECKING, Any
 
-from dissect.cstruct import cstruct
 from dissect.database.ese.ntds import NTDS
 from dissect.database.ese.ntds.util import UserAccountControl
 from dissect.util.ts import wintimestamp
@@ -170,18 +169,6 @@ NTDS_PARAMETERS_DB_VALUE = "DSA Database file"
 DEFAULT_LM_HASH = "aad3b435b51404eeaad3b435b51404ee"
 DEFAULT_NT_HASH = "31d6cfe0d16ae931b73c59d7e0c089c0"
 
-# MS-DS-ManagedPassword attribute structure
-MS_DS_MANAGED_PASSWORD_DEF = """
-struct gms_managed_password {
-    uint16 version;
-    uint16 reserved;
-    uint32 length;
-    char password[length];
-};
-"""
-
-MS_DS_MANAGED_PASSWORD = cstruct().load(MS_DS_MANAGED_PASSWORD_DEF)
-
 
 class NtdsPlugin(Plugin):
     """Plugin to parse NTDS.dit Active Directory database and extract user credentials.
@@ -234,8 +221,7 @@ class NtdsPlugin(Plugin):
         """Extract all computer accounts from the NTDS.dit database."""
         for computer in self.ntds.computers():
             try:
-                blob = computer.get("msDS-ManagedPassword")
-                dump_smsa_password = MS_DS_MANAGED_PASSWORD.gms_managed_password(blob).hex()
+                dump_smsa_password = computer.get("msDS-ManagedPassword")
             except Exception:
                 dump_smsa_password = None
 
