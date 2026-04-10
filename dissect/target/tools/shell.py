@@ -186,6 +186,7 @@ class ExtendedCmd(cmd.Cmd):
         self.debug = DebugMode.OFF
         self.cyber = cyber
         self.identchars += "."
+        self._local_prev_dir: str | None = None
 
         self.register_aliases()
 
@@ -420,7 +421,8 @@ class ExtendedCmd(cmd.Cmd):
 
     def do_clear(self, line: str) -> bool:
         """Clear the terminal screen."""
-        os.system("cls||clear")
+        clear_cmd = "cls" if os.name == "nt" else "clear"
+        subprocess.run(clear_cmd, shell=True, check=False)
         return False
 
     def do_cls(self, line: str) -> bool:
@@ -464,6 +466,45 @@ class ExtendedCmd(cmd.Cmd):
         else:
             print("Usage: debug [on|off|pm]")
 
+        return False
+
+    def do_shell(self, line: str) -> bool:
+        """Execute a local shell command. Usage: !<command>."""
+        parts = line.strip().split(maxsplit=1)
+
+        # Handle `cd` as a special case, as it needs to change the state of our current process.
+        if parts and parts[0] == "cd":
+            target = parts[1].strip() if len(parts) > 1 else pathlib.Path.home()
+            self.do_lcd(target)
+        else:
+            subprocess.run(line, shell=True, check=False)
+        return False
+
+    def do_lcd(self, line: str) -> bool:
+        """Change the local working directory. Usage: lcd <path>."""
+        if line == "-":
+            if self._local_prev_dir is None:
+                print("cd: no previous directory")
+                return False
+            line = self._local_prev_dir
+
+        try:
+            prev = Path.cwd()
+            line = str(Path(line).expanduser())
+            line = os.path.expandvars(line)
+            os.chdir(line)
+            print("Local directory changed to", Path.cwd())
+            self._local_prev_dir = str(prev)  # only update after successful chdir
+        except FileNotFoundError:
+            print(f"cd: no such file or directory: {line}")
+        except PermissionError:
+            print(f"cd: permission denied: {line}")
+
+        return False
+
+    def do_lpwd(self, line: str) -> bool:
+        """Print the current local working directory."""
+        print(Path.cwd())
         return False
 
 
