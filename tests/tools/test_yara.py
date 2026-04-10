@@ -94,8 +94,10 @@ def test_yara_decompress(
 
         out, _ = capsys.readouterr()
 
-        ts_ctime = fieldtypes.datetime(gzip_path.stat().st_ctime)
-        hit = f"<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 ts_atime=1970-01-01 00:00:00+00:00 ts_ctime={ts_ctime} ts_btime=1970-01-01 00:00:00+00:00 path='/var/log/messages.gz' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=485a4c5e37cd08a0cdf028cc2b1f32b4, sha1=7716bff4d3282184a17f35f5f0dde25aede762f9, sha256=d175bb08145c0be3338b058f8b7a775cc08967ba6aa7448fa2af9957eb1ab37f)"  # noqa E501
+        gzstat = gzip_path.stat()
+        ts_ctime = fieldtypes.datetime(gzstat.st_ctime)
+        ts_btime = fieldtypes.datetime(gzstat.st_birthtime) if hasattr(gzstat, "st_birthtime") else None
+        hit = f"<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 ts_atime=1970-01-01 00:00:00+00:00 ts_ctime={ts_ctime} ts_btime={ts_btime} path='/var/log/messages.gz' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=485a4c5e37cd08a0cdf028cc2b1f32b4, sha1=7716bff4d3282184a17f35f5f0dde25aede762f9, sha256=d175bb08145c0be3338b058f8b7a775cc08967ba6aa7448fa2af9957eb1ab37f)"  # noqa E501
 
         if no_decompress:
             assert len(out.splitlines()) == 0
