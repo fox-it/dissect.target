@@ -1099,3 +1099,14 @@ def test_target_cli_unsupported_plugin_debug_pm(monkeypatch: pytest.MonkeyPatch,
     assert "->" in out
     assert "raise UnsupportedPluginError" in out
     assert ("ipdb>" in out) or ("(Pdb)" in out)  # ipdb or pdb depending on availability
+
+
+def test_target_cli_lscolors(capsys: pytest.CaptureFixture) -> None:
+    """Test that we correctly format ls colors for different file types."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    cli.onecmd("ls -la --color /files/pipes")
+    captured = capsys.readouterr()
+    assert fs.fmt_ls_colors("so", "unix.sock") in captured.out
+    assert fs.fmt_ls_colors("pi", "fifo") in captured.out
