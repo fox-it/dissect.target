@@ -495,7 +495,7 @@ class ExtendedCmd(cmd.Cmd):
             print("Local directory changed to", Path.cwd())
             # only update after successful chdir and only if it's a different directory
             if prev != Path.cwd():
-                self._local_prev_dir = str(prev)  
+                self._local_prev_dir = str(prev)
         except FileNotFoundError:
             print(f"cd: no such file or directory: {line}")
         except PermissionError:
@@ -1158,7 +1158,7 @@ class TargetCli(TargetCmd):
             else:
                 tar.addfile(info)
 
-        fobj = stdout.buffer if args.file == "-" else pathlib.Path(args.file).open("wb")  # noqa: SIM115
+        fobj = stdout.buffer if args.file == "-" else Path(args.file).open("wb")  # noqa: SIM115
         mode = "w|"
         if args.gzip:
             mode = "w|gz"
@@ -1225,9 +1225,7 @@ class TargetCli(TargetCmd):
 
             return diverging_path
 
-        def save_path(
-            src_path: Path, dst_path: Path, create_dst_subdir: Path | None = None
-        ) -> None:
+        def save_path(src_path: Path, dst_path: Path, create_dst_subdir: Path | None = None) -> None:
             """Save a common file or directory in src_path to dst_path.
 
             If src_path is a file, dst_path can be either a directory or a file
