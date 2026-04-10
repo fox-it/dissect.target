@@ -27,6 +27,9 @@ def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     # Ensure associated filter query was correctly found for all
     assert len([record for record in target_win.cim() if record.filter_query]) == 3
 
+    # Ensure all namespaces were correctly iterated over
+    assert len(list(target_win.cim._iter_namespaces())) == 125
+
 
 def test_cim_direct_mode() -> None:
     data_path = absolute_path("_data/plugins/os/windows/cim/default-namespace")
@@ -41,7 +44,7 @@ Result of the WMI query on the system used to generate the test data
 
 ## __FilterToConsumerBinding
 ```
- Get-WMIObject -Namespace root\Subscription -Class __FilterToConsumerBinding
+Get-WMIObject -Namespace root\Subscription -Class __FilterToConsumerBinding
 __GENUS                 : 2
 __CLASS                 : __FilterToConsumerBinding
 __SUPERCLASS            : __IndicationRelated
@@ -283,3 +286,6 @@ def test_consumerbindings_all_namespaces(target_win: Target, fs_win: VirtualFile
     consumer_records = list(target_win.cim.consumerbindings())
     binding_names = [r.filter_name for r in consumer_records]
     assert "Pentestlab-WMI" in binding_names
+
+    # Ensure all namespaces were correctly iterated over
+    assert len(list(target_win.cim._iter_namespaces())) == 118
