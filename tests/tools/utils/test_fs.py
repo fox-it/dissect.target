@@ -1,18 +1,66 @@
 from __future__ import annotations
 
+import stat
 import sys
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
+import pytest
+
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import stat_result
-from dissect.target.tools.utils.fs import LsEntry, print_ls_entry
+from dissect.target.tools.utils.fs import LsEntry, file_type_from_mode, fmt_ls_colors, print_ls_entry
 
 if TYPE_CHECKING:
-    import pytest
-
     from dissect.target.target import Target
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        # Files
+        pytest.param(stat.S_IFREG, "fi", id="file"),
+        pytest.param(stat.S_IFREG | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH, "ex", id="executable"),
+        pytest.param(stat.S_IFREG | stat.S_ISUID, "su", id="setuid"),
+        pytest.param(stat.S_IFREG | stat.S_ISGID, "sg", id="setgid"),
+        # Directories
+        pytest.param(stat.S_IFDIR, "di", id="directory"),
+        pytest.param(stat.S_IFDIR | stat.S_IWOTH, "ow", id="otherwritable"),
+        pytest.param(stat.S_IFDIR | stat.S_ISVTX, "st", id="sticky"),
+        pytest.param(stat.S_IFDIR | stat.S_IWOTH | stat.S_ISVTX, "tw", id="sticky-otherwritable"),
+        # Special files
+        pytest.param(stat.S_IFLNK, "ln", id="link"),
+        pytest.param(stat.S_IFIFO, "pi", id="pipe"),
+        pytest.param(stat.S_IFSOCK, "so", id="socket"),
+        pytest.param(stat.S_IFBLK, "bd", id="blockdevice"),
+        pytest.param(stat.S_IFCHR, "cd", id="chardevice"),
+        # Other, unknown
+        pytest.param(0, "or", id="other"),
+        pytest.param(None, "or", id="other-none"),
+    ],
+)
+def test_file_type_from_mode(mode: int | None, expected: str) -> None:
+    """Test that file_type_from_mode correctly identifies file types and special permissions based on the mode."""
+    assert file_type_from_mode(mode) == expected
+
+
+@pytest.mark.parametrize(
+    ("name", "has_color"),
+    [
+        pytest.param("archive.7z", True, id="7z"),
+        pytest.param("notes.bak", True, id="bak"),
+        pytest.param("script.sh", False, id="no-color"),
+    ],
+)
+def test_fmt_ls_colors_file_extension(name: str, has_color: bool) -> None:
+    """Test that fmt_ls_colors applies color codes based on some known file extensions."""
+    if has_color:
+        # The actual color code is not important for this test, just that it's different from the input name
+        assert fmt_ls_colors("fi", name) != name
+    else:
+        # If no color should be applied, the output should be the same as the input name
+        assert fmt_ls_colors("fi", name) == name
 
 
 def test_target_cli_print_extensive_file_stat(target_win: Target, capsys: pytest.CaptureFixture) -> None:
