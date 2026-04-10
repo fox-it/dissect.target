@@ -979,6 +979,7 @@ class TargetCli(TargetCmd):
     @arg("-u", action="store_true", dest="use_atime", help="show time of last access")
     @arg("-t", action="store_true", dest="sort_by_time", help="sort by time, newest first")
     @arg("-r", action="store_true", dest="reverse_sort", help="reverse sort order")
+    @arg("--color", action="store_true", help="force color output")
     @alias("l")
     @alias("dir")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1002,6 +1003,8 @@ class TargetCli(TargetCmd):
             use_color = True
         if os.getenv("NO_COLOR") in ["1", "True", "true"]:
             use_color = False
+        if args.color:
+            use_color = True
 
         print_ls(
             path=path,

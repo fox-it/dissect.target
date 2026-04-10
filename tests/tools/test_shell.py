@@ -1073,3 +1073,14 @@ def test_target_cli_tar_unknown_path(tmp_path: Path, capsys: pytest.CaptureFixtu
     captured = capsys.readouterr()
     assert captured.err == "tar: missing.txt: No such file or directory\n"
     assert outpath.is_file()
+
+
+def test_target_cli_lscolors(capsys: pytest.CaptureFixture) -> None:
+    """Test that we correctly format ls colors for different file types."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    cli.onecmd("ls -la --color /files/pipes")
+    captured = capsys.readouterr()
+    assert fs.fmt_ls_colors("so", "unix.sock") in captured.out
+    assert fs.fmt_ls_colors("pi", "fifo") in captured.out
