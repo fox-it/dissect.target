@@ -9,7 +9,6 @@ import io
 import itertools
 import logging
 import os
-import pathlib
 import platform
 import pydoc
 import random
@@ -186,6 +185,7 @@ class ExtendedCmd(cmd.Cmd):
         self.debug = DebugMode.OFF
         self.cyber = cyber
         self.identchars += "."
+        self._local_prev_dir: str | None = None
 
         self.register_aliases()
 
@@ -205,7 +205,7 @@ class ExtendedCmd(cmd.Cmd):
 
         return object.__getattribute__(self, attr)
 
-    def _load_targetrc(self, path: pathlib.Path) -> None:
+    def _load_targetrc(self, path: Path) -> None:
         """Load and execute commands from the run commands file."""
         try:
             with path.open() as fh:
@@ -218,9 +218,9 @@ class ExtendedCmd(cmd.Cmd):
         except Exception as e:
             log.debug("Error processing .targetrc file: %s", e)
 
-    def _get_targetrc_path(self) -> pathlib.Path | None:
+    def _get_targetrc_path(self) -> Path | None:
         """Get the path to the run commands file. Can return ``None`` if ``DEFAULT_RUNCOMMANDS_FILE`` is not set."""
-        return pathlib.Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
+        return Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
 
     def preloop(self) -> None:
         super().preloop()
@@ -420,7 +420,8 @@ class ExtendedCmd(cmd.Cmd):
 
     def do_clear(self, line: str) -> bool:
         """Clear the terminal screen."""
-        os.system("cls||clear")
+        clear_cmd = "cls" if os.name == "nt" else "clear"
+        subprocess.run(clear_cmd, shell=True, check=False)
         return False
 
     def do_cls(self, line: str) -> bool:
@@ -466,6 +467,47 @@ class ExtendedCmd(cmd.Cmd):
 
         return False
 
+    def do_shell(self, line: str) -> bool:
+        """Execute a local shell command. Usage: !<command>."""
+        parts = line.strip().split(maxsplit=1)
+
+        # Handle `cd` as a special case, as it needs to change the state of our current process.
+        if parts and parts[0] == "cd":
+            target = parts[1].strip() if len(parts) > 1 else Path.home()
+            self.do_lcd(target)
+        else:
+            subprocess.run(line, shell=True, check=False)
+        return False
+
+    def do_lcd(self, line: str) -> bool:
+        """Change the local working directory. Usage: lcd <path>."""
+        if line == "-":
+            if self._local_prev_dir is None:
+                print("cd: no previous directory")
+                return False
+            line = self._local_prev_dir
+
+        try:
+            prev = Path.cwd()
+            line = str(Path(line).expanduser())
+            line = os.path.expandvars(line)
+            os.chdir(line)
+            print("Local directory changed to", Path.cwd())
+            # only update after successful chdir and only if it's a different directory
+            if prev != Path.cwd():
+                self._local_prev_dir = str(prev)
+        except FileNotFoundError:
+            print(f"cd: no such file or directory: {line}")
+        except PermissionError:
+            print(f"cd: permission denied: {line}")
+
+        return False
+
+    def do_lpwd(self, line: str) -> bool:
+        """Print the current local working directory."""
+        print(Path.cwd())
+        return False
+
 
 class TargetCmd(ExtendedCmd):
     DEFAULT_HISTFILE = "~/.dissect_history"
@@ -484,11 +526,11 @@ class TargetCmd(ExtendedCmd):
 
         if self.histdir:
             self.histdirfmt = getattr(target._config, "HISTDIRFMT", self.DEFAULT_HISTDIRFMT)
-            self.histfile = pathlib.Path(self.histdir).resolve() / pathlib.Path(
+            self.histfile = Path(self.histdir).resolve() / Path(
                 self.histdirfmt.format(uid=os.getuid(), target=target.name)
             )
         else:
-            self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
+            self.histfile = Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
         # prompt format
         self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
@@ -503,9 +545,9 @@ class TargetCmd(ExtendedCmd):
 
         super().__init__(self.target.props.get("cyber"))
 
-    def _get_targetrc_path(self) -> pathlib.Path:
+    def _get_targetrc_path(self) -> Path:
         """Get the path to the run commands file."""
-        return pathlib.Path(
+        return Path(
             getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
         ).expanduser()
 
@@ -1116,7 +1158,7 @@ class TargetCli(TargetCmd):
             else:
                 tar.addfile(info)
 
-        fobj = stdout.buffer if args.file == "-" else pathlib.Path(args.file).open("wb")  # noqa: SIM115
+        fobj = stdout.buffer if args.file == "-" else Path(args.file).open("wb")  # noqa: SIM115
         mode = "w|"
         if args.gzip:
             mode = "w|gz"
@@ -1157,7 +1199,7 @@ class TargetCli(TargetCmd):
     @arg("-v", "--verbose", action="store_true")
     def cmd_save(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Save a common file or directory to the host filesystem."""
-        dst_path = pathlib.Path(args.out).resolve()
+        dst_path = Path(args.out).resolve()
 
         if len(args.path) > 1 and not dst_path.is_dir():
             # Saving multiple items to a non-directory is generally not very
@@ -1165,27 +1207,25 @@ class TargetCli(TargetCmd):
             # items are directories.
             print(f"{dst_path}: cannot save multiple files, destination is not a directory")
 
-        def log_saved_path(src_path: pathlib.Path, dst_path: pathlib.Path) -> None:
+        def log_saved_path(src_path: Path, dst_path: Path) -> None:
             if args.verbose:
                 print(f"{src_path} -> {dst_path}")
 
-        def get_diverging_path(path: pathlib.Path, reference_path: pathlib.Path) -> pathlib.Path:
+        def get_diverging_path(path: Path, reference_path: Path) -> Path:
             """Get the part of path where it diverges from reference_path."""
-            diverging_path = pathlib.Path()
+            diverging_path = Path()
 
             for diff_idx, path_part in enumerate(reference_path.parts):
                 if path_part != path.parts[diff_idx]:
                     diverging_parts = path.parts[diff_idx:]
                     if diverging_parts:
                         for part in diverging_parts:
-                            diverging_path = diverging_path.joinpath(pathlib.Path(part))
+                            diverging_path = diverging_path.joinpath(Path(part))
                     break
 
             return diverging_path
 
-        def save_path(
-            src_path: pathlib.Path, dst_path: pathlib.Path, create_dst_subdir: pathlib.Path | None = None
-        ) -> None:
+        def save_path(src_path: Path, dst_path: Path, create_dst_subdir: Path | None = None) -> None:
             """Save a common file or directory in src_path to dst_path.
 
             If src_path is a file, dst_path can be either a directory or a file

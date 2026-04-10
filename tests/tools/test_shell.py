@@ -11,6 +11,7 @@ import sys
 import tarfile
 from collections import ChainMap
 from io import BytesIO, StringIO
+from pathlib import Path
 from typing import IO, TYPE_CHECKING, TextIO
 from unittest.mock import MagicMock, call, mock_open, patch
 
@@ -34,7 +35,6 @@ from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
-    from pathlib import Path
 
     from pytest_benchmark.fixture import BenchmarkFixture
 
@@ -155,6 +155,66 @@ def test_debug_mode_parsing() -> None:
 
     cli.do_debug("postmortem")
     assert cli.debug == DebugMode.POST_MORTEM
+
+
+def test_extended_cmd_lcd_and_lpwd(
+    tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that do_lcd correctly changes the local directory and do_lpwd prints the local working directory."""
+    cli = ExtendedCmd()
+    start_dir = tmp_path / "start"
+    next_dir = tmp_path / "next"
+    start_dir.mkdir()
+    next_dir.mkdir()
+
+    monkeypatch.chdir(start_dir)
+
+    assert cli.do_lcd(str(next_dir)) is False
+
+    # The current working directory should be updated to the new directory after a successful cd
+    assert str(Path.cwd()) == str(next_dir)
+
+    # _local_prev_dir should be updated to the previous directory after a successful cd
+    assert cli._local_prev_dir == str(start_dir)
+
+    # The output should indicate that the local directory has changed to the new directory
+    out = capsys.readouterr().out
+    assert f"Local directory changed to {next_dir}" in out
+
+    # do_lpwd should print the current local working directory, which should be the new directory
+    assert cli.do_lpwd("") is False
+    out = capsys.readouterr().out
+    assert out.strip() == str(next_dir)
+
+
+def test_extended_cmd_do_shell_runs_subprocess() -> None:
+    """Test that do_shell correctly runs a subprocess for non-cd commands."""
+    cli = ExtendedCmd()
+
+    with patch("dissect.target.tools.shell.subprocess.run") as mocked_run:
+        assert cli.do_shell("echo hello") is False
+
+    mocked_run.assert_called_once_with("echo hello", shell=True, check=False)
+
+
+def test_extended_cmd_do_shell_cd_delegates_to_lcd() -> None:
+    """Test that !cd (do_shell with a cd command) correctly delegates to do_lcd."""
+    cli = ExtendedCmd()
+
+    with patch.object(ExtendedCmd, "do_lcd", autospec=True, return_value=False) as mocked_do_lcd:
+        assert cli.do_shell("cd /tmp") is False
+
+    mocked_do_lcd.assert_called_once_with(cli, "/tmp")
+
+
+def test_extended_cmd_onecmd_bang_delegates_to_do_shell() -> None:
+    """Test that onecmd with a bang command correctly delegates to do_shell."""
+    cli = ExtendedCmd()
+
+    with patch.object(ExtendedCmd, "do_shell", autospec=True, return_value=False) as mocked_do_shell:
+        cli.onecmd("!echo hello")
+
+    mocked_do_shell.assert_called_once_with(cli, "echo hello")
 
 
 def test_run_cli_postmortem() -> None:
