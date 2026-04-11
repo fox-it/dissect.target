@@ -10,6 +10,7 @@ import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, arg, find_functions
+from dissect.target.tools.query import main as target_query
 from dissect.target.tools.utils.cli import (
     args_to_uri,
     configure_generic_arguments,
@@ -183,3 +184,20 @@ def test_namespace_plugin_args() -> None:
     _, result = execute_function_on_target(mock_target, Mock(), ["--a", "asdf", "--b", "123"])
 
     assert result == "asdf"
+
+
+def test_argparse_for_plugin(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test if various argparse flows work as expected."""
+    # Test if plugins are correctly parsed by the argparser and not named as '__call__'
+    with monkeypatch.context() as m, patch("dissect.target.tools.utils.cli.sys.exit", return_value=1):
+        m.setattr("sys.argv", ["target-query", "-f", "example_namespace", "-h"])
+        target_query()
+        out, _ = capsys.readouterr()
+        assert out.startswith("usage: target-query -f example_namespace [-h]")
+
+    # Test if arguments from plugins and arguments from plugin functions are shown in argparse help
+    with monkeypatch.context() as m, patch("dissect.target.tools.utils.cli.sys.exit", return_value=1):
+        m.setattr("sys.argv", ["target-query", "-f", "example", "-h"])
+        target_query()
+        out, _ = capsys.readouterr()
+        assert out.startswith("usage: target-query -f example [-h] [--flag] [--plugin-flag]")
