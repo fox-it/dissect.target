@@ -34,7 +34,9 @@ def test_read_recycle_bin(target_win):
     mocked_file.is_file.return_value = True
     mocked_file.is_dir.return_value = False
     with patch.object(RecyclebinPlugin, "read_recycle_meta_file") as mocked_bin_file:
-        assert [mocked_bin_file.return_value] == list(RecyclebinPlugin(target_win).read_recycle_file(mocked_file))
+        assert [mocked_bin_file.return_value] == list(
+            RecyclebinPlugin(target_win).read_recycle_file(mocked_file)
+        )
 
 
 def test_filtered_name(target_win):
@@ -60,7 +62,9 @@ def test_read_recycle_bin_directory(target_win):
 
     mocked_dir.iterdir.return_value = [mocked_file] * 3
 
-    with patch.object(RecyclebinPlugin, "read_recycle_meta_file", return_value=mocked_file):
+    with patch.object(
+        RecyclebinPlugin, "read_recycle_meta_file", return_value=mocked_file
+    ):
         data = list(RecyclebinPlugin(target_win).read_recycle_file(mocked_dir))
 
         assert data == [mocked_file] * 3

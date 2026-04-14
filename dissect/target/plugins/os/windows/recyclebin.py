@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, Iterator
 
 from dissect import cstruct
 from dissect.util.ts import wintimestamp
@@ -114,7 +114,9 @@ class RecyclebinPlugin(Plugin):
 
         sid = self.find_sid(bin_path)
         source_path = str(bin_path).lstrip("/")
-        deleted_path = str(bin_path.parent / bin_path.name.replace("$I", "$R")).lstrip("/")
+        deleted_path = str(bin_path.parent / bin_path.name.replace("$I", "$R")).lstrip(
+            "/"
+        )
 
         user_details = self.target.user_details.find(sid=sid)
         user = user_details.user if user_details else None
@@ -129,14 +131,16 @@ class RecyclebinPlugin(Plugin):
             _user=user,
         )
 
-    def read_recycle_deleted_folder(self, folder_path: TargetPath) -> RecycleBinRecord:
+    def read_recycle_deleted_folder(self, path: TargetPath) -> RecycleBinRecord:
         # Generally speaking when deleting a file, the $R* file is the actual renamed deleted file.
         # This is however also the case for deleted folders. When a folder is deleted,
         # it is also renamed and placed here (with original recursive content).
         #
         # This function will create RecycleBin records for each file in a deleted folder.
 
-        meta_file = self.target.fs.path(str(folder_path.parent / folder_path.name.replace("$R", "$I")).lstrip("/"))
+        meta_file = self.target.fs.path(
+            str(path.parent / path.name.replace("$R", "$I")).lstrip("/")
+        )
         if not meta_file.exists():
             return
 
@@ -144,26 +148,22 @@ class RecyclebinPlugin(Plugin):
         header = self.select_header(meta_data)
         entry = header(meta_data)
 
-        sid = self.find_sid(folder_path)
+        sid = self.find_sid(path)
         original_folder_path = self.target.fs.path(entry.filename.rstrip("\x00"))
 
         user_details = self.target.user_details.find(sid=sid)
         user = user_details.user if user_details else None
-        for parent_path, _, childs in folder_path.walk():
-            for child in childs:
-                child_path = self.target.fs.path(f"{str(parent_path).lstrip('/')}/{child}")
-                original_parent_of_child = original_folder_path / str(parent_path).split(folder_path.name)[1].lstrip(
-                    "/"
-                )
-                yield RecycleBinRecord(
-                    ts=wintimestamp(entry.timestamp),
-                    path=original_parent_of_child / child,
-                    source=meta_file,
-                    filesize=child_path.stat().st_size,
-                    deleted_path=child_path,
-                    _target=self.target,
-                    _user=user,
-                )
+
+        for child_path in path.rglob("*"):
+            yield RecycleBinRecord(
+                ts=wintimestamp(entry.timestamp),
+                path=original_folder_path / child_path.name,
+                source=meta_file,
+                filesize=child_path.stat().st_size,
+                deleted_path=child_path,
+                _target=self.target,
+                _user=user,
+            )
 
     def find_sid(self, path: TargetPath) -> str:
         parent_path = path.parent
