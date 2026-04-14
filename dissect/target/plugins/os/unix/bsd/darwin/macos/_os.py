@@ -104,7 +104,7 @@ class MacOSPlugin(DarwinPlugin):
                         gid=user.get("gid", [None])[0],
                         gecos=user.get("realname", [None])[0],
                         home=posix_path(home_dir) if home_dir else None,
-                        shell=user.get("shell", [None])[0],
+                        shell=posix_path(shell) if (shell := user.get("shell", [None])[0]) else None,
                         source=path,
                     )
         except FileNotFoundError:

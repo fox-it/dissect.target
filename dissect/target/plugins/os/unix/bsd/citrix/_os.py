@@ -5,6 +5,7 @@ import re
 from io import BytesIO
 from typing import TYPE_CHECKING
 
+from flow.record.fieldtypes import posix_path
 from dissect.util.stream import RangeStream
 
 from dissect.target.filesystems.ffs import FfsFilesystem
@@ -195,9 +196,17 @@ class CitrixPlugin(BsdPlugin):
     @export(property=True)
     def ips(self) -> list[str]:
         return self._ips
+    
+    @staticmethod
+    def _as_hashable_path_or_str(value: object | None) -> str | None:
+        if value is None:
+            return None
+        if hasattr(value, "as_posix"):
+            return value.as_posix()
+        return str(value)
 
     @export(record=UnixUserRecord)
-    def users(self) -> Iterator[UnixUserRecord]:
+    def users(self) -> Iterator:
         nstmp_users = set()
         seen = set()
         nstmp_path = self.target.fs.path("/var/nstmp/")
@@ -226,23 +235,28 @@ class CitrixPlugin(BsdPlugin):
                 # for the root user in /var/nstmp.
                 user_home = self.target.fs.path("/root")
 
-            seen.add((username, user_home.as_posix() if user_home else None, None))
-            yield UnixUserRecord(name=username, home=user_home)
+            seen.add((username, self._as_hashable_path_or_str(user_home), None))
+            yield UnixUserRecord(name=username, home=posix_path(user_home.as_posix()) if user_home else None)
 
         # Yield all users in nstmp that were not observed in the config
         for username in nstmp_users:
             # The nsmonitor user has a home directory of /var/nstmp/monitors rather than /var/nstmp/nsmonitor
             home = nstmp_path.joinpath(username) if username != "nsmonitor" else nstmp_path.joinpath("monitors")
-            seen.add((username, home.as_posix(), None))
-            yield UnixUserRecord(name=username, home=home)
+            seen.add((username, self._as_hashable_path_or_str(home), None))
+            yield UnixUserRecord(name=username, home=posix_path(home.as_posix()))
 
         # Yield users from /etc/passwd if we have not seem them in previous loops
         for user in super().users():
-            if (user.name, user.home.as_posix(), user.shell) in seen:
+            if (
+                user.name,
+                self._as_hashable_path_or_str(user.home),
+                self._as_hashable_path_or_str(user.shell),
+            ) in seen:
                 continue
+
             # To prevent bogus command history for all users without a home whenever a history is located at the root
             # of the filesystem, we set the user home to None if their home is equivalent to '/'
-            user.home = user.home if user.home != "/" else None
+            user.home = user.home if user.home and str(user.home) != "/" else None
             yield user
 
     @export(property=True)
