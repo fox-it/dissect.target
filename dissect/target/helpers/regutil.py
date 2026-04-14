@@ -16,6 +16,7 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import IntEnumMissing
 
 if TYPE_CHECKING:
@@ -23,8 +24,13 @@ if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
+log = get_logger(__name__)
+
 GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
 GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
+
+REGFLEX_NAME_VALUE_REGEX = re.compile(r'^(?P<name>"(?:[^"\\]|\\.)*")=(?P<value>.*)')
+
 
 KeyType = regf.IndexLeaf | regf.FastLeaf | regf.HashLeaf | regf.IndexRoot | regf.KeyNode
 """The possible key types that can be returned from the registry."""
@@ -768,8 +774,13 @@ class RegFlex:
                 continue
 
             if line.startswith('"'):
-                name, _, value = line.partition("=")
-                name = name.strip('"')
+                match = REGFLEX_NAME_VALUE_REGEX.search(line)
+                if match is None:
+                    log.warning("Failed to parse RegFlex value: %r", line)
+                    continue
+
+                name = match.group("name").strip('"')
+                value = match.group("value")
 
                 if value.endswith("\\"):
                     value = [value[:-1]]
