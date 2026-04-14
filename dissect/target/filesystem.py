@@ -1862,6 +1862,7 @@ def open_multi_volume(fhs: list[BinaryIO], *args, **kwargs) -> Iterator[Filesyst
 
 register("ntfs", "NtfsFilesystem")
 register("extfs", "ExtFilesystem")
+register("erofs", "EROFSFilesystem")
 register("xfs", "XfsFilesystem")
 register("fat", "FatFilesystem")
 register("ffs", "FfsFilesystem")
