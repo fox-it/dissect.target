@@ -14,7 +14,6 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
     get_drive_letter,
     get_owner_and_group,
     get_record_size,
-    get_volume_identifier,
 )
 
 if TYPE_CHECKING:
@@ -539,7 +538,7 @@ class _Info:
         # the paths returned in the records are actually reachable.
         return cls(
             serial=fs.ntfs.serial,
-            volume_uuid=get_volume_identifier(fs),
+            volume_uuid=fs.identifier,
             drive_letter=get_drive_letter(target, fs),
         )
 
