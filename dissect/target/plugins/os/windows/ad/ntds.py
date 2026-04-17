@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds import NTDS
 from dissect.database.ese.ntds.util import UserAccountControl
+from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -16,72 +17,147 @@ from dissect.target.plugins.os.windows.sam import des_decrypt
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dissect.database.ese.ntds.objects import Computer, User
+    from dissect.database.ese.ntds.objects import (
+        Computer,
+        DomainDNS,
+        Object,
+        OrganizationalUnit,
+        SecurityObject,
+        TrustedDomain,
+        User,
+    )
 
     from dissect.target.target import Target
 
 
-GENERIC_FIELDS = [
+OBJECT_FIELDS = [
     ("string", "cn"),
-    ("string", "upn"),
-    ("string", "sam_name"),
-    ("string", "sam_type"),
-    ("string", "description"),
     ("string", "sid"),
     ("varint", "rid"),
-    ("datetime", "password_last_set"),
-    ("datetime", "logon_last_failed"),
-    ("datetime", "logon_last_success"),
-    ("datetime", "account_expires"),
+    ("varint", "dnt"),
+    ("varint", "pdnt"),
+    ("string", "name"),
+    ("string", "display_name"),
+    ("string", "description"),
+    ("string[]", "object_classes"),
+    ("string", "distinguished_name"),
+    ("string", "guid"),
     ("datetime", "creation_time"),
     ("datetime", "last_modified_time"),
-    ("boolean", "admin_count"),
     ("boolean", "is_deleted"),
+    ("varint", "nt_security_descriptor"),
+]
+
+SECURITY_PRINCIPAL_FIELDS = [
+    *OBJECT_FIELDS,
+    ("string", "sam_name"),
+    ("string", "sam_type"),
+    ("boolean", "admin_count"),
+    ("string[]", "sid_history"),
+]
+
+ACCOUNT_FIELDS = [
+    *SECURITY_PRINCIPAL_FIELDS,
+    ("string", "upn"),
+    ("string[]", "user_account_control"),
+    ("datetime", "password_last_set"),
+    ("datetime", "logon_last_failed"),
+    ("datetime", "logon_last_local"),
+    ("datetime", "logon_last_replicated"),
+    ("datetime", "account_expires"),
+    ("uint32", "primary_group_id"),
+    ("string[]", "member_of"),
+    ("string[]", "allowed_to_delegate"),
     ("string", "lm"),
     ("string[]", "lm_history"),
     ("string", "nt"),
     ("string[]", "nt_history"),
-    ("string", "supplemental_credentials"),
-    ("string", "user_account_control"),
-    ("string[]", "object_classes"),
-    ("string", "distinguished_name"),
-    ("string", "object_guid"),
-    ("uint32", "primary_group_id"),
-    ("string[]", "member_of"),
-    ("string[]", "service_principal_name"),
+    ("string", "user_password"),
+    ("string", "unix_password"),
+    ("string", "sfu_password"),
+    ("string[]", "supplemental_credentials"),
+    ("string", "info"),
+    ("string", "comment"),
+    ("string", "email"),
+    ("string", "title"),
+    ("string", "telephone_number"),
+    ("string", "home_directory"),
+    ("path", "logon_script"),
+    ("string[]", "service_principal_names"),
 ]
 
-# Record descriptor for NTDS user secrets
+CONTAINER_FIELDS = [
+    *OBJECT_FIELDS,
+    ("string", "gplink"),
+]
+
 NtdsUserRecord = TargetRecordDescriptor(
     "windows/ad/user",
     [
-        *GENERIC_FIELDS,
-        ("string", "info"),
-        ("string", "comment"),
-        ("string", "telephone_number"),
-        ("string", "home_directory"),
+        *ACCOUNT_FIELDS,
     ],
 )
+
 NtdsComputerRecord = TargetRecordDescriptor(
     "windows/ad/computer",
     [
-        *GENERIC_FIELDS,
+        *ACCOUNT_FIELDS,
         ("string", "dns_hostname"),
         ("string", "operating_system"),
         ("string", "operating_system_version"),
+        ("string[]", "service_principal_name"),
+        ("varint", "allowed_to_act"),
+        ("boolean", "has_laps"),
+        ("string", "legacy_laps"),
+        ("datetime", "legacy_laps_expiration"),
+        ("string", "windows_laps"),
+        ("datetime", "windows_laps_expiration"),
+        ("string", "dump_smsa_password"),
+    ],
+)
+
+NtdsGroupRecord = TargetRecordDescriptor(
+    "windows/ad/group",
+    [
+        *SECURITY_PRINCIPAL_FIELDS,
+        ("string[]", "members"),
+    ],
+)
+
+NtdsDomainRecord = TargetRecordDescriptor(
+    "windows/ad/domain",
+    [
+        *CONTAINER_FIELDS,
+        ("uint32", "machine_account_quota"),
+        ("uint32", "behavior_version"),
+    ],
+)
+
+NtdsTrustedDomainRecord = TargetRecordDescriptor(
+    "windows/ad/trusted_domain",
+    [
+        *NtdsDomainRecord.target_fields,
+        ("string", "trust_partner"),
+        ("uint32", "trust_direction"),
+        ("uint32", "trust_type"),
+        ("uint32", "trust_attributes"),
+        ("string", "security_identifier"),
+    ],
+)
+
+NtdsOURecord = TargetRecordDescriptor(
+    "windows/ad/ou",
+    [
+        *CONTAINER_FIELDS,
+        ("boolean", "blocks_inheritance"),
     ],
 )
 
 NtdsGPORecord = TargetRecordDescriptor(
     "windows/ad/gpo",
     [
-        ("string", "cn"),
-        ("string", "distinguished_name"),
-        ("string", "object_guid"),
-        ("string", "name"),
-        ("string", "display_name"),
-        ("datetime", "creation_time"),
-        ("datetime", "last_modified_time"),
+        *CONTAINER_FIELDS,
+        ("path", "gpc_path"),
     ],
 )
 
@@ -116,10 +192,7 @@ class NtdsPlugin(Plugin):
         self.path = self.target.fs.path(path)
 
     def check_compatible(self) -> None:
-        if not self.target.has_function("lsa"):
-            raise UnsupportedPluginError("System Hive is not present or LSA function not available")
-
-        if not self.path.is_file():
+        if not self.path.is_file() or not self.path.exists():
             raise UnsupportedPluginError("No NTDS.dit database found on target")
 
     @cached_property
@@ -129,6 +202,8 @@ class NtdsPlugin(Plugin):
 
         if self.target.has_function("lsa"):
             ntds.pek.unlock(self.target.lsa.syskey)
+        else:
+            self.target.log.warning("LSA plugin not available, cannot unlock PEK and decrypt sensitive data")
 
         return ntds
 
@@ -137,11 +212,7 @@ class NtdsPlugin(Plugin):
         """Extract all user accounts from the NTDS.dit database."""
         for user in self.ntds.users():
             yield NtdsUserRecord(
-                **extract_user_info(user, self.target),
-                info=user.get("info"),
-                comment=user.get("comment"),
-                telephone_number=user.get("telephoneNumber"),
-                home_directory=user.get("homeDirectory"),
+                **extract_account_info(user, self.target),
                 _target=self.target,
             )
 
@@ -149,11 +220,71 @@ class NtdsPlugin(Plugin):
     def computers(self) -> Iterator[NtdsComputerRecord]:
         """Extract all computer accounts from the NTDS.dit database."""
         for computer in self.ntds.computers():
+            try:
+                dump_smsa_password = computer.get("msDS-ManagedPassword")
+            except Exception:
+                dump_smsa_password = None
+
             yield NtdsComputerRecord(
-                **extract_user_info(computer, self.target),
+                **extract_account_info(computer, self.target),
+                **extract_laps(computer),
                 dns_hostname=computer.get("dNSHostName"),
                 operating_system=computer.get("operatingSystem"),
                 operating_system_version=computer.get("operatingSystemVersion"),
+                service_principal_name=computer.get("servicePrincipalName"),
+                allowed_to_act=computer.get("msDS-AllowedToActOnBehalfOfOtherIdentity"),
+                dump_smsa_password=dump_smsa_password,
+                _target=self.target,
+            )
+
+    @export(record=NtdsGroupRecord)
+    def groups(self) -> Iterator[NtdsGroupRecord]:
+        """Extract all groups from the NTDS.dit database."""
+        for group in self.ntds.groups():
+            try:
+                members = [member.sid for member in group.members()]
+            except Exception as e:
+                members = []
+                self.target.log.warning("Failed to extract group members for group %s: %s", group, e)
+                self.target.log.debug("", exc_info=e)
+
+            yield NtdsGroupRecord(
+                **extract_security_info(group),
+                members=members,
+                _target=self.target,
+            )
+
+    @export(record=NtdsDomainRecord)
+    def domains(self) -> Iterator[NtdsDomainRecord]:
+        """Extract all domains from the NTDS.dit database."""
+        for domain in self.ntds.search(objectClass="domainDNS"):
+            yield NtdsDomainRecord(
+                **extract_domain_info(domain),
+                _target=self.target,
+            )
+
+    @export(record=NtdsTrustedDomainRecord)
+    def trusted_domains(self) -> Iterator[NtdsTrustedDomainRecord]:
+        """Extract all trusted domains from the NTDS.dit database."""
+        for trusted_domain in self.ntds.trusts():
+            yield NtdsTrustedDomainRecord(
+                **extract_domain_info(trusted_domain),
+                trust_partner=trusted_domain.get("trustPartner"),
+                trust_direction=trusted_domain.get("trustDirection"),
+                trust_type=trusted_domain.get("trustType"),
+                trust_attributes=trusted_domain.get("trustAttributes"),
+                security_identifier=trusted_domain.get("securityIdentifier"),
+                _target=self.target,
+            )
+
+    @export(record=NtdsOURecord)
+    def organizational_units(self) -> Iterator[NtdsOURecord]:
+        """Extract all organizational units from the NTDS.dit database."""
+        for ou in self.ntds.search(objectClass="organizationalUnit"):
+            gp_options = ou.get("gPOptions")
+            yield NtdsOURecord(
+                **extract_container_info(ou),
+                blocks_inheritance=bool(gp_options & 1) if gp_options is not None else False,
                 _target=self.target,
             )
 
@@ -162,28 +293,14 @@ class NtdsPlugin(Plugin):
         """Extract all group policy objects (GPO) NTDS.dit database."""
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
-                cn=gpo.cn,
-                distinguished_name=gpo.distinguished_name,
-                object_guid=gpo.guid,
-                name=gpo.name,
-                display_name=gpo.display_name,
-                creation_time=gpo.when_created,
-                last_modified_time=gpo.when_changed,
+                **extract_container_info(gpo),
+                gpc_path=gpo.get("gPCFileSysPath"),
                 _target=self.target,
             )
 
     @export(output="yield")
     def secretsdump(self) -> Iterator[str]:
         """Extract credentials in secretsdump format. Because it's a popular format."""
-        # Keep impacket defined constants in the method so we don't polute our own
-        kerberos_key_type = {
-            1: "dec-cbc-crc",
-            3: "des-cbc-md5",
-            17: "aes128-cts-hmac-sha1-96",
-            18: "aes256-cts-hmac-sha1-96",
-            0xFFFFFF74: "rc4_hmac",
-        }
-
         for obj in self.ntds.query(
             # For now just use the same filter as secretsdump.py
             "(&(|(sAMAccountType=805306368)(sAMAccountType=805306369)(sAMAccountType=805306370))(instanceType=4))"
@@ -213,60 +330,204 @@ class NtdsPlugin(Plugin):
             for i, (lm_hist, nt_hist) in enumerate(zip_longest(lm_history, nt_history, fillvalue="")):
                 yield f"{username}_history{i}:{rid}:{lm_hist}:{nt_hist}:::"
 
-            for supplemental in obj.get("supplementalCredentials") or []:
-                if "Primary:Kerberos-Newer-Keys" in supplemental:
-                    for cred in supplemental["Primary:Kerberos-Newer-Keys"]["Credentials"]:
-                        key_type = kerberos_key_type.get(cred["KeyType"], hex(cred["KeyType"]))
-                        key = cred["Key"].hex()
-                        yield f"{username}:{key_type}:{key}"
-
-                if "Primary:CLEARTEXT" in supplemental:
-                    yield f"{username}:CLEARTEXT:{supplemental['Primary:CLEARTEXT']}"
+            for supplemental_credential in get_supplemental_credentials(obj):
+                yield f"{username}:{supplemental_credential}"
 
 
-def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
+def get_supplemental_credentials(account: User | Computer) -> Iterator[str]:
+    """Extract supplemental credentials from a user object.
+
+    Args:
+        account: The user or computer object to extract supplemental credentials from.
+
+    Yields:
+        Supplemental credentials in the secrets dump format.
+    """
+    # Keep impacket defined constants in the method so we don't pollute our own
+    kerberos_key_type = {
+        1: "dec-cbc-crc",
+        3: "des-cbc-md5",
+        17: "aes128-cts-hmac-sha1-96",
+        18: "aes256-cts-hmac-sha1-96",
+        0xFFFFFF74: "rc4_hmac",
+    }
+
+    for supplemental in account.get("supplementalCredentials") or []:
+        if "Primary:Kerberos-Newer-Keys" in supplemental:
+            for cred in supplemental["Primary:Kerberos-Newer-Keys"]["Credentials"]:
+                key_type = kerberos_key_type.get(cred["KeyType"], hex(cred["KeyType"]))
+                key = cred["Key"].hex()
+                yield f"{key_type}:{key}"
+
+        if "Primary:CLEARTEXT" in supplemental:
+            yield f"CLEARTEXT:{supplemental['Primary:CLEARTEXT']}"
+
+
+def extract_object_info(obj: Object) -> dict[str, Any]:
+    """Extract generic information from an Object."""
+    description = obj.get("description")
+    description = description.pop() if description else None
+    return {
+        "cn": obj.cn,
+        "sid": obj.sid,
+        "rid": obj.rid,
+        "dnt": obj.dnt,
+        "pdnt": obj.pdnt,
+        "name": obj.name,
+        "display_name": obj.display_name,
+        "description": description,
+        "object_classes": obj.object_class,
+        "distinguished_name": obj.distinguished_name,
+        "guid": obj.guid,
+        "creation_time": obj.when_created,
+        "last_modified_time": obj.when_changed,
+        "is_deleted": obj.is_deleted,
+        "nt_security_descriptor": obj.get("nTSecurityDescriptor"),
+    }
+
+
+def extract_security_info(security_obj: SecurityObject) -> dict[str, Any]:
+    """Extract generic information from a Security Object."""
+    return {
+        **extract_object_info(security_obj),
+        "sam_name": security_obj.sam_account_name,
+        "sam_type": security_obj.get("sAMAccountType"),
+        "admin_count": bool(security_obj.get("adminCount")),
+        "sid_history": security_obj.get("sIDHistory"),
+    }
+
+
+def extract_container_info(container_object: OrganizationalUnit | DomainDNS | TrustedDomain) -> dict[str, Any]:
+    """Extract generic information from a Container Object."""
+    return {
+        **extract_object_info(container_object),
+        "gplink": container_object.get("gPLink"),
+    }
+
+
+def extract_domain_info(domain: DomainDNS | TrustedDomain) -> dict[str, Any]:
+    """Extract generic information from a domain Object."""
+    return {
+        **extract_container_info(domain),
+        "machine_account_quota": domain.get("ms-DS-MachineAccountQuota"),
+        "behavior_version": domain.get("msDS-Behavior-Version"),
+    }
+
+
+def extract_account_info(account: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
-    lm_hash = des_decrypt(lm_pwd, user.rid).hex() if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
-    nt_hash = des_decrypt(nt_pwd, user.rid).hex() if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
+    if target.ad.ntds.pek.unlocked:
+        lm_hash = des_decrypt(lm_pwd, account.rid).hex() if (lm_pwd := account.get("dBCSPwd")) else DEFAULT_LM_HASH
+        nt_hash = des_decrypt(nt_pwd, account.rid).hex() if (nt_pwd := account.get("unicodePwd")) else DEFAULT_NT_HASH
 
-    # Decrypt password history
-    lm_history = [des_decrypt(lm, user.rid).hex() for lm in user.get("lmPwdHistory")]
-    nt_history = [des_decrypt(nt, user.rid).hex() for nt in user.get("ntPwdHistory")]
+        lm_history = [des_decrypt(lm, account.rid).hex() for lm in account.get("lmPwdHistory")]
+        nt_history = [des_decrypt(nt, account.rid).hex() for nt in account.get("ntPwdHistory")]
+    else:
+        lm_hash = None
+        nt_hash = None
+
+        lm_history = None
+        nt_history = None
 
     try:
-        member_of = [group.distinguished_name for group in user.groups()]
+        member_of = [group.distinguished_name for group in account.groups()]
     except Exception as e:
         member_of = []
-        target.log.warning("Failed to extract group membership for user %s: %s", user, e)
+        target.log.warning("Failed to extract group membership for user %s: %s", account, e)
         target.log.debug("", exc_info=e)
 
-    # Extract supplemental credentials and yield records
+    try:
+        sfu_password = account.get("msSFU30Password")
+    except Exception:
+        sfu_password = None
+
+    try:
+        user_password = account.get("userPassword")
+    except Exception:
+        user_password = None
+
+    try:
+        unix_password = account.get("unixPassword")
+    except Exception:
+        unix_password = None
+
+    account_expires = account.get("accountExpires")
+
     return {
-        "cn": user.cn,
-        "upn": user.get("userPrincipalName"),
-        "sam_name": user.sam_account_name,
-        "sam_type": user.sam_account_type.name,
-        "description": user.get("description"),
-        "sid": user.sid,
-        "rid": user.rid,
-        "password_last_set": user.get("pwdLastSet"),
-        "logon_last_failed": user.get("badPasswordTime"),
-        "logon_last_success": user.get("lastLogon"),
-        "account_expires": user.get("accountExpires") if isinstance(user.get("accountExpires"), datetime) else None,
-        "creation_time": user.when_created,
-        "last_modified_time": user.when_changed,
-        "admin_count": user.get("adminCount"),
-        "is_deleted": user.is_deleted,
+        **extract_security_info(account),
+        "upn": account.get("userPrincipalName"),
+        "password_last_set": account.get("pwdLastSet"),
+        "logon_last_failed": account.get("badPasswordTime"),
+        "logon_last_local": account.get("lastLogon"),
+        "logon_last_replicated": account.get("lastLogonTimestamp"),
+        "account_expires": account_expires if isinstance(account_expires, datetime) else None,
         "lm": lm_hash,
         "lm_history": lm_history,
         "nt": nt_hash,
         "nt_history": nt_history,
-        "supplemental_credentials": user.get("supplementalCredentials"),
-        "user_account_control": user.user_account_control.name,
-        "object_classes": user.object_class,
-        "distinguished_name": user.distinguished_name,
-        "object_guid": user.guid,
-        "primary_group_id": user.primary_group_id,
+        "user_password": user_password if user_password else None,
+        "unix_password": unix_password if unix_password else None,
+        "sfu_password": sfu_password,
+        "supplemental_credentials": list(get_supplemental_credentials(account)),
+        "user_account_control": account.user_account_control.name.split("|"),
+        "primary_group_id": account.primary_group_id,
         "member_of": member_of,
-        "service_principal_name": user.get("servicePrincipalName"),
+        "allowed_to_delegate": account.get("msDS-AllowedToDelegateTo"),
+        "info": account.get("info"),
+        "comment": account.get("comment"),
+        "email": account.get("mail"),
+        "title": account.get("title"),
+        "telephone_number": account.get("telephoneNumber"),
+        "home_directory": account.get("homeDirectory"),
+        "logon_script": account.get("scriptPath"),
+        "service_principal_names": account.get("servicePrincipalName"),
+    }
+
+
+def extract_laps(computer: Computer) -> dict[str, Any]:
+    """Extract LAPS information from the NTDS.dit database.
+
+    LAPS information can be stored in multiple attributes depending on the Windows version and LAPS configuration.
+
+    Args:
+        computer: The computer object to extract LAPS information from.
+
+    Returns:
+        Dictionary containing LAPS information.
+    """
+    has_laps = False
+    try:
+        legacy_laps = computer.get("ms-MCS-AdmPwd")
+        has_laps = True
+    except Exception:
+        legacy_laps = None
+
+    try:
+        windows_laps = computer.get("msLAPS-Password")
+        has_laps = True
+    except Exception:
+        windows_laps = None
+
+    try:
+        windows_laps = computer.get("msLAPS-EncryptedPassword")
+        has_laps = True
+    except Exception:
+        windows_laps = None
+
+    try:
+        windows_laps_expiration = wintimestamp(int(computer.get("msLAPS-PasswordExpirationTime")))
+    except Exception:
+        windows_laps_expiration = None
+
+    try:
+        legacy_laps_expiration = wintimestamp(int(computer.get("ms-MCS-AdmPwdExpirationTime")))
+    except Exception:
+        legacy_laps_expiration = None
+
+    return {
+        "has_laps": has_laps,
+        "legacy_laps": legacy_laps,
+        "legacy_laps_expiration": legacy_laps_expiration,
+        "windows_laps": windows_laps,
+        "windows_laps_expiration": windows_laps_expiration,
     }
