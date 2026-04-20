@@ -483,6 +483,7 @@ def run_target_shell(
         m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv]))
         m.setattr("sys.stdin", StringIO(stdin))
         m.setenv("NO_COLOR", "1")
+        m.setenv("NO_PROMPT_TOOLKIT", "1")
         target_shell()
         return capsys.readouterr()
 
@@ -618,7 +619,8 @@ def test_shell_prompt_tab_autocomplete() -> None:
 
     with patch("pexpect.expect.Expecter.new_data", new=ansi_new_data):
         # We set NO_COLOR=1 so that the output is not colored and easier to match
-        child = pexpect.spawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
+        env = ChainMap(os.environ, {"NO_COLOR": "1", "NO_PROMPT_TOOLKIT": "1"})
+        child = pexpect.spawn("target-shell", args=[str(target_path)], env=env)
 
         # increase window size to avoid line wrapping
         child.setwinsize(100, 100)
