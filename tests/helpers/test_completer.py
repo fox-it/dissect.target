@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from io import BytesIO
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -60,6 +61,10 @@ def test_local_path_completion_with_unclosed_double_quote(tmp_path: Path, monkey
     assert completions == ['"my file.txt"', '"my folder/"']
 
 
+@pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="Windows filesystems do not allow double quotes in local filenames",
+)
 def test_local_path_completion_escapes_quote_char(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that a quote character in a filename is properly escaped in the completion suggestions."""
     monkeypatch.chdir(tmp_path)
@@ -177,7 +182,16 @@ def test_target_path_completion_handles_escaped_spaces(target_bare: Target) -> N
     ("quote", "filename", "prefix", "expected_completion"),
     [
         ("'", "apostrophe's note.txt", "apostrophe", "'apostrophe\\'s note.txt'"),
-        ('"', 'doubleq"note.txt', "doubleq", '"doubleq\\"note.txt"'),
+        pytest.param(
+            '"',
+            'doubleq"note.txt',
+            "doubleq",
+            '"doubleq\\"note.txt"',
+            marks=pytest.mark.skipif(
+                sys.platform.startswith("win"),
+                reason="Windows filesystems do not allow double quotes in local filenames",
+            ),
+        ),
     ],
 )
 def test_local_path_completion_quote_matrix(
