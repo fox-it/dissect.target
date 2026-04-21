@@ -26,9 +26,8 @@ if TYPE_CHECKING:
 
 log = get_logger(__name__)
 
-GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
-GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
-
+RE_GLOB_INDEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
+RE_GLOB_MAGIC = re.compile(r"[*?[]")
 RE_REGFLEX_NAME_VALUE = re.compile(r'^"(?P<name>(?:[^"\\]|\\.)*?)"=(?P<value>.*)')
 
 
@@ -885,7 +884,7 @@ def has_glob_magic(pattern: str) -> bool:
     Returns:
         Whether ``pattern`` contains any glob patterns.
     """
-    return GLOB_MAGIC_REGEX.search(pattern) is not None
+    return RE_GLOB_MAGIC.search(pattern) is not None
 
 
 def glob_split(pattern: str) -> tuple[str]:
@@ -899,7 +898,7 @@ def glob_split(pattern: str) -> tuple[str]:
         key path parts (if any) which don't have a glob pattern. The second
         contains the rest of the key path with parts containing glob patterns.
     """
-    first_glob = GLOB_INDEX_REGEX.search(pattern)
+    first_glob = RE_GLOB_INDEX.search(pattern)
 
     if not first_glob:
         return pattern, ""
