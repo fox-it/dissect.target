@@ -67,3 +67,17 @@ class macOSLocalePlugin(LocalePlugin):
     def install_date(self) -> str | None:
         mtime = self.target.fs.path("/private/var/db/.AppleSetupDone").lstat().st_mtime
         return datetime.fromtimestamp(mtime, timezone.utc)
+
+    @export(property=True)
+    def location_services_active(self) -> bool | None:
+        path = self.target.fs.path("/Library/Preferences/com.apple.timezone.auto.plist")
+
+        if not path.exists():
+            return None
+
+        try:
+            with path.open("rb") as fh:
+                plist = plistlib.load(fh)
+            return plist.get("Active")
+        except Exception:
+            return None

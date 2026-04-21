@@ -1,23 +1,274 @@
 from __future__ import annotations
 
-import plistlib
 import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.userdirs import _build_userdirs
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
-    from flow.record.base import Record
-
-    from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
+
+LauncherRecord1 = [
+    ("string", "Label"),
+    ("string", "Disabled"),
+    ("string", "UserName"),
+    ("string", "GroupName"),
+    ("string", "Group"),
+    ("string", "CFBundleIdentifier"),
+    ("string", "CFBundleDevelopmentRegion"),
+    ("string", "CFBundleInfoDictionaryVersion"),
+    ("string", "CFBundleName"),
+    ("boolean", "InitGroups"),
+    ("string", "Program"),
+    ("string", "BundleProgram"),
+    ("string[]", "ProgramArguments"),
+    ("boolean", "EnableGlobbing"),
+    ("boolean", "EnableTransactions"),
+    ("boolean", "PressuredExit"),
+    ("boolean", "EnablePressureExit"),
+    ("string", "EnablePressuredExit"),
+    ("string", "KeepAlive"),
+    ("boolean", "SuccessfulExit"),
+    ("boolean", "Crashed"),
+    ("boolean", "RunAtLoad"),
+    ("string", "RootDirectory"),
+    ("string", "WorkingDirectory"),
+    ("varint", "Umask"),
+    ("varint", "TimeOut"),
+    ("varint", "ExitTimeOut"),
+    ("varint", "ThrottleInterval"),
+    ("varint", "StartInterval"),
+    ("boolean", "StartOnMount"),
+    ("string[]", "WatchPaths"),
+    ("string[]", "QueueDirectories"),
+    ("string", "StandardInPath"),
+    ("string", "StandardOutPath"),
+    ("string", "StandardErrorPath"),
+    ("boolean", "Debug"),
+    ("boolean", "WaitForDebugger"),
+    ("varint", "Nice"),
+    ("string", "ProcessType"),
+    ("boolean", "PowerNap"),
+    ("boolean", "AbandonProcessGroup"),
+    ("boolean", "LowPriorityIO"),
+    ("boolean", "LowPriorityBackgroundIO"),
+    ("boolean", "MaterializeDatalessFiles"),
+    ("boolean", "LaunchOnlyOnce"),
+    ("boolean", "BootShell"),
+    ("boolean", "SessionCreate"),
+    ("boolean", "LegacyTimers"),
+    ("boolean", "TransactionTimeLimitEnabled"),
+    ("boolean", "LimitLoadToDeveloperMode"),
+    ("string", "LimitLoadToSessionType"),
+    ("boolean", "Wait"),
+    ("string[]", "AssociatedBundleIdentifiers"),
+    ("string", "plist_path"),
+    ("string", "POSIXSpawnType"),
+    ("string", "PosixSpawnType"),
+    ("string", "MultipleInstances"),
+    ("boolean", "DisabledInSafeBoot"),
+    ("boolean", "BeginTransactionAtShutdown"),
+    ("boolean", "OnDemand"),
+    ("boolean", "AlwaysSIGTERMOnShutdown"),
+    ("boolean", "MinimalBootProfiles"),
+    ("boolean", "MinimalBootProfile"),
+    ("boolean", "LSBackgroundOnly"),
+    ("boolean", "HopefullyExitsLast"),
+    ("boolean", "ExponentialThrottling"),
+    ("boolean", "IgnoreProcessGroupAtShutdown"),
+    ("boolean", "EventMonitor"),
+    ("boolean", "AuxiliaryBootstrapper"),
+    ("boolean", "AuxiliaryBootstrapperAllowDemand"),
+    ("boolean", "DrainMessagesAfterFailedInit"),
+    ("boolean", "DrainMessagesOnFailedInit"),
+    ("string", "LimitLoadFromVariant"),
+    ("string", "LimitLoadFromBootMode"),
+    ("string", "EfficiencyMode"),
+    ("string", "Conclave"),
+    ("string[]", "LaunchEvents"),
+    ("string[]", "MachServices"),
+    ("string[]", "SoftResourceLimits"),
+    ("string[]", "HardResourceLimits"),
+    ("string[]", "EnvironmentVariables"),
+    ("string[]", "NoEnvironmentVariables"),
+    ("string[]", "NO_EnvironmentVariables"),
+    ("string", "SHAuthorizationRight"),
+    ("string", "PublishesEvents"),
+    ("string", "LimitLoadToVariant"),
+    ("string", "RunLoopType"),
+    ("string[]", "RemoteServices"),
+    ("string[]", "JetsamProperties"),
+    ("string[]", "LimitLoadToHardware"),
+    ("string[]", "PanicOnCrash"),
+    ("string[]", "LimitLoadToBootMode"),
+    ("string", "Cryptex"),
+    ("string", "ServiceType"),
+    ("string", "ServiceIPC"),
+    ("string[]", "UrgentLogSubmission"),
+    ("string[]", "AppIntents"),
+    ("string[]", "BinaryOrderPreference"),
+    ("string[]", "LimitLoadFromHardware"),
+    ("string[]", "StartCalendarInterval"),
+    ("string[]", "AdditionalProperties"),
+    ("string[]", "NSAppTransportSecurity"),
+    ("string[]", "com_apple_usbcd"),
+    ("string[]", "com_apple_private_tcc_allow"),
+    ("string[]", "com_apple_security_application_groups"),
+    ("string[]", "com_apple_private_security_restricted_application_groups"),
+    ("string[]", "com_apple_security_exception_files_home_relative_path_read_write"),
+    ("string[]", "com_apple_security_exception_mach_lookup_global_name"),
+    ("string[]", "com_apple_security_exception_sysctl_read_only"),
+    ("boolean", "com_apple_private_security_no_sandbox"),
+    ("boolean", "com_apple_ane_iokit_user_access"),
+    ("boolean", "com_apple_alarm"),
+    ("boolean", "com_apple_imdpersistence_IMDPersistenceAgent_GroupMetadata"),
+    ("boolean", "com_apple_imdpersistence_IMDPersistenceAgent_Syndication"),
+    ("path", "source"),
+]
+
+LauncherRecord2 = [
+    ("boolean", "Wait"),
+    ("varint", "Instances"),
+    ("string", "plist_path"),
+    ("path", "source"),
+]
+
+LauncherRecord3 = [
+    ("string", "SocketKey"),
+    ("string", "SockType"),
+    ("boolean", "SockPassive"),
+    ("string", "SockNodeName"),
+    ("string", "SockServiceName"),
+    ("string", "SockFamily"),
+    ("string", "SockProtocol"),
+    ("varint", "SockPathMode"),
+    ("string", "SockPathName"),
+    ("string", "SecureSocketWithKey"),
+    ("varint", "SockPathOwner"),
+    ("varint", "SockPathGroup"),
+    ("varint", "SockPathMode"),
+    ("string", "Bonjour"),
+    ("string", "MulticastGroup"),
+    ("boolean", "ReceivePacketInfo"),
+    ("string", "plist_path"),
+    ("path", "source"),
+]
+
+LauncherRecord4 = [
+    ("string[]", "Version4"),
+    ("path", "source"),
+]
+
+LauncherRecord5 = [
+    ("boolean", "UNSettingAlerts"),
+    ("boolean", "UNSettingAlwaysShowPreviews"),
+    ("boolean", "UNSettingLockScreen"),
+    ("boolean", "UNSettingModalAlertStyle"),
+    ("boolean", "UNAutomaticallyShowSettings"),
+    ("boolean", "UNSettingNotificationCenter"),
+    ("boolean", "UNDaemonShouldReceiveBackgroundResponses"),
+    ("boolean", "UNSuppressUserAuthorizationPrompt"),
+    ("string", "plist_path"),
+    ("path", "source"),
+]
+
+LauncherRecord6 = [
+    ("string", "UNNotificationIconDefault"),
+    ("string", "UNNotificationIconSettings"),
+    ("string", "plist_path"),
+    ("path", "source"),
+]
+
+LauncherRecord7 = [
+    ("string[]", "Listeners"),
+    ("string", "plist_path"),
+    ("path", "source"),
+]
+
+TargetRecordDescriptor(
+    "macos/launch_daemons",
+    LauncherRecord1,
+)
+
+LaunchAgentRecords = (
+    TargetRecordDescriptor(
+        "macos/launch_agents",
+        LauncherRecord1,
+    ),
+    TargetRecordDescriptor(
+        "macos/launch_agents",
+        LauncherRecord3,
+    ),
+    TargetRecordDescriptor(
+        "macos/launch_agents",
+        LauncherRecord5,
+    ),
+    TargetRecordDescriptor(
+        "macos/launch_agents",
+        LauncherRecord6,
+    ),
+)
+
+LaunchDaemonRecords = (
+    TargetRecordDescriptor(
+        "macos/launch_daemons",
+        LauncherRecord1,
+    ),
+    TargetRecordDescriptor(
+        "macos/launch_daemons",
+        LauncherRecord2,
+    ),
+    TargetRecordDescriptor(
+        "macos/launch_daemons",
+        LauncherRecord3,
+    ),
+    TargetRecordDescriptor(
+        "macos/launch_daemons",
+        LauncherRecord4,
+    ),
+    TargetRecordDescriptor(
+        "macos/launch_daemons",
+        LauncherRecord7,
+    ),
+)
+
+COLLAPSE_PATHS = {
+    ("LaunchEvents", False),
+    ("MachServices", True),
+    ("EnvironmentVariables", True),
+    ("KeepAlive", False),
+    ("SoftResourceLimits", True),
+    ("HardResourceLimits", True),
+    ("MultipleInstances", True),
+    ("UserName", True),
+    ("GroupName", True),
+    ("RemoteServices", False),
+    ("JetsamProperties", True),
+    ("LimitLoadToSessionType", True),
+    ("Version4", False),
+    ("EnablePressuredExit", True),
+    ("LimitLoadToHardware", True),
+    ("_PanicOnCrash", True),
+    ("LimitLoadFromHardware", True),
+    ("StartCalendarInterval", True),
+    ("PublishesEvents", False),
+    ("_AdditionalProperties", False),
+    ("Disabled", True),
+    ("com.apple.usbcd", True),
+    ("NoEnvironmentVariables", True),
+    ("NO_EnvironmentVariables", True),
+    ("NSAppTransportSecurity", True),
+    ("_UrgentLogSubmission", True),
+    ("AppIntents", True),
+}
 
 
 class LaunchersPlugin(Plugin):
@@ -44,25 +295,6 @@ class LaunchersPlugin(Plugin):
         self.launch_daemon_files = set()
         self._find_files()
 
-    def _build_userdirs(self, hist_paths: list[str]) -> set[tuple[UserDetails, Path]]:
-        """Join the selected dirs with the user home path.
-
-        Args:
-            hist_paths: A list with paths as strings.
-
-        Returns:
-            List of tuples containing user and unique file path objects.
-        """
-        users_dirs: set[tuple] = set()
-        for user_details in self.target.user_details.all_with_home():
-            for d in hist_paths:
-                home_dir: Path = user_details.home_path
-                for cur_dir in home_dir.glob(d):
-                    cur_dir = cur_dir.resolve()
-                    if cur_dir.exists():
-                        users_dirs.add((user_details, cur_dir))
-        return users_dirs
-
     def check_compatible(self) -> None:
         if not (self.launch_agent_files or self.launch_daemon_files):
             raise UnsupportedPluginError("No Agent or Deamon files found")
@@ -74,7 +306,7 @@ class LaunchersPlugin(Plugin):
                 self.launch_agent_files.add(path)
 
         # --- Per-user LaunchAgents ---
-        for _, path in self._build_userdirs(self.USER_LAUNCH_AGENT_PATHS):
+        for _, path in _build_userdirs(self, self.USER_LAUNCH_AGENT_PATHS):
             self.launch_agent_files.add(path)
 
         # --- System-wide LaunchDaemons ---
@@ -83,100 +315,20 @@ class LaunchersPlugin(Plugin):
                 self.launch_daemon_files.add(path)
 
         # --- Per-user LaunchDaemons ---
-        for _, path in self._build_userdirs(self.USER_LAUNCH_DAEMON_PATHS):
+        for _, path in _build_userdirs(self, self.USER_LAUNCH_DAEMON_PATHS):
             self.launch_daemon_files.add(path)
 
     @export(record=DynamicDescriptor(["string"]))
     # @export(output="yield")
     def launch_agents(self) -> Iterator[DynamicDescriptor]:
         """Yield macOS launch agent plist files."""
-        for file in self.launch_agent_files:
-            file = self.target.fs.path(file)
-            try:
-                fh = file.open(mode="rb")
-            except FileNotFoundError:
-                self.target.log.exception("LaunchAgent missing target: %s", {file})
-                continue
-            try:
-                data = plistlib.load(fh)
-                flat_data = {}
-                extract_nested_dict(flat_data, data)
-
-                yield self.build_record("macos/launch_agent", flat_data, file)
-            except Exception:
-                self.target.log.exception("Failed to parse %s", file)
+        yield from build_records(
+            self, "macos/launch_agents", self.launch_agent_files, LaunchAgentRecords, COLLAPSE_PATHS
+        )
 
     @export(record=DynamicDescriptor(["string"]))
     def launch_daemons(self) -> Iterator[DynamicDescriptor]:
         """Yield macOS launch daemon plist files."""
-        for file in self.launch_daemon_files:
-            file = self.target.fs.path(file)
-            fh = file.open(mode="rb")
-            try:
-                data = plistlib.load(fh)
-                flat_data = {}
-                extract_nested_dict(flat_data, data)
-
-                yield self.build_record("macos/launch_daemon", flat_data, file)
-            except Exception:
-                self.target.log.exception("Failed to parse %s", file)
-
-    def build_record(self, record_name: str, rdict: dict, source: Path | None) -> Record:
-        # predictable order of fields in the list is important, since we'll
-        # be constructing a record descriptor from it.
-        record_fields = sorted(rdict.items())
-
-        record_values = {
-            "_target": self.target,
-            "source": source,
-        }
-        record_fields = []
-
-        for k, v in rdict.items():
-            k = format_key(k)
-
-            if isinstance(v, bool):
-                record_fields.append(("boolean", k))
-            elif isinstance(v, int):
-                record_fields.append(("varint", k))
-            else:
-                record_fields.append(("string", k))
-
-            record_values[k] = v
-
-        record_fields.append(("path", "source"))
-
-        # tuple conversion here is needed for lru_cache
-        desc = self.create_event_descriptor(record_name, tuple(record_fields))
-        return desc(**record_values)
-
-    def create_event_descriptor(self, record_name: str, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
-        return TargetRecordDescriptor(record_name, record_fields)
-
-
-def format_key(key: str) -> str:
-    # A lot of "malformed" keys
-    key = key.replace(".", "_")
-    key = key.replace("-", "_")
-    key = key.replace("@", "_")
-    key = key.replace(" ", "_")
-    key = key.replace("()", "")
-    key = key.removeprefix("#")
-    key = key.removeprefix("_")
-    key = key.lstrip("_")
-
-    if "/" in key:
-        key = key.rsplit("/", 1)[-1]
-
-    if key == "0":
-        key = "zero"
-
-    return key
-
-
-def extract_nested_dict(flat: dict, nested: dict) -> None:
-    for k, v in nested.items():
-        if isinstance(v, dict):
-            extract_nested_dict(flat, v)
-        else:
-            flat[k] = v
+        yield from build_records(
+            self, "macos/launch_daemons", self.launch_daemon_files, LaunchDaemonRecords, COLLAPSE_PATHS
+        )

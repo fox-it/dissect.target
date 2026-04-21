@@ -20,10 +20,15 @@ if TYPE_CHECKING:
     ("names", "paths"),
     [
         (
-            (".GlobalPreferences.plist", ".AppleSetupDone"),
+            (
+                ".GlobalPreferences.plist",
+                ".AppleSetupDone",
+                "com.apple.timezone.auto.plist",
+            ),
             (
                 "/Library/Preferences/.GlobalPreferences.plist",
                 "/private/var/db/.AppleSetupDone",
+                "/Library/Preferences/com.apple.timezone.auto.plist",
             ),
         ),
     ],
@@ -59,6 +64,7 @@ def test_locale(
         assert target_unix.timezone == "Europe/Amsterdam"
         assert target_unix.language == ["en_US", "nl_NL"]
         assert target_unix.install_date == datetime.fromtimestamp(apple_setup_time, tz=tz)
+        assert target_unix.location_services_active
 
     finally:
         target_unix.fs = None
