@@ -29,7 +29,7 @@ log = get_logger(__name__)
 GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
 GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 
-REGFLEX_NAME_VALUE_REGEX = re.compile(r'^(?P<name>"(?:[^"\\]|\\.)*")=(?P<value>.*)')
+RE_REGFLEX_NAME_VALUE = re.compile(r'^"(?P<name>(?:[^"\\]|\\.)*?)"=(?P<value>.*)')
 
 
 KeyType = regf.IndexLeaf | regf.FastLeaf | regf.HashLeaf | regf.IndexRoot | regf.KeyNode
@@ -774,12 +774,11 @@ class RegFlex:
                 continue
 
             if line.startswith('"'):
-                match = REGFLEX_NAME_VALUE_REGEX.search(line)
-                if match is None:
+                if not (match := RE_REGFLEX_NAME_VALUE.search(line)):
                     log.warning("Failed to parse RegFlex value: %r", line)
                     continue
 
-                name = match.group("name").strip('"')
+                name = match.group("name")
                 value = match.group("value")
 
                 if value.endswith("\\"):
