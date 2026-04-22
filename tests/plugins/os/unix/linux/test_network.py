@@ -334,7 +334,7 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
 @pytest.mark.parametrize(
     ("expected_record", "messages"),
     [
-        (
+        pytest.param(
             {
                 "name": "eth0",
                 "cidr": [ip_interface("10.13.37.1/32")],
@@ -342,8 +342,9 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "source": "syslog",
             },
             "Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'",  # noqa: E501
+            id="networkmanager-dhcp4-option-addr",
         ),
-        (
+        pytest.param(
             {
                 "name": "eth0",
                 "cidr": [ip_interface("10.13.37.1/32")],
@@ -351,8 +352,9 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "source": "syslog",
             },
             "Jan  1 13:37:01 hostname NetworkManager[2]: <info>  [1600000000.0000] dhcp4 (eth0): state changed new lease, address=10.13.37.1",  # noqa: E501
+            id="networkmanager-dhcp4-new-lease",
         ),
-        (
+        pytest.param(
             {
                 "name": "eth0",
                 "cidr": [ip_interface("10.13.37.1/32")],
@@ -360,8 +362,9 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "source": "syslog",
             },
             "Jan  1 13:37:01 hostname NetworkManager[2]: <info>  [1600000000.0000] dhcp4 (eth0): state changed new lease, address=10.13.37.1, acd pending",  # noqa: E501
+            id="networkmanager-dhcp4-pending",
         ),
-        (
+        pytest.param(
             {
                 "name": "eth0",
                 "cidr": [ip_interface("10.13.37.2/24")],
@@ -369,8 +372,9 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "source": "syslog",
             },
             "Feb  2 13:37:02 test systemd-networkd[3]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0",
+            id="networkd-dhcpv4-addr",
         ),
-        (
+        pytest.param(
             {
                 "name": "eth0",
                 "cidr": [ip_interface("10.13.37.3/32")],
@@ -378,8 +382,9 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "source": "syslog",
             },
             "Mar  3 13:37:03 localhost NetworkManager[4]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3",
+            id="networkmanager-dhcp4-addr-variant",
         ),
-        (
+        pytest.param(
             {
                 "name": None,
                 "cidr": [ip_interface("10.13.37.4/32")],
@@ -387,8 +392,9 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "source": "syslog",
             },
             "Apr  4 13:37:04 localhost dhclient[5]: bound to 10.13.37.4 -- renewal in 1337 seconds.",
+            id="dhclient-bound-to-addr",
         ),
-        (
+        pytest.param(
             {
                 "name": "eth0",
                 "cidr": [ip_interface("2001:db8::/64")],
@@ -399,10 +405,13 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
                 "Jun  6 13:37:06 test systemd-networkd[6]: eth0: DHCPv6 address 2001:db8::/64 via 2001:db8:ffff:ffff:ffff:ffff:ffff:ffff\n"  # noqa: E501
                 "May  5 13:37:05 test systemd-networkd[6]: eth0: DHCPv6 lease lost\n"
             ),
+            id="networkd-dhcpv6-addr",
         ),
     ],
 )
-def test_ips_dhcp(target_unix_users: Target, fs_unix: VirtualFilesystem, expected_record: dict, messages: str) -> None:
+def test_network_ips_dhcp(
+    target_unix_users: Target, fs_unix: VirtualFilesystem, expected_record: dict, messages: str
+) -> None:
     """Test DHCP lease messages from /var/log/syslog."""
     fs_unix.map_file_fh(
         "/var/log/syslog",

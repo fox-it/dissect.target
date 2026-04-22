@@ -32,7 +32,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     assert target.path == path
 
 
-def test_docker() -> None:
+def test_containerimage_docker() -> None:
     """Test if we map a Docker image correctly."""
     path = absolute_path("_data/loaders/containerimage/alpine-docker.tar")
 
@@ -75,7 +75,7 @@ def test_docker() -> None:
     ]
 
 
-def test_oci_podman() -> None:
+def test_containerimage_oci_podman() -> None:
     """Test if we map a Podman OCI image correctly."""
     path = absolute_path("_data/loaders/containerimage/alpine-oci.tar")
 

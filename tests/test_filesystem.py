@@ -68,7 +68,7 @@ def vfs() -> VirtualFilesystem:
     return vfs
 
 
-def test_registration(tmp_path: Path) -> None:
+def test_filesystem_registration(tmp_path: Path) -> None:
     code = """
         from __future__ import annotations
 
@@ -1179,7 +1179,7 @@ def test_mapped_file_readlink(vfs: VirtualFilesystem) -> None:
         MappedFile(vfs, "/guestlink", "/hostlink").readlink_ext()
 
 
-def test_reset_file_position() -> None:
+def test_filesystem_reset_file_position() -> None:
     fh = BytesIO(b"\x00" * 8192)
     fh.seek(512)
 

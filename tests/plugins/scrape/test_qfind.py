@@ -35,7 +35,7 @@ def mock_target(target_bare: Target) -> Target:
     return target_bare
 
 
-def test_qfind(mock_target: Target) -> None:
+def test_qfind_scrape(mock_target: Target) -> None:
     """Test if qfind can find a simple short needle."""
     results = list(mock_target.qfind(["B"]))
 

@@ -156,7 +156,11 @@ def mock_read_key_subkeys(self: AmcachePlugin, key: str) -> Iterator[Mock]:
 @pytest.mark.parametrize(
     ("test_file_id", "expected_file_id"),
     [
-        ("00008e01cdeb9a1c23cee421a647f29c45f67623be97", "8e01cdeb9a1c23cee421a647f29c45f67623be97"),
+        pytest.param(
+            "00008e01cdeb9a1c23cee421a647f29c45f67623be97",
+            "8e01cdeb9a1c23cee421a647f29c45f67623be97",
+            id="file-id",
+        ),
         ("", None),
         (None, None),
     ],

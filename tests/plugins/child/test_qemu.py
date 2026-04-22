@@ -24,7 +24,7 @@ def test_compatible(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     QemuChildTargetPlugin(target_linux).check_compatible()
 
 
-def test_list_children(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+def test_qemu_children(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     qemu_xml = absolute_path("_data/loaders/libvirt/qemu.xml")
     fs_linux.map_file("/etc/libvirt/qemu/linux2022.xml", qemu_xml)
     fs_linux.map_file("/etc/libvirt/qemu/linux2024.xml", qemu_xml)

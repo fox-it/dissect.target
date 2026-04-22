@@ -28,42 +28,62 @@ def target_win_reg(target_win: Target, fs_win: VirtualFilesystem) -> Target:
     ("provided_target", "provided_key", "arg_depth", "arg_length", "expected_output", "expected_log"),
     [
         # test invalid target
-        ("target_default", "FOOBAR", 1, 100, "", "has no Windows Registry"),
+        pytest.param(
+            "target_default",
+            "FOOBAR",
+            1,
+            100,
+            "",
+            "has no Windows Registry",
+            id="invalid-target",
+        ),
         # test invalid key feedback
-        ("target_win_reg", "FOOBAR", 1, 100, "", "Key 'FOOBAR' does not exist"),
-        (
+        pytest.param(
+            "target_win_reg",
+            "FOOBAR",
+            1,
+            100,
+            "",
+            "Key 'FOOBAR' does not exist",
+            id="invalid-key-1",
+        ),
+        pytest.param(
             "target_win_reg",
             "HKEY_LOCAL_MACHINE\\FOOBAR",
             1,
             100,
             "",
             "Key 'HKEY_LOCAL_MACHINE\\\\FOOBAR' does not exist",
+            id="invalid-key-2",
         ),
         # test key value abbrevation
-        (
+        pytest.param(
             "target_win_reg",
             "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\ComputerName",
             1,
             100,
             "- 'ComputerName' 'DESKTOP-M3OSHQU'",
             "",
+            id="key-abbr-1",
         ),
-        (
+        pytest.param(
             "target_win_reg",
             "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\ComputerName",
             1,
             10,
             "- 'ComputerName' 'DESKTOP-M...",
             "",
+            id="key-abbr-2",
         ),
         # test class name printing
-        (
+        pytest.param(
             "target_win_reg",
             "HKLM\\SYSTEM\\ControlSet001\\Control\\Lsa\\Data",
             1,
             100,
             "+ 'Data' (2022-06-23 01:25:23.729778+00:00) (a282942c)",
             "",
+            id="class-name-printing",
         ),
     ],
 )

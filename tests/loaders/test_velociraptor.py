@@ -133,7 +133,7 @@ def test_windows_ntfs_zip(mock_velociraptor_dir: Path) -> None:
         (["uploads/auto/Library", "uploads/auto/Applications", "uploads/auto/%2ETEST"]),
     ],
 )
-def test_unix(paths: list[str], tmp_path: Path) -> None:
+def test_velo_unix(paths: list[str], tmp_path: Path) -> None:
     """Test that ``VelociraptorLoader`` correctly loads a Unix directory structure."""
     root = tmp_path
     mkdirs(root, paths)

@@ -33,7 +33,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     assert target.path == path
 
 
-def test_compressed_tar(caplog: pytest.LogCaptureFixture) -> None:
+def test_ns_compressed_tar(caplog: pytest.LogCaptureFixture) -> None:
     """Test if we map a compressed NetScaler Collector tar image correctly."""
     path = absolute_path("_data/loaders/nscollector/collector_P_10.164.0.3_22Oct2025_11_31.tar.gz")
 

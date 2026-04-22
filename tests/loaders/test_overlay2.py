@@ -39,7 +39,7 @@ def test_target_open(opener: Callable[[str | Path], Target], target_linux_docker
         ("f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071", 9, 19),
     ],
 )
-def test_docker(target_linux_docker: Target, path: str, layers: int, entries: int) -> None:
+def test_overlay2_docker(target_linux_docker: Target, path: str, layers: int, entries: int) -> None:
     """Test if we correctly detect and map a Docker container."""
     container = target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts").joinpath(path)
 

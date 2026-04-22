@@ -131,7 +131,7 @@ def test_anonymous_filesystems() -> None:
     ],
 )
 @pytest.mark.benchmark
-def test_benchmark(benchmark: BenchmarkFixture, archive: str, loader: type[Loader]) -> None:
+def test_benchmark_acquire(benchmark: BenchmarkFixture, archive: str, loader: type[Loader]) -> None:
     """Benchmark the loading of Acquire archives."""
     file = absolute_path(archive)
 

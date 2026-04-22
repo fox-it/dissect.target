@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_child_colima(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+def test_child_lima(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/root/.lima/default/diffdisk", BytesIO())
     fs_unix.map_file_fh("/root/.lima/docker/diffdisk", BytesIO())
     fs_unix.map_file_fh("/home/user/.config/lima/ligma/diffdisk", BytesIO())

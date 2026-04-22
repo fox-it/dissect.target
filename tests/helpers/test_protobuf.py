@@ -22,8 +22,16 @@ def test_protobuf_varint_decode(input: bytes, expected_output: int) -> None:
 @pytest.mark.parametrize(
     ("input", "expected_output"),
     [
-        (1234567890, b"\xd2\x85\xd8\xcc\x04"),
-        (pow(2, 128), b"\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x04"),
+        pytest.param(
+            1234567890,
+            b"\xd2\x85\xd8\xcc\x04",
+            id="1234567890",
+        ),
+        pytest.param(
+            pow(2, 128),
+            b"\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x80\x04",
+            id="pow(2, 128)",
+        ),
     ],
 )
 def test_protobuf_varint_encode(input: int, expected_output: bytes) -> None:

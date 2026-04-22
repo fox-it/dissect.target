@@ -51,7 +51,7 @@ def ffs_fs_entry(ffs_fs: FfsFilesystem) -> FfsFilesystemEntry:
     return FfsFilesystemEntry(ffs_fs, "/some_file", inode)
 
 
-def test_jffs2_stat(ffs_fs_entry: FfsFilesystemEntry) -> None:
+def test_ffs_stat(ffs_fs_entry: FfsFilesystemEntry) -> None:
     stat = ffs_fs_entry.stat()
 
     entry = ffs_fs_entry.entry

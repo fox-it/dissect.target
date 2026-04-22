@@ -10,7 +10,7 @@ from dissect.target.filesystems.extfs import ExtFilesystem, ExtFilesystemEntry
 from tests._utils import absolute_path
 
 
-def test_stat_information() -> None:
+def test_extfs_stat_information() -> None:
     extfs = Mock(block_size=0x1000)
     extfs.sb.s_inode_size = 129
 

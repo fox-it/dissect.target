@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_docker(target_linux_docker: Target) -> None:
+def test_docker_child(target_linux_docker: Target) -> None:
     target_linux_docker.add_plugin(DockerChildTargetPlugin)
     children = sorted([child for _, child in target_linux_docker.list_children()], key=lambda r: r.path)
 

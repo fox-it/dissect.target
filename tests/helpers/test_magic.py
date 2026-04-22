@@ -109,12 +109,19 @@ entry = fs.get("example.png")
         ("from_buffer", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", True, "application/vnd.ms-excel"),
         ("from_buffer", b"Received:", True, "message/rfc822"),
         ("from_buffer", b"!BDN", True, "application/vnd.ms-outlook-pst"),
-        ("from_buffer", (b"\x00" * 2112) + b"Microsoft Word document data", True, "application/msword"),
-        (
+        pytest.param(
+            "from_buffer",
+            (b"\x00" * 2112) + b"Microsoft Word document data",
+            True,
+            "application/msword",
+            id="msword",
+        ),
+        pytest.param(
             "from_buffer",
             (b"\x00" * 592) + bytes.fromhex("108d81649b4fcf1186ea00aa00b929e8"),
             True,
             "application/vnd.ms-powerpoint",
+            id="mspowerpoint",
         ),
         # Executables
         ("from_buffer", b"MZ", True, "application/x-ms-dos-executable"),

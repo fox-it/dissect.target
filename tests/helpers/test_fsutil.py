@@ -1015,7 +1015,7 @@ def glob_fs() -> VirtualFilesystem:
         ("/", "boo/bla/*", []),
     ],
 )
-def test_glob_ext(glob_fs: VirtualFilesystem, start_path: str, pattern: str, results: list[str]) -> None:
+def test_fsutil_glob_ext(glob_fs: VirtualFilesystem, start_path: str, pattern: str, results: list[str]) -> None:
     start_entry = glob_fs.get(start_path)
     entries = fsutil.glob_ext(start_entry, pattern)
 

@@ -18,53 +18,61 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize(
     ("data_path", "target_path", "expected_version", "os_plugin"),
     [
-        (
+        pytest.param(
             "_data/plugins/os/unix/linux/debian/_os/debian-os-release",
             "/etc/os-release",
             "Debian GNU/Linux 11 (bullseye)",
             LinuxPlugin,
+            id="debian-11",
         ),
-        (
+        pytest.param(
             "_data/plugins/os/unix/linux/debian/_os/ubuntu-os-release",
             "/etc/os-release",
             "Ubuntu 22.04.2 LTS (Jammy Jellyfish)",
             LinuxPlugin,
+            id="ubuntu-22",
         ),
-        (
+        pytest.param(
             "_data/plugins/os/unix/linux/redhat/_os/centos-os-release",
             "/etc/os-release",
             "CentOS Linux 8",
             LinuxPlugin,
+            id="centos-8",
         ),
-        (
+        pytest.param(
             "_data/plugins/os/unix/linux/redhat/_os/fedora-os-release",
             "/etc/os-release",
             "Fedora Linux 37 (Container Image)",
             LinuxPlugin,
+            id="fedora-37",
         ),
-        (
+        pytest.param(
             "_data/plugins/os/unix/linux/suse/_os/opensuse-os-release",
             "/etc/os-release",
             "openSUSE Leap 15.4",
             LinuxPlugin,
+            id="opensuse-leap-15",
         ),
-        (
+        pytest.param(
             "_data/plugins/os/unix/linux/debian/_os/ubuntu-lsb-release",
             "/etc/lsb-release",
             "Ubuntu 22.04.2 LTS",
             LinuxPlugin,
+            id="ubuntu-22-lsb",
         ),
-        (
+        pytest.param(
             "_data/plugins/os/unix/bsd/freebsd/_os/freebsd-freebsd-version",
             "/bin/freebsd-version",
             "13.0-RELEASE",
             FreeBsdPlugin,
+            id="freebsd-13",
         ),
-        (
+        pytest.param(
             "_data/plugins/os/unix/linux/alpine/_os/alpine-os-release",
             "/etc/os-release",
             "Alpine Linux 3.18.4",
             LinuxPlugin,
+            id="alpine-3.18",
         ),
     ],
 )

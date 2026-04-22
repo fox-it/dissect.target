@@ -171,7 +171,7 @@ def test_commandhistory_fish_history(target_unix_users: Target, fs_unix: Virtual
 @pytest.mark.parametrize(
     ("db_type", "db_file", "db_history"),
     [
-        (
+        pytest.param(
             "mongodb",
             ".dbshell",
             """
@@ -179,8 +179,9 @@ def test_commandhistory_fish_history(target_unix_users: Target, fs_unix: Virtual
             print("Hello World")
             db.users.find({ name: /foo/i }, { _id: 0, name: 1})
             """,
+            id="mongodb",
         ),
-        (
+        pytest.param(
             "postgresql",
             ".psql_history",
             """
@@ -189,8 +190,9 @@ def test_commandhistory_fish_history(target_unix_users: Target, fs_unix: Virtual
             \\dt
             select * from users;
             """,
+            id="postgresql",
         ),
-        (
+        pytest.param(
             "mysql",
             ".mysql_history",
             """
@@ -199,8 +201,9 @@ def test_commandhistory_fish_history(target_unix_users: Target, fs_unix: Virtual
             show tables;
             select * from users;
             """,
+            id="mysql",
         ),
-        (
+        pytest.param(
             "sqlite",
             ".sqlite_history",
             """
@@ -210,6 +213,7 @@ def test_commandhistory_fish_history(target_unix_users: Target, fs_unix: Virtual
             insert into tbl1 values('goodbye', 20);
             select * from tbl1;
             """,
+            id="sqlite",
         ),
     ],
 )

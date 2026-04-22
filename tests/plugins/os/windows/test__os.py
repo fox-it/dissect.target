@@ -156,7 +156,7 @@ def test_windowsplugin__nt_version(
     ("keys", "value"),
     [
         ([], None),
-        (
+        pytest.param(
             [
                 ("CSDVersion", 5678),
                 ("CurrentBuildNumber", 1234),
@@ -167,8 +167,9 @@ def test_windowsplugin__nt_version(
                 ("UBR", 9012),
             ],
             "Some Product (NT 10.0) 1234.9012 5678",
+            id="major-minor",
         ),
-        (
+        pytest.param(
             [
                 ("CSDVersion", 5678),
                 ("CurrentBuildNumber", 1234),
@@ -177,46 +178,53 @@ def test_windowsplugin__nt_version(
                 ("UBR", 9012),
             ],
             "Some Product (NT x.y) 1234.9012 5678",
+            id="current-version",
         ),
-        (
+        pytest.param(
             [
                 ("CurrentBuildNumber", 1234),
                 ("CurrentVersion", "x.y"),
                 ("ProductName", "Some Product"),
             ],
             "Some Product (NT x.y) 1234",
+            id="bare-version",
         ),
-        (
+        pytest.param(
             [
                 ("ProductName", "Some Product"),
             ],
             "Some Product (NT <Unknown CurrentVersion>) <Unknown CurrentBuildNumber>",
+            id="only-product",
         ),
-        (
+        pytest.param(
             [
                 ("CurrentVersion", "x.y"),
             ],
             "<Unknown ProductName> (NT x.y) <Unknown CurrentBuildNumber>",
+            id="only-version",
         ),
-        (
+        pytest.param(
             [
                 ("CurrentBuildNumber", 1234),
             ],
             "<Unknown ProductName> (NT <Unknown CurrentVersion>) 1234",
+            id="only-build",
         ),
-        (
+        pytest.param(
             [
                 ("UBR", 9012),
             ],
             "<Unknown ProductName> (NT <Unknown CurrentVersion>) <Unknown CurrentBuildNumber>.9012",
+            id="only-ubr",
         ),
-        (
+        pytest.param(
             [
                 ("CSDVersion", 5678),
             ],
             "<Unknown ProductName> (NT <Unknown CurrentVersion>) <Unknown CurrentBuildNumber> 5678",
+            id="only-csd",
         ),
-        (
+        pytest.param(
             [
                 ("ProductName", "Windows 10 Pro"),
                 ("CurrentMajorVersionNumber", 10),
@@ -225,8 +233,9 @@ def test_windowsplugin__nt_version(
                 ("UBR", 1234),
             ],
             "Windows 10 Pro (NT 10.0) 19045.1234",
+            id="win-10-pro",
         ),
-        (
+        pytest.param(
             [
                 ("ProductName", "Windows 10 Enterprise"),
                 ("CurrentMajorVersionNumber", 10),
@@ -235,6 +244,7 @@ def test_windowsplugin__nt_version(
                 ("UBR", 1234),
             ],
             "Windows 11 Enterprise (NT 10.0) 22000.1234",
+            id="win-11-enterprise",
         ),
     ],
 )
