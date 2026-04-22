@@ -1288,11 +1288,9 @@ class OSPlugin(Plugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        """Return a slug of the target's OS architecture.
+        """Return a target triple slug of the target's instruction set architecture, vendor and OS.
 
-        Returns:
-            A slug of the OS architecture, e.g. 'x86_32-unix', 'MIPS-linux' or
-            'AMD64-win32', or 'unknown' if the architecture is unknown.
+        See ``target_triple`` in ``dissect.target.helpers.arch`` for implementation details.
         """
         raise NotImplementedError
 
