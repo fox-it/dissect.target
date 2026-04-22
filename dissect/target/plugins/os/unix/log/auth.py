@@ -386,4 +386,4 @@ class AuthPlugin(Plugin):
                 iterable = year_rollover_helper(auth_file, RE_TS, "%b %d %H:%M:%S", target_tz)
 
             for ts, line in iterable:
-                self._auth_log_builder.build_record(ts, auth_file, line)
+                yield self._auth_log_builder.build_record(ts, auth_file, line)
