@@ -4,7 +4,7 @@ import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
 
@@ -66,7 +66,7 @@ class MacOSContentsVersionPlugin(Plugin):
         if not self.files:
             raise UnsupportedPluginError("No contents version.plist files found")
 
-    @export(record=DynamicDescriptor(["string"]))
-    def contents_version(self) -> Iterator[DynamicDescriptor]:
+    @export(record=ContentsVersionRecord)
+    def contents_version(self) -> Iterator[ContentsVersionRecord]:
         """Yield contents version.plist information."""
         yield from build_records(self, "macos/contents_version", self.files, ContentsVersionRecords)

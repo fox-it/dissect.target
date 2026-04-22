@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.userdirs import _build_userdirs
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

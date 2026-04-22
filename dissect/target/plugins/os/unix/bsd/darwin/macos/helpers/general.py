@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import re
     from pathlib import Path
 
     from dissect.target.plugin import Plugin
@@ -27,3 +29,13 @@ def _build_userdirs(plugin: Plugin, hist_paths: list[str]) -> set[tuple[UserDeta
                 if cur_dir.exists():
                     users_dirs.add((user_details, cur_dir))
     return users_dirs
+
+
+def parse_timestamp(timestamp: re.Match) -> datetime:
+    ts = None
+    try:
+        ts = datetime.fromisoformat(timestamp.group())
+    except ValueError:
+        ts = datetime.strptime(timestamp.group(), "%b %d %H:%M:%S").replace(tzinfo=timezone.utc)
+
+    return ts

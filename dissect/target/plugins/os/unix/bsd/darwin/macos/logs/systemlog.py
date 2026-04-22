@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import gzip
 import re
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import parse_timestamp
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from datetime import tzinfo
 
     from dissect.target.target import Target
 
@@ -108,7 +107,3 @@ class SystemLogPlugin(Plugin):
                 )
 
             logfile.close()
-
-
-def parse_timestamp(timestamp: re.Match, tzinfo: tzinfo = timezone.utc) -> datetime:
-    return datetime.strptime(timestamp.group(), "%b %d %H:%M:%S").replace(tzinfo=tzinfo)

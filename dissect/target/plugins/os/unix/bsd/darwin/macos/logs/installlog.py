@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import parse_timestamp
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -104,18 +104,3 @@ class InstallLogPlugin(Plugin):
                 message=message.strip(),
                 _target=self.target,
             )
-
-
-def parse_timestamp(timestamp: re.Match) -> datetime:
-    # I could not find docs about this but it seems to be the case that when you
-    # start installing your macbook, it outputs the timestamp in this BSD style
-    # format without any timezone info. After some messages it starts outputting
-    # ISO timestamps with timezone info. From those timestamps I kind of inferred
-    # that this is actually just UTC.
-    ts = None
-    try:
-        ts = datetime.fromisoformat(timestamp.group())
-    except ValueError:
-        ts = datetime.strptime(timestamp.group(), "%b %d %H:%M:%S").replace(tzinfo=timezone.utc)
-
-    return ts

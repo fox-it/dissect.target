@@ -4,10 +4,10 @@ import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.userdirs import _build_userdirs
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -318,16 +318,16 @@ class LaunchersPlugin(Plugin):
         for _, path in _build_userdirs(self, self.USER_LAUNCH_DAEMON_PATHS):
             self.launch_daemon_files.add(path)
 
-    @export(record=DynamicDescriptor(["string"]))
+    @export(record=LaunchAgentRecords)
     # @export(output="yield")
-    def launch_agents(self) -> Iterator[DynamicDescriptor]:
+    def launch_agents(self) -> Iterator[LaunchAgentRecords]:
         """Yield macOS launch agent plist files."""
         yield from build_records(
             self, "macos/launch_agents", self.launch_agent_files, LaunchAgentRecords, COLLAPSE_PATHS
         )
 
-    @export(record=DynamicDescriptor(["string"]))
-    def launch_daemons(self) -> Iterator[DynamicDescriptor]:
+    @export(record=LaunchDaemonRecords)
+    def launch_daemons(self) -> Iterator[LaunchDaemonRecords]:
         """Yield macOS launch daemon plist files."""
         yield from build_records(
             self, "macos/launch_daemons", self.launch_daemon_files, LaunchDaemonRecords, COLLAPSE_PATHS

@@ -4,10 +4,10 @@ import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.userdirs import _build_userdirs
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -61,8 +61,8 @@ class LoginItemsPlugin(Plugin):
         for _, path in _build_userdirs(self, self.USER_LOGIN_ITEMS_PATHS):
             self.login_items_files.add(path)
 
-    @export(record=DynamicDescriptor(["string"]))
+    @export(record=LoginItemsRecord)
     # @export(output="yield")
-    def login_items(self) -> Iterator[DynamicDescriptor]:
+    def login_items(self) -> Iterator[LoginItemsRecord]:
         """Yield macOS login items plist files."""
         yield from build_records(self, "macos/login_items", self.login_items_files, LoginItemsRecords)

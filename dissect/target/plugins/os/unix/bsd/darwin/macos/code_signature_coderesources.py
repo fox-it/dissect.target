@@ -4,7 +4,7 @@ import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
 
@@ -83,8 +83,8 @@ class CodeSignatureCodeResourcesPlugin(Plugin):
         if not (self.files):
             raise UnsupportedPluginError("No code signature coderesources files found")
 
-    @export(record=DynamicDescriptor(["string"]))
-    def code_signature_coderesources(self) -> Iterator[DynamicDescriptor]:
+    @export(record=CodeSignatureCodeResourcesRecords)
+    def code_signature_coderesources(self) -> Iterator[CodeSignatureCodeResourcesRecords]:
         """Yield code signature coderesources information."""
         yield from build_records(
             self, "macos/code_signature_coderesources", self.files, CodeSignatureCodeResourcesRecords
