@@ -37,13 +37,26 @@ MACHINE_MAP_LINUX = {
 }
 
 
-# Translate a Mach-O instruction CPU sub type to a standardized machine name.
-# https://en.wikipedia.org/wiki/Mach-O
+# Translate a Mach-O instruction CPU type to a standardized machine name.
+# Cherry-picked to only architectures widely distributed by Apple.
+# https://en.wikipedia.org/wiki/Mach-O, /usr/include/mach-o/loader.h & /usr/include/mach-o/machine.h
 MACHINE_MAP_DARWIN = {
-    0x0C000001: "aarch64",  # big endian, x64
-    0x0100000C: "aarch64",  # little endian, x64
-    0x0C000000: "aarch32",  # big endian, x32
-    0x0000000C: "aarch32",  # little endian, x32
+    0x00000006: "mc68k",  # CPU_TYPE_MC680x0
+    0x06000000: "mc68k",
+    0x00000007: "x86",  # CPU_TYPE_X86
+    0x07000000: "x86",
+    0x01000007: "x86_64",  # (CPU_TYPE_X86 | CPU_ARCH_ABI64)
+    0x07000001: "x86_64",
+    0x00000012: "powerpc32",  # CPU_TYPE_POWERPC
+    0x12000000: "powerpc32",
+    0x01000012: "powerpc64",  # CPU_TYPE_POWERPC64 = (CPU_TYPE_POWERPC | CPU_ARCH_ABI64)
+    0x12000001: "powerpc64",
+    0x0000000C: "aarch32",  # CPU_TYPE_ARM
+    0x0C000000: "aarch32",
+    0x0100000C: "aarch64",  # CPU_TYPE_ARM64 = (CPU_TYPE_ARM | CPU_ARCH_ABI64)
+    0x0C000001: "aarch64",
+    0x0200000C: "aarch64",  # CPU_TYPE_ARM64_32 = (CPU_TYPE_ARM | CPU_ARCH_ABI64_32)
+    0x0C000002: "aarch64",
 }
 
 
