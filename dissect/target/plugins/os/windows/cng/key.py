@@ -72,7 +72,7 @@ class CNGKey:
             self.encrypted.pop(i)
 
     def parse(self, **kwargs) -> tuple[list[CNGKeyProperty], list[BCryptKey], list[CNGEncryptedProperty]]:
-        """Return the (decrypted) properties and key data of this key. kwargs are passed to ``dpapi.decrypt_blob``."""
+        """Return (decrypted) properties and key data of this key. Kwargs are passed to ``DPAPIPlugin.decrypt_blob``."""
         self.fh.seek(self.offset_properties)
         properties = []
         keys = []
