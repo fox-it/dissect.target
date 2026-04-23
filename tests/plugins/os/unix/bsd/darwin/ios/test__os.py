@@ -37,7 +37,7 @@ def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
     target_ios.add_plugin(IOSApplicationsPlugin)
     target_ios.apply()
 
-    assert target_ios.os == OperatingSystem.IOS
+    assert target_ios.os == OperatingSystem.IOS == "ios"
     assert target_ios.version == "iPhone OS 17.3 (21D50)"
     assert target_ios.architecture == "aarch64-apple-ios"
     assert target_ios.hostname == "This-Iss-iPhone"

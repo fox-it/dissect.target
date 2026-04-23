@@ -6,6 +6,7 @@ import pytest
 
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.cellebrite import CellebriteFilesystem, CellebriteLoader
+from dissect.target.plugin import OperatingSystem
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
@@ -83,5 +84,5 @@ def test_loader() -> None:
         "/var",
     ]
 
-    assert t.os == "linux"
+    assert t.os == OperatingSystem.LINUX == "linux"
     assert t.hostname == "example"

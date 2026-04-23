@@ -129,8 +129,8 @@ class OpenVPNPlugin(Plugin):
     )
 
     user_config_paths: Final[dict[str, list[str]]] = {
-        OperatingSystem.WINDOWS.value: ["OpenVPN/config/"],
-        OperatingSystem.OSX.value: ["Library/Application Support/OpenVPN Connect/profiles/"],
+        OperatingSystem.WINDOWS: ["OpenVPN/config/"],
+        OperatingSystem.OSX: ["Library/Application Support/OpenVPN Connect/profiles/"],
     }
 
     def __init__(self, target: Target):

@@ -97,7 +97,7 @@ def test_esxi_os_detection(target_bare: Target, fs_esxi: VirtualFilesystem) -> N
 
     assert ESXiPlugin.detect(target_bare)
     assert isinstance(target_bare._os, ESXiPlugin)
-    assert target_bare.os == OperatingSystem.ESXI
+    assert target_bare.os == OperatingSystem.ESXI == "esxi"
     assert target_bare.hostname == "localhost"
     assert target_bare.version == "6.7.0"
     assert target_bare.ips == ["192.168.56.101"]

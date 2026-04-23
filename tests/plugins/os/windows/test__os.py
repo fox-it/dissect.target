@@ -7,6 +7,7 @@ import pytest
 from flow.record.fieldtypes import windows_path
 
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.generic import ComputerSidRecord
@@ -345,5 +346,5 @@ def test_windows_architecture(
     key.add_value("PROCESSOR_ARCHITECTURE", reg_value)
     hive_hklm.map_key(key_name, key)
 
-    assert target_win_users.os == "windows"
+    assert target_win_users.os == OperatingSystem.WINDOWS == "windows"
     assert target_win_users.architecture == expected_triple

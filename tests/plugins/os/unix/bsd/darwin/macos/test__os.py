@@ -29,7 +29,7 @@ def test_macos_os(target_macos_users: Target, fs_macos: VirtualFilesystem) -> No
     dissect_user = users[0]
     test_user = users[1]
 
-    assert target_macos_users.os == OperatingSystem.MACOS
+    assert target_macos_users.os == OperatingSystem.MACOS == "macos"
     assert target_macos_users.hostname == "dummys-Mac"
     assert target_macos_users.version == "macOS 11.7.5 (20G1225)"
 

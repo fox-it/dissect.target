@@ -5,7 +5,7 @@ import re
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.localeutil import normalize_language
-from dissect.target.plugin import export
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.default.locale import LocalePlugin
 
 RE_CONFIG_TIMEZONE = re.compile(
@@ -17,7 +17,7 @@ class CitrixLocalePlugin(LocalePlugin):
     """Citrix Netscaler locale plugin."""
 
     def check_compatible(self) -> None:
-        if self.target.os != "citrix-netscaler":
+        if self.target.os != OperatingSystem.CITRIX:
             raise UnsupportedPluginError("Citrix Netscaler specific plugin loaded on non-Citrix target")
 
     @export(property=True)

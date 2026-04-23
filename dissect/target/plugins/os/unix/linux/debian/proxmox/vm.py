@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import OperatingSystem, Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -21,7 +21,7 @@ class VirtualMachinePlugin(Plugin):
     """Plugin to list Proxmox virtual machines."""
 
     def check_compatible(self) -> None:
-        if self.target.os != "proxmox":
+        if self.target.os != OperatingSystem.PROXMOX:
             raise UnsupportedPluginError("Not a Proxmox operating system")
 
     @export(record=VirtualMachineRecord)
