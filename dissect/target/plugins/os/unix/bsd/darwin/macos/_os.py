@@ -6,11 +6,12 @@ from typing import TYPE_CHECKING
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.filesystem import Filesystem
+from dissect.target.helpers.arch import target_triple
 from dissect.target.helpers.record import MacOSUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd.darwin._os import (
     DarwinPlugin,
-    detect_macho_arch,
+    macho_cpu_type,
 )
 from dissect.target.target import Target
 
@@ -116,7 +117,7 @@ class MacOSPlugin(DarwinPlugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        if arch := detect_macho_arch(
+        if machine := macho_cpu_type(
             paths=[
                 "/bin/bash",
                 "/bin/sh",
@@ -126,5 +127,5 @@ class MacOSPlugin(DarwinPlugin):
             ],
             fs=self.target.fs,
         ):
-            return f"{arch}-macos"
+            return target_triple(self.os, machine)
         return None
