@@ -1290,7 +1290,7 @@ class OSPlugin(Plugin):
     def architecture(self) -> str | None:
         """Return a target triple slug of the target's instruction set architecture, vendor and OS.
 
-        See ``target_triple`` in ``dissect.target.helpers.arch`` for implementation details.
+        See :func:`dissect.target.helpers.arch.target_triple` for implementation details.
         """
         raise NotImplementedError
 
