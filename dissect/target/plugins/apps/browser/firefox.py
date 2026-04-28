@@ -70,10 +70,14 @@ class FirefoxPlugin(BrowserPlugin):
         # Windows
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
-        # Linux
+        # Linux (146 and before)
         ".mozilla/firefox",
         "snap/firefox/common/.mozilla/firefox",
         ".var/app/org.mozilla.firefox/.mozilla/firefox",
+        # Linux (147 and newer) uses XDG_CONFIG_HOME by default
+        ".config/mozilla/firefox",
+        "snap/firefox/common/.config/mozilla/firefox",
+        ".var/app/org.mozilla.firefox/.config/mozilla/firefox",
         # macOS
         "Library/Application Support/Firefox",
     )
@@ -84,24 +88,24 @@ class FirefoxPlugin(BrowserPlugin):
     )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/cookie", GENERIC_COOKIE_FIELDS
+        "application/browser/firefox/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+        "application/browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/extension",
+        "application/browser/firefox/extension",
         GENERIC_EXTENSION_RECORD_FIELDS + FIREFOX_EXTENSION_RECORD_FIELDS,
     )
 
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
+        "application/browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     def __init__(self, target: Target):
@@ -110,7 +114,6 @@ class FirefoxPlugin(BrowserPlugin):
 
     def find_installs(self) -> Iterator[tuple[UserDetails | None, Path]]:
         """Find Firefox install directories on the target."""
-
         for user_details in self.target.user_details.all_with_home():
             for directory in self.USER_DIRS:
                 if (install := user_details.home_path.joinpath(directory)).is_dir():
@@ -129,7 +132,6 @@ class FirefoxPlugin(BrowserPlugin):
 
         Currently does not parse ``$INSTALL/profiles.ini`` file.
         """
-
         seen = set()
 
         for user_details, install in self.installs:
@@ -154,7 +156,6 @@ class FirefoxPlugin(BrowserPlugin):
         Yields:
             Opened SQLite3 databases.
         """
-
         iter_system = ((None, system_dir, None) for user, system_dir in self.installs if user is None)
 
         for user_details, install, profile_dir in chain(iter_system, self._iter_profiles()):
@@ -170,7 +171,7 @@ class FirefoxPlugin(BrowserPlugin):
                 db_file = profile_dir.joinpath(filename)
 
             try:
-                yield user_details, db_file, SQLite3(db_file.open())
+                yield user_details, db_file, SQLite3(db_file)
             except FileNotFoundError:
                 self.target.log.info("Could not find %s file: %s", filename, db_file)
             except DBError as e:
@@ -453,7 +454,6 @@ class FirefoxPlugin(BrowserPlugin):
             - https://github.com/mozilla-firefox/firefox/tree/main/toolkit/components/passwordmgr
             - https://github.com/lclevy/firepwd
         """
-
         working_passwords = set()
 
         for user_details, _, profile_dir in self._iter_profiles():
@@ -568,7 +568,6 @@ def _decrypt_master_key_pbes2(decoded_item: core.Sequence, primary_password: byt
     Returns:
         Bytes of decrypted AES ciphertext.
     """
-
     # SEQUENCE {
     #   SEQUENCE {
     #     OBJECTIDENTIFIER 1.2.840.113549.1.5.13 => pkcs5 pbes2
@@ -638,7 +637,6 @@ def _decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, gl
     Returns:
         Tuple of decrypted bytes and a dotted ASN.1 string representation of the identified encryption algorithm.
     """
-
     # SEQUENCE {
     #     SEQUENCE {
     #         OBJECTIDENTIFIER ???
@@ -669,13 +667,10 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
     Returns:
         32 byte or 24 byte long decrypted and unpadded master key for AES or 3DES operations.
     """
-
     # Extract neccesary information from the key4.db file. Multiple values might exist for the
     # values we are interested in. Generally the last entry will be the currently active value,
     # which is why we need to iterate every row in the table to get the last entry.
-    with key4_file.open("rb") as fh:
-        db = SQLite3(fh)
-
+    with SQLite3(key4_file) as db:
         # Get the last ``item`` (global salt) and ``item2`` (password check) values.
         if table := db.table("metadata"):
             for row in table.rows():
@@ -693,40 +688,42 @@ def decrypt_master_key(key4_file: Path, primary_password: bytes) -> bytes:
         else:
             raise ValueError(f"Missing table 'nssPrivate' in key4.db {key4_file}")
 
-    if not master_key:
-        raise ValueError(f"Password master key is not defined in key4.db {key4_file}")
+        if not master_key:
+            raise ValueError(f"Password master key is not defined in key4.db {key4_file}")
 
-    if master_key_cka != CKA_ID:
-        raise ValueError(
-            f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}' in {key4_file}"
-        )
+        if master_key_cka != CKA_ID:
+            raise ValueError(
+                f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}' in {key4_file}"  # noqa: E501
+            )
 
-    decoded_password_check: core.Sequence = core.load(password_check)
-    decoded_master_key: core.Sequence = core.load(master_key)
+        decoded_password_check: core.Sequence = core.load(password_check)
+        decoded_master_key: core.Sequence = core.load(master_key)
 
-    try:
-        decrypted_password_check, algorithm = _decrypt_master_key(decoded_password_check, primary_password, global_salt)
+        try:
+            decrypted_password_check, algorithm = _decrypt_master_key(
+                decoded_password_check, primary_password, global_salt
+            )
 
-    except EOFError:
-        raise ValueError("No primary password provided")
+        except EOFError:
+            raise ValueError("No primary password provided")
 
-    except ValueError as e:
-        raise ValueError(f"Unable to decrypt Firefox password check: {e!s}") from e
+        except ValueError as e:
+            raise ValueError(f"Unable to decrypt Firefox password check: {e!s}") from e
 
-    if not decrypted_password_check:
-        raise ValueError(f"Encountered unknown algorithm {algorithm} while decrypting Firefox master key")
+        if not decrypted_password_check:
+            raise ValueError(f"Encountered unknown algorithm {algorithm} while decrypting Firefox master key")
 
-    expected_password_check = b"password-check\x02\x02"
+        expected_password_check = b"password-check\x02\x02"
 
-    if decrypted_password_check != expected_password_check:
-        log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
-        raise ValueError("Master key decryption failed. Provided password could be missing or incorrect")
+        if decrypted_password_check != expected_password_check:
+            log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
+            raise ValueError("Master key decryption failed. Provided password could be missing or incorrect")
 
-    decrypted, algorithm = _decrypt_master_key(decoded_master_key, primary_password, global_salt)
+        decrypted, algorithm = _decrypt_master_key(decoded_master_key, primary_password, global_salt)
 
-    block_size = 16 if algos.EncryptionAlgorithmId.map(algorithm) == "pbes2" else 8
+        block_size = 16 if algos.EncryptionAlgorithmId.map(algorithm) == "pbes2" else 8
 
-    return unpad(decrypted, block_size)
+        return unpad(decrypted, block_size)
 
 
 def decrypt_value(b64_ciphertext: str, key: bytes) -> bytes | None:
@@ -749,7 +746,6 @@ def decrypt_value(b64_ciphertext: str, key: bytes) -> bytes | None:
         - https://github.com/mozilla-firefox/firefox/blob/main/security/manager/ssl/SecretDecoderRing.cpp
         - https://github.com/mozilla-firefox/firefox/blob/main/security/nss/lib/pk11wrap/pk11sdr.c#L156
     """
-
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency")
 

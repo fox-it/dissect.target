@@ -142,7 +142,6 @@ class SearchIndexPlugin(Plugin):
             - https://devblogs.microsoft.com/windows-search-platform/configuration-and-settings/
             - https://learn.microsoft.com/en-us/windows/win32/search/-search-3x-wds-included-in-index
         """  # noqa: E501
-
         for db_path, user_details in self.databases:
             if db_path.suffix == ".edb":
                 yield from self.parse_esedb(db_path, user_details)
@@ -155,7 +154,6 @@ class SearchIndexPlugin(Plugin):
 
     def parse_esedb(self, path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the ESE ``SystemIndex_PropertyStore`` table."""
-
         with path.open("rb") as fh:
             db = ESE(fh)
             table = db.table("SystemIndex_PropertyStore")
@@ -165,10 +163,7 @@ class SearchIndexPlugin(Plugin):
 
     def parse_sqlite(self, path: Path, user_details: UserDetails | None) -> Iterator[SearchIndexRecords]:
         """Parse the SQLite3 ``SystemIndex_1_PropertyStore`` table."""
-
-        with path.open("rb") as fh:
-            db = SQLite3(fh)
-
+        with SQLite3(path) as db:
             # ``ColumnId`` is translated using the ``SystemIndex_1_PropertyStore_Metadata`` table.
             columns = {
                 row.get("Id"): row.get("UniqueKey", "").split("-", maxsplit=1)[-1]
@@ -201,7 +196,6 @@ class SearchIndexPlugin(Plugin):
         self, values: dict[str, Any] | TableRecord, user_details: UserDetails | None, db_path: Path
     ) -> Iterator[SearchIndexRecords]:
         """Build a ``SearchIndexRecord``, ``SearchIndexActivityRecord`` or ``HistoryRecord``."""
-
         if values.get("System_ItemType") == "ActivityHistoryItem":
             yield SearchIndexActivityRecord(
                 ts_start=wintimestamp(int.from_bytes(values.get("System_ActivityHistory_StartTime", b""), "little")),

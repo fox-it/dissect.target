@@ -21,12 +21,14 @@ from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
-from dissect.target.target import DiskCollection, Event, Target, TargetLogAdapter, log
+from dissect.target.target import Event, Target, TargetLogAdapter, log
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from logging import Logger
+
+    from dissect.target.target import DiskCollection
 
 
 class ErrorCounter(TargetLogAdapter):
@@ -224,6 +226,7 @@ def mocked_win_volumes_fs() -> Iterator[tuple[Mock, Mock, Mock]]:
     mock_good_volume.drive_letter = "W"
 
     mock_good_fs = Mock(name="good-fs")
+    mock_good_fs.__type__ = "mock"
     mock_good_fs.iter_subfs.return_value = []
 
     def mock_filesystem_open(volume: Mock) -> Mock:
@@ -581,7 +584,9 @@ def test_empty_volume_log(target_bare: Target, caplog: pytest.LogCaptureFixture)
 @pytest.mark.parametrize("nr_of_fs", [1, 2])
 def test_fs_mount_others(target_unix: Target, nr_of_fs: int) -> None:
     for _ in range(nr_of_fs):
-        target_unix.filesystems.add(Mock())
+        fs = Mock()
+        fs.__type__ = "mock"
+        target_unix.filesystems.add(fs)
 
     target_unix._mount_others()
 
@@ -595,7 +600,9 @@ def test_fs_mount_others(target_unix: Target, nr_of_fs: int) -> None:
 @pytest.mark.parametrize("nr_of_fs", [1, 2])
 def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int) -> None:
     for idx in range(nr_of_fs):
-        target_unix.filesystems.add(Mock())
+        fs = Mock()
+        fs.__type__ = "mock"
+        target_unix.filesystems.add(fs)
         target_unix._mount_others()
 
         assert f"/$fs$/fs{idx}" in target_unix.fs.mounts
@@ -754,7 +761,6 @@ def test_expected_path(path: str | Path, expected: Path) -> None:
 
 def test_exception_invalid_path() -> None:
     """Test if we throw small and neat error messages and not long stack traces when giving invalid path(s)."""
-
     with pytest.raises(
         TargetError,
         match=r"Failed to initiate RawLoader for target [/\\]path[/\\]to[/\\]invalid.img: Provided target path does not exist",  # noqa: E501

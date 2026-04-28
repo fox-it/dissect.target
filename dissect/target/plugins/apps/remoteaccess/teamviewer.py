@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     GENERIC_LOG_RECORD_FIELDS,
@@ -66,24 +66,48 @@ class TeamViewerPlugin(RemoteAccessPlugin):
         "/var/log/teamviewer*/*.log",
     )
 
+    SYSTEM_INCOMING_GLOBS = (
+        "sysvol/Program Files/TeamViewer/*_incoming.txt",
+        "sysvol/Program Files (x86)/TeamViewer/*_incoming.txt",
+    )
+
     USER_GLOBS = (
         "AppData/Roaming/TeamViewer/teamviewer*_logfile.log",
         "Library/Logs/TeamViewer/teamviewer*_logfile*.log",
     )
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/teamviewer/log", GENERIC_LOG_RECORD_FIELDS
+        "application/remoteaccess/teamviewer/log", GENERIC_LOG_RECORD_FIELDS
+    )
+
+    IncomingConnectionRecord = TargetRecordDescriptor(
+        "application/remoteaccess/teamviewer/connection/incoming",
+        [
+            ("datetime", "ts"),
+            ("datetime", "end"),
+            ("string", "remote_id"),
+            ("string", "name"),
+            ("string", "user"),
+            ("string", "connection_type"),
+            ("string", "connection_id"),
+        ],
     )
 
     def __init__(self, target: Target):
         super().__init__(target)
 
         self.logfiles: set[tuple[str, UserDetails | None]] = set()
+        self.incoming_logfiles: set[str] = set()
 
         # Find system service log files.
         for log_glob in self.SYSTEM_GLOBS:
             for logfile in self.target.fs.glob(log_glob):
                 self.logfiles.add((logfile, None))
+
+        # Find system incoming connection log files.
+        for log_glob in self.SYSTEM_INCOMING_GLOBS:
+            for logfile in self.target.fs.glob(log_glob):
+                self.incoming_logfiles.add(logfile)
 
         # Find user log files.
         for user_details in self.target.user_details.all_with_home():
@@ -92,7 +116,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     self.logfiles.add((logfile, user_details))
 
     def check_compatible(self) -> None:
-        if not len(self.logfiles):
+        if not self.logfiles and not self.incoming_logfiles:
             raise UnsupportedPluginError("No Teamviewer logs found on target")
 
     @export(record=RemoteAccessLogRecord)
@@ -107,6 +131,8 @@ class TeamViewerPlugin(RemoteAccessPlugin):
             logfile = self.target.fs.path(logfile)
 
             start_date = None
+            prev_timestamp = None
+            fold = 0
             for line in logfile.open("rt", errors="replace"):
                 if not (line := line.strip()) or line.startswith("# "):
                     continue
@@ -117,6 +143,18 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     except Exception as e:
                         self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
                         self.target.log.debug("", exc_info=e)
+                        # Unset start_date if it was already defined
+                        start_date = None
+
+                    fold = 0
+                    if start_date is None:
+                        continue
+
+                    # See whether the utcoffset with the two different timezones are the same
+                    target_start_date = start_date.replace(tzinfo=target_tz)
+                    if target_start_date.utcoffset() == start_date.utcoffset():
+                        # Adjust the start_date so it uses the timezone known to target throughout
+                        start_date = target_start_date
 
                     continue
 
@@ -153,13 +191,22 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     time += ".000000"
 
                 try:
-                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(
-                        tzinfo=start_date.tzinfo if start_date else target_tz
-                    )
+                    tz_info = start_date.tzinfo if start_date else target_tz
+                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(tzinfo=tz_info)
                 except Exception as e:
                     self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
                     self.target.log.debug("", exc_info=e)
-                    timestamp = 0
+                    timestamp = prev_timestamp or start_date
+
+                if timestamp and prev_timestamp and prev_timestamp > timestamp:
+                    # We might currently be in a grey area where the dst period ended.
+                    # replace the fold value of the timestamp
+                    fold = 1
+
+                if timestamp:
+                    timestamp = timestamp.replace(fold=fold)
+
+                prev_timestamp = timestamp
 
                 yield self.RemoteAccessLogRecord(
                     ts=timestamp,
@@ -167,6 +214,51 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     source=logfile,
                     _target=self.target,
                     _user=user_details.user if user_details else None,
+                )
+
+    @export(record=IncomingConnectionRecord)
+    def incoming(self) -> Iterator[IncomingConnectionRecord]:
+        """Yield TeamViewer incoming connection logs.
+
+        TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a system.
+        """
+        for logfile in self.incoming_logfiles:
+            logfile = self.target.fs.path(logfile)
+
+            for line in logfile.open("rt", errors="replace"):
+                if not (line := line.strip()) or line.startswith("# "):
+                    continue
+
+                fields = line.split("\t")
+                if len(fields) < 7:
+                    self.target.log.warning("Skipping TeamViewer incoming connection log line %r in %s", line, logfile)
+                    continue
+
+                try:
+                    start = datetime.strptime(fields[2], "%d-%m-%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+                    end = datetime.strptime(fields[3], "%d-%m-%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+                except Exception as e:
+                    self.target.log.warning(
+                        "Unable to parse timestamps in TeamViewer incoming connection log line %r in %s", line, logfile
+                    )
+                    self.target.log.debug("", exc_info=e)
+                    continue
+
+                remote_id = fields[0]
+                name = fields[1]
+                user = fields[4]
+                connection_type = fields[5]
+                connection_id = fields[6]
+
+                yield self.IncomingConnectionRecord(
+                    ts=start,
+                    end=end,
+                    remote_id=remote_id,
+                    name=name,
+                    user=user,
+                    connection_type=connection_type,
+                    connection_id=connection_id,
+                    _target=self.target,
                 )
 
 
@@ -178,8 +270,8 @@ def parse_start(line: str) -> datetime | None:
 
         Start: 2021/11/11 12:34:56
         Start: 2024/12/31 01:02:03.123 (UTC+2:00)
+        Start: 2025/01/01 12:28:41.436 (UTC)
     """
-
     if match := RE_START.search(line):
         dt = match.groupdict()
 
@@ -188,13 +280,21 @@ def parse_start(line: str) -> datetime | None:
             dt["time"] = dt["time"].rsplit(".")[0]
 
         # Format timezone, e.g. "UTC+2:00" to "UTC+0200"
-        if dt["timezone"]:
-            name, operator, amount = re.split(r"(\+|\-)", dt["timezone"])
-            amount = int(amount.replace(":", ""))
-            dt["timezone"] = f"{name}{operator}{amount:0>4d}"
+        if timezone := dt["timezone"]:
+            identifier = " %Z%z"
+            # Handle just UTC timezone
+            if timezone.lower() == "utc":
+                timezone = " UTC+00:00"
+            else:
+                name, operator, amount = re.split(r"(\+|\-)", timezone)
+                amount = int(amount.replace(":", ""))
+                timezone = f" {name}{operator}{amount:0>4d}"
+        else:
+            timezone = ""
+            identifier = ""
 
         return datetime.strptime(  # noqa: DTZ007
-            f"{dt['date']} {dt['time']}" + (f" {dt['timezone']}" if dt["timezone"] else ""),
-            "%Y/%m/%d %H:%M:%S" + (" %Z%z" if dt["timezone"] else ""),
+            f"{dt['date']} {dt['time']}{timezone}",
+            f"%Y/%m/%d %H:%M:%S{identifier}",
         )
     return None

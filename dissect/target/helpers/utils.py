@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, timezone
 from enum import Enum, IntEnum
 from typing import TYPE_CHECKING, BinaryIO, TypeVar
 
@@ -12,6 +12,7 @@ from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from datetime import tzinfo
     from pathlib import Path
 
 

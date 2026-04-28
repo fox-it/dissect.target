@@ -72,11 +72,14 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
     parser.add_argument("-L", "--loader", help="select a specific loader (i.e. vmx, raw)")
     parser.add_argument("--child", help="load child of target by path of index (see --list-children)")
-    parser.add_argument("--children", action="store_true", help="include children")
+    parser.add_argument("--children", action="store_true", help="include children (depth=1 or use --recursive)")
     parser.add_argument(
-        "--list-children", action=_OverrideRequiredAction, help="list all children indices and paths, then exit"
+        "--list-children",
+        action=_OverrideRequiredAction,
+        help="list children indices and paths (optionally use \
+                --recursive), then exit",
     )
-    parser.add_argument("--recursive", action="store_true", help="make --list-children behave recursively")
+    parser.add_argument("--recursive", action="store_true", help="make --(list-)children behave recursively")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", action="store_true", help="print version")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
@@ -154,7 +157,6 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
     Returns:
         ``True`` if there are multiple output types detected, false otherwise.
     """
-
     # Show help for a function or in general
     if "-h" in rest or "--help" in rest:
         found_functions, _ = find_functions(args.function)
@@ -214,10 +216,14 @@ def process_plugin_arguments(parser: argparse.ArgumentParser, args: argparse.Nam
 
 
 def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
-    direct: bool = getattr(args, "direct", False)
+    direct: bool = getattr(args, "direct", False) or getattr(args, "direct_sensitive", False)
     child: str | None = getattr(args, "child", None)
 
-    target = Target.open_direct(args.target) if direct else Target.open(args.target, apply=apply)
+    target = (
+        Target.open_direct(args.targets, case_sensitive=getattr(args, "direct_sensitive", False))
+        if direct
+        else Target.open(args.target, apply=apply)
+    )
 
     if child:
         try:
@@ -234,14 +240,14 @@ def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
 
 
 def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Target]:
-    direct: bool = getattr(args, "direct", False)
+    direct: bool = getattr(args, "direct", False) or getattr(args, "direct_sensitive", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
 
     targets: Iterable[Target] = (
-        [Target.open_direct(args.targets)]
+        [Target.open_direct(args.targets, case_sensitive=getattr(args, "direct_sensitive", False))]
         if direct
-        else Target.open_all(args.targets, include_children=children, apply=apply)
+        else Target.open_all(args.targets, include_children=children, recursive=args.recursive, apply=apply)
     )
 
     for target in targets:
@@ -267,7 +273,7 @@ def list_plugins(
 ) -> None:
     functions = None
     if targets:
-        for target in Target.open_all(targets, include_children):
+        for target in Target.open_all(targets, include_children=include_children):
             functions, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
     elif patterns:
         functions, _ = find_functions(patterns, Target(), show_hidden=True)
@@ -320,7 +326,6 @@ def generate_argparse_for_method(
     usage_tmpl: str | None = None,
 ) -> argparse.ArgumentParser:
     """Generate an ``argparse.ArgumentParser`` for a bound or unbound ``Plugin`` class method."""
-
     # allow functools.partial wrapped method
     while hasattr(method, "func"):
         method = method.func
@@ -352,7 +357,6 @@ def generate_argparse_for_plugin_class(
     usage_tmpl: str | None = None,
 ) -> argparse.ArgumentParser:
     """Generate an ``argparse.ArgumentParser`` for a ``Plugin`` class."""
-
     if not isinstance(plugin_cls, type) or not issubclass(plugin_cls, Plugin):
         raise TypeError(f"`plugin_cls` must be a valid plugin class, not `{plugin_cls}`")
 
@@ -378,7 +382,6 @@ def generate_argparse_for_plugin(
     usage_tmpl: str | None = None,
 ) -> argparse.ArgumentParser:
     """Generate an ``argparse.ArgumentParser`` for a ``Plugin`` instance."""
-
     if not isinstance(plugin_instance, Plugin):
         raise TypeError(f"`plugin_instance` must be a valid plugin instance, not `{plugin_instance}`")
 
@@ -418,7 +421,6 @@ def execute_function_on_target(
 
     If no explicit arguments are provided, they will be parsed from ``sys.argv``.
     """
-
     func_cls, func_obj = target.get_function(func.name)
     plugin_method, parser = plugin_function_with_argparser(func_obj)
 

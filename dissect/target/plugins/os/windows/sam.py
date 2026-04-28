@@ -263,6 +263,29 @@ def rid_to_key(rid: int) -> tuple[bytes, bytes]:
     return k1, k2
 
 
+def des_decrypt(data: bytes, rid: int) -> bytes:
+    """Decrypt a DES-encrypted hash using the RID-derived keys.
+
+    Args:
+        data: Encrypted data (16 bytes).
+        rid: Relative ID of the user account.
+
+    Raises:
+        ValueError: If data is not 16 bytes.
+    """
+    if len(data) != 16:
+        raise ValueError("data must be 16 bytes long")
+
+    key1, key2 = rid_to_key(rid)
+    des1 = DES.new(key1, DES.MODE_ECB)
+    des2 = DES.new(key2, DES.MODE_ECB)
+
+    block1 = des1.decrypt(data[:8])
+    block2 = des2.decrypt(data[8:])
+
+    return block1 + block2
+
+
 def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -> bytes:
     if not enc_hash:
         return b""
@@ -271,8 +294,6 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
 
     if sh.revision not in [0x01, 0x02]:
         raise ValueError(f"Unsupported LM/NT hash revision encountered: {sh.revision}")
-
-    d1, d2 = (DES.new(k, DES.MODE_ECB) for k in rid_to_key(rid))
 
     if sh.revision == 0x01:  # LM/NT revision 0x01 involving RC4
         sh_hash = enc_hash[len(c_sam.SAM_HASH) :]
@@ -290,7 +311,7 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
         sh_hash = enc_hash[len(c_sam.SAM_HASH_AES) :]
         obfkey = AES.new(samkey, AES.MODE_CBC, sh.salt).decrypt(sh_hash)[:16]
 
-    return d1.decrypt(obfkey[:8]) + d2.decrypt(obfkey[8:])
+    return des_decrypt(obfkey, rid)
 
 
 class SamPlugin(Plugin):
@@ -356,7 +377,7 @@ class SamPlugin(Plugin):
 
     @export(record=SamRecord)
     def sam(self) -> Iterator[SamRecord]:
-        """Dump SAM entries
+        """Dump SAM entries.
 
         The Security Account Manager (SAM) registry hive contains registry keys that store usernames, full names and
         passwords in a hashed format, either an LM or NT hash.
@@ -384,7 +405,6 @@ class SamPlugin(Plugin):
             lm (string): Parsed LM-hash.
             nt (string): Parsed NT-hash.
         """
-
         syskey = self.target.lsa.syskey  # aka. bootkey
         samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
 

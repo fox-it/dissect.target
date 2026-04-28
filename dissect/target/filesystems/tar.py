@@ -14,9 +14,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     Filesystem,
-    FilesystemEntry,
     VirtualDirectory,
-    VirtualDirEntry,
     VirtualFile,
     VirtualFilesystem,
 )
@@ -25,6 +23,11 @@ from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.target.filesystem import (
+        FilesystemEntry,
+        VirtualDirEntry,
+    )
 
 
 log = get_logger(__name__)
@@ -57,7 +60,7 @@ class TarFilesystem(Filesystem):
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
 
         for member in self.tar.getmembers():
-            mname = member.name.strip("/")
+            mname = member.name.removeprefix("./").strip("/")
             if not mname.startswith(self.base) or mname == ".":
                 continue
 

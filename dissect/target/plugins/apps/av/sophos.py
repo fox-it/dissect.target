@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 HitmanAlertRecord = TargetRecordDescriptor(
     "application/av/sophos/hitman/log",
     [
@@ -78,8 +79,7 @@ class SophosPlugin(Plugin):
         """
         if self.target.fs.path(self.LOG_SOPHOS_HITMAN).exists():
             try:
-                fh = self.target.fs.path(self.LOG_SOPHOS_HITMAN).open("rb")
-                db = SQLite3(fh)
+                db = SQLite3(self.target.fs.path(self.LOG_SOPHOS_HITMAN))
                 alerts = next(filter(lambda t: t.name == "Alerts", db.tables()))
                 for alert in alerts.rows():
                     yield HitmanAlertRecord(

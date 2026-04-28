@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
-from dissect.target.plugins.os.windows.credential.lsa import LSAPlugin
+from dissect.target.helpers.regutil import VirtualKey
+from dissect.target.plugins.os.windows.lsa import LSAPlugin
 from tests.plugins.os.windows.test__os import map_version_value
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 SYSTEM_KEY = "SYSTEM\\ControlSet001\\Control\\LSA"
@@ -18,7 +19,6 @@ SECRETS_KEY = "SECURITY\\Policy\\Secrets"
 
 def map_lsa_system_keys(hive_hklm: VirtualHive, subkeys: dict) -> None:
     """Add values to the registry required to calculate the SYSKEY / BootKey."""
-
     if subkeys.keys() != {"Data", "GBG", "JD", "Skew1"}:
         raise ValueError("Invalid subkey names")
 
@@ -32,7 +32,6 @@ def map_lsa_system_keys(hive_hklm: VirtualHive, subkeys: dict) -> None:
 
 def map_lsa_polkey(hive_hklm: VirtualHive, path: str, value: bytes) -> None:
     """Add policy key to the registry which is required to derive the LSA key of the system."""
-
     policy_key = VirtualKey(hive_hklm, path)
     policy_key.add_value("(Default)", value)
     hive_hklm.map_key(path, policy_key)
@@ -40,7 +39,6 @@ def map_lsa_polkey(hive_hklm: VirtualHive, path: str, value: bytes) -> None:
 
 def map_lsa_secrets(hive_hklm: VirtualHive, secrets: dict[str, bytes | tuple[bytes, bytes]]) -> None:
     """Add given encrypted LSA secrets to the ``hive_hklm`` :class"`VirtualHive`."""
-
     secrets_key = VirtualKey(hive_hklm, SECRETS_KEY)
 
     for name, value in secrets.items():
@@ -72,7 +70,6 @@ def map_lsa_secrets(hive_hklm: VirtualHive, secrets: dict[str, bytes | tuple[byt
 
 def test_lsa_secrets_win_10(target_win: Target, hive_hklm: VirtualHive) -> None:
     """Test decrypting LSA secrets of a Windows 10 system."""
-
     map_lsa_system_keys(
         hive_hklm,
         {
@@ -153,7 +150,6 @@ def test_lsa_secrets_win_10(target_win: Target, hive_hklm: VirtualHive) -> None:
 
 def test_lsa_secrets_win_xp(target_win: Target, hive_hklm: VirtualHive) -> None:
     """Test decrypting LSA secrets of a Windows XP system."""
-
     map_lsa_system_keys(
         hive_hklm,
         {

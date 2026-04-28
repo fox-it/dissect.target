@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from dissect.regf import c_regf
 
 from dissect.target.helpers.regutil import (
     HiveCollection,
-    KeyCollection,
     RegFlex,
-    RegistryHive,
     RegistryKeyNotFoundError,
     RegistryValueType,
     VirtualHive,
@@ -20,6 +20,12 @@ from dissect.target.helpers.regutil import (
 )
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import (
+        KeyCollection,
+        RegistryHive,
+    )
+
 
 def test_regflex() -> None:
     regflex = RegFlex()
@@ -30,10 +36,11 @@ def test_regflex() -> None:
     assert "HKEY_CURRENT_USER" in regflex.hives
     hive = regflex.hives["HKEY_CURRENT_USER"]
     assert hive.key("Test1").value("Value1").value == "a"
+    assert hive.key("Test2").value("Version=13.37").value == ord("b")
 
     assert "HKEY_CLASSES_ROOT" in regflex.hives
     hive = regflex.hives["HKEY_CLASSES_ROOT"]
-    assert hive.key("Test2").value("Value2").value == "b"
+    assert hive.key("Test3").value("Value2").value == "c"
 
     assert "HKEY_LOCAL_MACHINE" in regflex.hives
     hive = regflex.hives["HKEY_LOCAL_MACHINE"]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from dissect.database.ese.tools import certlog
 from dissect.database.exception import Error
@@ -10,7 +10,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
     from dissect.target.target import Target
@@ -43,12 +43,12 @@ CertificateExtensionRecord = TargetRecordDescriptor(
 CertificateRecord = TargetRecordDescriptor(
     "filesystem/windows/certlog/certificate",
     [
-        ("string", "certificate_hash2"),
+        ("digest", "fingerprint"),
         ("string", "certificate_template"),
         ("string", "common_name"),
         ("string", "country"),
         ("string", "device_serial_number"),
-        ("string", "distinguished_name"),
+        ("string", "subject_dn"),
         ("string", "domain_component"),
         ("string", "email"),
         ("string", "given_name"),
@@ -57,7 +57,8 @@ CertificateRecord = TargetRecordDescriptor(
         ("string", "organization"),
         ("string", "organizational_unit"),
         ("string", "public_key_algorithm"),
-        ("string", "serial_number"),
+        ("string", "serial_number_hex"),
+        ("varint", "serial_number"),
         ("string", "state_or_province"),
         ("string", "street_address"),
         ("string", "subject_key_identifier"),
@@ -69,8 +70,8 @@ CertificateRecord = TargetRecordDescriptor(
         ("string", "enrollment_flags"),
         ("string", "general_flags"),
         ("string", "issuer_name_id"),
-        ("datetime", "not_after"),
-        ("datetime", "not_before"),
+        ("datetime", "not_valid_after"),
+        ("datetime", "not_valid_before"),
         ("string", "private_key_flags"),
         ("string", "public_key"),
         ("varint", "public_key_length"),
@@ -95,7 +96,7 @@ RequestRecord = TargetRecordDescriptor(
         ("string", "device_serial_number"),
         ("string", "disposition"),
         ("string", "disposition_message"),
-        ("string", "distinguished_name"),
+        ("string", "subject_dn"),
         ("string", "domain_component"),
         ("string", "email"),
         ("string", "endorsement_certificate_hash"),
@@ -172,13 +173,14 @@ FIELD_MAPPINGS = {
     "$AttributeValue": "common_name",
     "$CRLPublishError": "crl_publish_error",
     "$CallerName": "caller_name",
-    "$CertificateHash2": "certificate_hash2",
+    "$CertificateHash": "fingerprint",
+    "$CertificateHash2": "fingerprint",
     "$CertificateTemplate": "certificate_template",
     "$CommonName": "common_name",
     "$Country": "country",
     "$DeviceSerialNumber": "device_serial_number",
     "$DispositionMessage": "disposition_message",
-    "$DistinguishedName": "distinguished_name",
+    "$DistinguishedName": "subject_dn",
     "$DomainComponent": "domain_component",
     "$EMail": "email",
     "$EndorsementCertificateHash": "endorsement_certificate_hash",
@@ -193,7 +195,7 @@ FIELD_MAPPINGS = {
     "$PublicKeyAlgorithm": "public_key_algorithm",
     "$RequestAttributes": "request_attributes",
     "$RequesterName": "requester_name",
-    "$SerialNumber": "serial_number",
+    "$SerialNumber": "serial_number_hex",
     "$SignerApplicationPolicies": "signer_application_policies",
     "$SignerPolicies": "signer_policies",
     "$StateOrProvince": "state_or_province",
@@ -221,8 +223,8 @@ FIELD_MAPPINGS = {
     "NameId": "name_id",
     "NextPublish": "next_publish",
     "NextUpdate": "next_update",
-    "NotAfter": "not_after",
-    "NotBefore": "not_before",
+    "NotAfter": "not_valid_after",
+    "NotBefore": "not_valid_before",
     "Number": "number",
     "PrivateKeyFlags": "private_key_flags",
     "PropagationComplete": "propagation_complete",
@@ -251,6 +253,44 @@ FIELD_MAPPINGS = {
     "TableName": "table_name",
     "ThisPublish": "this_publish",
     "ThisUpdate": "this_update",
+}
+
+
+def format_fingerprint(input_hash: str | None) -> tuple[str | None, str | None, str | None]:
+    if input_hash:
+        input_hash = input_hash.replace(" ", "")
+        # hash is expected to be a sha1, but as it not documented, we make this function more flexible if hash is
+        # in another standard format (md5/sha256), especially in the future
+        match len(input_hash):
+            case 32:
+                return input_hash, None, None
+            case 40:
+                return None, input_hash, None
+            case 64:
+                return None, None, input_hash
+            case _:
+                raise ValueError(
+                    "Unexpected hash size found while processing certlog "
+                    f"$CertificateHash/$CertificateHash2 column: len {len(input_hash)}, content {input_hash}"
+                )
+    return None, None, None
+
+
+def format_serial_number(serial_number_as_hex: str | None) -> str | None:
+    if not serial_number_as_hex:
+        return None
+    return serial_number_as_hex.replace(" ", "")
+
+
+def serial_number_as_int(serial_number_as_hex: str | None) -> int | None:
+    if not serial_number_as_hex:
+        return None
+    return int(serial_number_as_hex, 16)
+
+
+FORMATING_FUNC: dict[str, Callable[[Any], Any]] = {
+    "fingerprint": format_fingerprint,
+    "serial_number_hex": format_serial_number,
 }
 
 
@@ -302,8 +342,27 @@ class CertLogPlugin(Plugin):
                 record_values = {}
                 for column, value in column_values:
                     new_column = FIELD_MAPPINGS.get(column)
-                    if new_column:
+                    if new_column in FORMATING_FUNC:
+                        try:
+                            value = FORMATING_FUNC[new_column](value)
+                        except Exception as e:
+                            self.target.log.warning("Error formatting column %s (%s): %s", new_column, column, value)
+                            self.target.log.debug("", exc_info=e)
+                            value = None
+                    if new_column and new_column not in record_values:
                         record_values[new_column] = value
+                        # Serial number is format as int and string, to ease search of a specific sn in both format
+                        if new_column == "serial_number_hex":
+                            record_values["serial_number"] = serial_number_as_int(value)
+                    elif new_column:
+                        self.target.log.debug(
+                            "Unexpected element while processing %s entries : %s column already exists "
+                            "(mapped from original column name %s). This may be cause by two column that were not"
+                            " expected to be present in the same time.",
+                            table_name,
+                            new_column,
+                            column,
+                        )
                     else:
                         self.target.log.debug(
                             "Unexpected column for table %s in CA %s: %s", table_name, ca_name, column

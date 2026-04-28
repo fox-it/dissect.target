@@ -4,7 +4,7 @@ import tarfile as tf
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target import filesystem, target
+from dissect.target import filesystem
 from dissect.target.filesystems.tar import (
     TarFilesystemDirectoryEntry,
     TarFilesystemEntry,
@@ -17,6 +17,8 @@ from dissect.target.loader import Loader, SubLoader
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
+
+    from dissect.target import target
 
 
 log = get_logger(__name__)
@@ -137,6 +139,7 @@ class TarLoader(Loader):
         import_lazy("dissect.target.loaders.acquire").AcquireTarSubLoader,
         import_lazy("dissect.target.loaders.uac").UacTarSubloader,
         import_lazy("dissect.target.loaders.nscollector").NsCollectorTarSubLoader,
+        import_lazy("dissect.target.loaders.vmsupport").VmSupportTarSubloader,
         GenericTarSubLoader,  # should be last
     )
 
