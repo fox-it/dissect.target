@@ -118,6 +118,7 @@ def main() -> int:
 
     # Determine the loader early so we can build its argument parser and show help for it.
     # If --loader is specified explicitly, look it up by scheme; otherwise infer from the first target.
+    explicit_loader = bool(args.loader)
     loader_instance = None
     loader_cls = None
     if args.loader:
@@ -145,20 +146,14 @@ def main() -> int:
         loader_options, rest = loader_parser.parse_known_args(rest)
         loader_kwargs = vars(loader_options)
 
-    # Instantiate the loader for the first target path (used for all targets in this run).
-    # For URI-based targets the path component and parsed_path are extracted by infer_loader.
-    if loader_cls is not None and args.targets:
-        if args.loader:
-            first_spec = args.targets[0]
-            adjusted_path, parsed_path = parse_path_uri(first_spec)
-            load_path = adjusted_path if parsed_path is not None else pathlib.Path(first_spec)
-        else:
-            result = infer_loader(args.targets[0])
-            if result is not None:
-                _, load_path, parsed_path = result
-            else:
-                load_path = args.targets[0]
-                parsed_path = None
+    # Instantiate the loader only when -L was explicitly specified.
+    # When the loader is auto-inferred from targets[0], fall through to open_all which
+    # independently detects the correct loader per path — avoiding the mixed-loader
+    # regression where all targets would be locked to the first inferred loader class.
+    if explicit_loader and loader_cls is not None and args.targets:
+        first_spec = args.targets[0]
+        adjusted_path, parsed_path = parse_path_uri(first_spec)
+        load_path = adjusted_path if parsed_path is not None else pathlib.Path(first_spec)
 
         try:
             loader_instance = loader_cls(load_path, parsed_path=parsed_path, loader_kwargs=loader_kwargs)
@@ -166,7 +161,7 @@ def main() -> int:
             parser.error(f"Failed to instantiate loader '{loader_cls.__name__}': {e}")
 
     # Clear args.loader so that process_generic_arguments does not call args_to_uri again —
-    # we have already instantiated the loader with the correct arguments above.
+    # we have already handled it above.
     args.loader = None
 
     process_generic_arguments(parser, args)

@@ -252,7 +252,7 @@ def open_targets(
     if direct:
         targets: Iterable[Target] = [Target.open_direct(args.targets)]
     elif loader_instance is not None:
-        targets = Target.with_loader(args.targets, loader_instance, include_children=children, apply=apply)
+        targets = Target.with_loader(args.targets, loader_instance, include_children=children, recursive=args.recursive, apply=apply)
     else:
         targets = Target.open_all(args.targets, include_children=children, recursive=args.recursive, apply=apply)
 

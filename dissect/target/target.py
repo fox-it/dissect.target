@@ -282,23 +282,13 @@ class Target:
         """
         spec = path
 
-        # If the path is a URI-like string, separate the path component
-        adjusted_path, parsed_path = parse_path_uri(spec)
-        # We always need a path to work with, so convert the spec into one if it's not one already
-        path = Path(spec) if not isinstance(spec, os.PathLike) else spec
-
-        if parsed_path is not None and (loader_cls := loader.find_loader_by_scheme(parsed_path.scheme)):
-            # If we find a loader by URI scheme, use the adjusted path (path component of the URI)
-            found_path = adjusted_path
-        elif loader_cls := loader.find_loader(path, fallbacks=[loader.DirLoader, loader.RawLoader]):
-            # Otherwise try to find a loader for the "raw" path
-            # If we succeed, upgrade the "spec" to the path
-            spec = path
-            found_path = path
-            parsed_path = None
-        else:
-            # No loader found
+        result = loader.infer_loader(spec)
+        if result is None:
             return cls.open_raw(spec)
+
+        loader_cls, found_path, parsed_path = result
+        if parsed_path is None:
+            spec = found_path
 
         try:
             loader_instance = loader_cls(found_path, parsed_path=parsed_path)
@@ -342,26 +332,17 @@ class Target:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
-        def _open_all(
-            spec: str | Path, include_children: bool = False, recursive: bool = False, *, apply: bool = True
-        ) -> Iterator[Target]:
-            # If the path is a URI-like string, separate the path component
-            adjusted_path, parsed_path = parse_path_uri(spec)
-            # We always need a path to work with, so convert the spec into one if it's not one already
-            path = Path(spec) if not isinstance(spec, os.PathLike) else spec
-
-            if parsed_path is not None and (loader_cls := loader.find_loader_by_scheme(parsed_path.scheme)):
-                # If we find a loader by URI scheme, use the adjusted path (path component of the URI)
-                found_path = adjusted_path
-            elif loader_cls := loader.find_loader(path, fallbacks=[loader.DirLoader, loader.RawLoader]):
-                # Otherwise try to find a loader for the "raw" path
-                # If we succeed, upgrade the "spec" to the path
-                spec = path
-                found_path = path
-                parsed_path = None
-            else:
+        def _open_all(spec: str | Path, include_children: bool = False, recursive: bool = False, *, apply: bool = True) -> Iterator[Target]:
+            result = loader.infer_loader(spec)
+            if result is None:
                 # Couldn't find a loader
                 return
+
+            loader_cls, found_path, parsed_path = result
+            # For non-URI specs, infer_loader resolves the spec to a Path; mirror that upgrade here
+            # so that load_spec (used as the target identity) is consistent with what open() would use.
+            if parsed_path is None:
+                spec = found_path
 
             get_target_logger(spec).debug("Attempting to use loader: %s", loader_cls)
             # See if the loader provides any additional paths to load
@@ -467,6 +448,7 @@ class Target:
         paths: str | Path | list[str | Path],
         loader_instance: loader.Loader,
         include_children: bool = False,
+        recursive: bool = False,
         *,
         apply: bool = True,
     ) -> Iterator[Self]:
@@ -479,7 +461,8 @@ class Target:
         Args:
             paths: A list of paths to load ``Targets`` from.
             loader_instance: An already-instantiated :class:`~dissect.target.loader.Loader` to use.
-            include_children: Whether to recursively open child targets.
+            include_children: Whether to open child targets.
+            recursive: Whether to open child targets recursively.
             apply: Whether to apply the target after loading.
 
         Raises:
@@ -534,7 +517,7 @@ class Target:
 
                 if include_children:
                     try:
-                        yield from target.open_children(apply=apply)
+                        yield from target.open_children(recursive=recursive, apply=apply)
                     except Exception as e:
                         get_target_logger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
 
