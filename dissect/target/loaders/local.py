@@ -63,6 +63,10 @@ class LocalLoader(Loader):
         target.path_query = self.parsed_query
         target.path = Path("local")
 
+        # Also honour flags passed via URI query string (e.g. "local?force-directory-fs=1")
+        force_directory_fs = force_directory_fs or "force-directory-fs" in self.parsed_query
+        fallback_to_directory_fs = fallback_to_directory_fs or "fallback-to-directory-fs" in self.parsed_query
+
         os_name = _get_os_name()
 
         if os_name == "windows":
