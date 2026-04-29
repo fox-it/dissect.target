@@ -109,7 +109,7 @@ def test_compressed_zip() -> None:
     assert test_file.open().readline() == b"root:x:0:0:root:/root:/bin/bash\n"
 
 
-def test_dir_uac(mock_uac_dir: Path) -> None:
+def test_uac_dir(mock_uac_dir: Path) -> None:
     """Test if we map an extracted UAC directory correctly."""
     loader = loader_open(mock_uac_dir)
     assert isinstance(loader, UacLoader)

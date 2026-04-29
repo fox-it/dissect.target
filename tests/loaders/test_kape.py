@@ -51,7 +51,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_kape_dir: Path
 
 
 @patch("dissect.target.filesystems.dir.DirectoryFilesystem.ntfs", None, create=True)
-def test_dir_kape(mock_kape_dir: Path) -> None:
+def test_kape_dir(mock_kape_dir: Path) -> None:
     """Test the ``KapeLoader`` with a directory."""
     loader = loader_open(mock_kape_dir)
     assert isinstance(loader, KapeLoader)

@@ -88,7 +88,7 @@ def test_vmsupport_compressed_tar(data_path: str) -> None:
     assert b"/resourceGroups/version" in test_file.open().read()
 
 
-def test_dir_vmsupport(mock_vmsupport_dir: Path) -> None:
+def test_vmsupport_dir(mock_vmsupport_dir: Path) -> None:
     """Test if we map an extracted vm support directory correctly."""
     loader = loader_open(mock_vmsupport_dir)
     assert isinstance(loader, VmSupportLoader)

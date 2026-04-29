@@ -81,13 +81,13 @@ def pytest_sessionstart(session: pytest.Session) -> None:
                     )
             break
 
-function_names = {}
+_function_names = {}
 
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_pycollect_makemodule(module_path: str, parent: str) -> None:
     if duplicates := find_duplicate_functions(module_path):
-        pytest.exit(f"duplicate functions found in module: {module_path}: {duplicates}")
+        pytest.exit(f"duplicate test function names found in module: {module_path}: {duplicates}")
 
 
 def find_duplicate_functions(source_path: str) -> set[str]:
