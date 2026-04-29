@@ -39,7 +39,7 @@ def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
 
     assert target_ios.os == OperatingSystem.IOS
     assert target_ios.version == "iPhone OS 17.3 (21D50)"
-    assert target_ios.architecture == "arm64-ios"
+    assert target_ios.architecture == "aarch64-apple-ios"
     assert target_ios.hostname == "This-Iss-iPhone"
     assert target_ios.timezone == "America/New_York"
     assert target_ios.language == ["en_US"]
