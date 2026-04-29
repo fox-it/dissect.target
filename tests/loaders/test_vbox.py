@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
+def test_target_open_vbox(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test that we correctly use ``VBoxLoader`` when opening a ``Target``."""
     path = tmp_path / "test.vbox"
     path.touch()
@@ -39,7 +39,7 @@ def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> 
         assert target.path == path
 
 
-def test_loader(tmp_path: Path) -> None:
+def test_vbox_loader(tmp_path: Path) -> None:
     path = tmp_path / "test.vbox"
     path.touch()
 

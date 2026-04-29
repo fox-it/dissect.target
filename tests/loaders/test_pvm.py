@@ -34,7 +34,7 @@ def mock_pvm_dir(tmp_path: Path) -> Iterator[Path]:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_pvm_dir: Path) -> None:
+def test_target_open_pvm(opener: Callable[[str | Path], Target], mock_pvm_dir: Path) -> None:
     """Test that we correctly use ``PvmLoader`` when opening a ``Target``."""
     with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
         target = opener(mock_pvm_dir)
@@ -42,7 +42,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_pvm_dir: Path)
         assert target.path == mock_pvm_dir
 
 
-def test_loader(mock_pvm_dir: Path) -> None:
+def test_pvm_loader(mock_pvm_dir: Path) -> None:
     """Test that ``PvmLoader`` correctly loads a PVM file and its disks."""
     with patch("dissect.target.container.open") as mock_container_open:
         loader = loader_open(mock_pvm_dir)

@@ -81,6 +81,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
                     )
             break
 
+
 _function_names = {}
 
 
@@ -94,14 +95,14 @@ def find_duplicate_functions(source_path: str) -> set[str]:
     source_code = pathlib.Path(source_path).read_text()
     tree = ast.parse(source_code, source_path)
     duplicates = set()
-    allowlist = ("test_other", "test_all", "test_target_open", "test_loader")
+    allowlist = ("test_other", "test_all",)  # ast will find some example Plugin functions from test_plugin.py
 
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name.startswith("test_") and node.name not in allowlist:
-            if node.name in function_names:
+            if node.name in _function_names:
                 duplicates.add(node.name)
             else:
-                function_names[node.name] = node
+                _function_names[node.name] = node
     return duplicates
 
 

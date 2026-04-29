@@ -28,7 +28,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_acquire(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``AcquireTarSubLoader`` when opening a ``Target``."""
     path = absolute_path("_data/loaders/acquire/test-windows-sysvol-absolute.tar")
 

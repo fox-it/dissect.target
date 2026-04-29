@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_cellebrite(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``CellebriteLoader`` when opening a ``Target``."""
     path = absolute_path("_data/loaders/cellebrite/EvidenceCollection.ufdx")
 
@@ -30,7 +30,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     assert target.path == path
 
 
-def test_loader() -> None:
+def test_cellebrite_loader() -> None:
     """Test if we correctly detect and load a Cellebrite UFDX FFS zip extraction from DigitalCorpora (``iOS_17``).
 
     The content of the ``EXTRACTION_FFS.zip`` file has been replaced with a minimal linux folder structure

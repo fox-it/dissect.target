@@ -29,7 +29,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_local(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``LocalLoader`` when opening a ``Target``."""
     for path in ["local", "local?some=query"]:
         with patch("dissect.target.target.Target.apply"):

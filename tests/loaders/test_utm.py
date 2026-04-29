@@ -57,7 +57,7 @@ def mock_utm_dir(tmp_path: Path) -> Path:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_utm_dir: Path) -> None:
+def test_target_open_utm(opener: Callable[[str | Path], Target], mock_utm_dir: Path) -> None:
     """Test that we correctly use ``UtmLoader`` when opening a ``Target``."""
     with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
         target = opener(mock_utm_dir)
@@ -65,7 +65,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_utm_dir: Path)
         assert target.path == mock_utm_dir
 
 
-def test_loader(mock_utm_dir: Path) -> None:
+def test_utm_loader(mock_utm_dir: Path) -> None:
     loader = loader_open(mock_utm_dir)
     assert isinstance(loader, UtmLoader)
 

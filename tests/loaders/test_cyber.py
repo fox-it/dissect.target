@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_cyber(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``CyberLoader`` when opening a ``Target``."""
     file_path = absolute_path("_data/loaders/tar/test-archive.tar")
     path = f"cyber://{file_path}"
@@ -35,7 +35,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
         assert target.path == file_path
 
 
-def test_loader() -> None:
+def test_cyber_loader() -> None:
     """Test that ``CyberLoader`` correctly loads a Cyber file."""
     path = f"cyber://{absolute_path('_data/loaders/tar/test-archive.tar')}"
 

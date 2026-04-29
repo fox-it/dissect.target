@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], target_linux_docker: Target) -> None:
+def test_target_open_overlay2(opener: Callable[[str | Path], Target], target_linux_docker: Target) -> None:
     """Test that we correctly use ``Overlay2Loader`` when opening a ``Target``."""
     for container in [
         "589135d12011921ac6ce69753569da5f206f4bc792a9133727ddae860997ee66",

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_ab(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``AndroidBackupLoader`` when opening a ``Target``."""
     path = absolute_path("_data/loaders/ab/test.ab")
     keychain.register_wildcard_value("password")
@@ -34,7 +34,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     assert target.path == path
 
 
-def test_loader() -> None:
+def test_ab_loader() -> None:
     """Test the Android Backup loader."""
     path = absolute_path("_data/loaders/ab/test.ab")
     keychain.register_wildcard_value("password")

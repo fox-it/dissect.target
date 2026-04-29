@@ -62,7 +62,7 @@ def mock_velociraptor_dir(request: pytest.FixtureRequest, tmp_path: Path) -> Pat
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_velociraptor_dir: Path) -> None:
+def test_target_open_velociraptor(opener: Callable[[str | Path], Target], mock_velociraptor_dir: Path) -> None:
     """Test that we correctly use ``VelociraptorLoader`` when opening a ``Target``."""
     path = mock_velociraptor_dir
 

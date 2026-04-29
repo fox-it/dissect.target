@@ -39,7 +39,7 @@ def mock_oci_podman_fs() -> VirtualFilesystem:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_oci_podman_fs: VirtualFilesystem) -> None:
+def test_target_open_overlay(opener: Callable[[str | Path], Target], mock_oci_podman_fs: VirtualFilesystem) -> None:
     """Test that we correctly use ``OverlayLoader`` when opening a ``Target``."""
     path = mock_oci_podman_fs.path(BASE_PATH)
     target = opener(path)

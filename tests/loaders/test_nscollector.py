@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_nscollector(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``NsCollectorTarSubLoader`` when opening a ``Target``."""
     path = absolute_path("_data/loaders/nscollector/collector_P_10.164.0.3_22Oct2025_11_31.tar.gz")
 

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
+def test_target_open_multiraw(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test that we correctly use ``MultiRawLoader`` when opening a ``Target``."""
     file1 = tmp_path / "file1.bin"
     file2 = tmp_path / "file2.bin"

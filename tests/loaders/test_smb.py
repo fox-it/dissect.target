@@ -54,7 +54,7 @@ def mock_connection(mock_impacket: MagicMock) -> MagicMock:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_connection: MagicMock) -> None:
+def test_target_open_smb(opener: Callable[[str | Path], Target], mock_connection: MagicMock) -> None:
     """Test that we correctly use ``SmbLoader`` when opening a ``Target``."""
     from dissect.target.loaders.smb import SmbLoader
 
@@ -65,7 +65,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_connection: Ma
         assert target.path == Path("host")
 
 
-def test_loader(mock_impacket: MagicMock, mock_connection: MagicMock) -> None:
+def test_smb_loader(mock_impacket: MagicMock, mock_connection: MagicMock) -> None:
     from dissect.target.filesystems.smb import SmbFilesystem
     from dissect.target.loader import open as loader_open
     from dissect.target.loaders.smb import SmbLoader, SmbRegistry

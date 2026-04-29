@@ -47,7 +47,7 @@ def mock_vmsupport_dir(tmp_path: Path) -> Path:
         ("mock_vmsupport_dir", VmSupportLoader),
     ],
 )
-def test_target_open(
+def test_target_open_vmsupport(
     opener: Callable[[str | Path], Target], path: str, loader: type[Loader], mock_vmsupport_dir: Path
 ) -> None:
     """Test that we correctly use the ESXi vm-support loaders when opening a ``Target``."""

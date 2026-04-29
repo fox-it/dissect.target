@@ -46,7 +46,7 @@ def mock_uac_dir(tmp_path: Path) -> Path:
         ("mock_uac_dir", UacLoader),
     ],
 )
-def test_target_open(
+def test_target_open_uac(
     opener: Callable[[str | Path], Target], path: str, loader: type[Loader], mock_uac_dir: Path
 ) -> None:
     """Test that we correctly use the UAC loaders when opening a ``Target``."""

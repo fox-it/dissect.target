@@ -42,7 +42,7 @@ def mock_kape_dir(tmp_path: Path) -> Path:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_kape_dir: Path) -> None:
+def test_target_open_kape(opener: Callable[[str | Path], Target], mock_kape_dir: Path) -> None:
     """Test that we correctly use ``KapeLoader`` when opening a ``Target``."""
     for path in [mock_kape_dir, absolute_path("_data/loaders/kape/test.vhdx")]:
         target = opener(path)
