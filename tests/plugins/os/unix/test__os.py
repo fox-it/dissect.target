@@ -204,15 +204,15 @@ def test_unix_users(target_unix_users: Target) -> None:
     ("expected_arch", "elf_buf"),
     [
         # https://launchpad.net/ubuntu/+source/coreutils/9.4-3.1ubuntu1
-        ("x86_64-unix", "7f454c4602010100000000000000000003003e0001000000a06d000000000000"),  # amd64
-        ("aarch64-unix", "7f454c460201010000000000000000000300b70001000000405e000000000000"),  # arm64
-        ("aarch32-unix", "7f454c4601010100000000000000000003002800010000001d40000034000000"),  # armhf
-        ("x86_32-unix", "7f454c460101010000000000000000000300030001000000e042000034000000"),  # i386
-        ("powerpc64-unix", "7f454c4602010100000000000000000003001500010000007470000000000000"),  # ppc64el
-        ("riscv64-unix", "7f454c460201010000000000000000000300f30001000000685a000000000000"),  # riscv64
+        ("x86_64-unknown-unix", "7f454c4602010100000000000000000003003e0001000000a06d000000000000"),  # amd64
+        ("aarch64-unknown-unix", "7f454c460201010000000000000000000300b70001000000405e000000000000"),  # arm64
+        ("aarch32-unknown-unix", "7f454c4601010100000000000000000003002800010000001d40000034000000"),  # armhf
+        ("x86-unknown-unix", "7f454c460101010000000000000000000300030001000000e042000034000000"),  # i386
+        ("powerpc64-unknown-unix", "7f454c4602010100000000000000000003001500010000007470000000000000"),  # ppc64el
+        ("riscv64-unknown-unix", "7f454c460201010000000000000000000300f30001000000685a000000000000"),  # riscv64
     ],
 )
-def test_architecture(target_unix: Target, fs_unix: VirtualFilesystem, expected_arch: str, elf_buf: str) -> None:
-    """Test if we correctly parse unix architecture."""
+def test_target_triples(target_unix: Target, fs_unix: VirtualFilesystem, expected_arch: str, elf_buf: str) -> None:
+    """Test if we correctly parse UNIX target triples returned from the :class`OSPlugin` architecture property."""
     fs_unix.map_file_fh("/bin/ls", BytesIO(bytes.fromhex(elf_buf)))
     assert target_unix.architecture == expected_arch
