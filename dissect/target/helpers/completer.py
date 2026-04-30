@@ -227,11 +227,16 @@ class QuotedPathCompleter(Completer):
         self.only_directories = only_directories
         self.file_filter = file_filter or (lambda _: True)
         self.expanduser = expanduser
-        self.path_func = self.target.fs.path if self.target else Path
+
+    def _make_path(self, path: str) -> Path:
+        """Create a Path object from the given path string, using the target's path function if available."""
+        if self.target:
+            return self.target.fs.path(path)
+        return Path(path)
 
     def _resolve_path(self, path: str) -> Path:
         """Resolve the given path to an absolute Path object, using the target's path function if available."""
-        p = self.path_func(path)
+        p = self._make_path(path)
         if not p.is_absolute():
             cwd = self.cli.cwd if self.target else Path.cwd()
             p = cwd / p
