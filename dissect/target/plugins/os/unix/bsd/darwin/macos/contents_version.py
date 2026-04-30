@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -18,19 +18,29 @@ re_illegal_characters = re.compile(r"[\(\): \.\-#\/\&gt;\&lt;]")
 ContentsVersionRecord = TargetRecordDescriptor(
     "macos/contents_version",
     [
-        ("string", "BuildAliasOf"),
-        ("string", "RelevancePlatform"),
-        ("string", "BuildVersion"),
-        ("string", "CFBundleShortVersionString"),
-        ("string", "CFBundleVersion"),
-        ("string", "ProjectName"),
-        ("string", "SourceVersion"),
+        ("string", "build_alias_of"),
+        ("string", "relevance_platform"),
+        ("string", "build_version"),
+        ("string", "cf_bundle_short_version_string"),
+        ("string", "cf_bundle_version"),
+        ("string", "project_name"),
+        ("string", "source_version"),
         ("path", "source"),
     ],
 )
 
 
 ContentsVersionRecords = (ContentsVersionRecord,)
+
+FIELD_MAPPINGS = {
+    "BuildAliasOf": "build_alias_of",
+    "RelevancePlatform": "relevance_platform",
+    "BuildVersion": "build_version",
+    "CFBundleShortVersionString": "cf_bundle_short_version_string",
+    "CFBundleVersion": "cf_bundle_version",
+    "ProjectName": "project_name",
+    "SourceVersion": "source_version",
+}
 
 
 class MacOSContentsVersionPlugin(Plugin):
@@ -69,4 +79,4 @@ class MacOSContentsVersionPlugin(Plugin):
     @export(record=ContentsVersionRecord)
     def contents_version(self) -> Iterator[ContentsVersionRecord]:
         """Yield contents version.plist information."""
-        yield from build_records(self, "macos/contents_version", self.files, ContentsVersionRecords)
+        yield from build_plist_records(self, self.files, ContentsVersionRecords, field_mappings=FIELD_MAPPINGS)

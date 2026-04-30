@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -56,4 +56,4 @@ class LoginWindowPlugin(Plugin):
     # @export(output="yield")
     def login_window(self) -> Iterator[DynamicDescriptor]:
         """Yield macOS login window plist files."""
-        yield from build_records(self, "macos/login_window", self.login_window_files)
+        yield from build_plist_records(self, self.login_window_files, function_name="macos/login_window")

@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -204,15 +204,15 @@ LaunchAgentRecords = (
         LauncherRecord1,
     ),
     TargetRecordDescriptor(
-        "macos/launch_agents",
+        "macos/launch_agents/socket",
         LauncherRecord3,
     ),
     TargetRecordDescriptor(
-        "macos/launch_agents",
+        "macos/launch_agents/un",
         LauncherRecord5,
     ),
     TargetRecordDescriptor(
-        "macos/launch_agents",
+        "macos/launch_agents/un_notification",
         LauncherRecord6,
     ),
 )
@@ -223,19 +223,19 @@ LaunchDaemonRecords = (
         LauncherRecord1,
     ),
     TargetRecordDescriptor(
-        "macos/launch_daemons",
+        "macos/launch_daemons/wait",
         LauncherRecord2,
     ),
     TargetRecordDescriptor(
-        "macos/launch_daemons",
+        "macos/launch_daemons/socket",
         LauncherRecord3,
     ),
     TargetRecordDescriptor(
-        "macos/launch_daemons",
+        "macos/launch_daemons/version4",
         LauncherRecord4,
     ),
     TargetRecordDescriptor(
-        "macos/launch_daemons",
+        "macos/launch_daemons/listeners",
         LauncherRecord7,
     ),
 )
@@ -322,13 +322,9 @@ class LaunchersPlugin(Plugin):
     # @export(output="yield")
     def launch_agents(self) -> Iterator[LaunchAgentRecords]:
         """Yield macOS launch agent plist files."""
-        yield from build_records(
-            self, "macos/launch_agents", self.launch_agent_files, LaunchAgentRecords, COLLAPSE_PATHS
-        )
+        yield from build_plist_records(self, self.launch_agent_files, LaunchAgentRecords, COLLAPSE_PATHS)
 
     @export(record=LaunchDaemonRecords)
     def launch_daemons(self) -> Iterator[LaunchDaemonRecords]:
         """Yield macOS launch daemon plist files."""
-        yield from build_records(
-            self, "macos/launch_daemons", self.launch_daemon_files, LaunchDaemonRecords, COLLAPSE_PATHS
-        )
+        yield from build_plist_records(self, self.launch_daemon_files, LaunchDaemonRecords, COLLAPSE_PATHS)

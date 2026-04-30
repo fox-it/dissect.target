@@ -18,9 +18,9 @@ KeyboardLayoutRecord = TargetRecordDescriptor(
         ("string", "input_source_kind"),
         ("string", "keyboard_layout_name"),
         ("varint", "keyboard_layout_id"),
-        ("boolean", "enabled"),
-        ("boolean", "selected"),
-        ("boolean", "current"),
+        ("boolean", "enabled_layout"),
+        ("boolean", "selected_layout"),
+        ("boolean", "current_layout"),
         ("path", "source"),
     ],
 )
@@ -55,9 +55,11 @@ class KeyboardLayoutPlugin(Plugin):
                 input_source_kind=source.get("InputSourceKind"),
                 keyboard_layout_name=source.get("KeyboardLayout Name"),
                 keyboard_layout_id=source.get("KeyboardLayout ID"),
-                enabled=True,
-                selected=source in plist.get("AppleSelectedInputSources", []),
-                current=(source.get("KeyboardLayout ID") == plist.get("AppleCurrentKeyboardLayoutInputSourceID")),
+                enabled_layout=True,
+                selected_layout=source in plist.get("AppleSelectedInputSources", []),
+                current_layout=(
+                    source.get("KeyboardLayout ID") == plist.get("AppleCurrentKeyboardLayoutInputSourceID")
+                ),
                 source=self.file,
                 _target=self.target,
             )

@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -20,15 +20,21 @@ LoginItemsRecord = TargetRecordDescriptor(
     "macos/login_items",
     [
         ("varint", "generation"),
-        ("varint", "backgroundAppRefreshLoadCount"),
-        ("boolean", "launchServicesItemsImported"),
-        ("boolean", "serviceManagementLoginItemsMigrated"),
+        ("varint", "background_app_refresh_load_count"),
+        ("boolean", "launch_services_items_imported"),
+        ("boolean", "service_management_login_items_migrated"),
         ("string", "plist_path"),
         ("path", "source"),
     ],
 )
 
 LoginItemsRecords = (LoginItemsRecord,)
+
+FIELD_MAPPINGS = {
+    "backgroundAppRefreshLoadCount": "background_app_refresh_load_count",
+    "launchServicesItemsImported": "launch_services_items_imported",
+    "serviceManagementLoginItemsMigrated": "service_management_login_items_migrated",
+}
 
 
 class LoginItemsPlugin(Plugin):
@@ -65,4 +71,4 @@ class LoginItemsPlugin(Plugin):
     # @export(output="yield")
     def login_items(self) -> Iterator[LoginItemsRecord]:
         """Yield macOS login items plist files."""
-        yield from build_records(self, "macos/login_items", self.login_items_files, LoginItemsRecords)
+        yield from build_plist_records(self, self.login_items_files, LoginItemsRecords, field_mappings=FIELD_MAPPINGS)

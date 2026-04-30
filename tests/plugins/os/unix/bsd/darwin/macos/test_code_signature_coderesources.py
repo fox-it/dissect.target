@@ -53,7 +53,7 @@ def test_code_signature_coderesources(
         assert len(results) == 11
 
         assert results[0].omit
-        assert results[0].weight == "20.0"
+        assert results[0].weight == 20.0
         assert results[0].plist_path == "rules/^.*"
         assert (
             results[0].source

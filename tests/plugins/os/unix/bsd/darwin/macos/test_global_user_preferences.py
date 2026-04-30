@@ -104,9 +104,9 @@ def test_global_user_preferences(
         assert results[0].source == "/Users/user/Library/Preferences/.GlobalPreferences.plist"
 
         assert results[1].AppleKeyboardUIMode == 2
-        assert results[1].source == ("/private/var/db/securityagent/Library/Preferences/.GlobalPreferences.plist")
+        assert results[1].source == "/private/var/db/securityagent/Library/Preferences/.GlobalPreferences.plist"
 
         assert results[2].AppleLocale == "en_US"
         assert results[2].AppleKeyboardUIMode == 3
         assert results[2].com_apple_sound_beep_flash == 0
-        assert results[2].source == ("/private/var/root/Library/Preferences/.GlobalPreferences.plist")
+        assert results[2].source == "/private/var/root/Library/Preferences/.GlobalPreferences.plist"

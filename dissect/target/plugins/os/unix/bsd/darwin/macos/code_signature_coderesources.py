@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -15,28 +15,28 @@ if TYPE_CHECKING:
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
 
-CodeSignatureCodeResourcesRecord1 = TargetRecordDescriptor(
-    "macos/code_signature_coderesources",
+OmitRecord = TargetRecordDescriptor(
+    "macos/code_signature_coderesources/omit",
     [
         ("boolean", "omit"),
-        ("string", "weight"),
+        ("varint", "weight"),
         ("string", "plist_path"),
         ("path", "source"),
     ],
 )
 
-CodeSignatureCodeResourcesRecord2 = TargetRecordDescriptor(
-    "macos/code_signature_coderesources",
+NestedRecord = TargetRecordDescriptor(
+    "macos/code_signature_coderesources/nested",
     [
         ("boolean", "nested"),
-        ("string", "weight"),
+        ("varint", "weight"),
         ("string", "plist_path"),
         ("path", "source"),
     ],
 )
 
-CodeSignatureCodeResourcesRecord3 = TargetRecordDescriptor(
-    "macos/code_signature_coderesources",
+CDHashRecord = TargetRecordDescriptor(
+    "macos/code_signature_coderesources/cdhash",
     [
         ("string", "cdhash"),
         ("string", "requirement"),
@@ -47,9 +47,9 @@ CodeSignatureCodeResourcesRecord3 = TargetRecordDescriptor(
 
 
 CodeSignatureCodeResourcesRecords = (
-    CodeSignatureCodeResourcesRecord1,
-    CodeSignatureCodeResourcesRecord2,
-    CodeSignatureCodeResourcesRecord3,
+    OmitRecord,
+    NestedRecord,
+    CDHashRecord,
 )
 
 
@@ -86,6 +86,4 @@ class CodeSignatureCodeResourcesPlugin(Plugin):
     @export(record=CodeSignatureCodeResourcesRecords)
     def code_signature_coderesources(self) -> Iterator[CodeSignatureCodeResourcesRecords]:
         """Yield code signature coderesources information."""
-        yield from build_records(
-            self, "macos/code_signature_coderesources", self.files, CodeSignatureCodeResourcesRecords
-        )
+        yield from build_plist_records(self, self.files, CodeSignatureCodeResourcesRecords)

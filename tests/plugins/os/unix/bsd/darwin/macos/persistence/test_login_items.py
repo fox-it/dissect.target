@@ -55,34 +55,30 @@ def test_login_items(
 
         assert len(results) == 4
 
-        assert results[0].domain is None
         assert results[0].generation == 2
-        assert results[0].serviceManagementLoginItemsMigrated
-        assert results[0].launchServicesItemsImported
-        assert results[0].backgroundAppRefreshLoadCount == 4
+        assert results[0].service_management_login_items_migrated
+        assert results[0].launch_services_items_imported
+        assert results[0].background_app_refresh_load_count == 4
         assert results[0].plist_path == ("userSettingsByUserIdentifier/8122F0CD-020B-4E0C-A3AD-2FCB201C9BB0")
         assert results[0].source == "/var/db/com.apple.backgroundtaskmanagement/BackgroundItems-v16.btm"
 
-        assert results[1].domain is None
         assert results[1].generation == 0
-        assert not results[1].serviceManagementLoginItemsMigrated
-        assert not results[1].launchServicesItemsImported
-        assert results[1].backgroundAppRefreshLoadCount == 0
+        assert not results[1].service_management_login_items_migrated
+        assert not results[1].launch_services_items_imported
+        assert results[1].background_app_refresh_load_count == 0
         assert results[1].plist_path == ("userSettingsByUserIdentifier/FFFFEEEE-DDDD-CCCC-BBBB-AAAA00000000")
         assert results[1].source == "/var/db/com.apple.backgroundtaskmanagement/BackgroundItems-v16.btm"
 
-        assert results[2].domain is None
         assert results[2].generation == 1
-        assert results[2].serviceManagementLoginItemsMigrated
-        assert not results[2].launchServicesItemsImported
-        assert results[2].backgroundAppRefreshLoadCount == 2
+        assert results[2].service_management_login_items_migrated
+        assert not results[2].launch_services_items_imported
+        assert results[2].background_app_refresh_load_count == 2
         assert results[2].plist_path == ("userSettingsByUserIdentifier/FFFFEEEE-DDDD-CCCC-BBBB-AAAA000000F8")
         assert results[2].source == "/var/db/com.apple.backgroundtaskmanagement/BackgroundItems-v16.btm"
 
-        assert results[3].domain is None
         assert results[3].generation == 1
-        assert results[3].serviceManagementLoginItemsMigrated
-        assert not results[3].launchServicesItemsImported
-        assert results[3].backgroundAppRefreshLoadCount == 2
+        assert results[3].service_management_login_items_migrated
+        assert not results[3].launch_services_items_imported
+        assert results[3].background_app_refresh_load_count == 2
         assert results[3].plist_path == ("userSettingsByUserIdentifier/FFFFEEEE-DDDD-CCCC-BBBB-AAAAFFFFFFFE")
         assert results[3].source == "/var/db/com.apple.backgroundtaskmanagement/BackgroundItems-v16.btm"

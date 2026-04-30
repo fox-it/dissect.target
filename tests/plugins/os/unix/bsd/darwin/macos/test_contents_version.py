@@ -52,29 +52,29 @@ def test_contents_version(
 
         assert len(results) == 3
 
-        assert results[0].BuildAliasOf == "Ensemble"
-        assert results[0].BuildVersion == "1983"
-        assert results[0].CFBundleShortVersionString == "1.0"
-        assert results[0].CFBundleVersion == "174.4.1"
-        assert results[0].ProjectName == "Ensemble_executables"
-        assert results[0].SourceVersion == "174004001000000"
+        assert results[0].build_alias_of == "Ensemble"
+        assert results[0].build_version == "1983"
+        assert results[0].cf_bundle_short_version_string == "1.0"
+        assert results[0].cf_bundle_version == "174.4.1"
+        assert results[0].project_name == "Ensemble_executables"
+        assert results[0].source_version == "174004001000000"
         assert results[0].source == "/System/Library/CoreServices/UniversalControl.app/Contents/version.plist"
 
-        assert results[1].BuildVersion == "100"
-        assert results[1].CFBundleShortVersionString == "1.0"
-        assert results[1].CFBundleVersion == "1"
-        assert results[1].ProjectName == "MobileBluetooth"
-        assert results[1].SourceVersion == "194026001000001"
+        assert results[1].build_version == "100"
+        assert results[1].cf_bundle_short_version_string == "1.0"
+        assert results[1].cf_bundle_version == "1"
+        assert results[1].project_name == "MobileBluetooth"
+        assert results[1].source_version == "194026001000001"
         assert (
             results[1].source == "/System/Library/Frameworks/IOBluetoothUI.framework/Versions/A/Resources/version.plist"
         )
 
-        assert results[2].BuildAliasOf == "SwiftUI"
-        assert results[2].BuildVersion == "12"
-        assert results[2].CFBundleShortVersionString == "7.4.27"
-        assert results[2].CFBundleVersion == "7.4.27"
-        assert results[2].ProjectName == "SwiftUICore"
-        assert results[2].SourceVersion == "7004027000000"
+        assert results[2].build_alias_of == "SwiftUI"
+        assert results[2].build_version == "12"
+        assert results[2].cf_bundle_short_version_string == "7.4.27"
+        assert results[2].cf_bundle_version == "7.4.27"
+        assert results[2].project_name == "SwiftUICore"
+        assert results[2].source_version == "7004027000000"
         assert (
             results[2].source == "/System/Library/Frameworks/SwiftUICore.framework/Versions/A/Resources/version.plist"
         )

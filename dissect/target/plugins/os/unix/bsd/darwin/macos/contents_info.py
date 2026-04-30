@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.plist import build_records
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -52,4 +52,4 @@ class ContentsInfoPlugin(Plugin):
     @export(record=DynamicDescriptor(["string"]))
     def contents_info(self) -> Iterator[DynamicDescriptor]:
         """Yield contents info information."""
-        yield from build_records(self, "macos/contents_info", self.files)
+        yield from build_plist_records(self, self.files, function_name="macos/contents_info")

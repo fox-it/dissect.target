@@ -37,15 +37,15 @@ def test_keyboard_layout(test_file: str, target_unix: Target, fs_unix: VirtualFi
         assert results[0].input_source_kind == "Keyboard Layout"
         assert results[0].keyboard_layout_name == "U.S."
         assert results[0].keyboard_layout_id == 0
-        assert results[0].enabled
-        assert results[0].selected
-        assert not results[0].current
+        assert results[0].enabled_layout
+        assert results[0].selected_layout
+        assert not results[0].current_layout
         assert results[0].source == "/Library/Preferences/com.apple.HIToolbox.plist"
 
         assert results[1].input_source_kind == "Keyboard Layout"
         assert results[1].keyboard_layout_name == "Dutch"
         assert results[1].keyboard_layout_id == 26
-        assert results[1].enabled
-        assert not results[1].selected
-        assert not results[1].current
+        assert results[1].enabled_layout
+        assert not results[1].selected_layout
+        assert not results[1].current_layout
         assert results[1].source == "/Library/Preferences/com.apple.HIToolbox.plist"

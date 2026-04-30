@@ -36,6 +36,6 @@ def test_aiport_preferences(test_file: str, target_unix: Target, fs_unix: Virtua
 
         assert results[0].counter == 2
         assert results[0].device_uuid == "0527924E-C5F8-4703-BDDC-9283B6E9FDAE"
-        assert results[0].version == 7200
+        assert results[0].version == "7200"
         assert results[0].preferred_order == "[]"
         assert results[0].source == "/Library/Preferences/SystemConfiguration/com.apple.airport.preferences.plist"

@@ -17,7 +17,7 @@ AirportPreferencesRecord = TargetRecordDescriptor(
     [
         ("varint", "counter"),
         ("string", "device_uuid"),
-        ("varint", "version"),
+        ("string", "version"),
         ("string", "preferred_order"),
         ("path", "source"),
     ],

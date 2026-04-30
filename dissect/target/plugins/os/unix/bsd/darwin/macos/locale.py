@@ -7,24 +7,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.localeutil import normalize_language
-from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.default.locale import LocalePlugin
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
 
-WindowsKeyboardRecord = TargetRecordDescriptor(
-    "windows/keyboard",
-    [
-        ("string", "layout"),
-        ("string", "language_id"),
-    ],
-)
-
 
 class macOSLocalePlugin(LocalePlugin):
-    """Windows locale plugin."""
+    """macOS locale plugin."""
 
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"
 
@@ -65,11 +56,13 @@ class macOSLocalePlugin(LocalePlugin):
 
     @export(property=True)
     def install_date(self) -> str | None:
+        """Get the installation date of the system."""
         mtime = self.target.fs.path("/private/var/db/.AppleSetupDone").lstat().st_mtime
         return datetime.fromtimestamp(mtime, timezone.utc)
 
     @export(property=True)
     def location_services_active(self) -> bool | None:
+        """Get the status of location services."""
         path = self.target.fs.path("/Library/Preferences/com.apple.timezone.auto.plist")
 
         if not path.exists():
