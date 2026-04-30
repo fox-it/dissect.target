@@ -80,6 +80,11 @@ def main() -> int:
         vnames.setdefault(basename, []).append(v)
         vfs.map_file_fh(f"volumes/{fname}", v)
 
+        if v.fs is not None and (allocation_implementation := getattr(v.fs, "space_allocation", None)):
+            unallocated, allocated = allocation_implementation()
+            vfs.map_file_fh(f"volumes/{fname}_unallocated", unallocated)
+            vfs.map_file_fh(f"volumes/{fname}_allocated", allocated)
+
     fake_ntfs = set()
     for i, fs in enumerate(t.filesystems):
         ntfs_obj = getattr(fs, "ntfs", None)
