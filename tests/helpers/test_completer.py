@@ -18,14 +18,14 @@ from dissect.target.helpers.completer import (
     get_current_word,
     unescape_path_input,
 )
+from dissect.target.target import Target
 from dissect.target.tools.shell import TargetCli, TargetCmdCompleter
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from prompt_toolkit.completion import Completer
-
-    from dissect.target.target import Target
 
 
 def _make_document(line: str) -> Document:
@@ -388,4 +388,72 @@ def test_completion_argparser_integration(target_bare: Target, tmp_path: Path, m
         '"/System Volume 1/README.txt"',
         '"/System Volume 1/file one.txt"',
         '"/System Volume 1/file two.txt"',
+    }
+
+
+def test_completion_target_relative() -> None:
+    """Test relative path completion for a target using ``cd`` command."""
+    target = Target.open(absolute_path("_data/tools/shell/unicode.tar"), apply=True)
+    target_cli = TargetCli(target)
+    completer = TargetCmdCompleter(target_cli)
+
+    completions = set(_get_completion_texts(completer, "cd ./<TAB>"))
+    assert completions == {
+        "./unicode/",
+    }
+
+    target_cli.onecmd("cd /unicode/charsets")
+    assert str(target_cli.cwd) == "/unicode/charsets"
+
+    completions = set(_get_completion_texts(completer, "cd <TAB>"))
+    assert completions == {"ħēļľŏ/", "привет/", "🕵🕵🕵/", "你好/", "مرحبًا/", "hello/"}
+
+    completions = set(_get_completion_texts(completer, "cd ../<TAB>"))
+    assert completions == {
+        "../charsets/",
+    }
+
+
+def test_completion_local_relative(target_bare: Target, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test relative path completion for a local path using ``lcd`` command."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "one/two/three/four").mkdir(parents=True)
+    (tmp_path / "one/2").touch()
+    (tmp_path / "one/two/3").touch()
+    (tmp_path / "one/two/three/4").touch()
+
+    target_cli = TargetCli(target_bare)
+    completer = TargetCmdCompleter(target_cli)
+
+    completions = set(_get_completion_texts(completer, "lcd <TAB>"))
+    assert "one/" in completions
+
+    completions = set(_get_completion_texts(completer, "lcd one/<TAB>"))
+    assert completions == {
+        "one/2",
+        "one/two/",
+    }
+
+    target_cli.onecmd("lcd one/two")
+    completions = set(_get_completion_texts(completer, "lcd ../<TAB>"))
+    assert completions == {
+        "../2",
+        "../two/",
+    }
+    completions = set(_get_completion_texts(completer, "lcd ./<TAB>"))
+    assert completions == {
+        "./3",
+        "./three/",
+    }
+
+    target_cli.onecmd("lcd three/four")
+    completions = set(_get_completion_texts(completer, "lcd ../../../<TAB>"))
+    assert completions == {
+        "../../../two/",
+        "../../../2",
+    }
+    completions = set(_get_completion_texts(completer, "lcd ../../<TAB>"))
+    assert completions == {
+        "../../three/",
+        "../../3",
     }

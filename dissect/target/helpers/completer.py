@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import copy
 import os
+import posixpath
 import re
 import shlex
 from pathlib import Path
@@ -236,10 +237,20 @@ class QuotedPathCompleter(Completer):
 
     def _resolve_path(self, path: str) -> Path:
         """Resolve the given path to an absolute Path object, using the target's path function if available."""
+        if self.target:
+            cwd = self.cli.cwd if self.cli else self.target.fs.path("/")
+
+            if not path:
+                return cwd
+
+            resolved = path if path.startswith("/") else posixpath.join(str(cwd), path)
+            # TargetPath may keep literal '..' segments; normalize first so completion lists the intended directory.
+            normalized = posixpath.normpath(resolved)
+            return self._make_path(normalized)
+
         p = self._make_path(path)
         if not p.is_absolute():
-            cwd = self.cli.cwd if self.target else Path.cwd()
-            p = cwd / p
+            p = Path.cwd() / p
         return p
 
     def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
