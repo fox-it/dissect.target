@@ -520,13 +520,15 @@ class ExtendedCmd(cmd.Cmd):
         # Handle `cd` as a special case, as it needs to change the state of our current process.
         if parts and parts[0] == "cd":
             target = parts[1].strip() if len(parts) > 1 else Path.home()
-            self.do_lcd(target)
+            self.cmd_lcd(argparse.Namespace(path=target), sys.stdout)
         else:
             subprocess.run(line, shell=True, check=False)
         return False
 
-    def do_lcd(self, line: str) -> bool:
+    @arg("path", nargs="?", type=LocalPathArgument, default="~", help="Change the local working directory.")
+    def cmd_lcd(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Change the local working directory. Usage: lcd <path>."""
+        line = args.path
         if line == "-":
             if self._local_prev_dir is None:
                 print("cd: no previous directory")
