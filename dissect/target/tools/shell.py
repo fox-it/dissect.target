@@ -37,7 +37,7 @@ try:
     from prompt_toolkit.document import Document
     from prompt_toolkit.filters import completion_is_selected
     from prompt_toolkit.formatted_text import ANSI
-    from prompt_toolkit.history import FileHistory
+    from prompt_toolkit.history import FileHistory, History
     from prompt_toolkit.key_binding import KeyBindings
     from prompt_toolkit.keys import Keys
     from prompt_toolkit.shortcuts import CompleteStyle
@@ -606,8 +606,12 @@ class TargetCmd(ExtendedCmd):
 
         self.preloop()
         completer = TargetCmdCompleter(self)
+
+        # Use readline-compatible history if readline is available, otherwise fallback to FileHistory
+        history = ReadlineCompatHistory(self.histfile, self.histfilesize) if readline else FileHistory(self.histfile)
+
         session = PromptSession(
-            history=FileHistory(f"{self.histfile}_pt"),
+            history=history,
             complete_style=CompleteStyle.MULTI_COLUMN,
         )
 
@@ -1924,6 +1928,29 @@ def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> cmd.Cmd | Non
 
 
 if HAS_PROMPT_TOOLKIT:
+
+    class ReadlineCompatHistory(History):
+        """Custom prompt_toolkit History that is compatible with readline history."""
+
+        def __init__(self, histfile: Path | str, histfilesize: int = 10_000):
+            super().__init__()
+            self.histfile = histfile
+            self.histfilesize = histfilesize
+
+        def load_history_strings(self) -> Iterable[str]:
+            """Yield most recent history strings from the readline history file."""
+            readline.read_history_file(self.histfile)
+            for i in range(readline.get_current_history_length(), 0, -1):
+                yield readline.get_history_item(i)
+
+        def store_string(self, string: str) -> None:
+            """Store the string in persistent readline history file."""
+            readline.add_history(string)
+            readline.set_history_length(self.histfilesize)
+            try:
+                readline.write_history_file(self.histfile)
+            except Exception as e:
+                log.debug("Error writing history file: %s", e)
 
     class TargetCmdCompleter(Completer):
         """Custom completer for TargetCmd that supports completing command names, target paths and local paths."""
