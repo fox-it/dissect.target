@@ -42,11 +42,6 @@ try:
     from prompt_toolkit.keys import Keys
     from prompt_toolkit.shortcuts import CompleteStyle
 
-    if TYPE_CHECKING:
-        from collections.abc import Iterable
-
-        from prompt_toolkit.completion import CompleteEvent, Completion
-
     from dissect.target.helpers.completer import (
         QuotedPathCompleter,
         get_current_word,
@@ -95,7 +90,9 @@ from dissect.target.tools.utils.fs import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
+
+    from prompt_toolkit.completion import CompleteEvent, Completion
 
     from dissect.target.plugin import FunctionDescriptor
 
@@ -593,7 +590,7 @@ class TargetCmd(ExtendedCmd):
             self.prompt_ps1 = "{base}:{cwd}$ "
 
         # Enable if prompt_toolkit is available and not disabled via environment variable
-        if HAS_PROMPT_TOOLKIT and os.getenv("NO_PROMPT_TOOLKIT", "0") not in {"1", "true", "True", "TRUE"}:
+        if HAS_PROMPT_TOOLKIT and os.getenv("NO_PROMPT_TOOLKIT", "0").lower() not in {"1", "true"}:
             self.cmdloop = self.cmdloop_prompt_toolkit
 
         super().__init__(self.target.props.get("cyber"))
@@ -638,7 +635,7 @@ class TargetCmd(ExtendedCmd):
 
         self.postloop()
 
-    def _get_targetrc_path(self) -> pathlib.Path:
+    def _get_targetrc_path(self) -> Path:
         """Get the path to the run commands file."""
         return Path(
             getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
