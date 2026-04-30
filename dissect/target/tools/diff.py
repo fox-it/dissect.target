@@ -511,7 +511,7 @@ class DifferentialCli(ExtendedCmd):
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         """Autocomplete based on files / directories found in the current path."""
-        path = line[:begidx].rsplit(" ")[-1]
+        path = line[:begidx].rsplit(" ", maxsplit=1)[-1]
         textlower = text.lower()
 
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.alt_separator)

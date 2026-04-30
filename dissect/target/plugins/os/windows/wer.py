@@ -115,7 +115,7 @@ class WindowsErrorReportingPlugin(Plugin):
                 record_type = "datetime"
                 key = "ts"
 
-            key = self._sanitize_key(key if key else name)
+            key = self._sanitize_key(key or name)
             if not key:
                 self.target.log.warning("Sanitizing key resulted in empty key, skipping line %r", line)
                 key = None
