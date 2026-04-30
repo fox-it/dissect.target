@@ -81,9 +81,12 @@ def main() -> int:
         vfs.map_file_fh(f"volumes/{fname}", v)
 
         if v.fs is not None and (allocation_implementation := getattr(v.fs, "space_allocation", None)):
-            unallocated, allocated = allocation_implementation()
-            vfs.map_file_fh(f"volumes/{fname}_unallocated", unallocated)
-            vfs.map_file_fh(f"volumes/{fname}_allocated", allocated)
+            try:
+                unallocated, allocated = allocation_implementation()
+                vfs.map_file_fh(f"volumes/{fname}_unallocated", unallocated)
+                vfs.map_file_fh(f"volumes/{fname}_allocated", allocated)
+            except NotImplementedError:
+                pass
 
     fake_ntfs = set()
     for i, fs in enumerate(t.filesystems):
