@@ -68,13 +68,7 @@ class Loader:
     """
 
     def __init__(
-        self,
-        path: Path,
-        *,
-        parsed_path: urllib.parse.ParseResult | None = None,
-        resolve: bool = True,
-        loader_kwargs: dict | None = None,
-        **kwargs,
+        self, path: Path, *, parsed_path: urllib.parse.ParseResult | None = None, resolve: bool = True, **kwargs
     ):
         self.path = path
         self.absolute_path = None
@@ -89,7 +83,6 @@ class Loader:
         self.parsed_query = (
             dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True)) if parsed_path else {}
         )
-        self._loader_kwargs = loader_kwargs or {}
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({str(self.path)!r})"
@@ -125,19 +118,6 @@ class Loader:
 
     def map(self, target: Target) -> None:
         """Maps the loaded path into a ``Target``.
-
-        Delegates to :meth:`_map` with any loader-specific keyword arguments set at instantiation time.
-
-        Args:
-            target: The target that we're mapping into.
-        """
-        return self._map(target, **self._loader_kwargs)
-
-    def _map(self, target: Target, **kwargs) -> None:
-        """Implementation hook for :meth:`map`.
-
-        Subclasses that accept loader-specific arguments (declared via ``@arg`` decorators)
-        should override this method instead of :meth:`map`.
 
         Args:
             target: The target that we're mapping into.

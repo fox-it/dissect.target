@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
-from dissect.target.loader import LOADERS_BY_SCHEME, Loader
+from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from datetime import datetime
 
+    from dissect.target.loader import Loader
     from dissect.target.plugin import FunctionDescriptor
 
 
@@ -239,22 +240,16 @@ def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
     return target
 
 
-def open_targets(
-    args: argparse.Namespace,
-    *,
-    apply: bool = True,
-    loader_instance: Loader | None = None,
-) -> Iterator[Target]:
-    direct: bool = getattr(args, "direct", False)
+def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Target]:
+    direct: bool = getattr(args, "direct", False) or getattr(args, "direct_sensitive", False)
     children: bool = getattr(args, "children", False)
     child: str | None = getattr(args, "child", None)
 
-    if direct:
-        targets: Iterable[Target] = [Target.open_direct(args.targets)]
-    elif loader_instance is not None:
-        targets = Target.with_loader(args.targets, loader_instance, include_children=children, recursive=args.recursive, apply=apply)
-    else:
-        targets = Target.open_all(args.targets, include_children=children, recursive=args.recursive, apply=apply)
+    targets: Iterable[Target] = (
+        [Target.open_direct(args.targets, case_sensitive=getattr(args, "direct_sensitive", False))]
+        if direct
+        else Target.open_all(args.targets, include_children=children, recursive=args.recursive, apply=apply)
+    )
 
     for target in targets:
         if child:
@@ -525,14 +520,27 @@ def args_to_uri(targets: list[str], loader_name: str, args: list[str] | None = N
     For loaders providing ``@arg()`` arguments.
     """
     loader = LOADERS_BY_SCHEME.get(loader_name, None)
-
     parser = argparse.ArgumentParser(
         argument_default=argparse.SUPPRESS, description="\n".join(textwrap.wrap(get_docstring(loader)))
     )
     for load_arg in getattr(loader, "__args__", []):
-        parser.add_argument(*load_arg[0], **load_arg[1])
-    args = vars(parser.parse_known_args(args)[0])
-    return [f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else "") for target in targets]
+        arg_opts, arg_kwargs = load_arg
+        kw = dict(arg_kwargs)
+        # If no explicit dest provided, prefer the long option string as dest
+        if "dest" not in kw:
+            long_opts = [o for o in arg_opts if o.startswith("--")]
+            if long_opts:
+                kw["dest"] = long_opts[0].lstrip("-")
+
+        parser.add_argument(*arg_opts, **kw)
+
+    ns, _ = parser.parse_known_args(args)
+    parsed = vars(ns)
+
+    params = {k: (1 if v is True else 0 if v is False else v) for k, v in parsed.items()}
+
+    q = ("?" + urllib.parse.urlencode(params, doseq=True)) if params else ""
+    return [f"{loader_name}://{t}{q}" for t in targets]
 
 
 def find_and_filter_plugins(

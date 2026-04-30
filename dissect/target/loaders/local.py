@@ -50,29 +50,29 @@ class LocalLoader(Loader):
     """Load local filesystem."""
 
     def __init__(self, path: Path, **kwargs):
-        kwargs["parsed_path"] = urllib.parse.urlparse(str(path))
+        if not kwargs.get("parsed_path"):
+            kwargs["parsed_path"] = urllib.parse.urlparse(str(path))
         super().__init__(path, **kwargs, resolve=False)
 
     @staticmethod
     def detect(path: Path) -> bool:
         return urllib.parse.urlparse(str(path)).path == "local"
 
-    def _map(self, target: Target, force_directory_fs: bool = False, fallback_to_directory_fs: bool = False) -> None:
+    def map(self, target: Target) -> None:
         # For the local loader we abuse the path/URI parsing a bit, so fix it up here
         target.parsed_path = urllib.parse.urlparse(str(target.path))
         target.path_query = self.parsed_query
         target.path = Path("local")
 
-        # Also honour flags passed via URI query string (e.g. "local?force-directory-fs=1")
-        force_directory_fs = force_directory_fs or "force-directory-fs" in self.parsed_query
-        fallback_to_directory_fs = fallback_to_directory_fs or "fallback-to-directory-fs" in self.parsed_query
-
         os_name = _get_os_name()
 
+        force_dirfs = "force-directory-fs" in self.parsed_query
+        fallback_to_dirfs = "fallback-to-directory-fs" in self.parsed_query
+
         if os_name == "windows":
-            map_windows_mounted_drives(target, force_dirfs=force_directory_fs, fallback_to_dirfs=fallback_to_directory_fs)
+            map_windows_mounted_drives(target, force_dirfs=force_dirfs, fallback_to_dirfs=fallback_to_dirfs)
         else:
-            if fallback_to_directory_fs or force_directory_fs:
+            if fallback_to_dirfs or force_dirfs:
                 # Where Windows does some sophisticated fallback, for other
                 # operating systems we don't know anything yet about the
                 # relation between disks and mount points.
