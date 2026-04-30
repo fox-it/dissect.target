@@ -17,7 +17,6 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
-from dissect.target.helpers.loaderutil import parse_path_uri
 from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import LOADERS_BY_SCHEME, infer_loader
 from dissect.target.plugin import (
@@ -116,20 +115,16 @@ def main() -> int:
 
     args, rest = parser.parse_known_args()
 
-    # Determine the loader early so we can build its argument parser and show help for it.
-    # If --loader is specified explicitly, look it up by scheme; otherwise infer from the first target.
-    explicit_loader = bool(args.loader)
-    loader_instance = None
-    loader_cls = None
-    if args.loader:
-        loader_cls = LOADERS_BY_SCHEME.get(args.loader)
-    elif args.targets:
-        result = infer_loader(args.targets[0])
-        if result is not None:
-            loader_cls = result[0]
-
-    # Show help for target-query
+    # Show help for target-query. If a loader can be determined, show loader-specific help.
     if not args.function and ("-h" in rest or "--help" in rest):
+        loader_cls = None
+        if args.loader:
+            loader_cls = LOADERS_BY_SCHEME.get(args.loader)
+        elif args.targets:
+            result = infer_loader(args.targets[0])
+            if result is not None:
+                loader_cls = result[0]
+
         if loader_cls is None:
             parser.print_help()
             return 0
@@ -137,32 +132,6 @@ def main() -> int:
         loader_parser = generate_argparse_for_loader_class(loader_cls)
         loader_parser.print_help()
         return 0
-
-    # Parse loader-specific arguments from the remaining (unknown) arguments.
-    # The parsed values are passed directly to the loader at instantiation time.
-    loader_kwargs: dict = {}
-    if loader_cls is not None and getattr(loader_cls, "__args__", []):
-        loader_parser = generate_argparse_for_loader_class(loader_cls)
-        loader_options, rest = loader_parser.parse_known_args(rest)
-        loader_kwargs = vars(loader_options)
-
-    # Instantiate the loader only when -L was explicitly specified.
-    # When the loader is auto-inferred from targets[0], fall through to open_all which
-    # independently detects the correct loader per path — avoiding the mixed-loader
-    # regression where all targets would be locked to the first inferred loader class.
-    if explicit_loader and loader_cls is not None and args.targets:
-        first_spec = args.targets[0]
-        adjusted_path, parsed_path = parse_path_uri(first_spec)
-        load_path = adjusted_path if parsed_path is not None else pathlib.Path(first_spec)
-
-        try:
-            loader_instance = loader_cls(load_path, parsed_path=parsed_path, loader_kwargs=loader_kwargs)
-        except Exception as e:
-            parser.error(f"Failed to instantiate loader '{loader_cls.__name__}': {e}")
-
-    # Clear args.loader so that process_generic_arguments does not call args_to_uri again —
-    # we have already handled it above.
-    args.loader = None
 
     process_generic_arguments(parser, args)
 
@@ -182,7 +151,6 @@ def main() -> int:
             )
 
     # Process plugin arguments after host and child args are checked
-    # This is for plugins, not loaders. We pass `rest` to let it find plugin args.
     different_output_types = process_plugin_arguments(parser, args, rest)
 
     if not args.targets:
@@ -201,7 +169,7 @@ def main() -> int:
     execution_report.set_event_callbacks(Target)
 
     try:
-        for target in open_targets(args, loader_instance=loader_instance):
+        for target in open_targets(args):
             record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []
