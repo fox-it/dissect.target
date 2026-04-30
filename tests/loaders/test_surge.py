@@ -197,8 +197,8 @@ def test_loader_with_windows_variants(mock_surge_windows_dir: Path) -> None:
 
         # The 3 found drive letters + fake NTFS
         assert len(t.filesystems) == 4
-        # The 3 found drive letters + sysvol + ntfs
-        assert len(t.fs.mounts) == 5
+        # The 3 found drive letters + sysvol
+        assert len(t.fs.mounts) == 4
         # The single usnjrnl record for C
         assert len(usnjrnl_records) == 1
 

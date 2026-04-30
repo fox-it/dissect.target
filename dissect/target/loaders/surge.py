@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target import Target
+    from dissect.target.filesystem import Filesystem
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +81,48 @@ def find_surge_root(path: Path) -> Path | None:
     return None
 
 
+def map_surge(loader: SurgeLoader, target: Target, fs_factory: tuple[Filesystem, Filesystem], is_zip: bool) -> None:
+    """Shared mapping logic for both Directory and Zip loaders."""
+    files_root = loader.root.joinpath("files")
+
+    if loader.os == OperatingSystem.WINDOWS:
+        # 1. Iterate through volumes (e.g., 'c', 'd')
+        for volume in filter(lambda x: x.is_dir(), files_root.iterdir()):
+            vol_name = volume.name.lower()
+
+            # Create the specific FS (and get a reference for manual entry mapping)
+            main_fs, entry_fs = fs_factory(volume)
+
+            target.filesystems.add(main_fs)
+            target.fs.mount(f"{vol_name}:", main_fs)
+
+            # 2. Handle extracted UsnJrnl if present
+            usnjrnl_path = loader.root.joinpath("usn-journals", volume.name)
+            if usnjrnl_path.is_file():
+                norm_name = fsutil.normpath(SURGE_USNJRNLJ)
+
+                if is_zip:
+                    # Zip specific entry creation
+                    entry = ZipFilesystemEntry(entry_fs, norm_name, loader.zip.getinfo(str(usnjrnl_path)))
+                    entry_fs._fs.map_file_entry(norm_name, entry)
+                else:
+                    # Directory specific entry creation
+                    entry = DirectoryFilesystemEntry(entry_fs, norm_name, usnjrnl_path)
+                    main_fs.map_file_entry(norm_name, entry)
+
+                log.warning("Surge: Using extracted UsnJrnl for volume '%s'.", vol_name)
+
+            # 3. Apply NTFS virtual filesystem helpers
+            loaderutil.add_virtual_ntfs_filesystem(
+                target, main_fs, usnjrnl_path=FILENAMES_USNJRNLJ, sds_path=FILENAMES_SECURESDS
+            )
+    else:
+        # Non-Windows logic (flat mount)
+        fs, _ = fs_factory(files_root)
+        target.filesystems.add(fs)
+        target.fs.mount("", fs)
+
+
 class SurgeLoader(Loader):
     """Loader for Surge forensic images, as directory. The Surge root directory
     can be at the root level or in a subdirectory.
@@ -125,78 +168,21 @@ class SurgeLoader(Loader):
         return contains_all_required_directories(surge_root, operating_system)
 
     def map(self, target: Target) -> None:
-        """Map the data such as volumes and filesystems.
+        """Map the Surge directory-based forensic image to the target."""
 
-        For Windows, first iterate through first level children of the files/
-        directory. These represent the volumes on the system, indicated by a
-        driveletter, without the colon.
+        def fs_factory(volume_path: str) -> tuple[VirtualFilesystem, DirectoryFilesystem]:
+            # For directories, we wrap in VirtualFilesystem to allow manual file mapping (UsnJrnl)
+            dir_fs = DirectoryFilesystem(volume_path, alt_separator="\\", case_sensitive=False)
+            vfs = VirtualFilesystem(alt_separator="\\", case_sensitive=False)
+            vfs.map_fs("", dir_fs)
+            return vfs, dir_fs
 
-        For every iteration we build a DirectoryFileSystem of all the volume
-        content. We create a VirtualFileSystem around it to allow us to add
-        entries.
-
-        When instructed to do so, Surge adds a sparse version of the UsnJrnl as
-        a file. If such a file exists, we add the file to the VirtualFilesystem.
-        We use a distinct name to make sure it does not interfere with the
-        actual data.
-
-        Other operating systems do not require such logic.
-        """
-        if self.os == OperatingSystem.WINDOWS:
-            volumes = filter(lambda x: x.is_dir(), self.root.joinpath("files").iterdir())
-            for volume in volumes:
-                volume_name = volume.name.lower()
-
-                dir_fs = DirectoryFilesystem(volume, alt_separator="\\", case_sensitive=False)
-                virtual_fs = VirtualFilesystem(alt_separator="\\", case_sensitive=False)
-                virtual_fs.map_fs("", dir_fs)
-
-                target.filesystems.add(virtual_fs)
-                target.fs.mount(volume_name + ":", virtual_fs)
-
-                usnjrnl_path = self.root.joinpath("usn-journals", volume.name)
-                if usnjrnl_path.is_file():
-                    usnjrnl_name = fsutil.normpath(SURGE_USNJRNLJ)
-                    usnjrnl_entry = DirectoryFilesystemEntry(dir_fs, usnjrnl_name, usnjrnl_path)
-                    virtual_fs.map_file_entry(usnjrnl_name, usnjrnl_entry)
-
-                    log.warning(
-                        (
-                            "Surge collection contains an extracted UsnJrnl for volume '%s'. "
-                            "Note that it will take precedence over any $Extend/$UsnJrnl:$J."
-                        ),
-                        volume_name,
-                    )
-
-                loaderutil.add_virtual_ntfs_filesystem(
-                    target,
-                    virtual_fs,
-                    usnjrnl_path=FILENAMES_USNJRNLJ,
-                    sds_path=FILENAMES_SECURESDS,
-                )
-        else:
-            dir_fs = DirectoryFilesystem(self.root.joinpath("files"))
-            target.filesystems.add(dir_fs)
-            target.fs.mount("", dir_fs)
+        map_surge(self, target, fs_factory, is_zip=False)
 
 
 class SurgeZipSubLoader(ZipSubLoader):
     """Loader for Surge forensic images, as a zip-file. The Surge root
     directory can be at the root level or in a subdirectory.
-
-    A Surge package is very similar to a Kape / Velociraptor package. The
-    'files' directory contains the disk data acquired using the Surge-collect.
-    The 'api' directory contains parsed, interpreted and collected host info.
-
-    See test_surge.py for directory tree examples for Linux, MacOS and Windows
-    surge targets.
-
-    The 'files' directory is not mandatory as it will not be created when only
-    collecting memory.
-
-    By default, a Surge package is a directory containing files. As an option,
-    the complete directory with subdirectories can be zipped. The ziploader
-    will load this SurgeZipSubLoader to handle these files.
     """
 
     def __init__(self, path: Path, zipfile: zipfile.Path, **kwargs):
@@ -224,56 +210,11 @@ class SurgeZipSubLoader(ZipSubLoader):
         return contains_all_required_directories(surge_root, operating_system)
 
     def map(self, target: Target) -> None:
-        """Map the data such as volumes and filesystems.
+        """Map the Surge ZIP-based forensic image to the target."""
 
-        For Windows, first iterate through first level children of the files/
-        directory. These represent the volumes on the system, indicated by a
-        driveletter, without the colon.
+        def fs_factory(volume_path: str) -> tuple[ZipFilesystem, ZipFilesystem]:
+            # ZipFilesystem already contains an internal VirtualFilesystem (_fs)
+            zip_fs = ZipFilesystem(self.zip.fp, str(volume_path), alt_separator="\\", case_sensitive=False)
+            return zip_fs, zip_fs
 
-        For every iteration we build a DirectoryFileSystem of all the volume
-        content. We create a VirtualFileSystem around it to allow us to add
-        entries.
-
-        When instructed to do so, Surge adds a sparse version of the UsnJrnl as
-        a file. If such a file exists, we add the file to the VirtualFilesystem.
-        We use a distinct name to make sure it does not interfere with the
-        actual data.
-
-        Other operating systems do not require such logic.
-        """
-        if self.os == OperatingSystem.WINDOWS:
-            volumes = filter(lambda x: x.is_dir(), self.root.joinpath("files").iterdir())
-            for volume in volumes:
-                volume_name = volume.name.lower()
-
-                zip_fs = ZipFilesystem(self.zip.fp, str(volume), alt_separator="\\", case_sensitive=False)
-
-                target.filesystems.add(zip_fs)
-                target.fs.mount(volume_name + ":", zip_fs)
-
-                usnjrnl_path = self.root.joinpath("usn-journals", volume.name)
-                if usnjrnl_path.is_file():
-                    usnjrnl_name = fsutil.normpath(SURGE_USNJRNLJ)
-                    usnjrnl_entry = ZipFilesystemEntry(zip_fs, usnjrnl_name, self.zip.getinfo(str(usnjrnl_path)))
-                    # Map entry to the virtualfilesystem under the ZipFilesystem
-                    zip_fs._fs.map_file_entry(usnjrnl_name, usnjrnl_entry)
-
-                    log.warning(
-                        (
-                            "Surge collection contains an extracted UsnJrnl for volume '%s'. "
-                            "Note that it will take precedence over any $Extend/$UsnJrnl:$J."
-                        ),
-                        volume_name,
-                    )
-
-                loaderutil.add_virtual_ntfs_filesystem(
-                    target,
-                    zip_fs,
-                    usnjrnl_path=FILENAMES_USNJRNLJ,
-                    sds_path=FILENAMES_SECURESDS,
-                )
-        else:
-            zip_fs = ZipFilesystem(self.zip.fp, str(self.root.joinpath("files")), alt_separator="", case_sensitive=True)
-
-            target.filesystems.add(zip_fs)
-            target.fs.mount("", zip_fs)
+        map_surge(self, target, fs_factory, is_zip=True)
