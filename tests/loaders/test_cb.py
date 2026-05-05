@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from dissect.target.target import Target
+from tests._utils import cleanup_modules
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -15,16 +16,21 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def mock_cbc_sdk(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
-    with monkeypatch.context() as m:
+    with (
+        cleanup_modules(
+            [
+                "dissect.target.loaders.cb",
+                "dissect.target.filesystems.cb",
+            ],
+            monkeypatch,
+        ),
+        monkeypatch.context() as m,
+    ):
         # The references to cbc_sdk properties in the cb loader will point to the MagicMock created
         # for the first test function that runs.
         # Thus we need to delete the cb loader module to force it to be reimported when used in a
         # new test so the MagickMock used in the cb module will be the one created for the test
         # function that is running.
-        if "dissect.target.loaders.cb" in sys.modules:
-            m.delitem(sys.modules, "dissect.target.loaders.cb")
-        if "dissect.target.filesystems.cb" in sys.modules:
-            m.delitem(sys.modules, "dissect.target.filesystems.cb")
 
         mock_cbc_sdk = MagicMock()
         m.setitem(sys.modules, "cbc_sdk", mock_cbc_sdk)

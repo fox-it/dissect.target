@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sphinx.application import Sphinx
+
 project = "dissect.target"
 
 extensions = [
@@ -41,3 +46,15 @@ suppress_warnings = [
     # https://github.com/readthedocs/sphinx-autoapi/issues/285
     "autoapi.python_import_resolution",
 ]
+
+
+def autoapi_skip_hook(app: Sphinx, what: str, name: str, obj: object, skip: bool, options: list[str]) -> bool:
+    # Do not skip OS modules in dissect.target (caught by `private-members`)
+    if name.endswith("._os") and what == "module":
+        skip = False
+    return skip
+
+
+def setup(sphinx: Sphinx) -> None:
+    if "autoapi.extension" in extensions:
+        sphinx.connect("autoapi-skip-member", autoapi_skip_hook)

@@ -104,7 +104,7 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
         try:
             _record = modifier_function(field_name, resolved_path)
         except FilesystemError as e:  # noqa: PERF203
-            level = logging.INFO if isinstance(e, FileNotFoundError) else logging.WARNING
+            level = logging.DEBUG if isinstance(e, FileNotFoundError) else logging.WARNING
             target.log.log(
                 level,
                 "Unable to modify record '%s' with function '%s': %s",
