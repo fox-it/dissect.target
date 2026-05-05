@@ -68,6 +68,7 @@ class ThumbcachePlugin(Plugin):
                 data_checksum=entry.data_checksum,
                 path=path,
                 data_size=len(entry.data),
+                _target=self.target,
             )
         for index_entry in cache.index_entries():
             yield IndexRecord(
@@ -76,6 +77,7 @@ class ThumbcachePlugin(Plugin):
                 flags=index_entry.flags,
                 last_modified=index_entry.last_modified,
                 path=cache.index_file,
+                _target=self.target,
             )
 
     def _parse_thumbcache(
