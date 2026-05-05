@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import typing
 import logging
+import typing
 from io import BytesIO
 from unittest.mock import patch
 
@@ -16,9 +16,6 @@ from tests._utils import absolute_path
 
 if typing.TYPE_CHECKING:
     import datetime
-    import pytest
-
-    from dissect.target.target import Target
 
 
 def test__create_local_fs_local_no_envelope(
