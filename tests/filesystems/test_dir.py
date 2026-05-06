@@ -68,7 +68,7 @@ def test_symlink_to_dir(tmp_path: pathlib.Path) -> None:
 
 @pytest.fixture
 def dirfs_entry() -> DirectoryFilesystemEntry:
-    return DirectoryFilesystemEntry(Mock(), "/some/path", Mock())
+    return DirectoryFilesystemEntry(Mock(sep="/"), "/some/path", Mock())
 
 
 def test_entry_attr(dirfs_entry: DirectoryFilesystemEntry) -> None:

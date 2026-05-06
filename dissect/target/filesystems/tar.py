@@ -57,14 +57,14 @@ class TarFilesystem(Filesystem):
 
         self.base = base or ""
 
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
+        self._fs = VirtualFilesystem(sep=self.sep, altsep=self.altsep, case_sensitive=self.case_sensitive)
 
         for member in self.tar.getmembers():
             mname = member.name.removeprefix("./").strip("/")
             if not mname.startswith(self.base) or mname == ".":
                 continue
 
-            rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
+            rel_name = fsutil.normpath(mname[len(self.base) :], sep=self.sep)
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             file_entry = entry_cls(self, rel_name, member)
@@ -129,7 +129,7 @@ class TarFilesystemEntry(VirtualFile):
     def readlink_ext(self) -> FilesystemEntry:
         """Read the link if this entry is a symlink. Returns a filesystem entry."""
         # Can't use the one in VirtualFile as it overrides the FilesystemEntry
-        return fsutil.resolve_link(self.fs, self.readlink(), self.path, alt_separator=self.fs.alt_separator)
+        return fsutil.resolve_link(self.fs, self.readlink(), self.path, sep=self.fs.sep)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""

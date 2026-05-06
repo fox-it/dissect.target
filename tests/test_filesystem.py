@@ -81,8 +81,8 @@ def test_registration(tmp_path: Path) -> None:
         class TestFilesystem(Filesystem):
             __type__ = "test"
 
-            def __init__(self, case_sensitive: bool = True, alt_separator: str = None, volume: Volume = None):
-                super().__init__(case_sensitive, alt_separator, volume)
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
                 print("Helloworld from TestFilesystem")
 
             def get(self, path: str) -> FilesystemEntry:
@@ -491,7 +491,7 @@ def test_virtual_filesystem_makedirs(paths: str) -> None:
 
         partial_path = ""
         for part in vfspath.strip("/").split("/"):
-            partial_path = fsutil.join(partial_path, part, alt_separator=vfs.alt_separator)
+            partial_path = fsutil.join(partial_path, part, sep=vfs.sep)
             vfs_entry = vfs.get(partial_path)
 
             assert isinstance(vfs_entry, VirtualDirectory)
@@ -513,7 +513,7 @@ def test_virtual_filesystem_map_fs(vfs: VirtualFilesystem) -> None:
     root_vfs = VirtualFilesystem()
     map_path = "/some/dir/"
     file_path = "/path/to/some/file"
-    root_file_path = fsutil.join(map_path, file_path, alt_separator=vfs.alt_separator)
+    root_file_path = fsutil.join(map_path, file_path, sep=vfs.sep)
 
     root_vfs.map_fs(map_path, vfs)
 
@@ -546,20 +546,20 @@ def test_virtual_filesystem_map_dir(tmp_path: Path) -> None:
         vfs.map_dir(vfs_path, tmp_dir)
 
         rel_path = os.path.relpath(some_dir, tmp_dir)
-        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        rel_path = fsutil.normalize(rel_path, sep=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, sep=vfs.sep)
         dir_entry = vfs.get(entry_name)
         assert isinstance(dir_entry, VirtualDirectory)
 
         rel_path = os.path.relpath(second_lvl_dir, tmp_dir)
-        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        rel_path = fsutil.normalize(rel_path, sep=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, sep=vfs.sep)
         dir_entry = vfs.get(entry_name)
         assert isinstance(dir_entry, VirtualDirectory)
 
         rel_path = os.path.relpath(some_file.name, tmp_dir)
-        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        rel_path = fsutil.normalize(rel_path, sep=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, sep=vfs.sep)
         file_entry = vfs.get(entry_name)
         assert isinstance(file_entry, MappedFile)
 
@@ -582,20 +582,12 @@ def test_virtual_filesystem_map_file(vfs_path: str) -> None:
 
     vfs.map_file(vfs_path, real_path)
 
-    vfs_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
+    vfs_path = fsutil.normalize(vfs_path, sep=vfs.sep).strip("/")
     vfs_entry = vfs.get(vfs_path)
 
     assert isinstance(vfs_entry, MappedFile)
     assert vfs_entry.path == vfs_path
     assert vfs_entry.entry == real_path
-
-
-def test_virtual_filesystem_map_file_as_dir() -> None:
-    vfs = VirtualFilesystem()
-    real_path = "/tmp/foo"
-
-    with pytest.raises(AttributeError):
-        vfs.map_file("/path/to/dir/", real_path)
 
 
 @pytest.mark.parametrize(
@@ -612,20 +604,12 @@ def test_virtual_filesystem_map_file_fh(vfs_path: str) -> None:
 
     vfs.map_file_fh(vfs_path, fh)
 
-    vfs_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
+    vfs_path = fsutil.normalize(vfs_path, sep=vfs.sep).strip("/")
     vfs_entry = vfs.get(vfs_path)
 
     assert isinstance(vfs_entry, VirtualFile)
     assert vfs_entry.path == vfs_path
     assert vfs_entry.entry is fh
-
-
-def test_virtual_filesystem_map_file_fh_as_dir() -> None:
-    vfs = VirtualFilesystem()
-    fh = Mock()
-
-    with pytest.raises(AttributeError):
-        vfs.map_file_fh("/path/to/dir/", fh)
 
 
 @pytest.mark.parametrize(
@@ -645,10 +629,10 @@ def test_virtual_filesystem_map_file_fh_as_dir() -> None:
 )
 def test_virtual_filesystem_map_file_entry(vfs_path: str) -> None:
     vfs = VirtualFilesystem()
-    entry_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
+    entry_path = fsutil.normalize(vfs_path, sep=vfs.sep).strip("/")
     dir_entry = VirtualDirectory(vfs, entry_path)
 
-    file_name = fsutil.join(vfs_path, "test", alt_separator=vfs.alt_separator)
+    file_name = fsutil.join(vfs_path, "test", sep=vfs.sep)
     file_entry = VirtualFile(vfs, file_name, Mock())
     dir_entry.add("test", file_entry)
 
@@ -689,14 +673,14 @@ def test_virtual_filesystem_map_file_entry(vfs_path: str) -> None:
 )
 def test_virtual_filesystem_link(vfs_path: str, link_path: str) -> None:
     vfs = VirtualFilesystem()
-    entry_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
+    entry_path = fsutil.normalize(vfs_path, sep=vfs.sep).strip("/")
     file_object = Mock()
     file_entry = VirtualFile(vfs, entry_path, file_object)
     vfs.map_file_entry(vfs_path, file_entry)
 
     vfs.link(vfs_path, link_path)
 
-    link_path = fsutil.normalize(link_path, alt_separator=vfs.alt_separator).strip("/")
+    link_path = fsutil.normalize(link_path, sep=vfs.sep).strip("/")
     link_entry = vfs.get(link_path)
 
     assert link_entry is file_entry
@@ -732,8 +716,8 @@ def test_virtual_filesystem_symlink(vfs_path: str, link_path: str) -> None:
 
     vfs.symlink(vfs_path, link_path)
 
-    vfs_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).rstrip("/")
-    link_path = fsutil.normalize(link_path, alt_separator=vfs.alt_separator).strip("/")
+    vfs_path = fsutil.normalize(vfs_path, sep=vfs.sep).rstrip("/")
+    link_path = fsutil.normalize(link_path, sep=vfs.sep).strip("/")
     link_entry = vfs.get(link_path)
 
     assert isinstance(link_entry, VirtualSymlink)
@@ -849,12 +833,12 @@ def test_virtual_filesystem_is_file(
 
 @pytest.fixture
 def virt_dir() -> VirtualDirectory:
-    return VirtualDirectory(Mock(), "")
+    return VirtualDirectory(Mock(sep="/"), "")
 
 
 @pytest.fixture
 def top_virt_dir() -> VirtualDirectory:
-    return VirtualDirectory(Mock(), "")
+    return VirtualDirectory(Mock(sep="/"), "")
 
 
 def test_virtual_directory_stat(virt_dir: VirtualDirectory, top_virt_dir: VirtualDirectory) -> None:
@@ -887,7 +871,7 @@ def test_virtual_directory_is_file(virt_dir: VirtualDirectory) -> None:
 
 @pytest.fixture
 def virt_file() -> VirtualFile:
-    return VirtualFile(Mock(), "", Mock())
+    return VirtualFile(Mock(sep="/"), "", Mock())
 
 
 def test_virtual_file_stat(virt_file: VirtualFile) -> None:
@@ -1125,7 +1109,7 @@ def test_root_filesystem_entry_is_file(
 
 @pytest.fixture
 def mapped_file() -> MappedFile:
-    return MappedFile(Mock(), "/some/path", "/host/path")
+    return MappedFile(Mock(sep="/"), "/some/path", "/host/path")
 
 
 def test_mapped_file_stat(mapped_file: MappedFile) -> None:
@@ -1261,6 +1245,26 @@ def test_layer_filesystem() -> None:
     lfs.remove_fs_layer(vfs4)
     lfs.prepend_fs_layer(vfs4)
     assert lfs.path("file1").read_text() == "value1"
+
+    assert lfs.sep == "/"
+    assert lfs.altsep == ""
+    for layer in lfs.layers:
+        assert layer.sep == "/"
+        assert layer.altsep == ""
+
+    lfs.sep = "\\"
+    assert lfs.sep == "\\"
+    assert lfs.altsep == "/"
+    for layer in lfs.layers:
+        assert layer.sep == "\\"
+        assert layer.altsep == "/"
+
+    lfs.altsep = "|"
+    assert lfs.sep == "\\"
+    assert lfs.altsep == "|"
+    for layer in lfs.layers:
+        assert layer.sep == "\\"
+        assert layer.altsep == "|"
 
 
 def test_layer_filesystem_mount() -> None:

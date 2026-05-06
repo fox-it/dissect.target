@@ -105,7 +105,7 @@ def test_stat_information(cluster_size: int, size: int, resident: bool, expected
     )
     map[0x80] = [Attribute.from_fh(io.BytesIO(attribute_record.dumps()))]
 
-    mock_fs = Mock()
+    mock_fs = Mock(sep="\\")
     with patch.object(entry, "attributes", map):
         fs_entry = NtfsFilesystemEntry(mock_fs, "some/path", entry)
 

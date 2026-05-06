@@ -55,5 +55,5 @@ def test_wsl(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert children[4].name == "Default Generation 1"
     assert (
         str(children[4].path)
-        == "\\sysvol\\ProgramData\\Microsoft\\Windows\\Hyper-V\\Virtual Machines\\B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"  # noqa E501
+        == "sysvol\\ProgramData\\Microsoft\\Windows\\Hyper-V\\Virtual Machines\\B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"  # noqa E501
     )

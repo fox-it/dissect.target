@@ -46,7 +46,7 @@ class WindowsPlugin(OSPlugin):
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.case_sensitive = False
-        target.fs.alt_separator = "\\"
+        target.fs.sep = "\\"
         target.fs.mount("sysvol", sysvol)
 
         # Mount EFI

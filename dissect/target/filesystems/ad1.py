@@ -81,7 +81,7 @@ class AD1FilesystemEntry(FilesystemEntry):
     entry: ad1.FileEntry
 
     def get(self, path: str) -> FilesystemEntry:
-        entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        entry_path = fsutil.join(self.path, path, sep=self.fs.sep)
         entry = self.fs._get_entry(path, self.entry)
         return AD1FilesystemEntry(self.fs, entry_path, entry)
 
