@@ -52,7 +52,6 @@ class DefaultPasswordPlugin(WindowsCredentialPlugin):
         References:
             - https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
         """
-
         # Search for DefaultPassword values in the LSA
         for secret in ["DefaultPassword", "DefaultPassword_OldVal"]:
             if default_pass := self.target.lsa._secrets.get(secret):

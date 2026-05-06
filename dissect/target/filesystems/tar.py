@@ -14,9 +14,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     Filesystem,
-    FilesystemEntry,
     VirtualDirectory,
-    VirtualDirEntry,
     VirtualFile,
     VirtualFilesystem,
 )
@@ -25,6 +23,11 @@ from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.target.filesystem import (
+        FilesystemEntry,
+        VirtualDirEntry,
+    )
 
 
 log = get_logger(__name__)

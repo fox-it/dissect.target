@@ -6,7 +6,7 @@ import os
 import pathlib
 import stat
 from collections import defaultdict
-from functools import cache
+from functools import cache, cached_property
 from typing import TYPE_CHECKING, Any, BinaryIO, Final
 
 from dissect.target.exceptions import (
@@ -24,10 +24,12 @@ TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from uuid import UUID
 
     from typing_extensions import Self
 
     from dissect.target.target import Target
+
 
 FILESYSTEMS: list[type[Filesystem]] = []
 MODULE_PATH = "dissect.target.filesystems"
@@ -269,7 +271,7 @@ class Filesystem:
         """
         return self.get(path).walk_ext(topdown, onerror, followlinks)
 
-    def recurse(self, path: str) -> Iterator[DirEntry]:
+    def recurse(self, path: str) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield contents as :class:`FilesystemEntry`.
 
         Does not follow symbolic links.
@@ -296,7 +298,6 @@ class Filesystem:
 
     def glob_ext(self, pattern: str) -> Iterator[FilesystemEntry]:
         """Iterate over the directory part of ``pattern``, returning entries matching ``pattern`` as FilesysmteEntry's.
-
 
         Args:
             pattern: The pattern to match.
@@ -499,6 +500,33 @@ class Filesystem:
         """
         return self.get(path).hash(algos)
 
+    @cached_property
+    def uuid(self) -> UUID | None:
+        """Return the UUID of the filesystem if it has one."""
+        return None
+
+    @cached_property
+    def serial(self) -> int | str | None:
+        """Return the serial of the filesystem if it has one."""
+        return None
+
+    @cached_property
+    def identifier(self) -> str:
+        """Returns the identifier of the filesystem.
+
+        Usually this is a serial or UUID, but it can also be a volume GUID or name.
+        """
+        if self.uuid:
+            return str(self.uuid)
+        if self.serial:
+            return str(self.serial)
+        if self.volume:
+            if guid := getattr(self.volume, "guid", None):
+                return guid
+            if name := getattr(self.volume, "name", None):
+                return name
+        return repr(self)
+
 
 class FilesystemEntry:
     """Base class for filesystem entries."""
@@ -633,7 +661,7 @@ class FilesystemEntry:
         """
         yield from fsutil.walk_ext(self, topdown, onerror, followlinks)
 
-    def recurse(self) -> Iterator[DirEntry]:
+    def recurse(self) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield its contents as :class:`DirEntry`.
 
         Does not follow symbolic links.
@@ -747,7 +775,8 @@ class FilesystemEntry:
         This means it follows the path a link points to, it tries to do it recursively.
 
         Returns:
-            The path the link points to."""
+            The path the link points to.
+        """
         raise NotImplementedError
 
     def readlink_ext(self) -> Self:
@@ -1357,7 +1386,6 @@ class VirtualFilesystem(Filesystem):
             tar_file: Source path of the tar file to map.
             map_single_file: Only mount a single file found inside the tar at the specified path.
         """
-
         if not isinstance(tar_file, pathlib.Path):
             try:
                 tar_file = pathlib.Path(tar_file)
@@ -1790,7 +1818,6 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
         class_name: The class to load.
         internal: Whether it is an internal module or not.
     """
-
     if internal:
         module = f"{MODULE_PATH}.{module}"
 
@@ -1870,3 +1897,4 @@ register("vmtar", "VmtarFilesystem")
 register("cpio", "CpioFilesystem")
 register("vbk", "VbkFilesystem")
 register("ad1", "AD1Filesystem")
+register("ntds", "NtdsFilesystem")

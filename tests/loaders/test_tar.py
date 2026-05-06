@@ -158,7 +158,6 @@ def test_detect_extension(should_detect: bool, filename: str, buffer: str, tmp_p
 )
 def test_detect_buffer(file: str, tmp_path: Path) -> None:
     """Test if we detect the given files as a (compressed) tar file or not."""
-
     if file == "small.tar.lz" and (platform.python_implementation() == "PyPy" or platform.system() == "Windows"):
         pytest.skip(reason="LZMA is flaky on PyPy and/or Windows")
 

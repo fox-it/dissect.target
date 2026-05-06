@@ -27,17 +27,17 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 PodmanImageRecord = TargetRecordDescriptor(
-    "apps/containers/podman/image",
+    "application/container/podman/image",
     COMMON_IMAGE_FIELDS,
 )
 
 PodmanContainerRecord = TargetRecordDescriptor(
-    "apps/containers/podman/container",
+    "application/container/podman/container",
     COMMON_CONTAINER_FIELDS,
 )
 
 PodmanLogRecord = TargetRecordDescriptor(
-    "apps/containers/podman/log",
+    "application/container/podman/log",
     COMMON_LOG_FIELDS,
 )
 
@@ -173,7 +173,6 @@ class PodmanPlugin(ContainerPlugin):
 
         Gets info from the ``ContainerConfig`` and ``ContainerState`` tables.
         """
-
         try:
             db = SQLite3(path)
         except (ValueError, DBError) as e:
@@ -235,7 +234,6 @@ class PodmanPlugin(ContainerPlugin):
 
     def _find_containers_fs(self, path: Path) -> Iterator[PodmanContainerRecord]:
         """Find Podman containers based on the ``$PODMAN/storage/overlay-containers/containers.json`` file."""
-
         containers = {}
         if (containers_file := path.joinpath("storage/overlay-containers/containers.json")).is_file():
             containers = json.loads(containers_file.read_text())
@@ -294,7 +292,6 @@ class PodmanPlugin(ContainerPlugin):
         References:
             - https://docs.podman.io/en/latest/markdown/podman-create.1.html#log-driver-driver
         """
-
         for install, _ in self.installs:
             for log_file in install.glob("storage/overlay-containers/*/userdata/ctr.log*"):
                 buf = ""

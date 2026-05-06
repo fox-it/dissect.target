@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import re
 import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystems.nfs import NfsFilesystem
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.arch import target_triple
 from dissect.target.helpers.logging import get_logger
-from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import NfsError
-from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
+from dissect.target.helpers.nfs.nfs3 import NfsStat
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
@@ -22,34 +22,17 @@ from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export, intern
 if TYPE_CHECKING:
     import logging
     from collections.abc import Callable, Iterator
-    from pathlib import Path
 
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+    from dissect.target.helpers.nfs.nfs3 import FileHandle
     from dissect.target.target import Target
 
 
 log = get_logger(__name__)
-
-
-# https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
-ARCH_MAP = {
-    0x00: "unknown",
-    0x02: "sparc",
-    0x03: "x86",
-    0x08: "mips",
-    0x14: "powerpc32",
-    0x15: "powerpc64",
-    0x16: "s390",  # and s390x
-    0x28: "aarch32",  # armv7
-    0x2A: "superh",
-    0x32: "ia-64",
-    0x3E: "x86_64",
-    0xB7: "aarch64",  # armv8
-    0xF3: "riscv64",
-    0xF7: "bpf",
-}
 
 
 class UnixPlugin(OSPlugin):
@@ -88,7 +71,6 @@ class UnixPlugin(OSPlugin):
         References:
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
-
         seen_users = set()
 
         # Yield users found in passwd files.
@@ -426,25 +408,28 @@ class UnixPlugin(OSPlugin):
 
         References:
             - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
+            - https://en.wikipedia.org/wiki/Instruction_set_architecture
         """
-
-        if not isinstance(path, TargetPath):
+        if not isinstance(path, Path):
             for fs in [self.target.fs, *self.target.filesystems]:
-                if (path := fs.path(path)).exists():
+                if (path := fs.path(path)).is_file():
                     break
 
-        if not path.exists():
+        if not isinstance(path, Path) or not path.is_file():
             return None
 
-        fh = path.open("rb")
-        fh.seek(4)  # ELF - e_ident[EI_CLASS]
-        bits = fh.read(1)[0]
+        with path.open("rb") as fh:
+            fh.seek(4)
+            ei_class = fh.read(1)[0]  # ELF - e_ident[EI_CLASS]
+            bitness = 32 if ei_class == 1 else 64
 
-        fh.seek(18)  # ELF - e_machine
-        e_machine = int.from_bytes(fh.read(2), "little")
-        arch = ARCH_MAP.get(e_machine, "unknown")
+            ei_data = fh.read(1)[0]  # ELF - e_ident[EI_DATA]
+            endianness = "little" if ei_data == 1 else "big"
 
-        return f"{arch}_32-{os}" if bits == 1 and arch[-2:] != "32" else f"{arch}-{os}"
+            fh.seek(18)
+            machine = int.from_bytes(fh.read(2), endianness)  # ELF - e_machine
+
+        return target_triple(os, machine, bitness)
 
 
 def parse_fstab(
@@ -454,7 +439,6 @@ def parse_fstab(
     """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """
-
     SKIP_FS_TYPES = (
         "swap",
         "tmpfs",

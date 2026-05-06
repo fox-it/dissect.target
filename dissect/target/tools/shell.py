@@ -4,22 +4,26 @@ import argparse
 import cmd
 import contextlib
 import fnmatch
+import functools
 import io
 import itertools
 import logging
 import os
-import pathlib
 import platform
 import pydoc
 import random
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
+import tarfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from enum import IntEnum
+from pathlib import Path, PurePosixPath
+from tarfile import BLKTYPE, CHRTYPE, DIRTYPE, FIFOTYPE, LNKTYPE, REGTYPE, SYMTYPE
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
@@ -35,7 +39,7 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
-from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
+from dissect.target.plugin import alias, arg, clone_alias
 from dissect.target.target import Target
 from dissect.target.tools.info import get_target_info, print_target_info
 from dissect.target.tools.utils.cli import (
@@ -59,12 +63,24 @@ from dissect.target.tools.utils.fs import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-    from dissect.target.filesystem import FilesystemEntry
+    from dissect.target.plugin import FunctionDescriptor
 
 
 log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
+
+
+@functools.cache
+def _get_debugger() -> Any:
+    """Lazily import and cache ipdb (fallback to pdb)."""
+    try:
+        import ipdb as debugger  # noqa: T100
+    except ImportError:
+        import pdb as debugger  # noqa: T100
+
+    return debugger
+
 
 try:
     import readline
@@ -131,6 +147,12 @@ class AnsiColors(StrEnum):
         return {item.name: item.value for item in cls}
 
 
+class DebugMode(IntEnum):
+    OFF = 0
+    ON = 1
+    POST_MORTEM = 2
+
+
 # ANSI color escape sequences for readline prompt
 ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
 
@@ -160,9 +182,10 @@ class ExtendedCmd(cmd.Cmd):
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
-        self.debug = False
+        self.debug = DebugMode.OFF
         self.cyber = cyber
         self.identchars += "."
+        self._local_prev_dir: str | None = None
 
         self.register_aliases()
 
@@ -182,7 +205,7 @@ class ExtendedCmd(cmd.Cmd):
 
         return object.__getattribute__(self, attr)
 
-    def _load_targetrc(self, path: pathlib.Path) -> None:
+    def _load_targetrc(self, path: Path) -> None:
         """Load and execute commands from the run commands file."""
         try:
             with path.open() as fh:
@@ -195,9 +218,9 @@ class ExtendedCmd(cmd.Cmd):
         except Exception as e:
             log.debug("Error processing .targetrc file: %s", e)
 
-    def _get_targetrc_path(self) -> pathlib.Path | None:
+    def _get_targetrc_path(self) -> Path | None:
         """Get the path to the run commands file. Can return ``None`` if ``DEFAULT_RUNCOMMANDS_FILE`` is not set."""
-        return pathlib.Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
+        return Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
 
     def preloop(self) -> None:
         super().preloop()
@@ -273,7 +296,6 @@ class ExtendedCmd(cmd.Cmd):
 
     def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False) -> bool:
         """Command execution helper that chains initial command, piped subprocesses, and output redirection together."""
-
         argparts = []
         if command_args_str is not None:
             argparts = arg_str_to_arg_list(command_args_str)
@@ -353,7 +375,7 @@ class ExtendedCmd(cmd.Cmd):
         return self._exec(_exec_, command_args_str, no_cyber)
 
     def do_man(self, line: str) -> bool:
-        """alias for help"""
+        """Alias for help."""
         self.do_help(line)
         return False
 
@@ -361,7 +383,7 @@ class ExtendedCmd(cmd.Cmd):
         return cmd.Cmd.complete_help(self, *args)
 
     def do_unalias(self, line: str) -> bool:
-        """delete runtime alias"""
+        """Delete runtime alias."""
         aliases = list(shlex.shlex(line, posix=True))
         for aliased in aliases:
             if aliased in self._runtime_aliases:
@@ -371,7 +393,7 @@ class ExtendedCmd(cmd.Cmd):
         return False
 
     def do_alias(self, line: str) -> bool:
-        """create a runtime alias"""
+        """Create a runtime alias."""
         args = list(shlex.shlex(line, posix=True))
 
         if not args:
@@ -397,20 +419,21 @@ class ExtendedCmd(cmd.Cmd):
         return False
 
     def do_clear(self, line: str) -> bool:
-        """clear the terminal screen"""
-        os.system("cls||clear")
+        """Clear the terminal screen."""
+        clear_cmd = "cls" if os.name == "nt" else "clear"
+        subprocess.run(clear_cmd, shell=True, check=False)
         return False
 
     def do_cls(self, line: str) -> bool:
-        """alias for clear"""
+        """Alias for clear."""
         return self.do_clear(line)
 
     def do_exit(self, line: str) -> bool:
-        """exit shell"""
+        """Exit shell."""
         return True
 
     def do_cyber(self, line: str) -> bool:
-        """cyber"""
+        """Cyber."""
         self.cyber = not self.cyber
         word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[self.cyber]
         with cyber.cyber(color=color):
@@ -418,12 +441,71 @@ class ExtendedCmd(cmd.Cmd):
         return False
 
     def do_debug(self, line: str) -> bool:
-        """toggle debug mode"""
-        self.debug = not self.debug
-        if self.debug:
+        """Toggle debug mode, or set one of: on, off, pm."""
+        mode = line.strip().lower()
+
+        if not mode:
+            if self.debug:
+                self.debug = DebugMode.OFF
+                print("Debug mode off")
+            else:
+                self.debug = DebugMode.ON
+                print("Debug mode on")
+            return False
+
+        if mode in {"on", "true", "1"}:
+            self.debug = DebugMode.ON
             print("Debug mode on")
-        else:
+        elif mode in {"off", "false", "0"}:
+            self.debug = DebugMode.OFF
             print("Debug mode off")
+        elif mode in {"pm", "postmortem"}:
+            self.debug = DebugMode.POST_MORTEM
+            print("Debug mode postmortem")
+        else:
+            print("Usage: debug [on|off|pm]")
+
+        return False
+
+    def do_shell(self, line: str) -> bool:
+        """Execute a local shell command. Usage: !<command>."""
+        parts = line.strip().split(maxsplit=1)
+
+        # Handle `cd` as a special case, as it needs to change the state of our current process.
+        if parts and parts[0] == "cd":
+            target = parts[1].strip() if len(parts) > 1 else Path.home()
+            self.do_lcd(target)
+        else:
+            subprocess.run(line, shell=True, check=False)
+        return False
+
+    def do_lcd(self, line: str) -> bool:
+        """Change the local working directory. Usage: lcd <path>."""
+        if line == "-":
+            if self._local_prev_dir is None:
+                print("cd: no previous directory")
+                return False
+            line = self._local_prev_dir
+
+        try:
+            prev = Path.cwd()
+            line = str(Path(line).expanduser())
+            line = os.path.expandvars(line)
+            os.chdir(line)
+            print("Local directory changed to", Path.cwd())
+            # only update after successful chdir and only if it's a different directory
+            if prev != Path.cwd():
+                self._local_prev_dir = str(prev)
+        except FileNotFoundError:
+            print(f"cd: no such file or directory: {line}")
+        except PermissionError:
+            print(f"cd: permission denied: {line}")
+
+        return False
+
+    def do_lpwd(self, line: str) -> bool:
+        """Print the current local working directory."""
+        print(Path.cwd())
         return False
 
 
@@ -444,11 +526,11 @@ class TargetCmd(ExtendedCmd):
 
         if self.histdir:
             self.histdirfmt = getattr(target._config, "HISTDIRFMT", self.DEFAULT_HISTDIRFMT)
-            self.histfile = pathlib.Path(self.histdir).resolve() / pathlib.Path(
+            self.histfile = Path(self.histdir).resolve() / Path(
                 self.histdirfmt.format(uid=os.getuid(), target=target.name)
             )
         else:
-            self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
+            self.histfile = Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
         # prompt format
         self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
@@ -463,10 +545,9 @@ class TargetCmd(ExtendedCmd):
 
         super().__init__(self.target.props.get("cyber"))
 
-    def _get_targetrc_path(self) -> pathlib.Path:
+    def _get_targetrc_path(self) -> Path:
         """Get the path to the run commands file."""
-
-        return pathlib.Path(
+        return Path(
             getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
         ).expanduser()
 
@@ -542,7 +623,7 @@ class TargetCmd(ExtendedCmd):
         return False
 
     def do_python(self, line: str) -> bool:
-        """drop into a Python shell"""
+        """Drop into a Python shell."""
         python_shell([self.target])
         return False
 
@@ -578,17 +659,16 @@ class TargetHubCli(cmd.Cmd):
         pass
 
     def do_exit(self, line: str) -> bool:
-        """exit shell"""
+        """Exit shell."""
         return True
 
     def do_list(self, line: str) -> bool:
-        """list the loaded targets"""
+        """List the loaded targets."""
         print("\n".join([f"{i:2d}: {e}" for i, e in enumerate(self._names)]))
         return False
 
     def do_enter(self, line: str) -> bool:
-        """enter a target by number or name"""
-
+        """Enter a target by number or name."""
         if line.isdigit():
             idx = int(line)
         else:
@@ -629,7 +709,7 @@ class TargetHubCli(cmd.Cmd):
         return compl
 
     def do_python(self, line: str) -> bool:
-        """drop into a Python shell"""
+        """Drop into a Python shell."""
         python_shell(self.targets)
         return False
 
@@ -691,9 +771,16 @@ class TargetCli(TargetCmd):
 
     def check_file(self, path: str) -> fsutil.TargetPath | None:
         path = self.resolve_path(path)
+
         if not path.exists():
             print(f"{path}: No such file")
             return None
+
+        # Check a special case where a path can be both a file and directory (e.g. NTDS.dit)
+        # We need to check this on the entry, as the path methods can't detect this because of how stat.S_IS* works
+        entry = path.get()
+        if entry.is_file() and entry.is_dir():
+            return path
 
         if path.is_dir():
             print(f"{path}: Is a directory")
@@ -735,47 +822,47 @@ class TargetCli(TargetCmd):
             self.cwd = dir
 
     def do_cd(self, line: str) -> bool:
-        """change directory"""
+        """Change directory."""
         self.chdir(line)
         return False
 
     def do_pwd(self, line: str) -> bool:
-        """print current directory"""
+        """Print current directory."""
         print(self.cwd)
         return False
 
     def do_disks(self, line: str) -> bool:
-        """print target disks"""
+        """Print target disks."""
         for d in self.target.disks:
             print(str(d))
         return False
 
     def do_volumes(self, line: str) -> bool:
-        """print target volumes"""
+        """Print target volumes."""
         for v in self.target.volumes:
             print(str(v))
         return False
 
     def do_filesystems(self, line: str) -> bool:
-        """print target filesystems"""
+        """Print target filesystems."""
         for fs in self.target.filesystems:
             print(str(fs))
         return False
 
     def do_mounts(self, line: str) -> bool:
-        """print target mounts"""
+        """Print target mounts."""
         for mount, fs in self.target.fs.mounts.items():
             print(f"<Mount fs={fs.__type__!r} path={mount!r}>")
         return False
 
     def do_info(self, line: str) -> bool:
-        """print target information"""
+        """Print target information."""
         target_info = get_target_info(self.target)
         print_target_info(self.target, target_info)
         return False
 
     def do_reload(self, line: str) -> bool:
-        """reload the target"""
+        """Reload the target."""
         self.target = self.target.reload()
         if self.cwd:
             self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
@@ -791,8 +878,7 @@ class TargetCli(TargetCmd):
     @alias("l")
     @alias("dir")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """list directory contents"""
-
+        """List directory contents."""
         path = self.resolve_path(args.path)
 
         if args.use_ctime and args.use_atime:
@@ -828,7 +914,7 @@ class TargetCli(TargetCmd):
 
     @arg("path", nargs="?")
     def cmd_ll(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """alias for ls -la"""
+        """Alias for ls -la."""
         args = extend_args(args, self.cmd_ls)
         args.l = True
         args.a = True
@@ -836,7 +922,7 @@ class TargetCli(TargetCmd):
 
     @arg("path", nargs="?")
     def cmd_tree(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """alias for ls -R"""
+        """Alias for ls -R."""
         args = extend_args(args, self.cmd_ls)
         args.recursive = True
         return self.cmd_ls(args, stdout)
@@ -849,7 +935,7 @@ class TargetCli(TargetCmd):
     @arg("-ctime", type=int, help="file (windows) or metadata (unix) was last changed n*24 hours ago")
     @arg("-btime", type=int, help="file was born n*24 hours ago (ext4)")
     def cmd_find(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """search for files in a directory hierarchy"""
+        """Search for files in a directory hierarchy."""
         path = self.resolve_path(args.path)
         if not path or not self.check_dir(path):
             return False
@@ -894,7 +980,7 @@ class TargetCli(TargetCmd):
     @arg("path")
     @arg("-L", "--dereference", action="store_true")
     def cmd_stat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """display file status"""
+        """Display file status."""
         path = self.resolve_path(args.path)
         if not path or not self.check_path(path):
             return False
@@ -907,7 +993,7 @@ class TargetCli(TargetCmd):
     @arg("-R", "--recursive", action="store_true")
     @alias("getfattr")
     def cmd_attr(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """display file attributes"""
+        """Display file attributes."""
         path = self.resolve_path(args.path)
         if not path or not self.check_path(path):
             return False
@@ -931,30 +1017,189 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_file(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """determine file type"""
-
-        path = self.check_file(args.path)
-        if not path:
+        """Determine file type."""
+        if not (path := self.check_file(args.path)):
             return False
 
-        fh = path.open()
-
-        # We could just alias this to cat <path> | file -, but this is slow for large files
-        # This way we can explicitly limit to just 512 bytes
         p = subprocess.Popen(["file", "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        p.stdin.write(fh.read(512))
+
+        with path.open() as fh:
+            # We could just alias this to cat <path> | file -, but this is slow for large files
+            # This way we can explicitly limit to just 512 bytes
+            p.stdin.write(fh.read(512))
+
         p.stdin.close()
         p.wait()
+
         filetype = p.stdout.read().decode().split(":", 1)[1].strip()
         print(f"{path}: {filetype}", file=stdout)
+
+        return False
+
+    @arg("path", nargs="+")
+    @arg(
+        "-f",
+        "--file",
+        default="-",
+        help="file to write the tar archive to, defaults to stdout",
+    )
+    @arg("-z", "--gzip", action="store_true", help="compress the tar archive with gzip")
+    @arg("-j", "--bzip2", action="store_true", help="compress the tar archive with bzip2")
+    @arg("-J", "--xz", action="store_true", help="compress the tar archive with xz")
+    @arg(
+        "-c",
+        "--create",
+        required=True,
+        action="store_true",
+        help="create a tar archive (only this mode is supported)",
+    )
+    @arg(
+        "-L",
+        "--dereference",
+        action="store_true",
+        help="follow symlinks and archive the files they point to instead of the symlinks themselves",
+    )
+    @arg("-v", "--verbose", action="store_true")
+    def cmd_tar(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Archive one or more files or directories into a tar archive.
+
+        By default, the archive is written to stdout, allowing it to be piped to other commands or redirected to a file.
+        To write to a file directly, use the -f option with the desired filename.
+        """
+
+        def get_tarinfo(
+            path: fsutil.TargetPath,
+            arcname: str,
+            dereference: bool,
+            inodes: dict[int, str],
+        ) -> tarfile.TarInfo | None:
+            """This function is heavily inspired by tarfile.TarFile.gettarinfo, but adapted to work with TargetPath.
+            Additional features like storing creation time in PAX headers is also added.
+            """
+            tarinfo = tarfile.TarInfo()
+
+            statres = path.lstat() if not dereference else path.stat()
+            linkname = ""
+
+            stmd = statres.st_mode
+            if stat.S_ISREG(stmd):
+                inode = (statres.st_ino, statres.st_dev)
+                if not dereference and statres.st_nlink > 1 and inode in inodes and arcname != inodes[inode]:
+                    # Is it a hardlink to an already archived file?
+                    type = LNKTYPE
+                    linkname = inodes[inode]
+                else:
+                    # The inode is added only if its valid. For win32 it is always 0.
+                    type = REGTYPE
+                    if inode[0]:
+                        inodes[inode] = arcname
+
+            elif stat.S_ISDIR(stmd):
+                type = DIRTYPE
+            elif stat.S_ISFIFO(stmd):
+                type = FIFOTYPE
+            elif stat.S_ISLNK(stmd):
+                type = SYMTYPE
+                linkname = str(path.readlink())
+            elif stat.S_ISCHR(stmd):
+                type = CHRTYPE
+            elif stat.S_ISBLK(stmd):
+                type = BLKTYPE
+            else:
+                return None
+
+            # Fill the TarInfo object with all information we can get.
+            tarinfo.name = arcname
+            tarinfo.mode = stmd
+            tarinfo.uid = statres.st_uid
+            tarinfo.gid = statres.st_gid
+            if type == REGTYPE:
+                tarinfo.size = statres.st_size
+            else:
+                tarinfo.size = 0
+            tarinfo.mtime = statres.st_mtime
+            tarinfo.type = type
+            tarinfo.linkname = linkname
+
+            # Store additional timestamps in PAX headers, as the standard tar format only supports mtime.
+            tarinfo.pax_headers["atime"] = str(statres.st_atime)
+            tarinfo.pax_headers["ctime"] = str(statres.st_ctime)
+            if hasattr(statres, "st_birthtime") and statres.st_birthtime is not None:
+                tarinfo.pax_headers["LIBARCHIVE.creationtime"] = str(statres.st_birthtime)
+            return tarinfo
+
+        def add_to_tar(
+            tar: tarfile.TarFile,
+            path: fsutil.TargetPath,
+            arcname: str,
+            dereference: bool,
+            inodes: dict[int, str],
+        ) -> None:
+            """This function is heavily inspired by tarfile.TarFile.add, but adapted to work with TargetPath."""
+            if args.verbose:
+                print(f"a {arcname}", file=sys.stderr)
+            info = get_tarinfo(path, arcname, dereference=dereference, inodes=inodes)
+            if not info:
+                print(f"tar: {PurePosixPath(path)}: unsupported file type, skipping", file=sys.stderr)
+                return
+            if info.isreg():
+                with path.open("rb") as f:
+                    tar.addfile(info, fileobj=f)
+            elif info.isdir():
+                tar.addfile(info)
+                for child in path.iterdir():
+                    add_to_tar(
+                        tar,
+                        child,
+                        f"{arcname}/{child.name}",
+                        dereference=dereference,
+                        inodes=inodes,
+                    )
+            else:
+                tar.addfile(info)
+
+        fobj = stdout.buffer if args.file == "-" else Path(args.file).open("wb")  # noqa: SIM115
+        mode = "w|"
+        if args.gzip:
+            mode = "w|gz"
+        elif args.bzip2:
+            mode = "w|bz2"
+        elif args.xz:
+            mode = "w|xz"
+
+        try:
+            inodes_cache = {}
+            with tarfile.open(fileobj=fobj, mode=mode, format=tarfile.PAX_FORMAT) as tar:
+                for arg_path in args.path:
+                    base_path = self.target.fs.path("/") if Path(arg_path).is_absolute() else self.cwd
+                    glob_path = arg_path.lstrip("/")
+
+                    # This is a workaround for Python 3.12 and lower
+                    paths = [base_path.joinpath(".")] if glob_path in (".", "") else list(base_path.glob(glob_path))
+
+                    if not paths:
+                        print(f"tar: {arg_path}: No such file or directory", file=sys.stderr)
+                        continue
+
+                    for path in paths:
+                        arcname = str(PurePosixPath(path).relative_to("/"))
+                        if not Path(arg_path).is_absolute():
+                            pure_path = PurePosixPath(path).relative_to(PurePosixPath(self.cwd))
+                            arcname = "/".join(p for p in pure_path.parts if p not in (".", ".."))
+                            arcname = arcname or "."
+                        add_to_tar(tar, path, arcname, dereference=args.dereference, inodes=inodes_cache)
+        finally:
+            if fobj is not stdout.buffer:
+                fobj.close()
+
         return False
 
     @arg("path", nargs="+")
     @arg("-o", "--out", default=".")
     @arg("-v", "--verbose", action="store_true")
     def cmd_save(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """save a common file or directory to the host filesystem"""
-        dst_path = pathlib.Path(args.out).resolve()
+        """Save a common file or directory to the host filesystem."""
+        dst_path = Path(args.out).resolve()
 
         if len(args.path) > 1 and not dst_path.is_dir():
             # Saving multiple items to a non-directory is generally not very
@@ -962,27 +1207,25 @@ class TargetCli(TargetCmd):
             # items are directories.
             print(f"{dst_path}: cannot save multiple files, destination is not a directory")
 
-        def log_saved_path(src_path: pathlib.Path, dst_path: pathlib.Path) -> None:
+        def log_saved_path(src_path: Path, dst_path: Path) -> None:
             if args.verbose:
                 print(f"{src_path} -> {dst_path}")
 
-        def get_diverging_path(path: pathlib.Path, reference_path: pathlib.Path) -> pathlib.Path:
+        def get_diverging_path(path: Path, reference_path: Path) -> Path:
             """Get the part of path where it diverges from reference_path."""
-            diverging_path = pathlib.Path()
+            diverging_path = Path()
 
             for diff_idx, path_part in enumerate(reference_path.parts):
                 if path_part != path.parts[diff_idx]:
                     diverging_parts = path.parts[diff_idx:]
                     if diverging_parts:
                         for part in diverging_parts:
-                            diverging_path = diverging_path.joinpath(pathlib.Path(part))
+                            diverging_path = diverging_path.joinpath(Path(part))
                     break
 
             return diverging_path
 
-        def save_path(
-            src_path: pathlib.Path, dst_path: pathlib.Path, create_dst_subdir: pathlib.Path | None = None
-        ) -> None:
+        def save_path(src_path: Path, dst_path: Path, create_dst_subdir: Path | None = None) -> None:
             """Save a common file or directory in src_path to dst_path.
 
             If src_path is a file, dst_path can be either a directory or a file
@@ -999,7 +1242,6 @@ class TargetCli(TargetCmd):
             src_path is saved there. This can be useful to recreate a part of
             the directory hierarchy in src_path.
             """
-
             src_name = src_path.name
             src_path = src_path.resolve()
             if src_path.is_dir():
@@ -1087,7 +1329,7 @@ class TargetCli(TargetCmd):
     @arg("path")
     @alias("type")
     def cmd_cat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print file content"""
+        """Print file content."""
         paths = list(self.resolve_glob_path(args.path))
 
         if not paths:
@@ -1096,19 +1338,18 @@ class TargetCli(TargetCmd):
 
         stdout = stdout.buffer
         for path in paths:
-            path = self.check_file(path)
-            if not path:
+            if not (path := self.check_file(path)):
                 continue
 
-            fh = path.open()
-            shutil.copyfileobj(fh, stdout)
+            with path.open() as fh:
+                shutil.copyfileobj(fh, stdout)
             stdout.flush()
         print()
         return False
 
     @arg("path")
     def cmd_zcat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print file content from compressed files"""
+        """Print file content from compressed files."""
         paths = list(self.resolve_glob_path(args.path))
 
         if not paths:
@@ -1117,12 +1358,11 @@ class TargetCli(TargetCmd):
 
         stdout = stdout.buffer
         for path in paths:
-            path = self.check_file(path)
-            if not path:
+            if not (path := self.check_file(path)):
                 continue
 
-            fh = fsutil.open_decompress(path)
-            shutil.copyfileobj(fh, stdout)
+            with fsutil.open_decompress(path) as fh:
+                shutil.copyfileobj(fh, stdout)
             stdout.flush()
 
         return False
@@ -1134,7 +1374,7 @@ class TargetCli(TargetCmd):
     @arg("-C", "--canonical", action="store_true")
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print a hexdump of file(s)"""
+        """Print a hexdump of file(s)."""
         paths = list(self.resolve_glob_path(args.path))
         if not paths:
             print(f"{args.path}: No such file or directory")
@@ -1158,18 +1398,18 @@ class TargetCli(TargetCmd):
     @alias("digest")
     @alias("shasum")
     def cmd_hash(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print the MD5, SHA1 and SHA256 hashes of a file"""
-        path = self.check_file(args.path)
-        if not path:
+        """Print the MD5, SHA1 and SHA256 hashes of a file."""
+        if not (path := self.check_file(args.path)):
             return False
 
         md5, sha1, sha256 = path.get().hash()
         print(f"MD5:\t{md5}\nSHA1:\t{sha1}\nSHA256:\t{sha256}", file=stdout)
+
         return False
 
     @arg("path")
     def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print the MD5 checksum of a file provided by a path"""
+        """Print the MD5 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1179,7 +1419,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print the SHA1 checksum of a file provided by a path"""
+        """Print the SHA1 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1189,7 +1429,7 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print the SHA256 checksum of a file provided by a path"""
+        """Print the SHA256 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
             return False
 
@@ -1201,29 +1441,31 @@ class TargetCli(TargetCmd):
     @alias("head")
     @alias("more")
     def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """open the first 10 MB of a file with less"""
-        path = self.check_file(args.path)
-        if not path:
+        """Open the first 10 MB of a file with less."""
+        if not (path := self.check_file(args.path)):
             return False
 
-        pydoc.pager(path.open("rt", errors="ignore").read(10 * 1024 * 1024))
+        with path.open("rt", errors="ignore") as fh:
+            pydoc.pager(fh.read(10 * 1024 * 1024))
+
         return False
 
     @arg("path")
     @alias("zhead")
     @alias("zmore")
     def cmd_zless(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """open the first 10 MB of a compressed file with zless"""
-        path = self.check_file(args.path)
-        if not path:
+        """Open the first 10 MB of a compressed file with zless."""
+        if not (path := self.check_file(args.path)):
             return False
 
-        pydoc.pager(fsutil.open_decompress(path, "rt").read(10 * 1024 * 1024))
+        with fsutil.open_decompress(path, "rt") as fh:
+            pydoc.pager(fh.read(10 * 1024 * 1024))
+
         return False
 
     @arg("path", nargs="+")
     def cmd_readlink(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """print resolved symbolic links or canonical file names"""
+        """Print resolved symbolic links or canonical file names."""
         for path in args.path:
             path = self.resolve_path(path)
             if not path.is_symlink():
@@ -1235,17 +1477,12 @@ class TargetCli(TargetCmd):
 
     @arg("path", nargs="?", help="load a hive from the given path")
     def cmd_registry(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """drop into a registry shell"""
-        if self.target.os == "linux":
-            run_cli(UnixConfigTreeCli(self.target))
-            return False
-
+        """Drop into a registry shell."""
         hive = None
 
         clikey = "registry"
         if args.path:
-            path = self.check_file(args.path)
-            if not path:
+            if not (path := self.check_file(args.path)):
                 return False
 
             hive = regutil.RegfHive(path)
@@ -1268,7 +1505,7 @@ class TargetCli(TargetCmd):
     @arg("-p", "--python", action="store_true", help="(I)Python shell")
     @arg("-r", "--registry", action="store_true", help="registry shell")
     def cmd_enter(self, args: argparse.Namespace, stdout: TextIO) -> bool:
-        """load one or more files as sub-targets and drop into a sub-shell"""
+        """Load one or more files as sub-targets and drop into a sub-shell."""
         paths = [self.resolve_path(path) for path in args.targets]
 
         if args.python:
@@ -1281,6 +1518,7 @@ class TargetCli(TargetCmd):
             cli = self._clicache[clikey]
         except KeyError:
             targets = list(Target.open_all(paths))
+
             cli = create_cli(targets, RegistryCli if args.registry else TargetCli)
             if not cli:
                 return False
@@ -1290,53 +1528,6 @@ class TargetCli(TargetCmd):
         run_cli(cli)
         print()
         return False
-
-
-class UnixConfigTreeCli(TargetCli):
-    def __init__(self, target: Target):
-        TargetCmd.__init__(self, target)
-        self.config_tree = target.etc()
-        self.prompt_base = _target_name(target)
-
-        self.cwd = None
-        self.chdir("/")
-
-    @property
-    def prompt(self) -> str:
-        return f"(config tree) {self.prompt_base}:{self.cwd}$ "
-
-    def check_compatible(target: Target) -> bool:
-        return target.has_function("etc")
-
-    def resolve_path(self, path: str | fsutil.TargetPath | None) -> fsutil.TargetPath:
-        if not path:
-            return self.cwd
-
-        if isinstance(path, fsutil.TargetPath):
-            return path
-
-        # It uses the alt separator of the underlying fs
-        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
-        return self.config_tree.path(path)
-
-    def resolve_key(self, path: str) -> FilesystemEntry:
-        return self.config_tree.path(path).get()
-
-    def resolve_glob_path(self, path: fsutil.TargetPath) -> Iterator[fsutil.TargetPath]:
-        path = self.resolve_path(path)
-        if path.exists():
-            yield path
-        else:
-            # Strip the leading '/' as non-relative patterns are unsupported as glob patterns.
-            glob_path = str(path).lstrip("/")
-            try:
-                for path in self.config_tree.path("/").glob(glob_path):
-                    yield path
-            except ValueError as e:
-                # The generator returned by glob() will raise a
-                # ValueError if the '**' glob is not used as an entire path
-                # component
-                print(e)
 
 
 class RegistryCli(TargetCmd):
@@ -1416,7 +1607,7 @@ class RegistryCli(TargetCmd):
         return r
 
     def do_cd(self, line: str) -> bool:
-        """change subkey"""
+        """Change subkey."""
         if line == "..":
             try:
                 self.resolve_key(self.cwd + "\\..")
@@ -1428,7 +1619,7 @@ class RegistryCli(TargetCmd):
         return False
 
     def do_up(self, line: str) -> bool:
-        """go up a subkey"""
+        """Go up a subkey."""
         parent = self.cwd.rpartition("\\")[0]
         if not parent:
             parent = "\\"
@@ -1436,12 +1627,12 @@ class RegistryCli(TargetCmd):
         return False
 
     def do_pwd(self, line: str) -> bool:
-        """print current path"""
+        """Print current path."""
         print(self.cwd.lstrip("\\"))
         return False
 
     def do_recommend(self, line: str) -> bool:
-        """recommend a key"""
+        """Recommend a key."""
         print(random.choice([name for _, name in self.scandir(None)]))
         return False
 
@@ -1499,7 +1690,6 @@ def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
 
 def _target_name(target: Target) -> str:
     """Return a printable FQDN target name for cmd.Cmd base prompts."""
-
     if target.has_function("domain") and target.domain:
         return escape_str(f"{target.name}.{target.domain}")
 
@@ -1629,8 +1819,8 @@ def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> cmd.Cmd | Non
     return cli
 
 
-def run_cli(cli: cmd.Cmd) -> None:
-    """Helper method for running a cmd.Cmd cli.
+def run_cli(cli: ExtendedCmd) -> None:
+    """Helper method for running a :class:`ExtendedCmd` cli.
 
     Loops cli.cmdloop(), skipping KeyboardInterrupts. This is done so
     that ctrl+c doesn't exit the shell but only resets the current line.
@@ -1648,10 +1838,16 @@ def run_cli(cli: cmd.Cmd) -> None:
         except Exception as e:
             if cli.debug:
                 log.exception("Unhandled error")
+
+                if cli.debug == DebugMode.POST_MORTEM:
+                    _get_debugger().post_mortem()
             else:
                 log.info(e)
-                print(f"*** Unhandled error: {e}")
-                print("If you wish to see the full debug trace, enable debug mode.")
+                print(
+                    f"*** Unhandled error: {e}\n\n"
+                    "Tip: type 'debug on' to enable debug mode and see full tracebacks.\n"
+                    "     type 'debug pm' to drop into a post-mortem debugger on unhandled exceptions.\n"
+                )
 
             cli.postloop()
         else:

@@ -11,8 +11,6 @@ from flow.record.fieldtypes import digest
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import (
-    UnixUserRecord,
-    WindowsUserRecord,
     create_extended_descriptor,
 )
 from dissect.target.plugin import alias, export
@@ -22,6 +20,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.helpers.record import (
+        UnixUserRecord,
+        WindowsUserRecord,
+    )
     from dissect.target.target import Target
 
 # Thanks to @Nordgaren, @daddycocoaman, @JustArion and @ogmini for their suggestions and feedback in the PR

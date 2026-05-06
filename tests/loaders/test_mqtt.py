@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from dissect.target.target import Target
+from tests._utils import cleanup_modules
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -57,10 +58,7 @@ class MqttMock(MagicMock):
 
 @pytest.fixture
 def mock_paho(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
-    with monkeypatch.context() as m:
-        if "dissect.target.loaders.mqtt" in sys.modules:
-            m.delitem(sys.modules, "dissect.target.loaders.mqtt")
-
+    with cleanup_modules(["dissect.target.loaders.mqtt"], monkeypatch), monkeypatch.context() as m:
         mock_paho = MagicMock()
         m.setitem(sys.modules, "paho", mock_paho)
         m.setitem(sys.modules, "paho.mqtt", mock_paho.mqtt)
