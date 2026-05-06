@@ -45,7 +45,6 @@ from dissect.target.helpers.polypath import (
     commonpath,
     dirname,
     isabs,
-    isreserved,
     join,
     normalize,
     normpath,
@@ -63,19 +62,8 @@ if TYPE_CHECKING:
 
     import dissect.target.filesystem as filesystem
 
-if sys.version_info >= (3, 14):
-    from dissect.target.helpers.compat.path_314 import PureDissectPath, TargetPath
-elif sys.version_info >= (3, 13):
-    from dissect.target.helpers.compat.path_313 import PureDissectPath, TargetPath
-elif sys.version_info >= (3, 12):
-    from dissect.target.helpers.compat.path_312 import PureDissectPath, TargetPath
-elif sys.version_info >= (3, 11):
-    from dissect.target.helpers.compat.path_311 import PureDissectPath, TargetPath
-elif sys.version_info >= (3, 10):  # noqa: UP036
-    from dissect.target.helpers.compat.path_310 import PureDissectPath, TargetPath
-else:
-    raise RuntimeError("dissect.target requires at least Python 3.10")
 
+from dissect.target.helpers.compat.pathlib import PureTargetPath, TargetPath
 
 log = get_logger(__name__)
 
@@ -83,7 +71,7 @@ re_glob_magic = re.compile(r"[*?[]")
 re_glob_index = re.compile(r"(?<=\/)[^\/]*[*?[]")
 
 __all__ = [
-    "PureDissectPath",
+    "PureTargetPath",
     "TargetPath",
     "abspath",
     "basename",
@@ -95,7 +83,6 @@ __all__ = [
     "glob_split",
     "has_glob_magic",
     "isabs",
-    "isreserved",
     "join",
     "normalize",
     "normpath",
@@ -115,10 +102,12 @@ __all__ = [
 ]
 
 
-def generate_addr(path: str | Path, alt_separator: str = "") -> int:
-    if not alt_separator and isinstance(path, Path):
-        alt_separator = (getattr(path, "parser", None) or path._flavour).altsep
-    path = normalize(str(path), alt_separator=alt_separator)
+def generate_addr(path: str | Path, *, sep: str = "/") -> int:
+    if isinstance(path, Path):
+        sep = (getattr(path, "parser", None) or path._flavour).sep
+        # Normalize Windows-style paths with a drive letter to start with a leading separator
+        path = ("\\" + str(path)) if (sep == "\\" and path.drive) else str(path)
+    path = normalize(path, sep=sep)
     return int(hashlib.sha256(path.encode()).hexdigest()[:8], 16)
 
 
@@ -335,19 +324,19 @@ def recurse(entry: filesystem.FilesystemEntry) -> Iterator[filesystem.Filesystem
             yield direntry.get()
 
 
-def glob_split(pattern: str, alt_separator: str = "") -> tuple[str, str]:
+def glob_split(pattern: str, sep: str = "/") -> tuple[str, str]:
     """Split a pattern on path part boundaries on the first path part with a glob pattern.
 
     Args:
         pattern: A glob pattern to match names of filesystem entries against.
-        alt_separator: An alternative path separator in use by the filesystem being matched.
+        sep: The path separator in use by the filesystem being matched.
 
     Returns:
         A tuple of a string with path parts up to the first path part that has a glob pattern and a string of
         the remaining path parts.
     """
     # re_glob_index expects a normalized pattern
-    pattern = normalize(pattern, alt_separator=alt_separator)
+    pattern = normalize(pattern, sep=sep)
 
     first_glob = re_glob_index.search(pattern)
 
@@ -370,7 +359,7 @@ def glob_ext(direntry: filesystem.FilesystemEntry, pattern: str) -> Iterator[fil
     """
     # Split the pattern on the last path part. base_name will contain the last path part (which is
     # '' if pattern ends with a /) and dir_name will contain the other parts.
-    dir_name, base_name = split(pattern, alt_separator=direntry.fs.alt_separator)
+    dir_name, base_name = split(pattern, sep=direntry.fs.sep)
 
     # The simple case where there are no globs.
     if not has_glob_magic(pattern):
@@ -463,15 +452,15 @@ def resolve_link(
     link: str,
     path: str,
     *,
-    alt_separator: str = "",
+    sep: str = "/",
     previous_links: set[str] | None = None,
 ) -> filesystem.FilesystemEntry:
     """Resolves a symlink to its actual path.
 
     It stops resolving once it detects an infinite recursion loop.
     """
-    link = normalize(link, alt_separator=alt_separator)
-    path = normalize(path, alt_separator=alt_separator)
+    link = normalize(link, sep=sep)
+    path = normalize(path, sep=sep)
 
     # Create hash for entry based on path and link
     link_id = f"{path}{link}"
@@ -498,7 +487,7 @@ def resolve_link(
             fs,
             entry.readlink(),
             link,
-            alt_separator=entry.fs.alt_separator,
+            sep=entry.fs.sep,
             previous_links=previous_links,
         )
 
