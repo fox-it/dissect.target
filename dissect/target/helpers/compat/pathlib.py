@@ -1374,7 +1374,7 @@ class TargetPath(PureTargetPath, pathlib.Path):
         f = f"{type(cls).__name__}.from_uri()"
         raise UnsupportedOperation(f"{f} is unsupported in Dissect")
 
-    # Substitute methods and properties that we do not support with ones that raise errors
+    # PATCH: Substitute methods and properties that we do not support with ones that raise errors
     # If any code tries to use unsupported features, it will get a clear error instead of silently doing the wrong thing
     for key, value in pathlib.Path.__dict__.items():
         if key in locals() or key.startswith("_"):
