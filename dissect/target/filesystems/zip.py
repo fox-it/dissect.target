@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import io
+import os
 import stat
 import zipfile
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import BufferedStream
@@ -98,6 +101,8 @@ class ZipFilesystemEntry(VirtualDirectory):
             return self._resolve().open()
 
         try:
+            if self.entry.compress_type == zipfile.ZIP_STORED and (zip_file := _reopen_zip_file(self.fs.zip)):
+                return _ZipFilesystemEntryStream(*zip_file, self.entry, self.fs.zip.pwd)
             return BufferedStream(self.fs.zip.open(self.entry), size=self.entry.file_size)
         except Exception:
             raise FileNotFoundError(self.path)
@@ -174,3 +179,52 @@ class ZipFilesystemEntry(VirtualDirectory):
                 0,
             ]
         )
+
+
+def _reopen_zip_file(zip_file: zipfile.ZipFile) -> tuple[zipfile.ZipFile, BinaryIO | None] | None:
+    if not isinstance(zip_file.filename, (str, os.PathLike)):
+        if isinstance(zip_file.fp, io.BytesIO):
+            fh = io.BytesIO(zip_file.fp.getvalue())
+            try:
+                return zipfile.ZipFile(fh, mode="r"), fh
+            except Exception:
+                fh.close()
+                raise
+
+        return None
+
+    path = Path(zip_file.filename)
+    return (zipfile.ZipFile(path, mode="r"), None) if path.is_file() else None
+
+
+class _ZipFilesystemEntryStream(BufferedStream):
+    """Seekable stream for a ZIP entry from an isolated archive handle."""
+
+    def __init__(
+        self,
+        zip_file: zipfile.ZipFile,
+        fh: BinaryIO | None,
+        entry: zipfile.ZipInfo,
+        pwd: bytes | None = None,
+    ):
+        self._zip_file = zip_file
+        self._fh = fh
+        try:
+            self._entry_fh = self._zip_file.open(entry, pwd=pwd)
+        except Exception:
+            self._zip_file.close()
+            if self._fh:
+                self._fh.close()
+            raise
+        super().__init__(self._entry_fh, size=entry.file_size)
+
+    def close(self) -> None:
+        try:
+            self._entry_fh.close()
+        finally:
+            try:
+                self._zip_file.close()
+            finally:
+                if self._fh:
+                    self._fh.close()
+                super().close()

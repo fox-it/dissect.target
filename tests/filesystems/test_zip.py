@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -11,6 +12,9 @@ from dissect.target.exceptions import (
     NotASymlinkError,
 )
 from dissect.target.filesystems.zip import ZipFilesystem, ZipFilesystemEntry
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _mkdir(zf: zipfile.ZipFile, name: str) -> None:
@@ -99,6 +103,10 @@ def zip_virtual_dir() -> io.BytesIO:
     return _create_zip("", False)
 
 
+def _payload(seed: int, size: int) -> bytes:
+    return bytes((offset + seed) % 251 for offset in range(size))
+
+
 @pytest.mark.parametrize(
     ("obj", "base"),
     [
@@ -180,3 +188,35 @@ def test_filesystems_zip(obj: str, base: str, request: pytest.FixtureRequest) ->
 
     if isinstance(zdir, ZipFilesystemEntry):
         assert zdir.stat().st_mode == 0o40777
+
+
+@pytest.mark.parametrize("compression", [zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED])
+@pytest.mark.parametrize("path_backed", [True, False])
+def test_filesystems_zip_interleaved_seek_reads(tmp_path: Path, compression: int, path_backed: bool) -> None:
+    payload_size = 16 * 1024
+    read_offset = 8 * 1024
+    read_size = 1024
+    payloads = [_payload(index * 37, payload_size) for index in range(3)]
+
+    zip_obj = tmp_path / "test.zip" if path_backed else io.BytesIO()
+    with zipfile.ZipFile(zip_obj, "w", compression=compression) as zf:
+        for index, payload in enumerate(payloads):
+            zf.writestr(f"file_{index}", payload)
+
+    if path_backed:
+        fh = zip_obj.open("rb")
+    else:
+        zip_obj.seek(0)
+        fh = zip_obj
+
+    with fh:
+        fs = ZipFilesystem(fh)
+        handles = [fs.get(f"file_{index}").open() for index in range(len(payloads))]
+
+        try:
+            for index, handle in enumerate(handles):
+                handle.seek(read_offset)
+                assert handle.read(read_size) == payloads[index][read_offset : read_offset + read_size]
+        finally:
+            for handle in handles:
+                handle.close()
