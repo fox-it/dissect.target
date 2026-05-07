@@ -68,7 +68,6 @@ class LoginItemsPlugin(Plugin):
             self.login_items_files.add(path)
 
     @export(record=LoginItemsRecord)
-    # @export(output="yield")
     def login_items(self) -> Iterator[LoginItemsRecord]:
         """Yield macOS login items plist files."""
         yield from build_plist_records(self, self.login_items_files, LoginItemsRecords, field_mappings=FIELD_MAPPINGS)

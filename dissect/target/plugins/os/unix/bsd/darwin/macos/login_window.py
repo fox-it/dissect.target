@@ -53,7 +53,6 @@ class LoginWindowPlugin(Plugin):
             self.login_window_files.add(path)
 
     @export(record=DynamicDescriptor(["string"]))
-    # @export(output="yield")
     def login_window(self) -> Iterator[DynamicDescriptor]:
         """Yield macOS login window plist files."""
         yield from build_plist_records(self, self.login_window_files, function_name="macos/login_window")
