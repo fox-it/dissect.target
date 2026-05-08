@@ -64,7 +64,7 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat.glob import _no_recurse_symlinks, _PathGlobber, _StringGlobber
 
 try:
-    from pathlib import UnsupportedOperation
+    from pathlib import UnsupportedOperation  # novermin
 except ImportError:
 
     class UnsupportedOperation(NotImplementedError):
