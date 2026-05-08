@@ -2,7 +2,11 @@
 
 Update periodically.
 
-Commit hash we're in sync with: add0ca9
+Commit we're in sync with:
+Hash:       add0ca9ea00ab02fd3a58d059e8370c2d0a1d32c
+Date:       2025-05-03
+Branch:     main (3.15)
+URL:        https://github.com/python/cpython/commit/add0ca9ea00ab02fd3a58d059e8370c2d0a1d32c
 
 Notes:
     - https://github.com/python/cpython/blob/main/Lib/fnmatch.py
