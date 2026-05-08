@@ -37,6 +37,9 @@ MODULE_PATH = "dissect.target.filesystems"
 log = get_logger(__name__)
 
 
+DEFAULT_ALTSEP = type("DEFAULT_ALTSEP", (), {})
+
+
 class Filesystem:
     """Base class for filesystems."""
 
@@ -52,7 +55,7 @@ class Filesystem:
         volume: BinaryIO | list[BinaryIO] | None = None,
         *,
         sep: str = "/",
-        altsep: str | None = None,
+        altsep: str | None | DEFAULT_ALTSEP = DEFAULT_ALTSEP,
         case_sensitive: bool = True,
     ) -> None:
         """The base initializer for the class.
@@ -62,7 +65,7 @@ class Filesystem:
             sep: The separator used to distinguish between directories in a path.
             altsep: The alternative separator used to distinguish between directories in a path.
                 If not provided, it will be set to the most common default for the given ``sep``.
-                (i.e. if ``sep`` is "/", ``altsep`` will be "", and if ``sep`` is "\\", ``altsep`` will be "/").
+                (i.e. if ``sep`` is "/", ``altsep`` will be ``None``, and if ``sep`` is "\\", ``altsep`` will be "/").
             case_sensitive: Defines if the paths in the filesystem are case sensitive or not.
 
         Raises:
@@ -80,10 +83,10 @@ class Filesystem:
         return f"<Filesystem type={self.__type__}>"
 
     @property
-    def altsep(self) -> str:
+    def altsep(self) -> str | None:
         """The alternative separator used to distinguish between directories in a path."""
-        if self._altsep is None:
-            return "/" if self.sep == "\\" else ""
+        if self._altsep is DEFAULT_ALTSEP:
+            return "/" if self.sep == "\\" else None
         return self._altsep
 
     @altsep.setter
@@ -1552,7 +1555,7 @@ class LayerFilesystem(Filesystem):
         return self._sep
 
     @property
-    def altsep(self) -> str:
+    def altsep(self) -> str | None:
         """The alternative separator of the filesystem."""
         return super().altsep
 
