@@ -863,7 +863,12 @@ class _Info:
         """Return the flags."""
         return self._stat(follow_symlinks=follow_symlinks).st_flags
 
-    # PATCH: remove xattr support for now
+    def _xattrs(self, *, follow_symlinks: bool = True) -> list[tuple[str, bytes]]:
+        """Return the xattrs as a list of (attr, value) pairs, or an empty
+        list if extended attributes aren't supported.
+        """
+        f = f"{type(self).__name__}._xattrs()"
+        raise UnsupportedOperation(f"{f} is not yet supported in Dissect")
 
 
 class TargetPath(PureTargetPath, pathlib.Path):
