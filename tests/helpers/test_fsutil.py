@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import bz2
 import gzip
+import inspect
 import io
 import os
+import pathlib
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -34,14 +36,22 @@ if TYPE_CHECKING:
     ("path", "sep", "result"),
     [
         pytest.param("/some/dir/some/file", "/", "/some/dir/some/file", id="posix"),
-        pytest.param("/some/dir/some/file", "\\", "/some/dir/some/file", id="windows"),
-        pytest.param("\\some\\dir\\some\\file", "\\", "/some/dir/some/file", id="windows-alt"),
-        pytest.param("/some///long\\\\dir/so\\//me\\file", "/", "/some/long\\\\dir/so\\/me\\file", id="posix-mixed"),
-        pytest.param("/some///long\\\\dir/so\\//me\\file", "\\", "/some/long/dir/so/me/file", id="windows-mixed"),
+        pytest.param("", "/", "", id="posix-empty"),
+        pytest.param("/", "/", "/", id="posix-root"),
+        pytest.param("/some/dir/", "/", "/some/dir/", id="posix-trailing-sep"),
+        pytest.param("//foo/bar", "/", "/foo/bar", id="posix-double-leading-sep"),
         pytest.param("/some/dir/../some/file", "/", "/some/dir/../some/file", id="posix-up-level"),
-        pytest.param("/some/dir/../some/file", "\\", "/some/dir/../some/file", id="windows-up-level"),
         pytest.param("/some/dir/./some/file", "/", "/some/dir/./some/file", id="posix-curdir"),
+        pytest.param("/some///long\\\\dir/so\\//me\\file", "/", "/some/long\\\\dir/so\\/me\\file", id="posix-mixed"),
+        pytest.param("\\some\\dir\\some\\file", "\\", "/some/dir/some/file", id="windows"),
+        pytest.param("", "\\", "", id="windows-empty"),
+        pytest.param("\\", "\\", "/", id="windows-root"),
+        pytest.param("\\some\\dir\\", "\\", "/some/dir/", id="windows-trailing-sep"),
+        pytest.param("/some/dir/some/file", "\\", "/some/dir/some/file", id="windows-alt"),
+        pytest.param("/some/dir/../some/file", "\\", "/some/dir/../some/file", id="windows-up-level"),
         pytest.param("/some/dir/./some/file", "\\", "/some/dir/./some/file", id="windows-curdir"),
+        pytest.param("/some///long\\\\dir/so\\//me\\file", "\\", "/some/long/dir/so/me/file", id="windows-mixed"),
+        pytest.param("\\\\server\\share", "\\", "/server/share", id="windows-unc"),
     ],
 )
 def test_normalize(path: str, sep: str, result: str) -> None:
@@ -70,6 +80,12 @@ def test_normalize(path: str, sep: str, result: str) -> None:
         pytest.param(
             ("C:\\some\\dir", "D:\\some\\file"), "\\", "C:\\some\\dir\\D:\\some\\file", id="windows-drive-absolute"
         ),
+        pytest.param(("", "some/file"), "/", "some/file", id="posix-empty-first"),
+        pytest.param(("/some/dir", ""), "/", "/some/dir/", id="posix-empty-second"),
+        pytest.param(("/a", "b", "c"), "/", "/a/b/c", id="posix-three-components"),
+        pytest.param(("\\a", "b", "c"), "\\", "\\a\\b\\c", id="windows-three-components"),
+        pytest.param(("/some/dir/", "file"), "/", "/some/dir/file", id="posix-trailing-sep-first"),
+        pytest.param(("\\some\\dir", "\\other"), "\\", "\\other", id="windows-abs"),
     ],
 )
 def test_join(args: str, sep: str, result: str) -> None:
@@ -85,18 +101,26 @@ def test_join(args: str, sep: str, result: str) -> None:
     ("path", "sep", "result"),
     [
         pytest.param("/some/dir/some/file", "/", "/some/dir/some", id="posix"),
-        pytest.param("/some/dir/some/file", "\\", "/some/dir/some", id="windows"),
-        pytest.param("\\some\\dir\\some\\file", "\\", "\\some\\dir\\some", id="windows-alt"),
+        pytest.param("/some", "/", "/", id="posix-no-dir"),
+        pytest.param("some", "/", "", id="posix-relative"),
+        pytest.param("/", "/", "/", id="posix-root"),
+        pytest.param("", "/", "", id="posix-empty"),
+        pytest.param("/some/dir/", "/", "/some/dir", id="posix-trailing-sep"),
         pytest.param("/some///long\\\\dir/so\\//me\\file", "/", "/some///long\\\\dir/so\\", id="posix-mixed"),
+        pytest.param("\\some\\dir\\some\\file", "\\", "\\some\\dir\\some", id="windows"),
+        pytest.param("/some/dir/some/file", "\\", "/some/dir/some", id="windows-alt"),
+        pytest.param("", "\\", "", id="windows-empty"),
+        pytest.param("C:", "\\", "", id="windows-root"),
+        pytest.param("/C:", "\\", "", id="windows-root-alt"),
         pytest.param("/some///long\\\\dir/so\\//me\\file", "\\", "/some///long\\\\dir/so\\//me", id="windows-mixed"),
+        pytest.param("c:\\some\\dir\\some\\file", "\\", "c:\\some\\dir\\some", id="windows-drive"),
+        pytest.param("C:\\some", "\\", "C:", id="windows-drive-root"),
+        pytest.param("C:some", "\\", "C:", id="windows-drive-root-no-sep"),
+        pytest.param("\\sysvol\\some\\file", "\\", "sysvol\\some", id="windows-sysvol"),
     ],
 )
 def test_dirname(path: str, sep: str, result: str) -> None:
-    """Test that getting the directory name of a path with the given separator produces the expected result.
-
-    The original path should be preserved. POSIX rules are always followed.
-    No normalization is performed.
-    """
+    """Test that getting the directory name of a path with the given separator produces the expected result."""
     assert fsutil.dirname(path, sep=sep) == result
 
 
@@ -104,12 +128,21 @@ def test_dirname(path: str, sep: str, result: str) -> None:
     ("path", "sep", "result"),
     [
         pytest.param("/some/dir/some/file", "/", "file", id="posix"),
-        pytest.param("/some/dir/some/file", "\\", "file", id="windows"),
-        pytest.param("\\some\\dir\\some\\file", "\\", "file", id="windows-alt"),
+        pytest.param("/some", "/", "some", id="posix-no-dir"),
+        pytest.param("some", "/", "some", id="posix-relative"),
+        pytest.param("/", "/", "", id="posix-root"),
+        pytest.param("", "/", "", id="posix-empty"),
+        pytest.param("/some/dir/", "/", "", id="posix-trailing-sep"),
         pytest.param("/some///long\\\\dir/so\\//me\\file", "/", "me\\file", id="posix-mixed"),
+        pytest.param("\\some\\dir\\some\\file", "\\", "file", id="windows"),
+        pytest.param("/some/dir/some/file", "\\", "file", id="windows-alt"),
+        pytest.param("", "\\", "", id="windows-empty"),
+        pytest.param("C:", "\\", "C:", id="windows-root"),
+        pytest.param("/C:", "\\", "C:", id="windows-root-alt"),
+        pytest.param("\\some\\dir\\", "\\", "", id="windows-trailing-sep"),
         pytest.param("/some///long\\\\dir/so\\//me\\file", "\\", "file", id="windows-mixed"),
         pytest.param("c:\\some\\dir\\some\\file", "\\", "file", id="windows-drive"),
-        pytest.param("C:", "\\", "C:", id="windows-root"),
+        pytest.param("\\sysvol\\some\\file", "\\", "file", id="windows-sysvol"),
     ],
 )
 def test_basename(path: str, sep: str, result: str) -> None:
@@ -121,28 +154,39 @@ def test_basename(path: str, sep: str, result: str) -> None:
     ("path", "sep", "result"),
     [
         pytest.param("/some/dir/some/file", "/", ("/some/dir/some", "file"), id="posix"),
-        pytest.param("/some/dir/some/file", "\\", ("/some/dir/some", "file"), id="windows"),
-        pytest.param("\\some\\dir\\some\\file", "\\", ("\\some\\dir\\some", "file"), id="windows-alt"),
-        pytest.param("/some/dir/some/", "/", ("/some/dir/some", ""), id="posix-trailing"),
+        pytest.param("/some", "/", ("/", "some"), id="posix-no-dir"),
+        pytest.param("/", "/", ("/", ""), id="posix-root"),
+        pytest.param("some/dir", "/", ("some", "dir"), id="posix-relative"),
+        pytest.param("some", "/", ("", "some"), id="posix-relative-root"),
+        pytest.param("", "/", ("", ""), id="posix-empty"),
+        pytest.param("/some/dir/some/", "/", ("/some/dir/some", ""), id="posix-trailing-sep"),
         pytest.param("/some/dir/some\\", "/", ("/some/dir", "some\\"), id="posix-mixed"),
-        pytest.param("/some/dir/some/", "\\", ("/some/dir/some", ""), id="windows-trailing"),
-        pytest.param("\\some\\dir\\some\\", "\\", ("\\some\\dir\\some", ""), id="windows-alt-trailing"),
         pytest.param(
             "/some///long\\\\dir/so\\//me\\file",
             "/",
             ("/some///long\\\\dir/so\\", "me\\file"),
-            id="posix-mixed-duplicate",
+            id="posix-mixed-multi-sep",
         ),
+        pytest.param("\\some\\dir\\some\\file", "\\", ("\\some\\dir\\some", "file"), id="windows"),
+        pytest.param("/some/dir/some/file", "\\", ("/some/dir/some", "file"), id="windows-alt"),
+        pytest.param("", "\\", ("", ""), id="windows-empty"),
+        pytest.param("/some/dir/some/", "\\", ("/some/dir/some", ""), id="windows-trailing-sep"),
+        pytest.param("\\some\\dir\\some\\", "\\", ("\\some\\dir\\some", ""), id="windows-trailing-sep-native"),
         pytest.param(
             "/some///long\\\\dir/so\\//me\\file", "\\", ("/some///long\\\\dir/so\\//me", "file"), id="windows-mixed"
         ),
+        pytest.param("C:\\some", "\\", ("C:", "some"), id="windows-drive-root"),
+        pytest.param("C:\\", "\\", ("", "C:"), id="windows-drive-trailing-sep"),
+        pytest.param("C:", "\\", ("", "C:"), id="windows-drive-only"),
+        pytest.param("C:some", "\\", ("C:", "some"), id="windows-drive-root-no-sep"),
+        pytest.param("/C:/some", "\\", ("C:", "some"), id="windows-drive-root-alt"),
+        pytest.param("\\\\server\\share\\file", "\\", ("\\\\server\\share", "file"), id="windows-unc"),
+        pytest.param("\\sysvol\\some\\file", "\\", ("sysvol\\some", "file"), id="windows-sysvol"),
+        pytest.param("\\efi\\some\\file", "\\", ("efi\\some", "file"), id="windows-efi"),
     ],
 )
 def test_split(path: str, sep: str, result: str) -> None:
-    """Test that splitting a path with the given separator produces the expected result.
-
-    The original path should be preserved. No normalization is performed.
-    """
+    """Test that splitting a path with the given separator produces the expected result."""
     assert fsutil.split(path, sep=sep) == result
 
 
@@ -153,7 +197,7 @@ def test_split(path: str, sep: str, result: str) -> None:
         pytest.param("/foo.bar/file.tar.gz", "/", ("/foo.bar/file.tar", ".gz"), id="posix-multiple-dots"),
         pytest.param("C:\\foo\\bar\\file.txt", "\\", ("C:\\foo\\bar\\file", ".txt"), id="windows"),
         pytest.param("C:/foo.bar/file.txt", "\\", ("C:/foo.bar/file", ".txt"), id="windows-alt"),
-        pytest.param("C:foo.bar/file.tar.gz", "\\", ("C:foo.bar/file.tar", ".gz"), id="windows-no-drive-slash"),
+        pytest.param("C:foo.bar/file.tar.gz", "\\", ("C:foo.bar/file.tar", ".gz"), id="windows-drive-no-sep"),
         pytest.param("/foo.bar/file", "/", ("/foo.bar/file", ""), id="posix-no-ext"),
         pytest.param("C:foo.bar/file", "\\", ("C:foo.bar/file", ""), id="windows-no-ext"),
         pytest.param("C:/foo.bar/file", "\\", ("C:/foo.bar/file", ""), id="windows-no-ext-dots-in-dir"),
@@ -163,13 +207,16 @@ def test_split(path: str, sep: str, result: str) -> None:
             ("C:/foo.bar/file.name.with.dots", ".txt"),
             id="windows-multiple-dots",
         ),
+        pytest.param("/foo/.hidden", "/", ("/foo/.hidden", ""), id="posix-dotfile"),
+        pytest.param("/foo/.file.txt", "/", ("/foo/.file", ".txt"), id="posix-dotfile-with-ext"),
+        pytest.param("/foo/.hidden", "\\", ("/foo/.hidden", ""), id="windows-dotfile"),
+        pytest.param("/foo/.file.txt", "\\", ("/foo/.file", ".txt"), id="windows-dotfile-with-ext"),
+        pytest.param("", "/", ("", ""), id="posix-empty"),
+        pytest.param("", "\\", ("", ""), id="windows-empty"),
     ],
 )
 def test_splitext(path: str, sep: str, result: tuple[str, str]) -> None:
-    """Test that splitting the extension of a path with the given separator produces the expected result.
-
-    The original path should be preserved. No normalization is performed.
-    """
+    """Test that splitting the extension of a path with the given separator produces the expected result."""
     assert fsutil.splitext(path, sep=sep) == result
 
 
@@ -178,16 +225,24 @@ def test_splitext(path: str, sep: str, result: tuple[str, str]) -> None:
     [
         pytest.param("/foo/bar/file.txt", "/", ("", "/foo/bar/file.txt"), id="posix"),
         pytest.param("C:/foo/bar/file.txt", "/", ("", "C:/foo/bar/file.txt"), id="posix-with-drive-letter"),
+        pytest.param("", "/", ("", ""), id="posix-empty"),
+        pytest.param("//host/share/file.txt", "/", ("", "//host/share/file.txt"), id="posix-unc"),
         pytest.param("C:\\foo\\bar\\file.txt", "\\", ("C:", "\\foo\\bar\\file.txt"), id="windows"),
         pytest.param("C:/foo/bar/file.txt", "\\", ("C:", "/foo/bar/file.txt"), id="windows-alt"),
-        pytest.param("C:file.txt", "\\", ("C:", "\\file.txt"), id="windows-ads"),
+        pytest.param("", "\\", ("", "\\"), id="windows-empty"),
+        pytest.param("C:", "\\", ("C:", "\\"), id="windows-bare-drive"),
+        pytest.param("C:file.txt", "\\", ("C:", "\\file.txt"), id="windows-drive-relative"),
         pytest.param("C:/file.txt", "\\", ("C:", "/file.txt"), id="windows-alt-root"),
-        pytest.param("//host/share/file.txt", "/", ("", "//host/share/file.txt"), id="posix-unc"),
+        pytest.param(
+            "\\C:\\some\\dir\\some\\file", "\\", ("C:", "\\some\\dir\\some\\file"), id="windows-leading-sep-drive"
+        ),
+        pytest.param("/C:/some/dir/some/file", "\\", ("C:", "/some/dir/some/file"), id="windows-alt-leading-sep-drive"),
         pytest.param("\\\\server\\share\\file.txt", "\\", ("\\\\server\\share", "\\file.txt"), id="windows-unc"),
         pytest.param("//server/share//file.txt", "\\", ("//server/share", "//file.txt"), id="windows-alt-unc"),
         pytest.param("\\sysvol\\file.txt", "\\", ("sysvol", "\\file.txt"), id="windows-sysvol"),
-        pytest.param("\\C:\\some\\dir\\some\\file", "\\", ("C:", "\\some\\dir\\some\\file"), id="windows-c"),
-        pytest.param("/C:/some/dir/some/file", "\\", ("C:", "/some/dir/some/file"), id="windows-alt-c"),
+        pytest.param("\\efi\\some\\file", "\\", ("efi", "\\some\\file"), id="windows-efi"),
+        pytest.param("\\winre\\some\\file", "\\", ("winre", "\\some\\file"), id="windows-winre"),
+        pytest.param("\\$fs$\\some\\file", "\\", ("$fs$", "\\some\\file"), id="windows-fs"),
     ],
 )
 def test_splitdrive(path: str, sep: str, result: tuple[str, str]) -> None:
@@ -196,8 +251,6 @@ def test_splitdrive(path: str, sep: str, result: tuple[str, str]) -> None:
     On POSIX-style paths, the drive is always empty. On Windows-style paths, we only split the drive if the path has
     a leading slash. Any name after the leading slash will be treated as the drive.
     If there's a second leading slash, it will be treated as a UNC path.
-
-    The original path should be preserved. No normalization is performed.
     """
     assert fsutil.splitdrive(path, sep=sep) == result
 
@@ -206,17 +259,30 @@ def test_splitdrive(path: str, sep: str, result: tuple[str, str]) -> None:
     ("path", "sep", "result"),
     [
         pytest.param("/foo/bar/file.txt", "/", ("", "/", "foo/bar/file.txt"), id="posix"),
+        pytest.param("", "/", ("", "", ""), id="posix-empty"),
+        pytest.param("some/path", "/", ("", "", "some/path"), id="posix-relative"),
+        pytest.param("//host/share/file.txt", "/", ("", "//", "host/share/file.txt"), id="posix-unc"),
         pytest.param("C:\\foo\\bar\\file.txt", "\\", ("C:", "\\", "foo\\bar\\file.txt"), id="windows"),
         pytest.param("C:/foo/bar/file.txt", "\\", ("C:", "/", "foo/bar/file.txt"), id="windows-alt"),
-        pytest.param("C:file.txt", "\\", ("C:", "\\", "file.txt"), id="windows-ads"),
+        pytest.param("", "\\", ("", "\\", ""), id="windows-empty"),
+        pytest.param("some/path", "\\", ("", "", "some/path"), id="windows-relative"),
+        pytest.param("C:file.txt", "\\", ("C:", "\\", "file.txt"), id="windows-drive-relative"),
         pytest.param("C:/file.txt", "\\", ("C:", "/", "file.txt"), id="windows-alt-root"),
-        pytest.param("//host/share/file.txt", "/", ("", "//", "host/share/file.txt"), id="posix-unc"),
+        pytest.param("c:", "\\", ("c:", "\\", ""), id="windows-drive-no-sep"),
+        pytest.param(
+            "\\C:\\some\\dir\\some\\file", "\\", ("C:", "\\", "some\\dir\\some\\file"), id="windows-leading-sep-drive"
+        ),
+        pytest.param(
+            "/C:/some/dir/some/file", "\\", ("C:", "/", "some/dir/some/file"), id="windows-alt-leading-sep-drive"
+        ),
         pytest.param("\\\\server\\share\\file.txt", "\\", ("\\\\server\\share", "\\", "file.txt"), id="windows-unc"),
+        pytest.param("//server/share/file", "\\", ("//server/share", "/", "file"), id="windows-alt-unc"),
         pytest.param("\\sysvol\\file.txt", "\\", ("sysvol", "\\", "file.txt"), id="windows-sysvol"),
-        pytest.param("\\C:\\some\\dir\\some\\file", "\\", ("C:", "\\", "some\\dir\\some\\file"), id="windows-c"),
-        pytest.param("/C:/some/dir/some/file", "\\", ("C:", "/", "some/dir/some/file"), id="windows-alt-c"),
-        pytest.param("c:", "\\", ("c:", "\\", ""), id="windows-c-no-sep"),
         pytest.param("sysvol", "\\", ("sysvol", "\\", ""), id="windows-sysvol-no-sep"),
+        pytest.param("\\efi\\some\\file", "\\", ("efi", "\\", "some\\file"), id="windows-efi"),
+        pytest.param("efi", "\\", ("efi", "\\", ""), id="windows-efi-no-sep"),
+        pytest.param("\\winre\\some\\file", "\\", ("winre", "\\", "some\\file"), id="windows-winre"),
+        pytest.param("\\$fs$\\some\\file", "\\", ("$fs$", "\\", "some\\file"), id="windows-fs"),
     ],
 )
 def test_splitroot(path: str, sep: str, result: tuple[str, str, str]) -> None:
@@ -225,8 +291,6 @@ def test_splitroot(path: str, sep: str, result: tuple[str, str, str]) -> None:
     On POSIX-style paths, the drive is always empty. On Windows-style paths, we only split the drive if the path has
     a leading slash. Any name after the leading slash will be treated as the drive.
     If there's a second leading slash, it will be treated as a UNC path.
-
-    The original path should be preserved. No normalization is performed.
     """
     assert fsutil.splitroot(path, sep=sep) == result
 
@@ -237,29 +301,30 @@ def test_splitroot(path: str, sep: str, result: tuple[str, str, str]) -> None:
         pytest.param("/some/dir", "/", True, id="posix-abs"),
         pytest.param("some/dir", "/", False, id="posix-rel"),
         pytest.param("\\some/dir", "/", False, id="posix-rel-backslash"),
-        pytest.param("\\some\\dir", "\\", True, id="windows-abs"),
-        pytest.param("/some/dir", "\\", True, id="windows-abs-alt"),
-        pytest.param("some/dir", "\\", False, id="windows-rel-alt"),
-        pytest.param("\\some/dir", "\\", True, id="windows-abs-mixed"),
-        pytest.param("C:\\some\\dir", "\\", True, id="windows-rel-drive"),
-        pytest.param("C:/some/dir", "\\", True, id="windows-rel-drive-alt"),
-        pytest.param("\\C:\\some\\dir", "\\", True, id="windows-abs-drive"),
-        pytest.param("/C:/some/dir", "\\", True, id="windows-abs-drive-alt"),
-        pytest.param("/sysvol/some/dir", "\\", True, id="windows-abs-drive-alt"),
-        pytest.param("sysvol/some/dir", "\\", True, id="windows-abs-drive-alt"),
         pytest.param("", "/", False, id="posix-empty"),
-        pytest.param("", "\\", False, id="windows-empty"),
         pytest.param("/", "/", True, id="posix-root"),
         pytest.param("\\", "/", False, id="posix-backslash"),
+        pytest.param("\\some\\dir", "\\", True, id="windows-abs"),
+        pytest.param("/some/dir", "\\", True, id="windows-abs-alt"),
+        pytest.param("some/dir", "\\", False, id="windows-rel"),
+        pytest.param("\\some/dir", "\\", True, id="windows-abs-mixed"),
+        pytest.param("", "\\", False, id="windows-empty"),
         pytest.param("\\", "\\", True, id="windows-root"),
         pytest.param("/", "\\", True, id="windows-root-alt"),
+        pytest.param("C:\\some\\dir", "\\", True, id="windows-drive"),
+        pytest.param("C:/some/dir", "\\", True, id="windows-drive-alt-sep"),
+        pytest.param("\\C:\\some\\dir", "\\", True, id="windows-leading-sep-drive"),
+        pytest.param("/C:/some/dir", "\\", True, id="windows-leading-alt-sep-drive"),
+        pytest.param("\\\\server\\share", "\\", True, id="windows-unc"),
+        pytest.param("/sysvol/some/dir", "\\", True, id="windows-leading-sep-sysvol"),
+        pytest.param("sysvol/some/dir", "\\", True, id="windows-sysvol"),
+        pytest.param("efi/some/dir", "\\", True, id="windows-efi"),
+        pytest.param("winre/some/dir", "\\", True, id="windows-winre"),
+        pytest.param("$fs$/some/dir", "\\", True, id="windows-fs"),
     ],
 )
 def test_isabs(path: str, sep: str, result: str) -> None:
-    """Test that checking if a path is absolute with the given separator produces the expected result.
-
-    Only paths starting with a separator are considered absolute, also for Windows-style paths.
-    """
+    """Test that checking if a path is absolute with the given separator produces the expected result."""
     assert fsutil.isabs(path, sep=sep) == result
 
 
@@ -267,14 +332,27 @@ def test_isabs(path: str, sep: str, result: str) -> None:
     ("path", "sep", "result"),
     [
         pytest.param("/some/dir/../some/file", "/", "/some/some/file", id="posix"),
+        pytest.param("some", "/", "some", id="posix-relative"),
+        pytest.param("/", "/", "/", id="posix-root"),
+        pytest.param("", "/", "", id="posix-empty"),
+        pytest.param(".", "/", "", id="posix-curdir"),
+        pytest.param("/some/../../../file", "/", "/file", id="posix-above-root"),
+        pytest.param(
+            "/some///long\\..\\dir/so\\.//me\\file", "/", "/some/long\\..\\dir/so\\./me\\file", id="posix-mixed"
+        ),
         pytest.param("\\some\\dir\\..\\some\\file", "\\", "\\some\\some\\file", id="windows"),
         pytest.param("/some/dir/../some/file", "\\", "\\some\\some\\file", id="windows-alt"),
-        pytest.param(
-            "/some///long\\..\\dir/so\\.//me\\file", "/", "/some/long\\..\\dir/so\\./me\\file", id="posix-long"
-        ),
-        pytest.param("/some///long\\..\\dir/so\\.//me\\file", "\\", "\\some\\dir\\so\\me\\file", id="windows-long"),
-        pytest.param("", "/", "", id="posix-empty"),
         pytest.param("", "\\", "", id="windows-empty"),
+        pytest.param(".", "\\", "", id="windows-curdir"),
+        pytest.param("/some///long\\..\\dir/so\\.//me\\file", "\\", "\\some\\dir\\so\\me\\file", id="windows-mixed"),
+        pytest.param("C:/some", "\\", "C:\\some", id="windows-drive-no-up-level"),
+        pytest.param("/C:/some", "\\", "C:\\some", id="windows-drive-leading-slash"),
+        pytest.param("C:", "\\", "C:", id="windows-drive-root"),
+        pytest.param("C:/", "\\", "C:", id="windows-drive-root-sep"),
+        pytest.param("/C:/", "\\", "C:", id="windows-drive-root-sep-leading-slash"),
+        pytest.param("C:\\some\\..\\file", "\\", "C:\\file", id="windows-drive-up-level"),
+        pytest.param("C:\\some\\..\\..\\sysvol\\file", "\\", "sysvol\\file", id="windows-drive-up-level-sysvol"),
+        pytest.param("\\sysvol\\some\\..\\file", "\\", "sysvol\\file", id="windows-sysvol"),
     ],
 )
 def test_normpath(path: str, sep: str, result: str) -> None:
@@ -304,6 +382,8 @@ def test_normpath(path: str, sep: str, result: str) -> None:
         pytest.param("some\\dir", "/my/cwd/", "\\", "\\my\\cwd\\some\\dir", id="windows-rel-cwd"),
         pytest.param("some/dir", "/my\\cwd/", "/", "/my\\cwd/some/dir", id="posix-rel-cwd-backslash"),
         pytest.param("some\\dir", "/my\\cwd/", "\\", "\\my\\cwd\\some\\dir", id="windows-rel-cwd-mixed"),
+        pytest.param("some/dir", "C:\\my\\cwd\\", "\\", "C:\\my\\cwd\\some\\dir", id="windows-rel-cwd-drive"),
+        pytest.param("sysvol/dir", "", "\\", "sysvol\\dir", id="windows-sysvol-rel"),
     ],
 )
 def test_abspath(path: str, cwd: str, sep: str, result: str) -> None:
@@ -318,8 +398,9 @@ def test_abspath(path: str, cwd: str, sep: str, result: str) -> None:
     ("path", "start", "sep", "case_sensitive", "result"),
     [
         pytest.param("/some/dir/some/file", "/some/dir", "/", None, "some/file", id="posix"),
-        pytest.param("\\some\\dir\\some\\file", "\\some\\dir", "\\", None, "some\\file", id="windows"),
-        pytest.param("/some/dir/some/file", "/some/dir", "\\", None, "some\\file", id="windows-alt"),
+        pytest.param("/some/dir", "/some/dir", "/", None, "", id="posix-same-path"),
+        pytest.param("/some/dir/file", "/some/other/file", "/", None, "../../dir/file", id="posix-sibling"),
+        pytest.param("/some/dir/file", "/", "/", None, "some/dir/file", id="posix-from-root"),
         pytest.param(
             "/some///long\\\\dir/so\\//me\\file", "/some/long\\\\dir", "/", None, "so\\/me\\file", id="posix-mixed"
         ),
@@ -331,6 +412,8 @@ def test_abspath(path: str, cwd: str, sep: str, result: str) -> None:
             "../../long\\\\dir/so\\/me\\file",
             id="posix-mixed-parent",
         ),
+        pytest.param("\\some\\dir\\some\\file", "\\some\\dir", "\\", None, "some\\file", id="windows"),
+        pytest.param("/some/dir/some/file", "/some/dir", "\\", None, "some\\file", id="windows-alt"),
         pytest.param(
             "/some///long\\\\dir/so\\//me\\file", "/some/long/dir", "\\", True, "so\\me\\file", id="windows-mixed"
         ),
@@ -342,6 +425,7 @@ def test_abspath(path: str, cwd: str, sep: str, result: str) -> None:
             "so\\me\\file",
             id="windows-mixed-alt",
         ),
+        pytest.param("C:/some/file", "D:/some/file", "\\", None, "..\\..\\..\\C:\\some\\file", id="windows-drive"),
         pytest.param(
             "/some/dir/some/file", "/SOME/DIR", "/", True, "../../some/dir/some/file", id="posix-case-sensitive"
         ),
@@ -350,8 +434,6 @@ def test_abspath(path: str, cwd: str, sep: str, result: str) -> None:
             "/some/dir/some/file", "/SOME/DIR", "\\", True, "..\\..\\some\\dir\\some\\file", id="windows-case-sensitive"
         ),
         pytest.param("/some/dir/some/file", "/SOME/DIR", "\\", False, "some\\file", id="windows-case-insensitive"),
-        # Ensure that drive letter paths are handled according to POSIX rules
-        pytest.param("C:/some/file", "D:/some/file", "\\", None, "..\\..\\..\\C:\\some\\file", id="windows-drive"),
     ],
 )
 def test_relpath(path: str, start: str, sep: str, case_sensitive: bool | None, result: str) -> None:
@@ -396,6 +478,21 @@ def test_relpath(path: str, start: str, sep: str, case_sensitive: bool | None, r
             "\\SOME\\dir\\SOME",
             id="windows-case-insensitive",
         ),
+        pytest.param(["/some/dir/file"], "/", None, "/some/dir/file", id="posix-single-path"),
+        pytest.param(
+            ["/some/dir/file", "/some/dir/other", "/some/dir/another"],
+            "/",
+            None,
+            "/some/dir",
+            id="posix-three-path-problem",
+        ),
+        pytest.param(
+            ["\\some\\dir\\file", "\\some\\dir\\other", "\\some\\other"],
+            "\\",
+            None,
+            "\\some",
+            id="windows-three-path-problem",
+        ),
     ],
 )
 def test_commonpath(paths: list[str], sep: str, case_sensitive: bool | None, result: str) -> None:
@@ -419,7 +516,7 @@ def test_commonpath(paths: list[str], sep: str, case_sensitive: bool | None, res
 )
 def test_generate_addr(path: str, sep: str, result: int) -> None:
     """Test that generating an address for a path with the given separator produces the expected result."""
-    vfs = VirtualFilesystem(sep=sep, altsep="/" if sep == "\\" else "")
+    vfs = VirtualFilesystem(sep=sep, altsep="/" if sep == "\\" else None)
     target_path = fsutil.TargetPath(vfs, path)
 
     assert fsutil.generate_addr(path, sep=sep) == result
@@ -506,61 +603,42 @@ def test_target_path_no_fs_exception() -> None:
 @pytest.mark.parametrize(
     ("sep", "paths", "parts", "string", "flow_string"),
     [
-        # POSIX-style empty path
         pytest.param("/", [""], (), "", "", id="posix-empty"),
-        # Windows-style empty path
-        pytest.param("\\", [""], (), "", "", id="windows-empty"),
-        # Windows-style construct drive
-        pytest.param("\\", ["", "C:", "some"], ("C:", "some"), "C:/some", "C:\\some", id="windows-drive-construct"),
-        # POSIX-style construct from empty
+        pytest.param("/", ["/"], ("/",), "/", "/", id="posix-single-sep"),
+        pytest.param("/", ["\\"], ("\\",), "\\", "\\", id="posix-single-backslash"),
         pytest.param("/", ["", "some/dir"], ("some", "dir"), "some/dir", "some/dir", id="posix-construct-empty"),
-        # Windows-style construct from empty
-        pytest.param("\\", ["", "some\\dir"], ("some", "dir"), "some/dir", "some\\dir", id="windows-construct-empty"),
-        # POSIX-style single separator path
-        pytest.param("/", ["/"], ("/",), "/", "/", id="posix-single-separator"),
-        # Windows-style single separator path
-        pytest.param("\\", ["\\"], ("/",), "/", "\\", id="windows-single-separator"),
-        # POSIX-style single backslash separator path
-        pytest.param("/", ["\\"], ("\\",), "\\", "\\", id="posix-single-backslash-separator"),
-        # Windows-style single alt separator path
-        pytest.param("\\", ["/"], ("/",), "/", "\\", id="windows-single-alt-separator"),
-        # POSIX-style path
         pytest.param(
             "/",
             ["/some/path/to/file"],
             ("/", "some", "path", "to", "file"),
             "/some/path/to/file",
             "/some/path/to/file",
-            id="posix-path",
+            id="posix",
         ),
-        # POSIX-style path with double separators
+        pytest.param(
+            "/",
+            ["some/dir/some/file"],
+            ("some", "dir", "some", "file"),
+            "some/dir/some/file",
+            "some/dir/some/file",
+            id="posix-relative",
+        ),
         pytest.param(
             "/",
             ["/some/dir//some/file"],
             ("/", "some", "dir", "some", "file"),
             "/some/dir/some/file",
             "/some/dir/some/file",
-            id="posix-path-with-double-separators",
+            id="posix-double-sep",
         ),
-        # POSIX-style path with backslashes in it
         pytest.param(
             "/",
-            ["/some/dir\\some/file"],
-            ("/", "some", "dir\\some", "file"),
-            "/some/dir\\some/file",
-            "/some/dir\\some/file",
-            id="posix-path-with-backslashes",
+            ["/some/path/to/file/"],
+            ("/", "some", "path", "to", "file"),
+            "/some/path/to/file",
+            "/some/path/to/file",
+            id="posix-trailing-sep",
         ),
-        # POSIX-style path with only backslashes (should be treated as literal backslashes)
-        pytest.param(
-            "/",
-            ["\\some\\dir\\some\\file"],
-            ("\\some\\dir\\some\\file",),
-            "\\some\\dir\\some\\file",
-            "\\some\\dir\\some\\file",
-            id="posix-path-only-backslashes",
-        ),
-        # POSIX-style path with double starting separators
         # https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_13
         pytest.param(
             "/",
@@ -568,256 +646,234 @@ def test_target_path_no_fs_exception() -> None:
             ("//", "some", "path", "to", "file"),
             "//some/path/to/file",
             "//some/path/to/file",
-            id="posix-path-with-double-starting-separators",
+            id="posix-double-leading-sep",
         ),
-        # POSIX-style path with triple starting separators
         pytest.param(
             "/",
             ["///some/path/to/file"],
             ("/", "some", "path", "to", "file"),
             "/some/path/to/file",
             "/some/path/to/file",
-            id="posix-path-with-triple-starting-separators",
+            id="posix-triple-leading-sep",
         ),
-        # POSIX-style path with trailing separator
         pytest.param(
             "/",
-            ["/some/path/to/file/"],
-            ("/", "some", "path", "to", "file"),
-            "/some/path/to/file",
-            "/some/path/to/file",
-            id="posix-path-with-trailing-separator",
+            ["/some/dir\\some/file"],
+            ("/", "some", "dir\\some", "file"),
+            "/some/dir\\some/file",
+            "/some/dir\\some/file",
+            id="posix-backslash",
         ),
-        # POSIX-style path with relative path in second arg
+        pytest.param(
+            "/",
+            ["\\some\\dir\\some\\file"],
+            ("\\some\\dir\\some\\file",),
+            "\\some\\dir\\some\\file",
+            "\\some\\dir\\some\\file",
+            id="posix-only-backslash",
+        ),
         pytest.param(
             "/",
             ["/some/dir", "some/file"],
             ("/", "some", "dir", "some", "file"),
             "/some/dir/some/file",
             "/some/dir/some/file",
-            id="posix-path-with-relative-second-arg",
+            id="posix-join-relative",
         ),
-        # POSIX-style path with absolute path in second arg
         pytest.param(
             "/",
             ["/some/path", "/to/file"],
             ("/", "to", "file"),
             "/to/file",
             "/to/file",
-            id="posix-path-with-absolute-second-arg",
+            id="posix-join-absolute",
         ),
-        # POSIX-style path with no leading separator (relative, should be treated as absolute)
-        pytest.param(
-            "/",
-            ["some/dir/some/file"],
-            ("some", "dir", "some", "file"),
-            "some/dir/some/file",
-            "some/dir/some/file",
-            id="posix-relative-path",
-        ),
-        # Windows-style path
+        pytest.param("\\", [""], (), "", "", id="windows-empty"),
+        pytest.param("\\", ["\\"], ("/",), "/", "\\", id="windows-single-sep"),
+        pytest.param("\\", ["/"], ("/",), "/", "\\", id="windows-single-alt-sep"),
+        pytest.param("\\", ["", "some\\dir"], ("some", "dir"), "some/dir", "some\\dir", id="windows-construct-empty"),
+        pytest.param("\\", ["", "C:", "some"], ("C:", "some"), "C:/some", "C:\\some", id="windows-drive-construct"),
         pytest.param(
             "\\",
             ["\\some\\path\\to\\file"],
             ("/", "some", "path", "to", "file"),
             "/some/path/to/file",
             "\\some\\path\\to\\file",
-            id="windows-path",
+            id="windows",
         ),
-        # Windows-style path with alt separator
         pytest.param(
             "\\",
             ["/some/path/to/file"],
             ("/", "some", "path", "to", "file"),
             "/some/path/to/file",
             "\\some\\path\\to\\file",
-            id="windows-path-with-alt-separator",
+            id="windows-alt",
         ),
-        # Windows-style path with double separators
         pytest.param(
             "\\",
             ["\\some\\dir\\\\some\\file"],
             ("/", "some", "dir", "some", "file"),
             "/some/dir/some/file",
             "\\some\\dir\\some\\file",
-            id="windows-path-with-double-separators",
+            id="windows-double-sep",
         ),
-        # Windows-style path with mixed separators
         pytest.param(
             "\\",
             ["\\some\\dir/some\\file"],
             ("/", "some", "dir", "some", "file"),
             "/some/dir/some/file",
             "\\some\\dir\\some\\file",
-            id="windows-path-with-mixed-separators",
+            id="windows-mixed-sep",
         ),
-        # Windows-style path with drive letter
         pytest.param(
             "\\",
             ["C:\\some\\dir\\some\\file"],
             ("C:", "some", "dir", "some", "file"),
             "C:/some/dir/some/file",
             "C:\\some\\dir\\some\\file",
-            id="windows-path-with-drive-letter",
+            id="windows-drive",
         ),
-        # Windows-style path with drive letter and alt separators
         pytest.param(
             "\\",
             ["C:/some/dir/some/file"],
             ("C:", "some", "dir", "some", "file"),
             "C:/some/dir/some/file",
             "C:\\some\\dir\\some\\file",
-            id="windows-path-with-drive-letter-alt",
+            id="windows-drive-alt",
         ),
-        # Windows-style path with drive letter and no trailing separator
         pytest.param(
             "\\",
             ["C:some/dir/some/file"],
             ("C:", "some", "dir", "some", "file"),
             "C:/some/dir/some/file",
             "C:\\some\\dir\\some\\file",
-            id="windows-path-with-drive-letter-no-sep",
+            id="windows-drive-no-sep",
         ),
-        # Windows-style path with drive letter with leading separator and no trailing separator
         pytest.param(
             "\\",
             ["/C:some/dir/some/file"],
             ("C:", "some", "dir", "some", "file"),
             "C:/some/dir/some/file",
             "C:\\some\\dir\\some\\file",
-            id="windows-path-with-drive-letter-leading-sep-no-trailing-sep",
+            id="windows-drive-leading-sep",
         ),
-        # Windows-style path with drive letter and leading slash
         pytest.param(
             "\\",
             ["/C:/some/dir/some/file"],
             ("C:", "some", "dir", "some", "file"),
             "C:/some/dir/some/file",
             "C:\\some\\dir\\some\\file",
-            id="windows-path-with-drive-letter-and-leading-slash",
+            id="windows-drive-leading-slash",
         ),
-        # Windows-style path drive letter with no trailing separator and relative path in second arg
-        pytest.param(
-            "\\",
-            ["C:", "some/dir/some/file"],
-            ("C:", "some", "dir", "some", "file"),
-            "C:/some/dir/some/file",
-            "C:\\some\\dir\\some\\file",
-            id="windows-path-with-drive-letter-no-sep-and-relative-second-arg",
-        ),
-        # Windows-style path drive letter with trailing separator and relative path in second arg
-        pytest.param(
-            "\\",
-            ["C:/", "some/dir/some/file"],
-            ("C:", "some", "dir", "some", "file"),
-            "C:/some/dir/some/file",
-            "C:\\some\\dir\\some\\file",
-            id="windows-path-with-drive-letter-and-sep-and-relative-second-arg",
-        ),
-        # Windows-style path with bare separator and relative path in second arg
-        pytest.param(
-            "\\",
-            ["\\", "C:/some/dir/some/file"],
-            ("C:", "some", "dir", "some", "file"),
-            "C:/some/dir/some/file",
-            "C:\\some\\dir\\some\\file",
-            id="windows-path-with-bare-separator-and-relative-second-arg",
-        ),
-        # Windows-style path with relative path in second arg
-        pytest.param(
-            "\\",
-            ["C:/some/dir", "some/file"],
-            ("C:", "some", "dir", "some", "file"),
-            "C:/some/dir/some/file",
-            "C:\\some\\dir\\some\\file",
-            id="windows-path-with-relative-second-arg",
-        ),
-        # Windows-style path with absolute path in second arg
-        pytest.param(
-            "\\",
-            ["C:/some/dir", "/sysvol/file"],
-            ("sysvol", "file"),
-            "sysvol/file",
-            "sysvol\\file",
-            id="windows-path-with-absolute-second-arg",
-        ),
-        # Windows-style path with drive path in second arg (should be joined in POSIX-style...)
-        pytest.param(
-            "\\",
-            ["C:/some/dir", "D:/some/file"],
-            ("C:", "some", "dir", "D:", "some", "file"),
-            "C:/some/dir/D:/some/file",
-            "C:\\some\\dir\\D:\\some\\file",
-            id="windows-path-with-drive-second-arg",
-        ),
-        # Windows-style path with drive path in second arg (...unless it starts with a separator)
-        pytest.param(
-            "\\",
-            ["C:/some/dir", "/D:/some/file"],
-            ("D:", "some", "file"),
-            "D:/some/file",
-            "D:\\some\\file",
-            id="windows-path-with-drive-second-arg-absolute",
-        ),
-        # Windows-style UNC path
-        pytest.param(
-            "\\",
-            ["\\\\some\\share\\file"],
-            ("//some/share", "file"),
-            "//some/share/file",
-            "\\\\some\\share\\file",
-            id="windows-unc-path",
-        ),
-        # Windows-style UNC path with alt separators
-        pytest.param(
-            "\\",
-            ["//some/share/file"],
-            ("//some/share", "file"),
-            "//some/share/file",
-            "\\\\some\\share\\file",
-            id="windows-unc-path-with-alt-separators",
-        ),
-        # Windows-style UNC path with absolute path in second arg
-        pytest.param(
-            "\\",
-            ["\\\\some\\share", "/sysvol/file"],
-            ("sysvol", "file"),
-            "sysvol/file",
-            "sysvol\\file",
-            id="windows-unc-path-with-absolute-second-arg",
-        ),
-        # Windows-style path with ADS
-        pytest.param(
-            "\\",
-            ["C:/some/dir/some/file:stream"],
-            ("C:", "some", "dir", "some", "file:stream"),
-            "C:/some/dir/some/file:stream",
-            "C:\\some\\dir\\some\\file:stream",
-            id="windows-path-with-ads",
-        ),
-        # Windows-style device path
-        pytest.param(
-            "\\",
-            ["\\Device\\HarddiskVolume1\\Windows\\System32\\backgroundTaskHost.exe"],
-            ("/", "Device", "HarddiskVolume1", "Windows", "System32", "backgroundTaskHost.exe"),
-            "/Device/HarddiskVolume1/Windows/System32/backgroundTaskHost.exe",
-            "\\Device\\HarddiskVolume1\\Windows\\System32\\backgroundTaskHost.exe",
-            id="windows-device-path",
-        ),
-        # Windows-style bare drive letter
         pytest.param(
             "\\",
             ["C:"],
             ("C:",),
             "C:",
             "C:",
-            id="windows-bare-drive-letter",
+            id="windows-bare-drive",
+        ),
+        pytest.param(
+            "\\",
+            ["C:", "some/dir/some/file"],
+            ("C:", "some", "dir", "some", "file"),
+            "C:/some/dir/some/file",
+            "C:\\some\\dir\\some\\file",
+            id="windows-drive-join-relative",
+        ),
+        pytest.param(
+            "\\",
+            ["C:/", "some/dir/some/file"],
+            ("C:", "some", "dir", "some", "file"),
+            "C:/some/dir/some/file",
+            "C:\\some\\dir\\some\\file",
+            id="windows-drive-sep-join-relative",
+        ),
+        pytest.param(
+            "\\",
+            ["\\", "C:/some/dir/some/file"],
+            ("C:", "some", "dir", "some", "file"),
+            "C:/some/dir/some/file",
+            "C:\\some\\dir\\some\\file",
+            id="windows-bare-sep-join-drive",
+        ),
+        pytest.param(
+            "\\",
+            ["C:/some/dir", "some/file"],
+            ("C:", "some", "dir", "some", "file"),
+            "C:/some/dir/some/file",
+            "C:\\some\\dir\\some\\file",
+            id="windows-join-relative",
+        ),
+        pytest.param(
+            "\\",
+            ["C:/some/dir", "/sysvol/file"],
+            ("sysvol", "file"),
+            "sysvol/file",
+            "sysvol\\file",
+            id="windows-join-absolute",
+        ),
+        pytest.param(
+            "\\",
+            ["C:/some/dir", "D:/some/file"],
+            ("C:", "some", "dir", "D:", "some", "file"),
+            "C:/some/dir/D:/some/file",
+            "C:\\some\\dir\\D:\\some\\file",
+            id="windows-join-drive",
+        ),
+        pytest.param(
+            "\\",
+            ["C:/some/dir", "/D:/some/file"],
+            ("D:", "some", "file"),
+            "D:/some/file",
+            "D:\\some\\file",
+            id="windows-join-drive-abs",
+        ),
+        pytest.param(
+            "\\",
+            ["\\\\some\\share\\file"],
+            ("//some/share", "file"),
+            "//some/share/file",
+            "\\\\some\\share\\file",
+            id="windows-unc",
+        ),
+        pytest.param(
+            "\\",
+            ["//some/share/file"],
+            ("//some/share", "file"),
+            "//some/share/file",
+            "\\\\some\\share\\file",
+            id="windows-unc-alt",
+        ),
+        pytest.param(
+            "\\",
+            ["\\\\some\\share", "/sysvol/file"],
+            ("sysvol", "file"),
+            "sysvol/file",
+            "sysvol\\file",
+            id="windows-unc-join-absolute",
+        ),
+        pytest.param(
+            "\\",
+            ["C:/some/dir/some/file:stream"],
+            ("C:", "some", "dir", "some", "file:stream"),
+            "C:/some/dir/some/file:stream",
+            "C:\\some\\dir\\some\\file:stream",
+            id="windows-ads",
+        ),
+        pytest.param(
+            "\\",
+            ["\\Device\\HarddiskVolume1\\Windows\\System32\\backgroundTaskHost.exe"],
+            ("/", "Device", "HarddiskVolume1", "Windows", "System32", "backgroundTaskHost.exe"),
+            "/Device/HarddiskVolume1/Windows/System32/backgroundTaskHost.exe",
+            "\\Device\\HarddiskVolume1\\Windows\\System32\\backgroundTaskHost.exe",
+            id="windows-device",
         ),
     ],
 )
 def test_target_path(sep: str, paths: list[str], parts: tuple[str, ...], string: str, flow_string: str) -> None:
     """Test that TargetPath correctly parses and represents paths."""
-    vfs = VirtualFilesystem(sep=sep, altsep="/" if sep == "\\" else "")
+    vfs = VirtualFilesystem(sep=sep, altsep="/" if sep == "\\" else None)
     path = vfs.path(*paths)
     assert path.parts == parts
     assert str(path) == string
@@ -1487,6 +1543,19 @@ def test_target_path_not_implemented(path_fs: VirtualFilesystem) -> None:
         assert path_fs.path().write_text("foo")
 
 
+def test_target_path_overrides() -> None:
+    """Test that TargetPath provides an override for all public methods of pathlib.Path."""
+    stdlib = {
+        name
+        for name, _ in inspect.getmembers(pathlib.Path)
+        if (not name.startswith("_")) or name.startswith("__")  # public members only
+    }
+    target_path_methods = {name for name, _ in inspect.getmembers(fsutil.TargetPath)}
+    assert len(stdlib - target_path_methods) == 0, (
+        f"TargetPath is missing overrides for: {stdlib - target_path_methods}"
+    )
+
+
 def test_target_path_checks_dirfs(tmp_path: Path, target_win: Target) -> None:
     """Test that TargetPath correctly checks for files and directories in a mapped DirectoryFilesystem on Windows."""
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
@@ -1529,11 +1598,11 @@ def test_target_path_checks_virtual() -> None:
 @pytest.mark.parametrize(
     ("file_name", "compressor", "content"),
     [
-        ("plain", lambda x: x, b"plain\ncontent"),
-        ("comp.gz", gzip.compress, b"gzip\ncontent"),
-        ("comp_gz", gzip.compress, b"gzip\ncontent"),
-        ("comp.bz2", bz2.compress, b"bz2\ncontent"),
-        ("comp_bz2", bz2.compress, b"bz2\ncontent"),
+        pytest.param("plain", lambda x: x, b"plain\ncontent", id="plain"),
+        pytest.param("comp.gz", gzip.compress, b"gzip\ncontent", id="gzip"),
+        pytest.param("comp_gz", gzip.compress, b"gzip\ncontent", id="gzip-underscore"),
+        pytest.param("comp.bz2", bz2.compress, b"bz2\ncontent", id="bz2"),
+        pytest.param("comp_bz2", bz2.compress, b"bz2\ncontent", id="bz2-underscore"),
     ],
 )
 def test_open_decompress(file_name: str, compressor: Callable, content: bytes) -> None:
@@ -1548,9 +1617,9 @@ def test_open_decompress(file_name: str, compressor: Callable, content: bytes) -
 @pytest.mark.parametrize(
     ("compressor", "mock_bool_name"),
     [
-        (fsutil.lzma.compress, "HAS_XZ"),
-        (fsutil.bz2.compress, "HAS_BZ2"),
-        (fsutil.zstd.compress, "HAS_ZSTD"),
+        pytest.param(fsutil.lzma.compress, "HAS_XZ", id="xz"),
+        pytest.param(fsutil.bz2.compress, "HAS_BZ2", id="bz2"),
+        pytest.param(fsutil.zstd.compress, "HAS_ZSTD", id="zstd"),
     ],
 )
 def test_open_decompress_missing_module(
@@ -1701,8 +1770,8 @@ def getxattr_spec(xattrs: dict[str, str]) -> dict[str, Any]:
 @pytest.mark.parametrize(
     "follow_symlinks",
     [
-        True,
-        False,
+        pytest.param(True, id="follow-symlinks"),
+        pytest.param(False, id="no-follow-symlinks"),
     ],
 )
 def test_fs_attrs(
@@ -1767,14 +1836,20 @@ def glob_fs() -> VirtualFilesystem:
 @pytest.mark.parametrize(
     ("start_path", "pattern", "results"),
     [
-        ("/", "foo/bar/bla/file.*", ["foo/bar/bla/file.ini", "foo/bar/bla/file.txt"]),
-        ("/", "foo/bar/*/file.ini", ["foo/bar/bla/file.ini"]),
-        ("/", "foo/bar/*/file.*", ["foo/bar/bla/file.ini", "foo/bar/bla/file.txt"]),
-        ("/", "*/bar/bla/file.ini", ["foo/bar/bla/file.ini", "moo/bar/bla/file.ini"]),
-        ("/", "*/bar/bla/*.ini", ["foo/bar/bla/file.ini", "moo/bar/bla/file.ini"]),
-        ("/foo", "*/bla/file.ini", ["foo/bar/bla/file.ini"]),
-        ("/foo", "*/bla/*.ini", ["foo/bar/bla/file.ini"]),
-        ("/", "boo/bla/*", []),
+        pytest.param("/", "foo/bar/bla/file.*", ["foo/bar/bla/file.ini", "foo/bar/bla/file.txt"], id="wildcard-ext"),
+        pytest.param("/", "foo/bar/*/file.ini", ["foo/bar/bla/file.ini"], id="wildcard-dir"),
+        pytest.param(
+            "/", "foo/bar/*/file.*", ["foo/bar/bla/file.ini", "foo/bar/bla/file.txt"], id="wildcard-dir-and-ext"
+        ),
+        pytest.param(
+            "/", "*/bar/bla/file.ini", ["foo/bar/bla/file.ini", "moo/bar/bla/file.ini"], id="wildcard-root-dir"
+        ),
+        pytest.param(
+            "/", "*/bar/bla/*.ini", ["foo/bar/bla/file.ini", "moo/bar/bla/file.ini"], id="wildcard-root-dir-ext"
+        ),
+        pytest.param("/foo", "*/bla/file.ini", ["foo/bar/bla/file.ini"], id="subdir-wildcard-dir"),
+        pytest.param("/foo", "*/bla/*.ini", ["foo/bar/bla/file.ini"], id="subdir-wildcard-dir-ext"),
+        pytest.param("/", "boo/bla/*", [], id="no-match"),
     ],
 )
 def test_glob_ext(glob_fs: VirtualFilesystem, start_path: str, pattern: str, results: list[str]) -> None:

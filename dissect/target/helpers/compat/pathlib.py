@@ -38,7 +38,11 @@ Changes will be marked with a comment starting with `# PATCH`. The largest struc
 - All variations of path (i.e. the product of all case sensitivity and separator styles) are pre-created as subclasses,
   and the correct class will be selected during TargetPath initialization
 
-Commit hash we're in sync with: 1bfe86c
+Commit we're in sync with:
+Hash:       ffb543d32f14803e8379c15a0a2d96c6b4c4dacd
+Date:       2026-05-05
+Branch:     main (3.15)
+URL:        https://github.com/python/cpython/commit/ffb543d32f14803e8379c15a0a2d96c6b4c4dacd
 
 Notes:
     - https://github.com/python/cpython/blob/main/Lib/pathlib
@@ -59,6 +63,14 @@ from dissect.target.filesystem import Filesystem
 from dissect.target.helpers import polypath
 from dissect.target.helpers.compat.glob import _no_recurse_symlinks, _PathGlobber, _StringGlobber
 
+try:
+    from pathlib import UnsupportedOperation
+except ImportError:
+
+    class UnsupportedOperation(NotImplementedError):
+        """An exception that is raised when an unsupported operation is attempted."""
+
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
@@ -66,10 +78,6 @@ if TYPE_CHECKING:
 
     from dissect.target.filesystem import DirEntry, FilesystemEntry
     from dissect.target.helpers.fsutil import stat_result
-
-
-class UnsupportedOperation(NotImplementedError):
-    """An exception that is raised when an unsupported operation is attempted."""
 
 
 def _create_error_method(key: str) -> Callable[..., None]:

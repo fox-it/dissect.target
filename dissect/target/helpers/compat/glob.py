@@ -2,7 +2,11 @@
 
 Update periodically.
 
-Commit hash we're in sync with: e542255
+Commit we're in sync with:
+Hash:       e54225545866d780b12d8e70c33d25fc13b2c3a9
+Date:       2026-03-02T11:56:28.000Z
+Branch:     main (3.15)
+URL:        https://github.com/python/cpython/commit/e54225545866d780b12d8e70c33d25fc13b2c3a9
 
 Notes:
     - https://github.com/python/cpython/blob/main/Lib/glob.py

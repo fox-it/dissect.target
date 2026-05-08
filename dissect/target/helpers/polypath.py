@@ -132,9 +132,9 @@ if TYPE_CHECKING:
 
     from dissect.target.filesystem import Filesystem
 
-# Additional drive names we allow besides traditional drive letters
 # Keep in sync with plugins/os/windows/_os.py
-ALLOWED_DRIVE_NAMES = ("$fs", "sysvol", "efi", "winre")
+ALLOWED_DRIVE_NAMES = ("$fs$", "sysvol", "efi", "winre")
+"""Additional drive names we allow besides traditional drive letters."""
 
 RE_NORMALIZE_PATH = re.compile(r"[/]+")
 RE_NORMALIZE_SBS_PATH = re.compile(r"[\\/]+")
@@ -152,7 +152,14 @@ def normalize(path: str, *, sep: str = "/") -> str:
 
 
 def isabs(path: str, *, sep: str = "/") -> bool:
-    """Test whether a path is absolute."""
+    """Test whether a path is absolute.
+
+    For POSIX-style paths, this is simply whether the path starts with a separator.
+    For Windows-style paths, we consider a path to be absolute if it starts with a separator
+    (e.g. ``\\path`` and UNC paths) or if it has a drive letter (e.g. ``C:\\path``, or any of the
+    additional drive names in ``ALLOWED_DRIVE_NAMES``).
+    Note that we also consider ``C:path`` to be absolute, since internally we would normalize this to ``C:\\path``.
+    """
     # We only consider paths starting with a separator to be absolute
     if sep == "\\":
         if path[:1] in ("\\", "/"):
@@ -190,8 +197,37 @@ def join(*args: str, sep: str = "/") -> str:
 def split(path: str, *, sep: str = "/") -> str:
     """Split a pathname. Returns tuple "(head, tail)" where "tail" is
     everything after the final slash. Either part may be empty.
+
+    Splitting always follows POSIX rules, with a twist. We do split Windows-style paths using the rules
+    described in :func:`splitroot`, but we normalize the result to more closely resemble POSIX-style splitting.
+    That does mean that for Windows-style paths, the "head" part will be normalized according to :func:`splitroot`
+    rules (e.g. ``/C:/path`` becomes ``C:/path``).
     """
-    return ntpath.split(path) if sep == "\\" else posixpath.split(path)
+    # Copy ntpath.split with small tweaks
+    path = os.fspath(path)
+
+    if sep == "\\":
+        drive, root, path = splitroot(path, sep=sep)
+        # set i to index beyond paths's last slash
+        i = len(path)
+
+        while i and path[i - 1] not in ("\\", "/"):
+            i -= 1
+        head, tail = path[:i], path[i:]  # now tail has no slashes
+        head = head.rstrip("\\/")
+        if drive and not head and not tail:
+            # Normalize "C:/" to ("", "C:") instead of ("C:/", "")
+            return "", drive
+        if drive and not head and tail:
+            # Normalize "C:/foo" to ("C:", "foo") instead of ("C:/", "foo")
+            return drive, tail
+        if not drive and not head and not tail:
+            # Normalize "" to ("", "") instead of ("\\", "")
+            return "", ""
+        return drive + root + head, tail
+
+    # POSIX split
+    return posixpath.split(path)
 
 
 def splitext(path: str, *, sep: str = "/") -> tuple[str, str]:
@@ -207,7 +243,7 @@ def splitext(path: str, *, sep: str = "/") -> tuple[str, str]:
 
 
 def splitdrive(path: str, *, sep: str = "/") -> tuple[str, str]:
-    """Split a pathname into drive and path. On POSIX separators, drive is always empty."""
+    """Split a pathname into drive and path. On POSIX-style separators, drive is always empty."""
     if sep == "\\":
         drive, root, tail = splitroot(path, sep=sep)
         return drive, root + tail
@@ -218,19 +254,24 @@ def splitroot(path: str, *, sep: str = "/") -> tuple[str, str, str]:
     """Split a pathname into drive, root and tail.
 
     The tail contains anything after the root.
+
+    For POSIX-style paths, pure POSIX rules are followed, so the drive is always empty.
+    For Windows-style paths, we consider paths starting with a separator to be absolute and a
+    candidate for having a drive. The drive is initially split according to ``ntpath.splitroot`` rules, but
+    we do additional processing to allow for some additional drive names (``ALLOWED_DRIVE_NAMES``) and to handle some
+    edge cases with leading separators.
     """
     if sep == "\\":
-        removed_leading_sep = False
-        # Only split using ntpath rules if the path starts with a separator (i.e. it's an absolute path)
+        removed_leading_sep = None
         if path[:1] in ("\\", "/") and path[1:2] not in ("\\", "/"):
             # We need to strip the leading separator for ntpath to correctly parse drive letters
             # Multiple leading separators could be UNC or device paths, so preserve them for correct parsing
+            removed_leading_sep = path[:1]
             path = path[1:]
-            removed_leading_sep = True
 
         drive, root, rel = nt_splitroot(path)
         if not drive and rel:
-            # ntpath only splts drives for UNC, device or drive letter paths
+            # ntpath only splits drives for UNC, device or drive letter paths
             # We want to support a few other drive names too (ALLOWED_DRIVE_NAMES)
             # Since we only take this path on absolute paths (and absolute paths are guaranteed by fs.path()),
             # we can treat the first part of the path as a drive, and the rest as a relative path
@@ -241,9 +282,9 @@ def splitroot(path: str, *, sep: str = "/") -> tuple[str, str, str]:
                     root = rel[index : index + 1] if index != -1 else "\\"
                 rel = rel[index + 1 :] if index != -1 else ""
 
-        if (not drive and not rel) or (removed_leading_sep and not drive and not root):
+        if (not drive and not rel) or (removed_leading_sep is not None and not drive and not root):
             # E.g. bare separator path like "\" or "/"
-            root = "\\"
+            root = removed_leading_sep or "\\"
 
         elif drive and not root:
             # E.g. c:path/to/file
@@ -263,29 +304,38 @@ def splitroot(path: str, *, sep: str = "/") -> tuple[str, str, str]:
 
 
 def basename(path: str, *, sep: str = "/") -> str:
-    """Returns the final component of a pathname."""
-    # Copy of posixpath.basename that uses the given separator
-    path = os.fspath(path)
-    normpath = path.replace("/", "\\") if sep == "\\" else path
-    i = normpath.rfind(sep) + 1
-    return path[i:]
+    """Returns the final component of a pathname.
+
+    Follows the same splitting rules as :func:`split`, but only returns the "tail" part.
+    """
+    return split(path, sep=sep)[1]
 
 
 def dirname(path: str, *, sep: str = "/") -> str:
-    """Returns the directory component of a pathname."""
-    # Copy of posixpath.dirname that uses the given separator
-    path = os.fspath(path)
-    normpath = path.replace("/", "\\") if sep == "\\" else path
-    i = normpath.rfind(sep) + 1
-    head = normpath[:i]
-    if head and head != sep * len(head):
-        head = head.rstrip(sep)
-    return path[: len(head)]
+    """Returns the directory component of a pathname.
+
+    Follows the same splitting rules as :func:`split`, but only returns the "head" part.
+    """
+    return split(path, sep=sep)[0]
 
 
 def normpath(path: str, *, sep: str = "/") -> str:
-    """Normalize path, eliminating double slashes, etc."""
-    path = ntpath.normpath(path) if sep == "\\" else posixpath.normpath(path)
+    """Normalize path, eliminating double slashes, etc.
+
+    For Windows-style paths we handle drive letters and leading separators according to :func:`splitroot` rules.
+    POSIX rules are followed for all other aspects of normalization, with normalization to the given separator.
+    """
+    if sep == "\\":
+        removed_leading_sep = False
+        if path[:1] in ("\\", "/") and path[1:2] not in ("\\", "/"):
+            removed_leading_sep = True
+            path = path[1:]
+        path = posixpath.normpath(path.replace("\\", "/")).replace("/", "\\")
+        if removed_leading_sep and splitroot(path, sep=sep)[0] == "":
+            path = sep + path
+    else:
+        path = posixpath.normpath(path)
+
     if path == ".":
         path = ""
     return path
@@ -430,7 +480,11 @@ def _commonprefix(m: Sequence[str], /) -> str:
 
 
 def relpath(path: str, start: str, *, sep: str = "/", case_sensitive: bool | None = None) -> str:
-    """Return a relative version of a path."""
+    """Return a relative version of a path.
+
+    POSIX rules are followed for all aspects of relative path calculation, with normalization to the given separator.
+    This means that drive letters are not treated as special components and will not "reset" the path to the root.
+    """
     # Copy of posixpath.relpath with pieces of ntpath.relpath
     path = os.fspath(path)
     if not path:
@@ -473,7 +527,11 @@ def relpath(path: str, start: str, *, sep: str = "/", case_sensitive: bool | Non
 
 
 def commonpath(paths: list[str], *, sep: str = "/", case_sensitive: bool | None = None) -> str:
-    """Given a sequence of path names, returns the longest common sub-path."""
+    """Given a sequence of path names, returns the longest common sub-path.
+
+    POSIX rules are followed for all aspects of common path calculation, with normalization to the given separator.
+    This means that drive letters are not treated as special components.
+    """
     # Copy of posixpath.commonpath with pieces of ntpath.commonpath
     paths = tuple(map(os.fspath, paths))
     if not paths:
