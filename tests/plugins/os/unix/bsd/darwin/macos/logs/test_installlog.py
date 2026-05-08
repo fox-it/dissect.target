@@ -41,13 +41,16 @@ def test_install_log(test_file: str, target_unix: Target, fs_unix: VirtualFilesy
         assert results[0].host == "localhost"
         assert results[0].component == "Installer"
         assert results[0].message == "Progress[57]: Progress UI App Starting"
+        assert results[0].source == "/var/log/install.log"
 
         assert results[1].ts == datetime(2026, 3, 25, 14, 7, tzinfo=tz)
         assert results[1].host == "localhost"
         assert results[1].component == "Installer"
         assert results[1].message == "Progress[57]: Logging also using os_log, installerProgressLog = 0xc6501c080"
+        assert results[0].source == "/var/log/install.log"
 
         assert results[-1].ts == datetime(2026, 3, 25, 15, 18, 58, tzinfo=tz)
         assert results[-1].host == "users-Virtual-Machine"
         assert results[-1].component == "loginwindow[1042]:"
         assert results[-1].message == "+[SUOSULoginCredentialPolicy currentLoginCredentialPolicy] = 0"
+        assert results[0].source == "/var/log/install.log"

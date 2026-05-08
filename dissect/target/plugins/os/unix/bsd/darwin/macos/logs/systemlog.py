@@ -23,11 +23,7 @@ RE_TIMESTAMP_PATTERN = re.compile(r"^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|
 
 
 class SystemLogPlugin(Plugin):
-    """Return information related software installations and updates on macOS.
-
-    References:
-        - https://sansorg.egnyte.com/dl/m9ftGF7heI
-    """
+    """Return system logs on macOS."""
 
     SYSTEM_LOG_GLOB = "/var/log/system.log*"
 
@@ -46,7 +42,7 @@ class SystemLogPlugin(Plugin):
 
     @export(record=macOSSystemLogRecord)
     def systemlog(self) -> Iterator[macOSSystemLogRecord]:
-        """Return all macOS install log messages.
+        """Return all macOS system log messages.
 
         Yields macOSSystemLogRecord instances with fields:
 
@@ -102,7 +98,7 @@ class SystemLogPlugin(Plugin):
                     host=hostname.strip(),
                     component=component.strip(),
                     message=message.strip(),
-                    source=filepath,  # What benefit does this field have???
+                    source=filepath,
                     _target=self.target,
                 )
 

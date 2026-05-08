@@ -20,6 +20,7 @@ macOSInstallLogRecord = TargetRecordDescriptor(
         ("string", "host"),
         ("string", "component"),
         ("string", "message"),
+        ("path", "source"),
     ],
 )
 
@@ -60,6 +61,7 @@ class InstallLogPlugin(Plugin):
             host (str): Hostname.
             component (str): Component name.
             message (str): Log message.
+            source (path): Path to the log file.
 
         References:
             - https://sansorg.egnyte.com/dl/m9ftGF7heI
@@ -84,6 +86,7 @@ class InstallLogPlugin(Plugin):
                         host=hostname.strip(),
                         component=component.strip(),
                         message=message.strip(),
+                        source=self.INSTALL_LOG_PATH,
                         _target=self.target,
                     )
 
@@ -102,5 +105,6 @@ class InstallLogPlugin(Plugin):
                 host=hostname.strip(),
                 component=component.strip(),
                 message=message.strip(),
+                source=self.INSTALL_LOG_PATH,
                 _target=self.target,
             )
