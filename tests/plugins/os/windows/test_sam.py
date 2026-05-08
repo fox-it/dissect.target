@@ -6,7 +6,6 @@ import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import RegFlex, VirtualKey
-from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from tests._utils import absolute_path
 from tests.plugins.os.windows.test_lsa import map_lsa_system_keys
 
@@ -391,13 +390,12 @@ def test_sam_plugin_groups(target_win_users: Target) -> None:
     """Test SAM groups loading from a .reg file using RegFlex."""
     # Load test data registry hive from .reg file using RegFlex
     regflex = RegFlex()
-    with absolute_path("_data/plugins/os/windows/sam/sam_groups.reg").open() as fh:
+    reg_file_path = "_data/plugins/os/windows/sam/sam_groups.reg"
+    with absolute_path(reg_file_path).open() as fh:
         regflex.map_definition(fh)
 
     # Map hives from regflex into target
     for name, hive in regflex.hives.items():
-        if name in RegistryPlugin.SHORTNAMES:
-            name = RegistryPlugin.SHORTNAMES[name]
         target_win_users.registry._map_hive(name, hive)
 
     # Add the SAM plugin and get groups

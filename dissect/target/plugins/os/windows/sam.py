@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 from dissect.util import ts
+from dissect.util.sid import read_sid, write_sid
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -290,41 +291,6 @@ def expand_des_key(key: bytes) -> bytes:
     return bytes(s)
 
 
-def parse_sid_cstruct(buf: bytes, offset: int = 0) -> tuple[str, int]:
-    """Parse a SID using cstruct for the fixed prefix, then loop for the variable subauthorities.
-
-    Layout:
-      1 byte  revision
-      1 byte  subcnt
-      6 bytes identifier authority (big-endian)
-      N x 4-byte subauthorities (little-endian)
-    """
-    SID_PREFIX_LEN = 8  # 1(revision)+1(subcnt)+6(identifier authority)
-
-    if len(buf) - offset < SID_PREFIX_LEN:
-        raise ValueError("Buffer too small for SID prefix")
-
-    sp = c_sam.SID_PREFIX(buf[offset : offset + SID_PREFIX_LEN])
-    rev = sp.revision
-    subcnt = sp.subcnt
-    ident_auth = int.from_bytes(bytes(sp.ident_auth), "big")
-
-    cur = offset + SID_PREFIX_LEN
-    need = subcnt * 4
-    if len(buf) - cur < need:
-        raise ValueError("Buffer too small for SID subauthorities")
-
-    subs: list[int] = []
-    for _ in range(subcnt):
-        # subauthority is little-endian uint32
-        val = int.from_bytes(buf[cur : cur + 4], "little")
-        subs.append(val)
-        cur += 4
-
-    sid_str = f"S-{rev}-{ident_auth}" + "".join(f"-{s}" for s in subs)
-    return sid_str, (cur - offset)
-
-
 def parse_sam_group_c_value(cbytes: bytes) -> tuple[int, str, str, list[str]]:
     """Parse an Aliases RID 'C' value using cstruct for the fixed header.
     Returns: (rid, name, description, members).
@@ -362,7 +328,10 @@ def parse_sam_group_c_value(cbytes: bytes) -> tuple[int, str, str, list[str]]:
             for _ in range(hdr.sid_cnt):
                 if cur >= len(arr):
                     break
-                sid, used = parse_sid_cstruct(arr, cur)
+
+                sid = read_sid(arr[cur:])
+                used = len(write_sid(sid))
+
                 members.append(sid)
                 cur += used
 
@@ -452,8 +421,8 @@ class SamPlugin(Plugin):
         if not HAS_CRYPTO:
             raise UnsupportedPluginError("Missing pycryptodome dependency")
 
-        # if not self.target.has_function("lsa"):
-        #    raise UnsupportedPluginError("LSA plugin is required for SAM plugin")
+        if not self.target.has_function("lsa"):
+            raise UnsupportedPluginError("LSA plugin is required for SAM plugin")
 
         if not len(list(self.target.registry.keys(self.SAM_USER_KEY))) > 0:
             raise UnsupportedPluginError(f"Registry key not found: {self.SAM_USER_KEY}")
@@ -644,8 +613,11 @@ class SamPlugin(Plugin):
                 u_lmpw = v_data[v.lmpw_ofs : v.lmpw_ofs + v.lmpw_len]
                 u_ntpw = v_data[v.ntpw_ofs : v.ntpw_ofs + v.ntpw_len]
 
-                lm_hash = decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
-                nt_hash = decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
+                lm_hash = ""
+                nt_hash = ""
+                if samkey:
+                    lm_hash = decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
+                    nt_hash = decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
 
                 names_key = self.target.registry.key(f"{self.SAM_USER_KEY}\\Users\\Names\\{u_username}")
 
