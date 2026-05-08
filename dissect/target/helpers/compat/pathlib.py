@@ -125,10 +125,10 @@ class _PolyParser:
     """
 
     sep = "/"
-    altsep = ""
+    altsep = None
     case_sensitive = False
 
-    def __init__(self, case_sensitive: bool = False, sep: str = "/", altsep: str = ""):
+    def __init__(self, case_sensitive: bool = False, sep: str = "/", altsep: str | None = None):
         self.case_sensitive = case_sensitive
         self.sep = sep
         self.altsep = altsep
@@ -1404,12 +1404,12 @@ class _TargetGlobber(_PathGlobber):
 # Do this statically instead of dynamically so that it's a bit easier to reason about
 # We could patch the class names up but, as I found out the hard way, that makes debugging harder
 class PureCaseSensitivePosixTargetPath(PureTargetPath):
-    parser = _PolyParser(case_sensitive=True, sep="/", altsep="")
+    parser = _PolyParser(case_sensitive=True, sep="/", altsep=None)
     __slots__ = ()
 
 
 class PureCaseInsensitivePosixTargetPath(PureTargetPath):
-    parser = _PolyParser(case_sensitive=False, sep="/", altsep="")
+    parser = _PolyParser(case_sensitive=False, sep="/", altsep=None)
     __slots__ = ()
 
 
@@ -1424,12 +1424,12 @@ class PureCaseInsensitiveWindowsTargetPath(PureTargetPath):
 
 
 class PureCaseSensitiveDumbTargetPath(PureTargetPath):
-    parser = _PolyParser(case_sensitive=True, sep="\\", altsep="")
+    parser = _PolyParser(case_sensitive=True, sep="\\", altsep=None)
     __slots__ = ()
 
 
 class PureCaseInsensitiveDumbTargetPath(PureTargetPath):
-    parser = _PolyParser(case_sensitive=False, sep="\\", altsep="")
+    parser = _PolyParser(case_sensitive=False, sep="\\", altsep=None)
     __slots__ = ()
 
 
@@ -1476,12 +1476,12 @@ class CaseInsensitiveDumberTargetPath(TargetPath, PureCaseInsensitiveDumberTarge
 
 
 _path_variants = {
-    (True, "/", ""): CaseSensitivePosixTargetPath,
-    (False, "/", ""): CaseInsensitivePosixTargetPath,
+    (True, "/", None): CaseSensitivePosixTargetPath,
+    (False, "/", None): CaseInsensitivePosixTargetPath,
     (True, "\\", "/"): CaseSensitiveWindowsTargetPath,
     (False, "\\", "/"): CaseInsensitiveWindowsTargetPath,
-    (True, "\\", ""): CaseSensitiveDumbTargetPath,
-    (False, "\\", ""): CaseInsensitiveDumbTargetPath,
+    (True, "\\", None): CaseSensitiveDumbTargetPath,
+    (False, "\\", None): CaseInsensitiveDumbTargetPath,
     (True, "/", "\\"): CaseSensitiveDumberTargetPath,
     (False, "/", "\\"): CaseInsensitiveDumberTargetPath,
 }

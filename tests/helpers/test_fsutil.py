@@ -462,7 +462,7 @@ def test_stat_result() -> None:
 
 @pytest.mark.parametrize(
     ("sep", "altsep"),
-    [("/", ""), ("\\", "/")],
+    [("/", None), ("\\", "/")],
     ids=["posix", "windows"],
 )
 @pytest.mark.parametrize(
@@ -477,7 +477,7 @@ def test_target_path_parser(sep: str, altsep: str, case_sensitive: bool) -> None
     # Direct initialization just uses the defaults
     path = fsutil.PureTargetPath("/some/dir")
     assert path.parser.sep == "/"
-    assert path.parser.altsep == ""
+    assert path.parser.altsep is None
 
     # Initialization with a VFS should use the VFS's separators
     path = vfs.path("/some/dir")

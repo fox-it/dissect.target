@@ -1247,10 +1247,10 @@ def test_layer_filesystem() -> None:
     assert lfs.path("file1").read_text() == "value1"
 
     assert lfs.sep == "/"
-    assert lfs.altsep == ""
+    assert lfs.altsep is None
     for layer in lfs.layers:
         assert layer.sep == "/"
-        assert layer.altsep == ""
+        assert layer.altsep is None
 
     lfs.sep = "\\"
     assert lfs.sep == "\\"
