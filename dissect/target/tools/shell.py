@@ -1390,7 +1390,7 @@ class TargetCli(TargetCmd):
                 if args.hex:
                     print(fh.read(args.length).hex(), file=stdout)
                 else:
-                    print(hexdump(fh.read(args.length), output="string"), file=stdout)
+                    print(hexdump(fh.read(args.length), output="string", pretty=True), file=stdout)
 
         return False
 
@@ -1666,7 +1666,7 @@ class RegistryCli(TargetCmd):
         if args.hex:
             print(value.value.hex(), file=stdout)
         else:
-            print(hexdump(value.value, output="string"), file=stdout)
+            print(hexdump(value.value, output="string", pretty=True), file=stdout)
 
         return False
 

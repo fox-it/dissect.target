@@ -99,7 +99,7 @@ def cmd_hexdump(t: Target, args: argparse.Namespace) -> None:
         print(f"# {obj}")
 
         obj.seek(args.skip)
-        hexdump(obj.read(args.length), offset=args.skip)
+        hexdump(obj.read(args.length), offset=args.skip, pretty=True)
 
         print()
 
