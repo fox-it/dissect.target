@@ -6,6 +6,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from flow.record.fieldtypes import windows_path
+
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.arch import target_triple
 from dissect.target.helpers.record import WindowsUserRecord
@@ -324,10 +326,12 @@ class WindowsPlugin(OSPlugin):
                     # Use SAM username if available
                     name = self._sam_by_sid[sid].username if sid in self._sam_by_sid else home.split("\\")[-1]
 
+                resolved_home = self.target.resolve(home) if home else None
+
                 yield WindowsUserRecord(
                     sid=subkey.name,
                     name=name,
-                    home=self.target.resolve(home),
+                    home=windows_path(str(resolved_home)) if resolved_home else None,
                     _target=self.target,
                 )
 

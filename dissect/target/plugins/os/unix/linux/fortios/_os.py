@@ -9,6 +9,7 @@ from io import BytesIO
 from tarfile import ReadError
 from typing import TYPE_CHECKING, BinaryIO, TextIO
 
+from flow.record.fieldtypes import posix_path
 from dissect.util import cpio
 from dissect.util.compression import xz
 
@@ -282,7 +283,7 @@ class FortiOSPlugin(LinuxPlugin):
                     name=username,
                     password=":".join(entry.get("password", [])),
                     groups=list(entry.get("accprofile", [])),
-                    home="/root",
+                    home=posix_path("/root"),
                     _target=self.target,
                 )
         except KeyError as e:
@@ -297,7 +298,7 @@ class FortiOSPlugin(LinuxPlugin):
                         name=username,
                         password=":".join(entry.get("password", [])),
                         groups=list(entry.get("profileid", [])),
-                        home="/root",
+                        home=posix_path("/root"),
                         _target=self.target,
                     )
             except KeyError as e:

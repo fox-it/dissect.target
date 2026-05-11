@@ -4,6 +4,8 @@ import gzip
 from io import BytesIO
 from typing import TYPE_CHECKING
 
+from flow.record.fieldtypes import posix_path
+
 from dissect.target.plugins.os.unix.linux.fortios._os import FortiOSPlugin
 from dissect.target.plugins.os.unix.linux.fortios.generic import GenericPlugin
 from dissect.target.plugins.os.unix.linux.fortios.locale import FortiOSLocalePlugin
@@ -93,7 +95,7 @@ def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert users[0].name == "admin"
     assert users[0].groups == ["super_admin"]
     assert users[0].password == "ENC:SH22zS4+QvU399DXuDApIVHu5fGh3wQCwO1aGeqlbA08G9tB/DvJsqLdG9HA18="
-    assert users[0].home == "/root"
+    assert users[0].home == posix_path("/root")
 
     assert users[1].hostname == "FortiGate-VM64"
     assert users[1].name == "guest"
