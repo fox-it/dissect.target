@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 log = get_logger(__name__)
 
 

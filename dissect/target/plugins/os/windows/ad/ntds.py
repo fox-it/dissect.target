@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from functools import cached_property
+from itertools import zip_longest
 from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds import NTDS
+from dissect.database.ese.ntds.util import UserAccountControl
 
 from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -158,7 +160,6 @@ class NtdsPlugin(Plugin):
     @export(record=NtdsGPORecord)
     def group_policies(self) -> Iterator[NtdsGPORecord]:
         """Extract all group policy objects (GPO) NTDS.dit database."""
-
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
                 cn=gpo.cn,
@@ -171,10 +172,60 @@ class NtdsPlugin(Plugin):
                 _target=self.target,
             )
 
+    @export(output="yield")
+    def secretsdump(self) -> Iterator[str]:
+        """Extract credentials in secretsdump format. Because it's a popular format."""
+        # Keep impacket defined constants in the method so we don't polute our own
+        kerberos_key_type = {
+            1: "dec-cbc-crc",
+            3: "des-cbc-md5",
+            17: "aes128-cts-hmac-sha1-96",
+            18: "aes256-cts-hmac-sha1-96",
+            0xFFFFFF74: "rc4_hmac",
+        }
+
+        for obj in self.ntds.query(
+            # For now just use the same filter as secretsdump.py
+            "(&(|(sAMAccountType=805306368)(sAMAccountType=805306369)(sAMAccountType=805306370))(instanceType=4))"
+        ):
+            if (upn := obj.get("userPrincipalName")) is not None:
+                domain = upn.split("@")[-1]
+                username = f"{domain}\\{obj.sam_account_name}"
+            else:
+                username = obj.sam_account_name
+
+            rid = obj.rid
+            lm_hash = des_decrypt(lm_pwd, rid).hex() if (lm_pwd := obj.get("dBCSPwd")) else DEFAULT_LM_HASH
+            nt_hash = des_decrypt(nt_pwd, rid).hex() if (nt_pwd := obj.get("unicodePwd")) else DEFAULT_NT_HASH
+            pwd_last_set = obj.get("pwdLastSet")
+            user_account_status = (
+                "Disabled" if UserAccountControl.ACCOUNTDISABLE in obj.user_account_control else "Enabled"
+            )
+
+            yield f"{username}:{rid}:{lm_hash}:{nt_hash}::: (pwdLastSet={pwd_last_set}) (status={user_account_status})"
+
+            # Password history output doesn't match what secretsdump.py outputs, but that's because they parse it wrong.
+            # Their crypto is flawed and assumes the LM history is always RC4 encrypted. That's not the case,
+            # it's just another encrypted blob that has an USHORT AlgoritmId determining the encryption type.
+            # Our decryption is handled transparently by the NTDS implementation, so we don't have to worry about it.
+            lm_history = [des_decrypt(lm, rid).hex() for lm in obj.get("lmPwdHistory")]
+            nt_history = [des_decrypt(nt, rid).hex() for nt in obj.get("ntPwdHistory")]
+            for i, (lm_hist, nt_hist) in enumerate(zip_longest(lm_history, nt_history, fillvalue="")):
+                yield f"{username}_history{i}:{rid}:{lm_hist}:{nt_hist}:::"
+
+            for supplemental in obj.get("supplementalCredentials") or []:
+                if "Primary:Kerberos-Newer-Keys" in supplemental:
+                    for cred in supplemental["Primary:Kerberos-Newer-Keys"]["Credentials"]:
+                        key_type = kerberos_key_type.get(cred["KeyType"], hex(cred["KeyType"]))
+                        key = cred["Key"].hex()
+                        yield f"{username}:{key_type}:{key}"
+
+                if "Primary:CLEARTEXT" in supplemental:
+                    yield f"{username}:CLEARTEXT:{supplemental['Primary:CLEARTEXT']}"
+
 
 def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
-
     lm_hash = des_decrypt(lm_pwd, user.rid).hex() if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
     nt_hash = des_decrypt(nt_pwd, user.rid).hex() if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
 

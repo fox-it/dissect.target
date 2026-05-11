@@ -12,7 +12,7 @@ from dissect.cstruct import utils
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.scrape import recover_string
-from dissect.target.plugins.scrape.qfind import QFindMatchRecord, QFindPlugin
+from dissect.target.plugins.scrape.qfind import QFindPlugin
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dissect.target.container import Container
+    from dissect.target.plugins.scrape.qfind import QFindMatchRecord
     from dissect.target.target import Target
     from dissect.target.volume import Volume
 
@@ -91,7 +92,7 @@ def main() -> int:
                 header = f"[{hit.offset:#08x} @ {hit.needle} ({hit.codec})]"
 
                 if not NO_COLOR:
-                    header = utils.COLOR_WHITE + header + utils.COLOR_NORMAL
+                    header = utils.COLOR_WHITE_BOLD + header + utils.COLOR_CLEAR
 
                 before_offset = max(0, hit.offset - args.window)
                 needle_len = len(hit.match)
@@ -100,7 +101,7 @@ def main() -> int:
 
                 if args.raw:
                     palette = (
-                        [(hit.offset - before_offset, utils.COLOR_NORMAL), (needle_len, utils.COLOR_BG_RED)]
+                        [(hit.offset - before_offset, utils.COLOR_CLEAR), (needle_len, utils.COLOR_BG_RED)]
                         if not NO_COLOR
                         else None
                     )
@@ -118,7 +119,7 @@ def main() -> int:
                         before_part,
                         (utils.COLOR_BG_RED if not NO_COLOR else ""),
                         after_part[:needle_len],
-                        (utils.COLOR_NORMAL if not NO_COLOR else ""),
+                        (utils.COLOR_CLEAR if not NO_COLOR else ""),
                         after_part[needle_len:],
                     )
                     print("".join(hit))
@@ -315,13 +316,13 @@ def progress_handler(target: Target) -> Callable[[Container | Volume, int, int],
         nonlocal current_disk, char
 
         if current_disk is None:
-            sys.stderr.write(f"{utils.COLOR_WHITE}{target}{utils.COLOR_NORMAL}\n")
+            sys.stderr.write(f"{utils.COLOR_WHITE_BOLD}{target}{utils.COLOR_CLEAR}\n")
 
         if current_disk != disk:
-            sys.stderr.write(f"\n{utils.COLOR_WHITE}[Current disk: {disk}]{utils.COLOR_NORMAL}\n")
+            sys.stderr.write(f"\n{utils.COLOR_WHITE_BOLD}[Current disk: {disk}]{utils.COLOR_CLEAR}\n")
             current_disk = disk
 
-        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_NORMAL}")
+        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_CLEAR}")
         sys.stderr.flush()
 
         if offset % (1337 * 3) == 0:

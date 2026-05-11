@@ -4,11 +4,12 @@ import plistlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from dissect.target.helpers.arch import target_triple
 from dissect.target.helpers.record import IOSUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd.darwin._os import (
     DarwinPlugin,
-    detect_macho_arch,
+    macho_cpu_type,
 )
 
 if TYPE_CHECKING:
@@ -84,8 +85,8 @@ class IOSPlugin(DarwinPlugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        if arch := detect_macho_arch(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], fs=self.target.fs):
-            return f"{arch}-ios"
+        if machine := macho_cpu_type(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], fs=self.target.fs):
+            return target_triple(self.os, machine)
         return None
 
 

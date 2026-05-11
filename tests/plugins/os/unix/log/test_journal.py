@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 
 def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test linux systemd journal file parsing."""
-
     data_file = absolute_path("_data/plugins/os/unix/log/journal/journal")
     fs_unix.map_file("var/log/journal/1337/user-1000.journal", data_file)
     target_unix.add_plugin(JournalPlugin)
@@ -46,7 +45,6 @@ def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None
 @pytest.mark.benchmark
 def test_benchmark_journal(target_unix: Target, fs_unix: VirtualFilesystem, benchmark: BenchmarkFixture) -> None:
     """Test if we can parse some large journal files. this demonstrates how slow the journal plugin is."""
-
     system_journal = absolute_path("_data/plugins/os/unix/log/journal/system.journal")
     user_journal = absolute_path("_data/plugins/os/unix/log/journal/user-1000.journal")
 
@@ -63,7 +61,6 @@ def test_journal_plugin_unused_object(
     caplog: pytest.LogCaptureFixture, target_unix: Target, fs_unix: VirtualFilesystem
 ) -> None:
     """Test if we can handle OBJECT_UNUSED in journal files correctly."""
-
     # unused.journal is a modified copy of system.journal at offset 0x393260.
     # the next_entry_array_offset was set from 0x00 to 0x3C1337.
     data_file = absolute_path("_data/plugins/os/unix/log/journal/unused.journal")

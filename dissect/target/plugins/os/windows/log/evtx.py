@@ -6,8 +6,9 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 from dissect.eventlog import evtx
+from dissect.eventlog.bxml import BxmlSub
 from dissect.eventlog.exceptions import MalformedElfChnkException
-from flow.record import Record, utils
+from flow.record import utils
 
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -17,6 +18,8 @@ from dissect.target.plugins.os.windows.log.evt import WindowsEventlogsMixin
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
+
+    from flow.record import Record
 
     from dissect.target.target import Target
 
@@ -64,7 +67,6 @@ class EvtxPlugin(WindowsEventlogsMixin, Plugin):
             Provider_Name (string): The Provider_Name field of the event.
             EventID (int): The EventID of the event.
         """
-
         if logs_dir:
             log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
         else:
@@ -182,7 +184,7 @@ def format_value(value: Any) -> Any:
     if value is None or value == "-":
         return None
 
-    if isinstance(value, evtx.BxmlSub):
+    if isinstance(value, BxmlSub):
         value = value.get()
 
     if isinstance(value, (datetime.datetime, list)):

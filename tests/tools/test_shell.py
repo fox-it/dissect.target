@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import gzip
+import hashlib
 import os
 import pathlib
 import platform
 import re
 import sys
+import tarfile
 from collections import ChainMap
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -14,12 +17,17 @@ from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
+from dissect.target.containers.raw import RawContainer
 from dissect.target.helpers.fsutil import TargetPath, normalize
+from dissect.target.target import Target
 from dissect.target.tools.shell import (
+    DebugMode,
+    ExtendedCmd,
     TargetCli,
     TargetHubCli,
     build_pipe,
     build_pipe_stdout,
+    run_cli,
 )
 from dissect.target.tools.shell import main as target_shell
 from dissect.target.tools.utils import fs
@@ -28,7 +36,8 @@ from tests._utils import absolute_path
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-    from dissect.target.target import Target
+    from pytest_benchmark.fixture import BenchmarkFixture
+
 
 try:
     import pexpect
@@ -121,6 +130,117 @@ def test_targethubcli_autocomplete_enter(make_mock_targets: Callable) -> None:
 
     suggestions = hub_cli.complete_enter("1", "enter 1", 6, 7)
     assert suggestions == ["1"]
+
+
+def test_debug_mode_parsing() -> None:
+    """Test that we correctly parse various ways of toggling debug mode."""
+    cli = ExtendedCmd()
+
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("pm")
+    assert cli.debug == DebugMode.POST_MORTEM
+
+    cli.do_debug("on")
+    assert cli.debug == DebugMode.ON
+
+    cli.do_debug("off")
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("")
+    assert cli.debug == DebugMode.ON
+
+    cli.do_debug("")
+    assert cli.debug == DebugMode.OFF
+
+    cli.do_debug("postmortem")
+    assert cli.debug == DebugMode.POST_MORTEM
+
+
+def test_extended_cmd_lcd_and_lpwd(
+    tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that do_lcd correctly changes the local directory and do_lpwd prints the local working directory."""
+    cli = ExtendedCmd()
+    start_dir = tmp_path / "start"
+    next_dir = tmp_path / "next"
+    start_dir.mkdir()
+    next_dir.mkdir()
+
+    monkeypatch.chdir(start_dir)
+
+    assert cli.do_lcd(str(next_dir)) is False
+
+    # The current working directory should be updated to the new directory after a successful cd
+    assert str(Path.cwd()) == str(next_dir)
+
+    # _local_prev_dir should be updated to the previous directory after a successful cd
+    assert cli._local_prev_dir == str(start_dir)
+
+    # The output should indicate that the local directory has changed to the new directory
+    out = capsys.readouterr().out
+    assert f"Local directory changed to {next_dir}" in out
+
+    # do_lpwd should print the current local working directory, which should be the new directory
+    assert cli.do_lpwd("") is False
+    out = capsys.readouterr().out
+    assert out.strip() == str(next_dir)
+
+
+def test_extended_cmd_do_shell_runs_subprocess() -> None:
+    """Test that do_shell correctly runs a subprocess for non-cd commands."""
+    cli = ExtendedCmd()
+
+    with patch("dissect.target.tools.shell.subprocess.run") as mocked_run:
+        assert cli.do_shell("echo hello") is False
+
+    mocked_run.assert_called_once_with("echo hello", shell=True, check=False)
+
+
+def test_extended_cmd_do_shell_cd_delegates_to_lcd() -> None:
+    """Test that !cd (do_shell with a cd command) correctly delegates to do_lcd."""
+    cli = ExtendedCmd()
+
+    with patch.object(ExtendedCmd, "do_lcd", autospec=True, return_value=False) as mocked_do_lcd:
+        assert cli.do_shell("cd /tmp") is False
+
+    mocked_do_lcd.assert_called_once_with(cli, "/tmp")
+
+
+def test_extended_cmd_onecmd_bang_delegates_to_do_shell() -> None:
+    """Test that onecmd with a bang command correctly delegates to do_shell."""
+    cli = ExtendedCmd()
+
+    with patch.object(ExtendedCmd, "do_shell", autospec=True, return_value=False) as mocked_do_shell:
+        cli.onecmd("!echo hello")
+
+    mocked_do_shell.assert_called_once_with(cli, "echo hello")
+
+
+def test_run_cli_postmortem() -> None:
+    """Test that we correctly start a pdb post-mortem session."""
+
+    class DummyCli:
+        def __init__(self) -> None:
+            self.debug = DebugMode.POST_MORTEM
+            self._calls = 0
+
+        def cmdloop(self) -> None:
+            self._calls += 1
+            if self._calls == 1:
+                raise RuntimeError("boom")
+
+        def postloop(self) -> None:
+            return None
+
+    cli = DummyCli()
+
+    mock_debugger = MagicMock()
+
+    with patch("dissect.target.tools.shell._get_debugger", return_value=mock_debugger):
+        run_cli(cli)
+
+    mock_debugger.post_mortem.assert_called_once()
 
 
 def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -469,7 +589,6 @@ def test_shell_hostname_escaping(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path: Path
 ) -> None:
     """Test if we properly escape hostnames in the base prompt."""
-
     tmp_path.joinpath("etc").mkdir()
     tmp_path.joinpath("var").mkdir()
     tmp_path.joinpath("opt").mkdir()
@@ -488,7 +607,6 @@ def test_shell_hostname_escaping(
 )
 def test_shell_prompt_tab_autocomplete() -> None:
     """Test the prompt tab-autocompletion."""
-
     ANSI_ESCAPE = re.compile(rb"\x07|\x08|\x0d|\x7f|\x1b[@-_][0-?]*[ -/]*[@-~]")
     original_new_data = pexpect.expect.Expecter.new_data
 
@@ -551,3 +669,414 @@ def test_shell_prompt_tab_autocomplete() -> None:
         child.expect_exact("ubuntu:/$ ", timeout=5)
         child.sendline("exit")
         child.expect(pexpect.EOF, timeout=5)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "args",
+    [
+        pytest.param(""),  # no flags
+        pytest.param("-l"),  # long listing
+    ],
+)
+@pytest.mark.parametrize("warm_cache", [True, False], ids=["warm_cache", "cold_cache"])
+def test_benchmark_ls_bin(
+    benchmark: BenchmarkFixture,
+    args: str,
+    warm_cache: bool,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    """Benchmark ls command with different parameters with a /bin directory containing ~1000 files.
+
+    The image only contains a /bin directory with ~1000 files and an /etc directory with some configuration files.
+    The rest of the filesystem is not included.
+
+    The /bin files are all sparse (filled with zeros).
+    The files in /etc do contain data.
+
+    The source image is stored compressed in the test data directory to save space.
+    Compressed size is 100kb and decompresses to 5mb.
+
+    How to reproduce the test image
+    ===============================
+
+    source: debian-live-13.3.0-amd64-standard.iso
+    sha256: ee2b3d5f9bc67d801eefeddbd5698efbb0b35358724b7ed3db461be3f5e7ecd6
+    extract /run/live/medium/filesystem.squashfs from the ISO
+    sha256 of filesystem.squashfs: 12a5feba804e23823917fa85a86814ec9953e2321c1bc4fc67c729d023ba115c
+
+    Extract walkfs for /bin so we can recreate the same file structure with sparse files.
+    Save some files from /etc to have some non-sparse files as well:
+
+        $ target-shell filesystem.squashfs
+        localhost.localdomain:/$ walkfs --walkfs-path /bin > /tmp/walkfs-bin.records
+        localhost.localdomain:/$ save -o /tmp/etc /etc/debian_version /etc/group /etc/hostname
+        localhost.localdomain:/$ save -o /tmp/etc /etc/hosts /etc/os-release /etc/passwd /etc/shadow
+
+    Create a raw image and format it with ext4, then mount it:
+
+        $ qemu-img create -f raw debian-trixie-bin-ext4.raw 5M
+        $ sudo qemu-nbd --connect=/dev/nbd0 debian-trixie-bin-ext4.raw -f raw
+        $ sudo mkfs.ext4 -m 0 /dev/nbd0
+        $ sudo mount /dev/nbd0 /mnt/debian-rw
+
+    Use a small Python script to recreate the files (sparse) from walkfs input, preserving permissions and timestamps
+    Copy the files from /etc to the mount:
+
+        $ python3 create-walkfs-sparse.py /tmp/walkfs-bin.records /mnt/debian-rw /tmp/etc
+
+    Finally, gzip the raw image to save space:
+
+        $ sync
+        $ sudo umount /mnt/debian-rw
+        $ sudo qemu-nbd --disconnect /dev/nbd0
+        $ gzip debian-trixie-bin-ext4.raw
+    """
+    with gzip.open(absolute_path("_data/filesystems/ext4/debian-trixie-bin-ext4.raw.gz"), "rb") as fh:
+        raw_image = fh.read()
+
+    container = RawContainer(BytesIO(raw_image))
+
+    t = Target()
+    t.disks.add(container)
+    t.apply()
+
+    target_cli = TargetCli(t)
+    cmd = f"ls {args} /bin"
+
+    if warm_cache:
+        target_cli.onecmd(cmd)
+
+    benchmark(target_cli.onecmd, cmd)
+
+    out, err = capsys.readouterr()
+    assert not err
+    assert "bash" in out
+    assert "zgrep" in out
+
+
+@pytest.mark.parametrize(
+    ("tar_args", "outname"),
+    [
+        ("-cvf", "out.tar"),
+        ("-cvzf", "out.tar.gz"),
+        ("-cvjf", "out.tar.bz2"),
+        ("-cvJf", "out.tar.xz"),
+    ],
+)
+def test_target_cli_tar_symlink(tmp_path: Path, tar_args: str, outname: str, capsys: pytest.CaptureFixture) -> None:
+    """Test that we can correctly tar symlinks, and that the metadata of the symlink and its target are preserved."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / outname
+    cli.onecmd(f"tar {tar_args} {outpath.as_posix()} /path")
+    captured = capsys.readouterr()
+    assert (
+        captured.err
+        == """\
+a path
+a path/to
+a path/to/symlink
+a path/to/symlink/target
+a path/to/target
+"""
+    )
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            "path",
+            "path/to",
+            "path/to/symlink",
+            "path/to/symlink/target",
+            "path/to/target",
+        ]
+        tarinfo = tar.getmember("path/to/symlink")
+        assert tarinfo.isdir()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        assert tarinfo.mtime == 1775548971.2269073
+        assert tarinfo.pax_headers["atime"] == "1775548971.198906"
+        assert tarinfo.pax_headers["ctime"] == "1775548971.2269073"
+
+        tarinfo = tar.getmember("path/to/symlink/target")
+        assert tarinfo.issym()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        assert tarinfo.linkname == "../target"
+        assert tarinfo.mtime == 1775548971.2269073
+        assert tarinfo.pax_headers["atime"] == "1775548971.2269073"
+        assert tarinfo.pax_headers["ctime"] == "1775548971.2269073"
+
+        tarinfo = tar.getmember("path/to/target")
+        assert tarinfo.issym()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        assert tarinfo.linkname == "symlink/target"
+        assert tarinfo.mtime == 1775548971.214906
+        assert tarinfo.pax_headers["atime"] == "1775548971.214906"
+        assert tarinfo.pax_headers["ctime"] == "1775548971.214906"
+
+
+def test_target_cli_tar_file_types(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we can correctly tar different file types, and that the metadata of the files are preserved."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+    cli.onecmd(f"tar -cf {outpath.as_posix()} /files")
+    captured = capsys.readouterr()
+
+    # tar should skip the unix socket and print warning, but should still include the other files and directories
+    assert captured.err == "tar: /files/pipes/unix.sock: unsupported file type, skipping\n"
+
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            "files",
+            "files/block",
+            "files/block/md0",
+            "files/block/ram0",
+            "files/char",
+            "files/char/zero",
+            "files/links",
+            "files/links/README-hardlink.txt",
+            "files/links/README-symlink.txt",
+            "files/pipes",
+            "files/pipes/fifo",
+        ]
+        # Block devices
+        tarinfo = tar.getmember("files/block/md0")
+        assert tarinfo.isblk()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        tarinfo = tar.getmember("files/block/ram0")
+        assert tarinfo.isblk()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+
+        # Char device
+        tarinfo = tar.getmember("files/char/zero")
+        assert tarinfo.ischr()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+
+        # Regular files
+        tarinfo = tar.getmember("files/links/README-hardlink.txt")
+        assert tarinfo.isreg()
+        assert tarinfo.gid == 1000
+        assert tarinfo.uid == 1000
+        tarinfo = tar.getmember("files/links/README-symlink.txt")
+        assert tarinfo.issym()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+
+        # FIFO pipe
+        tarinfo = tar.getmember("files/pipes/fifo")
+        assert tarinfo.isfifo()
+        assert tarinfo.gid == 0
+        assert tarinfo.uid == 0
+        assert tarinfo.mtime == 1775548986.923013
+        assert tarinfo.pax_headers["atime"] == "1775548986.923013"
+        assert tarinfo.pax_headers["ctime"] == "1775548986.923013"
+        assert tarinfo.pax_headers["LIBARCHIVE.creationtime"] == "1775548986.923013"
+
+
+def test_target_cli_tar_hardlink(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we can correctly tar hardlinks, and that the metadata of the hardlink and its target are preserved."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} README.txt /files/links/README-hardlink.txt")
+    captured = capsys.readouterr()
+    assert captured.err == "a README.txt\na files/links/README-hardlink.txt\n"
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == ["README.txt", "files/links/README-hardlink.txt"]
+        tarinfo = tar.getmember("README.txt")
+        assert tarinfo.isreg()
+        assert (
+            hashlib.sha256(tar.extractfile(tarinfo).read()).hexdigest()
+            == "1e340358aabb36cb3bf24d8adb0060bf54b0b9fcad94a79d0e8ca96c7930dc6a"
+        )
+        tarinfo = tar.getmember("files/links/README-hardlink.txt")
+        assert tarinfo.islnk()
+        assert tarinfo.linkname == "README.txt"
+
+
+def test_target_cli_tar_relative_paths(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we can use relative paths, and it's correctly resolved based on the current working directory."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+    cli.onecmd("cd /files")
+
+    # test that we can tar the current directory with relative paths
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} .")
+    captured = capsys.readouterr()
+    assert (
+        captured.err
+        == """\
+a .
+a ./block
+a ./block/ram0
+a ./block/md0
+a ./char
+a ./char/zero
+a ./links
+a ./links/README-symlink.txt
+a ./links/README-hardlink.txt
+a ./pipes
+a ./pipes/fifo
+a ./pipes/unix.sock
+tar: /files/pipes/unix.sock: unsupported file type, skipping
+"""
+    )
+
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            ".",
+            "./block",
+            "./block/md0",
+            "./block/ram0",
+            "./char",
+            "./char/zero",
+            "./links",
+            "./links/README-hardlink.txt",
+            "./links/README-symlink.txt",
+            "./pipes",
+            "./pipes/fifo",
+        ]
+
+    # test that we can also use relative paths that go up the directory tree
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} ../files")
+    captured = capsys.readouterr()
+    assert (
+        captured.err
+        == """\
+a files
+a files/block
+a files/block/ram0
+a files/block/md0
+a files/char
+a files/char/zero
+a files/links
+a files/links/README-symlink.txt
+a files/links/README-hardlink.txt
+a files/pipes
+a files/pipes/fifo
+a files/pipes/unix.sock
+tar: /files/../files/pipes/unix.sock: unsupported file type, skipping
+"""
+    )
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == [
+            "files",
+            "files/block",
+            "files/block/md0",
+            "files/block/ram0",
+            "files/char",
+            "files/char/zero",
+            "files/links",
+            "files/links/README-hardlink.txt",
+            "files/links/README-symlink.txt",
+            "files/pipes",
+            "files/pipes/fifo",
+        ]
+
+    # check if leading `../` is correctly stripped
+    cli.onecmd("cd /files/block")
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} ../../README.txt")
+    captured = capsys.readouterr()
+    assert captured.err == "a README.txt\n"
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == ["README.txt"]
+
+
+def test_target_cli_tar_dereference(tmp_path: Path) -> None:
+    """Test archiving of symlink with and without dereference option."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+
+    # without dereference, the symlink should be archived as a symlink
+    cli.onecmd(f"tar -cf {outpath.as_posix()} /files/links/README-symlink.txt")
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == ["files/links/README-symlink.txt"]
+        tarinfo = tar.getmember("files/links/README-symlink.txt")
+        assert tarinfo.issym()
+        assert tarinfo.linkname == "../../README.txt"
+
+    # with dereference, the symlink should be archived as a regular file with the content of the target
+    cli.onecmd(f"tar --dereference -cf {outpath.as_posix()} /files/links/README-symlink.txt")
+    assert outpath.is_file()
+    with tarfile.open(outpath, "r:*") as tar:
+        members = tar.getnames()
+        assert sorted(members) == ["files/links/README-symlink.txt"]
+        tarinfo = tar.getmember("files/links/README-symlink.txt")
+        assert tarinfo.isreg()
+        assert (
+            tar.extractfile(tarinfo).read()
+            == b"""\
+# Creating this image
+
+qemu-img create -f raw image.ext4 140k
+sudo mkfs.ext4 -I 256 -b 1024 -i 2048 image.ext4 -U e0c3d987-a36c-4f9e-9b2f-90e633d7d7a1
+
+## Mounting the image
+
+sudo modprobe nbd
+sudo qemu-nbd --connect=/dev/nbd0 image.ext4 --format=raw
+sudo mkdir /mnt/image
+sudo mount /dev/nbd0 /mnt/image -o noatime
+
+## Create symlink data
+
+cd /mnt/image
+sudo mkdir -p ./path/to/symlink
+sudo ln -s symlink/target ./path/to/target
+sudo ln -s ../target ./path/to/symlink/target
+
+## Create files data
+
+cd /mnt/image
+sudo mkdir -p ./files/{block,char,links,pipes}
+sudo mknod ./files/block/ram0 b 1 0
+sudo mknod ./files/block/md0 b 9 0
+
+sudo mknod ./files/char/zero c 1 5
+
+sudo ln -s ../../README.txt ./files/links/README-symlink.txt
+sudo ln ./README.txt ./files/links/README-hardlink.txt
+
+sudo mkfifo ./files/pipes/fifo
+sudo socat UNIX-LISTEN:./files/pipes/unix.sock,fork,unlink-close=0 -
+"""
+        )
+
+
+def test_target_cli_tar_unknown_path(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test that we correctly handle unknown paths when trying to tar."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    outpath = tmp_path / "out.tar"
+
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} missing.txt")
+    captured = capsys.readouterr()
+    assert captured.err == "tar: missing.txt: No such file or directory\n"
+    assert outpath.is_file()
