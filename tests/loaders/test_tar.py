@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.loader import open as loader_open
+from dissect.target.loaders.compression import CompressionLoader
 from dissect.target.loaders.tar import GenericTarSubLoader, TarLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
@@ -17,6 +18,8 @@ from tests.filesystems.test_tar import _mkdir
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
+
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 @pytest.mark.parametrize(
@@ -41,12 +44,13 @@ def test_compressed_tar_file(caplog: pytest.LogCaptureFixture) -> None:
 
     with caplog.at_level(logging.WARNING):
         loader = loader_open(path)
-        assert isinstance(loader, TarLoader)
+        assert isinstance(loader, CompressionLoader)
         assert "is compressed" in caplog.text
 
     t = Target()
     loader.map(t)
-    assert isinstance(loader.subloader, GenericTarSubLoader)
+    assert isinstance(loader.loader, TarLoader)
+    assert isinstance(loader.loader.subloader, GenericTarSubLoader)
 
     assert len(t.filesystems) == 1
 
@@ -61,11 +65,12 @@ def test_compressed_tar_file_with_empty_dir() -> None:
     path = absolute_path("_data/loaders/tar/test-archive-empty-folder.tgz")
 
     loader = loader_open(path)
-    assert isinstance(loader, TarLoader)
+    assert isinstance(loader, CompressionLoader)
 
     t = Target()
     loader.map(t)
-    assert isinstance(loader.subloader, GenericTarSubLoader)
+    assert isinstance(loader.loader, TarLoader)
+    assert isinstance(loader.loader.subloader, GenericTarSubLoader)
 
     assert len(t.filesystems) == 1
 
@@ -87,11 +92,12 @@ def test_case_sensitivity_windows(tmp_path: Path) -> None:
         _mkdir(tf, "Windows/System32")
 
     loader = loader_open(path)
-    assert isinstance(loader, TarLoader)
+    assert isinstance(loader, CompressionLoader)
 
     t = Target()
     loader.map(t)
-    assert isinstance(loader.subloader, GenericTarSubLoader)
+    assert isinstance(loader.loader, TarLoader)
+    assert isinstance(loader.loader.subloader, GenericTarSubLoader)
 
     # Make sure the case sensitiveness is changed to False and make sure we detect the target as Windows.
     assert not t.filesystems[0].case_sensitive
@@ -107,11 +113,12 @@ def test_case_sensitivity_linux(tmp_path: Path) -> None:
         _mkdir(tf, "opt")
 
     loader = loader_open(path)
-    assert isinstance(loader, TarLoader)
+    assert isinstance(loader, CompressionLoader)
 
     t = Target()
     loader.map(t)
-    assert isinstance(loader.subloader, GenericTarSubLoader)
+    assert isinstance(loader.loader, TarLoader)
+    assert isinstance(loader.loader.subloader, GenericTarSubLoader)
 
     assert t.filesystems[0].case_sensitive
 
@@ -121,17 +128,6 @@ def test_case_sensitivity_linux(tmp_path: Path) -> None:
     [
         # regular tar file
         (True, "file.tar", ""),
-        # gzip tar file
-        (True, "file.tar.gz", ""),
-        (True, "file.tgz", ""),
-        # bzip2 tar file
-        (True, "file.tar.bz2", ""),
-        (True, "file.tar.bz", ""),
-        (True, "file.tbz", ""),
-        (True, "file.tbz2", ""),
-        # xz tar file
-        (True, "file.tar.xz", ""),
-        (True, "file.txz", ""),
         # some things it should not detect
         (False, "file", "00010203"),
         (False, "file.zip", "504b0304"),
@@ -150,10 +146,6 @@ def test_detect_extension(should_detect: bool, filename: str, buffer: str, tmp_p
     "file",
     [
         "small.tar",
-        "small.tar.bz2",
-        "small.tar.gz",
-        "small.tar.lz",
-        "small.tar.xz",
     ],
 )
 def test_detect_buffer(file: str, tmp_path: Path) -> None:
@@ -168,3 +160,17 @@ def test_detect_buffer(file: str, tmp_path: Path) -> None:
     tmp_tar.write_bytes(small_file.read_bytes())
 
     assert TarLoader.detect(tmp_tar)
+
+
+@pytest.mark.parametrize(
+    "archive",
+    [
+        "_data/loaders/tar/test-archive.tar",
+    ],
+)
+@pytest.mark.benchmark
+def test_benchmark(benchmark: BenchmarkFixture, archive: str) -> None:
+    """Benchmark the loading of archives."""
+    file = absolute_path(archive)
+
+    benchmark(lambda: TarLoader(file).map(Target()))
