@@ -39,4 +39,5 @@ def test_at_jobs(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem
         assert results[0].queue == "a"
         assert results[0].seq == 7
         assert results[0].execution_time == datetime(2026, 5, 8, 12, 0, 0, tzinfo=tz)
+        assert results[0].command == "periodic_test.sh"
         assert results[0].source == "/usr/lib/cron/jobs/a0000701c43af0"

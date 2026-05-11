@@ -21,6 +21,7 @@ AtJobsRecord = TargetRecordDescriptor(
         ("string", "queue"),
         ("varint", "seq"),
         ("datetime", "execution_time"),
+        ("string", "command"),
         ("path", "source"),
     ],
 )
@@ -65,7 +66,7 @@ class AtJobsPlugin(Plugin):
                 continue
 
             queue = name[0]
-            seq = int(name[1:6])
+            seq = int(name[1:6], 16)
             time_hex = name[6:]
 
             execution_time = None
@@ -75,9 +76,29 @@ class AtJobsPlugin(Plugin):
             except ValueError:
                 pass
 
+            command_line = False
+            command = ""
+            with self.target.fs.path(file).open("r") as f:
+                for line in f:
+                    if command_line:
+                        command += line
+                    else:
+                        line = line.strip()
+
+                        if not line or line.startswith(("#", "export")):
+                            continue
+
+                        line = line.split("#", 1)[0].strip()
+
+                        if "export OLDPWD" in line:
+                            command_line = True
+
+            command = command.rstrip("\n")
+
             yield AtJobsRecord(
                 queue=queue,
                 seq=seq,
                 execution_time=execution_time,
                 source=file,
+                command=command,
             )
