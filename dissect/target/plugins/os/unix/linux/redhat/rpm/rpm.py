@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.database.bsd import DB
 from dissect.database.sqlite3 import SQLite3
@@ -26,7 +26,7 @@ log = get_logger(__name__)
 class Package:
     """RPM Package."""
 
-    def __init__(self, blob: bytes) -> None:
+    def __init__(self, blob: BinaryIO | bytes) -> None:
         self.blob = blob
         self.package = parse_blob(blob)
 
@@ -87,6 +87,10 @@ class Package:
     @property
     def summary(self) -> str | None:
         return self.package.get("summary")
+
+    @property
+    def description(self) -> str | None:
+        return self.package.get("description")
 
     @property
     def size(self) -> int | None:
@@ -226,7 +230,7 @@ def parse_packages(path: Path) -> Iterator[Package]:
         yield Package(blob)
 
 
-def parse_blob(blob: bytes) -> dict:
+def parse_blob(blob: BinaryIO | bytes) -> dict:
     """Parse a RPM package blob. Does not parse dribble entries (yet).
 
     References:
@@ -234,7 +238,7 @@ def parse_blob(blob: bytes) -> dict:
         - https://github.com/rpm-software-management/rpm/blob/master/lib/tagexts.cc @ getNEVRA
         - https://github.com/knqyf263/go-rpmdb
     """
-    fh = BytesIO(blob)
+    fh = BytesIO(blob) if isinstance(blob, (bytes, bytearray, memoryview)) else blob
     header = c_rpm.Header(fh)
     offset = fh.tell()
     package = {}

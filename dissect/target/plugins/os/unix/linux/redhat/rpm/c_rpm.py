@@ -4,6 +4,7 @@ from dissect.cstruct import cstruct
 
 # References:
 # - https://github.com/rpm-software-management/rpm/blob/master/include/rpm/rpmtag.h
+# - https://github.com/rpm-software-management/rpm/blob/master/lib/header_internal.hh
 rpm_def = """
 #define HEADER_IMAGE            61
 #define HEADER_SIGNATURES       62
@@ -421,8 +422,8 @@ struct EntryInfo {
 };
 
 struct Header {
-    int32       index_length;           // il
-    int32       data_length;            // dl
+    uint32      index_length;           // il
+    uint32      data_length;            // dl
     EntryInfo   pe_list[index_length];
 };
 

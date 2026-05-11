@@ -166,6 +166,7 @@ target-query = "dissect.target.tools.query:main"
 target-reg = "dissect.target.tools.reg:main"
 target-shell = "dissect.target.tools.shell:main"
 target-yara = "dissect.target.tools.yara:main"
+dissect-rpm = "dissect.target.plugins.os.unix.linux.redhat.rpm.rpm:main" # NOTE: temporary backport
 
 [tool.ruff]
 line-length = 120
