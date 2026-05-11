@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.fsutil import TargetPath
 
+
 __all__ = ("Modifier", "ModifierFunc", "get_modifier_function")
 
 RECORD_NAME = "filesystem/file/digest"
@@ -64,7 +65,6 @@ def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
     Returns:
         Modified record with digests of path field types.
     """
-
     if not resolved_path.exists() or not resolved_path.is_file():
         raise FileNotFoundError(f"Path not found or is not a file: '{resolved_path}'")
 
@@ -104,7 +104,7 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
         try:
             _record = modifier_function(field_name, resolved_path)
         except FilesystemError as e:  # noqa: PERF203
-            level = logging.INFO if isinstance(e, FileNotFoundError) else logging.WARNING
+            level = logging.DEBUG if isinstance(e, FileNotFoundError) else logging.WARNING
             target.log.log(
                 level,
                 "Unable to modify record '%s' with function '%s': %s",

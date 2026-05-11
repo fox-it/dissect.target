@@ -26,7 +26,6 @@ def test_vmware_workstation_clipboard_dnd(
     target: Target, fs: VirtualFilesystem, dnd_path: str, request: pytest.FixtureRequest
 ) -> None:
     """Test if we correctly detect drag and drop artifacts on Windows and Unix targets."""
-
     target = request.getfixturevalue(target)
     fs = request.getfixturevalue(fs)
     fs.map_dir_from_tar(dnd_path, absolute_path("_data/plugins/apps/virtualization/vmware_workstation/dnd.tar"))
@@ -64,7 +63,6 @@ def test_vmware_workstation_vm_configs(
     target: Target, fs: VirtualFilesystem, inventory_dir: str, request: pytest.FixtureRequest
 ) -> None:
     """Test if we find and parse VM configuration files correctly."""
-
     target = request.getfixturevalue(target)
     fs = request.getfixturevalue(fs)
     fs.map_file(

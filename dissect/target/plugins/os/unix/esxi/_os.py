@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 
 class ESXiPlugin(UnixPlugin):
-    """ESXi OS plugin
+    """ESXi OS plugin.
 
     ESXi partitioning varies between versions. Generally, specific partition numbers have special meaning.
 
@@ -172,7 +172,6 @@ class ESXiPlugin(UnixPlugin):
 
     def _add_nfs(self, nfs_ip: str, remote_share: str, mount_alias: str) -> None:
         """Mount NFS share to the target."""
-
         if not self._is_nfs_enabled:
             self._log_nfs_mount_disabled(nfs_ip, remote_share, mount_alias)
             return
@@ -258,7 +257,6 @@ def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO | None:
     and stderr containing an I/O error message. The file does get properly decrypted, so we return
     ``None`` if there are no bytes in stdout which would indicate it actually failed.
     """
-
     result = subprocess.run(
         [
             "crypto-util",
@@ -289,7 +287,13 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
     else:
         target.log.debug("Skipping static decryption because of missing crypto module")
 
-    if not local_tgz and target.name == "local":
+    if local_tgz is None:
+        if target.name != "local":
+            target.log.warning(
+                "local.tgz is encrypted but static decryption failed and no dynamic decryption available!"
+            )
+            return None
+
         target.log.info(
             "local.tgz is encrypted but static decryption failed, attempting dynamic decryption using crypto-util"
         )
@@ -297,12 +301,8 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
 
         if local_tgz is None:
             target.log.warning("Dynamic decryption of %s failed", local_tgz_ve)
-    else:
-        target.log.warning("local.tgz is encrypted but static decryption failed and no dynamic decryption available!")
 
-    if local_tgz:
-        return tar.TarFilesystem(local_tgz)
-    return None
+    return tar.TarFilesystem(local_tgz) if local_tgz else None
 
 
 def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:
@@ -434,7 +434,6 @@ def nfs_volume_uuid(host: str, path: str) -> str:
 
     This is used to create a unique identifier for NFS volumes in ESXi.
     """
-
     h1 = lookup8(host.encode(), 42)  # 42 is starting value
     h2 = lookup8(path.encode(), h1)
 
