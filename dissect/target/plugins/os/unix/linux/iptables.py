@@ -150,6 +150,7 @@ class IptablesSavePlugin(Plugin):
                             packet_count=policy["packet_count"],
                             byte_count=policy["byte_count"],
                             source=rule_path,
+                            _target=self.target,
                         )
 
                     # Rule
@@ -166,6 +167,7 @@ class IptablesSavePlugin(Plugin):
                             packet_count=rule["packet_count"] or None,
                             byte_count=rule["byte_count"] or None,
                             source=rule_path,
+                            _target=self.target,
                         )
 
                     else:
