@@ -9,11 +9,13 @@ import pytest
 from dissect.target.containers.raw import RawContainer
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.loaders.local import (
+    FREEBSD_DRIVE_REGEX,
     LINUX_DEV_DIR,
     LINUX_DRIVE_REGEX,
     LocalLoader,
     _add_disk_as_raw_container_to_target,
     _get_windows_drive_volumes,
+    map_freebsd_drives,
     map_linux_drives,
 )
 from dissect.target.target import Target, TargetLogAdapter
@@ -142,6 +144,36 @@ def test_map_linux_drives(tmp_path: Path) -> None:
         mock_mount.assert_called_with(str(tmp_path), dir_fs)
 
 
+def test_map_freebsd_drives(tmp_path: Path) -> None:
+    """Test that we correctly map FreeBSD drives to the target."""
+    mock_drive = LINUX_DEV_DIR.joinpath("ada0")
+    mock_dev_dir = create_autospec(Path)
+    mock_dev_dir.iterdir.return_value = iter([mock_drive])
+
+    t = Target()
+
+    with (
+        patch("dissect.target.loaders.local.LINUX_DEV_DIR", mock_dev_dir),
+        patch(
+            "dissect.target.loaders.local._add_disk_as_raw_container_to_target",
+            autospec=True,
+        ) as mock_add_raw_disks,
+        patch("dissect.target.loaders.local.VOLATILE_FREEBSD_PATH", tmp_path),
+        patch.object(t.filesystems, "add", autospec=True) as mock_add_fs,
+        patch.object(t.fs, "mount", autospec=True) as mock_mount,
+    ):
+        map_freebsd_drives(t)
+
+        mock_add_raw_disks.assert_called_with(mock_drive, t)
+
+        mock_add_fs.assert_called()
+        dir_fs = mock_add_fs.call_args[0][0]
+        assert isinstance(dir_fs, DirectoryFilesystem)
+        assert dir_fs.base_path == tmp_path
+
+        mock_mount.assert_called_with(str(tmp_path), dir_fs)
+
+
 @pytest.mark.parametrize(
     ("drive_path", "expected"),
     [
@@ -170,3 +202,23 @@ def test_map_linux_drives(tmp_path: Path) -> None:
 def test_linux_drive_regex(drive_path: Path, expected: bool) -> None:
     """Test that we correctly match Linux drive paths."""
     assert (LINUX_DRIVE_REGEX.match(drive_path.name) is not None) == expected
+
+
+@pytest.mark.parametrize(
+    ("drive_path", "expected"),
+    [
+        (Path("/dev/da0"), True),  # SCSI
+        (Path("/dev/da1"), True),  # SCSI
+        (Path("/dev/da2"), True),  # SCSI
+        (Path("/dev/ada0"), True),  # SATA
+        (Path("/dev/ada1"), True),  # SATA
+        (Path("/dev/nvd0"), True),  # NVME
+        (Path("/dev/nvd1"), True),  # NVME
+        (Path("/dev/da0p1"), False),  # Partition
+        (Path("/dev/ada1p2"), False),  # Partition
+        (Path("/dev/nvd0p3"), False),  # Partition
+    ],
+)
+def test_freebsd_drive_regex(drive_path: Path, expected: bool) -> None:
+    """Test that we correctly match Linux drive paths."""
+    assert (FREEBSD_DRIVE_REGEX.match(drive_path.name) is not None) == expected
