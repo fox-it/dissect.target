@@ -98,6 +98,7 @@ PackageManagerPackageFileRecord = TargetRecordDescriptor(
         ("digest", "stored_digest"),
         ("digest", "actual_digest"),
         ("boolean", "digest_match"),
+        ("boolean", "size_match"),
         ("path", "source"),
     ],
 )
