@@ -274,7 +274,7 @@ def test_recursive_symlink_open_across_layers() -> None:
 def test_recursive_symlink_dev() -> None:
     lfs = LayerFilesystem()
 
-    fs1 = ExtFilesystem(fh=absolute_path("_data/filesystems/symlink_disk.ext4").open("rb"))
+    fs1 = ExtFilesystem(fh=absolute_path("_data/filesystems/filesystem.ext4").open("rb"))
     lfs.mount(fs=fs1, path="/")
 
     with pytest.raises(SymlinkRecursionError):

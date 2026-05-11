@@ -36,10 +36,11 @@ def test_regflex() -> None:
     assert "HKEY_CURRENT_USER" in regflex.hives
     hive = regflex.hives["HKEY_CURRENT_USER"]
     assert hive.key("Test1").value("Value1").value == "a"
+    assert hive.key("Test2").value("Version=13.37").value == ord("b")
 
     assert "HKEY_CLASSES_ROOT" in regflex.hives
     hive = regflex.hives["HKEY_CLASSES_ROOT"]
-    assert hive.key("Test2").value("Value2").value == "b"
+    assert hive.key("Test3").value("Value2").value == "c"
 
     assert "HKEY_LOCAL_MACHINE" in regflex.hives
     hive = regflex.hives["HKEY_LOCAL_MACHINE"]
