@@ -6,6 +6,7 @@ import inspect
 import io
 import os
 import pathlib
+import re
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -1044,10 +1045,38 @@ def test_target_path_as_uri(sep: str, path: str, uri: str) -> None:
     assert vfs.path(path).as_uri() == uri
 
 
-def test_target_path_from_uri() -> None:
+@pytest.mark.parametrize(
+    ("sep", "uri", "path", "exception"),
+    [
+        pytest.param("/", "file:///some/file.txt", "/some/file.txt", None, id="posix"),
+        pytest.param("\\", "file:///sysvol/file.txt", "/sysvol/file.txt", None, id="windows"),
+        pytest.param(
+            "/",
+            "http:///some/file.txt",
+            None,
+            ValueError("URI does not start with 'file:'"),
+            id="posix-invalid-protocol",
+        ),
+        pytest.param("/", "file://localhost/file.txt", "/file.txt", None, id="posix-localhost-authority"),
+        pytest.param("/", "file:file.txt", None, ValueError("URI is not absolute"), id="posix-relative"),
+    ],
+)
+def test_target_path_from_uri(sep: str, uri: str, path: str | None, exception: Exception | None) -> None:
     """Test that TargetPath.from_uri raises the expected exception, as it is unsupported."""
-    with pytest.raises(Exception, match="from_uri\\(\\) is unsupported"):
-        fsutil.TargetPath.from_uri("file:///some/file.txt")
+    vfs = VirtualFilesystem(sep=sep)
+
+    if exception is not None:
+        with pytest.raises(type(exception), match=re.escape(str(exception))):
+            fsutil.TargetPath.from_uri(uri, fs=vfs)
+    else:
+        result = fsutil.TargetPath.from_uri(uri, fs=vfs)
+        assert result == vfs.path(path)
+
+    with pytest.raises(TypeError, match="missing 1 required keyword-only argument"):
+        fsutil.TargetPath.from_uri(uri)
+
+    with pytest.raises(ValueError, match="missing filesystem argument"):
+        fsutil.TargetPath.from_uri(uri, fs=None)
 
 
 def test_target_path_is_absolute() -> None:

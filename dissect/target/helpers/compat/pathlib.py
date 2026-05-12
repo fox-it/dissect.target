@@ -349,7 +349,8 @@ class PureTargetPath(pathlib.PurePath):
         try:
             return self._parts_normcase_cached
         except AttributeError:
-            self._parts_normcase_cached = self._str_normcase.split(self.parser.sep)
+            # PATCH: split the normalized string with POSIX-style separators
+            self._parts_normcase_cached = self._str_normcase.split("/")
             return self._parts_normcase_cached
 
     def __lt__(self, other: object) -> bool:
@@ -1382,10 +1383,37 @@ class TargetPath(PureTargetPath, pathlib.Path):
         return super().as_uri()
 
     @classmethod
-    def from_uri(cls, uri: str) -> Self:
+    def from_uri(cls, uri: str, *, fs: Filesystem) -> Self:
         """Return a new path from the given 'file' URI."""
-        f = f"{type(cls).__name__}.from_uri()"
-        raise UnsupportedOperation(f"{f} is unsupported in Dissect")
+        # PATCH: take the 3.13 implementation for now, since since 3.14 it uses urllib.request.url2pathname with
+        # arguments that aren't supported in older Python versions
+        if fs is None:
+            raise ValueError("missing filesystem argument")
+
+        if not uri.startswith("file:"):
+            raise ValueError(f"URI does not start with 'file:': {uri!r}")
+
+        path = uri[5:]
+        if path[:3] == "///":
+            # Remove empty authority
+            path = path[2:]
+        elif path[:12] == "//localhost/":
+            # Remove 'localhost' authority
+            path = path[11:]
+        if path[:3] == "///" or (path[:1] == "/" and path[2:3] in ":|"):
+            # Remove slash before DOS device/UNC path
+            path = path[1:]
+        if path[1:2] == "|":
+            # Replace bar with colon in DOS drive
+            path = path[:1] + ":" + path[2:]
+
+        from urllib.parse import unquote_to_bytes
+
+        # PATCH: always assume UTF-8
+        path = cls(fs, unquote_to_bytes(path).decode())
+        if not path.is_absolute():
+            raise ValueError(f"URI is not absolute: {uri!r}")
+        return path
 
     # PATCH: Substitute methods and properties that we do not support with ones that raise errors
     # If any code tries to use unsupported features, it will get a clear error instead of silently doing the wrong thing
