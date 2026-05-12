@@ -42,7 +42,7 @@ try:
     from prompt_toolkit.keys import Keys
     from prompt_toolkit.shortcuts import CompleteStyle
 
-    from dissect.target.helpers.completer import (
+    from dissect.target.tools.utils.completer import (
         QuotedPathCompleter,
         get_current_word,
         make_completion_parser,

@@ -12,14 +12,14 @@ pytest.importorskip("prompt_toolkit")
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
-from dissect.target.helpers.completer import (
+from dissect.target.target import Target
+from dissect.target.tools.shell import TargetCli, TargetCmdCompleter
+from dissect.target.tools.utils.completer import (
     QuotedPathCompleter,
     detect_path_input_style,
     get_current_word,
     unescape_path_input,
 )
-from dissect.target.target import Target
-from dissect.target.tools.shell import TargetCli, TargetCmdCompleter
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
