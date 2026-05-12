@@ -23,6 +23,44 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 
+class Packages:
+    """Parses a RPM Packages file. Supports NDB, SQLite3 and BerkleyDB formats."""
+
+    def __init__(self, input: Path) -> None:
+        """Initializes :class:`Packages` using ``Path`` as input. In the future we should also support ``BinaryIO``."""
+        self.path = None
+        self.db = None
+
+        self.blobs: set[bytes] = set()
+
+        if not isinstance(input, Path):
+            raise TypeError(f"Unexpected input: {input!r}")
+
+        self.path = input
+
+        # SQLite3 format
+        if self.path.suffix == ".sqlite":
+            self.db = SQLite3(self.path)
+            self.blobs.update(row.blob for row in self.db.table("Packages").rows())
+
+        # Native DB (NDB) format
+        elif self.path.suffix == ".db":
+            self.db = NDB(input.open("rb"))
+            self.blobs.update(self.db.records())
+
+        # Berkley DB format
+        else:
+            self.db = DB(input.open("rb"))
+            self.blobs.update(blob for i, (_, blob) in enumerate(self.db.records()) if i > 0)
+
+    def __repr__(self) -> str:
+        return f"<Packages type={self.db.__class__.__name__} size={len(self.blobs)}>"
+
+    def __iter__(self):
+        for blob in self.blobs:
+            yield Package(blob)
+
+
 class Package:
     """RPM Package."""
 
@@ -207,29 +245,6 @@ class File(Entry):
         return f"<File path={self.path} size={self.size}>"
 
 
-def parse_packages(path: Path) -> Iterator[Package]:
-    """Parse a RPM storage container (BerkleyDB, NDB or SQLite3)."""
-    blobs: set[bytes] = set()
-
-    # SQLite3 format
-    if path.suffix == ".sqlite":
-        db = SQLite3(path)
-        blobs.update(row.blob for row in db.table("Packages").rows())
-
-    # Native DB (NDB) format
-    elif path.suffix == ".db":
-        db = NDB(path.open("rb"))
-        blobs.update(db.records())
-
-    # Berkley DB format
-    else:
-        db = DB(path.open("rb"))
-        blobs.update(blob for i, (_, blob) in enumerate(db.records()) if i > 0)
-
-    for blob in blobs:
-        yield Package(blob)
-
-
 def parse_blob(blob: BinaryIO | bytes) -> dict:
     """Parse a RPM package blob. Does not parse dribble entries (yet).
 
@@ -316,7 +331,7 @@ def main() -> int:
         print(f"Provided path is not a file: {path}")
         return 1
 
-    for package in parse_packages(path):
+    for package in Packages(path):
         print(package)
         for entry in package.entries():
             print(entry)

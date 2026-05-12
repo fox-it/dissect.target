@@ -6,7 +6,7 @@ from flow.record.fieldtypes import digest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import arg, export
-from dissect.target.plugins.os.unix.linux.redhat.rpm.rpm import parse_packages
+from dissect.target.plugins.os.unix.linux.redhat.rpm.rpm import Packages
 from dissect.target.plugins.os.unix.packagemanager import (
     PackageManagerPackageFileRecord,
     PackageManagerPackageRecord,
@@ -58,7 +58,13 @@ class RpmPlugin(PackageManagerPlugin):
     def packages(self, output_files: bool = False) -> Iterator[PackageManagerPackageRecord]:
         """Yield currently installed RPM packages from SQLite3, BerkleyDB or NDB (Native DB) databases."""
         for path in self.databases:
-            for package in parse_packages(path):
+            try:
+                packages = Packages(path)
+            except Exception as e:
+                self.target.log.warning("Unable to parse RPM Packages database %s: %s", path, e)
+                continue
+
+            for package in packages:
                 yield PackageManagerPackageRecord(
                     ts=package.install_time,
                     package_manager="rpm",

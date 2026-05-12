@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.plugins.os.unix.linux.redhat.rpm.c_ndb import c_ndb
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from io import BytesIO
 
 
 class NDB:
@@ -16,7 +15,7 @@ class NDB:
         - https://github.com/rpm-software-management/rpm/blob/rpm-4.17.0-release/lib/backend/ndb/rpmpkg.c
     """
 
-    def __init__(self, fh: BytesIO):
+    def __init__(self, fh: BinaryIO):
         self.fh = fh
         self.header = c_ndb.Header(fh)
 
