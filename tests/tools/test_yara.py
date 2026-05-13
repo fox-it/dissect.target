@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
+from flow.record import fieldtypes
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.tools.yara import HAS_YARA
@@ -45,8 +46,8 @@ def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: p
 
         out, _ = capsys.readouterr()
 
-        hit1 = "<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 path='/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=d690ba32b59d28614aebefe9b03c74d4, sha1=4b1ced217aabe37138e96fb93bf40026639b9d3b, sha256=7a644118588ff0dcf2fadbe198ae1f1629c29374bac491ba41d5cf957edf0dfc)"  # noqa E501
-        hit2 = "<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 path='/test/dir/to/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=bd7490dd2978ce983e2e1613ac8444c0, sha1=849a062cf09280f5c7dce4c7f87c69a1d9262e08, sha256=9bf7629a67c7ce8019910f1c1251fe44b61b3fff55a59a5e148af3c207dc102f)"  # noqa E501
+        hit1 = "<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 ts_atime=1970-01-01 00:00:00+00:00 ts_ctime=1970-01-01 00:00:00+00:00 ts_btime=None path='/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=d690ba32b59d28614aebefe9b03c74d4, sha1=4b1ced217aabe37138e96fb93bf40026639b9d3b, sha256=7a644118588ff0dcf2fadbe198ae1f1629c29374bac491ba41d5cf957edf0dfc)"  # noqa E501
+        hit2 = "<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 ts_atime=1970-01-01 00:00:00+00:00 ts_ctime=1970-01-01 00:00:00+00:00 ts_btime=None path='/test/dir/to/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=bd7490dd2978ce983e2e1613ac8444c0, sha1=849a062cf09280f5c7dce4c7f87c69a1d9262e08, sha256=9bf7629a67c7ce8019910f1c1251fe44b61b3fff55a59a5e148af3c207dc102f)"  # noqa E501
 
         assert len(out.splitlines()) == 2
 
@@ -93,7 +94,10 @@ def test_yara_decompress(
 
         out, _ = capsys.readouterr()
 
-        hit = "<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 path='/var/log/messages.gz' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=485a4c5e37cd08a0cdf028cc2b1f32b4, sha1=7716bff4d3282184a17f35f5f0dde25aede762f9, sha256=d175bb08145c0be3338b058f8b7a775cc08967ba6aa7448fa2af9957eb1ab37f)"  # noqa E501
+        gzstat = gzip_path.stat()
+        ts_ctime = fieldtypes.datetime(gzstat.st_ctime)
+        ts_btime = fieldtypes.datetime(gzstat.st_birthtime) if hasattr(gzstat, "st_birthtime") else None
+        hit = f"<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 ts_atime=1970-01-01 00:00:00+00:00 ts_ctime={ts_ctime} ts_btime={ts_btime} path='/var/log/messages.gz' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=485a4c5e37cd08a0cdf028cc2b1f32b4, sha1=7716bff4d3282184a17f35f5f0dde25aede762f9, sha256=d175bb08145c0be3338b058f8b7a775cc08967ba6aa7448fa2af9957eb1ab37f)"  # noqa E501
 
         if no_decompress:
             assert len(out.splitlines()) == 0
