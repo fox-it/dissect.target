@@ -1,1 +1,1 @@
-# TODO write tests for MacOSResourcesLocalizableStringsPlugin
+# TODO write tests for macOSResourcesLocalizableStringsPlugin

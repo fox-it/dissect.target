@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugins.os.unix.bsd.darwin.macos.logs.installlog import InstallLogPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos.logs.install_log import InstallLogPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ def test_install_log(test_file: str, target_unix: Target, fs_unix: VirtualFilesy
 
         target_unix.add_plugin(InstallLogPlugin)
 
-        results = list(target_unix.installlog())
+        results = list(target_unix.install_log())
         assert len(results) == 3
 
         assert results[0].ts == datetime(2026, 3, 25, 14, 6, 59, tzinfo=tz)

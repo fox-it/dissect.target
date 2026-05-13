@@ -43,6 +43,8 @@ def test_launch_agents(
         shell="/bin/zsh",
     )
     target_unix.users = lambda: [user]
+    stat_results = []
+    entries = []
 
     for name, path in zip(names, paths, strict=True):
         data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/persistence/launchers/{name}")
@@ -50,10 +52,12 @@ def test_launch_agents(
         entry = fs_unix.get(path)
         stat_result = entry.stat()
         stat_result.st_mtime = 1704067199
+        stat_results.append(stat_result)
+        entries.append(entry)
 
-    with patch.object(entry, "stat") as mock_stat:
-        mock_stat.return_value = stat_result
-
+    with (
+        patch.object(entries[0], "stat", return_value=stat_results[0]),
+    ):
         target_unix.add_plugin(LaunchersPlugin)
 
         results = list(target_unix.launch_agents())
@@ -165,16 +169,22 @@ def test_launch_daemons(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
 ) -> None:
+    stat_results = []
+
+    entries = []
+
     for name, path in zip(names, paths, strict=True):
         data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/persistence/launchers/{name}")
         fs_unix.map_file(path, data_file)
         entry = fs_unix.get(path)
         stat_result = entry.stat()
         stat_result.st_mtime = 1704067199
+        stat_results.append(stat_result)
+        entries.append(entry)
 
-    with patch.object(entry, "stat") as mock_stat:
-        mock_stat.return_value = stat_result
-
+    with (
+        patch.object(entries[0], "stat", return_value=stat_results[0]),
+    ):
         target_unix.add_plugin(LaunchersPlugin)
 
         results = list(target_unix.launch_daemons())

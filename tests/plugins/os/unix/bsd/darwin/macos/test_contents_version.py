@@ -35,16 +35,22 @@ if TYPE_CHECKING:
 def test_contents_version(
     names: tuple[str, ...], paths: tuple[str, ...], target_unix: Target, fs_unix: VirtualFilesystem
 ) -> None:
+    stat_results = []
+    entries = []
     for name, path in zip(names, paths, strict=True):
         data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/contents_version/{name}")
         fs_unix.map_file(path, data_file)
         entry = fs_unix.get(path)
         stat_result = entry.stat()
         stat_result.st_mtime = 1704067199
+        stat_results.append(stat_result)
+        entries.append(entry)
 
-    with patch.object(entry, "stat") as mock_stat:
-        mock_stat.return_value = stat_result
-
+    with (
+        patch.object(entries[0], "stat", return_value=stat_results[0]),
+        patch.object(entries[1], "stat", return_value=stat_results[1]),
+        patch.object(entries[2], "stat", return_value=stat_results[2]),
+    ):
         target_unix.add_plugin(MacOSContentsVersionPlugin)
 
         results = list(target_unix.contents_version())

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugins.os.unix.bsd.darwin.macos.resources_info_strings import MacOSResourcesInfoStringsPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos.resources_info_strings import macOSResourcesInfoStringsPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -25,17 +25,21 @@ if TYPE_CHECKING:
 def test_resources_info_strings(
     names: tuple[str, ...], paths: tuple[str, ...], target_unix: Target, fs_unix: VirtualFilesystem
 ) -> None:
+    stat_results = []
+    entries = []
     for name, path in zip(names, paths, strict=True):
         data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/resources_info_strings/{name}")
         fs_unix.map_file(f"{path}", data_file)
         entry = fs_unix.get(f"{path}")
         stat_result = entry.stat()
         stat_result.st_mtime = 1704067199
+        stat_results.append(stat_result)
+        entries.append(entry)
 
-    with patch.object(entry, "stat") as mock_stat:
-        mock_stat.return_value = stat_result
-
-        target_unix.add_plugin(MacOSResourcesInfoStringsPlugin)
+    with (
+        patch.object(entries[0], "stat", return_value=stat_results[0]),
+    ):
+        target_unix.add_plugin(macOSResourcesInfoStringsPlugin)
 
         results = list(target_unix.resources_info_strings())
         results.sort(key=lambda r: (r.source, getattr(r, "plist_path", "")))

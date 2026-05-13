@@ -33,9 +33,12 @@ def _build_userdirs(plugin: Plugin, hist_paths: list[str]) -> set[tuple[UserDeta
 
 def parse_timestamp(timestamp: re.Match) -> datetime:
     ts = None
+    value = timestamp.group()
     try:
-        ts = datetime.fromisoformat(timestamp.group())
+        value = value.removesuffix("-0")
+
+        ts = datetime.fromisoformat(value)
     except ValueError:
-        ts = datetime.strptime(timestamp.group(), "%b %d %H:%M:%S").replace(tzinfo=timezone.utc)
+        ts = datetime.strptime(value, "%b %d %H:%M:%S").replace(tzinfo=timezone.utc)
 
     return ts

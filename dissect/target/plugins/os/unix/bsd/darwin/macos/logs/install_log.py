@@ -50,7 +50,7 @@ class InstallLogPlugin(Plugin):
             raise UnsupportedPluginError("No install.log file found.")
 
     @export(record=macOSInstallLogRecord)
-    def installlog(self) -> Iterator[macOSInstallLogRecord]:
+    def install_log(self) -> Iterator[macOSInstallLogRecord]:
         """Return all macOS install log messages.
 
         Yields macOSInstallLogRecord instances with fields:
@@ -72,19 +72,21 @@ class InstallLogPlugin(Plugin):
         current_buf = ""
 
         for line in logfile.readlines():
-            # If we have a buffer with a timestamp and
-            # our current line also has a timestamp,
-            # we should have a complete record in our buffer.
             if ts_match := RE_TIMESTAMP_PATTERN.match(line):
                 if current_ts:
-                    # Add 1 to skip the whitespace after the timestamp.
                     asdf = current_buf[len(current_ts.group()) + 1 :]
-                    hostname, component, message = asdf.split(" ", 2)
 
+                    parts = asdf.split(" ", 2)
+
+                    if len(parts) == 3:
+                        hostname, component, message = parts
+                    elif len(parts) == 2:
+                        hostname, message = parts
+                        component = None
                     yield macOSInstallLogRecord(
                         ts=parse_timestamp(current_ts),
                         host=hostname.strip(),
-                        component=component.strip(),
+                        component=component.strip() if component else None,
                         message=message.strip(),
                         source=self.INSTALL_LOG_PATH,
                         _target=self.target,
@@ -95,7 +97,6 @@ class InstallLogPlugin(Plugin):
             elif current_buf:
                 current_buf += line
 
-        # For the last line
         if current_ts and current_buf:
             asdf = current_buf[len(current_ts.group()) + 1 :]
             hostname, component, message = asdf.split(" ", 2)
