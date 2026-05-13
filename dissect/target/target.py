@@ -282,23 +282,13 @@ class Target:
         """
         spec = path
 
-        # If the path is a URI-like string, separate the path component
-        adjusted_path, parsed_path = parse_path_uri(spec)
-        # We always need a path to work with, so convert the spec into one if it's not one already
-        path = Path(spec) if not isinstance(spec, os.PathLike) else spec
-
-        if parsed_path is not None and (loader_cls := loader.find_loader_by_scheme(parsed_path.scheme)):
-            # If we find a loader by URI scheme, use the adjusted path (path component of the URI)
-            found_path = adjusted_path
-        elif loader_cls := loader.find_loader(path, fallbacks=[loader.DirLoader, loader.RawLoader]):
-            # Otherwise try to find a loader for the "raw" path
-            # If we succeed, upgrade the "spec" to the path
-            spec = path
-            found_path = path
-            parsed_path = None
-        else:
-            # No loader found
+        result = loader.infer_loader(spec)
+        if result is None:
             return cls.open_raw(spec)
+
+        loader_cls, found_path, parsed_path = result
+        if parsed_path is None:
+            spec = found_path
 
         try:
             loader_instance = loader_cls(found_path, parsed_path=parsed_path)
@@ -345,23 +335,16 @@ class Target:
         def _open_all(
             spec: str | Path, include_children: bool = False, recursive: bool = False, *, apply: bool = True
         ) -> Iterator[Target]:
-            # If the path is a URI-like string, separate the path component
-            adjusted_path, parsed_path = parse_path_uri(spec)
-            # We always need a path to work with, so convert the spec into one if it's not one already
-            path = Path(spec) if not isinstance(spec, os.PathLike) else spec
-
-            if parsed_path is not None and (loader_cls := loader.find_loader_by_scheme(parsed_path.scheme)):
-                # If we find a loader by URI scheme, use the adjusted path (path component of the URI)
-                found_path = adjusted_path
-            elif loader_cls := loader.find_loader(path, fallbacks=[loader.DirLoader, loader.RawLoader]):
-                # Otherwise try to find a loader for the "raw" path
-                # If we succeed, upgrade the "spec" to the path
-                spec = path
-                found_path = path
-                parsed_path = None
-            else:
+            result = loader.infer_loader(spec)
+            if result is None:
                 # Couldn't find a loader
                 return
+
+            loader_cls, found_path, parsed_path = result
+            # For non-URI specs, infer_loader resolves the spec to a Path; mirror that upgrade here
+            # so that load_spec (used as the target identity) is consistent with what open() would use.
+            if parsed_path is None:
+                spec = found_path
 
             get_target_logger(spec).debug("Attempting to use loader: %s", loader_cls)
             # See if the loader provides any additional paths to load

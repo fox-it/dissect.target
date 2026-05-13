@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from datetime import datetime
 
+    from dissect.target.loader import Loader
     from dissect.target.plugin import FunctionDescriptor
 
 
@@ -352,6 +353,26 @@ def generate_argparse_for_method(
     return parser
 
 
+def generate_argparse_for_loader_class(
+    loader_cls: type[Loader],
+    usage_tmpl: str | None = None,
+) -> argparse.ArgumentParser:
+    """Generate an ``argparse.ArgumentParser`` for a :class:`~dissect.target.loader.Loader` class."""
+    desc = get_docstring(loader_cls)
+
+    help_formatter = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(
+        prog=f"target-query -L {loader_cls.__name__.lower().removesuffix('loader')}",
+        description=desc,
+        formatter_class=help_formatter,
+        add_help=False,
+    )
+
+    _add_args_to_parser(parser, getattr(loader_cls, "__args__", []))
+
+    return parser
+
+
 def generate_argparse_for_plugin_class(
     plugin_cls: type[Plugin],
     usage_tmpl: str | None = None,
@@ -499,14 +520,27 @@ def args_to_uri(targets: list[str], loader_name: str, args: list[str] | None = N
     For loaders providing ``@arg()`` arguments.
     """
     loader = LOADERS_BY_SCHEME.get(loader_name, None)
-
     parser = argparse.ArgumentParser(
         argument_default=argparse.SUPPRESS, description="\n".join(textwrap.wrap(get_docstring(loader)))
     )
     for load_arg in getattr(loader, "__args__", []):
-        parser.add_argument(*load_arg[0], **load_arg[1])
-    args = vars(parser.parse_known_args(args)[0])
-    return [f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else "") for target in targets]
+        arg_opts, arg_kwargs = load_arg
+        kw = dict(arg_kwargs)
+        # If no explicit dest provided, prefer the long option string as dest
+        if "dest" not in kw:
+            long_opts = [o for o in arg_opts if o.startswith("--")]
+            if long_opts:
+                kw["dest"] = long_opts[0].lstrip("-")
+
+        parser.add_argument(*arg_opts, **kw)
+
+    ns, _ = parser.parse_known_args(args)
+    parsed = vars(ns)
+
+    params = {k: (1 if v is True else 0 if v is False else v) for k, v in parsed.items()}
+
+    q = ("?" + urllib.parse.urlencode(params, doseq=True)) if params else ""
+    return [f"{loader_name}://{t}{q}" for t in targets]
 
 
 def find_and_filter_plugins(
