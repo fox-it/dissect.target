@@ -194,7 +194,7 @@ def join(*args: str, sep: str = "/") -> str:
     return path
 
 
-def split(path: str, *, sep: str = "/") -> str:
+def split(path: str, *, sep: str = "/") -> tuple[str, str]:
     """Split a pathname. Returns tuple "(head, tail)" where "tail" is
     everything after the final slash. Either part may be empty.
 
