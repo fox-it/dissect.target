@@ -35,7 +35,7 @@ def mock_vmwarevm_dir(tmp_path: Path) -> Iterator[Path]:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: Path) -> None:
+def test_target_open_vmwarevm(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: Path) -> None:
     """Test that we correctly use ``VmwarevmLoader`` when opening a ``Target``."""
     with patch("dissect.target.container.open"), patch("dissect.target.target.Target.apply"):
         target = opener(mock_vmwarevm_dir)
@@ -43,7 +43,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: 
         assert target.path == mock_vmwarevm_dir
 
 
-def test_loader(mock_vmwarevm_dir: Path) -> None:
+def test_vmwarevm_loader(mock_vmwarevm_dir: Path) -> None:
     """Test that ``VmwarevmLoader`` correctly loads a VMware VM directory."""
     loader = loader_open(mock_vmwarevm_dir)
     assert isinstance(loader, VmwarevmLoader)

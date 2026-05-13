@@ -145,11 +145,12 @@ def test_parse_domain(
     [
         ("/etc/hostname", "myhost", "mydomain.com", b"myhost.mydomain.com"),
         ("/etc/HOSTNAME", "myhost", "mydomain.com", b"myhost.mydomain.com"),
-        (
+        pytest.param(
             "/etc/sysconfig/network",
             "myhost",
             "mydomain.com",
             b"NETWORKING=NO\nHOSTNAME=myhost.mydomain.com\nGATEWAY=192.168.1.1",
+            id="hostname-fqdn",
         ),
         ("/etc/hostname", "myhost", None, b"myhost"),
         ("/etc/sysconfig/network", "myhost", None, b"NETWORKING=NO\nHOSTNAME=myhost\nGATEWAY=192.168.1.1"),
@@ -175,7 +176,7 @@ def test_parse_hostname_string(
     assert domain == expected_domain, f"Expected domain {expected_domain!r} but got {domain!r}"
 
 
-def test_users(target_unix_users: Target) -> None:
+def test_unix_users(target_unix_users: Target) -> None:
     users = list(target_unix_users.users())
 
     assert len(users) == 3

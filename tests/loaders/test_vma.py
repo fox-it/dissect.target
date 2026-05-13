@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_vma(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``VmaLoader`` when opening a ``Target``."""
     path = absolute_path("_data/loaders/vma/vzdump-qemu-6969-2025_08_01-15_24_07.vma")
 
@@ -30,7 +30,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     assert target.path == path
 
 
-def test_loader() -> None:
+def test_vma_loader() -> None:
     """Test that ``VmaLoader`` correctly loads a VMA file and its disks."""
     path = absolute_path("_data/loaders/vma/vzdump-qemu-6969-2025_08_01-15_24_07.vma")
 

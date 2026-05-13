@@ -79,7 +79,7 @@ def test_open_fallback_fh(tmp_path: Path) -> None:
     assert not vhd.VhdContainer.detect(tmp_dummy)
 
 
-def test_reset_file_position() -> None:
+def test_container_reset_file_position() -> None:
     fh = BytesIO(b"\x00" * 8192)
     fh.seek(512)
 
@@ -104,7 +104,7 @@ def test_reset_file_position() -> None:
         assert fh.tell() == 512
 
 
-def test_registration(tmp_path: Path) -> None:
+def test_container_registration(tmp_path: Path) -> None:
     code = """
         from __future__ import annotations
 

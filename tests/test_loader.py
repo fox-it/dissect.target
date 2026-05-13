@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_registration(tmp_path: Path) -> None:
+def test_loader_registration(tmp_path: Path) -> None:
     code = """
         from pathlib import Path
 

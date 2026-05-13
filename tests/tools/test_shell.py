@@ -444,11 +444,12 @@ def test_redirect_syntax_error(target_win: Target, capsys: pytest.CaptureFixture
         ("/a/b/c|/d", "/a/1.txt|/b/2.txt|/d/3.txt", "/b", "b|b/2.txt"),
         ("/p/q/n", "/p/q/n/1.txt", "/p/q/n/1.txt", "1.txt"),
         ("/p/q/n", "/p/q/n/1.txt|2.txt", "/p/q/n/1.txt", "1.txt"),
-        (
+        pytest.param(
             "/save_test/bin|save_test/data",
             "/save_test/data/hello|/save_test/bin/world",
             "/save_test",
             "save_test|save_test/bin|save_test/bin/world|save_test/data|save_test/data/hello",
+            id="extended",
         ),
     ],
 )

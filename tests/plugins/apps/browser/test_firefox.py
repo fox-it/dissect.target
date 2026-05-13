@@ -58,13 +58,15 @@ def target_firefox_oculus(target_android: Target, fs_android: VirtualFilesystem)
 @pytest.mark.parametrize(
     ("target_platform", "expected_source"),
     [
-        (
+        pytest.param(
             "target_firefox_win",
             "C:\\Users\\John\\AppData\\local\\Mozilla\\Firefox\\Profiles\\g1rbw8y7.default-release\\places.sqlite",
+            id="windows",
         ),
-        (
+        pytest.param(
             "target_firefox_unix",
             "/root/.mozilla/firefox/g1rbw8y7.default-release/places.sqlite",
+            id="unix",
         ),
     ],
 )

@@ -134,7 +134,7 @@ def test_packet(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesy
         assert result.owner == "root"
 
 
-def test_unix(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem) -> None:
+def test_sockets_unix(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.unix())

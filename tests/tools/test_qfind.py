@@ -131,7 +131,7 @@ buf_unique = (b"\x00" * 512) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4)) + (b"ABCD"
         ),
     ],
 )
-def test_qfind(
+def test_qfind_tool(
     target_bare: Target,
     buf: bytes,
     argv: list[str],

@@ -99,7 +99,7 @@ def test_is_symlink(nfs_filesystem_entry: NfsFilesystemEntry) -> None:
     assert nfs_filesystem_entry.is_symlink()
 
 
-def test_readlink(nfs_filesystem_entry: NfsFilesystemEntry, mock_nfs_client: MagicMock) -> None:
+def test_nfs_readlink(nfs_filesystem_entry: NfsFilesystemEntry, mock_nfs_client: MagicMock) -> None:
     mock_nfs_client.readlink.return_value = "/target"
     target = nfs_filesystem_entry.readlink()
     mock_nfs_client.readlink.assert_called_with(FileHandle(opaque=b"file_handle"))

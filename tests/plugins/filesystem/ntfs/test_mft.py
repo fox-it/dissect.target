@@ -110,7 +110,12 @@ def test_get_owner_and_group_none_attr() -> None:
 @pytest.mark.parametrize(
     ("guid", "serial", "expected_result"),
     [
-        ("7dc1a62c-c488-47c5-8eab-09240f38894e", 0x9E0C158A4CE55327, "7dc1a62c-c488-47c5-8eab-09240f38894e"),
+        pytest.param(
+            "7dc1a62c-c488-47c5-8eab-09240f38894e",
+            0x9E0C158A4CE55327,
+            "7dc1a62c-c488-47c5-8eab-09240f38894e",
+            id="7dc1a62c-c488-47c5-8eab-09240f38894e",
+        ),
         (None, 0x2B4A7D188A9163F2, "3119443236264961010"),
         ("", None, None),
         (None, None, None),
@@ -147,20 +152,23 @@ def test_volume_identifier_none_guid() -> None:
         (r".+Size:(No Data)", 120),
         (r".+Is_ADS$", 24),
         (r".+Size:\d+", 184),
-        (
+        pytest.param(
             r"2021-08-04 ([+.:]?\d+)+ [SF]0?[BCMA] 43 NamelessDirectory - "
             r"In[uU]se:True Resident:No Data Owner:No Data Size:No Data VolumeUUID:No Data",
             8,
+            id="namelessdir-1",
         ),
-        (
+        pytest.param(
             r"2021-08-04 ([+.:]?\d+)+ [SF]0?[BCMA] 46 NamelessDirectory\\totally_normal.txt - "
             r"In[uU]se:True Resident:True Owner:No Data Size:28 VolumeUUID:No Data",
             8,
+            id="namelessdir-2",
         ),
-        (
+        pytest.param(
             r"2021-08-04 ([+.:]?\d+)+ [SF]0?[BCMA] 46 NamelessDirectory\\totally_normal.txt"
             r":secret_text.txt - InUse:True Resident:True Owner:No Data Size:24 VolumeUUID:No Data Is_ADS",
             4,
+            id="namelessdir-3",
         ),
     ],
 )

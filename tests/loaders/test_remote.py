@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_remote(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``RemoteLoader`` when opening a ``Target``."""
     path = "remote://127.0.0.1:1337"
     with (
@@ -37,7 +37,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
         assert target.path == Path("127.0.0.1:1337")
 
 
-def test_loader() -> None:
+def test_remote_loader() -> None:
     """Test that ``RemoteLoader`` is correctly selected."""
     with patch.object(ssl, "SSLContext", autospec=True):
         loader = loader_open("remote://127.0.0.1:1337")

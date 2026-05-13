@@ -21,25 +21,33 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize(
     ("expected_ips", "messages"),
     [
-        (
+        pytest.param(
             ["10.13.37.1"],
             "Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'",  # noqa: E501
+            id="networkmanager-dhcp4-option",
         ),
-        (["10.13.37.2"], "Feb  2 13:37:02 test systemd-networkd[2]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0"),
-        (
+        pytest.param(
+            ["10.13.37.2"],
+            "Feb  2 13:37:02 test systemd-networkd[2]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0",
+            id="systemd-dhcpv4-address-via",
+        ),
+        pytest.param(
             ["10.13.37.3"],
             "Mar  3 13:37:03 localhost NetworkManager[3]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3",
+            id="networkmanager-dhcpv4-address",
         ),
-        (
+        pytest.param(
             ["10.13.37.4"],
             "Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.",
+            id="dhclient-bound-to",
         ),
-        (
+        pytest.param(
             ["2001:db8::"],
             (
                 "Jun  6 13:37:06 test systemd-networkd[5]: eth0: DHCPv6 address 2001:db8::/64 via 2001:db8:ffff:ffff:ffff:ffff:ffff:ffff\n"  # noqa: E501
                 "May  5 13:37:05 test systemd-networkd[5]: eth0: DHCPv6 lease lost\n"
             ),
+            id="dhcpv6-ipv6",
         ),
     ],
 )
@@ -180,9 +188,21 @@ def test_ips_netplan_static(target_unix_users: Target, fs_unix: VirtualFilesyste
         ("network:", []),
         ("network:\n    ethernets:\n", []),
         ("network:\n    ethernets:\n        eth0:\n", []),
-        ("network:\n    ethernets:\n        eth0:\n            addresses: []\n", []),
-        ("network:\n    ethernets:\n        eth0:\n            addresses: [1.2.3.4/24]\n", ["1.2.3.4"]),
-        ("network:\n    ethernets:\n        eth0:\n            addresses: ['1.2.3.4']\n", ["1.2.3.4"]),
+        pytest.param(
+            "network:\n    ethernets:\n        eth0:\n            addresses: []\n",
+            [],
+            id="empty-list",
+        ),
+        pytest.param(
+            "network:\n    ethernets:\n        eth0:\n            addresses: [1.2.3.4/24]\n",
+            ["1.2.3.4"],
+            id="cidr-24",
+        ),
+        pytest.param(
+            "network:\n    ethernets:\n        eth0:\n            addresses: ['1.2.3.4']\n",
+            ["1.2.3.4"],
+            id="no-cidr",
+        ),
     ],
 )
 def test_ips_netplan_static_invalid(

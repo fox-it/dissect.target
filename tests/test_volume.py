@@ -8,7 +8,7 @@ from dissect.target import volume
 from dissect.target.volumes import disk
 
 
-def test_reset_file_position() -> None:
+def test_volume_reset_file_position() -> None:
     fh = BytesIO(b"\x00" * 8192)
     fh.seek(512)
 

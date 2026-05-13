@@ -9,12 +9,18 @@ from tests._utils import absolute_path
 @pytest.mark.parametrize(
     ("target", "fs", "target_file"),
     [
-        (
+        pytest.param(
             "target_win_users",
             "fs_win",
             "users\\John\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\psreadline\\ConsoleHost_history.txt",
+            id="windows",
         ),
-        ("target_unix_users", "fs_unix", "/root/.local/share/powershell/PSReadLine/ConsoleHost_history.txt"),
+        pytest.param(
+            "target_unix_users",
+            "fs_unix",
+            "/root/.local/share/powershell/PSReadLine/ConsoleHost_history.txt",
+            id="unix",
+        ),
     ],
 )
 def test_powershell(target: str, fs: str, target_file: str, request: pytest.FixtureRequest) -> None:

@@ -67,7 +67,7 @@ def mock_session(mock_device: MagicMock) -> MagicMock:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_session: MagicMock) -> None:
+def test_target_open_cb(opener: Callable[[str | Path], Target], mock_session: MagicMock) -> None:
     """Test that we correctly use ``CbLoader`` when opening a ``Target``."""
     from dissect.target.loaders.cb import CbLoader
 
@@ -79,7 +79,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_session: Magic
         assert target.path == Path("instance/workstation")
 
 
-def test_loader(mock_session: MagicMock, mock_cbc_sdk: MagicMock) -> None:
+def test_cb_loader(mock_session: MagicMock, mock_cbc_sdk: MagicMock) -> None:
     """Test the CB loader."""
     from dissect.target.filesystems.cb import CbFilesystem
     from dissect.target.loader import open as loader_open

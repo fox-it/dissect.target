@@ -41,7 +41,10 @@ def test_process_not_found(target_linux_users: Target, fs_linux_proc: VirtualFil
 def test_processes(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
 
-    for process in target_linux_users.proc.processes():
+    results = list(target_linux_users.proc.processes())
+    assert len(results) == 4
+
+    for process in results:
         assert process.pid in (1, 2, 3, 1337)
         assert process.state in ("Sleeping", "Waking", "Running", "Wakekill")
         assert process.name in ("systemd", "kthread", "acquire", "sshd")

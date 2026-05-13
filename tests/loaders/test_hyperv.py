@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_hyperv(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``HyperVLoader`` when opening a ``Target``."""
     for path in [
         absolute_path("_data/loaders/hyperv/B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"),
@@ -51,7 +51,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
         ("c:\\Virtual Machines", "c:\\Disks"),
     ],
 )
-def test_loader(descriptor_dir: str, disk_dir: str, target_bare: Target) -> None:
+def test_hyperv_loader(descriptor_dir: str, disk_dir: str, target_bare: Target) -> None:
     """Test the Hyper-V loader with XML and VMCX descriptor files."""
     gen1_xml_filename = "B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"
     gen2_xml_filename = "D351C151-DAC7-4042-B434-B72D522C1E4A.xml"

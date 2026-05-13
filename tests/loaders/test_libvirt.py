@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_libvirt(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``LibvirtLoader`` when opening a ``Target``."""
     vfs = VirtualFilesystem()
     vfs.map_file("/test.xml", absolute_path("_data/loaders/libvirt/qemu.xml"))
@@ -37,7 +37,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
         assert target.path == path
 
 
-def test_loader(tmp_path: Path) -> None:
+def test_libvirt_loader(tmp_path: Path) -> None:
     """Test that ``LibvirtLoader`` works with local files, absolute and relative."""
     xml_file = tmp_path.joinpath("base")
     xml_file.write_text("not a libvirt file")

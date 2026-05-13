@@ -43,37 +43,40 @@ class ErrorCounter(TargetLogAdapter):
     [
         # Base cases:
         # Scenario 0:  Can we still load a single target that's not a dir?
-        (
+        pytest.param(
             [
                 "/raw.tst",
             ],
             "/raw.tst",
             "[TestLoader('/raw.tst')]",
             0,
+            id="single-target-no-dir",
         ),
         # Scenario 0b: Make sure we still get so see errors if a target fails to load
         # (1 error + 1 exception no load)
-        (
+        pytest.param(
             [
                 "/raw.vbox",
             ],
             "/raw.vbox",
             "[]",
             2,
+            id="no-target-ensure-errors",
         ),
         # Scenario 0c: Attempting to load a dir with nothing of interest yield an error
         # (1 exception no load)
-        (
+        pytest.param(
             [
                 "/dir/garbage",
             ],
             "/dir",
             "[]",
             1,
+            id="target-dir-empty",
         ),
         # Dir cases:
         # Scenario 1:  Dir is loadable target (simple)
-        (
+        pytest.param(
             [
                 "/dir/etc",
                 "/dir/var",
@@ -81,9 +84,10 @@ class ErrorCounter(TargetLogAdapter):
             "/dir",
             "[DirLoader('/dir')]",
             0,
+            id="target-dir-simple",
         ),
         # Scenario 2: dir contains multiple loadable targets
-        (
+        pytest.param(
             [
                 "/dir/raw.img",
                 "/dir/raw2.tst",
@@ -91,10 +95,11 @@ class ErrorCounter(TargetLogAdapter):
             "/dir",
             "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
             0,
+            id="multiple-targets-dir",
         ),
         # Scenario 2b: dir contains multiple loadable targets and some garbage
         # (it will wrap the garbage in a RawLoader to try)
-        (
+        pytest.param(
             [
                 "/dir/raw.img",
                 "/dir/raw2.tst",
@@ -103,9 +108,10 @@ class ErrorCounter(TargetLogAdapter):
             "/dir",
             "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst'), RawLoader('/dir/info.txt')]",
             0,
+            id="multiple-targets-dir-one-garbage",
         ),
         # Scenario 3: dir contains 1 loadable dir as well as 2 loadable targets
-        (
+        pytest.param(
             [
                 "/dir/unix/etc",
                 "/dir/unix/var",
@@ -115,9 +121,10 @@ class ErrorCounter(TargetLogAdapter):
             "/dir",
             "[DirLoader('/dir/unix'), RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
             0,
+            id="one-dir-multiple-targets",
         ),
         # Scenario 3b: dir contains 2 loadable dirs as well as 2 loadable targets
-        (
+        pytest.param(
             [
                 "/dir/unix/etc",
                 "/dir/unix/var",
@@ -129,9 +136,10 @@ class ErrorCounter(TargetLogAdapter):
             "/dir",
             "[DirLoader('/dir/unix'), DirLoader('/dir/win'), RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
             0,
+            id="multiple-dirs-multiple-targets",
         ),
         # Scenario 4: dir is a loadable dir but contains other files including loadable targets
-        (
+        pytest.param(
             [
                 "/dir/etc",
                 "/dir/var",
@@ -141,9 +149,10 @@ class ErrorCounter(TargetLogAdapter):
             "/dir",
             "[DirLoader('/dir')]",
             0,
+            id="loadable-dir-other-files-and-targets",
         ),
         # Scenario 4b: Windows variant
-        (
+        pytest.param(
             [
                 "/dir/c:",
                 "/dir/c:/windows/system32",
@@ -153,9 +162,10 @@ class ErrorCounter(TargetLogAdapter):
             "/dir",
             "[DirLoader('/dir')]",
             0,
+            id="windows-variant",
         ),
         # Scenario 5: Hypothetical Dirloader with selection
-        (
+        pytest.param(
             [
                 "/dir/select.txt",  # selects 1 and 3
                 "/dir/raw1.img",
@@ -165,6 +175,7 @@ class ErrorCounter(TargetLogAdapter):
             "/dir",
             "[SelectLdr('/dir/raw1.img'), SelectLdr('/dir/raw3.img')]",
             0,
+            id="dirloader-selection-variant",
         ),
     ],
 )

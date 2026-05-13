@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
+def test_target_open_dir(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test that we correctly use ``DirLoader`` when opening a ``Target``."""
     root = tmp_path
     mkdirs(root, ["windows/system32"])

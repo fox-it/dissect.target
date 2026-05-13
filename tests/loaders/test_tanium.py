@@ -40,7 +40,7 @@ def mock_tanium_dir(tmp_path: Path) -> Path:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_tanium_dir: Path) -> None:
+def test_target_open_tanium(opener: Callable[[str | Path], Target], mock_tanium_dir: Path) -> None:
     """Test that we correctly use ``TaniumLoader`` when opening a ``Target``."""
     path = mock_tanium_dir
 
@@ -49,7 +49,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_tanium_dir: Pa
     assert target.path == path
 
 
-def test_loader(mock_tanium_dir: Path) -> None:
+def test_tanium_loader(mock_tanium_dir: Path) -> None:
     loader = loader_open(mock_tanium_dir)
     assert isinstance(loader, TaniumLoader)
 

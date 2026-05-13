@@ -45,7 +45,7 @@ def mock_vmwarevm_dir(tmp_path: Path) -> Path:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: Path) -> None:
+def test_target_open_vmx(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: Path) -> None:
     """Test that we correctly use ``VmwarevmLoader`` when opening a ``Target``."""
     path = mock_vmwarevm_dir / "Test.vmx"
 
@@ -55,7 +55,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_vmwarevm_dir: 
         assert target.path == path
 
 
-def test_loader(mock_vmwarevm_dir: Path) -> None:
+def test_vmx_loader(mock_vmwarevm_dir: Path) -> None:
     (mock_vmwarevm_dir / "mock.vmdk").touch()
 
     with _mock_vmx_and_container_open(["mock.vmdk"]) as mock_container_open:

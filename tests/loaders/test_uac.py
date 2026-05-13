@@ -46,7 +46,7 @@ def mock_uac_dir(tmp_path: Path) -> Path:
         ("mock_uac_dir", UacLoader),
     ],
 )
-def test_target_open(
+def test_target_open_uac(
     opener: Callable[[str | Path], Target], path: str, loader: type[Loader], mock_uac_dir: Path
 ) -> None:
     """Test that we correctly use the UAC loaders when opening a ``Target``."""
@@ -71,7 +71,7 @@ def test_target_open(
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143112.tar.gz"),
     ],
 )
-def test_compressed_tar(data_path: str) -> None:
+def test_uac_compressed_tar(data_path: str) -> None:
     """Test if we map a compressed UAC tar image correctly."""
     path = absolute_path(data_path)
 
@@ -109,7 +109,7 @@ def test_compressed_zip() -> None:
     assert test_file.open().readline() == b"root:x:0:0:root:/root:/bin/bash\n"
 
 
-def test_dir(mock_uac_dir: Path) -> None:
+def test_uac_dir(mock_uac_dir: Path) -> None:
     """Test if we map an extracted UAC directory correctly."""
     loader = loader_open(mock_uac_dir)
     assert isinstance(loader, UacLoader)
@@ -133,7 +133,7 @@ def test_dir(mock_uac_dir: Path) -> None:
     ],
 )
 @pytest.mark.benchmark
-def test_benchmark(benchmark: BenchmarkFixture, archive: str, loader: type[Loader]) -> None:
+def test_benchmark_uac(benchmark: BenchmarkFixture, archive: str, loader: type[Loader]) -> None:
     file = absolute_path(archive)
 
     benchmark(lambda: loader(file).map(Target()))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import pathlib
 import tempfile
@@ -79,6 +80,30 @@ def pytest_sessionstart(session: pytest.Session) -> None:
                         "\n! !"
                     )
             break
+
+
+_function_names = {}
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pycollect_makemodule(module_path: str, parent: str) -> None:
+    if duplicates := find_duplicate_functions(module_path):
+        pytest.exit(f"duplicate test function names found in module: {module_path}: {duplicates}")
+
+
+def find_duplicate_functions(source_path: str) -> set[str]:
+    source_code = pathlib.Path(source_path).read_text()
+    tree = ast.parse(source_code, source_path)
+    duplicates = set()
+    allowlist = ("test_other", "test_all",)  # ast will find some example Plugin functions from test_plugin.py
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("test_") and node.name not in allowlist:
+            if node.name in _function_names:
+                duplicates.add(node.name)
+            else:
+                _function_names[node.name] = node
+    return duplicates
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:

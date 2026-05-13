@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_wsl(target_win: Target, fs_win: VirtualFilesystem) -> None:
+def test_hyperv(target_win: Target, fs_win: VirtualFilesystem) -> None:
     fs_win.map_file(
         "ProgramData/Microsoft/Windows/Hyper-V/data.vmcx",
         absolute_path("_data/plugins/child/hyperv/data.vmcx"),

@@ -47,7 +47,7 @@ def mock_vmsupport_dir(tmp_path: Path) -> Path:
         ("mock_vmsupport_dir", VmSupportLoader),
     ],
 )
-def test_target_open(
+def test_target_open_vmsupport(
     opener: Callable[[str | Path], Target], path: str, loader: type[Loader], mock_vmsupport_dir: Path
 ) -> None:
     """Test that we correctly use the ESXi vm-support loaders when opening a ``Target``."""
@@ -69,7 +69,7 @@ def test_target_open(
         "_data/loaders/vmsupport/esx-localhost8-2026-01-09--16.04-135806.tgz",
     ],
 )
-def test_compressed_tar(data_path: str) -> None:
+def test_vmsupport_compressed_tar(data_path: str) -> None:
     """Test if we map a compressed vm support tar image correctly."""
     path = absolute_path(data_path)
 
@@ -88,7 +88,7 @@ def test_compressed_tar(data_path: str) -> None:
     assert b"/resourceGroups/version" in test_file.open().read()
 
 
-def test_dir(mock_vmsupport_dir: Path) -> None:
+def test_vmsupport_dir(mock_vmsupport_dir: Path) -> None:
     """Test if we map an extracted vm support directory correctly."""
     loader = loader_open(mock_vmsupport_dir)
     assert isinstance(loader, VmSupportLoader)
@@ -112,7 +112,7 @@ def test_dir(mock_vmsupport_dir: Path) -> None:
     ],
 )
 @pytest.mark.benchmark
-def test_benchmark(benchmark: BenchmarkFixture, archive: str, loader: type[Loader]) -> None:
+def test_benchmark_vmsupport(benchmark: BenchmarkFixture, archive: str, loader: type[Loader]) -> None:
     file = absolute_path(archive)
 
     benchmark(lambda: loader(file).map(Target()))

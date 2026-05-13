@@ -22,7 +22,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_asdf(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``AsdfLoader`` when opening a ``Target``."""
     path = absolute_path("_data/loaders/asdf/metadata.asdf")
 

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+def test_target_open_vbk(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``VbkLoader`` when opening a ``Target``."""
     path = absolute_path(
         "_data/loaders/vbk/Backup Job 1/VBK-Test-VM.e56465c7-3a5a-4599-bc25-3555b9b8cD2025-07-20T160920_3702.vbk"
@@ -52,7 +52,7 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
         ),
     ],
 )
-def test_loader(path: str, disk_sizes: list[int]) -> None:
+def test_vbk_loader(path: str, disk_sizes: list[int]) -> None:
     """Test the VBK loader on real files."""
     path = absolute_path("_data/loaders/vbk").joinpath(path)
 

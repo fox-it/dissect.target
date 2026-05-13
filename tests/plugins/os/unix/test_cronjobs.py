@@ -70,7 +70,7 @@ def test_unix_cronjobs_env(target_unix: Target, fs_unix: VirtualFilesystem) -> N
 @pytest.mark.parametrize(
     ("cron_line", "expected_output", "expected_user"),
     [
-        (
+        pytest.param(
             "0 0 * * * FOO=bar    /path/to/some/script.sh",
             {
                 "command": "FOO=bar    /path/to/some/script.sh",
@@ -82,8 +82,9 @@ def test_unix_cronjobs_env(target_unix: Target, fs_unix: VirtualFilesystem) -> N
                 "weekday": "*",
             },
             None,
+            id="variant-1",
         ),
-        (
+        pytest.param(
             "0 * * * * source some-file ; /path/to/some/script.sh",
             {
                 "command": "source some-file ; /path/to/some/script.sh",
@@ -95,8 +96,9 @@ def test_unix_cronjobs_env(target_unix: Target, fs_unix: VirtualFilesystem) -> N
                 "weekday": "*",
             },
             None,
+            id="variant-2",
         ),
-        (
+        pytest.param(
             r"0 0 * * * sleep ${RANDOM:0:1} && /path/to/executable",
             {
                 "command": r"sleep ${RANDOM:0:1} && /path/to/executable",
@@ -108,8 +110,9 @@ def test_unix_cronjobs_env(target_unix: Target, fs_unix: VirtualFilesystem) -> N
                 "weekday": "*",
             },
             None,
+            id="variant-3",
         ),
-        (
+        pytest.param(
             "*/5 * * * * /bin/bash -c 'source /some-file; echo \"FOO: $BAR\" >> /var/log/some.log 2>&1'",
             {
                 "command": "/bin/bash -c 'source /some-file; echo \"FOO: $BAR\" >> /var/log/some.log 2>&1'",
@@ -121,8 +124,9 @@ def test_unix_cronjobs_env(target_unix: Target, fs_unix: VirtualFilesystem) -> N
                 "weekday": "*",
             },
             None,
+            id="variant-4",
         ),
-        (
+        pytest.param(
             "0 0 * * * example.sh",
             {
                 "command": "example.sh",
@@ -134,8 +138,9 @@ def test_unix_cronjobs_env(target_unix: Target, fs_unix: VirtualFilesystem) -> N
                 "weekday": "*",
             },
             None,
+            id="variant-4",
         ),
-        (
+        pytest.param(
             "0 0 * * * root example.sh",
             {
                 "command": "root example.sh",
@@ -147,8 +152,9 @@ def test_unix_cronjobs_env(target_unix: Target, fs_unix: VirtualFilesystem) -> N
                 "weekday": "*",
             },
             "root",
+            id="variant-5",
         ),
-        (
+        pytest.param(
             "0 0 * * * root\texample.sh",
             {
                 "command": "example.sh",
@@ -160,6 +166,7 @@ def test_unix_cronjobs_env(target_unix: Target, fs_unix: VirtualFilesystem) -> N
                 "weekday": "*",
             },
             "root",
+            id="variant-6",
         ),
     ],
 )

@@ -77,7 +77,7 @@ def test_ntfs_unknown_file() -> None:
         (0x1000, 0x2000, True, 0),
     ],
 )
-def test_stat_information(cluster_size: int, size: int, resident: bool, expected_blks: int) -> None:
+def test_ntfs_stat_information(cluster_size: int, size: int, resident: bool, expected_blks: int) -> None:
     ntfs = Mock(cluster_size=cluster_size)
 
     entry = MftRecord()

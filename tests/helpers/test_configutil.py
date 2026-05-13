@@ -84,21 +84,23 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
 @pytest.mark.parametrize(
     ("indented_string", "expected_output"),
     [
-        (
+        pytest.param(
             """
             key value1
               value2
             """,
             {"key value1": "value2"},
+            id="variant-1",
         ),
-        (
+        pytest.param(
             """
             key1 value1
               key2 value2
             """,
             {"key1 value1": {"key2": "value2"}},
+            id="variant-2",
         ),
-        (
+        pytest.param(
             """
             key value1
               value2
@@ -106,8 +108,9 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
               value3
             """,
             {"key value1": ["value2", "value3"]},
+            id="variant-3",
         ),
-        (
+        pytest.param(
             """
             key value1
               key2 value2a
@@ -117,8 +120,9 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
               key3 value3b
             """,
             {"key value1": [{"key2": "value2a", "key3": "value3a"}, {"key2": "value2b", "key3": "value3b"}]},
+            id="variant-4",
         ),
-        (
+        pytest.param(
             """
             key value
               key2 value2
@@ -128,8 +132,9 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
               key2 value2
             """,
             {"key value": {"key2": "value2", "key3": "value3"}, "key value4": {"key2": "value2"}},
+            id="variant-5",
         ),
-        (
+        pytest.param(
             """
             key value
                 key2 value2
@@ -139,8 +144,9 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
                 key2
             """,
             {"key value": {"key2": "value2", "key3": "value3"}, "key value4": "key2"},
+            id="variant-6",
         ),
-        (
+        pytest.param(
             """
             key value
                 value2
@@ -148,6 +154,7 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
                 key3 value3
             """,
             {"key value": "value2", "key2 value": {"key3": "value3"}},
+            id="variant-6",
         ),
     ],
 )
@@ -383,7 +390,7 @@ def test_env_parser(input: str | Path, expected_output: dict) -> None:
 @pytest.mark.parametrize(
     ("string_data", "expected_output"),
     [
-        (
+        pytest.param(
             'default-duid "\\000\\001\\000\\001\\037\\305\\371\\341\\001\\002\\003\\004\\005\\006"\nlease {\ninterface "eth0"; # some comment\nfixed-address "1.2.3.4";\noption subnet-mask 255.255.255.0;\nrenew 2 2023/10/04 13:37:04;\n# some other comment}',  # noqa: E501
             {
                 "default-duid": '"\\000\\001\\000\\001\\037\\305\\371\\341\\001\\002\\003\\004\\005\\006"',
@@ -394,6 +401,7 @@ def test_env_parser(input: str | Path, expected_output: dict) -> None:
                     "renew": "2 2023/10/04 13:37:04",
                 },
             },
+            id="dhcp-lease",
         ),
     ],
 )
