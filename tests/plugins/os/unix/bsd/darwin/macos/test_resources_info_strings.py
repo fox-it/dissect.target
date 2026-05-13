@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugins.os.unix.bsd.darwin.macos.resources_info_strings import macOSResourcesInfoStringsPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos.resources_info_strings import ResourcesInfoStringsPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ def test_resources_info_strings(
     with (
         patch.object(entries[0], "stat", return_value=stat_results[0]),
     ):
-        target_unix.add_plugin(macOSResourcesInfoStringsPlugin)
+        target_unix.add_plugin(ResourcesInfoStringsPlugin)
 
         results = list(target_unix.resources_info_strings())
         results.sort(key=lambda r: (r.source, getattr(r, "plist_path", "")))

@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-macOSInstallLogRecord = TargetRecordDescriptor(
-    "macos/install",
+InstallLogRecord = TargetRecordDescriptor(
+    "macos/install_log",
     [
         ("datetime", "ts"),
         ("string", "host"),
@@ -49,11 +49,11 @@ class InstallLogPlugin(Plugin):
         if not self.target.fs.exists(self.INSTALL_LOG_PATH):
             raise UnsupportedPluginError("No install.log file found.")
 
-    @export(record=macOSInstallLogRecord)
-    def install_log(self) -> Iterator[macOSInstallLogRecord]:
+    @export(record=InstallLogRecord)
+    def install_log(self) -> Iterator[InstallLogRecord]:
         """Return all macOS install log messages.
 
-        Yields macOSInstallLogRecord instances with fields:
+        Yields InstallLogRecord instances with fields:
 
         .. code-block:: text
 
@@ -83,7 +83,7 @@ class InstallLogPlugin(Plugin):
                     elif len(parts) == 2:
                         hostname, message = parts
                         component = None
-                    yield macOSInstallLogRecord(
+                    yield InstallLogRecord(
                         ts=parse_timestamp(current_ts),
                         host=hostname.strip(),
                         component=component.strip() if component else None,
@@ -101,7 +101,7 @@ class InstallLogPlugin(Plugin):
             asdf = current_buf[len(current_ts.group()) + 1 :]
             hostname, component, message = asdf.split(" ", 2)
 
-            yield macOSInstallLogRecord(
+            yield InstallLogRecord(
                 ts=parse_timestamp(current_ts),
                 host=hostname.strip(),
                 component=component.strip(),

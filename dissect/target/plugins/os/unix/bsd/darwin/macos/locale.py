@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-class macOSLocalePlugin(LocalePlugin):
+class LocalePlugin(LocalePlugin):
     """macOS locale plugin."""
 
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"

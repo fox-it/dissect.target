@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.plugins.os.unix.bsd.darwin.macos.locale import macOSLocalePlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos.locale import LocalePlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -59,7 +59,7 @@ def test_locale(
 
         target_unix.fs.mount("/", fs_unix)
         target_unix.os = "macos"
-        target_unix.add_plugin(macOSLocalePlugin)
+        target_unix.add_plugin(LocalePlugin)
 
         assert target_unix.timezone == "Europe/Amsterdam"
         assert target_unix.language == ["en_US", "nl_NL"]

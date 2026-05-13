@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from dissect.target.plugins.os.unix.bsd.darwin.macos.contents_version import (
-    MacOSContentsVersionPlugin,
+    ContentsVersionPlugin,
 )
 from tests._utils import absolute_path
 
@@ -51,7 +51,7 @@ def test_contents_version(
         patch.object(entries[1], "stat", return_value=stat_results[1]),
         patch.object(entries[2], "stat", return_value=stat_results[2]),
     ):
-        target_unix.add_plugin(MacOSContentsVersionPlugin)
+        target_unix.add_plugin(ContentsVersionPlugin)
 
         results = list(target_unix.contents_version())
         results.sort(key=lambda r: r.source)

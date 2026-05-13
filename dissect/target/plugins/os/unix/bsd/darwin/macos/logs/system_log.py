@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import gzip
-import re
 from datetime import timezone
 from typing import TYPE_CHECKING
 
@@ -12,16 +11,15 @@ from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.unix.log.helpers import RE_TS
 
 if TYPE_CHECKING:
+    import re
     from collections.abc import Iterator
 
     from dissect.target.target import Target
 
-macOSSystemLogRecord = TargetRecordDescriptor(
-    "macos/system",
+SystemLogRecord = TargetRecordDescriptor(
+    "macos/system_log",
     [("datetime", "ts"), ("string", "host"), ("string", "component"), ("string", "message"), ("path", "source")],
 )
-
-RE_TIMESTAMP_PATTERN = re.compile(r"^(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}")
 
 
 class SystemLogPlugin(Plugin):
@@ -42,8 +40,9 @@ class SystemLogPlugin(Plugin):
         for file in self.target.fs.glob(self.SYSTEM_LOG_GLOB):
             self.log_files.add(file)
 
-    @export(record=macOSSystemLogRecord)
-    def system_log(self) -> Iterator[macOSSystemLogRecord]:
+    @export(record=SystemLogRecord)
+    def system_log(self) -> Iterator[SystemLogRecord]:
+        """Return all macOS system log messages."""
         for file in self.log_files:
             filepath = self.target.fs.path(file)
 
@@ -60,12 +59,12 @@ class SystemLogPlugin(Plugin):
                 current_buf = ""
 
                 for line in logfile.readlines():
-                    if ts_match := RE_TIMESTAMP_PATTERN.match(line):
+                    if ts_match := RE_TS.match(line):
                         if current_ts_match:
                             asdf = current_buf[len(current_ts_match.group()) + 1 :]
                             hostname, component, message = asdf.split(" ", 2)
 
-                            yield macOSSystemLogRecord(
+                            yield SystemLogRecord(
                                 ts=next(ts_iter, None),
                                 host=hostname.strip(),
                                 component=component.strip(),
@@ -84,7 +83,7 @@ class SystemLogPlugin(Plugin):
                     asdf = current_buf[len(current_ts_match.group()) + 1 :]
                     hostname, component, message = asdf.split(" ", 2)
 
-                    yield macOSSystemLogRecord(
+                    yield SystemLogRecord(
                         ts=next(ts_iter, None),
                         host=hostname.strip(),
                         component=component.strip(),

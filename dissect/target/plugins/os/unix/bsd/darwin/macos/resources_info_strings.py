@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 re_illegal_characters = re.compile(r"[\(\): \.\-#\/\&gt;\&lt;]")
 
 
-class macOSResourcesInfoStringsPlugin(Plugin):
+class ResourcesInfoStringsPlugin(Plugin):
     """macOS Resources InfoPlist.strings plist file."""
 
     PATHS = (

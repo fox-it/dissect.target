@@ -43,7 +43,7 @@ FIELD_MAPPINGS = {
 }
 
 
-class MacOSContentsVersionPlugin(Plugin):
+class ContentsVersionPlugin(Plugin):
     """macOS Contents version.plist file."""
 
     PATHS = (
