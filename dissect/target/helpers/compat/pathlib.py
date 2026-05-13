@@ -466,7 +466,8 @@ class PureTargetPath(pathlib.PurePath):
 
     def as_posix(self) -> str:
         """Return the string representation of the path with forward (/) slashes."""
-        return str(self).replace(self.parser.sep, "/")
+        # PATCH: no need to normalize separators since we already use POSIX-style separators internally
+        return str(self)
 
     @property
     def _raw_path(self) -> str:

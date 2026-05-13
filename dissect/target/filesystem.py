@@ -55,7 +55,7 @@ class Filesystem:
         volume: BinaryIO | list[BinaryIO] | None = None,
         *,
         sep: str = "/",
-        altsep: str | None | DEFAULT_ALTSEP = DEFAULT_ALTSEP,
+        altsep: str | None | type[DEFAULT_ALTSEP] = DEFAULT_ALTSEP,
         case_sensitive: bool = True,
     ) -> None:
         """The base initializer for the class.
