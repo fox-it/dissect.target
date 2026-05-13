@@ -5,13 +5,14 @@ import re
 from datetime import datetime
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.certificate import parse_x509
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.webserver.webserver import (
+    LogFormat,
     WebserverAccessLogRecord,
     WebserverCertificateRecord,
     WebserverErrorLogRecord,
@@ -24,11 +25,6 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
-
-
-class LogFormat(NamedTuple):
-    name: str
-    pattern: re.Pattern
 
 
 # e.g. ServerRoot "/etc/httpd"
@@ -152,6 +148,24 @@ RE_ERROR_COMMON_PATTERN = r"""
     )?
     ((?P<error_code>\w+)\:\s)?          # APR/OS error status code and string (optional).
     (?P<message>.*)                     # The actual log message.
+"""
+
+RE_FIRST_LINE_OF_REQUEST = r"""
+    "
+    (
+        -                               # Malformed requests may result in the value "-"
+        |
+        (
+            (?P<method>.*?)             # The HTTP Method used for the request.
+            \s
+            (?P<uri>.*?)                # The HTTP URI of the request.
+            \s
+            ?(?P<protocol>HTTP\/.*?)?   # The request protocol.
+        )
+        |
+        (?P<request_line>.*?)           # Malformed or invalid requests can contain raw bytes
+    )
+    "
 """
 
 RE_ENV_VAR_IN_STRING = re.compile(r"\$\{(?P<env_var>[^\"\s$]+)\}", re.VERBOSE)
@@ -331,7 +345,7 @@ class ApachePlugin(WebserverPlugin):
 
             elif "include" in line_lower:
                 if not (match := RE_CONFIG_INCLUDE.match(line)):
-                    self.target.log.warning("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
+                    self.target.log.debug("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
                     continue
 
                 location = match.groupdict().get("location")
@@ -423,16 +437,20 @@ class ApachePlugin(WebserverPlugin):
                 if response_time := log.get("response_time"):
                     response_time = apache_response_time_to_ms(response_time)
 
+                ts = datetime.strptime(log["ts"], logformat.timestamp or "%d/%b/%Y:%H:%M:%S %z")  # noqa: DTZ007
+                if logformat.timestamp and "%z" not in logformat.timestamp:
+                    ts.replace(tzinfo=self.target.datetime.tzinfo)
+
                 yield WebserverAccessLogRecord(
-                    ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
+                    ts=ts,
                     webserver=self.__namespace__,
-                    remote_user=clean_value(log["remote_user"]),
+                    remote_user=clean_value(log.get("remote_user")),
                     remote_ip=log["remote_ip"],
                     local_ip=clean_value(log.get("local_ip")),
                     method=log["method"],
                     uri=log["uri"],
                     protocol=log["protocol"],
-                    status_code=log["status_code"],
+                    status_code=log.get("status_code"),
                     bytes_sent=clean_value(log["bytes_sent"]) or 0,
                     pid=log.get("pid"),
                     referer=clean_value(log.get("referer")),

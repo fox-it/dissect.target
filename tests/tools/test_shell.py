@@ -169,7 +169,7 @@ def test_extended_cmd_lcd_and_lpwd(
 
     monkeypatch.chdir(start_dir)
 
-    assert cli.do_lcd(str(next_dir)) is False
+    assert cli.cmd_lcd(argparse.Namespace(path=str(next_dir)), sys.stdout) is False
 
     # The current working directory should be updated to the new directory after a successful cd
     assert str(Path.cwd()) == str(next_dir)
@@ -198,13 +198,13 @@ def test_extended_cmd_do_shell_runs_subprocess() -> None:
 
 
 def test_extended_cmd_do_shell_cd_delegates_to_lcd() -> None:
-    """Test that !cd (do_shell with a cd command) correctly delegates to do_lcd."""
+    """Test that !cd (do_shell with a cd command) correctly delegates to cmd_lcd."""
     cli = ExtendedCmd()
 
-    with patch.object(ExtendedCmd, "do_lcd", autospec=True, return_value=False) as mocked_do_lcd:
+    with patch.object(ExtendedCmd, "cmd_lcd", autospec=True, return_value=False) as mocked_cmd_lcd:
         assert cli.do_shell("cd /tmp") is False
 
-    mocked_do_lcd.assert_called_once_with(cli, "/tmp")
+    mocked_cmd_lcd.assert_called_once_with(cli, argparse.Namespace(path="/tmp"), sys.stdout)
 
 
 def test_extended_cmd_onecmd_bang_delegates_to_do_shell() -> None:
@@ -483,6 +483,7 @@ def run_target_shell(
         m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv]))
         m.setattr("sys.stdin", StringIO(stdin))
         m.setenv("NO_COLOR", "1")
+        m.setenv("NO_PROMPT_TOOLKIT", "1")
         target_shell()
         return capsys.readouterr()
 
@@ -618,7 +619,8 @@ def test_shell_prompt_tab_autocomplete() -> None:
 
     with patch("pexpect.expect.Expecter.new_data", new=ansi_new_data):
         # We set NO_COLOR=1 so that the output is not colored and easier to match
-        child = pexpect.spawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
+        env = ChainMap(os.environ, {"NO_COLOR": "1", "NO_PROMPT_TOOLKIT": "1"})
+        child = pexpect.spawn("target-shell", args=[str(target_path)], env=env)
 
         # increase window size to avoid line wrapping
         child.setwinsize(100, 100)
