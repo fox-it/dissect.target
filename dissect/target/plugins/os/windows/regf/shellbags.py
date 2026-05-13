@@ -614,7 +614,7 @@ class DELEGATE(SHITEM):
     @property
     def name(self) -> str:
         GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.shell_identifier))
-        return GUID_name if GUID_name else f"{{{self.shell_identifier}}}"
+        return GUID_name or f"{{{self.shell_identifier}}}"
 
 
 class EXTENSION_BLOCK:

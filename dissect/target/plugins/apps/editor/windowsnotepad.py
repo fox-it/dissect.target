@@ -273,7 +273,7 @@ class WindowsNotepadTab:
                 self.content += text
 
         # Set None if no deleted content was found
-        self.deleted_content = deleted_content if deleted_content else None
+        self.deleted_content = deleted_content or None
 
 
 class WindowsNotepadPlugin(EditorPlugin):
