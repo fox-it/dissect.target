@@ -238,4 +238,4 @@ def test_win_logs_default_install(target_win: Target, fs_win: VirtualFilesystem)
     assert records[0].server_name == "localhost"
     assert records[0].server_port == 8080
     assert records[0].access_log_config == "logs/localhost_access_log*.txt"
-    assert records[0].source == "\\sysvol\\xampp\\tomcat\\conf\\server.xml"
+    assert records[0].source == "sysvol\\xampp\\tomcat\\conf\\server.xml"

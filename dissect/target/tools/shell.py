@@ -852,7 +852,7 @@ class TargetCli(TargetCmd):
         if isinstance(path, fsutil.TargetPath):
             return path
 
-        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
+        path = fsutil.abspath(path, cwd=str(self.cwd), sep=self.target.fs.sep)
         return self.target.fs.path(path)
 
     def resolve_glob_path(self, path: str) -> Iterator[fsutil.TargetPath]:

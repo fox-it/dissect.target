@@ -86,7 +86,7 @@ class NtdsFilesystemEntry(FilesystemEntry):
     def get(self, path: str) -> NtdsFilesystemEntry:
         return NtdsFilesystemEntry(
             self.fs,
-            fsutil.join(self.path, path, alt_separator=self.fs.alt_separator),
+            fsutil.join(self.path, path, sep=self.fs.sep),
             self.fs._get_object(path, self.entry),
         )
 

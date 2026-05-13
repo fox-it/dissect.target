@@ -57,7 +57,7 @@ class ZipFilesystem(Filesystem):
         self.zip = zipfile.ZipFile(fh, mode="r")
         self.base = base or ""
 
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
+        self._fs = VirtualFilesystem(sep=self.sep, altsep=self.altsep, case_sensitive=self.case_sensitive)
 
         for member in self.zip.infolist():
             mname = member.filename.strip("/")
@@ -73,7 +73,7 @@ class ZipFilesystem(Filesystem):
         return zipfile.is_zipfile(fh)
 
     def _resolve_path(self, path: str) -> str:
-        return fsutil.normpath(path[len(self.base) :], alt_separator=self.alt_separator)
+        return fsutil.normpath(path[len(self.base) :], sep=self.sep)
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""

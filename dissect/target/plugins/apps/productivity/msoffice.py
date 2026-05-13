@@ -108,7 +108,7 @@ class ClickOnceDeploymentManifestParser:
         if not (codebase_str_path := dependent_assembly.get("codebase")):
             return set()
 
-        codebase_str_path = fsutil.abspath(codebase_str_path, str(cwd), alt_separator=self._target.fs.alt_separator)
+        codebase_str_path = fsutil.abspath(codebase_str_path, cwd=str(cwd), sep=self._target.fs.sep)
         codebase_path: Path = self._target.fs.path(codebase_str_path)
         if not codebase_path.exists():
             return set()  # Ignore files which are not actually installed, for example due to language settings
@@ -381,10 +381,10 @@ class MSOffice(Plugin):
 
     def _machine_startup_folders(self) -> Iterator[str]:
         """Return machine-scoped office startup folders."""
-        yield fsutil.join(self._office_install_root("Word"), "STARTUP", alt_separator="\\")
-        yield fsutil.join(self._office_install_root("Excel"), "XLSTART", alt_separator="\\")
-        yield fsutil.join(self._office_install_root("Word"), "Templates", alt_separator="\\")
-        yield fsutil.join(self._office_install_root("Word"), "Document Themes", alt_separator="\\")
+        yield fsutil.join(self._office_install_root("Word"), "STARTUP", sep="\\")
+        yield fsutil.join(self._office_install_root("Excel"), "XLSTART", sep="\\")
+        yield fsutil.join(self._office_install_root("Word"), "Templates", sep="\\")
+        yield fsutil.join(self._office_install_root("Word"), "Document Themes", sep="\\")
 
     def _parse_plugin_status(self, addin: KeyCollection) -> NativePluginStatus | None:
         """Parse the registry value which controls if the add-in autostarts.
