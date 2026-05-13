@@ -49,7 +49,7 @@ def register_key(
 
     key = Key(key_type, value, provider, identifier, is_wildcard)
     KEYCHAIN.append(key)
-    log.info("Registered key %s", key)
+    log.debug("Registered key %s", key)
 
 
 def get_all_keys() -> list[Key]:

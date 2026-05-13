@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from io import BytesIO
+from pathlib import Path
 from typing import BinaryIO
 
 from dissect.cstruct import cstruct
@@ -82,6 +83,14 @@ class MasterKey:
         self.key_hash = None
         self.decrypted = False
 
+        self.version = self._mk.dwVersion
+        self.hash_algo = HashAlgorithm.from_id(self._mk.HMACAlgId)
+        self.cipher_algo = CipherAlgorithm.from_id(self._mk.CryptAlgId)
+        self.kdf_iter = self._mk.dwPBKDF2IterationCount
+
+    def __repr__(self) -> str:
+        return f"<MasterKey version={self.version} cipher={self.cipher_algo.name} hash={self.hash_algo.name} iter={self.kdf_iter} decrypted={self.decrypted}>"  # noqa: E501
+
     def decrypt_with_hash(self, user_sid: str, password_hash: bytes) -> bool:
         """Decrypts the master key with the given user's SID and password hash."""
         return self.decrypt_with_key(derive_password_hash(password_hash, user_sid))
@@ -132,21 +141,18 @@ class MasterKey:
             return False
 
         # Compute encryption key
-        hash_algo = HashAlgorithm.from_id(self._mk.HMACAlgId)
-        cipher_algo = CipherAlgorithm.from_id(self._mk.CryptAlgId)
-
-        data = cipher_algo.decrypt_with_hmac(
+        data = self.cipher_algo.decrypt_with_hmac(
             self._mk_key,
             key,
             self._mk.pSalt,
-            hash_algo,
-            self._mk.dwPBKDF2IterationCount,
+            self.hash_algo,
+            self.kdf_iter,
         )
 
         self.key = data[-64:]
         self.hmac_salt = data[:16]
-        self.hmac = data[16 : 16 + int(hash_algo.digest_length)]
-        self.hmac_computed = dpapi_hmac(key, self.hmac_salt, self.key, hash_algo)
+        self.hmac = data[16 : 16 + int(self.hash_algo.digest_length)]
+        self.hmac_computed = dpapi_hmac(key, self.hmac_salt, self.key, self.hash_algo)
         self.decrypted = self.hmac == self.hmac_computed
         if self.decrypted:
             self.key_hash = hashlib.sha1(self.key).digest()
@@ -155,18 +161,29 @@ class MasterKey:
 
 
 class MasterKeyFile:
-    def __init__(self, fh: BinaryIO):
-        self._mk_header = c_master_key.MasterKeyFileHeader(fh)
+    def __init__(self, fh: BinaryIO | Path):
+        # Set file handle
+        if isinstance(fh, Path):
+            self.path = fh
+            self.fh = fh.open("rb")
+        else:
+            self.fh = fh
+            self.path = None
+
+        self._mk_header = c_master_key.MasterKeyFileHeader(self.fh)
         self._user_mk = None
 
         # User Master Key
         if self._mk_header.qwUserKeySize:
-            self._user_mk = MasterKey(fh.read(self._mk_header.qwUserKeySize))
+            self._user_mk = MasterKey(self.fh.read(self._mk_header.qwUserKeySize))
 
         # Here we would also parse the rest of the keys, but as of now we don't decrypt them
         self._backup_mk = None
         self._credhist_mk = None
         self._domain_mk = None
+
+    def __repr__(self) -> str:
+        return f"<MasterKeyFile fh={self.path or self.fh}>"
 
     @property
     def decrypted(self) -> bool:
