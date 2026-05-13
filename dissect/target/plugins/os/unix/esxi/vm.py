@@ -6,7 +6,7 @@ from defusedxml import ElementTree
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import OperatingSystem, Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -33,7 +33,7 @@ class VirtualMachinePlugin(Plugin):
     __namespace__ = "vm"
 
     def check_compatible(self) -> None:
-        if self.target.os != "esxi":
+        if self.target.os != OperatingSystem.ESXI:
             raise UnsupportedPluginError("ESXi specific plugin loaded on non-ESXi target")
 
         if not self.target.fs.path("/etc/vmware/hostd/vmInventory.xml").exists():

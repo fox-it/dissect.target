@@ -10,7 +10,7 @@ from dissect.target.helpers.record import (
     UnixUserRecord,
     WindowsUserRecord,
 )
-from dissect.target.plugin import InternalPlugin
+from dissect.target.plugin import InternalPlugin, OperatingSystem
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -51,7 +51,7 @@ class UsersPlugin(InternalPlugin):
             raise ValueError("Either sid or uid or username is expected")
 
         def is_name_matching(name: str) -> bool:
-            if force_case_sensitive or self.target.os != "windows":
+            if force_case_sensitive or self.target.os != OperatingSystem.WINDOWS:
                 # always do case-sensitive match for non-Windows OSes
                 return name == username
             return name.lower() == username.lower()

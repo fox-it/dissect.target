@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.linux.debian.proxmox._os import ProxmoxPlugin
 from tests._utils import absolute_path
 
@@ -27,7 +28,7 @@ def test_proxmox_os(target_bare: Target) -> None:
     target_bare._os_plugin = ProxmoxPlugin
     target_bare.apply()
 
-    assert target_bare.os == "proxmox"
+    assert target_bare.os == OperatingSystem.PROXMOX == "proxmox"
     assert sorted(map(str, target_bare.fs.path("/etc/pve").rglob("*"))) == [
         "/etc/pve/__version__",
         "/etc/pve/authkey.pub",

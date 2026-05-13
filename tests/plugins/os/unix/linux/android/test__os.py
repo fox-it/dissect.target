@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 from tests._utils import absolute_path
 
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 def test_android_os(target_android: Target) -> None:
     target_android.add_plugin(AndroidPlugin)
 
-    assert target_android.os == "android"
+    assert target_android.os == OperatingSystem.ANDROID == "android"
     assert target_android.version == "Android 4.4.2 (2013-10-31)"
     assert target_android.hostname == "TMG28071935"
 
@@ -49,7 +50,7 @@ def test_android_os_detect_props(target_bare: Target, build_prop_locations: list
 
     target_bare.add_plugin(AndroidPlugin)
 
-    assert target_bare.os == "android"
+    assert target_bare.os == OperatingSystem.ANDROID == "android"
     assert sorted(map(str, target_bare._os.build_prop_paths)) == sorted(p for p, _ in build_prop_locations)
     assert target_bare._os.props
     assert target_bare.hostname == "TMG28071935"

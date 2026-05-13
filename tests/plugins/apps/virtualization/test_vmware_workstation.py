@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.apps.virtualization.vmware_workstation import (
     VmwareWorkstationPlugin,
 )
@@ -70,7 +71,7 @@ def test_vmware_workstation_vm_configs(
         str(absolute_path(f"_data/plugins/apps/virtualization/vmware_workstation/inventory-{target.os}.vmls")),
     )
     fs.map_file(
-        "first.vmx" if target.os == "windows" else "/path/to/first.vmx",
+        "first.vmx" if target.os == OperatingSystem.WINDOWS else "/path/to/first.vmx",
         str(absolute_path("_data/plugins/apps/virtualization/vmware_workstation/first.vmx")),
     )
 

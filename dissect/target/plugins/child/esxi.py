@@ -6,7 +6,7 @@ from dissect.hypervisor import vmx
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
-from dissect.target.plugin import ChildTargetPlugin
+from dissect.target.plugin import ChildTargetPlugin, OperatingSystem
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -18,7 +18,7 @@ class ESXiChildTargetPlugin(ChildTargetPlugin):
     __type__ = "esxi"
 
     def check_compatible(self) -> None:
-        if self.target.os != "esxi":
+        if self.target.os != OperatingSystem.ESXI:
             raise UnsupportedPluginError("Not an ESXi operating system")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
