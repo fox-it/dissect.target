@@ -7,7 +7,10 @@ import pathlib
 import stat
 from collections import defaultdict
 from functools import cache, cached_property
+from itertools import zip_longest
 from typing import TYPE_CHECKING, Any, BinaryIO, Final
+
+from dissect.util.stream import MappingStream
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -173,6 +176,24 @@ class Filesystem:
             A :class:`FilesystemEntry` for the path.
         """
         raise NotImplementedError
+
+    def allocated_space_iter(self) -> Iterator[BinaryIO]:
+        """Iteratively yield streams of allocated data on the filesystem."""
+        raise NotImplementedError
+
+    def unallocated_space_iter(self) -> Iterator[BinaryIO]:
+        """Iteratively yield streams of unallocated data on the filesystem."""
+        raise NotImplementedError
+
+    def space_allocation_iter(self) -> Iterator[tuple[BinaryIO, BinaryIO]]:
+        """Iteratively yield tuples of [unallocated, allocated] streams. Sometimes the same bytes need to be parsed to
+        determine both allocated and unallocated space, so this method allows filesystems to expose a method of parsing
+        those bytes once rather than seperately for unallocated and allocated.
+
+        This default implementation just yields from allocated_space_iter and unallocated_space_iter, padding with None
+        values if one is exhausted before the other.
+        """
+        yield from zip_longest(self.unallocated_space_iter(), self.allocated_space_iter())
 
     def open(self, path: str) -> BinaryIO:
         """Open a filesystem entry.
@@ -499,6 +520,34 @@ class Filesystem:
             The digests of the contents of ``path``.
         """
         return self.get(path).hash(algos)
+
+    def allocated_space(self) -> BinaryIO:
+        """Expose the allocated space of this filesystem as one contiguous stream."""
+        return self._stream_list_to_contiguous(list(self.allocated_space_iter()))
+
+    def unallocated_space(self) -> BinaryIO:
+        """Expose the unallocated space on this filesystem as one contiguous stream."""
+        return self._stream_list_to_contiguous(list(self.unallocated_space_iter()))
+
+    def space_allocation(self) -> tuple[BinaryIO, BinaryIO]:
+        """Fully iterates the underlying filesystem's space allocation iterator function to convert individual 'runs' of
+        unallocated/allocated space into one, contiguous stream for each. Depending on the underlying filesystem, using
+        this function rather than allocated_space() and unallocated_space() seperately may be much faster as
+        space_allocation_iter is called once rather than twice (once for unallocated and once for allocated).
+        """
+        unallocated, allocated = zip(*self.space_allocation_iter(), strict=True)
+        return self._stream_list_to_contiguous(
+            [stream for stream in unallocated if stream is not None]
+        ), self._stream_list_to_contiguous([stream for stream in allocated if stream is not None])
+
+    def _stream_list_to_contiguous(self, streams: list[BinaryIO]) -> MappingStream:
+        """Convert a list of streams into one contiguous stream."""
+        merged_stream = MappingStream(sum(stream.size for stream in streams))
+        offset = 0
+        for stream in streams:
+            merged_stream.add(offset, stream.size, stream)
+            offset += stream.size
+        return merged_stream
 
     @cached_property
     def uuid(self) -> UUID | None:
