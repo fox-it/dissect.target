@@ -44,6 +44,7 @@ def test_system_log(test_files: str, target_unix: Target, fs_unix: VirtualFilesy
         results = list(target_unix.system_log())
 
         results = list(target_unix.system_log())
+        results.reverse()
         results.sort(key=lambda r: r.source)
 
         assert len(results) == 286

@@ -60,42 +60,26 @@ class WifiLogPlugin(Plugin):
     @export(record=WifiLogRecord)
     def wifi_log(self) -> Iterator[WifiLogRecord]:
         """Return all macOS WiFi log messages."""
-        timestamps = [ts for ts, _ in year_rollover_helper(self.file, RE_TS, "%a %b %d %H:%M:%S.%f", timezone.utc)]
-        timestamps.reverse()
-        ts_iter = iter(timestamps)
+        current_buf = ""
 
-        with self.file.open(mode="rt") as logfile:
-            current_ts_match: re.Match[str] | None = None
-            current_buf = ""
-
-            for line in logfile.readlines():
-                if ts_match := RE_TS.match(line):
-                    if current_ts_match:
-                        asdf = current_buf[len(current_ts_match.group()) + 1 :]
-                        hostname, message = asdf.split(" ", 1)
-
-                        yield WifiLogRecord(
-                            ts=next(ts_iter, None),
-                            host=hostname.strip(),
-                            message=message.strip(),
-                            source=self.file,
-                            _target=self.target,
-                        )
-
-                    current_ts_match = ts_match
-                    current_buf = line
-
-                elif current_buf:
-                    current_buf += line
-
-            if current_ts_match and current_buf:
-                asdf = current_buf[len(current_ts_match.group()) + 1 :]
+        for ts, line in year_rollover_helper(
+            self.file,
+            RE_TS,
+            "%a %b %d %H:%M:%S.%f",
+            timezone.utc,
+        ):
+            current_buf = line + "\n\t" + current_buf
+            if ts:
+                match = RE_TS.match(current_buf)
+                asdf = current_buf[match.end() :].lstrip(" ")
                 hostname, message = asdf.split(" ", 1)
 
                 yield WifiLogRecord(
-                    ts=next(ts_iter, None),
+                    ts=ts,
                     host=hostname.strip(),
                     message=message.strip(),
                     source=self.file,
                     _target=self.target,
                 )
+
+                current_buf = ""

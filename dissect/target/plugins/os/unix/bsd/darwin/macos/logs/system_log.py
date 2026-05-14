@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import gzip
 from datetime import timezone
 from typing import TYPE_CHECKING
 
@@ -11,7 +10,6 @@ from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.unix.log.helpers import RE_TS
 
 if TYPE_CHECKING:
-    import re
     from collections.abc import Iterator
 
     from dissect.target.target import Target
@@ -46,48 +44,22 @@ class SystemLogPlugin(Plugin):
         for file in self.log_files:
             filepath = self.target.fs.path(file)
 
-            timestamps = [ts for ts, _ in year_rollover_helper(filepath, RE_TS, "%b %d %H:%M:%S", timezone.utc)]
-            timestamps.reverse()
-            ts_iter = iter(timestamps)
+            current_buf = ""
 
-            with (
-                gzip.open(filepath.open("rb"), mode="rt")
-                if file.endswith(".gz")
-                else filepath.open(mode="rt") as logfile
-            ):
-                current_ts_match: re.Match[str] | None = None
-                current_buf = ""
-
-                for line in logfile.readlines():
-                    if ts_match := RE_TS.match(line):
-                        if current_ts_match:
-                            asdf = current_buf[len(current_ts_match.group()) + 1 :]
-                            hostname, component, message = asdf.split(" ", 2)
-
-                            yield SystemLogRecord(
-                                ts=next(ts_iter, None),
-                                host=hostname.strip(),
-                                component=component.strip(),
-                                message=message.strip(),
-                                source=filepath,
-                                _target=self.target,
-                            )
-
-                        current_ts_match = ts_match
-                        current_buf = line
-
-                    elif current_buf:
-                        current_buf += line
-
-                if current_ts_match and current_buf:
-                    asdf = current_buf[len(current_ts_match.group()) + 1 :]
+            for ts, line in year_rollover_helper(filepath, RE_TS, "%b %d %H:%M:%S", timezone.utc):
+                current_buf = line + "\n\t" + current_buf
+                if ts:
+                    match = RE_TS.match(current_buf)
+                    asdf = current_buf[match.end() :].lstrip(" ")
                     hostname, component, message = asdf.split(" ", 2)
 
                     yield SystemLogRecord(
-                        ts=next(ts_iter, None),
+                        ts=ts,
                         host=hostname.strip(),
                         component=component.strip(),
                         message=message.strip(),
                         source=filepath,
                         _target=self.target,
                     )
+
+                    current_buf = ""

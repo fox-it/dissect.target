@@ -37,15 +37,15 @@ def test_wifi_log(test_file: str, target_unix: Target, fs_unix: VirtualFilesyste
         results = list(target_unix.wifi_log())
         assert len(results) == 2
 
-        assert results[0].ts == datetime(2023, 5, 4, 4, 23, 16, 774000, tzinfo=tz)
-        assert results[0].host == "<airport[114]>"
-        assert results[0].message == "configdStart: ****** [AirPort logger started] ******"
-        assert results[0].source == "/var/log/wifi.log"
-
-        assert results[1].ts == datetime(2023, 5, 4, 4, 23, 16, 776000, tzinfo=tz)
-        assert results[1].host == "[airport]/114"
+        assert results[0].ts == datetime(2023, 5, 4, 4, 23, 16, 776000, tzinfo=tz)
+        assert results[0].host == "[airport]/114"
         assert (
-            results[1].message
+            results[0].message
             == "@[5.319676] (configdIODriverInterface.m:401) dq:'com.apple.main-thread'/tid[0x39e] FreedDeviceNodeListManager initialized, list[0xb2cd122e0] lock[0xb2d0f8380]"  # noqa: E501
         )
+        assert results[0].source == "/var/log/wifi.log"
+
+        assert results[1].ts == datetime(2023, 5, 4, 4, 23, 16, 774000, tzinfo=tz)
+        assert results[1].host == "<airport[114]>"
+        assert results[1].message == "configdStart: ****** [AirPort logger started] ******"
         assert results[1].source == "/var/log/wifi.log"
