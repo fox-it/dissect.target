@@ -33,102 +33,107 @@ def build_sqlite_records(
     joins: tuple = (),
     field_mappings: dict | None = None,
 ) -> Iterator[TargetRecordDescriptor]:
+    joins_by_table1 = defaultdict(list)
+    joins_by_table2 = defaultdict(list)
+    ignore_joins_map = defaultdict(list)
+
+    for j in joins:
+        joins_by_table1[j["table1"]].append(j)
+        joins_by_table2[j["table2"]].append(j)
+
+        if j["join"] == "ignore":
+            key = (j["table1"], j["table2"])
+            ignore_joins_map[key].append(j)
+
     for file in files:
-        with SQLite3(file) as database:
-            for table in database.tables():
-                for row in table.rows():
-                    row_dict = {k: v for k, v in row}  # noqa C416
+        try:
+            with SQLite3(file) as database:
+                for table in database.tables():
+                    for row in table.rows():
+                        row_dict = {k: v for k, v in row}  # noqa C416
 
-                    for key, value in list(row_dict.items()):
-                        if isinstance(value, (bytes, bytearray)) and value.startswith(b"bplist00"):
-                            if is_nskeyedarchive_blob(value):
-                                try:
-                                    archiver = NSKeyedArchiver(BytesIO(value))
-                                    decoded_value = archiver.top.get("root")
-                                    row_dict[key] = decoded_value
-                                except Exception:
-                                    plugin.target.log.exception(
-                                        "Failed to decode %s value for key %s",
-                                        table.name,
-                                        key,
+                        for key, value in list(row_dict.items()):
+                            if isinstance(value, (bytes, bytearray)) and value.startswith(b"bplist00"):
+                                if is_nskeyedarchive_blob(value):
+                                    try:
+                                        archiver = NSKeyedArchiver(BytesIO(value))
+                                        decoded_value = archiver.top.get("root")
+                                        row_dict[key] = decoded_value
+                                    except Exception:
+                                        plugin.target.log.exception(
+                                            "Failed to decode %s value for key %s",
+                                            table.name,
+                                            key,
+                                        )
+                                else:
+                                    yield from build_record_from_data(
+                                        plugin, file, value, record_descriptors, field_mappings
                                     )
-                            else:
-                                yield from build_record_from_data(
-                                    plugin, file, value, record_descriptors, field_mappings
-                                )
-                                row_dict.pop(key)
+                                    row_dict.pop(key)
 
-                    if table.name in {j["table2"] for j in joins}:
-                        for j2 in joins:
-                            if j2["table2"] != table.name:
-                                continue
-
-                            if row_dict.get(j2["key2"]) is None:
-                                row_dict["table"] = table.name
-                                yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
-                                break
-                            else:
-                                match = False
-                                for row1 in database.table(j2["table1"]).rows():
-                                    row1_dict = {k: v for k, v in row1}  # noqa C416
-                                    if row1_dict.get(j2["key1"]) == row_dict.get(j2["key2"]):
-                                        match = True
-                                        break
-
-                                if not match:
+                        if table.name in joins_by_table2:
+                            for j2 in joins_by_table2[table.name]:
+                                if row_dict.get(j2["key2"]) is None:
                                     row_dict["table"] = table.name
                                     yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
                                     break
+                                else:
+                                    match = False
+                                    for row1 in database.table(j2["table1"]).rows():
+                                        row1_dict = {k: v for k, v in row1}  # noqa C416
+                                        if row1_dict.get(j2["key1"]) == row_dict.get(j2["key2"]):
+                                            match = True
+                                            break
 
-                    elif table.name in {j["table1"] for j in joins}:
-                        tables = set()
-                        iterate_rows = defaultdict(list)
-                        tables.add(table.name)
+                                    if not match:
+                                        row_dict["table"] = table.name
+                                        yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
+                                        break
 
-                        for j in joins:
-                            if j["table1"] != table.name:
-                                continue
+                        elif table.name in joins_by_table1:
+                            tables = set()
+                            iterate_rows = defaultdict(list)
+                            tables.add(table.name)
 
-                            ignore_joins = [
-                                ij
-                                for ij in joins
-                                if ij["table1"] == j["table1"]
-                                and ij["table2"] == j["table2"]
-                                and ij["join"] == "ignore"
-                            ]
+                            for j in joins_by_table1[table.name]:
+                                ignore_joins = ignore_joins_map[(j["table1"], j["table2"])]
 
-                            if j["join"] == "iterate":
-                                for expanded in handle_iterate_join(database, row_dict, j, joins, tables):
-                                    iterate_rows[j["table2"]].append(expanded)
+                                if j["join"] == "iterate":
+                                    for expanded in handle_iterate_join(
+                                        database, row_dict, j, joins_by_table1, ignore_joins_map, tables
+                                    ):
+                                        iterate_rows[j["table2"]].append(expanded)
 
-                            elif j["join"] == "nested":
-                                handle_nested_join(database, row_dict, j, ignore_joins, tables)
+                                elif j["join"] == "nested":
+                                    handle_nested_join(database, row_dict, j, ignore_joins, tables)
 
-                        if len(iterate_rows) > 0:
-                            row_dict = prefix_row(row_dict, table.name)
-                            keys = list(iterate_rows.keys())
-                            values = list(iterate_rows.values())
-                            for key in keys:
-                                tables.add(key)
-                            row_dict["tables"] = tables
+                            if len(iterate_rows) > 0:
+                                row_dict = prefix_row(row_dict, table.name)
+                                keys = list(iterate_rows.keys())
+                                values = list(iterate_rows.values())
+                                for key in keys:
+                                    tables.add(key)
+                                row_dict["tables"] = tables
 
-                            for combination in product(*values):
-                                combined_row = dict(row_dict)
-                                for joined_row in combination:
-                                    combined_row.update(joined_row)
+                                for combination in product(*values):
+                                    combined_row = dict(row_dict)
+                                    for joined_row in combination:
+                                        combined_row.update(joined_row)
 
-                                yield build_record(
-                                    plugin,
-                                    combined_row,
-                                    file,
-                                    record_descriptors,
-                                )
+                                    yield build_record(
+                                        plugin,
+                                        combined_row,
+                                        file,
+                                        record_descriptors,
+                                    )
+                            else:
+                                yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
+
                         else:
+                            row_dict["table"] = table.name
                             yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
-
-                    else:
-                        row_dict["table"] = table.name
-                        yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
+        except Exception:
+            plugin.target.log.exception("Failed to process SQLite file: %s", file)
 
 
 def prefix_row(row_dict: dict, table: str) -> dict:
@@ -139,16 +144,13 @@ def handle_iterate_join(
     database: SQLite3,
     parent_dict: dict,
     current_join: dict,
-    joins: tuple,
+    joins_by_table1: defaultdict(list),
+    ignore_joins_map: defaultdict(list),
     tables: set[str],
 ) -> list[dict]:
     results: list[dict] = []
 
-    ignore_joins = [
-        ij
-        for ij in joins
-        if ij["table1"] == current_join["table1"] and ij["table2"] == current_join["table2"] and ij["join"] == "ignore"
-    ]
+    ignore_joins = ignore_joins_map[(current_join["table1"], current_join["table2"])]
 
     for child_row in database.table(current_join["table2"]).rows():
         if child_row.get(current_join["key2"]) != parent_dict.get(current_join["key1"]):
@@ -164,23 +166,16 @@ def handle_iterate_join(
                 child_dict.pop(ij["key2"], None)
 
         downstream_iterate_rows = defaultdict(list)
-        for dj in joins:
-            if dj["table1"] != current_join["table2"]:
-                continue
+        for j in joins_by_table1[current_join["table2"]]:
+            downstream_ignore = ignore_joins_map[(j["table1"], j["table2"])]
 
-            downstream_ignore = [
-                ij
-                for ij in joins
-                if ij["table1"] == dj["table1"] and ij["table2"] == dj["table2"] and ij["join"] == "ignore"
-            ]
+            if j["join"] == "iterate":
+                for expanded in handle_iterate_join(database, child_dict, j, joins_by_table1, ignore_joins_map, tables):
+                    downstream_iterate_rows[j["table2"]].append(expanded)
 
-            if dj["join"] == "iterate":
-                for expanded in handle_iterate_join(database, child_dict, dj, joins, tables):
-                    downstream_iterate_rows[dj["table2"]].append(expanded)
-
-            elif dj["join"] == "nested":
-                tables.add(dj["table2"])
-                handle_nested_join(database, child_dict, dj, downstream_ignore)
+            elif j["join"] == "nested":
+                tables.add(j["table2"])
+                handle_nested_join(database, child_dict, j, downstream_ignore)
 
         if len(downstream_iterate_rows) > 0:
             base_prefixed = prefix_row(child_dict, current_join["table2"])
