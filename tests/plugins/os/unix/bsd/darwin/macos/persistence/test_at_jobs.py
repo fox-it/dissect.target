@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize(
     "test_file",
     [
-        "a0000701c43af0",
+        "a0000901c45260",
     ],
 )
 def test_at_jobs(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -37,7 +37,7 @@ def test_at_jobs(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem
         assert len(results) == 1
 
         assert results[0].queue == "a"
-        assert results[0].seq == 7
-        assert results[0].execution_time == datetime(2026, 5, 8, 12, 0, 0, tzinfo=tz)
-        assert results[0].command == "periodic_test.sh"
-        assert results[0].source == "/usr/lib/cron/jobs/a0000701c43af0"
+        assert results[0].seq == 9
+        assert results[0].execution_time == datetime(2026, 5, 12, 16, 0, 0, tzinfo=tz)
+        assert results[0].command == 'say "hello"'
+        assert results[0].source == "/usr/lib/cron/jobs/a0000901c45260"
