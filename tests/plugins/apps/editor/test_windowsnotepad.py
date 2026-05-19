@@ -29,7 +29,7 @@ loremipsum = "Lorem ipsum dolor sit amet. Eum error blanditiis eum pariatur dele
 
 def test_windows_tab_parsing() -> None:
     # Standalone parsing of tab files, so not using the plugin
-    tab_file = Path(absolute_path("_data/plugins/apps/texteditor/windowsnotepad/unsaved-with-deletions.bin"))
+    tab_file = Path(absolute_path("_data/plugins/apps/editor/windowsnotepad/tabstate_1/unsaved-with-deletions.bin"))
     content = WindowsNotepadTab(tab_file)
     assert content.content == "Not saved aasdflasd"
     assert repr(content) == "<WindowsNotepadTab saved=False content_size=19 has_deleted_content=True>"
@@ -49,7 +49,7 @@ def test_windows_tab_plugin_deleted_contents(
         ),
     }
 
-    tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
+    tabcache = absolute_path("_data/plugins/apps/editor/windowsnotepad/tabstate_1")
 
     user = target_win_users.user_details.find(username="John")
     tab_dir = user.home_path.joinpath(
@@ -108,7 +108,7 @@ def test_windows_tab_plugin_default(
         "stored_unsaved_with_new_data.bin": ("Stored to disk but unsaved, but with extra data.", None),
     }
 
-    tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
+    tabcache = absolute_path("_data/plugins/apps/editor/windowsnotepad/tabstate_1")
 
     user = target_win_users.user_details.find(username="John")
     tab_dir = user.home_path.joinpath(
@@ -162,7 +162,7 @@ def test_windows_saved_tab_plugin_extra_fields(
         ),
     }
 
-    tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
+    tabcache = absolute_path("_data/plugins/apps/editor/windowsnotepad/tabstate_1")
 
     user = target_win_users.user_details.find(username="John")
     tab_dir = user.home_path.joinpath(
@@ -193,3 +193,23 @@ def test_windows_saved_tab_plugin_extra_fields(
         assert rec.ts == file_text_map[rec.path.name][2]
         assert rec.digest.sha256 == file_text_map[rec.path.name][3]
         assert rec.source is not None
+
+
+def test_windows_markdown_option(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
+    """Test if we can parse option version 3 Windows 11 Notepad TabState binary files.
+
+    References:
+        - https://cfreds.nist.gov/all/MarkSpencer/TheTechHiveScenario
+        - https://blogs.windows.com/windows-insider/2025/05/30/text-formatting-in-notepad-begin-rolling-out-to-windows-insiders/
+    """
+    tabstate = absolute_path("_data/plugins/apps/editor/windowsnotepad/tabstate_2")
+    fs_win.map_dir("Users/John/AppData/Local/Packages/Microsoft.WindowsNotepad_8wekyb3d8bbwe/LocalState/TabState", tabstate)  # noqa: E501
+    target_win_users.add_plugin(WindowsNotepadPlugin)
+    records = list(target_win_users.windowsnotepad.history())
+
+    assert sorted(r.saved_path for r in records) == [
+       "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\algorthim_notes.txt",
+       "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\Contract_Notes_1-05.txt",
+       "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\ticket-priority_method_summaries.txt",  # noqa: E501
+       "C:\\Users\\Chad Turner\\Downloads\\test_data.csv",
+    ]
