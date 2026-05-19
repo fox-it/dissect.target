@@ -1941,7 +1941,11 @@ if HAS_PROMPT_TOOLKIT:
 
         def load_history_strings(self) -> Iterable[str]:
             """Yield most recent history strings from the readline history file."""
-            readline.read_history_file(self.histfile)
+            try:
+                readline.read_history_file(self.histfile)
+            except OSError as e:
+                log.error("Unable to read %s: %s", self.histfile, e)  # noqa: TRY400
+
             for i in range(readline.get_current_history_length(), 0, -1):
                 yield readline.get_history_item(i)
 
