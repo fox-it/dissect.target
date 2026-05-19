@@ -10,6 +10,7 @@ import itertools
 import logging
 import os
 import platform
+import plistlib
 import pydoc
 import random
 import re
@@ -23,6 +24,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from pathlib import Path, PurePosixPath
+from pprint import pprint
 from tarfile import BLKTYPE, CHRTYPE, DIRTYPE, FIFOTYPE, LNKTYPE, REGTYPE, SYMTYPE
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
 
@@ -1502,6 +1504,16 @@ class TargetCli(TargetCmd):
                 else:
                     print(hexdump(fh.read(args.length), output="string", pretty=True), file=stdout)
 
+        return False
+
+    @arg("path", type=TargetPathArgument)
+    def cmd_pcat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Print the contents of an Apple plist file."""
+        paths = list(self.resolve_glob_path(args.path))
+        for path in paths:
+            if len(paths) > 1:
+                print(path)
+            pprint(plistlib.load(path.open("rb")), stream=stdout)
         return False
 
     @arg("path", type=TargetPathArgument)
