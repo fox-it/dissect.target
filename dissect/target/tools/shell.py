@@ -1507,7 +1507,7 @@ class TargetCli(TargetCmd):
         return False
 
     @arg("path", type=TargetPathArgument)
-    def cmd_pcat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+    def cmd_plcat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print the contents of an Apple plist file."""
         paths = list(self.resolve_glob_path(args.path))
         for path in paths:
