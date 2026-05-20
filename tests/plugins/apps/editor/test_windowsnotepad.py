@@ -203,13 +203,15 @@ def test_windows_markdown_option(target_win_users: Target, fs_win: VirtualFilesy
         - https://blogs.windows.com/windows-insider/2025/05/30/text-formatting-in-notepad-begin-rolling-out-to-windows-insiders/
     """
     tabstate = absolute_path("_data/plugins/apps/editor/windowsnotepad/tabstate_2")
-    fs_win.map_dir("Users/John/AppData/Local/Packages/Microsoft.WindowsNotepad_8wekyb3d8bbwe/LocalState/TabState", tabstate)  # noqa: E501
+    fs_win.map_dir(
+        "Users/John/AppData/Local/Packages/Microsoft.WindowsNotepad_8wekyb3d8bbwe/LocalState/TabState", tabstate
+    )
     target_win_users.add_plugin(WindowsNotepadPlugin)
     records = list(target_win_users.windowsnotepad.history())
 
     assert sorted(r.saved_path for r in records) == [
-       "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\algorthim_notes.txt",
-       "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\Contract_Notes_1-05.txt",
-       "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\ticket-priority_method_summaries.txt",  # noqa: E501
-       "C:\\Users\\Chad Turner\\Downloads\\test_data.csv",
+        "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\algorthim_notes.txt",
+        "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\Contract_Notes_1-05.txt",
+        "C:\\Users\\Chad Turner\\Documents\\Work\\FriendlyNeighborIT\\Deliverables\\ticket-priority_method_summaries.txt",  # noqa: E501
+        "C:\\Users\\Chad Turner\\Downloads\\test_data.csv",
     ]
