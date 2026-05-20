@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
 
 
 def test_android_os(target_android: Target) -> None:
+    """Test if we detect Android and the version correctly."""
     target_android.add_plugin(AndroidPlugin)
 
     assert target_android.os == "android"
@@ -60,3 +62,23 @@ def test_android_os_detect_props(target_bare: Target, build_prop_locations: list
 
     # test if glob does not go too deep.
     assert "/foo/bar/too/deep/build.prop" not in target_bare._os.build_prop_paths
+
+
+def test_android_os_users(target_android: Target, fs_android: VirtualFilesystem) -> None:
+    """Test if we detect and parse Android users correctly."""
+    fs_android.map_file("/data/system/users/userlist.xml", absolute_path("_data/plugins/os/unix/linux/android/users/userlist.xml"))
+    fs_android.map_file("/data/system/users/0/settings_global.xml", absolute_path("_data/plugins/os/unix/linux/android/users/settings_global.xml"))
+    fs_android.map_file("/data/system/users/0.xml", absolute_path("_data/plugins/os/unix/linux/android/users/0.xml"))
+    target_android.add_plugin(AndroidPlugin)
+
+    records = list(target_android.users())
+    assert len(records) == 1
+    assert records[0].hostname == "Pixel 7a"
+    assert records[0].name == "Liz"
+    assert records[0].uid == 0
+    assert records[0].home == "/data/media/0"
+    assert records[0].source == "/data/system/users/0.xml"
+    assert records[0].usertype == "android.os.usertype.full.SYSTEM"
+    assert records[0].last_login == datetime(2024, 7, 28, 3, 30, 36, 703000, tzinfo=timezone.utc)
+    assert records[0].last_foreground == datetime(2024, 7, 28, 3, 30, 26, 264000, tzinfo=timezone.utc)
+    assert records[0].flags == 19475
