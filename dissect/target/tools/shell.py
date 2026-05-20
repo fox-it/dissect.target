@@ -9,7 +9,6 @@ import io
 import itertools
 import logging
 import os
-import pathlib
 import platform
 import pydoc
 import random
@@ -26,6 +25,35 @@ from enum import IntEnum
 from pathlib import Path, PurePosixPath
 from tarfile import BLKTYPE, CHRTYPE, DIRTYPE, FIFOTYPE, LNKTYPE, REGTYPE, SYMTYPE
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
+
+try:
+    # Allow disabling prompt_toolkit via environment variable
+    if os.getenv("NO_PROMPT_TOOLKIT", "0") in {"1", "true", "True", "TRUE"}:
+        raise ImportError("Prompt toolkit disabled via environment variable")  # noqa: TRY301
+
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.completion import Completer, NestedCompleter
+    from prompt_toolkit.contrib.completers import SystemCompleter
+    from prompt_toolkit.document import Document
+    from prompt_toolkit.filters import completion_is_selected
+    from prompt_toolkit.formatted_text import ANSI
+    from prompt_toolkit.history import FileHistory, History
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.keys import Keys
+    from prompt_toolkit.shortcuts import CompleteStyle
+
+    from dissect.target.tools.utils.completer import (
+        QuotedPathCompleter,
+        get_current_word,
+        make_completion_parser,
+        split_words,
+    )
+
+    HAS_PROMPT_TOOLKIT = True
+
+except ImportError:
+    HAS_PROMPT_TOOLKIT = False
+
 
 from dissect.cstruct import hexdump
 from flow.record import RecordOutput
@@ -62,7 +90,9 @@ from dissect.target.tools.utils.fs import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
+
+    from prompt_toolkit.completion import CompleteEvent, Completion
 
     from dissect.target.plugin import FunctionDescriptor
 
@@ -154,8 +184,23 @@ class DebugMode(IntEnum):
     POST_MORTEM = 2
 
 
-# ANSI color escape sequences for readline prompt
-ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
+if HAS_PROMPT_TOOLKIT:
+    ANSI_COLORS = AnsiColors.as_dict()
+else:
+    # ANSI color escape sequences for readline prompt
+    ANSI_COLORS = readline_escape(AnsiColors.as_dict()) if readline else AnsiColors.as_dict()
+
+
+class TargetPathArgument(str):
+    """Custom str type for argparse arguments that represent target paths."""
+
+    __slots__ = ()
+
+
+class LocalPathArgument(str):
+    """Custom str type for argparse arguments that represent local paths."""
+
+    __slots__ = ()
 
 
 class ExtendedCmd(cmd.Cmd):
@@ -186,6 +231,7 @@ class ExtendedCmd(cmd.Cmd):
         self.debug = DebugMode.OFF
         self.cyber = cyber
         self.identchars += "."
+        self._local_prev_dir: str | None = None
 
         self.register_aliases()
 
@@ -205,7 +251,7 @@ class ExtendedCmd(cmd.Cmd):
 
         return object.__getattribute__(self, attr)
 
-    def _load_targetrc(self, path: pathlib.Path) -> None:
+    def _load_targetrc(self, path: Path) -> None:
         """Load and execute commands from the run commands file."""
         try:
             with path.open() as fh:
@@ -218,9 +264,9 @@ class ExtendedCmd(cmd.Cmd):
         except Exception as e:
             log.debug("Error processing .targetrc file: %s", e)
 
-    def _get_targetrc_path(self) -> pathlib.Path | None:
+    def _get_targetrc_path(self) -> Path | None:
         """Get the path to the run commands file. Can return ``None`` if ``DEFAULT_RUNCOMMANDS_FILE`` is not set."""
-        return pathlib.Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
+        return Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
 
     def preloop(self) -> None:
         super().preloop()
@@ -420,7 +466,8 @@ class ExtendedCmd(cmd.Cmd):
 
     def do_clear(self, line: str) -> bool:
         """Clear the terminal screen."""
-        os.system("cls||clear")
+        clear_cmd = "cls" if os.name == "nt" else "clear"
+        subprocess.run(clear_cmd, shell=True, check=False)
         return False
 
     def do_cls(self, line: str) -> bool:
@@ -466,6 +513,49 @@ class ExtendedCmd(cmd.Cmd):
 
         return False
 
+    def do_shell(self, line: str) -> bool:
+        """Execute a local shell command. Usage: !<command>."""
+        parts = line.strip().split(maxsplit=1)
+
+        # Handle `cd` as a special case, as it needs to change the state of our current process.
+        if parts and parts[0] == "cd":
+            target = parts[1].strip() if len(parts) > 1 else Path.home()
+            self.cmd_lcd(argparse.Namespace(path=target), sys.stdout)
+        else:
+            subprocess.run(line, shell=True, check=False)
+        return False
+
+    @arg("path", nargs="?", type=LocalPathArgument, default="~", help="Change the local working directory.")
+    def cmd_lcd(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Change the local working directory. Usage: lcd <path>."""
+        line = args.path
+        if line == "-":
+            if self._local_prev_dir is None:
+                print("cd: no previous directory")
+                return False
+            line = self._local_prev_dir
+
+        try:
+            prev = Path.cwd()
+            line = str(Path(line).expanduser())
+            line = os.path.expandvars(line)
+            os.chdir(line)
+            print("Local directory changed to", Path.cwd())
+            # only update after successful chdir and only if it's a different directory
+            if prev != Path.cwd():
+                self._local_prev_dir = str(prev)
+        except FileNotFoundError:
+            print(f"cd: no such file or directory: {line}")
+        except PermissionError:
+            print(f"cd: permission denied: {line}")
+
+        return False
+
+    def do_lpwd(self, line: str) -> bool:
+        """Print the current local working directory."""
+        print(Path.cwd())
+        return False
+
 
 class TargetCmd(ExtendedCmd):
     DEFAULT_HISTFILE = "~/.dissect_history"
@@ -484,11 +574,11 @@ class TargetCmd(ExtendedCmd):
 
         if self.histdir:
             self.histdirfmt = getattr(target._config, "HISTDIRFMT", self.DEFAULT_HISTDIRFMT)
-            self.histfile = pathlib.Path(self.histdir).resolve() / pathlib.Path(
+            self.histfile = Path(self.histdir).resolve() / Path(
                 self.histdirfmt.format(uid=os.getuid(), target=target.name)
             )
         else:
-            self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
+            self.histfile = Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
         # prompt format
         self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
@@ -501,16 +591,67 @@ class TargetCmd(ExtendedCmd):
         elif getattr(target._config, "NO_COLOR", None) or os.getenv("NO_COLOR"):
             self.prompt_ps1 = "{base}:{cwd}$ "
 
+        # Enable if prompt_toolkit is available and not disabled via environment variable
+        if HAS_PROMPT_TOOLKIT and os.getenv("NO_PROMPT_TOOLKIT", "0").lower() not in {"1", "true"}:
+            self.cmdloop = self.cmdloop_prompt_toolkit
+
         super().__init__(self.target.props.get("cyber"))
 
-    def _get_targetrc_path(self) -> pathlib.Path:
+    def cmdloop_prompt_toolkit(self, intro: str | None = None) -> None:
+        """Cmdloop implementation using prompt_toolkit."""
+        key_bindings = KeyBindings()
+
+        @key_bindings.add(Keys.Enter, filter=completion_is_selected)
+        def enter_confirms_completion(event: CompleteEvent) -> None:
+            """When a completion is selected, Enter inserts it, but doesn't submit."""
+            event.current_buffer.complete_state = None  # close the dropdown
+
+        self.preloop()
+        completer = TargetCmdCompleter(self)
+
+        # Use readline-compatible history if readline is available, otherwise fallback to FileHistory
+        history = ReadlineCompatHistory(self.histfile, self.histfilesize) if readline else FileHistory(self.histfile)
+
+        session = PromptSession(
+            history=history,
+            complete_style=CompleteStyle.MULTI_COLUMN,
+        )
+
+        if intro is not None:
+            self.intro = intro
+        if self.intro:
+            print(self.intro)
+
+        try:
+            stop = None
+            while not stop:
+                line = session.prompt(
+                    ANSI(self.prompt),
+                    completer=completer,
+                    complete_while_typing=False,
+                    key_bindings=key_bindings,
+                )
+                line = self.precmd(line)
+                stop = self.onecmd(line)
+                stop = self.postcmd(stop, line)
+        except KeyboardInterrupt:
+            raise
+        except EOFError:
+            return
+
+        self.postloop()
+
+    def _get_targetrc_path(self) -> Path:
         """Get the path to the run commands file."""
-        return pathlib.Path(
+        return Path(
             getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
         ).expanduser()
 
     def preloop(self) -> None:
         super().preloop()
+        if self.cmdloop == self.cmdloop_prompt_toolkit:
+            return  # history is handled by prompt_toolkit, no need to do anything here
+
         if readline and self.histfile.exists():
             try:
                 readline.read_history_file(self.histfile)
@@ -518,6 +659,9 @@ class TargetCmd(ExtendedCmd):
                 log.debug("Error reading history file: %s", e)
 
     def postloop(self) -> None:
+        if self.cmdloop == self.cmdloop_prompt_toolkit:
+            return  # history is handled by prompt_toolkit, no need to do anything here
+
         if readline:
             readline.set_history_length(self.histfilesize)
             try:
@@ -779,9 +923,10 @@ class TargetCli(TargetCmd):
         if dir := self.check_dir(path):
             self.cwd = dir
 
-    def do_cd(self, line: str) -> bool:
+    @arg("path", type=TargetPathArgument)
+    def cmd_cd(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Change directory."""
-        self.chdir(line)
+        self.chdir(args.path)
         return False
 
     def do_pwd(self, line: str) -> bool:
@@ -826,7 +971,7 @@ class TargetCli(TargetCmd):
             self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
         return False
 
-    @arg("path", nargs="?")
+    @arg("path", nargs="?", type=TargetPathArgument)
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
@@ -870,7 +1015,7 @@ class TargetCli(TargetCmd):
         )
         return False
 
-    @arg("path", nargs="?")
+    @arg("path", nargs="?", type=TargetPathArgument)
     def cmd_ll(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Alias for ls -la."""
         args = extend_args(args, self.cmd_ls)
@@ -878,14 +1023,14 @@ class TargetCli(TargetCmd):
         args.a = True
         return self.cmd_ls(args, stdout)
 
-    @arg("path", nargs="?")
+    @arg("path", nargs="?", type=TargetPathArgument)
     def cmd_tree(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Alias for ls -R."""
         args = extend_args(args, self.cmd_ls)
         args.recursive = True
         return self.cmd_ls(args, stdout)
 
-    @arg("path", nargs="?")
+    @arg("path", nargs="?", type=TargetPathArgument)
     @arg("-name", default="*", help="path to match with")
     @arg("-iname", help="like -name, but the match is case insensitive")
     @arg("-atime", type=int, help="file was last accessed n*24 hours ago")
@@ -935,7 +1080,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     @arg("-L", "--dereference", action="store_true")
     def cmd_stat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Display file status."""
@@ -946,7 +1091,7 @@ class TargetCli(TargetCmd):
         print_stat(path, stdout, args.dereference)
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     @arg("-d", "--dump", action="store_true")
     @arg("-R", "--recursive", action="store_true")
     @alias("getfattr")
@@ -973,7 +1118,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     def cmd_file(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Determine file type."""
         if not (path := self.check_file(args.path)):
@@ -994,11 +1139,12 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path", nargs="+")
+    @arg("path", nargs="+", type=TargetPathArgument)
     @arg(
         "-f",
         "--file",
         default="-",
+        type=LocalPathArgument,
         help="file to write the tar archive to, defaults to stdout",
     )
     @arg("-z", "--gzip", action="store_true", help="compress the tar archive with gzip")
@@ -1116,7 +1262,7 @@ class TargetCli(TargetCmd):
             else:
                 tar.addfile(info)
 
-        fobj = stdout.buffer if args.file == "-" else pathlib.Path(args.file).open("wb")  # noqa: SIM115
+        fobj = stdout.buffer if args.file == "-" else Path(args.file).open("wb")  # noqa: SIM115
         mode = "w|"
         if args.gzip:
             mode = "w|gz"
@@ -1152,12 +1298,18 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path", nargs="+")
-    @arg("-o", "--out", default=".")
+    @arg("path", nargs="+", type=TargetPathArgument)
+    @arg(
+        "-o",
+        "--out",
+        default=".",
+        type=LocalPathArgument,
+        help="directory to save the files to, defaults to the current directory",
+    )
     @arg("-v", "--verbose", action="store_true")
     def cmd_save(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Save a common file or directory to the host filesystem."""
-        dst_path = pathlib.Path(args.out).resolve()
+        dst_path = Path(args.out).resolve()
 
         if len(args.path) > 1 and not dst_path.is_dir():
             # Saving multiple items to a non-directory is generally not very
@@ -1165,27 +1317,25 @@ class TargetCli(TargetCmd):
             # items are directories.
             print(f"{dst_path}: cannot save multiple files, destination is not a directory")
 
-        def log_saved_path(src_path: pathlib.Path, dst_path: pathlib.Path) -> None:
+        def log_saved_path(src_path: Path, dst_path: Path) -> None:
             if args.verbose:
                 print(f"{src_path} -> {dst_path}")
 
-        def get_diverging_path(path: pathlib.Path, reference_path: pathlib.Path) -> pathlib.Path:
+        def get_diverging_path(path: Path, reference_path: Path) -> Path:
             """Get the part of path where it diverges from reference_path."""
-            diverging_path = pathlib.Path()
+            diverging_path = Path()
 
             for diff_idx, path_part in enumerate(reference_path.parts):
                 if path_part != path.parts[diff_idx]:
                     diverging_parts = path.parts[diff_idx:]
                     if diverging_parts:
                         for part in diverging_parts:
-                            diverging_path = diverging_path.joinpath(pathlib.Path(part))
+                            diverging_path = diverging_path.joinpath(Path(part))
                     break
 
             return diverging_path
 
-        def save_path(
-            src_path: pathlib.Path, dst_path: pathlib.Path, create_dst_subdir: pathlib.Path | None = None
-        ) -> None:
+        def save_path(src_path: Path, dst_path: Path, create_dst_subdir: Path | None = None) -> None:
             """Save a common file or directory in src_path to dst_path.
 
             If src_path is a file, dst_path can be either a directory or a file
@@ -1286,7 +1436,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     @alias("type")
     def cmd_cat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print file content."""
@@ -1307,7 +1457,7 @@ class TargetCli(TargetCmd):
         print()
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     def cmd_zcat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print file content from compressed files."""
         paths = list(self.resolve_glob_path(args.path))
@@ -1327,7 +1477,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     @arg("-n", "--length", type=int, default=16 * 20, help="amount of bytes to read")
     @arg("-s", "--skip", type=int, default=0, help="skip offset bytes from the beginning")
     @arg("-p", "--hex", action="store_true", help="output in plain hexdump style")
@@ -1350,11 +1500,11 @@ class TargetCli(TargetCmd):
                 if args.hex:
                     print(fh.read(args.length).hex(), file=stdout)
                 else:
-                    print(hexdump(fh.read(args.length), output="string"), file=stdout)
+                    print(hexdump(fh.read(args.length), output="string", pretty=True), file=stdout)
 
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     @alias("digest")
     @alias("shasum")
     def cmd_hash(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1367,7 +1517,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print the MD5 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
@@ -1377,7 +1527,7 @@ class TargetCli(TargetCmd):
         print(f"{md5}  {path!s}", file=stdout)
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print the SHA1 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
@@ -1387,7 +1537,7 @@ class TargetCli(TargetCmd):
         print(f"{sha1}  {path!s}", file=stdout)
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print the SHA256 checksum of a file provided by a path."""
         if not (path := self.check_file(args.path)):
@@ -1397,7 +1547,7 @@ class TargetCli(TargetCmd):
         print(f"{sha256}  {path!s}", file=stdout)
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     @alias("head")
     @alias("more")
     def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1410,7 +1560,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path")
+    @arg("path", type=TargetPathArgument)
     @alias("zhead")
     @alias("zmore")
     def cmd_zless(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1423,7 +1573,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path", nargs="+")
+    @arg("path", nargs="+", type=TargetPathArgument)
     def cmd_readlink(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print resolved symbolic links or canonical file names."""
         for path in args.path:
@@ -1435,7 +1585,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path", nargs="?", help="load a hive from the given path")
+    @arg("path", nargs="?", help="load a hive from the given path", type=TargetPathArgument)
     def cmd_registry(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Drop into a registry shell."""
         hive = None
@@ -1626,7 +1776,7 @@ class RegistryCli(TargetCmd):
         if args.hex:
             print(value.value.hex(), file=stdout)
         else:
-            print(hexdump(value.value, output="string"), file=stdout)
+            print(hexdump(value.value, output="string", pretty=True), file=stdout)
 
         return False
 
@@ -1777,6 +1927,120 @@ def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> cmd.Cmd | Non
         cli = TargetHubCli(targets, cli_cls)
 
     return cli
+
+
+if HAS_PROMPT_TOOLKIT:
+
+    class ReadlineCompatHistory(History):
+        """Custom prompt_toolkit History that is compatible with readline history."""
+
+        def __init__(self, histfile: Path | str, histfilesize: int = 10_000):
+            super().__init__()
+            self.histfile = histfile
+            self.histfilesize = histfilesize
+
+        def load_history_strings(self) -> Iterable[str]:
+            """Yield most recent history strings from the readline history file."""
+            readline.read_history_file(self.histfile)
+            for i in range(readline.get_current_history_length(), 0, -1):
+                yield readline.get_history_item(i)
+
+        def store_string(self, string: str) -> None:
+            """Store the string in persistent readline history file."""
+            readline.add_history(string)
+            readline.set_history_length(self.histfilesize)
+            try:
+                readline.write_history_file(self.histfile)
+            except Exception as e:
+                log.debug("Error writing history file: %s", e)
+
+    class TargetCmdCompleter(Completer):
+        """Custom completer for TargetCmd that supports completing command names, target paths and local paths."""
+
+        def __init__(self, cli: cmd.Cmd):
+            self.cli = cli
+            command_names = [name.partition("_")[2] for name in dir(self.cli) if name.startswith(("do_", "cmd_"))]
+            commands = {
+                **dict.fromkeys(command_names),
+                "help": dict.fromkeys(command_names),
+                "man": dict.fromkeys(command_names),
+                "?": dict.fromkeys(command_names),
+                "debug": dict.fromkeys(["on", "off", "pm"]),
+            }
+            self.command_completer = NestedCompleter.from_nested_dict(commands)
+            self.target_path_completer = QuotedPathCompleter(cli=cli, target=cli.target)
+            self.local_path_completer = QuotedPathCompleter(cli=cli, target=None)
+            self.system_completer = SystemCompleter()
+
+            self.argparsers: dict[str, argparse.ArgumentParser] = {}
+            for cmd_name in dir(self.cli):
+                if not cmd_name.startswith(("do_", "cmd_")):
+                    continue
+
+                func_name = getattr(self.cli, cmd_name)
+                _prefix, _, command = cmd_name.partition("_")
+                if getattr(func_name, "__args__", []):
+                    parser = make_completion_parser(generate_argparse_for_method(func_name))
+                    self.argparsers[command] = parser
+
+        def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
+            text = document.text_before_cursor
+            stripped = text.lstrip()
+            words = stripped.split()
+
+            command = words[0] if words else ""
+
+            if document.text.lstrip().startswith("!"):
+                yield from self.system_completer.get_completions(
+                    Document(text=document.text[1:], cursor_position=document.cursor_position - 1),
+                    complete_event,
+                )
+            elif command in self.argparsers:
+                parser = self.argparsers[command]
+                SENTINEL = "__COMPLETING__"
+
+                words = split_words(document.text_before_cursor)
+                completing_words = list(words[1:])  # strip the command name
+
+                text = document.text_before_cursor
+                raw_current_word = get_current_word(document.text_before_cursor)
+                ends_with_space = text.endswith(" ") and not raw_current_word
+
+                if ends_with_space:
+                    completing_words.append(SENTINEL)
+                else:
+                    if completing_words:
+                        last_word = words[-1]  # use the shlex-split word, not raw_current_word
+                        if "=" in last_word and last_word.startswith("-"):
+                            flag, _ = last_word.split("=", 1)
+                            completing_words[-1] = f"{flag}={SENTINEL}"
+                        else:
+                            completing_words[-1] = SENTINEL
+                    else:
+                        completing_words.append(SENTINEL)
+
+                # Here we parse the args using the SENTINEL to find out which argument we're currently completing
+                args, _remaining = parser.parse_known_args(completing_words)
+                action = parser.get_completing_action(args, SENTINEL)
+                arg_type = parser.dest_types.get(action.dest) if action else TargetPathArgument
+
+                # Strip flag prefix from current_word for the subdocument, eg: --out=/somepath -> /somepath
+                if "=" in raw_current_word and raw_current_word.startswith("-"):
+                    _, current_word = raw_current_word.split("=", 1)
+                else:
+                    current_word = raw_current_word
+                subdocument = Document(current_word, cursor_position=len(current_word))
+
+                if arg_type is TargetPathArgument:
+                    yield from self.target_path_completer.get_completions(subdocument, complete_event)
+                elif arg_type is LocalPathArgument:
+                    yield from self.local_path_completer.get_completions(subdocument, complete_event)
+            else:
+                yield from self.command_completer.get_completions(document, complete_event)
+
+
+else:
+    TargetCmdCompleter = None
 
 
 def run_cli(cli: ExtendedCmd) -> None:
