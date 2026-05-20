@@ -246,7 +246,10 @@ class PureTargetPath(pathlib.PurePath):
     } - set(getattr(pathlib.PurePath, "__slots__", ())))
     # fmt: on
 
+    sep = "/"
+    """The internal separator used by this path implementation."""
     parser: _PolyParser = _PolyParser(case_sensitive=False)
+    """The parser used by this path implementation."""
     # PATCH: hack for compatibility with flow.record paths on <=3.12
     _flavour = None
 
@@ -350,7 +353,7 @@ class PureTargetPath(pathlib.PurePath):
             return self._parts_normcase_cached
         except AttributeError:
             # PATCH: split the normalized string with POSIX-style separators
-            self._parts_normcase_cached = self._str_normcase.split("/")
+            self._parts_normcase_cached = self._str_normcase.split(self.sep)
             return self._parts_normcase_cached
 
     def __lt__(self, other: object) -> bool:
@@ -387,14 +390,14 @@ class PureTargetPath(pathlib.PurePath):
 
     @classmethod
     def _format_parsed_parts(cls, drv: str, root: str, tail: list[str]) -> str:
-        # PATCH: normalize to POSIX-style paths, and ignore the drive if there is one (we also include it in the tail)
+        # PATCH: normalize to the internal separator, ignore the drive if there is one (we also include it in the tail)
         if drv:
-            return "/".join(tail)
+            return cls.sep.join(tail)
         if root:
-            return root + "/".join(tail)
+            return root + cls.sep.join(tail)
         if tail and cls.parser.splitdrive(tail[0])[0]:
             tail = [".", *tail]
-        return "/".join(tail)
+        return cls.sep.join(tail)
 
     def _from_parsed_parts(self, drv: str, root: str, tail: list[str]) -> Self:
         path = self._from_parsed_string(self._format_parsed_parts(drv, root, tail))
@@ -427,9 +430,9 @@ class PureTargetPath(pathlib.PurePath):
                 # e.g. //?/unc/server/share
                 root = sep
 
-        # PATCH: normalize to POSIX-style paths, and add the drive to the relative part
-        drv = drv.replace(cls.parser.sep, "/")
-        root = root.replace(cls.parser.sep, "/")
+        # PATCH: normalize to the internal separator, and add the drive to the relative part
+        drv = drv.replace(cls.parser.sep, cls.sep)
+        root = root.replace(cls.parser.sep, cls.sep)
         return (
             drv,
             root,
@@ -1193,7 +1196,7 @@ class TargetPath(PureTargetPath, pathlib.Path):
         # PATCH: use a custom path-based globber so we can override how the path is stringified
         globber = _TargetGlobber(self.parser.sep, case_sensitive, case_pedantic, recursive)
         select = globber.selector(parts[::-1])
-        return select(globber.concat_path(self, "/"))
+        return select(globber.concat_path(self, self.sep))
 
     def rglob(
         self, pattern: str | os.PathLike[str], *, case_sensitive: bool | None = None, recurse_symlinks: bool = False
