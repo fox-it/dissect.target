@@ -11,7 +11,7 @@ def test_android_manifest() -> None:
     et = axml.tree
     ns = r"{http://schemas.android.com/apk/res/android}"
 
-    assert (el := et.find("."))
+    assert (el := et.find(".")) is not None
     assert el.tag == "manifest"
     assert el.attrib["package"] == "dev.serwin.AnarchRE"
     assert el.attrib[f"{ns}versionCode"] == "3"
