@@ -75,10 +75,10 @@ def _create_zip(prefix: str = "", zip_dir: bool = True) -> io.BytesIO:
     zf.writestr(symlink, "file_1")
 
     if zip_dir:
-        _mkdir(zf, f"{prefix}large/")
+        _mkdir(zf, f"{prefix}LARGE/")
 
     for i in range(1000):
-        zf.writestr(f"{prefix}large/{i}", f"contents {i}")
+        zf.writestr(f"{prefix}LARGE/{i}", f"CAN. YOU. HEAR. ME. {i}")
 
     zf.close()
     buf.seek(0)
@@ -138,7 +138,7 @@ def zip_absolute_base_virtual_dir() -> io.BytesIO:
         pytest.param("zip_absolute_base_virtual_dir", "/base/", id="absolute-base-virtual-dir"),
     ],
 )
-def test_filesystems_zip(obj: str, base: str | None, request: pytest.FixtureRequest) -> None:
+def test_zip(obj: str, base: str | None, request: pytest.FixtureRequest) -> None:
     fh = request.getfixturevalue(obj)
 
     assert ZipFilesystem.detect(fh)
@@ -208,6 +208,18 @@ def test_filesystems_zip(obj: str, base: str | None, request: pytest.FixtureRequ
     assert zfile.stat(follow_symlinks=False) == zfile.lstat()
 
 
+def test_zip_case_sensitivity(zip_simple: io.BytesIO) -> None:
+    fs = ZipFilesystem(zip_simple, case_sensitive=True)
+    with pytest.raises(FileNotFoundError):
+        fs.get("FILE_1")
+
+    assert fs.get("LARGE/1").open().read() == b"CAN. YOU. HEAR. ME. 1"
+
+    fs = ZipFilesystem(zip_simple, case_sensitive=False)
+    assert fs.get("FILE_1").open().read() == b"file 1 contents"
+    assert fs.get("large/1").open().read() == b"CAN. YOU. HEAR. ME. 1"
+
+
 @pytest.mark.parametrize(
     ("obj", "base"),
     [
@@ -228,8 +240,11 @@ def test_benchmark(obj: str, base: str | None, request: pytest.FixtureRequest, b
     def benchy() -> None:
         fs = ZipFilesystem(fh, base)
         fs.listdir("/")
+        list(fs.scandir("/"))
         fs.get("file_1").open().read()
         fs.get("dir").listdir()
-        fs.get("large").listdir()
+        list(fs.get("dir").scandir())
+        fs.get("LARGE").listdir()
+        list(fs.get("LARGE").scandir())
 
     benchmark(benchy)
