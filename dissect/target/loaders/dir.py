@@ -64,6 +64,10 @@ def map_dirs(
 
     drive_letter_map = defaultdict(list)
     for path in dirs:
+        # For unarchived acquire collections that have both "windows" and "Windows"
+        if path.parent.name.endswith("fs") and os_type == OperatingSystem.WINDOWS:
+            case_sensitive = True
+
         drive_letter = None
         if isinstance(path, tuple):
             drive_letter, path = path
