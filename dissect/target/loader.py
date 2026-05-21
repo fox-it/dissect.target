@@ -153,6 +153,42 @@ class SubLoader(Loader, Generic[T]):
         raise NotImplementedError
 
 
+class MiddlewareLoader(Loader):
+    """A base class for preparing arbitrary data to be used by other :class:`Loader`s.
+
+    Instead of mapping data directly to a :class:`Target <dissect.target.target.Target>`, loaders of this type
+    prepare data in some way and make it available for other :class:`Loader`s to use.
+
+    Subclasses should implement the :method:`detect` method like any other loader, and return a path to the prepared
+    data in the :method:`prepare` method . The loading mechanism will then use that path to find other loaders to map
+    the prepared data into the target.
+
+    Feels like forever since I've heard the term "middleware", I'm bringing it back baby!
+    """
+
+    def __init__(self, path: Path, *, fallbacks: list[type[Loader]] | None = None, **kwargs):
+        super().__init__(path, **kwargs)
+        # This will be the loader that successfully mapped the prepared path
+        self.loader = None
+
+    @staticmethod
+    def detect(path: Path) -> bool:
+        raise NotImplementedError
+
+    def prepare(self, target: Target) -> Path:
+        raise NotImplementedError
+
+    def map(self, target: Target) -> None:
+        path = self.prepare(target)
+
+        if (loader := find_loader(path, fallbacks=[DirLoader, RawLoader])) is not None:
+            ldr = loader(path)
+            ldr.map(target)
+
+            # Store a reference to the loader if we successfully mapped
+            self.loader = ldr
+
+
 def register(module_name: str, class_name: str, internal: bool = True) -> None:
     """Registers a ``Loader`` class inside ``LOADERS``.
 
@@ -290,4 +326,5 @@ register("cyber", "CyberLoader")
 register("log", "LogLoader")
 register("remote", "RemoteLoader")
 register("mqtt", "MqttLoader")
+register("compression", "CompressionLoader")
 register("multiraw", "MultiRawLoader")  # Should be last

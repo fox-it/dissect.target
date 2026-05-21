@@ -20,43 +20,9 @@ if TYPE_CHECKING:
 
     from dissect.target import target
 
-
 log = get_logger(__name__)
 
-TAR_EXT_COMP = (
-    ".tar.gz",
-    ".tar.xz",
-    ".tar.bz",
-    ".tar.bz2",
-    ".tar.lzma",
-    ".tar.lz",
-    ".tgz",
-    ".txz",
-    ".tbz",
-    ".tbz2",
-    ".tlz",
-    ".tlzma",
-)
 TAR_EXT = (".tar",)
-
-TAR_MAGIC_COMP = (
-    # gzip
-    b"\x1f\x8b",
-    # bzip2
-    b"\x42\x5a\x68",
-    # xz
-    b"\xfd\x37\x7a\x58\x5a\x00",
-    # lzma
-    b"\x5d\x00\x00\x01\x00",
-    b"\x5d\x00\x00\x10\x00",
-    b"\x5d\x00\x00\x08\x00",
-    b"\x5d\x00\x00\x10\x00",
-    b"\x5d\x00\x00\x20\x00",
-    b"\x5d\x00\x00\x40\x00",
-    b"\x5d\x00\x00\x80\x00",
-    b"\x5d\x00\x00\x00\x01",
-    b"\x5d\x00\x00\x00\x02",
-)
 TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
 WINDOWS_MEMBERS = (
@@ -146,20 +112,13 @@ class TarLoader(Loader):
     def __init__(self, path: Path, **kwargs):
         super().__init__(path, **kwargs)
 
-        if is_compressed(path):
-            log.warning(
-                "Tar file %r is compressed, which will affect performance. "
-                "Consider uncompressing the archive before passing the tar file to Dissect.",
-                path,
-            )
-
         self.fh = path.open("rb")
         self.tar = tf.open(mode="r:*", fileobj=self.fh)  # noqa: SIM115
         self.subloader = None
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
+        return path.name.lower().endswith(TAR_EXT) or is_tar_magic(path, TAR_MAGIC)
 
     def map(self, target: target.Target) -> None:
         for candidate in self.__subloaders__:
@@ -192,7 +151,3 @@ def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
                     continue
                 return True
     return False
-
-
-def is_compressed(path: Path) -> bool:
-    return path.name.lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
