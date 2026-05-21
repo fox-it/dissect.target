@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import io
 import tarfile
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.exceptions import IsADirectoryError, NotADirectoryError
 from dissect.target.filesystems.tar import TarFilesystem, TarFilesystemEntry
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def _mkdir(tf: tarfile.TarFile, name: str) -> None:
@@ -48,20 +52,21 @@ def _mksym(tf: tarfile.TarFile, name: str, dest: str) -> None:
     tf.addfile(info)
 
 
-def _create_tar(prefix: str = "", tar_dir: bool = True, tar_sym: bool = False) -> io.BytesIO:
+def _create_tar(prefix: str = "", insert_dir: bool = True, tar_sym: bool = False) -> io.BytesIO:
     buf = io.BytesIO()
     tf = tarfile.TarFile(fileobj=buf, mode="w")
 
-    if prefix and tar_dir:
+    if prefix and insert_dir:
         cur = []
-        for p in prefix.strip("/").split("/"):
+        for p in (prefix.rstrip("/") if prefix != "/" else prefix).split("/"):
             cur.append(p)
-            _mkdir(tf, "/".join(cur))
+            if name := "/".join(cur):
+                _mkdir(tf, name)
 
     _mkfile(tf, f"{prefix}file_1", b"file 1 contents")
     _mkfile(tf, f"{prefix}file_2", b"file 2 contents")
 
-    if tar_dir:
+    if insert_dir:
         _mkdir(tf, f"{prefix}dir/")
 
     for i in range(100):
@@ -70,6 +75,12 @@ def _create_tar(prefix: str = "", tar_dir: bool = True, tar_sym: bool = False) -
     if tar_sym:
         _mksym(tf, f"{prefix}sym_1", f"{prefix}file_1")
         _mksym(tf, f"{prefix}sym_2", f"{prefix}dir")
+
+    if insert_dir:
+        _mkdir(tf, f"{prefix}LARGE/")
+
+    for i in range(1000):
+        _mkfile(tf, f"{prefix}LARGE/{i}", f"CAN. YOU. HEAR. ME. {i}".encode())
 
     tf.close()
     buf.seek(0)
@@ -106,18 +117,36 @@ def tar_symlink() -> io.BytesIO:
     return _create_tar("", tar_sym=True)
 
 
+@pytest.fixture
+def tar_absolute() -> io.BytesIO:
+    return _create_tar("/", False)
+
+
+@pytest.fixture
+def tar_absolute_base() -> io.BytesIO:
+    return _create_tar("/base/", False)
+
+
+@pytest.fixture
+def tar_absolute_base_dir() -> io.BytesIO:
+    return _create_tar("/base/")
+
+
 @pytest.mark.parametrize(
     ("obj", "base"),
     [
-        ("tar_simple", ""),
-        ("tar_base", "base/"),
-        ("tar_relative", ""),
-        ("tar_relative_dir", ""),
-        ("tar_virtual_dir", ""),
-        ("tar_symlink", ""),
+        pytest.param("tar_simple", None, id="simple"),
+        pytest.param("tar_base", "base/", id="base"),
+        pytest.param("tar_relative", None, id="relative"),
+        pytest.param("tar_relative_dir", None, id="relative-dir"),
+        pytest.param("tar_virtual_dir", None, id="virtual-dir"),
+        pytest.param("tar_symlink", None, id="symlink"),
+        pytest.param("tar_absolute", None, id="absolute"),
+        pytest.param("tar_absolute_base", "/base/", id="absolute-base"),
+        pytest.param("tar_absolute_base_dir", "/base/", id="absolute-base-dir"),
     ],
 )
-def test_filesystems_tar(obj: str, base: str, request: pytest.FixtureRequest) -> None:
+def test_tar(obj: str, base: str | None, request: pytest.FixtureRequest) -> None:
     fh = request.getfixturevalue(obj)
 
     assert TarFilesystem.detect(fh)
@@ -125,14 +154,14 @@ def test_filesystems_tar(obj: str, base: str, request: pytest.FixtureRequest) ->
     fs = TarFilesystem(fh, base)
     assert isinstance(fs, TarFilesystem)
 
-    assert len(fs.listdir("/")) == (5 if fs.lexists("sym_1") else 3)
+    assert len(fs.listdir("/")) == (6 if fs.lexists("sym_1") else 4)
 
-    assert fs.get("./file_1").open().read() == b"file 1 contents"
-    assert fs.get("./file_2").open().read() == b"file 2 contents"
-    assert len(list(fs.glob("./dir/*"))) == 100
+    assert fs.get("file_1").open().read() == b"file 1 contents"
+    assert fs.get("file_2").open().read() == b"file 2 contents"
+    assert len(list(fs.glob("dir/*"))) == 100
 
-    tfile = fs.get("./file_1")
-    tdir = fs.get("./dir")
+    tfile = fs.get("file_1")
+    tdir = fs.get("dir")
 
     assert tfile.is_file()
     assert not tfile.is_dir()
@@ -192,3 +221,47 @@ def test_filesystems_tar(obj: str, base: str, request: pytest.FixtureRequest) ->
             tsymd.open()
 
         assert len(list(tsymd.listdir())) == 100
+
+
+def test_tar_case_sensitivity(tar_simple: io.BytesIO) -> None:
+    fs = TarFilesystem(tar_simple)
+    with pytest.raises(FileNotFoundError):
+        fs.get("FILE_1")
+
+    assert fs.get("LARGE/1").open().read() == b"CAN. YOU. HEAR. ME. 1"
+
+    fs = TarFilesystem(tar_simple, case_sensitive=False)
+    assert fs.get("FILE_1").open().read() == b"file 1 contents"
+    assert fs.get("large/1").open().read() == b"CAN. YOU. HEAR. ME. 1"
+
+
+@pytest.mark.parametrize(
+    ("obj", "base"),
+    [
+        pytest.param("tar_simple", None, id="simple"),
+        pytest.param("tar_base", "base/", id="base"),
+        pytest.param("tar_relative", None, id="relative"),
+        pytest.param("tar_relative_dir", None, id="relative-dir"),
+        pytest.param("tar_virtual_dir", None, id="virtual-dir"),
+        pytest.param("tar_absolute", None, id="absolute"),
+        pytest.param("tar_absolute_base", "/base/", id="absolute-base"),
+        pytest.param("tar_absolute_base_dir", "/base/", id="absolute-base-virtual-dir"),
+    ],
+)
+@pytest.mark.benchmark
+def test_benchmark_tar_filesystem(
+    obj: str, base: str | None, request: pytest.FixtureRequest, benchmark: BenchmarkFixture
+) -> None:
+    fh = request.getfixturevalue(obj)
+
+    def benchy() -> None:
+        fs = TarFilesystem(fh, base)
+        fs.listdir("/")
+        list(fs.scandir("/"))
+        fs.get("file_1").open().read()
+        fs.get("dir").listdir()
+        list(fs.get("dir").scandir())
+        fs.get("LARGE").listdir()
+        list(fs.get("LARGE").scandir())
+
+    benchmark(benchy)

@@ -43,11 +43,11 @@ def _mkdir(zf: zipfile.ZipFile, name: str) -> None:
         zf.start_dir = zf.fp.tell()
 
 
-def _create_zip(prefix: str = "", zip_dir: bool = True) -> io.BytesIO:
+def _create_zip(prefix: str = "", insert_dir: bool = True) -> io.BytesIO:
     buf = io.BytesIO()
     zf = zipfile.ZipFile(buf, "w")
 
-    if prefix and zip_dir:
+    if prefix and insert_dir:
         cur = []
         for p in (prefix.rstrip("/") if prefix != "/" else prefix).split("/"):
             cur.append(p)
@@ -60,7 +60,7 @@ def _create_zip(prefix: str = "", zip_dir: bool = True) -> io.BytesIO:
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_4", (2107, 13, 1, 0, 0, 0)), "file 4 contents")
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_5", (2025, 9, 8, 10, 39, 40)), "file 5 contents")
 
-    if zip_dir:
+    if insert_dir:
         _mkdir(zf, f"{prefix}dir/")
 
     for i in range(100):
@@ -74,7 +74,7 @@ def _create_zip(prefix: str = "", zip_dir: bool = True) -> io.BytesIO:
     symlink.external_attr = 0o120777 << 16
     zf.writestr(symlink, "file_1")
 
-    if zip_dir:
+    if insert_dir:
         _mkdir(zf, f"{prefix}LARGE/")
 
     for i in range(1000):
@@ -121,7 +121,7 @@ def zip_absolute_base() -> io.BytesIO:
 
 
 @pytest.fixture
-def zip_absolute_base_virtual_dir() -> io.BytesIO:
+def zip_absolute_base_dir() -> io.BytesIO:
     return _create_zip("/base/", False)
 
 
@@ -135,7 +135,7 @@ def zip_absolute_base_virtual_dir() -> io.BytesIO:
         pytest.param("zip_virtual_dir", None, id="virtual-dir"),
         pytest.param("zip_absolute", None, id="absolute"),
         pytest.param("zip_absolute_base", "/base/", id="absolute-base"),
-        pytest.param("zip_absolute_base_virtual_dir", "/base/", id="absolute-base-virtual-dir"),
+        pytest.param("zip_absolute_base_dir", "/base/", id="absolute-base-dir"),
     ],
 )
 def test_zip(obj: str, base: str | None, request: pytest.FixtureRequest) -> None:
@@ -230,11 +230,13 @@ def test_zip_case_sensitivity(zip_simple: io.BytesIO) -> None:
         pytest.param("zip_virtual_dir", None, id="virtual-dir"),
         pytest.param("zip_absolute", None, id="absolute"),
         pytest.param("zip_absolute_base", "/base/", id="absolute-base"),
-        pytest.param("zip_absolute_base_virtual_dir", "/base/", id="absolute-base-virtual-dir"),
+        pytest.param("zip_absolute_base_dir", "/base/", id="absolute-base-dir"),
     ],
 )
 @pytest.mark.benchmark
-def test_benchmark(obj: str, base: str | None, request: pytest.FixtureRequest, benchmark: BenchmarkFixture) -> None:
+def test_benchmark_zip_filesystem(
+    obj: str, base: str | None, request: pytest.FixtureRequest, benchmark: BenchmarkFixture
+) -> None:
     fh = request.getfixturevalue(obj)
 
     def benchy() -> None:
