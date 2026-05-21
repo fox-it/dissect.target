@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -10,7 +11,10 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystems.zip import ZipFilesystem, ZipFilesystemEntry
+from dissect.target.filesystems.zip import ZipFilesystem
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 
 def _mkdir(zf: zipfile.ZipFile, name: str) -> None:
@@ -45,9 +49,10 @@ def _create_zip(prefix: str = "", zip_dir: bool = True) -> io.BytesIO:
 
     if prefix and zip_dir:
         cur = []
-        for p in prefix.strip("/").split("/"):
+        for p in (prefix.rstrip("/") if prefix != "/" else prefix).split("/"):
             cur.append(p)
-            _mkdir(zf, "/".join(cur))
+            if name := "/".join(cur):
+                _mkdir(zf, name)
 
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_1", (1980, 0, 0, 0, 0, 0)), "file 1 contents")
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_2", (2107, 1, 1, 0, 0, 0)), "file 2 contents")
@@ -68,6 +73,12 @@ def _create_zip(prefix: str = "", zip_dir: bool = True) -> io.BytesIO:
     symlink = zipfile.ZipInfo(f"{prefix}symlink_file")
     symlink.external_attr = 0o120777 << 16
     zf.writestr(symlink, "file_1")
+
+    if zip_dir:
+        _mkdir(zf, f"{prefix}large/")
+
+    for i in range(1000):
+        zf.writestr(f"{prefix}large/{i}", f"contents {i}")
 
     zf.close()
     buf.seek(0)
@@ -99,41 +110,59 @@ def zip_virtual_dir() -> io.BytesIO:
     return _create_zip("", False)
 
 
+@pytest.fixture
+def zip_absolute() -> io.BytesIO:
+    return _create_zip("/", False)
+
+
+@pytest.fixture
+def zip_absolute_base() -> io.BytesIO:
+    return _create_zip("/base/")
+
+
+@pytest.fixture
+def zip_absolute_base_virtual_dir() -> io.BytesIO:
+    return _create_zip("/base/", False)
+
+
 @pytest.mark.parametrize(
     ("obj", "base"),
     [
-        ("zip_simple", ""),
-        ("zip_base", "base/"),
-        ("zip_relative", ""),
-        ("zip_relative_dir", ""),
-        ("zip_virtual_dir", ""),
+        pytest.param("zip_simple", None, id="simple"),
+        pytest.param("zip_base", "base/", id="base"),
+        pytest.param("zip_relative", None, id="relative"),
+        pytest.param("zip_relative_dir", None, id="relative-dir"),
+        pytest.param("zip_virtual_dir", None, id="virtual-dir"),
+        pytest.param("zip_absolute", None, id="absolute"),
+        pytest.param("zip_absolute_base", "/base/", id="absolute-base"),
+        pytest.param("zip_absolute_base_virtual_dir", "/base/", id="absolute-base-virtual-dir"),
     ],
 )
-def test_filesystems_zip(obj: str, base: str, request: pytest.FixtureRequest) -> None:
+def test_filesystems_zip(obj: str, base: str | None, request: pytest.FixtureRequest) -> None:
     fh = request.getfixturevalue(obj)
 
     assert ZipFilesystem.detect(fh)
 
     fs = ZipFilesystem(fh, base)
     assert isinstance(fs, ZipFilesystem)
-    assert len(fs.listdir("/")) == 8
+    assert len(fs.listdir("/")) == 9
 
-    assert fs.get("./file_1").open().read() == b"file 1 contents"
-    assert fs.get("./file_2").open().read() == b"file 2 contents"
-    assert fs.get("./file_3").open().read() == b"file 3 contents"
-    assert fs.get("./file_1").lstat().st_mtime_ns == 315532800000000000
-    assert fs.get("./file_2").lstat().st_mtime_ns == 4323283200000000000
-    assert fs.get("./file_3").lstat().st_mtime_ns == 315532800000000000
-    assert fs.get("./file_4").lstat().st_mtime_ns == 4354819199000000000
-    assert fs.get("./file_5").lstat().st_mtime_ns == 1757327980000000000
-    assert fs.get("./symlink_file").open().read() == b"file 1 contents"
-    assert len(list(fs.glob("./dir/*"))) == 100
-    assert len(list(fs.glob("./symlink_dir/*"))) == 100
+    assert fs.get("file_1").open().read() == b"file 1 contents"
+    assert fs.get("file_2").open().read() == b"file 2 contents"
+    assert fs.get("file_3").open().read() == b"file 3 contents"
+    assert fs.get("file_1").lstat().st_mtime_ns == 315532800000000000
+    assert fs.get("file_2").lstat().st_mtime_ns == 4323283200000000000
+    assert fs.get("file_3").lstat().st_mtime_ns == 315532800000000000
+    assert fs.get("file_4").lstat().st_mtime_ns == 4354819199000000000
+    assert fs.get("file_5").lstat().st_mtime_ns == 1757327980000000000
+    assert fs.get("symlink_file").open().read() == b"file 1 contents"
+    assert len(list(fs.glob("dir/*"))) == 100
+    assert len(list(fs.glob("symlink_dir/*"))) == 100
 
-    zfile = fs.get("./file_1")
-    zdir = fs.get("./dir")
-    zsymd = fs.get("./symlink_dir")
-    zsymf = fs.get("./symlink_file")
+    zfile = fs.get("file_1")
+    zdir = fs.get("dir")
+    zsymd = fs.get("symlink_dir")
+    zsymf = fs.get("symlink_file")
 
     assert zfile.is_file()
     assert not zfile.is_dir()
@@ -173,10 +202,34 @@ def test_filesystems_zip(obj: str, base: str, request: pytest.FixtureRequest) ->
     assert not file1.is_symlink()
     assert file1.open().read() == b"contents 1"
 
-    assert file1.stat() == zsymd.get("1").stat()
+    assert file1.stat() == zsymd.readlink_ext().get("1").stat()
 
     assert zfile.stat().st_mode == 0o100600
     assert zfile.stat(follow_symlinks=False) == zfile.lstat()
 
-    if isinstance(zdir, ZipFilesystemEntry):
-        assert zdir.stat().st_mode == 0o40777
+
+@pytest.mark.parametrize(
+    ("obj", "base"),
+    [
+        pytest.param("zip_simple", None, id="simple"),
+        pytest.param("zip_base", "base/", id="base"),
+        pytest.param("zip_relative", None, id="relative"),
+        pytest.param("zip_relative_dir", None, id="relative-dir"),
+        pytest.param("zip_virtual_dir", None, id="virtual-dir"),
+        pytest.param("zip_absolute", None, id="absolute"),
+        pytest.param("zip_absolute_base", "/base/", id="absolute-base"),
+        pytest.param("zip_absolute_base_virtual_dir", "/base/", id="absolute-base-virtual-dir"),
+    ],
+)
+@pytest.mark.benchmark
+def test_benchmark(obj: str, base: str | None, request: pytest.FixtureRequest, benchmark: BenchmarkFixture) -> None:
+    fh = request.getfixturevalue(obj)
+
+    def benchy() -> None:
+        fs = ZipFilesystem(fh, base)
+        fs.listdir("/")
+        fs.get("file_1").open().read()
+        fs.get("dir").listdir()
+        fs.get("large").listdir()
+
+    benchmark(benchy)
