@@ -41,12 +41,8 @@ class AirportPreferencesPlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not self.file:
-            raise UnsupportedPluginError("No com.apple.airport.preferences.plist file found")
-
-    @export(record=AirportPreferencesRecord)
-    def airport_preferences(self) -> Iterator[AirportPreferencesRecord]:
-        """Yield AirPort preference information."""
-        plist = plistlib.load(self.file.open())
+        with self.file.open() as fh:
+            plist = plistlib.load(fh)
 
         yield AirportPreferencesRecord(
             counter=plist.get("Counter"),
