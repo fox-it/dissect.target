@@ -9,7 +9,7 @@ from dissect.util.stream import BufferedStream
 
 from dissect.target.container import Container
 from dissect.target.helpers.logging import get_logger
-from dissect.target.helpers.windows_drive import _windows_get_disk_size
+from dissect.target.helpers.windows_drive import _windows_get_disk_size, _windows_get_drive_size
 
 log = get_logger(__name__)
 
@@ -41,13 +41,16 @@ class WindowsDrive(Container):
             raise TypeError("Windows Drive can only be opened by path")
         if sys.platform != "win32":
             raise TypeError("Windows Drive is only available on Windows platform.")
-        disk_size = _windows_get_disk_size(str(fh))
+        if is_physical_drive_path(path=str(fh)):
+            drive_size = _windows_get_disk_size(str(fh))
+        else:
+            drive_size = _windows_get_drive_size(str(fh))
         self._raw_stream = fh.open("rb")
         self.stream = BufferedStream(
             self._raw_stream,
-            size=disk_size,
+            size=drive_size,
         )
-        super().__init__(fh, disk_size, *args, **kwargs)
+        super().__init__(fh, drive_size, *args, **kwargs)
 
     @staticmethod
     def _detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
