@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import ctypes
-from enum import IntEnum, Flag, IntFlag
+from enum import IntFlag
 from typing import TypeVar
 
 T = TypeVar("T", bound=ctypes.Structure)
@@ -35,6 +35,7 @@ def _windows_disk_get_length_info(path: str) -> int:
     References:
         - https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-ioctl_disk_get_length_info
     """
+    # define IOCTL_DISK_GET_LENGTH_INFO          CTL_CODE(IOCTL_DISK_BASE, 0x0017, METHOD_BUFFERED, FILE_READ_ACCESS)
     IOCTL_DISK_GET_LENGTH_INFO = 0x7405C
     from ctypes import wintypes
 
@@ -42,7 +43,7 @@ def _windows_disk_get_length_info(path: str) -> int:
         _fields_ = (("Length", wintypes.LARGE_INTEGER),)
 
     handle = _windows_createfile(
-        path, desired_access=GenericAccessRight.GENERIC_ZERO, file_share_mode=FileShareMode.READ
+        path, desired_access=GenericAccessRight.GENERIC_READ, file_share_mode=FileShareMode.READ
     )
     try:
         status, res = _windows_ioctl(handle, IOCTL_DISK_GET_LENGTH_INFO, GET_LENGTH_INFORMATION)
@@ -69,6 +70,7 @@ def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
     """
     from ctypes import wintypes
 
+    # define IOCTL_DISK_GET_DRIVE_GEOMETRY_EX    CTL_CODE(IOCTL_DISK_BASE, 0x0028, METHOD_BUFFERED, FILE_ANY_ACCESS)
     IOCTL_DISK_GET_DRIVE_GEOMETRY_EX = 0x700A0
 
     class DISK_GEOMETRY(ctypes.Structure):
