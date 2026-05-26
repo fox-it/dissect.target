@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import ctypes
+from enum import IntEnum
 from typing import TypeVar
 
 T = TypeVar("T", bound=ctypes.Structure)
 
-from enum import IntEnum
 
 def _windows_get_disk_size(path: str) -> int:
     """Get disk size from a Drive path. Must be used only on a Windows platform.
@@ -20,31 +20,16 @@ def _windows_get_disk_size(path: str) -> int:
 def _windows_get_drive_size(path: str) -> int:
     """Retrieves the length of the specified disk, volume, or partition. Must be used only on a Windows platform.
 
+    Unlike _windows_get_disk_size, also works on volume and partition.
+
     Args:
         path: Drive path, E.g `\\\\.\\PhysicalDrive0`, `\\\\.\\C:`
     """
     return _windows_disk_get_length_info(path)
 
 
-
-
-"""
-#define FILE_DEVICE_DISK                0x00000007
-#define METHOD_BUFFERED                 0
-#define IOCTL_DISK_BASE                 FILE_DEVICE_DISK
-#define FILE_ANY_ACCESS                 0
-#define FILE_READ_ACCESS          ( 0x0001 )    // file & pipe
-#define IOCTL_DISK_GET_LENGTH_INFO          CTL_CODE(IOCTL_DISK_BASE, 0x0017, METHOD_BUFFERED, FILE_READ_ACCESS)
-#define IOCTL_DISK_GET_DRIVE_GEOMETRY_EX    CTL_CODE(IOCTL_DISK_BASE, 0x0028, METHOD_BUFFERED, FILE_ANY_ACCESS)
-
-#define CTL_CODE( DeviceType, Function, Method, Access ) (                 \
-    ((DeviceType) << 16) | ((Access) << 14) | ((Function) << 2) | (Method) \
-)
-
-"""
 def _windows_disk_get_length_info(path: str) -> int:
-    """
-    Call IOCTL_DISK_GET_LENGTH_INFO.
+    """Call IOCTL_DISK_GET_LENGTH_INFO.
 
     References:
         - https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-ioctl_disk_get_length_info
@@ -53,11 +38,11 @@ def _windows_disk_get_length_info(path: str) -> int:
     from ctypes import wintypes
 
     class GET_LENGTH_INFORMATION(ctypes.Structure):
-        _fields_ = (
-            ("Length", wintypes.LARGE_INTEGER),
-        )
+        _fields_ = (("Length", wintypes.LARGE_INTEGER),)
 
-    handle = _windows_createfile(path, desired_access=GenericAccessRight.GENERIC_READ)
+    handle = _windows_createfile(
+        path, desired_access=GenericAccessRight.GENERIC_READ, file_share_mode=FileShareMode.READ
+    )
     try:
         status, res = _windows_ioctl(handle, IOCTL_DISK_GET_LENGTH_INFO, GET_LENGTH_INFORMATION)
     finally:
@@ -110,18 +95,37 @@ def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
 
 
 class GenericAccessRight(IntEnum):
-    """
+    """CreateFileW dwDesiredAccess (some IOCTL required specific access, such as READ instead of ZERO).
+
     References:
         - https://learn.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
     """
+
     GENERIC_ALL = 0x10000000
     GENERIC_EXECUTE = 0x20000000
     GENERIC_WRITE = 0x40000000
     GENERIC_READ = 0x80000000
-    GENERIC_NONE = 0x00000000
+    GENERIC_ZERO = 0x00000000
 
 
-def _windows_createfile(path: str, desired_access : GenericAccessRight = GenericAccessRight.GENERIC_NONE) -> int:
+class FileShareMode(IntEnum):
+    """CreateFileW file share mode.
+
+    References:
+    - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+    """
+
+    NONE = 0x00000000
+    READ = 0x00000001
+    WRITE = 0x00000002
+    DELETE = 0x00000004
+
+
+def _windows_createfile(
+    path: str,
+    desired_access: GenericAccessRight = GenericAccessRight.GENERIC_ZERO,
+    file_share_mode: FileShareMode = FileShareMode.NONE,
+) -> int:
     """Open a file using the windows CreateFileW API."""
     OPEN_EXISTING = 3
     FILE_ATTRIBUTE_NORMAL = 0x00000080
@@ -129,7 +133,7 @@ def _windows_createfile(path: str, desired_access : GenericAccessRight = Generic
     handle = ctypes.windll.kernel32.CreateFileW(
         path,
         int(desired_access),
-        0,
+        int(file_share_mode),
         0,
         OPEN_EXISTING,
         FILE_ATTRIBUTE_NORMAL,
@@ -138,7 +142,7 @@ def _windows_createfile(path: str, desired_access : GenericAccessRight = Generic
 
     if handle == -1:
         err = ctypes.windll.kernel32.GetLastError()
-        raise OSError(f"unable to open handle to {path}, error: 0x{err:08x}")
+        raise OSError(f"unable to open handle to {path} using CreateFileW, error: 0x{err:08x}")
 
     return handle
 
