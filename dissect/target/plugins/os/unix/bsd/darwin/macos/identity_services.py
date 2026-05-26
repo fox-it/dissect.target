@@ -7,7 +7,7 @@ from dissect.database.sqlite3 import SQLite3
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_paths import _build_userdirs
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

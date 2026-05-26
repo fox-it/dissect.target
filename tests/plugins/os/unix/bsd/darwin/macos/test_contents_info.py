@@ -66,7 +66,7 @@ def test_contents_info(
         assert results[0].CFBundlePackageType == "APPL"
         assert results[0].CFBundleShortVersionString == "5.0"
         assert results[0].CFBundleSignature == "????"
-        assert results[0].CFBundleSupportedPlatforms == "['macOSX']"
+        assert results[0].CFBundleSupportedPlatforms == ["macOSX"]
         assert results[0].CFBundleVersion == "5.0"
         assert results[0].DTCompiler == "com.apple.compilers.llvm.clang.1_0"
         assert results[0].DTPlatformBuild == ""
@@ -90,7 +90,7 @@ def test_contents_info(
         assert results[4].CFBundlePackageType == "KEXT"
         assert results[4].CFBundleShortVersionString == "1.8"
         assert results[4].CFBundleSignature == "????"
-        assert results[4].CFBundleSupportedPlatforms == "['macOSX']"
+        assert results[4].CFBundleSupportedPlatforms == ["macOSX"]
         assert results[4].CFBundleVersion == "1.8"
         assert results[4].DTCompiler == "com.apple.compilers.llvm.clang.1_0"
         assert results[4].DTPlatformBuild == "25E245"

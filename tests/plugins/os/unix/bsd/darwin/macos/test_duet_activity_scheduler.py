@@ -70,3 +70,30 @@ def test_duet_activity_scheduler(test_files: list[str], target_unix: Target, fs_
         assert results[48].z_super == 0
         assert results[48].z_max == 0
         assert results[48].source == "/var/db/DuetActivityScheduler/DuetActivitySchedulerClassC.db"
+
+        assert results[51].ns_persistence_maximum_framework_version == 1526
+        assert results[51].ns_store_model_version_identifiers == [""]
+        assert results[51].ns_store_type == "SQLite"
+        assert results[51].ns_auto_vacuum_level == "2"
+        assert (
+            results[51].ns_store_model_version_hashes_digest
+            == "rvkNkhmOezVbzsczB2H+gkUsiGN7C2d7a9TtXbZPD0kn0MZYSVEGM64BycQewlVstp1ROUAOBjEmkbNTkiu6JA=="
+        )
+        assert results[51].ns_store_model_version_checksum_key == "rXdwmenydb+cl65S3tSy9rIL6lkwSXqL7UvaJVK21Lc="
+        assert results[51].ns_persistence_framework_version == 1526
+        assert results[51].ns_store_model_version_hashes_version == 3
+        assert results[51].source == "/var/db/DuetActivityScheduler/DuetActivitySchedulerClassC.db"
+
+        assert results[52].tr_cloud_kit_sync_state is None
+        assert results[52].text_replacement_entry is None
+        assert results[52].plist_path == "NSStoreModelVersionHashes"
+        assert results[52].source == "/var/db/DuetActivityScheduler/DuetActivitySchedulerClassC.db"
+
+        assert results[53].table == "Z_METADATA"
+        assert results[53].z_version == 1
+        assert results[53].z_uuid == "514A8E5F-DE48-4C3E-9129-3AF14DEAD0E1"
+        assert results[53].source == "/var/db/DuetActivityScheduler/DuetActivitySchedulerClassC.db"
+
+        assert results[54].table == "Z_MODELCACHE"
+        assert isinstance(results[54].z_content, (bytes, bytearray))
+        assert results[54].source == "/var/db/DuetActivityScheduler/DuetActivitySchedulerClassC.db"

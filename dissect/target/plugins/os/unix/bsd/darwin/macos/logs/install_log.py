@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import parse_timestamp
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.parse_timestamp import parse_timestamp
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dissect.target.target import Target
 
 InstallLogRecord = TargetRecordDescriptor(
     "macos/install_log",
@@ -42,12 +41,36 @@ class InstallLogPlugin(Plugin):
 
     INSTALL_LOG_PATH = "/var/log/install.log"
 
-    def __init__(self, target: Target):
-        super().__init__(target)
-
     def check_compatible(self) -> None:
         if not self.target.fs.exists(self.INSTALL_LOG_PATH):
             raise UnsupportedPluginError("No install.log file found.")
+
+    def parse_log(self, current_ts: re.Match[str], current_buf: str) -> Iterator[InstallLogRecord]:
+        # Log format: "<timestamp> <hostname> <component>: <message>"
+        # Strip the timestamp (and following space) to extract the rest of the line
+        asdf = current_buf[len(current_ts.group()) + 1 :]
+
+        # Split into hostname, component and message
+        parts = asdf.split(" ", 2)
+
+        if len(parts) == 3:
+            hostname, component, message = parts
+            yield InstallLogRecord(
+                ts=parse_timestamp(current_ts),
+                host=hostname.strip(),
+                component=component.strip() if component else None,
+                message=message.strip(),
+                source=self.INSTALL_LOG_PATH,
+                _target=self.target,
+            )
+        elif len(parts) != 3:
+            self.target.log.warning(
+                "Skipping malformed install log entry in %s: "
+                "expected 3 fields (hostname, component, message), got %d -> '%s'",
+                self.INSTALL_LOG_PATH,
+                len(parts),
+                asdf.strip(),
+            )
 
     @export(record=InstallLogRecord)
     def install_log(self) -> Iterator[InstallLogRecord]:
@@ -66,46 +89,23 @@ class InstallLogPlugin(Plugin):
         References:
             - https://sansorg.egnyte.com/dl/m9ftGF7heI
         """
-        logfile = self.target.fs.path(self.INSTALL_LOG_PATH).open(mode="rt")
-
         current_ts: re.Match[str] | None = None
         current_buf = ""
+        with self.target.fs.path(self.INSTALL_LOG_PATH).open(mode="rt") as fh:
+            for line in fh:
+                # New timestamp indicates the start of new log entry.
+                if ts_match := RE_TIMESTAMP_PATTERN.match(line):
+                    # If previous log entry exists, parse it.
+                    if current_ts:
+                        yield from self.parse_log(current_ts, current_buf)
 
-        for line in logfile.readlines():
-            if ts_match := RE_TIMESTAMP_PATTERN.match(line):
-                if current_ts:
-                    asdf = current_buf[len(current_ts.group()) + 1 :]
+                    current_ts = ts_match
+                    current_buf = line
 
-                    parts = asdf.split(" ", 2)
+                # Lines without a timestamp are part of the previous log entry.
+                elif current_buf:
+                    current_buf += line  # append continuation
 
-                    if len(parts) == 3:
-                        hostname, component, message = parts
-                    elif len(parts) == 2:
-                        hostname, message = parts
-                        component = None
-                    yield InstallLogRecord(
-                        ts=parse_timestamp(current_ts),
-                        host=hostname.strip(),
-                        component=component.strip() if component else None,
-                        message=message.strip(),
-                        source=self.INSTALL_LOG_PATH,
-                        _target=self.target,
-                    )
-
-                current_ts = ts_match
-                current_buf = line
-            elif current_buf:
-                current_buf += line
-
-        if current_ts and current_buf:
-            asdf = current_buf[len(current_ts.group()) + 1 :]
-            hostname, component, message = asdf.split(" ", 2)
-
-            yield InstallLogRecord(
-                ts=parse_timestamp(current_ts),
-                host=hostname.strip(),
-                component=component.strip(),
-                message=message.strip(),
-                source=self.INSTALL_LOG_PATH,
-                _target=self.target,
-            )
+            # If previous log entry exists, parse it.
+            if current_ts and current_buf:
+                yield from self.parse_log(current_ts, current_buf)

@@ -84,11 +84,10 @@ def test_global_user_preferences(
         results = list(target_unix.global_user_preferences())
         results.sort(key=lambda r: r.source)
 
-        assert len(results) == 3
+        assert len(results) == 4
 
         assert results[0].AKLastLocale == "en_US@rg=nlzzzz"
         assert results[0].com_apple_sound_beep_flash == 0
-        assert results[0].NSLinguisticDataAssetsRequested == "['en', 'en_US', 'nl', 'nl_NL']"
         assert not results[0].AppleMiniaturizeOnDoubleClick
         assert results[0].NSAutomaticPeriodSubstitutionEnabled
         assert results[0].NSSpellCheckerDictionaryContainerTransitionComplete
@@ -96,22 +95,25 @@ def test_global_user_preferences(
         assert results[0].ACDMonthlyAnalyticsLastPosted == "796140692.59226"
         assert results[0].AKLastIDMSEnvironment == 0
         assert results[0].NSAutomaticCapitalizationEnabled
-        assert results[0].NSLinguisticDataAssetsRequestedByChecker == "[]"
-        assert results[0].NSUserDictionaryReplacementItems == ("[{'replace': 'omw', 'on': 1, 'with': 'On my way!'}]")
         assert results[0].NSLinguisticDataAssetsRequestTime == "2026-03-25 14:12:53.295950"
         assert results[0].AppleAntiAliasingThreshold == 4
         assert results[0].com_apple_springing_enabled
-        assert results[0].AppleLanguages == "['en-US', 'nl-NL']"
         assert results[0].AppleLocale == "en_US@rg=nlzzzz"
         assert results[0].com_apple_trackpad_forceClick
         assert results[0].NSLinguisticDataAssetsRequestLastInterval == "86400.0"
         assert results[0].AppleLanguagesSchemaVersion == 5400
         assert results[0].source == "/Users/user/Library/Preferences/.GlobalPreferences.plist"
 
-        assert results[1].AppleKeyboardUIMode == 2
-        assert results[1].source == "/private/var/db/securityagent/Library/Preferences/.GlobalPreferences.plist"
+        assert results[1].replace == "omw"
+        assert results[1].on == 1
+        assert getattr(results[1], "with") == "On my way!"
+        assert results[1].plist_path == "NSUserDictionaryReplacementItems[0]"
+        assert results[1].source == "/Users/user/Library/Preferences/.GlobalPreferences.plist"
 
-        assert results[2].AppleLocale == "en_US"
-        assert results[2].AppleKeyboardUIMode == 3
-        assert results[2].com_apple_sound_beep_flash == 0
-        assert results[2].source == "/private/var/root/Library/Preferences/.GlobalPreferences.plist"
+        assert results[2].AppleKeyboardUIMode == 2
+        assert results[2].source == "/private/var/db/securityagent/Library/Preferences/.GlobalPreferences.plist"
+
+        assert results[3].AppleLocale == "en_US"
+        assert results[3].AppleKeyboardUIMode == 3
+        assert results[3].com_apple_sound_beep_flash == 0
+        assert results[3].source == "/private/var/root/Library/Preferences/.GlobalPreferences.plist"

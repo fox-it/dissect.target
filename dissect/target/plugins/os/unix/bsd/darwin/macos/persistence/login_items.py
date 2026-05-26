@@ -1,23 +1,49 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_paths import _build_userdirs
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
 
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
-
 LoginItemsRecord = TargetRecordDescriptor(
     "macos/login_items",
+    [
+        ("string", "associatedBundleIdentifiers"),
+        ("bytes", "bookmark"),
+        ("string", "bundleIdentifier"),
+        ("string", "container"),
+        ("string", "designatedRequirement"),
+        ("string", "developerName"),
+        ("varint", "login_item_disposition"),
+        ("datetime", "executableModificationDate"),
+        ("path", "executablePath"),
+        ("varint", "flags"),
+        ("varint", "generation"),
+        ("string", "identifier"),
+        ("bytes", "lightweightRequirement"),
+        ("datetime", "modificationDate"),
+        ("string", "name"),
+        ("string", "programArguments"),
+        ("string", "sha256"),
+        ("string", "teamIdentifier"),
+        ("varint", "login_item_type"),
+        ("string", "url"),
+        ("string", "uuid"),
+        ("string", "plist_path"),
+        ("path", "source"),
+    ],
+)
+
+LoginItemsMetadataRecord = TargetRecordDescriptor(
+    "macos/login_items/metadata",
     [
         ("varint", "generation"),
         ("varint", "background_app_refresh_load_count"),
@@ -28,12 +54,14 @@ LoginItemsRecord = TargetRecordDescriptor(
     ],
 )
 
-LoginItemsRecords = (LoginItemsRecord,)
+LoginItemsRecords = (LoginItemsRecord, LoginItemsMetadataRecord)
 
 FIELD_MAPPINGS = {
     "backgroundAppRefreshLoadCount": "background_app_refresh_load_count",
     "launchServicesItemsImported": "launch_services_items_imported",
     "serviceManagementLoginItemsMigrated": "service_management_login_items_migrated",
+    "type": "login_item_type",
+    "disposition": "login_item_disposition",
 }
 
 

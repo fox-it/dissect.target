@@ -17,10 +17,10 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize(
     "test_files",
     [
-        ("system.log", "system.log.0.gz"),
+        ["system.log", "system.log.0.gz"],
     ],
 )
-def test_system_log(test_files: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_system_log(test_files: list[str], target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     tz = timezone.utc
     stat_results = []
 
@@ -41,8 +41,6 @@ def test_system_log(test_files: str, target_unix: Target, fs_unix: VirtualFilesy
         patch.object(entries[1], "stat", return_value=stat_results[1]),
     ):
         target_unix.add_plugin(SystemLogPlugin)
-        results = list(target_unix.system_log())
-
         results = list(target_unix.system_log())
         results.reverse()
         results.sort(key=lambda r: r.source)

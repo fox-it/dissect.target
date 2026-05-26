@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -12,8 +11,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
-
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
 
 OmitRecord = TargetRecordDescriptor(
     "macos/code_signature_coderesources/omit",
@@ -35,6 +32,16 @@ NestedRecord = TargetRecordDescriptor(
     ],
 )
 
+OptionalRecord = TargetRecordDescriptor(
+    "macos/code_signature_coderesources/optional",
+    [
+        ("boolean", "optional"),
+        ("varint", "weight"),
+        ("string", "plist_path"),
+        ("path", "source"),
+    ],
+)
+
 CDHashRecord = TargetRecordDescriptor(
     "macos/code_signature_coderesources/cdhash",
     [
@@ -45,18 +52,23 @@ CDHashRecord = TargetRecordDescriptor(
     ],
 )
 
-
 CodeSignatureCodeResourcesRecords = (
     OmitRecord,
     NestedRecord,
+    OptionalRecord,
     CDHashRecord,
 )
+
+FIELD_MAPPINGS = {
+    "Resources_PROMISE_icns": "resources_promise_icns",
+}
 
 
 class CodeSignatureCodeResourcesPlugin(Plugin):
     """macOS Code signature CodeResources plugin."""
 
     PATHS = (
+        "/Applications/*.app/Contents/_CodeSignature/CodeResources",
         "/Applications/Utilities/*.app/Contents/_CodeSignature/CodeResources",
         "/System/Library/CoreServices/*.app/Contents/_CodeSignature/CodeResources",
         "/System/Library/Extensions/*.kext/Contents/_CodeSignature/CodeResources",
@@ -86,4 +98,6 @@ class CodeSignatureCodeResourcesPlugin(Plugin):
     @export(record=CodeSignatureCodeResourcesRecords)
     def code_signature_coderesources(self) -> Iterator[CodeSignatureCodeResourcesRecords]:
         """Yield code signature coderesources information."""
-        yield from build_plist_records(self, self.files, CodeSignatureCodeResourcesRecords)
+        yield from build_plist_records(
+            self, self.files, CodeSignatureCodeResourcesRecords, field_mappings=FIELD_MAPPINGS
+        )

@@ -76,7 +76,7 @@ ZModelCacheRecord = TargetRecordDescriptor(
     "macos/duet_activity_scheduler",
     [
         ("string", "table"),
-        ("string", "z_content"),
+        ("bytes", "z_content"),
         ("path", "source"),
     ],
 )

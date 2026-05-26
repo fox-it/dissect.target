@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_paths import _build_userdirs
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.general import _build_userdirs
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
-
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
 
 
 class LoginWindowPlugin(Plugin):

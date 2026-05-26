@@ -48,16 +48,11 @@ class AirportPreferencesPlugin(Plugin):
         """Yield AirPort preference information."""
         plist = plistlib.load(self.file.open())
 
-        counter = plist.get("Counter")
-        version = plist.get("Version")
-        device_uuid = plist.get("DeviceUUID")
-        preferred_order = plist.get("PreferredOrder")
-
         yield AirportPreferencesRecord(
-            counter=counter,
-            device_uuid=device_uuid,
-            version=version,
-            preferred_order=preferred_order,
+            counter=plist.get("Counter"),
+            device_uuid=plist.get("DeviceUUID"),
+            version=plist.get("Version"),
+            preferred_order=plist.get("PreferredOrder"),
             source=self.file,
             _target=self.target,
         )

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -12,8 +11,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
-
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/\&gt;\&lt;]")
 
 ContentsVersionRecord = TargetRecordDescriptor(
     "macos/contents_version",
@@ -47,6 +44,7 @@ class ContentsVersionPlugin(Plugin):
     """macOS Contents version.plist file."""
 
     PATHS = (
+        "/Applications/*.app/Contents/version.plist",
         "/Applications/*/*.app/Contents/version.plist",
         "/Applications/*/*.app/Contents/Resources/*.help/Contents/version.plist",
         "/System/Library/CoreServices/*.app/Contents/version.plist",

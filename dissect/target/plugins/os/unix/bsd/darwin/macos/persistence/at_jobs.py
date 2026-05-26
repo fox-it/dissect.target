@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,8 +11,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
-
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
 
 AtJobsRecord = TargetRecordDescriptor(
     "macos/at_jobs",

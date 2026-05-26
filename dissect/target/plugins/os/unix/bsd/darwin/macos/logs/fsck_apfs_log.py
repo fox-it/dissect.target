@@ -11,14 +11,13 @@ from dissect.target.plugin import Plugin, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dissect.target.target import Target
 
 FsckAPFSLogRecord = TargetRecordDescriptor(
     "macos/fsck_apfs_log",
     [
+        ("datetime", "ts"),
         ("string", "disk_path"),
         ("string", "message"),
-        ("datetime", "ts"),
         ("path", "source"),
     ],
 )
@@ -36,9 +35,6 @@ class FsckAPFSLogPlugin(Plugin):
 
     FSCK_APFS_LOG_PATH = "/var/log/fsck_apfs.log"
 
-    def __init__(self, target: Target):
-        super().__init__(target)
-
     def check_compatible(self) -> None:
         if not self.target.fs.exists(self.FSCK_APFS_LOG_PATH):
             raise UnsupportedPluginError("No fsck_apfs.log file found.")
@@ -46,23 +42,22 @@ class FsckAPFSLogPlugin(Plugin):
     @export(record=FsckAPFSLogRecord)
     def fsck_apfs_log(self) -> Iterator[FsckAPFSLogRecord]:
         """Return all fsck_apfs log messages."""
-        logfile = self.target.fs.path(self.FSCK_APFS_LOG_PATH).open(mode="rt")
+        with self.target.fs.path(self.FSCK_APFS_LOG_PATH).open(mode="rt") as fh:
+            for line in fh:
+                if line != "\n":
+                    parts = line.split(" ", 1)
 
-        for line in logfile.readlines():
-            if line != "\n":
-                parts = line.split(" ", 1)
+                    disk_path, message = parts
+                    disk_path = disk_path.strip(":")
+                    ts = None
 
-                disk_path, message = parts
-                disk_path = disk_path.strip(":")
-                ts = None
+                    if ts_match := RE_TIMESTAMP_PATTERN.search(message):
+                        ts = datetime.strptime(ts_match.group(), "%a %b %d %H:%M:%S %Y").replace(tzinfo=timezone.utc)
 
-                if ts_match := RE_TIMESTAMP_PATTERN.search(message):
-                    ts = datetime.strptime(ts_match.group(), "%a %b %d %H:%M:%S %Y").replace(tzinfo=timezone.utc)
-
-                yield FsckAPFSLogRecord(
-                    disk_path=disk_path.strip(),
-                    message=message.strip(),
-                    ts=ts,
-                    source=self.FSCK_APFS_LOG_PATH,
-                    _target=self.target,
-                )
+                    yield FsckAPFSLogRecord(
+                        ts=ts,
+                        disk_path=disk_path.strip(),
+                        message=message.strip(),
+                        source=self.FSCK_APFS_LOG_PATH,
+                        _target=self.target,
+                    )

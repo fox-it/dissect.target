@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         ["_mbsetupuser.plist", "user.plist"],
     ],
 )
-def test_passwords(test_files: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_passwords(test_files: list[str], target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     stat_results = []
     entries = []
     for test_file in test_files:

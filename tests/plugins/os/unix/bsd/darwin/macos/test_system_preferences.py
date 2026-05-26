@@ -37,5 +37,5 @@ def test_system_preferences(test_file: str, target_unix: Target, fs_unix: Virtua
         assert results[0].Counter == 2
         assert results[0].DeviceUUID == "0527924E-C5F8-4703-BDDC-9283B6E9FDAE"
         assert results[0].Version == 7200
-        assert results[0].PreferredOrder == "[]"
+        assert results[0].PreferredOrder == []
         assert results[0].source == "/Library/Preferences/SystemConfiguration/com.apple.airport.preferences.plist"

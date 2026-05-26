@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 InstallationHistoryRecord = TargetRecordDescriptor(
     "macos/installation_history",
     [
-        ("datetime", "date"),
+        ("datetime", "ts"),
         ("string", "display_name"),
         ("string", "display_version"),
         ("string", "process_name"),
@@ -55,7 +55,7 @@ class InstallationHistoryPlugin(Plugin):
         date = data.get("date")
 
         yield InstallationHistoryRecord(
-            date=date,
+            ts=date,
             display_name=display_name,
             display_version=display_version,
             process_name=process_name,

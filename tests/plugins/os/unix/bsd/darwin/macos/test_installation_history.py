@@ -36,7 +36,7 @@ def test_aiport_preferences(test_file: str, target_unix: Target, fs_unix: Virtua
         results = list(target_unix.installation_history())
         assert len(results) == 1
 
-        assert results[0].date == datetime(2026, 3, 25, 14, 7, 11, tzinfo=tz)
+        assert results[0].ts == datetime(2026, 3, 25, 14, 7, 11, tzinfo=tz)
         assert results[0].display_name == "macOS 26.4"
         assert results[0].display_version == "26.4"
         assert results[0].process_name == "softwareupdated"

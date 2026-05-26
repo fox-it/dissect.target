@@ -310,6 +310,8 @@ def dynamic_build_record(plugin: Plugin, function_name: str, rdict: dict, source
             record_fields.append(("boolean", k))
         elif isinstance(v, int):
             record_fields.append(("varint", k))
+        elif isinstance(v, list):
+            record_fields.append(("string[]", k))
         else:
             record_fields.append(("string", k))
 
@@ -348,6 +350,7 @@ def select_descriptor(
 
     missing_fields = rdict_keys - set(selected_record.fields.keys())
     if missing_fields:
+        print(rdict)
         plugin.target.log.warning(
             "Source %s contains fields not defined in the selected record descriptor: %s",
             source,
@@ -456,6 +459,20 @@ def emit_dict_records(
 
         if isinstance(v, dict):
             child_dicts[k] = v
+
+        elif isinstance(v, list):
+            cleaned_list = []
+            contains_dict = False
+            for i, item in enumerate(v):
+                if isinstance(item, dict):
+                    contains_dict = True
+                    child_dicts[f"{k}[{i}]"] = item
+                else:
+                    cleaned_list.append(item)
+
+            if cleaned_list or not contains_dict:
+                attributes[k] = cleaned_list
+
         else:
             attributes[k] = v
 

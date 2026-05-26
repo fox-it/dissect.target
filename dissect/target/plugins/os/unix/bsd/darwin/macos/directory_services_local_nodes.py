@@ -49,9 +49,22 @@ class DirectoryServicesLocalNodesPlugin(Plugin):
     def directory_services_local_nodes(
         self,
     ) -> Iterator[DirectoryServicesLocalNodesRecord]:
-        """Yield directory services local nodes information."""
+        """Yield directory services local nodes information.
+
+        Database schema:
+            Tables prefixed with "rec:":
+                Rows contain:
+                    - filename  -> name of the backing plist (links to attribute tables)
+                    - filetime  -> datetime
+
+            Attribute tables (e.g. "name", "realname", "uid", "gid", etc.):
+                Rows contain:
+                    - filename   -> name of the backing plist (links to "rec:" tables)
+                    - recordtype -> e.g. "users", "groups", "computers"
+                    - value      -> content depends on recordtype
+        """
         with SQLite3(self.file) as database:
-            NAME_TABLES = {
+            ATTRIBUTE_TABLES = {
                 "name",
                 "realname",
                 "generateduid",
@@ -72,7 +85,7 @@ class DirectoryServicesLocalNodesPlugin(Plugin):
             for table in database.tables():
                 if table.name.startswith("rec:"):
                     r_rows.extend((table.name, r_row) for r_row in table.rows())
-                elif table.name in NAME_TABLES:
+                elif table.name in ATTRIBUTE_TABLES:
                     n_tables.add(table)
 
             for table in n_tables:

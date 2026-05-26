@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -12,8 +11,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
-
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
 
 
 class SystemPreferencesPlugin(Plugin):

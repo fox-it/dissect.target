@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -13,13 +12,12 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-re_illegal_characters = re.compile(r"[\(\): \.\-#\/\>\<]")
-
 
 class ContentsInfoPlugin(Plugin):
     """macOS contents info plugin."""
 
     PATHS = (
+        "/Applications/*.app/Contents/Info.plist",
         "/Applications/*/*.app/Contents/Info.plist",
         "/Applications/*/*.app/Contents/Resources/*.help/Contents/Info.plist",
         "/System/Library/CoreServices/*.app/Contents/Info.plist",

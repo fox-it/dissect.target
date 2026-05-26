@@ -115,3 +115,7 @@ def test_text_replacements(test_files: list[str], target_unix: Target, fs_unix: 
         assert results[6].z_version == 1
         assert results[6].z_uuid == "555547C2-D9F5-4B51-8BEE-EEE6158CDDED"
         assert results[6].source == "/Users/user/Library/KeyboardServices/TextReplacements.db"
+
+        assert results[7].table == "Z_MODELCACHE"
+        assert isinstance(results[7].z_content, bytes)
+        assert results[7].source == "/Users/user/Library/KeyboardServices/TextReplacements.db"

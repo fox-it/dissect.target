@@ -242,8 +242,20 @@ def test_launch_daemons(
         assert results[0].start_on_mount is None
         assert results[0].soft_resource_limits == []
 
-        assert results[1].hostname == "localhost"
-        assert results[1].domain is None
-        assert results[1].listeners == ["{'SockPathMode': 49663, 'SockPathName': '/private/var/run/cupsd'}"]
-        assert results[1].plist_path == "Sockets"
+        assert results[1].socket_key is None
+        assert results[1].sock_type is None
+        assert results[1].sock_passive is None
+        assert results[1].sock_node_name is None
+        assert results[1].sock_service_name is None
+        assert results[1].sock_family is None
+        assert results[1].sock_protocol is None
+        assert results[1].sock_path_mode == 49663
+        assert results[1].sock_path_name == "/private/var/run/cupsd"
+        assert results[1].secure_socket_with_key is None
+        assert results[1].sock_path_owner is None
+        assert results[1].sock_path_group is None
+        assert results[1].bonjour is None
+        assert results[1].multicast_group is None
+        assert results[1].receive_packet_info is None
+        assert results[1].plist_path == "Sockets/Listeners[0]"
         assert results[1].source == "/System/Library/LaunchDaemons/org.cups.cupsd.plist"

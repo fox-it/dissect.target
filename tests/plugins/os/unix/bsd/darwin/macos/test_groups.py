@@ -19,7 +19,7 @@ if TYPE_CHECKING:
         ["nobody.plist", "_eligibilityd.plist", "_applepay.plist"],
     ],
 )
-def test_groups(test_files: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_groups(test_files: list[str], target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     stat_results = []
     entries = []
     for test_file in test_files:
