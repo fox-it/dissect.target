@@ -16,7 +16,13 @@ if TYPE_CHECKING:
 
 SystemLogRecord = TargetRecordDescriptor(
     "macos/system_log",
-    [("datetime", "ts"), ("string", "host"), ("string", "component"), ("string", "message"), ("path", "source")],
+    [
+        ("datetime", "ts"),
+        ("string", "host"),
+        ("string", "component"),
+        ("string", "message"),
+        ("path", "source"),
+    ],
 )
 
 

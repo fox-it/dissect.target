@@ -23,12 +23,6 @@ AtJobsRecord = TargetRecordDescriptor(
     ],
 )
 
-FIELD_MAPPINGS = {
-    "backgroundAppRefreshLoadCount": "background_app_refresh_load_count",
-    "launchServicesItemsImported": "launch_services_items_imported",
-    "serviceManagementLoginItemsMigrated": "service_management_login_items_migrated",
-}
-
 
 class AtJobsPlugin(Plugin):
     """macOS at jobs plugin."""

@@ -34,7 +34,12 @@ RE_TS = re.compile(
 
 WifiLogRecord = TargetRecordDescriptor(
     "wifi_log",
-    [("datetime", "ts"), ("string", "host"), ("string", "message"), ("path", "source")],
+    [
+        ("datetime", "ts"),
+        ("string", "host"),
+        ("string", "message"),
+        ("path", "source"),
+    ],
 )
 
 

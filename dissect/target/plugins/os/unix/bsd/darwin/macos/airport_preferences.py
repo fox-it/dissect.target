@@ -1,4 +1,3 @@
-@ -1,59 +1,55 @@
 from __future__ import annotations
 
 import plistlib
