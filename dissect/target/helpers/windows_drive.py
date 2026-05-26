@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import ctypes
-from enum import IntEnum
+from enum import IntEnum, Flag, IntFlag
 from typing import TypeVar
 
 T = TypeVar("T", bound=ctypes.Structure)
@@ -20,10 +20,11 @@ def _windows_get_disk_size(path: str) -> int:
 def _windows_get_drive_size(path: str) -> int:
     """Retrieves the length of the specified disk, volume, or partition. Must be used only on a Windows platform.
 
-    Unlike _windows_get_disk_size, also works on volume and partition.
+    Unlike _windows_get_disk_size, also works on volume and partition but require GENERIC_READ
+        on file handle and fail on C:.
 
     Args:
-        path: Drive path, E.g `\\\\.\\PhysicalDrive0`, `\\\\.\\C:`
+        path: Drive path, E.g `\\\\.\\PhysicalDrive0`, `\\\\.\\D:`
     """
     return _windows_disk_get_length_info(path)
 
@@ -41,7 +42,7 @@ def _windows_disk_get_length_info(path: str) -> int:
         _fields_ = (("Length", wintypes.LARGE_INTEGER),)
 
     handle = _windows_createfile(
-        path, desired_access=GenericAccessRight.GENERIC_READ, file_share_mode=FileShareMode.READ
+        path, desired_access=GenericAccessRight.GENERIC_ZERO, file_share_mode=FileShareMode.READ
     )
     try:
         status, res = _windows_ioctl(handle, IOCTL_DISK_GET_LENGTH_INFO, GET_LENGTH_INFORMATION)
@@ -50,7 +51,12 @@ def _windows_disk_get_length_info(path: str) -> int:
 
     if status == 0:
         err = ctypes.windll.kernel32.GetLastError()
-        raise OSError(f"unable to execute IOCTL_DISK_GET_LENGTH_INFO, error: 0x{err:08x}")
+        err_desc = ""
+        if err == "0x00000005":
+            err_desc = ""
+        elif err == "0x00000020":
+            err_desc = " "
+        raise OSError(f"unable to execute IOCTL_DISK_GET_LENGTH_INFO, error: 0x{err:08x}. {err_desc}")
 
     return res.Length
 
@@ -94,7 +100,7 @@ def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
     return res
 
 
-class GenericAccessRight(IntEnum):
+class GenericAccessRight(IntFlag):
     """CreateFileW dwDesiredAccess (some IOCTL required specific access, such as READ instead of ZERO).
 
     References:
@@ -108,7 +114,7 @@ class GenericAccessRight(IntEnum):
     GENERIC_ZERO = 0x00000000
 
 
-class FileShareMode(IntEnum):
+class FileShareMode(IntFlag):
     """CreateFileW file share mode.
 
     References:
