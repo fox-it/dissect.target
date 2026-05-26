@@ -5,6 +5,7 @@ from typing import TypeVar
 
 T = TypeVar("T", bound=ctypes.Structure)
 
+from enum import IntEnum
 
 def _windows_get_disk_size(path: str) -> int:
     """Get disk size from a Drive path. Must be used only on a Windows platform.
@@ -56,7 +57,7 @@ def _windows_disk_get_length_info(path: str) -> int:
             ("Length", wintypes.LARGE_INTEGER),
         )
 
-    handle = _windows_createfile(path)
+    handle = _windows_createfile(path, desired_access=GenericAccessRight.GENERIC_READ)
     try:
         status, res = _windows_ioctl(handle, IOCTL_DISK_GET_LENGTH_INFO, GET_LENGTH_INFORMATION)
     finally:
@@ -64,7 +65,7 @@ def _windows_disk_get_length_info(path: str) -> int:
 
     if status == 0:
         err = ctypes.windll.kernel32.GetLastError()
-        raise OSError(f"unable to execute IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, error: 0x{err:08x}")
+        raise OSError(f"unable to execute IOCTL_DISK_GET_LENGTH_INFO, error: 0x{err:08x}")
 
     return res.Length
 
@@ -108,14 +109,26 @@ def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
     return res
 
 
-def _windows_createfile(path: str) -> int:
+class GenericAccessRight(IntEnum):
+    """
+    References:
+        - https://learn.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
+    """
+    GENERIC_ALL = 0x10000000
+    GENERIC_EXECUTE = 0x20000000
+    GENERIC_WRITE = 0x40000000
+    GENERIC_READ = 0x80000000
+    GENERIC_NONE = 0x00000000
+
+
+def _windows_createfile(path: str, desired_access : GenericAccessRight = GenericAccessRight.GENERIC_NONE) -> int:
     """Open a file using the windows CreateFileW API."""
     OPEN_EXISTING = 3
     FILE_ATTRIBUTE_NORMAL = 0x00000080
 
     handle = ctypes.windll.kernel32.CreateFileW(
         path,
-        0,
+        int(desired_access),
         0,
         0,
         OPEN_EXISTING,
