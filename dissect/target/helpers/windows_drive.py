@@ -53,7 +53,7 @@ def _windows_disk_get_length_info(path: str) -> int:
 
     class GET_LENGTH_INFORMATION(ctypes.Structure):
         _fields_ = (
-            ("Length", wintypes.LARGE_INTEGER)
+            ("Length", wintypes.LARGE_INTEGER),
         )
 
     handle = _windows_createfile(path)
