@@ -43,7 +43,7 @@ def _windows_disk_get_length_info(path: str) -> int:
         _fields_ = (("Length", wintypes.LARGE_INTEGER),)
 
     handle = _windows_createfile(
-        path, desired_access=GenericAccessRight.GENERIC_READ, file_share_mode=FileShareMode.READ
+        path, desired_access=GenericAccessRight.GENERIC_READ, file_share_mode=FileShareMode.NONE
     )
     try:
         status, res = _windows_ioctl(handle, IOCTL_DISK_GET_LENGTH_INFO, GET_LENGTH_INFORMATION)
@@ -150,7 +150,10 @@ def _windows_createfile(
 
     if handle == -1:
         err = ctypes.windll.kernel32.GetLastError()
-        raise OSError(f"unable to open handle to {path} using CreateFileW, error: 0x{err:08x}")
+        err_as_string = ""
+        if err == 0x00000005:
+            err_as_string = "ERROR_ACCESS_DENIED"
+        raise OSError(f"unable to open handle to {path} using CreateFileW, error: 0x{err:08x} {err_as_string}")
 
     return handle
 
