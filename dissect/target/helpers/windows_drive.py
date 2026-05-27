@@ -41,9 +41,10 @@ def _windows_disk_get_length_info(path: str) -> int:
 
     class GET_LENGTH_INFORMATION(ctypes.Structure):
         _fields_ = (("Length", wintypes.LARGE_INTEGER),)
-
+    # File share mode is not the desired access.
+    # 
     handle = _windows_createfile(
-        path, desired_access=GenericAccessRight.GENERIC_READ, file_share_mode=FileShareMode.NONE
+        path, desired_access=GenericAccessRight.GENERIC_READ, file_share_mode=FileShareMode.READ | FileShareMode.DELETE | FileShareMode.WRITE
     )
     try:
         status, res = _windows_ioctl(handle, IOCTL_DISK_GET_LENGTH_INFO, GET_LENGTH_INFORMATION)
