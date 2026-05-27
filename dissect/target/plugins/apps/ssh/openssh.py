@@ -65,9 +65,15 @@ class OpenSSHPlugin(SSHPlugin):
 
     @export(record=AuthorizedKeysRecord)
     def authorized_keys(self) -> Iterator[AuthorizedKeysRecord]:
-        """Yields the content of the authorized_keys files on a target for each user."""
+        """Yields the content of the authorized_keys files on a target for each user.
+
+        Searches for ``$HOME/.ssh/*authorized_keys*``.
+
+        References:
+            - https://man.openbsd.org/sshd#AUTHORIZED_KEYS_FILE_FORMAT
+        """
         for user_details, authorized_keys_file in self.ssh_directory_globs(
-            "authorized_keys*", "administrator_authorized_keys"
+            "*authorized_keys*", "administrator_authorized_keys"
         ):
             for line in authorized_keys_file.open("rt"):
                 line = line.strip()
@@ -77,6 +83,7 @@ class OpenSSHPlugin(SSHPlugin):
                 try:
                     options, keytype, public_key, comment = parse_ssh_key(line)
                 except ValueError:
+                    self.target.log.warning("File %s contains an invalid key %r", authorized_keys_file, line)
                     continue
 
                 public_key_pem = None
@@ -214,12 +221,31 @@ def parse_ssh_public_key_file(path: Path) -> tuple[str | None, str, str]:
     return key_type, public_key, comment
 
 
-def parse_ssh_key(key_string: str) -> tuple[str | None, str, str, str]:
+def parse_ssh_key(key_string: str) -> tuple[list[str], str, str, str]:
+    """Parse a line from an ``authorized_keys`` file or an entire ``.pub`` key file.
+
+    Public keys consist of the following space-separated fields:
+        - ``options``
+        - ``keytype``
+        - base64-encoded ``key``
+        - ``comment``
+
+    The ``options`` (if present) consist of comma-separated option specifications.
+    No spaces are permitted, except within double quotes.
+
+    References:
+        - https://man.openbsd.org/sshd#AUTHORIZED_KEYS_FILE_FORMAT
+    """
     parts = re.findall(r'(?:[^\s,"]|"(?:\\.|[^"])*")+', key_string)
 
-    options = None
-    if not key_string.startswith(("sk-", "ssh-", "ecdsa-")):
-        options = parts.pop(0)
+    # Pop options until we reach the ``keytype`` field.
+    try:
+        options = []
+        while not parts[0].startswith(("sk-", "ssh-", "ecdsa-")):
+            options.append(parts.pop(0))
+    except IndexError:
+        # We exhausted all parts looking for ``keytype``, this key is malformed.
+        raise ValueError("Key does not contain a valid keytype")
 
     keytype, public_key = parts[:2]
 
