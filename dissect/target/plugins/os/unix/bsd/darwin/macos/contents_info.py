@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_paths import find_bundle_files
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
 
 if TYPE_CHECKING:
@@ -16,32 +17,9 @@ if TYPE_CHECKING:
 class ContentsInfoPlugin(Plugin):
     """macOS contents info plugin."""
 
-    PATHS = (
-        "/Applications/*.app/Contents/Info.plist",
-        "/Applications/*/*.app/Contents/Info.plist",
-        "/Applications/*/*.app/Contents/Resources/*.help/Contents/Info.plist",
-        "/System/Library/CoreServices/*.app/Contents/Info.plist",
-        "/System/Library/Extensions/*.kext/Contents/Info.plist",
-        "/System/Library/Extensions/*.kext/Contents/PlugIns/*.kext/Contents/Info.plist",
-        "/System/Library/Extensions/*.kext/Contents/PlugIns/*.kext/Contents/PlugIns/*.plugin/Contents/Info.plist",
-        "/System/Library/Extensions/*.kext/Contents/PlugIns/*.kext/Contents/Resources/*.bundle/Contents/Info.plist",
-        "/System/Library/Extensions/*.kext/Contents/Resources/*.bundle/Contents/Info.plist",
-        "/System/Library/Extensions/*.kext/PlugIns/*.kext/Info.plist",
-        "/System/Library/Filesystems/*/*.kext/Contents/Info.plist",
-        "/System/Library/Filesystems/*/Encodings/*.kext/Contents/Info.plist",
-        "/System/Library/Frameworks/*.framework/Versions/A/Resources/Info.plist",
-        "/System/Library/PrivateFrameworks/*.framework/Versions/A/Resources/*.kext/Contents/Info.plist",
-    )
-
     def __init__(self, target: Target):
         super().__init__(target)
-        self.files = set()
-        self._find_files()
-
-    def _find_files(self) -> None:
-        for pattern in self.PATHS:
-            for path in self.target.fs.glob(pattern):
-                self.files.add(path)
+        self.files = find_bundle_files(self.target, "Info.plist")
 
     def check_compatible(self) -> None:
         if not (self.files):

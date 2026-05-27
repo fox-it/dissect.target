@@ -33,16 +33,14 @@ class SystemLogPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.log_files = set()
-        self._resolve_files()
+        self.log_files = self._resolve_files()
 
     def check_compatible(self) -> None:
         if not self.log_files:
             raise UnsupportedPluginError("No system log files found.")
 
     def _resolve_files(self) -> None:
-        for file in self.target.fs.glob(self.SYSTEM_LOG_GLOB):
-            self.log_files.add(file)
+        return set(self.target.fs.glob(self.SYSTEM_LOG_GLOB))
 
     @export(record=SystemLogRecord)
     def system_log(self) -> Iterator[SystemLogRecord]:

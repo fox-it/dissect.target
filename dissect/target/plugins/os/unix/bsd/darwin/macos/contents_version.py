@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_paths import find_bundle_files
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_plist_records
 
 if TYPE_CHECKING:
@@ -43,32 +44,9 @@ FIELD_MAPPINGS = {
 class ContentsVersionPlugin(Plugin):
     """macOS Contents version.plist file."""
 
-    PATHS = (
-        "/Applications/*.app/Contents/version.plist",
-        "/Applications/*/*.app/Contents/version.plist",
-        "/Applications/*/*.app/Contents/Resources/*.help/Contents/version.plist",
-        "/System/Library/CoreServices/*.app/Contents/version.plist",
-        "/System/Library/Extensions/*.kext/Contents/PlugIns/*.kext/Contents/version.plist",
-        "/System/Library/Extensions/*.kext/Contents/PlugIns/*.kext/Contents/PlugIns/*.plugin/Contents/version.plist",
-        "/System/Library/Extensions/*.kext/Contents/PlugIns/*.kext/Contents/Resources/*.bundle/Contents/version.plist",
-        "/System/Library/Extensions/*.kext/Contents/Resources/*.bundle/Contents/version.plist",
-        "/System/Library/Extensions/*.kext/Contents/version.plist",
-        "/System/Library/Extensions/*.kext/PlugIns/*.kext/version.plist",
-        "/System/Library/Filesystems/*/*.kext/Contents/version.plist",
-        "/System/Library/Filesystems/*/Encodings/*.kext/Contents/version.plist",
-        "/System/Library/Frameworks/*.framework/Versions/A/Resources/version.plist",
-        "/System/Library/PrivateFrameworks/*.framework/Versions/A/Resources/*.kext/Contents/version.plist",
-    )
-
     def __init__(self, target: Target):
         super().__init__(target)
-        self.files = set()
-        self._find_files()
-
-    def _find_files(self) -> None:
-        for pattern in self.PATHS:
-            for path in self.target.fs.glob(pattern):
-                self.files.add(path)
+        self.files = self.files = find_bundle_files(self.target, "version.plist")
 
     def check_compatible(self) -> None:
         if not self.files:
