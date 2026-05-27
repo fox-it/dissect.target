@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
+from dissect.target.helpers.locale.util import normalize_language, normalize_timezone
 
 
 def test_helpers_localeutil_normalize_timezone() -> None:
