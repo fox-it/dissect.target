@@ -36,5 +36,4 @@ class MultiRawLoader(Loader):
 
 def _split_paths(path: Path) -> list[Path]:
     root = path.joinpath("/") if isinstance(path, TargetPath) else path.cwd()
-    print(f"Path : {path} Root path = {str(path).split('+')}")
     return [root.joinpath(subpath) for subpath in str(path).split("+")]
