@@ -6,8 +6,6 @@ from dissect.target import container
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loader import Loader
 
-
-
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -38,5 +36,5 @@ class MultiRawLoader(Loader):
 
 def _split_paths(path: Path) -> list[Path]:
     root = path.joinpath("/") if isinstance(path, TargetPath) else path.cwd()
-    print(f"Path : {path} Root path = {str(path).split('+')}" )
+    print(f"Path : {path} Root path = {str(path).split('+')}")
     return [root.joinpath(subpath) for subpath in str(path).split("+")]
