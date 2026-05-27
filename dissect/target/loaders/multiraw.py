@@ -4,7 +4,11 @@ from typing import TYPE_CHECKING
 
 from dissect.target import container
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
+
+
+log = get_logger(__name__)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -36,5 +40,5 @@ class MultiRawLoader(Loader):
 
 def _split_paths(path: Path) -> list[Path]:
     root = path.joinpath("/") if isinstance(path, TargetPath) else path.cwd()
-
+    log.trace("Root path = %s", root)
     return [root.joinpath(subpath) for subpath in str(path).split("+")]
