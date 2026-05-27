@@ -7,11 +7,7 @@ from typing import TYPE_CHECKING, BinaryIO
 from dissect.util.stream import BufferedStream
 
 from dissect.target.container import Container
-from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.windows_ffi import _windows_get_disk_size, _windows_get_drive_size, run_on_windows
-
-log = get_logger(__name__)
-
 
 if TYPE_CHECKING:
     from pathlib import Path
