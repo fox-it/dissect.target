@@ -50,11 +50,14 @@ class SystemLogPlugin(Plugin):
         for file in self.log_files:
             filepath = self.target.fs.path(file)
 
-            current_buf = ""
+            lines = []
 
             for ts, line in year_rollover_helper(filepath, RE_TS, "%b %d %H:%M:%S", timezone.utc):
-                current_buf = line + "\n\t" + current_buf
+                lines.insert(0, line)
+
                 if ts:
+                    current_buf = "\n\t".join(lines)
+
                     match = RE_TS.match(current_buf)
                     asdf = current_buf[match.end() :].lstrip(" ")
                     hostname, component, message = asdf.split(" ", 2)
@@ -68,4 +71,4 @@ class SystemLogPlugin(Plugin):
                         _target=self.target,
                     )
 
-                    current_buf = ""
+                    lines = []

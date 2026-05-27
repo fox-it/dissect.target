@@ -46,7 +46,30 @@ class AtJobsPlugin(Plugin):
 
     @export(record=AtJobsRecord)
     def at_jobs(self) -> Iterator[AtJobsRecord]:
-        """Yield macOS at jobs."""
+        """Yield macOS `at` jobs.
+
+        The filename of an `at` job follows this structure:
+
+            QSSSSSTTTTTTTT
+
+        Where:
+            Q = queue identifier
+            S = sequence number (hexadecimal)
+            T = execution time (hexadecimal, in minutes)
+
+        The execution time is derived from the hexadecimal value and converted to seconds.
+
+        Within the job file, the line:
+
+            OLDPWD=/usr/lib/cron; export OLDPWD
+
+        typically marks the end of environment setup. Future lines are part of
+        the command to be executed and are extracted as such.
+
+        Yields:
+            AtJobsRecord: Parsed `at` job record containing queue, sequence number,
+            execution time and command.
+        """
         for file in self.at_jobs_files:
             name = Path(file).name
 
@@ -90,6 +113,6 @@ class AtJobsPlugin(Plugin):
                 queue=queue,
                 seq=seq,
                 execution_time=execution_time,
-                source=file,
                 command=command,
+                source=file,
             )

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugins.os.unix.bsd.darwin.macos.persistence.periodic import PeriodicPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos.periodic import PeriodicPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -39,7 +39,7 @@ def test_periodic_scripts(
     entries = []
 
     for name, path in zip(names, paths, strict=True):
-        data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/persistence/periodic/{name}")
+        data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/periodic/{name}")
         fs_unix.map_file(path, data_file)
         entry = fs_unix.get(path)
         stat_result = entry.stat()
@@ -80,7 +80,7 @@ def test_periodic_conf(
     stat_results = []
     entries = []
     for name, path in zip(names, paths, strict=True):
-        data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/persistence/periodic/{name}")
+        data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/periodic/{name}")
         fs_unix.map_file(path, data_file)
         entry = fs_unix.get(path)
         stat_result = entry.stat()

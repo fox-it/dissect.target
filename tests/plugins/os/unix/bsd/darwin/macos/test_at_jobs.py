@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugins.os.unix.bsd.darwin.macos.persistence.at_jobs import AtJobsPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos.at_jobs import AtJobsPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 )
 def test_at_jobs(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     tz = timezone.utc
-    data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/persistence/{test_file}")
+    data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/{test_file}")
     fs_unix.map_file(f"/usr/lib/cron/jobs/{test_file}", data_file)
     entry = fs_unix.get(f"/usr/lib/cron/jobs/{test_file}")
     stat_result = entry.stat()
