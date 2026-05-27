@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import io
 import re
-import sys
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import BufferedStream
 
 from dissect.target.container import Container
 from dissect.target.helpers.logging import get_logger
-from dissect.target.helpers.windows_drive import _windows_get_disk_size, _windows_get_drive_size
+from dissect.target.helpers.windows_ffi import _windows_get_disk_size, _windows_get_drive_size, run_on_windows
 
 log = get_logger(__name__)
 
@@ -31,7 +30,7 @@ def is_logical_drive_path(path: str) -> bool:
 class WindowsDrive(Container):
     r"""Allows to load windows drive, such as `\\.\C:` or `\\.\PhysicalDrive1` directly from Windows.
     This Container is needed as Windows Drive does not support seek end, and must be wrapped inside a bufferedStream.
-    Specific windows api call must be used to retrieves drive length.
+    Specific Windows api call must be used to retrieves drive length.
     """
 
     __type__ = "windows_drive"
@@ -39,7 +38,7 @@ class WindowsDrive(Container):
     def __init__(self, fh: BinaryIO | Path, *args, **kwargs):
         if hasattr(fh, "read"):
             raise TypeError("Windows Drive can only be opened by path")
-        if sys.platform != "win32":
+        if not run_on_windows():
             raise TypeError("Windows Drive is only available on Windows platform.")
         if is_physical_drive_path(path=str(fh)):
             drive_size = _windows_get_disk_size(str(fh))
@@ -58,7 +57,7 @@ class WindowsDrive(Container):
 
     @staticmethod
     def detect_path(path: Path, original: list | BinaryIO) -> bool:
-        if sys.platform != "win32":
+        if not run_on_windows():
             return False
         # return path.drive == "\\\\.\\"
         return is_physical_drive_path(str(path)) or is_logical_drive_path(str(path))

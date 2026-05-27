@@ -14,11 +14,9 @@ from dissect.target import filesystem, volume
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.dir import DirectoryFilesystem
-from dissect.target.helpers.windows_drive import (
-    _windows_closehandle,
-    _windows_createfile,
+from dissect.target.helpers.windows_ffi import (
     _windows_get_disk_size,
-    _windows_ioctl,
+    _windows_get_volume_disk_extents,
 )
 from dissect.target.loader import Loader
 
@@ -384,39 +382,6 @@ def _windows_get_devices() -> list[str]:
 def _is_physical_drive(path: str) -> bool:
     path = path.replace("\\\\.\\", "")
     return path in _windows_get_devices()
-
-
-def _windows_get_volume_disk_extents(path: str) -> ctypes.Structure:
-    from ctypes import wintypes
-
-    ERROR_MORE_DATA = 234
-    IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS = 0x560000
-
-    class DISK_EXTENT(ctypes.Structure):
-        _fields_ = (
-            ("DiskNumber", wintypes.DWORD),
-            ("StartingOffset", wintypes.LARGE_INTEGER),
-            ("ExtentLength", wintypes.LARGE_INTEGER),
-        )
-
-    class VOLUME_DISK_EXTENTS(ctypes.Structure):
-        _fields_ = (
-            ("NumberOfDiskExtents", wintypes.DWORD),
-            ("Extents", DISK_EXTENT * 1),
-        )
-
-    handle = _windows_createfile(path)
-    try:
-        status, res = _windows_ioctl(handle, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, VOLUME_DISK_EXTENTS)
-    finally:
-        _windows_closehandle(handle)
-
-    if status == 0:
-        err = ctypes.windll.kernel32.GetLastError()
-        if err != ERROR_MORE_DATA:
-            raise OSError(f"unable to execute IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, error: 0x{err:08x}")
-
-    return res
 
 
 def _get_os_name() -> str:

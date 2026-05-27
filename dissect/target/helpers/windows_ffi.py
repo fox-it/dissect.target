@@ -1,17 +1,67 @@
+"""Function related to low level Windows API call (using ctypes.win*).
+
+Mainly used for Physical/logical drive information gathering on live windows systems.
+"""
+
 from __future__ import annotations
 
 import ctypes
+import sys
 from enum import IntFlag
 from typing import TypeVar
 
 T = TypeVar("T", bound=ctypes.Structure)
+
+# Some commons err code that we may encounter, to provide more readable error message.
+ERR_CODE_MAP = {
+    0x4: "ERROR_TOO_MANY_OPEN_FILES",
+    0x5: "ERROR_ACCESS_DENIED",
+    0x6: "ERROR_INVALID_HANDLE",
+    0xE: "ERROR_INVALID_DRIVE",
+    0x20: "ERROR_SHARING_VIOLATION",
+}
+
+
+class GenericAccessRight(IntFlag):
+    """CreateFileW dwDesiredAccess (some IOCTL required specific access, such as READ instead of ZERO).
+
+    References:
+        - https://learn.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
+    """
+
+    GENERIC_ALL = 0x10000000
+    GENERIC_EXECUTE = 0x20000000
+    GENERIC_WRITE = 0x40000000
+    GENERIC_READ = 0x80000000
+    GENERIC_ZERO = 0x0
+
+
+class FileShareMode(IntFlag):
+    """CreateFileW file share mode.
+
+    References:
+    - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+    """
+
+    NONE = 0x0
+    READ = 0x1
+    WRITE = 0x2
+    DELETE = 0x4
+
+
+def run_on_windows() -> bool:
+    """Simple wrapper around sys.plateform check.
+
+    Allows to ease mock.
+    """
+    return sys.platform == "win32"
 
 
 def _windows_get_disk_size(path: str) -> int:
     """Get disk size from a Drive path. Must be used only on a Windows platform.
 
     Args:
-        path: Drive path, E.g \\\\.\\PhysicalDrive0
+        path: Drive path, E.g. `\\\\.\\PhysicalDrive0`
     """
     geometry_ex = _windows_get_disk_geometry_ex(path)
     return geometry_ex.DiskSize
@@ -20,8 +70,8 @@ def _windows_get_disk_size(path: str) -> int:
 def _windows_get_drive_size(path: str) -> int:
     """Retrieves the length of the specified disk, volume, or partition. Must be used only on a Windows platform.
 
-    Unlike _windows_get_disk_size, also works on volume and partition but require GENERIC_READ
-        on file handle and fail on C:.
+    Unlike _windows_get_disk_size, also works on volume and partition but require GENERIC_READ permission
+        on file handle.
 
     Args:
         path: Drive path, E.g `\\\\.\\PhysicalDrive0`, `\\\\.\\D:`
@@ -35,7 +85,7 @@ def _windows_disk_get_length_info(path: str) -> int:
     References:
         - https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-ioctl_disk_get_length_info
     """
-    # define IOCTL_DISK_GET_LENGTH_INFO          CTL_CODE(IOCTL_DISK_BASE, 0x0017, METHOD_BUFFERED, FILE_READ_ACCESS)
+    # IOCTL_DISK_GET_LENGTH_INFO = CTL_CODE(IOCTL_DISK_BASE, 0x0017, METHOD_BUFFERED, FILE_READ_ACCESS)
     IOCTL_DISK_GET_LENGTH_INFO = 0x7405C
     from ctypes import wintypes
 
@@ -44,8 +94,11 @@ def _windows_disk_get_length_info(path: str) -> int:
 
     # File share mode is not the desired access, but controls how other processes are
     # allowed to access the file/device while you have it open.
-    # E.g FileShareMode.DELETE  means that file can be open,
+    # E.g. FileShareMode.DELETE means that file can be open,
     # even if another process has a handle open with delete access.
+    # Being permissive allows to prevent ERROR_SHARING_VIOLATION.
+    # ERROR_SHARING_VIOLATION can still occur if an handle is already open without FileShareMode.READ, as we need
+    # GENERIC_READ access.
     handle = _windows_createfile(
         path,
         desired_access=GenericAccessRight.GENERIC_READ,
@@ -58,12 +111,7 @@ def _windows_disk_get_length_info(path: str) -> int:
 
     if status == 0:
         err = ctypes.windll.kernel32.GetLastError()
-        err_desc = ""
-        if err == "0x00000005":
-            err_desc = ""
-        elif err == "0x00000020":
-            err_desc = " "
-        raise OSError(f"unable to execute IOCTL_DISK_GET_LENGTH_INFO, error: 0x{err:08x}. {err_desc}")
+        raise OSError(f"unable to execute IOCTL_DISK_GET_LENGTH_INFO, error: 0x{err:08x}. {ERR_CODE_MAP.get(err, '')}")
 
     return res.Length
 
@@ -103,36 +151,11 @@ def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
 
     if status == 0:
         err = ctypes.windll.kernel32.GetLastError()
-        raise OSError(f"unable to execute IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, error: 0x{err:08x}")
+        raise OSError(
+            f"unable to execute IOCTL_DISK_GET_DRIVE_GEOMETRY_EX, error: 0x{err:08x} {ERR_CODE_MAP.get(err, '')}"
+        )
 
     return res
-
-
-class GenericAccessRight(IntFlag):
-    """CreateFileW dwDesiredAccess (some IOCTL required specific access, such as READ instead of ZERO).
-
-    References:
-        - https://learn.microsoft.com/en-us/windows/win32/secauthz/generic-access-rights
-    """
-
-    GENERIC_ALL = 0x10000000
-    GENERIC_EXECUTE = 0x20000000
-    GENERIC_WRITE = 0x40000000
-    GENERIC_READ = 0x80000000
-    GENERIC_ZERO = 0x00000000
-
-
-class FileShareMode(IntFlag):
-    """CreateFileW file share mode.
-
-    References:
-    - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
-    """
-
-    NONE = 0x00000000
-    READ = 0x00000001
-    WRITE = 0x00000002
-    DELETE = 0x00000004
 
 
 def _windows_createfile(
@@ -156,10 +179,9 @@ def _windows_createfile(
 
     if handle == -1:
         err = ctypes.windll.kernel32.GetLastError()
-        err_as_string = ""
-        if err == 0x00000005:
-            err_as_string = "ERROR_ACCESS_DENIED"
-        raise OSError(f"unable to open handle to {path} using CreateFileW, error: 0x{err:08x} {err_as_string}")
+        raise OSError(
+            f"unable to open handle to {path} using CreateFileW, error: 0x{err:08x} {ERR_CODE_MAP.get(err, '')}"
+        )
 
     return handle
 
@@ -191,3 +213,39 @@ def _windows_ioctl(handle: int, ioctl: int, out_struct: type[T]) -> tuple[int, T
     )
 
     return status, out_inst
+
+
+def _windows_get_volume_disk_extents(path: str) -> ctypes.Structure:
+    from ctypes import wintypes
+
+    ERROR_MORE_DATA = 234
+    IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS = 0x560000
+
+    class DISK_EXTENT(ctypes.Structure):
+        _fields_ = (
+            ("DiskNumber", wintypes.DWORD),
+            ("StartingOffset", wintypes.LARGE_INTEGER),
+            ("ExtentLength", wintypes.LARGE_INTEGER),
+        )
+
+    class VOLUME_DISK_EXTENTS(ctypes.Structure):
+        _fields_ = (
+            ("NumberOfDiskExtents", wintypes.DWORD),
+            ("Extents", DISK_EXTENT * 1),
+        )
+
+    handle = _windows_createfile(path)
+    try:
+        status, res = _windows_ioctl(handle, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, VOLUME_DISK_EXTENTS)
+    finally:
+        _windows_closehandle(handle)
+
+    if status == 0:
+        err = ctypes.windll.kernel32.GetLastError()
+        if err != ERROR_MORE_DATA:
+            raise OSError(
+                f"unable to execute IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, "
+                f"error: 0x{err:08x} {ERR_CODE_MAP.get(err, '')}"
+            )
+
+    return res
