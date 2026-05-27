@@ -23,11 +23,6 @@ def is_logical_drive_path(path: str) -> bool:
     return re.fullmatch(r"\\\\.\\+[a-z]:", path, re.IGNORECASE) is not None
 
 
-def open_fh_on_drive(fh: Path) -> io.BufferedReader:
-    """Open fh in rb mode. Allows to mock in test."""
-    return fh.open("rb")
-
-
 class WindowsDrive(Container):
     r"""Allows to load windows drive, such as `\\.\C:` or `\\.\PhysicalDrive1` directly from Windows.
     This Container is needed as Windows Drive does not support seek end, and must be wrapped inside a bufferedStream.
@@ -45,7 +40,7 @@ class WindowsDrive(Container):
             drive_size = _windows_get_disk_size(str(fh))
         else:
             drive_size = _windows_get_drive_size(str(fh))
-        self._raw_stream = open_fh_on_drive(fh)
+        self._raw_stream = fh.open("rb")
         self.stream = BufferedStream(
             self._raw_stream,
             size=drive_size,
@@ -60,7 +55,6 @@ class WindowsDrive(Container):
     def detect_path(path: Path, original: list | BinaryIO) -> bool:
         if not run_on_windows():
             return False
-        # return path.drive == "\\\\.\\"
         return is_physical_drive_path(str(path)) or is_logical_drive_path(str(path))
 
     def read(self, length: int = -1) -> bytes:

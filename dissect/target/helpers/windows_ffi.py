@@ -124,7 +124,7 @@ def _windows_get_disk_geometry_ex(path: str) -> ctypes.Structure:
     """
     from ctypes import wintypes
 
-    # define IOCTL_DISK_GET_DRIVE_GEOMETRY_EX    CTL_CODE(IOCTL_DISK_BASE, 0x0028, METHOD_BUFFERED, FILE_ANY_ACCESS)
+    # IOCTL_DISK_GET_DRIVE_GEOMETRY_EX = CTL_CODE(IOCTL_DISK_BASE, 0x0028, METHOD_BUFFERED, FILE_ANY_ACCESS)
     IOCTL_DISK_GET_DRIVE_GEOMETRY_EX = 0x700A0
 
     class DISK_GEOMETRY(ctypes.Structure):
