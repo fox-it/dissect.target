@@ -228,6 +228,7 @@ def open(item: list | str | BinaryIO | Path, *args, **kwargs) -> Container:
     try:
         for container in [*CONTAINERS, RawContainer]:
             try:
+                log.trace('Testing %s for path : %s', container, first_path)
                 # Path must be leading for things like SplitContainer, but fall back to fh if we have one
                 if (first_path and container.detect_path(first_path, item)) or (
                     first_fh and container.detect_fh(first_fh, item)
