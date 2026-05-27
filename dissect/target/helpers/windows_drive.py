@@ -41,10 +41,15 @@ def _windows_disk_get_length_info(path: str) -> int:
 
     class GET_LENGTH_INFORMATION(ctypes.Structure):
         _fields_ = (("Length", wintypes.LARGE_INTEGER),)
-    # File share mode is not the desired access.
-    # 
+
+    # File share mode is not the desired access, but controls how other processes are
+    # allowed to access the file/device while you have it open.
+    # E.g FileShareMode.DELETE  means that file can be open,
+    # even if another process has a handle open with delete access.
     handle = _windows_createfile(
-        path, desired_access=GenericAccessRight.GENERIC_READ, file_share_mode=FileShareMode.READ | FileShareMode.DELETE | FileShareMode.WRITE
+        path,
+        desired_access=GenericAccessRight.GENERIC_READ,
+        file_share_mode=FileShareMode.READ | FileShareMode.DELETE | FileShareMode.WRITE,
     )
     try:
         status, res = _windows_ioctl(handle, IOCTL_DISK_GET_LENGTH_INFO, GET_LENGTH_INFORMATION)
