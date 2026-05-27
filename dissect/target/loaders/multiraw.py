@@ -26,7 +26,6 @@ class MultiRawLoader(Loader):
 
     @staticmethod
     def detect(path: Path) -> bool:
-        print(list(_split_paths(path)))
         if not path.exists() and "+" in str(path):
             return all(p.exists() for p in _split_paths(path))
 

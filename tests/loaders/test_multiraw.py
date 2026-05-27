@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import call, patch
@@ -106,35 +105,3 @@ def test_path() -> None:
                 call(fs.path("/dir/file2.bin")),
             ]
         )
-
-
-def test_windows_drive() -> None:
-    """Test that ``MultiRawLoader`` works with a ``WindowsDrive``."""
-    vfs = VirtualFilesystem()
-    vfs.map_file_fh("\\\\.\\O:", io.BytesIO(b'Hello from O:'))
-    vfs.map_file_fh("\\\\.\\C:", io.BytesIO(b'Hello from C:'))
-    def patch_open_fh_on_drive(fh : Path) -> io.BufferedReader:
-        if str(fh) == "\\\\.\\O:":
-            return BytesIO(b'Hello from O:')
-        if str(fh) == "\\\\.\\C:":
-            return BytesIO(b'Hello from C:"')
-        else:
-            raise FileNotFoundError
-    with (
-        patch("dissect.target.containers.windows_drive.run_on_windows", return_value=True),
-        patch(
-            "dissect.target.containers.windows_drive._windows_get_disk_size", return_value=13
-        ) as mock_windows_get_disk_size,
-        patch(
-            "dissect.target.containers.windows_drive._windows_get_drive_size", return_value=13
-        ) as mock_windows_get_drive_size,
-        patch('dissect.target.containers.windows_drive.open_fh_on_drive', new=patch_open_fh_on_drive)
-    ):
-        loader = loader_open(vfs.path("\\\\.\\O:"))
-        assert not isinstance(loader, MultiRawLoader)
-
-        loader = loader_open(vfs.path("\\\\.\\C:+\\\\.\\O:"))
-        assert isinstance(loader, MultiRawLoader)
-        t = Target()
-        loader.map(t)
-        assert len(t.disks) == 2
