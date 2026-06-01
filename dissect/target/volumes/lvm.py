@@ -32,8 +32,14 @@ KNOWN_SKIP_TYPES = (
 class LvmVolumeSystem(LogicalVolumeSystem):
     __type__ = "lvm"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
-        self.lvm = lvm.LVM2(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO],
+        *args,
+        devices: list[lvm.LVM2Device] | None = None,
+        **kwargs,
+    ):
+        self.lvm = lvm.LVM2(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
@@ -56,7 +62,12 @@ class LvmVolumeSystem(LogicalVolumeSystem):
 
         for vg_name, pvs in devices.items():
             try:
-                yield cls(pvs, disk=list(source_disks[vg_name]))
+                source_fhs = [pv.fh for pv in pvs]
+                yield cls(
+                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    devices=pvs,
+                    disk=list(source_disks[vg_name]),
+                )
             except Exception:  # noqa: PERF203
                 continue
 
@@ -71,10 +82,8 @@ class LvmVolumeSystem(LogicalVolumeSystem):
         return b"LABELONE" in buf
 
     @property
-    def backing_objects(self) -> Iterator[Any]:
-        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
-        for dev in vols:
-            yield dev.fh
+    def backing_objects(self) -> list[Any]:
+        return self.fh if isinstance(self.fh, list) else [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         num = 1

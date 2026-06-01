@@ -17,8 +17,14 @@ if TYPE_CHECKING:
 class DdfVolumeSystem(LogicalVolumeSystem):
     __type__ = "ddf"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
-        self.ddf = DDF(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO],
+        *args,
+        devices: list[DDFPhysicalDisk] | None = None,
+        **kwargs,
+    ):
+        self.ddf = DDF(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
@@ -40,7 +46,12 @@ class DdfVolumeSystem(LogicalVolumeSystem):
 
         for guid, devs in sets.items():
             try:
-                yield cls(devs, disk=list(source_disks[guid]))
+                source_fhs = [dev.fh for dev in devs]
+                yield cls(
+                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    devices=devs,
+                    disk=list(source_disks[guid]),
+                )
             except Exception:  # noqa: PERF203
                 continue
 
@@ -55,10 +66,8 @@ class DdfVolumeSystem(LogicalVolumeSystem):
         return int.from_bytes(fh.read(4), "big") == 0xDE11DE11
 
     @property
-    def backing_objects(self) -> Iterator[Any]:
-        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
-        for dev in vols:
-            yield dev.fh
+    def backing_objects(self) -> list[Any]:
+        return self.fh if isinstance(self.fh, list) else [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         # MD only supports one configuration and virtual disk but doing this as a loop

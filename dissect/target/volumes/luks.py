@@ -35,8 +35,8 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
         return luks.is_luks_volume(fh)
 
     @property
-    def backing_objects(self) -> Iterator[Any]:
-        yield self.fh
+    def backing_objects(self) -> list[Any]:
+        return [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):

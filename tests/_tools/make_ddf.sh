@@ -9,13 +9,13 @@
 #
 # Must be run as root (losetup + mdadm), e.g.:
 #
-#     sudo tests/_data/volumes/ddf/make_ddf.sh
+#     sudo tests/_tools/make_ddf.sh
 #
-# The fixtures are written next to this script.
+# By default the fixtures are written to tests/_data/volumes/ddf/.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUT_DIR="${1:-${SCRIPT_DIR}}"
+OUT_DIR="${1:-${SCRIPT_DIR}/../_data/volumes/ddf}"
 DISK_SIZE="${2:-33554432}"  # 32 MiB per disk
 
 WORK="$(mktemp -d)"

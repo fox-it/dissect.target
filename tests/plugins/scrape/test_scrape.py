@@ -58,7 +58,7 @@ class MockFactory:
 
         decrypted.vs = Mock(spec=EncryptedVolumeSystem)
 
-        type(decrypted.vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in [volume]))
+        type(decrypted.vs).backing_objects = PropertyMock(side_effect=lambda: [volume])
         return decrypted
 
     @staticmethod
@@ -73,7 +73,7 @@ class MockFactory:
         lv.disk = [v.disk for v in backing_volumes]  # List of physical disks
         lv.vs = Mock(spec=LogicalVolumeSystem)
 
-        type(lv.vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in backing_volumes))
+        type(lv.vs).backing_objects = PropertyMock(side_effect=lambda: list(backing_volumes))
 
         return lv
 
@@ -466,7 +466,7 @@ def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
 
     # Create a mock LVM volume system and assign to the logical volume
     lvm_vs = Mock(spec=LogicalVolumeSystem)
-    type(lvm_vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in [vol1]))
+    type(lvm_vs).backing_objects = PropertyMock(side_effect=lambda: [vol1])
     lvm_lv.vs = lvm_vs
 
     # Add LVM logical volume to target volumes

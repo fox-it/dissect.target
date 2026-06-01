@@ -17,8 +17,14 @@ if TYPE_CHECKING:
 class MdVolumeSystem(LogicalVolumeSystem):
     __type__ = "md"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO] | None, *args, **kwargs):
-        self.md = MD(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO] | None,
+        *args,
+        devices: list[MDPhysicalDisk] | None = None,
+        **kwargs,
+    ):
+        self.md = MD(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
@@ -39,7 +45,12 @@ class MdVolumeSystem(LogicalVolumeSystem):
 
         for uuid, devs in devices.items():
             try:
-                yield cls(devs, disk=list(source_disks[uuid]))
+                source_fhs = [dev.fh for dev in devs]
+                yield cls(
+                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    devices=devs,
+                    disk=list(source_disks[uuid]),
+                )
             except Exception:  # noqa: PERF203
                 continue
 
@@ -54,10 +65,8 @@ class MdVolumeSystem(LogicalVolumeSystem):
         return offset is not None
 
     @property
-    def backing_objects(self) -> Iterator[Any]:
-        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
-        for vol in vols:
-            yield vol.fh
+    def backing_objects(self) -> list[Any]:
+        return self.fh if isinstance(self.fh, list) else [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         # MD only supports one configuration and virtual disk but doing this as a loop
