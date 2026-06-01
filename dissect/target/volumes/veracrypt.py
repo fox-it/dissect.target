@@ -34,9 +34,9 @@ class VeraCryptVolumeSystem(EncryptedVolumeSystem):
 
     __type__ = "veracrypt"
 
-    def __init__(self, fh: BinaryIO | Volume | list[BinaryIO | Volume], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | Volume, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
-        self.veracrypt = VeraCrypt(fh, is_system=True)
+        self.veracrypt = VeraCrypt(fh.disk if isinstance(fh, Volume) else fh, is_system=True)
 
     @staticmethod
     def _detect(fh: BinaryIO | Volume) -> bool:
