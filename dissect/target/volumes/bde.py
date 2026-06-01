@@ -35,8 +35,8 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
         return bde.is_bde_volume(fh)
 
     @property
-    def backing_objects(self) -> Iterator[Any]:
-        yield self.fh
+    def backing_objects(self) -> list[Any]:
+        return [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):

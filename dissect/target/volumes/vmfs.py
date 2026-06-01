@@ -17,8 +17,14 @@ if TYPE_CHECKING:
 class VmfsVolumeSystem(LogicalVolumeSystem):
     __type__ = "vmfs"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
-        self.lvm = lvm.LVM(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO],
+        *args,
+        devices: list[lvm.Device] | None = None,
+        **kwargs,
+    ):
+        self.lvm = lvm.LVM(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
@@ -41,7 +47,12 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         for lv_id, devices in lvm_volumes.items():
             try:
                 disks = list(source_disks[lv_id])
-                yield cls(devices, disk=disks[0] if len(disks) == 1 else disks)
+                source_fhs = [dev.fh for dev in devices]
+                yield cls(
+                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    devices=devices,
+                    disk=disks[0] if len(disks) == 1 else disks,
+                )
             except Exception:  # noqa: PERF203
                 continue
 
@@ -56,10 +67,8 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         return int.from_bytes(sector[:4], "little") == c_lvm.LVM_MAGIC_NUMBER
 
     @property
-    def backing_objects(self) -> Iterator[Any]:
-        vols = [self.fh] if not isinstance(self.fh, list) else self.fh
-        for vol in vols:
-            yield vol.fh
+    def backing_objects(self) -> list[Any]:
+        return self.fh if isinstance(self.fh, list) else [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         for i, volume in enumerate(self.lvm.volumes):

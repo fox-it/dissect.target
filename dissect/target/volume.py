@@ -121,14 +121,14 @@ class VolumeSystem:
         raise NotImplementedError
 
     @property
-    def backing_objects(self) -> Iterator[Any]:
-        """An iterator of all the raw file-like objects that this volume system is based on.
+    def backing_objects(self) -> list[Any]:
+        """A list of all the raw file-like objects that this volume system is based on.
 
         For example, a volume system that is based on multiple disks should return the file-like objects
         of all those disks here.
 
         Returns:
-            An iterator of all the raw file-like objects that this volume system is based on.
+            A list of all the raw file-like objects that this volume system is based on.
         """
         raise NotImplementedError
 

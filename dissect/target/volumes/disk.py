@@ -27,8 +27,8 @@ class DissectVolumeSystem(VolumeSystem):
             return True
 
     @property
-    def backing_objects(self) -> Iterator[Any]:
-        yield self.fh
+    def backing_objects(self) -> list[Any]:
+        return [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         for v in self._disk.partitions:

@@ -300,33 +300,22 @@ class ScrapePlugin(Plugin):
 
 
 def process_lvm_layer(context: ScrapeContext, volume: Volume) -> bool:
-    """
-    Processes an LVM logical volume in the scraping context.
+    """Processes an LVM logical volume in the scraping context.
 
-    If dependencies (backing physical volumes) are met, removes their regions from the scrape map (unless `all` is set),
-    adds the logical volume as a new region, and updates the volume region map.
+    If dependencies (backing physical volumes) are met, removes their regions from the scrape map (unless ``all`` is
+    set), adds the logical volume as a new region, and updates the volume region map.
 
     Returns True if processed, False otherwise.
     """
     if not (context.lvm and isinstance(volume.vs, LogicalVolumeSystem)):
         return False
 
-    dependencies_met = True
     backing_regions_info = []
+    for backing_vol_obj in volume.vs.backing_objects:
+        if backing_vol_obj not in context.volume_region_map:
+            return False
 
-    try:
-        for backing_vol_obj in volume.vs.backing_objects:
-            if backing_vol_obj not in context.volume_region_map:
-                dependencies_met = False
-                break
-
-            backing_regions_info.append(context.volume_region_map[backing_vol_obj])
-
-    except (AttributeError, TypeError):
-        dependencies_met = False
-
-    if not dependencies_met:
-        return False
+        backing_regions_info.append(context.volume_region_map[backing_vol_obj])
 
     if not context.all:
         for map_key, region_key in backing_regions_info:
@@ -346,8 +335,7 @@ def process_lvm_layer(context: ScrapeContext, volume: Volume) -> bool:
 
 
 def process_encrypted_layer(context: ScrapeContext, volume: Volume) -> bool:
-    """
-    Processes an encrypted volume layer in the scraping context.
+    """Processes an encrypted volume layer in the scraping context.
 
     If dependencies are met, replaces the encrypted region with the decrypted volume region
     in the scrape map and updates the volume region map.
@@ -357,13 +345,8 @@ def process_encrypted_layer(context: ScrapeContext, volume: Volume) -> bool:
     if not (context.encrypted and isinstance(volume.vs, EncryptedVolumeSystem)):
         return False
 
-    backing_vol_obj = None
-    try:
-        backing_vol_obj = next(volume.vs.backing_objects)
-    except (AttributeError, TypeError, StopIteration):
-        return False
-
-    if backing_vol_obj not in context.volume_region_map:
+    backing_vol_obj = None if volume.vs is None else next(iter(volume.vs.backing_objects), None)
+    if backing_vol_obj is None or backing_vol_obj not in context.volume_region_map:
         return False
 
     if not context.all:

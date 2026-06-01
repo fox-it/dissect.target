@@ -58,7 +58,7 @@ class MockFactory:
 
         decrypted.vs = Mock(spec=EncryptedVolumeSystem)
 
-        type(decrypted.vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in [volume]))
+        type(decrypted.vs).backing_objects = PropertyMock(side_effect=lambda: [volume])
         return decrypted
 
     @staticmethod
@@ -73,7 +73,7 @@ class MockFactory:
         lv.disk = [v.disk for v in backing_volumes]  # List of physical disks
         lv.vs = Mock(spec=LogicalVolumeSystem)
 
-        type(lv.vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in backing_volumes))
+        type(lv.vs).backing_objects = PropertyMock(side_effect=lambda: list(backing_volumes))
 
         return lv
 
@@ -281,7 +281,6 @@ def test_create_streams_lvm(target_bare: Target, lvm: bool, all_flag: bool, expe
 
 def test_create_streams_two_raw_disks(target_bare: Target) -> None:
     """Test Scenario: Two separate raw disks (no partition table)."""
-
     target_bare.add_plugin(ScrapePlugin)
 
     disk_a, vol_a = MockFactory.create_raw_disk("disk_a", "vol_a_whole", size=1000)
@@ -356,7 +355,6 @@ def test_find_needles_in_contiguous_regions(target_bare: Target) -> None:
 
 def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
     """Test finding needles in non-contiguous regions."""
-
     # Layout: [---vol1(LVM)---][---volB---][---rest---]
     needle = b"NEEDLE"
     disk_size = 4096 * 4
@@ -403,7 +401,7 @@ def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
 
     # Create a mock LVM volume system and assign to the logical volume
     lvm_vs = Mock(spec=LogicalVolumeSystem)
-    type(lvm_vs).backing_objects = PropertyMock(side_effect=lambda: (x for x in [vol1]))
+    type(lvm_vs).backing_objects = PropertyMock(side_effect=lambda: [vol1])
     lvm_lv.vs = lvm_vs
 
     # Add LVM logical volume to target volumes
