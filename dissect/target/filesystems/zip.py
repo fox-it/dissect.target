@@ -65,18 +65,10 @@ class ZipFilesystem(Filesystem):
         return zf.is_zipfile(fh)
 
     def _resolve_path(self, path: str) -> str:
-        while path:
-            if path[0] == "/":
-                path = path[1:]
-            elif path[:2] == "./":
-                path = path[2:]
-            else:
-                break
-
         if not self.case_sensitive:
             path = path.lower()
 
-        return fsutil.normpath(path, alt_separator=self.alt_separator)
+        return fsutil.normpath(path, alt_separator=self.alt_separator).lstrip("/")
 
     def get(self, path: str) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""
