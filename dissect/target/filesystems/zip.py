@@ -125,19 +125,22 @@ class ZipFilesystemEntry(FilesystemEntry):
             return False
         return fsutil.dirname(path.strip("/"), alt_separator=self.fs.alt_separator) == self.path.strip("/")
 
-    def iterdir(self) -> Iterator[str]:
+    def _iterdir(self) -> Iterator[str]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
         if self.is_symlink():
-            yield from self.readlink_ext().iterdir()
+            yield from self.readlink_ext()._iterdir()
         else:
             yield from filter(self._is_child, self.fs._namemap.keys())
 
+    def iterdir(self) -> Iterator[str]:
+        yield from map(fsutil.basename, self._iterdir())
+
     def scandir(self) -> Iterator[DirEntry]:
-        for name in self.iterdir():
+        for name in self._iterdir():
             entry = self.fs.zip.getinfo(self.fs._namemap.get(name, name))
-            yield ZipDirEntry(self.fs, self.path, name, entry)
+            yield ZipDirEntry(self.fs, self.path, fsutil.basename(name), entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

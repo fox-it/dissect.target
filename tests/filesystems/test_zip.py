@@ -183,6 +183,8 @@ def test_zip(obj: str, base: str | None, request: pytest.FixtureRequest) -> None
     assert len(list(zdir.iterdir())) == 100
     assert len(list(zdir.scandir())) == 100
 
+    assert zdir.listdir() == [str(i) for i in range(100)]
+
     with pytest.raises(IsADirectoryError):
         zdir.open()
 
