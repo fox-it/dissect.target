@@ -43,15 +43,15 @@ def _mkdir(zf: zipfile.ZipFile, name: str) -> None:
         zf.start_dir = zf.fp.tell()
 
 
-def _create_zip(prefix: str = "", insert_dir: bool = True) -> io.BytesIO:
+def _create_zip(prefix: str = "", insert_dir: bool = True, sep: str = "/") -> io.BytesIO:
     buf = io.BytesIO()
     zf = zipfile.ZipFile(buf, "w")
 
     if prefix and insert_dir:
         cur = []
-        for p in (prefix.rstrip("/") if prefix != "/" else prefix).split("/"):
+        for p in (prefix.rstrip(sep) if prefix != sep else prefix).split(sep):
             cur.append(p)
-            if name := "/".join(cur):
+            if name := sep.join(cur):
                 _mkdir(zf, name)
 
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_1", (1980, 0, 0, 0, 0, 0)), "file 1 contents")
@@ -61,24 +61,24 @@ def _create_zip(prefix: str = "", insert_dir: bool = True) -> io.BytesIO:
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_5", (2025, 9, 8, 10, 39, 40)), "file 5 contents")
 
     if insert_dir:
-        _mkdir(zf, f"{prefix}dir/")
+        _mkdir(zf, f"{prefix}dir{sep}")
 
     for i in range(100):
-        zf.writestr(f"{prefix}dir/{i}", f"contents {i}")
+        zf.writestr(f"{prefix}dir{sep}{i}", f"contents {i}")
 
     symlink = zipfile.ZipInfo(f"{prefix}symlink_dir")
     symlink.external_attr = 0o120777 << 16
-    zf.writestr(symlink, "dir/")
+    zf.writestr(symlink, f"dir{sep}")
 
     symlink = zipfile.ZipInfo(f"{prefix}symlink_file")
     symlink.external_attr = 0o120777 << 16
     zf.writestr(symlink, "file_1")
 
     if insert_dir:
-        _mkdir(zf, f"{prefix}LARGE/")
+        _mkdir(zf, f"{prefix}LARGE{sep}")
 
     for i in range(1000):
-        zf.writestr(f"{prefix}LARGE/{i}", f"CAN. YOU. HEAR. ME. {i}")
+        zf.writestr(f"{prefix}LARGE{sep}{i}", f"CAN. YOU. HEAR. ME. {i}")
 
     zf.close()
     buf.seek(0)
