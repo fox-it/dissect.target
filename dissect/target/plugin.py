@@ -68,6 +68,7 @@ class OperatingSystem(StrEnum):
     UNIX = "unix"
     VYOS = "vyos"
     WINDOWS = "windows"
+    XBOX = "xbox"
 
 
 @dataclass(frozen=True, eq=True, slots=True)

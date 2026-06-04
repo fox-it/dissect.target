@@ -15,10 +15,11 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
-    from dissect.target.volumes.disk import DissectVolumeSystem
 
 disk = import_lazy("dissect.target.volumes.disk")
 """A lazy import of :mod:`dissect.target.volumes.disk`."""
+xbox = import_lazy("dissect.target.volumes.xbox")
+"""A lazy import of :mod:`dissect.target.volumes.xbox`."""
 lvm = import_lazy("dissect.target.volumes.lvm")
 """A lazy import of :mod:`dissect.target.volumes.lvm`."""
 vmfs = import_lazy("dissect.target.volumes.vmfs")
@@ -36,6 +37,10 @@ luks = import_lazy("dissect.target.volumes.luks")
 log = get_logger(__name__)
 """A logger instance for this module."""
 
+ALTERNATIVE_VOLUME_MANAGERS: list[type[VolumeSystem]] = [
+    xbox.XboxVolumeSystem,
+]
+"""All available :class:`VolumeSystem` classes that aren't :class:`~dissect.target.volumes.disk.DissectVolumeSystem`."""
 LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [
     lvm.LvmVolumeSystem,
     vmfs.VmfsVolumeSystem,
@@ -43,7 +48,10 @@ LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [
     ddf.DdfVolumeSystem,
 ]
 """All available :class:`LogicalVolumeSystem` classes."""
-ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem, luks.LUKSVolumeSystem]
+ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [
+    bde.BitlockerVolumeSystem,
+    luks.LUKSVolumeSystem,
+]
 """All available :class:`EncryptedVolumeSystem` classes."""
 
 
@@ -320,25 +328,38 @@ class Volume(io.IOBase):
         return True
 
 
-def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
-    """Open a :class:`~dissect.target.volumes.disk.DissectVolumeSystem` on the given file-like object.
+def open(fh: BinaryIO, *args, **kwargs) -> VolumeSystem:
+    """Open a supported :class:`~dissect.target.volume.VolumeSystem` on the given file-like object.
 
     Args:
-        fh: The file-like object to open a :class:`~dissect.target.volumes.disk.DissectVolumeSystem` on.
+        fh: The file-like object to open a :class:`~dissect.target.volume.VolumeSystem` on.
 
     Raises:
-        VolumeSystemError: If opening the :class:`~dissect.target.volumes.disk.DissectVolumeSystem` failed.
+        VolumeSystemError: If opening the :class:`~dissect.target.volume.VolumeSystem` failed.
 
     Returns:
-        An opened :class:`~dissect.target.volumes.disk.DissectVolumeSystem`.
+        An opened :class:`~dissect.target.volume.VolumeSystem`.
     """
     offset = fh.tell()
-    fh.seek(0)
-
     try:
+        fh.seek(0)
         return disk.DissectVolumeSystem(fh)
     except Exception as e:
-        raise VolumeSystemError(f"Failed to load volume system for {fh}") from e
+        for cls in ALTERNATIVE_VOLUME_MANAGERS:
+            try:
+                if cls.detect(fh):
+                    return cls(fh)
+            except ImportError as e:  # noqa: PERF203
+                log.info("Failed to import %s", cls)
+                log.debug("", exc_info=e)
+            except Exception as e:
+                log.error(  # noqa: TRY400
+                    "Failed to open %s volume manager for %s: %s", cls.__type__, fh, e
+                )
+                log.debug("", exc_info=e)
+        else:
+            # Otherwise raise the original exception
+            raise VolumeSystemError(f"Failed to load volume system for {fh}") from e
     finally:
         fh.seek(offset)
 
@@ -349,12 +370,12 @@ def is_lvm_volume(volume: BinaryIO) -> bool:
     Args:
         volume: A file-like object to test if it is part of any logical volume system.
     """
-    for logical_vs in LOGICAL_VOLUME_MANAGERS:
+    for cls in LOGICAL_VOLUME_MANAGERS:
         try:
-            if logical_vs.detect_volume(volume):
+            if cls.detect_volume(volume):
                 return True
         except ImportError as e:  # noqa: PERF203
-            log.info("Failed to import %s", logical_vs)
+            log.info("Failed to import %s", cls)
             log.debug("", exc_info=e)
         except Exception as e:
             raise VolumeSystemError(f"Failed to detect logical volume for {volume}") from e
@@ -368,12 +389,12 @@ def is_encrypted(volume: BinaryIO) -> bool:
     Args:
         volume: A file-like object to test if it is part of any encrypted volume system.
     """
-    for manager in ENCRYPTED_VOLUME_MANAGERS:
+    for cls in ENCRYPTED_VOLUME_MANAGERS:
         try:
-            if manager.detect(volume):
+            if cls.detect(volume):
                 return True
         except ImportError as e:  # noqa: PERF203
-            log.info("Failed to import %s", manager)
+            log.info("Failed to import %s", cls)
             log.debug("", exc_info=e)
         except Exception as e:
             raise VolumeSystemError(f"Failed to detect encrypted volume for {volume}") from e
@@ -394,17 +415,17 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
     Returns:
         An iterator of decrypted :class:`Volume` objects as opened by the encrypted volume manager.
     """
-    for manager_cls in ENCRYPTED_VOLUME_MANAGERS:
+    for cls in ENCRYPTED_VOLUME_MANAGERS:
         try:
-            if manager_cls.detect(volume):
-                volume_manager = manager_cls(volume)
+            if cls.detect(volume):
+                volume_manager = cls(volume)
                 yield from volume_manager.volumes
         except ImportError as e:  # noqa: PERF203
-            log.info("Failed to import %s", manager_cls)
+            log.info("Failed to import %s", cls)
             log.debug("", exc_info=e)
         except Exception as e:
             log.error(  # noqa: TRY400
-                "Failed to open an encrypted volume %s with volume manager %s: %s", volume, manager_cls.__type__, e
+                "Failed to open an encrypted volume %s with volume manager %s: %s", volume, cls.__type__, e
             )
             log.debug("", exc_info=e)
     return None
@@ -419,11 +440,11 @@ def open_lvm(volumes: list[BinaryIO], *args, **kwargs) -> Iterator[VolumeSystem]
     Returns:
         An iterator of all the :class:`Volume` objects opened by the logical volume system.
     """
-    for logical_vs in LOGICAL_VOLUME_MANAGERS:
+    for cls in LOGICAL_VOLUME_MANAGERS:
         try:
-            yield from logical_vs.open_all(volumes)
+            yield from cls.open_all(volumes)
         except ImportError as e:  # noqa: PERF203
-            log.info("Failed to import %s", logical_vs)
+            log.info("Failed to import %s", cls)
             log.debug("", exc_info=e)
         except Exception as e:
-            raise VolumeSystemError(f"Failed to load logical volume system for {volumes}") from e
+            raise VolumeSystemError(f"Failed to open a logical volume system for {volumes}") from e
