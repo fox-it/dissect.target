@@ -55,7 +55,7 @@ FIELD_MAPPINGS = {
 class ResourcesInfoStringsPlugin(Plugin):
     """macOS Resources InfoPlist.strings plugin.
 
-    Parser localized bundle metadata for the Info.plist file.
+    Parses localized bundle metadata for the Info.plist file.
 
     References:
         - https://developer.apple.com/library/archive/documentation/CoreFoundation/Conceptual/CFBundles/BundleTypes/BundleTypes.html
