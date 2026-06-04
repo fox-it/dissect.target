@@ -55,19 +55,46 @@ EXTENSIONS = {
 
 
 def find_bundle_files(target: Target, end_path: str) -> set:
+    """Search for files matching a given end path within known macOS bundle locations.
+
+    Iterates over predefined base system paths and collects all matching files
+    found by recursively exploring bundle structures.
+
+    Args:
+        target (Target): Object providing filesystem access.
+        end_path (str): Relative path to search for within bundles.
+
+    Returns:
+        set: A set of matching file paths.
+    """
     results = set()
 
     for base in START_PATHS:
-        results.update(find_end_paths(target, end_path, base))
+        results.update(find_end_paths(target, end_path, target.fs.path(base)))
 
     return results
 
 
-def find_end_paths(target: Target, end_path: str, base_path: str) -> set:
-    found = set()
+def find_end_paths(target: Target, end_path: str, base_path: Path) -> set:
+    """Recursively search for files within macOS bundle directories that match a given end path.
 
-    if isinstance(base_path, str):
-        base_path = target.fs.path(base_path)
+    Looks for known bundle types (e.g., .app, .framework, .kext) based on the
+    EXTENSIONS mapping, which defines the internal subdirectories that should be traversed
+    for each bundle extension. Explores the relevant subpaths for every discovered bundle,
+    and checks whether the specified relative file path (end path) exists.
+
+    Continues recursively into each valid subpath, in order to handle
+    nested bundle structures.
+
+    Args:
+        target (Target): Object providing filesystem access.
+        end_path (str): Relative path to locate inside bundle directories.
+        base_path (Path): Base directory from which the search begins.
+
+    Returns:
+        set: A set of matching file paths found within bundle hierarchies.
+    """
+    found = set()
 
     for ext, subpaths in EXTENSIONS.items():
         for bundle_str in target.fs.glob(f"{base_path}/{ext}"):

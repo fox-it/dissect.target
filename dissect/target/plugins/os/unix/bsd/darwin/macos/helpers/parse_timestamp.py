@@ -8,6 +8,17 @@ if TYPE_CHECKING:
 
 
 def parse_timestamp(timestamp: re.Match) -> datetime:
+    """Parse a timestamp match into a datetime object.
+
+    Attempts to parse the matched string as an ISO 8601 datetime. If that fails,
+    falls back to parsing a syslog-style timestamp ("%b %d %H:%M:%S") and assigns UTC timezone.
+
+    Args:
+        timestamp (re.Match): A regex match object containing the timestamp string.
+
+    Returns:
+        datetime: The parsed datetime object.
+    """
     ts = None
     value = timestamp.group()
     try:
