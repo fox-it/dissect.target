@@ -31,7 +31,17 @@ RE_TIMESTAMP_PATTERN = re.compile(
 
 
 class FsckAPFSLogPlugin(Plugin):
-    """Return information related to fsck_apfs log entries on macOS."""
+    """Plugin to parse File System Consistency Check (FSCK) logs on macOS.
+
+    The fsck_apfs.log file is a macOS log file associated with
+    filesystem checking activity. The fsck utility is used to check and
+    optionally repair filesystems.
+
+    References:
+        - https://linux.die.net/man/8/fsck
+        - https://www.cyberengage.org/post/macos-incident-response-tactics-log-analysis-and-forensic-tools
+        - https://www.hackthelogs.com/MacLogs.html
+    """
 
     FSCK_APFS_LOG_PATH = "/var/log/fsck_apfs.log"
 
@@ -41,7 +51,19 @@ class FsckAPFSLogPlugin(Plugin):
 
     @export(record=FsckAPFSLogRecord)
     def fsck_apfs_log(self) -> Iterator[FsckAPFSLogRecord]:
-        """Return all fsck_apfs log messages."""
+        """Return all macOS fsck_apfs log messages.
+
+        Yields FsckAPFSLogRecord with the following fields:
+
+        .. code-block:: text
+
+            ts (datetime): Timestamp (UTC), if present in the log line.
+            disk_path (string): Disk or APFS volume identifier from the log line.
+            message (string): Log message content.
+            source (path): Path to the fsck_apfs.log file.
+
+        Lines without a recognizable timestamp will have ts set to None.
+        """
         with self.target.fs.path(self.FSCK_APFS_LOG_PATH).open(mode="rt") as fh:
             for line in fh:
                 if line != "\n":

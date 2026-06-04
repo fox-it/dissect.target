@@ -27,7 +27,14 @@ SystemLogRecord = TargetRecordDescriptor(
 
 
 class SystemLogPlugin(Plugin):
-    """Return system logs on macOS."""
+    """Plugin to parse system logs on macOS.
+
+    Contains information on system diagnostics and general messages.
+
+    References:
+        - https://www.cyberengage.org/post/macos-incident-response-tactics-log-analysis-and-forensic-tools
+        - https://www.hackthelogs.com/MacLogs.html
+    """
 
     SYSTEM_LOG_GLOB = "/var/log/system.log*"
 
@@ -39,12 +46,23 @@ class SystemLogPlugin(Plugin):
         if not self.log_files:
             raise UnsupportedPluginError("No system log files found.")
 
-    def _resolve_files(self) -> None:
+    def _resolve_files(self) -> set:
         return set(self.target.fs.glob(self.SYSTEM_LOG_GLOB))
 
     @export(record=SystemLogRecord)
     def system_log(self) -> Iterator[SystemLogRecord]:
-        """Return all macOS system log messages."""
+        """Return all macOS system log messages.
+
+        Yields SystemLogRecord with the following fields:
+
+        .. code-block:: text
+
+            ts (datetime): Timestamp (UTC) derived from the log line.
+            host (string): Hostname parsed from the log entry.
+            component (string): Component or process associated with the log entry.
+            message (string): Log message content.
+            source (path): Path to the system log file.
+        """
         for file in self.log_files:
             filepath = self.target.fs.path(file)
 

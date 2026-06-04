@@ -36,11 +36,8 @@ def test_gkopaque(test_file: str, target_unix: Target, fs_unix: VirtualFilesyste
         assert len(results) == 74247
 
         assert results[0].table == "whitelist"
-        assert (
-            results[0].current
-            == "\x00\x03'\udcec\udce1\udcfbZ'\udcb5\udcf5\udcc5\x1a\x00\udc99\x00\udcb1\udce4\udc85K\udcb7"
-        )
-        assert results[0].opaque == "\udccb\udce5k\udc97\udc84\udc97N\n\x1c\x01Y\udcc4\x1f9+wB\x1bM#"
+        assert results[0].current == b"\x00\x03'\xec\xe1\xfbZ'\xb5\xf5\xc5\x1a\x00\x99\x00\xb1\xe4\x85K\xb7"
+        assert results[0].opaque == b"\xcb\xe5k\x97\x84\x97N\n\x1c\x01Y\xc4\x1f9+wB\x1bM#"
         assert results[0].source == "/var/db/gkopaque.bundle/Contents/Resources/gkopaque.db"
 
         assert results[-1].table == "conditions"

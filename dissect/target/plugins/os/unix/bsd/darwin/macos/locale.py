@@ -15,7 +15,10 @@ if TYPE_CHECKING:
 
 
 class LocalePlugin(LocalePlugin):
-    """macOS locale plugin."""
+    """macOS locale plugin.
+
+    This plugin retrieves locale information from the system.
+    """
 
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"
 
@@ -26,24 +29,41 @@ class LocalePlugin(LocalePlugin):
         if not self.target.os == "macos":
             raise UnsupportedPluginError("Unsupported Plugin")
 
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
     @export(property=True)
     def timezone(self) -> str | None:
-        """Get the configured timezone of the system in IANA TZ standard format."""
+        """Return the configured timezone of the system.
+
+        .. code-block::
+
+                ["Europe", "Amsterdam"] -> Europe/Amsterdam
+                ["UTC"]                 -> UTC
+        """
         preferences = plistlib.load(self.target.fs.path(self.GLOBAL).open())
-        tz_data = preferences["com.apple.TimeZonePref.Last_Selected_City"]
-        tz = None
+        tz_data = preferences.get("com.apple.TimeZonePref.Last_Selected_City")
+
+        tz_candidate = "/".join(tz_data)
+        result = self.check_timezone(tz_candidate)
+        if result:
+            return result
 
         for entry in tz_data:
-            try:
-                tz = ZoneInfo(entry).key
-            except ZoneInfoNotFoundError:  # noqa: PERF203
-                continue
+            result = self.check_timezone(entry)
+            if result:
+                return result
 
-        return tz
+        return None
+
+    def check_timezone(self, entry: str) -> str | None:
+        try:
+            return ZoneInfo(entry).key
+        except (ZoneInfoNotFoundError, PermissionError):
+            return None
 
     @export(property=True)
     def language(self) -> str | None:
-        """Get a list of installed languages on the system."""
+        """Return a list of installed languages on the system."""
         preferences = plistlib.load(self.target.fs.path(self.GLOBAL).open())
         languages = preferences["AppleLanguages"]
         clean_languages = []
@@ -56,13 +76,13 @@ class LocalePlugin(LocalePlugin):
 
     @export(property=True)
     def install_date(self) -> str | None:
-        """Get the installation date of the system."""
+        """Return the installation date of the system."""
         mtime = self.target.fs.path("/private/var/db/.AppleSetupDone").lstat().st_mtime
         return datetime.fromtimestamp(mtime, timezone.utc)
 
     @export(property=True)
     def location_services_active(self) -> bool | None:
-        """Get the status of location services."""
+        """Return whether location services are active."""
         path = self.target.fs.path("/Library/Preferences/com.apple.timezone.auto.plist")
 
         if not path.exists():

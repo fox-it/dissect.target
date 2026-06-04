@@ -15,7 +15,11 @@ if TYPE_CHECKING:
 
 
 class ContentsInfoPlugin(Plugin):
-    """macOS contents info plugin."""
+    """macOS contents info plugin.
+
+    The information property list file is a structured file that contains configuration information
+    for an application.
+    """
 
     def __init__(self, target: Target):
         super().__init__(target)

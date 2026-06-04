@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -25,30 +24,49 @@ AtJobsRecord = TargetRecordDescriptor(
 
 
 class AtJobsPlugin(Plugin):
-    """macOS at jobs plugin."""
+    """macOS at jobs plugin.
+
+    The at utility schedules commands to be executed at a later time.
+
+    References:
+        - https://man.freebsd.org/cgi/man.cgi?query=at&sektion=1&format=html
+        - github.com/freebsd/freebsd-src/blob/main/usr.bin/at/at.c
+    """
 
     PATHS = ("/usr/lib/cron/jobs/*",)
 
     def __init__(self, target: Target):
         super().__init__(target)
-
-        self.at_jobs_files = set()
-        self._find_files()
+        self.at_jobs_files = self._find_files()
 
     def check_compatible(self) -> None:
         if not (self.at_jobs_files):
             raise UnsupportedPluginError("No At Jobs files found")
 
-    def _find_files(self) -> None:
+    def _find_files(self) -> set:
+        files = set()
+
         for pattern in self.PATHS:
             for path in self.target.fs.glob(pattern):
-                self.at_jobs_files.add(path)
+                files.add(self.target.fs.path(path))
+
+        return files
 
     @export(record=AtJobsRecord)
     def at_jobs(self) -> Iterator[AtJobsRecord]:
-        """Yield macOS `at` jobs.
+        """Return macOS `at` job records.
 
-        The filename of an `at` job follows this structure:
+        Yields AtJobsRecord with the following fields:
+
+        .. code-block:: text
+
+            queue (string): Queue identifier derived from the job filename.
+            seq (varint): Sequence number derived from the job filename.
+            execution_time (datetime): Execution time derived from the job filename.
+            command (string): Command contents extracted from the job file.
+            source (path): Path to the `at` job file.
+
+        The job filename typically follows the structure:
 
             QSSSSSTTTTTTTT
 
@@ -57,21 +75,11 @@ class AtJobsPlugin(Plugin):
             S = sequence number (hexadecimal)
             T = execution time (hexadecimal, in minutes)
 
-        The execution time is derived from the hexadecimal value and converted to seconds.
-
-        Within the job file, the line:
-
-            OLDPWD=/usr/lib/cron; export OLDPWD
-
-        typically marks the end of environment setup. Future lines are part of
-        the command to be executed and are extracted as such.
-
-        Yields:
-            AtJobsRecord: Parsed `at` job record containing queue, sequence number,
-            execution time and command.
+        Lines following the environment setup (typically after 'export OLDPWD') are treated
+        as the command content.
         """
         for file in self.at_jobs_files:
-            name = Path(file).name
+            name = file.name
 
             if name in (".SEQ", ".lockfile"):
                 continue
@@ -92,7 +100,7 @@ class AtJobsPlugin(Plugin):
 
             command_line = False
             command = ""
-            with self.target.fs.path(file).open("r") as f:
+            with file.open("r") as f:
                 for line in f:
                     if command_line:
                         command += line

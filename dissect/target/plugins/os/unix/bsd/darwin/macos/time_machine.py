@@ -22,19 +22,16 @@ TimeMachineRecord = TargetRecordDescriptor(
 
 
 class TimeMachinePlugin(Plugin):
-    """macOS time machine plugin."""
+    """macOS Time Machine plugin.
+
+    Parses Time Machine preferences. Time Machine is macOS's backup system.
+    """
 
     PATH = "/Library/Preferences/com.apple.TimeMachine.plist"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.file = None
-        self._resolve_file()
-
-    def _resolve_file(self) -> None:
-        path = self.target.fs.path(self.PATH)
-        if path.exists():
-            self.file = path
+        self.file = self.target.fs.path(self.PATH) if self.target.fs.path(self.PATH).exists() else None
 
     def check_compatible(self) -> None:
         if not self.file:
@@ -42,7 +39,15 @@ class TimeMachinePlugin(Plugin):
 
     @export(record=TimeMachineRecord)
     def time_machine(self) -> Iterator[TimeMachineRecord]:
-        """Yield time machine information."""
+        """Return macOS Time Machine preferences.
+
+        Yields TimeMachineRecord with the following fields:
+
+        .. code-block:: text
+
+            preferences_version (varint): Version of the Time Machine preferences.
+            source (path): Path to the com.apple.TimeMachine.plist file.
+        """
         plist = plistlib.load(self.file.open())
 
         yield TimeMachineRecord(
@@ -50,3 +55,7 @@ class TimeMachinePlugin(Plugin):
             source=self.file,
             _target=self.target,
         )
+
+
+# I was only able to find a preferences_version field in the plist file on a fresh Tahoe system.
+# It could be that more fields will show up in the plist file depending on user activity.

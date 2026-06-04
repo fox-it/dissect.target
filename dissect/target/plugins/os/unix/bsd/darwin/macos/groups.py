@@ -15,73 +15,69 @@ if TYPE_CHECKING:
 GroupInfoRecord = TargetRecordDescriptor(
     "macos/groups",
     [
-        ("string", "generateduid"),
-        ("string", "members"),
-        ("string", "smb_sid"),
-        ("varint", "gid"),
-        ("string", "name"),
-        ("string", "realname"),
+        ("string[]", "generateduid"),
+        ("string[]", "members"),
+        ("string[]", "smb_sid"),
+        ("varint[]", "gid"),
+        ("string[]", "name"),
+        ("string[]", "realname"),
         ("path", "source"),
     ],
 )
 
 
 class GroupPlugin(Plugin):
-    """macOS group plugin."""
+    """macOS group plugin.
+
+    Parses ``/var/db/dslocal/nodes/Default/groups/*.plist`` files, which contain config data for groups.
+
+    References:
+        - https://xmcyber.com/blog/introducing-machound-a-solution-to-macos-active-directory-based-attacks/
+    """
 
     GROUP_PATH_GLOB = "/var/db/dslocal/nodes/Default/groups/*.plist"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.group_files = set()
-        self._resolve_files()
+        self.group_files = self._resolve_files()
 
     def check_compatible(self) -> None:
         if not self.group_files:
             raise UnsupportedPluginError("No group files found")
 
-    def _resolve_files(self) -> None:
+    def _resolve_files(self) -> set():
+        files = set()
         for file in self.target.fs.glob(self.GROUP_PATH_GLOB):
-            self.group_files.add(file)
+            files.add(file)
+        return files
 
     @export(record=GroupInfoRecord)
     def groups(self) -> Iterator[GroupInfoRecord]:
-        """Yield user account policy information."""
+        """Return group information.
+
+        Yields GroupInfoRecords with the following fields:
+
+        .. code-block:: text
+
+            generateduid (string[]): Generated unique identifier(s) for the group.
+            members (string[]): List of user accounts that are members of the group.
+            smb_sid (string[]): SMB security identifier(s) associated with the group.
+            gid (varint[]): Group ID(s) assigned to the group.
+            name (string[]): Name(s) of the group.
+            realname (string[]): Realname(s) of the group.
+            source (path): Path to the group plist file.
+        """
         for file in self.group_files:
             file = self.target.fs.path(file)
             group_data = plistlib.load(file.open())
 
-            if uuid := group_data.get("generateduid"):  # noqa: SIM102
-                if len(uuid) == 1:
-                    uuid = uuid[0]
-
-            if smb_sid := group_data.get("smb_sid"):  # noqa: SIM102
-                if len(smb_sid):
-                    smb_sid = smb_sid[0]
-
-            if gid := group_data.get("gid"):  # noqa: SIM102
-                if len(gid) == 1:
-                    gid = gid[0]
-
-            if members := group_data.get("users"):  # noqa: SIM102
-                if len(members) == 1:
-                    members = members[0]
-
-            if realname := group_data.get("realname"):  # noqa: SIM102
-                if len(realname) == 1:
-                    realname = realname[0]
-
-            if name := group_data.get("name"):  # noqa: SIM102
-                if len(name) == 1:
-                    name = name[0]
-
             yield GroupInfoRecord(
-                generateduid=uuid,
-                members=members,
-                smb_sid=smb_sid,
-                gid=gid,
-                name=name,
-                realname=realname,
+                generateduid=group_data.get("generateduid"),
+                members=group_data.get("users"),
+                smb_sid=group_data.get("smb_sid"),
+                gid=group_data.get("gid"),
+                name=group_data.get("name"),
+                realname=group_data.get("realname"),
                 source=file,
                 _target=self.target,
             )

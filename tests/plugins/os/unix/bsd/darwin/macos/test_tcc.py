@@ -76,26 +76,31 @@ def test_tcc(
         assert results[0].value == "32"
         assert results[0].source == "/Library/Application Support/com.apple.TCC/TCC.db"
 
-        assert results[-2].table == "access"
-        assert results[-2].service == "kTCCServiceLiverpool"
-        assert results[-2].client == "com.apple.homeenergyd"
-        assert results[-2].client_type == 0
-        assert results[-2].auth_value == 2
-        assert results[-2].auth_reason == 4
-        assert results[-2].auth_version == 1
-        assert results[-2].csreq is None
-        assert results[-2].policy_id is None
-        assert results[-2].indirect_object_identifier_type == "0"
-        assert results[-2].indirect_object_identifier == "UNUSED"
-        assert results[-2].indirect_object_code_identity is None
-        assert results[-2].indirect_object_identifier_type == "0"
-        assert results[-2].flags == 0
-        assert results[-2].last_modified == datetime(2026, 3, 25, 14, 25, 29, tzinfo=tz)
-        assert results[-2].pid is None
-        assert results[-2].pid_version is None
-        assert results[-2].boot_uuid == "UNUSED"
-        assert results[-2].last_reminded == datetime(2026, 3, 25, 14, 25, 29, tzinfo=tz)
-        assert results[-2].source == "/Users/user/Library/Application Support/com.apple.TCC/TCC.db"
+        assert results[1].table == "access"
+        assert results[1].service == "kTCCServiceSystemPolicyAllFiles"
+        assert (
+            results[1].client
+            == "/System/Library/PrivateFrameworks/VoiceShortcuts.framework/Versions/A/Support/siriactionsd"
+        )
+        assert results[1].client_type == 1
+        assert results[1].auth_value == 0
+        assert results[1].auth_reason == 5
+        assert results[1].auth_version == 1
+        assert (
+            results[1].csreq
+            == b"\xfa\xde\x0c\x00\x00\x00\x004\x00\x00\x00\x01\x00\x00\x00\x06\x00\x00\x00\x02\x00\x00\x00\x16com.apple.siriactionsd\x00\x00\x00\x00\x00\x03"  # noqa E501
+        )
+        assert results[1].policy_id is None
+        assert results[1].indirect_object_identifier == "UNUSED"
+        assert results[1].indirect_object_identifier_type is None
+        assert results[1].indirect_object_code_identity is None
+        assert results[1].flags == 0
+        assert results[1].last_modified == datetime(2026, 3, 25, 14, 13, 27, tzinfo=tz)
+        assert results[1].pid is None
+        assert results[1].pid_version is None
+        assert results[1].boot_uuid == "UNUSED"
+        assert results[1].last_reminded == datetime(1970, 1, 1, 0, 0, 0, tzinfo=tz)
+        assert results[1].source == "/Library/Application Support/com.apple.TCC/TCC.db"
 
         assert results[-1].table == "integrity_flag"
         assert results[-1].key == "integrity_flag"

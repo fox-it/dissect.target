@@ -35,19 +35,17 @@ SoftwareUpdatePreferencesRecord = TargetRecordDescriptor(
 
 
 class SoftwareUpdatePreferencesPlugin(Plugin):
-    """macOS software update preferences plugin."""
+    """macOS software update preferences plugin.
+
+    References:
+        - https://eclecticlight.co/2022/11/14/how-does-ventura-update-faster-inside-the-macos-update-process/
+    """
 
     PATH = "/Library/Preferences/com.apple.SoftwareUpdate.plist"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.file = None
-        self._resolve_file()
-
-    def _resolve_file(self) -> None:
-        path = self.target.fs.path(self.PATH)
-        if path.exists():
-            self.file = path
+        self.file = self.target.fs.path(self.PATH) if self.target.fs.path(self.PATH).exists() else None
 
     def check_compatible(self) -> None:
         if not self.file:
@@ -55,7 +53,28 @@ class SoftwareUpdatePreferencesPlugin(Plugin):
 
     @export(record=SoftwareUpdatePreferencesRecord)
     def software_update_preferences(self) -> Iterator[SoftwareUpdatePreferencesRecord]:
-        """Yield software update preference information."""
+        """Return software update preference information.
+
+        Yields SoftwareUpdatePreferencesRecords with the following fields:
+
+        .. code-block:: text
+
+            last_result_code (varint): Result code of the last update attempt.
+            last_attempt_system_version (string): macOS version targeted in the last update attempt.
+            last_attempt_build_version (string): Build version targeted in the last update attempt.
+            automatic_download (boolean): Whether automatic download of updates is enabled.
+            automatically_install_macos_updates (boolean): Whether macOS updates are installed automatically.
+            critical_update_install (boolean): Whether critical updates are installed automatically.
+            config_data_install (boolean): Whether configuration data updates are installed automatically.
+            recommended_updates (string[]): List of recommended updates.
+            splat_enabled (boolean): Whether the cryptex-based update subsystem (SPLAT) is enabled.
+            post_logout_notification (boolean): Whether to notify user after logout following update.
+            last_recommended_major_os_bundle_id (string): Bundle identifier of last recommended major OS upgrade.
+            primary_languages (string[]): Preferred system languages.
+            last_successful_date (datetime): Timestamp of last successful update.
+            last_full_successful_date (datetime): Timestamp of last full successful update.
+            source (path): Path to the com.apple.SoftwareUpdate.plist file.
+        """
         plist = plistlib.load(self.file.open())
 
         yield SoftwareUpdatePreferencesRecord(

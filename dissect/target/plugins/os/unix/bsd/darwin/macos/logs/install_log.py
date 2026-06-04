@@ -33,10 +33,14 @@ RE_TIMESTAMP_PATTERN = re.compile(
 
 
 class InstallLogPlugin(Plugin):
-    """Return information related software installations and updates on macOS.
+    """Plugin to parse install logs on macOS.
+
+    Contains information on the software installation history.
 
     References:
         - https://sansorg.egnyte.com/dl/m9ftGF7heI
+        - https://www.cyberengage.org/post/macos-incident-response-tactics-log-analysis-and-forensic-tools
+        - https://www.hackthelogs.com/MacLogs.html
     """
 
     INSTALL_LOG_PATH = "/var/log/install.log"
@@ -76,18 +80,15 @@ class InstallLogPlugin(Plugin):
     def install_log(self) -> Iterator[InstallLogRecord]:
         """Return all macOS install log messages.
 
-        Yields InstallLogRecord instances with fields:
+        Yields InstallLogRecord with the following fields:
 
         .. code-block:: text
 
-            ts (datetime): Timestamp of the log line.
-            host (str): Hostname.
-            component (str): Component name.
-            message (str): Log message.
-            source (path): Path to the log file.
-
-        References:
-            - https://sansorg.egnyte.com/dl/m9ftGF7heI
+            ts (datetime): Timestamp (UTC).
+            host (string): Hostname parsed from the log line.
+            component (string): Component responsible for the log entry.
+            message (string): Log message content.
+            source (path): Path to the install.log file.
         """
         current_ts: re.Match[str] | None = None
         current_buf = ""

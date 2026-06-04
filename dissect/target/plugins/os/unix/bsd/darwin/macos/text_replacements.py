@@ -23,7 +23,7 @@ ZTextReplacementEntryRecord = TargetRecordDescriptor(
         ("varint", "z_opt"),
         ("varint", "z_was_deleted"),
         ("varint", "z_needs_save_to_cloud"),
-        ("string", "z_timestamp"),
+        ("datetime", "z_timestamp"),
         ("string", "z_phrase"),
         ("string", "z_shortcut"),
         ("string", "z_unique_name"),
@@ -73,7 +73,7 @@ ZPlistRecord = TargetRecordDescriptor(
         ("varint", "ns_persistence_maximum_framework_version"),
         ("string[]", "ns_store_model_version_identifiers"),
         ("string", "ns_store_type"),
-        ("string", "ns_auto_vacuum_level"),
+        ("varint", "ns_auto_vacuum_level"),
         ("string", "ns_store_model_version_hashes_digest"),
         ("string", "ns_store_model_version_checksum_key"),
         ("varint", "ns_persistence_framework_version"),
@@ -85,8 +85,8 @@ ZPlistRecord = TargetRecordDescriptor(
 NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
     "macos/text_replacements/ns_store_model_version_hashes",
     [
-        ("string", "tr_cloud_kit_sync_state"),
-        ("string", "text_replacement_entry"),
+        ("bytes", "tr_cloud_kit_sync_state"),
+        ("bytes", "text_replacement_entry"),
         ("string", "plist_path"),
         ("path", "source"),
     ],
@@ -96,7 +96,6 @@ ZModelCacheRecord = TargetRecordDescriptor(
     "macos/text_replacements/z_model_cache",
     [
         ("string", "table"),
-        ("bytes", "z_content"),
         ("path", "source"),
     ],
 )
@@ -129,7 +128,6 @@ FIELD_MAPPINGS = {
     "Z_MAX": "z_max",
     "Z_VERSION": "z_version",
     "Z_UUID": "z_uuid",
-    "Z_CONTENT": "z_content",
     "NSPersistenceMaximumFrameworkVersion": "ns_persistence_maximum_framework_version",
     "NSStoreModelVersionIdentifiers": "ns_store_model_version_identifiers",
     "NSStoreType": "ns_store_type",
@@ -142,29 +140,110 @@ FIELD_MAPPINGS = {
     "TextReplacementEntry": "text_replacement_entry",
 }
 
+CONVERT_TIMESTAMPS = {
+    "z_timestamp": "2001",
+}
+
 
 class TextReplacementsPlugin(Plugin):
-    """macOS text replacements plugin."""
+    """macOS text replacements plugin.
+
+    References:
+        - https://fatbobman.com/en/posts/tables_and_fields_of_coredata/
+        - https://developer.apple.com/documentation/coredata/nsstoremodelversionidentifierskey
+    """
 
     PATH = ("Library/KeyboardServices/TextReplacements.db",)
 
     def __init__(self, target: Target):
         super().__init__(target)
-
-        self.files = set()
-        self._find_files()
+        self.files = self._find_files()
 
     def check_compatible(self) -> None:
         if not (self.files):
             raise UnsupportedPluginError("No TextReplacements.db files found")
 
-    def _find_files(self) -> None:
+    def _find_files(self) -> set:
+        files = set()
         for _, path in _build_userdirs(self, self.PATH):
-            self.files.add(path)
+            files.add(path)
+        return files
 
     @export(record=TextReplacementsRecords)
     def text_replacements(
         self,
     ) -> Iterator[TextReplacementsRecords]:
-        """Yield text replacements information."""
-        yield from build_sqlite_records(self, self.files, TextReplacementsRecords, field_mappings=FIELD_MAPPINGS)
+        """Return text replacements information.
+
+        Yields the following record types extracted from the
+        TextReplacements.db database:
+
+        .. code-block:: text
+
+            ZTextReplacementEntryRecord:
+                table (string): Name of the source table (ZTEXTREPLACEMENTENTRY).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): The ID of the table.
+                z_opt (varint): The version number of the data record.
+                z_was_deleted (varint): Indicates if the record was deleted.
+                z_needs_save_to_cloud (varint): Indicates if the record needs to be saved to cloud.
+                z_timestamp (datetime): Timestamp associated with the record.
+                z_phrase (string): Full replacement text (what gets inserted).
+                z_shortcut (string): Shortcut text that triggers the replacement.
+                z_unique_name (string): Unique identifier for the replacement entry.
+                z_remote_record_info (string): Remote record info.
+                source (path): Path to the TextReplacements.db file.
+
+            ZTrCloudKitSyncStateRecord:
+                table (string): Name of the source table (ZTRCLOUDKITSYNCSTATE).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): The ID of the table.
+                z_opt (varint): The version number of the data record.
+                z_did_pull_once (varint): Indicates if initial CloudKit sync has occurred.
+                z_fetch_change_token (string): CloudKit change token for sync state tracking.
+                source (path): Path to the TextReplacements.db file.
+
+            ZPrimaryKeyRecord:
+                table (string): Name of the source table (Z_PRIMARYKEY).
+                z_ent (varint): The ID of the table.
+                z_name (string): The name of the entity in the data model.
+                z_super (varint): This value corresponds to the Z_ENT of the parent entity.
+                    0 indicates that the entity has no parent entity.
+                z_max (varint): Marks the last used z_pk value for each registry table.
+                source (path): Path to the TextReplacements.db file.
+
+            ZMetadataRecord:
+                table (string): Name of the source table (Z_METADATA).
+                z_version (varint): The specific purpose is unknown, value is always 1.
+                z_uuid (string): The ID identifier (UUID type) of the current database file.
+                source (path): Path to the TextReplacements.db file.
+
+            ZPlistRecord (Plist extracted from Z_METADATA's Z_PLIST field):
+                ns_persistence_maximum_framework_version (varint): Maximum supported persistence framework version.
+                ns_store_model_version_identifiers (string[]): Version identifiers for the model,
+                    used to create the store.
+                ns_store_type (string): Store type.
+                ns_auto_vacuum_level (varint): Auto-vacuum level.
+                ns_store_model_version_hashes_digest (string): Digest of model version hashes.
+                ns_store_model_version_checksum_key (string): Model version checksum key.
+                ns_persistence_framework_version (varint): Persistence framework version.
+                ns_store_model_version_hashes_version (varint): Version of the hashes.
+                source (path): Path to the TextReplacements.db file.
+
+            NSStoreModelVersionHashesRecord:
+                tr_cloud_kit_sync_state (bytes): Hash for ZTRCLOUDKITSYNCSTATE entity.
+                text_replacement_entry (bytes): Hash for ZTEXTREPLACEMENTENTRY entity.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the TextReplacements.db file.
+
+            ZModelCacheRecord (contains Z_CONTENT field with binary data):
+                table (string): Name of the source table (Z_MODELCACHE).
+                source (path): Path to the TextReplacements.db file.
+        """
+        yield from build_sqlite_records(
+            self,
+            self.files,
+            TextReplacementsRecords,
+            field_mappings=FIELD_MAPPINGS,
+            convert_timestamps=CONVERT_TIMESTAMPS,
+        )

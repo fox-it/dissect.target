@@ -44,7 +44,7 @@ def test_system_log(test_file: str, target_unix: Target, fs_unix: VirtualFilesys
         assert len(results) == 11
 
         assert results[0].ts == datetime(2026, 5, 6, 7, 45, 10, tzinfo=tz)
-        assert results[0].severity_level == 5
+        assert results[0].priority_level == 5
         assert results[0].pid == 121
         assert results[0].asl_host == "localhost"
         assert results[0].sender == "syslogd"
@@ -57,7 +57,7 @@ def test_system_log(test_file: str, target_unix: Target, fs_unix: VirtualFilesys
         assert results[0].source == "/var/log/asl/2026.05.06.G80.asl"
 
         assert results[1].ts == datetime(2026, 5, 6, 7, 45, 10, tzinfo=tz)
-        assert results[1].severity_level == 5
+        assert results[1].priority_level == 5
         assert results[1].pid == 121
         assert results[1].asl_host == "localhost"
         assert results[1].sender == "syslogd"
@@ -70,7 +70,7 @@ def test_system_log(test_file: str, target_unix: Target, fs_unix: VirtualFilesys
         assert results[1].source == "/var/log/asl/2026.05.06.G80.asl"
 
         assert results[-1].ts == datetime(2026, 5, 6, 11, 50, 20, tzinfo=tz)
-        assert results[-1].severity_level == 5
+        assert results[-1].priority_level == 5
         assert results[-1].pid == 122
         assert results[-1].asl_host == "localhost"
         assert results[-1].sender == "syslogd"

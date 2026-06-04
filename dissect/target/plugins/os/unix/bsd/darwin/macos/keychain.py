@@ -13,27 +13,27 @@ if TYPE_CHECKING:
 
     from dissect.target import Target
 
-KeychainRecord = TargetRecordDescriptor(
-    "macos/keychain",
+GenpRecord = TargetRecordDescriptor(
+    "macos/keychain/genp",
     [
         ("string", "table"),
         ("varint", "row_id"),
-        ("float", "cdat"),
-        ("float", "mdat"),
-        ("string", "desc"),
-        ("string", "icmt"),
-        ("string", "crtr"),
-        ("string", "type"),
-        ("string", "scrp"),
-        ("string", "labl"),
-        ("string", "alis"),
+        ("datetime", "cdat"),
+        ("datetime", "mdat"),
+        ("bytes", "desc"),
+        ("bytes", "icmt"),
+        ("varint", "crtr"),
+        ("varint", "keychain_type"),
+        ("varint", "scrp"),
+        ("bytes", "labl"),
+        ("bytes", "alis"),
         ("varint", "invi"),
         ("varint", "nega"),
         ("varint", "cusi"),
-        ("varint", "prot"),
-        ("string", "acct"),
-        ("string", "svce"),
-        ("string", "gena"),
+        ("bytes", "prot"),
+        ("bytes", "acct"),
+        ("bytes", "svce"),
+        ("bytes", "gena"),
         ("string", "data"),
         ("string", "agrp"),
         ("string", "pdmn"),
@@ -45,10 +45,112 @@ KeychainRecord = TargetRecordDescriptor(
         ("string", "musr"),
         ("string", "UUID"),
         ("varint", "sysb"),
-        ("string", "pcss"),
-        ("string", "pcsk"),
-        ("string", "pcsi"),
-        ("string", "persistref"),
+        ("varint", "pcss"),
+        ("bytes", "pcsk"),
+        ("bytes", "pcsi"),
+        ("bytes", "persistref"),
+        ("varint", "clip"),
+        ("string", "ggrp"),
+        ("path", "source"),
+    ],
+)
+
+
+InetRecord = TargetRecordDescriptor(
+    "macos/keychain/inet",
+    [
+        ("string", "table"),
+        ("varint", "row_id"),
+        ("datetime", "cdat"),
+        ("datetime", "mdat"),
+        ("bytes", "desc"),
+        ("bytes", "icmt"),
+        ("varint", "crtr"),
+        ("varint", "keychain_type"),
+        ("varint", "scrp"),
+        ("bytes", "labl"),
+        ("bytes", "alis"),
+        ("varint", "invi"),
+        ("varint", "nega"),
+        ("varint", "cusi"),
+        ("bytes", "prot"),
+        ("bytes", "acct"),
+        ("bytes", "sdmn"),
+        ("bytes", "srvr"),
+        ("string", "ptcl"),
+        ("bytes", "atyp"),
+        ("varint", "port"),
+        ("bytes", "path_binary"),
+        ("string", "data"),
+        ("string", "agrp"),
+        ("string", "pdmn"),
+        ("varint", "sync"),
+        ("varint", "tomb"),
+        ("string", "sha1"),
+        ("string", "vwht"),
+        ("string", "tkid"),
+        ("string", "musr"),
+        ("string", "UUID"),
+        ("varint", "sysb"),
+        ("varint", "pcss"),
+        ("bytes", "pcsk"),
+        ("bytes", "pcsi"),
+        ("bytes", "persistref"),
+        ("varint", "clip"),
+        ("string", "ggrp"),
+        ("path", "source"),
+    ],
+)
+
+KeysRecord = TargetRecordDescriptor(
+    "macos/keychain/keys",
+    [
+        ("string", "table"),
+        ("varint", "row_id"),
+        ("datetime", "cdat"),
+        ("datetime", "mdat"),
+        ("bytes", "kcls"),
+        ("bytes", "labl"),
+        ("bytes", "alis"),
+        ("varint", "perm"),
+        ("varint", "priv"),
+        ("varint", "modi"),
+        ("bytes", "klbl"),
+        ("bytes", "atag"),
+        ("varint", "crtr"),
+        ("varint", "keychain_type"),
+        ("varint", "bsiz"),
+        ("varint", "esiz"),
+        ("varint", "sdat"),
+        ("varint", "edat"),
+        ("varint", "sens"),
+        ("varint", "asen"),
+        ("varint", "extr"),
+        ("varint", "next"),
+        ("varint", "encr"),
+        ("varint", "decr"),
+        ("varint", "drve"),
+        ("varint", "sign"),
+        ("varint", "vrfy"),
+        ("varint", "snrc"),
+        ("varint", "vyrc"),
+        ("varint", "wrap"),
+        ("varint", "unwp"),
+        ("string", "data"),
+        ("string", "agrp"),
+        ("string", "pdmn"),
+        ("varint", "sync"),
+        ("varint", "tomb"),
+        ("string", "sha1"),
+        ("string", "vwht"),
+        ("string", "tkid"),
+        ("string", "musr"),
+        ("string", "UUID"),
+        ("varint", "sysb"),
+        ("varint", "pcss"),
+        ("bytes", "pcsk"),
+        ("bytes", "pcsi"),
+        ("bytes", "persistref"),
         ("varint", "clip"),
         ("string", "ggrp"),
         ("path", "source"),
@@ -80,53 +182,71 @@ MetaDataKeysRecord = TargetRecordDescriptor(
     "macos/keychain/meta_data_keys",
     [
         ("string", "table"),
-        ("string", "keyclass"),
-        ("string", "actual_key_class"),
+        ("varint", "keyclass"),
+        ("varint", "actual_keyclass"),
         ("string", "data"),
         ("path", "source"),
     ],
 )
 
 KeychainRecords = (
-    KeychainRecord,
+    GenpRecord,
+    InetRecord,
+    KeysRecord,
     SqliteSequenceRecord,
     TVersionRecord,
     MetaDataKeysRecord,
 )
 
 FIELD_MAPPINGS = {
-    "actualKeyclass": "actual_key_class",
+    "actualKeyclass": "actual_keyclass",
     "rowid": "row_id",
+    "path": "path_binary",
+    "type": "keychain_type",
+}
+
+CONVERT_TIMESTAMPS = {
+    "cdat": "2001",
+    "mdat": "2001",
 }
 
 
 class KeychainPlugin(Plugin):
-    """macOS keychain plugin."""
+    """macOS keychain plugin.
+
+    Parses Data Protection keychain databases (keychain-2.db).
+    These are stored in ``Library/Keychains/*/``, where ``*`` is the UUID that assigned to that Mac.
+
+    References:
+        - https://eclecticlight.co/2023/08/07/an-introduction-to-keychains-and-how-theyve-changed/
+    """
 
     USER_PATH = ("Library/Keychains/*/keychain-2.db",)
 
     def __init__(self, target: Target):
         super().__init__(target)
-
-        self.files = set()
-        self._find_files()
+        self.files = self._find_files()
 
     def check_compatible(self) -> None:
         if not (self.files):
             raise UnsupportedPluginError("No keychain-2.db files found")
 
-    def _find_files(self) -> None:
+    def _find_files(self) -> set:
+        files = set()
         for _, path in _build_userdirs(self, self.USER_PATH):
-            self.files.add(path)
+            files.add(path)
+        return files
 
     @export(record=KeychainRecords)
     def keychain(
         self,
     ) -> Iterator[KeychainRecords]:
-        """Yield keychain information."""
-        yield from build_sqlite_records(self, self.files, KeychainRecords, field_mappings=FIELD_MAPPINGS)
+        """Return macOS Keychain database entries."""
+        yield from build_sqlite_records(
+            self, self.files, KeychainRecords, field_mappings=FIELD_MAPPINGS, convert_timestamps=CONVERT_TIMESTAMPS
+        )
 
-        # Still missing cert, outgoingqueue, incomingqueue, synckeys, ckmirror, currentkeys,
+        # TODO: Add cert, outgoingqueue, incomingqueue, synckeys, ckmirror, currentkeys,
         # ckstate, item_backup, backup_keybag, ckmanifest, pending_manifest, ckmanifest_leaf,
         # backup_keyarchive, currentkeyarchives, archived_key_backup, pending_manifest_leaf,
         # currentitems, ckdevicestate, tlkshare, sharingIncomingQueue,

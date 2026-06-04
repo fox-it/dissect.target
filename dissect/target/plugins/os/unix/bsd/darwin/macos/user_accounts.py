@@ -53,8 +53,8 @@ ZAccountRecord = TargetRecordDescriptor(
         ("varint", "z_warming_up"),
         ("varint", "z_account_type"),
         ("varint", "z_parent_account"),
-        ("float", "z_date"),
-        ("float", "z_last_credential_renewal_rejection_date"),
+        ("datetime", "z_date"),
+        ("datetime", "z_last_credential_renewal_rejection_date"),
         ("string", "z_account_description"),
         ("string", "z_authentication_type"),
         ("string", "z_credential_type"),
@@ -131,19 +131,6 @@ ZSyncableDataClassesRecord = TargetRecordDescriptor(
     ],
 )
 
-ZDataClassRecord = TargetRecordDescriptor(
-    "macos/user_accounts/z_dataclass",
-    [
-        ("string", "table"),
-        ("varint", "z_pk"),
-        ("varint", "z_ent"),
-        ("varint", "z_opt"),
-        ("varint", "z_enum_value"),
-        ("string", "z_name"),
-        ("path", "source"),
-    ],
-)
-
 ZPrimaryKeyRecord = TargetRecordDescriptor(
     "macos/user_accounts/z_primary_key",
     [
@@ -169,8 +156,8 @@ ZMetadataRecord = TargetRecordDescriptor(
 ZPlistRecord = TargetRecordDescriptor(
     "macos/user_accounts/z_plist",
     [
-        ("string", "ac_account_type_version"),
-        ("string", "ns_auto_vacuum_level"),
+        ("varint", "ac_account_type_version"),
+        ("varint", "ns_auto_vacuum_level"),
         ("varint", "ns_persistence_framework_version"),
         ("varint", "ns_persistence_maximum_framework_version"),
         ("string", "ns_store_model_version_checksum_key"),
@@ -185,13 +172,13 @@ ZPlistRecord = TargetRecordDescriptor(
 NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
     "macos/user_accounts/ns_store_model_version_hashes",
     [
-        ("string", "access_options_key"),
-        ("string", "account"),
-        ("string", "account_property"),
-        ("string", "account_type"),
-        ("string", "authorization"),
-        ("string", "credential_item"),
-        ("string", "dataclass"),
+        ("bytes", "access_options_key"),
+        ("bytes", "account_hash"),
+        ("bytes", "account_property"),
+        ("bytes", "account_type"),
+        ("bytes", "authorization"),
+        ("bytes", "credential_item"),
+        ("bytes", "dataclass"),
         ("string", "plist_path"),
         ("path", "source"),
     ],
@@ -201,7 +188,6 @@ ZModelCacheRecord = TargetRecordDescriptor(
     "macos/user_accounts/z_model_cache",
     [
         ("string", "table"),
-        ("bytes", "z_content"),
         ("path", "source"),
     ],
 )
@@ -215,7 +201,6 @@ UserAccountRecords = (
     ZAccountTypeRecord,
     ZSupportedDataClassesRecord,
     ZSyncableDataClassesRecord,
-    ZDataClassRecord,
     ZPrimaryKeyRecord,
     ZMetadataRecord,
     ZPlistRecord,
@@ -277,74 +262,196 @@ FIELD_MAPPINGS = {
     "NSStoreModelVersionIdentifiers": "ns_store_model_version_identifiers",
     "NSStoreType": "ns_store_type",
     "AccessOptionsKey": "access_options_key",
-    "Account": "account",
+    "Account": "account_hash",
     "AccountProperty": "account_property",
     "AccountType": "account_type",
     "Authorization": "authorization",
     "CredentialItem": "credential_item",
     "Dataclass": "dataclass",
-    "Z_CONTENT": "z_content",
 }
 
 
 class UserAccountsPlugin(Plugin):
-    """macOS user accounts plugin."""
+    """macOS user accounts plugin.
+
+    Parses macOS user account SQLite database files.
+
+    References:
+        - https://fatbobman.com/en/posts/tables_and_fields_of_coredata/
+        - https://developer.apple.com/documentation/coredata/nsstoremodelversionidentifierskey
+    """
 
     USER_PATH = ("Library/Accounts/Accounts*.sqlite",)
 
     def __init__(self, target: Target):
         super().__init__(target)
-
-        self.files = set()
-        self._find_files()
+        self.files = self._find_files()
 
     def check_compatible(self) -> None:
         if not (self.files):
             raise UnsupportedPluginError("No user account database files found")
 
-    def _find_files(self) -> None:
+    def _find_files(self) -> set:
+        files = set()
         for _, path in _build_userdirs(self, self.USER_PATH):
-            self.files.add(path)
+            files.add(path)
+        return files
 
-    @export(
-        record=[
-            ZAccessOptionsKeyRecord,
-            ZOwningAccountTypesRecord,
-            ZAccountRecord,
-            ZEnabledDataClassesRecord,
-            ZAccountPropertyRecord,
-            ZAccountTypeRecord,
-            ZSupportedDataClassesRecord,
-            ZSyncableDataClassesRecord,
-            ZDataClassRecord,
-            ZPrimaryKeyRecord,
-            ZMetadataRecord,
-            ZPlistRecord,
-            NSStoreModelVersionHashesRecord,
-            ZModelCacheRecord,
-        ]
-    )
+    @export(record=UserAccountRecords)
     def user_accounts(
         self,
-    ) -> Iterator[
-        [
-            ZAccessOptionsKeyRecord,
-            ZOwningAccountTypesRecord,
-            ZAccountRecord,
-            ZEnabledDataClassesRecord,
-            ZAccountPropertyRecord,
-            ZAccountTypeRecord,
-            ZSupportedDataClassesRecord,
-            ZSyncableDataClassesRecord,
-            ZDataClassRecord,
-            ZPrimaryKeyRecord,
-            ZMetadataRecord,
-            ZPlistRecord,
-            NSStoreModelVersionHashesRecord,
-            ZModelCacheRecord,
-        ]
-    ]:
-        """Yield user accounts information."""
+    ) -> Iterator[UserAccountRecords]:
+        """Return user accounts information.
+
+        Yields the following record types extracted from the
+        Accounts*.sqlite databases:
+
+        .. code-block:: text
+
+            ZAccessOptionsKeyRecord:
+                table (string): Name of the source table (ZACCESSOPTIONSKEY).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): The ID of the table.
+                z_opt (varint): The version number of the data record.
+                z_enum_value (varint): Enumeration value.
+                z_name (string): The name of the entity in the data model.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZOwningAccountTypesRecord:
+                table (string): Name of the source table (Z_1OWNINGACCOUNTTYPES).
+                z_1_access_keys (varint): Reference to z_pk in ZACCESSOPTIONSKEY.
+                z_4_owning_account_types (varint): Reference to z_pk in ZACCOUNTTYPE.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZAccountRecord:
+                table (string): Name of the source table (ZACCOUNT).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): The ID of the table.
+                z_opt (varint): The version number of the data record.
+                z_active (varint): Indicates whether the account is active:
+                    0 = False.
+                    1 = True.
+                z_authenticated (varint): Indicates whether the account is authenticated:
+                    0 = False.
+                    1 = True.
+                z_supports_authentication (varint): Indicates if authentication is supported:
+                    0 = False.
+                    1 = True.
+                z_visible (varint): Indicates whether account is visible:
+                    0 = False.
+                    1 = True.
+                z_warming_up (varint): Indicates account initialization state:
+                    0 = False.
+                    1 = True.
+                z_account_type (varint): Reference to z_pk in ZACCOUNTTYPE.
+                z_parent_account (varint): Reference to z_pk of parent account.
+                z_date (datetime): Timestamp.
+                z_last_credential_renewal_rejection_date (datetime): Timestamp of last credential renewal rejection.
+                z_account_description (string): Account description.
+                z_authentication_type (string): Authentication type.
+                z_credential_type (string): Credential type.
+                z_identifier (string): Account identifier.
+                z_modification_id (string): Modification identifier.
+                z_owning_bundle_id (string): Bundle ID of owning service/app.
+                z_username (string): Username for the account.
+                z_dataclass_properties (bytes): Dataclass properties.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZEnabledDataClassesRecord:
+                table (string): Name of the source table (Z_2ENABLEDDATACLASSES).
+                z_2_enabled_accounts (varint): Reference to z_pk in ZACCOUNT.
+                z_7_enabled_dataclasses (varint): Reference to z_pk in ZDATACLASS.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZAccountPropertyRecord:
+                table (string): Name of the source table (ZACCOUNTPROPERTY).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): The ID of the table.
+                z_opt (varint): The version number of the data record.
+                z_owner (varint): Reference to z_pk of owning ZACCOUNT.
+                z_key (string): Property key.
+                z_value (string): Property value.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZAccountTypeRecord:
+                table (string): Name of the source table (ZACCOUNTTYPE).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): The ID of the table.
+                z_opt (varint): The version number of the data record.
+                z_obsolete (varint): Indicates whether account type is obsolute:
+                    0 = False.
+                    1 = True.
+                z_supports_authentication (varint): Indicates whether authentication is supported:
+                    0 = False.
+                    1 = True.
+                z_supports_multiple_accounts (varint): Indicates whether multiple accounts are supported:
+                    0 = False.
+                    1 = True.
+                z_visibility (varint): Indicates visibility of the account type:
+                    0 = False.
+                    1 = True.
+                z_account_type_description (string): Description of account type.
+                z_credential_protection_policy (string): Credential protection policy.
+                z_credential_type (string): Credential type.
+                z_identifier (string): Account identifier.
+                z_owning_bundle_id (string): Owning bundle ID.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZSupportedDataClassesRecord:
+                table (string): Name of the source table (Z_4SUPPORTEDDATACLASSES).
+                z_4_supported_types (varint): Reference to z_pk in ZACCOUNTTYPE.
+                z_7_supported_dataclasses (varint): Reference to z_pk in ZDATACLASS.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZSyncableDataClassesRecord:
+                table (string): Name of the source table (Z_4SYNCABLEDATACLASSES).
+                z_4_syncable_types (varint): Reference to z_pk in ZACCOUNTTYPE.
+                z_7_syncable_dataclasses (varint): Reference to z_pk in ZDATACLASS.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZPrimaryKeyRecord:
+                table (string): Name of the source table (Z_PRIMARYKEY).
+                z_ent (varint): The ID of the table.
+                z_name (string): The name of the entity in the data model.
+                z_super (varint): This value corresponds to the Z_ENT of the parent entity.
+                    0 indicates that the entity has no parent entity.
+                z_max (varint): Marks the last used z_pk value for each registry table.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZMetadataRecord:
+                table (string): Name of the source table (Z_METADATA).
+                z_version (varint): The specific purpose is unknown, value is always 1.
+                z_uuid (string): The ID identifier (UUID type) of the current database file.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZPlistRecord (Plist extracted from Z_METADATA's Z_PLIST field):
+                ac_account_type_version (varint): AC account type version.
+                ns_persistence_maximum_framework_version (varint): Maximum supported persistence framework version.
+                ns_store_model_version_identifiers (string[]): Version identifiers for the model,
+                    used to create the store.
+                ns_store_type (string): Store type.
+                ns_auto_vacuum_level (varint): Auto-vacuum level.
+                ns_store_model_version_hashes_digest (string): Digest of model version hashes.
+                ns_store_model_version_checksum_key (string): Model version checksum key.
+                ns_persistence_framework_version (varint): Persistence framework version.
+                ns_store_model_version_hashes_version (varint): Version of the hashes.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            NSStoreModelVersionHashesRecord:
+                access_options_key (bytes): Hash for ZACCESSOPTIONSKEY entity.
+                account (bytes): Hash for ZACCOUNT entity.
+                account_property (bytes): Hash for ZACCOUNTPROPERTY entity.
+                account_type (bytes): Hash for ZACCOUNTTYPE entity.
+                authorization (bytes): Hash for ZAUTHORIZATION entity.
+                credential_item (bytes): Hash for ZCREDENTIALITEM entity.
+                dataclass (bytes): Hash for ZDATACLASS entity.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the Accounts*.sqlite database file.
+
+            ZModelCacheRecord (contains Z_CONTENT field with binary data):
+                table (string): Name of the source table (Z_MODELCACHE).
+                source (path): Path to the Accounts*.sqlite database file.
+        """
         yield from build_sqlite_records(self, self.files, UserAccountRecords, field_mappings=FIELD_MAPPINGS)
 
-        # Still missing Z_2PROVISIONEDDATACLASSES, ZAUTHORIZATION, ZCREDENTIALITEM tables
+        # TODO: Add Z_2PROVISIONEDDATACLASSES, ZAUTHORIZATION, ZCREDENTIALITEM tables

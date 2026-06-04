@@ -61,30 +61,33 @@ def test_login_items(
 
         assert len(results) == 4
 
-        assert results[0].associatedBundleIdentifiers is None
+        assert results[0].associated_bundle_identifiers is None
+        assert results[0].bookmark is not None
         assert isinstance(results[0].bookmark, (bytes, bytearray))
-        assert results[0].bundleIdentifier == "com.microsoft.VSCode"
+        assert results[0].bundle_identifier == "com.microsoft.VSCode"
         assert results[0].container is None
-        assert results[0].designatedRequirement == (
+        assert results[0].designated_requirement == (
             'identifier "com.microsoft.VSCode" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] '  # noqa E501
             "/* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = UBF8T346G9"  # noqa E501
         )
-        assert results[0].developerName is None
+        assert results[0].developer_name is None
         assert results[0].login_item_disposition == 3
-        assert results[0].executableModificationDate == datetime(1970, 1, 1, 0, 0, tzinfo=tz)
-        assert results[0].executablePath is None
+        assert results[0].executable_modification_date == datetime(1970, 1, 1, 0, 0, tzinfo=tz)
+        assert results[0].executable_path is None
         assert results[0].flags == 0
         assert results[0].generation == 0
         assert results[0].identifier == "2.com.microsoft.VSCode"
-        assert isinstance(results[0].lightweightRequirement, (bytes, bytearray))
-        assert results[0].modificationDate == datetime(1995, 4, 29, 15, 46, 38, tzinfo=tz)
+        assert results[0].lightweight_requirement is not None
+        assert isinstance(results[0].lightweight_requirement, (bytes, bytearray))
+        assert results[0].modification_date == datetime(2026, 4, 29, 15, 46, 38, tzinfo=tz)
         assert results[0].name == "Visual Studio Code.app"
-        assert results[0].programArguments is None
+        assert results[0].program_arguments is None
         assert results[0].sha256 is None
-        assert results[0].teamIdentifier == "UBF8T346G9"
+        assert results[0].team_identifier == "UBF8T346G9"
         assert results[0].login_item_type == 2
         assert results[0].url == "file:///Applications/Visual%20Studio%20Code.app/"
         assert results[0].uuid == "6f541698-5211-4cf2-95b7-e97534baee39"
+        assert results[0].items == []
         assert results[0].plist_path == "itemsByUserIdentifier/5C6F7FDD-02B2-498E-97B6-DE77293A8E90[0]"
         assert results[0].source == "/var/db/com.apple.backgroundtaskmanagement/BackgroundItems-v16.btm"
 

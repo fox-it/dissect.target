@@ -27,19 +27,19 @@ DirectoryServicesLocalNodesRecord = TargetRecordDescriptor(
 
 
 class DirectoryServicesLocalNodesPlugin(Plugin):
-    """macOS directory services local nodes plugin."""
+    """macOS Directory Services local nodes plugin.
+
+    The /var/db/dslocal/sqlindex database tracks metadata for plist files in the directory structure
+
+    References:
+        - https://web.archive.org/web/20221206190314/https://samsclass.info/121/lec16/ch13.pdf
+    """
 
     PATH = "/var/db/dslocal/nodes/Default/sqlindex"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.file = None
-        self._resolve_file()
-
-    def _resolve_file(self) -> None:
-        path = self.target.fs.path(self.PATH)
-        if path.exists():
-            self.file = path
+        self.file = self.target.fs.path(self.PATH) if self.target.fs.path(self.PATH).exists() else None
 
     def check_compatible(self) -> None:
         if not self.file:
@@ -49,19 +49,24 @@ class DirectoryServicesLocalNodesPlugin(Plugin):
     def directory_services_local_nodes(
         self,
     ) -> Iterator[DirectoryServicesLocalNodesRecord]:
-        """Yield directory services local nodes information.
+        """Return macOS Directory Services local node entries.
 
-        Database schema:
-            Tables prefixed with "rec:":
-                Rows contain:
-                    - filename  -> name of the backing plist (links to attribute tables)
-                    - filetime  -> datetime
+        Yields DirectoryServicesLocalNodesRecord with the following fields:
 
-            Attribute tables (e.g. "name", "realname", "uid", "gid", etc.):
-                Rows contain:
-                    - filename   -> name of the backing plist (links to "rec:" tables)
-                    - recordtype -> e.g. "users", "groups", "computers"
-                    - value      -> content depends on recordtype
+        .. code-block:: text
+
+            tables (string[]): Names of tables contributing to the record.
+            filetime (datetime): Timestamp associated with the row.
+            filename (string): Name of the backing plist file.
+            recordtype (string): Type of directory record (e.g. users, groups).
+            value (string): Attribute value associated with the record.
+            source (path): Path to the sqlindex file.
+
+        Data is derived from the sqlindex database, where:
+            - Tables prefixed with "rec:" contain rows with plist filenames and associated filetimes.
+            - Attribute tables (e.g. name, uid, gid) contain rows with filenames, recordtypes, and values.
+
+        Records are created by correlating rows between "rec:" and attribute tables.
         """
         with SQLite3(self.file) as database:
             ATTRIBUTE_TABLES = {
@@ -121,4 +126,4 @@ class DirectoryServicesLocalNodesPlugin(Plugin):
                             _target=self.target,
                         )
 
-        # Still missing altsecurityidentities, hardwareuuid, en_address, mail, member tables
+        # TODO: Add altsecurityidentities, hardwareuuid, en_address, mail, member tables

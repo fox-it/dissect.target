@@ -23,11 +23,11 @@ AccessRecord = TargetRecordDescriptor(
         ("varint", "auth_value"),
         ("varint", "auth_reason"),
         ("varint", "auth_version"),
-        ("string", "csreq"),
+        ("bytes", "csreq"),
         ("string", "policy_id"),
-        ("string", "indirect_object_identifier_type"),
         ("string", "indirect_object_identifier"),
-        ("string", "indirect_object_code_identity"),
+        ("string", "indirect_object_identifier_type"),
+        ("bytes", "indirect_object_code_identity"),
         ("varint", "flags"),
         ("datetime", "last_modified"),
         ("varint", "pid"),
@@ -55,31 +55,92 @@ TCCRecords = (
 
 
 class TCCPlugin(Plugin):
-    """macOS transparency, consent, control (tcc) framework plugin."""
+    """macOS transparency, consent, control (tcc) framework plugin.
+
+    TCC is a mechanism in macOS to limit and control application access to certain features. This can include
+    things such as location services, contacts, photos, microphone, camera, accessibility, full disk access, etc.
+
+    References:
+        - https://www.rainforestqa.com/blog/macos-tcc-db-deep-dive
+    """
 
     SYSTEM_PATH = "/Library/Application Support/com.apple.TCC/TCC.db"
     USER_PATH = ("Library/Application Support/com.apple.TCC/TCC.db",)
 
     def __init__(self, target: Target):
         super().__init__(target)
-
-        self.files = set()
-        self._find_files()
+        self.files = self._find_files()
 
     def check_compatible(self) -> None:
         if not (self.files):
             raise UnsupportedPluginError("No TCC.db files found")
 
-    def _find_files(self) -> None:
-        self.files.add(self.target.fs.path(self.SYSTEM_PATH))
+    def _find_files(self) -> set:
+        files = set()
+        files.add(self.target.fs.path(self.SYSTEM_PATH))
         for _, path in _build_userdirs(self, self.USER_PATH):
-            self.files.add(path)
+            files.add(path)
+        return files
 
     @export(record=TCCRecords)
     def tcc(
         self,
     ) -> Iterator[TCCRecords]:
-        """Yield transparency, consent, control (tcc) framework information."""
+        """Return transparency, consent, control (tcc) framework information.
+
+        Yields the following record types:
+
+        .. code-block:: text
+
+            AccessRecord:
+                table (string): Source table name (access).
+                service (string): What service access is being restricted to.
+                client (string):  Bundle Identifier or absolute path to the program that wants to use the service.
+                client_type (varint): Whether client is a Bundle Identifier(0) or an absolute path(1)
+                auth_value (varint): Authorization decision:
+                    0 = denied.
+                    1 = unknown.
+                    2 = allowed
+                    3 = limited.
+                    Observed auth_value = 5 in macOS Tahoe, but unsure about it's meaning.
+                auth_reason (varint): A code indicating how this auth_value was set:
+                    1 = Error.
+                    2 = User Consent.
+                    3 =  User Set.
+                    4 = System Set.
+                    5 = Service Policy.
+                    6 = MDM Policy.
+                    7 = Override Policy.
+                    8 = Missing usage string.
+                    9 = Prompt Timeout.
+                    10 = Preflight Unknown.
+                    11 = Entitled.
+                    12 = App Type Policy.
+                auth_version (varint): Always 1 as of macOS Tahoe.
+                csreq (bytes): Binary code signing requirement blob that the client must
+                    satisfy in order for access to be granted.
+                policy_id (string): Might be related to MDM(Mobile Device Management) policies, which can
+                    be used by organizations to allow TCC access for some applications at a global level.
+                indirect_object_identifier (string): For some services this is what the client
+                    is asking to interact with. This will be set to UNUSED if not applicable.
+                indirect_object_identifier_type (string): Whether indirect_object_identifier is a
+                    Bundle Identifier(0) or an absolute path(1)
+                indirect_object_code_identity (bytes): Same as csreq, but for the
+                    indirect_object_identifier instead of client.
+                flags (varint): Always 0 as of macOS Tahoe.
+                last_modified (datetime): The last time this entry was modified.
+                pid (varint): Process ID.
+                pid_version (string): Version of the process.
+                boot_uuid (string): System boot session UUID.
+                last_reminded (datetime): Last time user was reminded.
+                source (path): Path to the TCC.db database file.
+
+            KeyValue:
+                table (string): Name of the source table.
+                key (string): Key name.
+                value (string): Value associated with the key.
+                source (path): Path to the TCC.db database file.
+        """
         yield from build_sqlite_records(self, self.files, TCCRecords)
 
-        # Still missing policies, active_policy, access_overrides, expired tables
+        # TODO: Add policies, active_policy, access_overrides, expired tables

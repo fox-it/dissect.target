@@ -27,19 +27,16 @@ KeyboardLayoutRecord = TargetRecordDescriptor(
 
 
 class KeyboardLayoutPlugin(Plugin):
-    """macOS keyboard layout plugin."""
+    """macOS keyboard layout plugin.
+
+    This plugin extracts information about the keyboard layouts of the system.
+    """
 
     PATH = "/Library/Preferences/com.apple.HIToolbox.plist"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.file = None
-        self._resolve_file()
-
-    def _resolve_file(self) -> None:
-        path = self.target.fs.path(self.PATH)
-        if path.exists():
-            self.file = path
+        self.file = self.target.fs.path(self.PATH) if self.target.fs.path(self.PATH).exists() else None
 
     def check_compatible(self) -> None:
         if not self.file:
@@ -47,7 +44,20 @@ class KeyboardLayoutPlugin(Plugin):
 
     @export(record=KeyboardLayoutRecord)
     def keyboard_layout(self) -> Iterator[KeyboardLayoutRecord]:
-        """Yield macOS keyboard layout information."""
+        """Return macOS keyboard layout information.
+
+        Yields KeyboardLayoutRecord with the following fields:
+
+        .. code-block:: text
+
+            input_source_kind (string): Kind of the input source.
+            keyboard_layout_name (string): Name of the keyboard layout.
+            keyboard_layout_id (varint): ID of the keyboard layout.
+            enabled_layout (boolean): Whether the layout is enabled.
+            selected_layout (boolean): Whether the layout is selected.
+            current_layout (boolean): Whether it is the current layout.
+            source (path): Path to the com.apple.HIToolbox.plist file.
+        """
         plist = plistlib.loads(self.file.read_bytes())
 
         for source in plist.get("AppleEnabledInputSources", []):

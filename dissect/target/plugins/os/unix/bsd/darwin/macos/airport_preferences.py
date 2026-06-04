@@ -17,27 +17,27 @@ AirportPreferencesRecord = TargetRecordDescriptor(
     [
         ("varint", "counter"),
         ("string", "device_uuid"),
-        ("string", "version"),
-        ("string", "preferred_order"),
+        ("string[]", "preferred_order"),
+        ("varint", "version_number"),
         ("path", "source"),
     ],
 )
 
 
 class AirportPreferencesPlugin(Plugin):
-    """macOS AirPort (WiFi) preferences plugin."""
+    """macOS AirPort (WiFi) preferences plugin.
+
+    Contains WiFi network information.
+
+    References:
+        - https://apple.stackexchange.com/questions/301346/how-can-i-better-sort-and-set-wifi-network-preferences-on-mac
+    """
 
     PATH = "/Library/Preferences/SystemConfiguration/com.apple.airport.preferences.plist"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.file = None
-        self._resolve_file()
-
-    def _resolve_file(self) -> None:
-        path = self.target.fs.path(self.PATH)
-        if path.exists():
-            self.file = path
+        self.file = self.target.fs.path(self.PATH) if self.target.fs.path(self.PATH).exists() else None
 
     def check_compatible(self) -> None:
         if not self.file:
@@ -45,14 +45,25 @@ class AirportPreferencesPlugin(Plugin):
 
     @export(record=AirportPreferencesRecord)
     def airport_preferences(self) -> Iterator[AirportPreferencesRecord]:
-        """Yield AirPort preference information."""
+        """Return macOS AirPort (Wi-Fi) preferences.
+
+        Yields AirportPreferencesRecord with the following fields:
+
+        .. code-block:: text
+
+            counter (varint): The Counter key of the plist.
+            device_uuid (string): UUID of the device.
+            preferred_order (string[]): Ordered list of known Wi-Fi network SSIDs.
+            version_number (varint): The version number of the plist.
+            source (path): Path to the com.apple.airport.preferences.plist file.
+        """
         plist = plistlib.load(self.file.open())
 
         yield AirportPreferencesRecord(
             counter=plist.get("Counter"),
             device_uuid=plist.get("DeviceUUID"),
-            version=plist.get("Version"),
             preferred_order=plist.get("PreferredOrder"),
+            version_number=plist.get("Version"),
             source=self.file,
             _target=self.target,
         )

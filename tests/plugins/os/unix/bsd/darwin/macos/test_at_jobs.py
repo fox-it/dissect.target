@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     ],
 )
 def test_at_jobs(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    # Test data was created by running: echo 'say "hello"' | at 09:00 tomorrow
+    # Command was executed on: 2026-05-11 (PDT time).
     tz = timezone.utc
     data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/{test_file}")
     fs_unix.map_file(f"/usr/lib/cron/jobs/{test_file}", data_file)

@@ -21,10 +21,12 @@ if TYPE_CHECKING:
             (
                 "loginwindow.plist",
                 "com.apple.loginwindow.E253F552-3A40-5010-9ACE-98662C9CFE20.plist",
+                "com.apple.loginwindow.16130786-970B-53D1-A07B-005E50471D95.plist",
             ),
             (
                 "/Users/user/Library/Preferences/loginwindow.plist",
                 "/Users/user/Library/Preferences/ByHost/com.apple.loginwindow.E253F552-3A40-5010-9ACE-98662C9CFE20.plist",
+                "/Users/user/Library/Preferences/ByHost/com.apple.loginwindow.16130786-970B-53D1-A07B-005E50471D95.plist",
             ),
         ),
     ],
@@ -58,22 +60,33 @@ def test_login_window(
     with (
         patch.object(entries[0], "stat", return_value=stat_results[0]),
         patch.object(entries[1], "stat", return_value=stat_results[1]),
+        patch.object(entries[2], "stat", return_value=stat_results[2]),
     ):
         target_unix.add_plugin(LoginWindowPlugin)
 
         results = list(target_unix.login_window())
         results.sort(key=lambda r: r.source)
 
-        assert len(results) == 2
+        assert len(results) == 5
 
-        assert not results[0].MiniBuddyLaunch
+        assert not results[0].hide
+        assert results[0].bundle_id == "com.apple.finder"
+        assert results[0].path == "/System/Library/CoreServices/Finder.app"
+        assert results[0].background_state == 2
+        assert results[0].plist_path == "TALAppsToRelaunchAtLogin[0]"
         assert (
             results[0].source
+            == "/Users/user/Library/Preferences/ByHost/com.apple.loginwindow.16130786-970B-53D1-A07B-005E50471D95.plist"
+        )
+
+        assert not results[3].mini_buddy_launch
+        assert (
+            results[3].source
             == "/Users/user/Library/Preferences/ByHost/com.apple.loginwindow.E253F552-3A40-5010-9ACE-98662C9CFE20.plist"
         )
 
-        assert results[-1].BuildVersionStampAsNumber == 52698816
-        assert results[-1].BuildVersionStampAsString == "25E246"
-        assert results[-1].SystemVersionStampAsNumber == 436469760
-        assert results[-1].SystemVersionStampAsString == "26.4"
-        assert results[-1].source == "/Users/user/Library/Preferences/loginwindow.plist"
+        assert results[4].build_version_as_string == "25E246"
+        assert results[4].build_version_stamp_as_number == 52698816
+        assert results[4].system_version_stamp_as_string == "26.4"
+        assert results[4].system_version_stamp_as_number == 436469760
+        assert results[4].source == "/Users/user/Library/Preferences/loginwindow.plist"

@@ -15,7 +15,13 @@ if TYPE_CHECKING:
 
 
 class ResourcesLocalizableStringsPlugin(Plugin):
-    """macOS Resources Localizable.strings plist file."""
+    """macOS Resources Localizable.strings plist file.
+
+    Parses resource files used to store text that can be translated into different languages.
+
+    References:
+        - https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/LoadingResources/Strings/Strings.html
+    """
 
     def __init__(self, target: Target):
         super().__init__(target)

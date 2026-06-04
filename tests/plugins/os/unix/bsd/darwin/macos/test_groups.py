@@ -42,26 +42,26 @@ def test_groups(test_files: list[str], target_unix: Target, fs_unix: VirtualFile
         results.sort(key=lambda r: r.realname)
         assert len(results) == 3
 
-        assert results[0].generateduid == "ABCDEFAB-CDEF-ABCD-EFAB-CDEFFFFFFFFE"
-        assert results[0].members is None
-        assert results[0].smb_sid == "S-1-0-0"
-        assert results[0].gid == -2
-        assert results[0].name == "['nobody', 'BUILTIN\\\\Nobody']"
-        assert results[0].realname == "Nobody"
+        assert results[0].generateduid == ["ABCDEFAB-CDEF-ABCD-EFAB-CDEFFFFFFFFE"]
+        assert results[0].members == []
+        assert results[0].smb_sid == ["S-1-0-0"]
+        assert results[0].gid == [-2]
+        assert results[0].name == ["nobody", "BUILTIN\\Nobody"]
+        assert results[0].realname == ["Nobody"]
         assert results[0].source == "/var/db/dslocal/nodes/Default/groups/nobody.plist"
 
-        assert results[-1].generateduid == "ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000104"
-        assert results[-1].members is None
-        assert results[-1].smb_sid is None
-        assert results[-1].gid == 260
-        assert results[-1].name == "_applepay"
-        assert results[-1].realname == "applepay Daemon"
-        assert results[-1].source == "/var/db/dslocal/nodes/Default/groups/_applepay.plist"
-
-        assert results[1].generateduid == "ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000129"
-        assert results[1].members == "_eligibilityd"
-        assert results[1].smb_sid is None
-        assert results[1].gid == 297
-        assert results[1].name == "_eligibilityd"
-        assert results[1].realname == "OS Eligibility Daemon"
+        assert results[1].generateduid == ["ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000129"]
+        assert results[1].members == ["_eligibilityd"]
+        assert results[1].smb_sid == []
+        assert results[1].gid == [297]
+        assert results[1].name == ["_eligibilityd"]
+        assert results[1].realname == ["OS Eligibility Daemon"]
         assert results[1].source == "/var/db/dslocal/nodes/Default/groups/_eligibilityd.plist"
+
+        assert results[2].generateduid == ["ABCDEFAB-CDEF-ABCD-EFAB-CDEF00000104"]
+        assert results[2].members == []
+        assert results[2].smb_sid == []
+        assert results[2].gid == [260]
+        assert results[2].name == ["_applepay"]
+        assert results[2].realname == ["applepay Daemon"]
+        assert results[2].source == "/var/db/dslocal/nodes/Default/groups/_applepay.plist"

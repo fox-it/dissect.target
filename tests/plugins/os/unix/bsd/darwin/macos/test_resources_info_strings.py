@@ -17,8 +17,11 @@ if TYPE_CHECKING:
     ("names", "paths"),
     [
         (
-            ("InfoPlist.strings",),
-            ("/System/Library/Extensions/OSvKernDSPLib.kext/Contents/Resources/InfoPlist.strings",),
+            ("WiFiAgent.strings", "OSvKernDSPLib.strings"),
+            (
+                "/System/Library/CoreServices/WiFiAgent.app/Contents/Resources/InfoPlist.strings",
+                "/System/Library/Extensions/OSvKernDSPLib.kext/Contents/Resources/InfoPlist.strings",
+            ),
         )
     ],
 )
@@ -38,12 +41,40 @@ def test_resources_info_strings(
 
     with (
         patch.object(entries[0], "stat", return_value=stat_results[0]),
+        patch.object(entries[1], "stat", return_value=stat_results[1]),
     ):
         target_unix.add_plugin(ResourcesInfoStringsPlugin)
 
         results = list(target_unix.resources_info_strings())
         results.sort(key=lambda r: (r.source, getattr(r, "plist_path", "")))
-        assert len(results) == 1
+        assert len(results) == 2
 
-        assert results[0].NSHumanReadableCopyright == "Copyright © 2004 Apple Inc. All rights reserved."
-        assert results[0].source == "/System/Library/Extensions/OSvKernDSPLib.kext/Contents/Resources/InfoPlist.strings"
+        assert results[0].cf_bundle_name == "WiFiAgent"
+        assert results[0].cf_bundle_display_name == "Wi-Fi"
+        assert results[0].cf_bundle_identifier is None
+        assert results[0].cf_bundle_version is None
+        assert results[0].cf_bundle_package_type is None
+        assert results[0].cf_bundle_signature is None
+        assert results[0].cf_bundle_executable is None
+        assert results[0].cf_bundle_document_types == []
+        assert results[0].cf_bundle_short_version_string is None
+        assert results[0].ls_minimum_system_version is None
+        assert results[0].ns_human_readable_copyright is None
+        assert results[0].ns_main_nib_file is None
+        assert results[0].ns_principal_class is None
+        assert results[0].source == "/System/Library/CoreServices/WiFiAgent.app/Contents/Resources/InfoPlist.strings"
+
+        assert results[1].cf_bundle_name is None
+        assert results[1].cf_bundle_display_name is None
+        assert results[1].cf_bundle_identifier is None
+        assert results[1].cf_bundle_version is None
+        assert results[1].cf_bundle_package_type is None
+        assert results[1].cf_bundle_signature is None
+        assert results[1].cf_bundle_executable is None
+        assert results[1].cf_bundle_document_types == []
+        assert results[1].cf_bundle_short_version_string is None
+        assert results[1].ls_minimum_system_version is None
+        assert results[1].ns_human_readable_copyright == "Copyright © 2004 Apple Inc. All rights reserved."
+        assert results[1].ns_main_nib_file is None
+        assert results[1].ns_principal_class is None
+        assert results[1].source == "/System/Library/Extensions/OSvKernDSPLib.kext/Contents/Resources/InfoPlist.strings"

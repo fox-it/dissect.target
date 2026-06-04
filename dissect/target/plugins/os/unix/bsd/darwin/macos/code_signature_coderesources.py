@@ -43,6 +43,26 @@ OptionalRecord = TargetRecordDescriptor(
     ],
 )
 
+HashRecord = TargetRecordDescriptor(
+    "macos/code_signature_coderesources/hash",
+    [
+        ("string", "hash"),
+        ("boolean", "optional"),
+        ("string", "plist_path"),
+        ("path", "source"),
+    ],
+)
+
+HashTwoRecord = TargetRecordDescriptor(
+    "macos/code_signature_coderesources/hash_two",
+    [
+        ("string", "hash2"),
+        ("boolean", "optional"),
+        ("string", "plist_path"),
+        ("path", "source"),
+    ],
+)
+
 CDHashRecord = TargetRecordDescriptor(
     "macos/code_signature_coderesources/cdhash",
     [
@@ -57,6 +77,8 @@ CodeSignatureCodeResourcesRecords = (
     OmitRecord,
     NestedRecord,
     OptionalRecord,
+    HashRecord,
+    HashTwoRecord,
     CDHashRecord,
 )
 
@@ -66,7 +88,19 @@ FIELD_MAPPINGS = {
 
 
 class CodeSignatureCodeResourcesPlugin(Plugin):
-    """macOS Code signature CodeResources plugin."""
+    """macOS Code signature CodeResources plugin.
+
+
+    _CodeSignature/CodeResources files are part of the macOS code
+    signing system and store metadata about signed resources within an
+    application bundle. They contains hashes and rules used to verify the
+    integrity of code and resources during code signature validation.
+
+    References:
+        - https://developer.apple.com/library/archive/documentation/Security/Conceptual/CodeSigningGuide/AboutCS/AboutCS.html
+        - https://developer.apple.com/documentation/endpointsecurity/es_process_t/cdhash
+        - https://alfiecg.uk/2024/01/06/Ad-hoc-signing.html
+    """
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -78,7 +112,49 @@ class CodeSignatureCodeResourcesPlugin(Plugin):
 
     @export(record=CodeSignatureCodeResourcesRecords)
     def code_signature_coderesources(self) -> Iterator[CodeSignatureCodeResourcesRecords]:
-        """Yield code signature coderesources information."""
+        """Return macOS CodeResources plist entries.
+
+        Yields the following record types:
+
+        .. code-block:: text
+
+            OmitRecord:
+                omit (boolean): Flag indicating the entry is marked as omitted.
+                weight (varint): Priority over other resources.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the CodeResources file.
+
+            NestedRecord:
+                nested (boolean): Flag indicating the entry may be associated with nested code,
+                    such as libraries, helper tools, and other bits of code that are embedded in the app.
+                weight (varint): Priority over other resources.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the CodeResources file.
+
+            OptionalRecord:
+                optional (boolean)
+                weight (varint): Priority over other resources.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the CodeResources file.
+
+            HashRecord:
+                hash (string): Hash value.
+                optional (boolean): Flag indicating the entry is marked as optional.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the CodeResources file.
+
+            HashTwoRecord:
+                hash2 (string): Secondary hash value.
+                optional (boolean): Flag indicating the entry is marked as optional.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the CodeResources file.
+
+            CDHashRecord:
+                cdhash (string): The code directory hash value.
+                requirement (string): Code signing requirement.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the CodeResources file.
+        """
         yield from build_plist_records(
             self, self.files, CodeSignatureCodeResourcesRecords, field_mappings=FIELD_MAPPINGS
         )

@@ -27,23 +27,28 @@ SqliteDatabasePropertiesRecord = TargetRecordDescriptor(
 
 
 class IdentityServicesPlugin(Plugin):
-    """macOS identity services plugin."""
+    """macOS identity services plugin.
+
+    ids.db is a SQLite database used by macOS's Identity Services framework (IDS),
+    the system that powers services like iMessage and FaceTime via the identityservicesd
+    daemon to store local identity-related data and metadata.
+    """
 
     USER_PATH = ("Library/IdentityServices/ids.db",)
 
     def __init__(self, target: Target):
         super().__init__(target)
-
-        self.files = set()
-        self._find_files()
+        self.files = self._find_files()
 
     def check_compatible(self) -> None:
         if not (self.files):
             raise UnsupportedPluginError("No ids.db files found")
 
-    def _find_files(self) -> None:
+    def _find_files(self) -> set:
+        files = set()
         for _, path in _build_userdirs(self, self.USER_PATH):
-            self.files.add(path)
+            files.add(path)
+        return files
 
     @export(
         record=[
@@ -57,7 +62,17 @@ class IdentityServicesPlugin(Plugin):
             SqliteDatabasePropertiesRecord,
         ]
     ]:
-        """Yield identity services information."""
+        """Return identity services information.
+
+        Yields SqliteDatabasePropertiesRecords with the following fields:
+
+        .. code-block:: text
+
+            table (string): Name of the source table (_SqliteDatabaseProperties).
+            key (string): Key name.
+            value (string): Value associated with the key.
+            source (path): Path to the com.apple.airport.preferences.plist file.
+        """
         for file in self.files:
             with SQLite3(file) as database:
                 for row in database.table("_SqliteDatabaseProperties").rows():
@@ -68,4 +83,4 @@ class IdentityServicesPlugin(Plugin):
                         source=file,
                     )
 
-            # Still missing outgoing_message, sqlite_sequence, incoming_message, outgoing_messages_to_delete tables
+            # TODO: Add outgoing_message, sqlite_sequence, incoming_message, outgoing_messages_to_delete tables

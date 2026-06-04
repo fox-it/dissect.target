@@ -156,3 +156,5 @@ def test_periodic_conf(
         assert results[3].monthly_status_security_output is None
         assert results[3].monthly_local == "/etc/monthly.local"
         assert results[3].source == "/etc/defaults/periodic.conf"
+
+        # TODO: Add test for PeriodicConfSecurityRecord

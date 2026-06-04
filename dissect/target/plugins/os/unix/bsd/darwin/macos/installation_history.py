@@ -25,40 +25,46 @@ InstallationHistoryRecord = TargetRecordDescriptor(
 
 
 class InstallationHistoryPlugin(Plugin):
-    """macOS Software installation history property list plugin."""
+    """macOS Software installation history property list plugin.
+
+    Extracts the history of installed applications and updates.
+
+    References:
+        - https://forensics.wiki/mac_os_x_10.9_artifacts_location/#software-installation
+    """
 
     PATH = "/Library/Receipts/InstallHistory.plist"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.file = None
-        self._resolve_file()
-
-    def _resolve_file(self) -> None:
-        path = self.target.fs.path(self.PATH)
-        if path.exists():
-            self.file = path
+        self.file = self.target.fs.path(self.PATH) if self.target.fs.path(self.PATH).exists() else None
 
     def check_compatible(self) -> None:
         if not self.file:
-            raise UnsupportedPluginError("No InstallHistory.plis file found")
+            raise UnsupportedPluginError("No InstallHistory.plist file found")
 
     @export(record=InstallationHistoryRecord)
     def installation_history(self) -> Iterator[InstallationHistoryRecord]:
-        """Yield installation history information."""
+        """Return installation history information.
+
+        Yields InstallationHistoryRecord with the following fields:
+
+        .. code-block:: text
+
+            ts (datetime): Timestamp of the installation.
+            display_name (string): Display name of the installed software.
+            display_version (string): Display version of the installed software.
+            process_name (string): Name of the installation process.
+            source (path): Path to the InstallHistory.plist file.
+        """
         plist = plistlib.load(self.file.open())
         data = plist[0]
 
-        display_name = data.get("displayName")
-        display_version = data.get("displayVersion")
-        process_name = data.get("processName")
-        date = data.get("date")
-
         yield InstallationHistoryRecord(
-            ts=date,
-            display_name=display_name,
-            display_version=display_version,
-            process_name=process_name,
+            ts=data.get("date"),
+            display_name=data.get("displayName"),
+            display_version=data.get("displayVersion"),
+            process_name=data.get("processName"),
             source=self.file,
             _target=self.target,
         )

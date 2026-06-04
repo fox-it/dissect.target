@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import struct
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -46,11 +45,19 @@ struct asl_record {
 };
 """)
 
+cs.load("""
+struct asl_string_header {
+    uint16 marker;
+    uint32 length;
+};
+""")
+
+
 ASLRecord = TargetRecordDescriptor(
     "macos/logs/asl",
     [
         ("datetime", "ts"),
-        ("varint", "severity_level"),
+        ("varint", "priority_level"),
         ("varint", "pid"),
         ("string", "asl_host"),
         ("string", "sender"),
@@ -62,16 +69,24 @@ ASLRecord = TargetRecordDescriptor(
 
 
 def _parse_asl_string_ref(data: bytes, ref: int) -> str | None:
+    # Resolve a string reference from the ASL file (inline or external)
     if ref == 0:
         return None
 
+    # Inline string packed into the reference itself
     if ref & 0x8000000000000000:
-        ref_bytes = struct.pack(">Q", ref & 0x7FFFFFFFFFFFFFFF)
+        ref_bytes = (ref & 0x7FFFFFFFFFFFFFFF).to_bytes(8, "big")
         slen = ref_bytes[0]
         return ref_bytes[1 : 1 + slen].decode("utf-8", errors="replace").rstrip("\x00")
 
+    # External string stored elsewhere in the file
     if ref + 6 < len(data) and data[ref : ref + 2] == b"\x00\x01":
-        slen = struct.unpack(">I", data[ref + 2 : ref + 6])[0]
+        try:
+            hdr = cs.asl_string_header(data[ref : ref + 6])
+            slen = hdr.length
+        except Exception:
+            return None
+
         if 0 < slen < 65536 and ref + 6 + slen <= len(data):
             return data[ref + 6 : ref + 6 + slen].decode("utf-8", errors="replace").rstrip("\x00")
 
@@ -94,33 +109,35 @@ def _valid_ref(data: bytes, ref: int) -> bool:
 
 
 def _parse_asl_file(data: bytes) -> Iterator[dict[str, Any]]:
-    """Parse an ASL DB binary file using cstruct."""
+    # Basic file validation (header + minimum size)
     if len(data) < 80 or data[:6] != b"ASL DB":
         return
 
     now = int(datetime.now(tz=timezone.utc).timestamp())
-    pos = 0x80
+    pos = 0x80  # Records typically start after header
 
+    # Iterate through file and try to locate valid ASL records
     while pos < len(data) - 60:
         rec_len = int.from_bytes(data[pos : pos + 2], "big")
 
-        # Sanity checks
+        # Skip invalid or unrealistic record sizes
         if rec_len < 120 or rec_len > 65535 or pos + rec_len + 2 > len(data):
             pos += 2
             continue
 
-        # Parse struct safely
         try:
+            # Parse record structure using cstruct
             rec = cs.asl_record(data[pos + 2 : pos + 2 + rec_len])
         except Exception:
             pos += 2
             continue
 
-        # Timestamp validation
+        # Filter out invalid timestamps
         if not (946684800 < rec.time_s < now + 31536000):
             pos += 2
             continue
 
+        # Validate that at least one string reference looks valid
         refs = [
             rec.host_ref,
             rec.sender_ref,
@@ -134,12 +151,13 @@ def _parse_asl_file(data: bytes) -> Iterator[dict[str, Any]]:
             pos += 2
             continue
 
-        # Decode strings
+        # Decode referenced strings (host, sender, etc.)
         host = _parse_asl_string_ref(data, rec.host_ref)
         sender = _parse_asl_string_ref(data, rec.sender_ref)
         facility = _parse_asl_string_ref(data, rec.facility_ref)
         message = _parse_asl_string_ref(data, rec.message_ref)
 
+        # Drop non-printable strings
         if not _valid_value(host):
             host = None
         if not _valid_value(sender):
@@ -149,10 +167,12 @@ def _parse_asl_file(data: bytes) -> Iterator[dict[str, Any]]:
         if not _valid_value(message):
             message = None
 
+        # Skip records without meaningful string content
         if not any([host, sender, facility, message]):
             pos += 2
             continue
 
+        # Yield parsed log entry
         yield {
             "ts": datetime.fromtimestamp(rec.time_s, tz=timezone.utc),
             "level": rec.level,
@@ -163,11 +183,21 @@ def _parse_asl_file(data: bytes) -> Iterator[dict[str, Any]]:
             "message": message,
         }
 
+        # Move to next record
         pos += rec_len + 2
 
 
 class ASLPlugin(Plugin):
-    """Plugin to parse macOS ASL databases."""
+    """Plugin to parse macOS Apple System Log (ASL) databases.
+
+    The Apple System Log (ASL) system is a macOS logging mechanism designed with a similar goal
+    to the traditional Unix syslog API. ASL logs are stored in a proprietary binary format and
+    are typically located in /private/var/log/asl/.
+
+    References:
+        - https://asl.readthedocs.io/en/latest/api.html#asl-messages
+        - https://www.cyberengage.org/post/making-sense-of-macos-logs-part1-a-user-friendly-guide
+    """
 
     ASL_PATHS = (
         "var/log/asl/*.asl",
@@ -177,14 +207,17 @@ class ASLPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self._asl_files = set()
-        self._find_files()
+        self._asl_files = self._find_files()
 
-    def _find_files(self) -> None:
+    def _find_files(self) -> set:
+        files = set()
+
         for pattern in self.ASL_PATHS:
             for path in self.target.fs.path("/").glob(pattern):
                 if path.is_file():
-                    self._asl_files.add(path)
+                    files.add(path)
+
+        return files
 
     def check_compatible(self) -> None:
         if not self._asl_files:
@@ -192,7 +225,29 @@ class ASLPlugin(Plugin):
 
     @export(record=ASLRecord)
     def asl(self) -> Iterator[ASLRecord]:
-        """Return all apple system log messages."""
+        """Return all macOS Apple System Log (ASL) messages.
+
+        Yields ASLRecord with the following fields:
+
+        .. code-block:: text
+
+            ts (datetime): Timestamp (UTC).
+            priority_level (varint): ASL priority level:
+                0 = Emergency.
+                1 = Alert.
+                2 = Critical.
+                3 = Error.
+                4 = Warning.
+                5 = Notice.
+                6 = Informational.
+                7 = Debug.
+            pid (varint): Process ID.
+            asl_host (string): Hostname as stored in the ASL record.
+            sender (string): Sender process name.
+            facility (string): Logging facility.
+            message (string): Log message content.
+            source (path): Path to the ASL file.
+        """
         for asl_path in self._asl_files:
             try:
                 with asl_path.open("rb") as fh:
@@ -205,7 +260,7 @@ class ASLPlugin(Plugin):
             for rec in records:
                 yield ASLRecord(
                     ts=rec["ts"],
-                    severity_level=rec["level"],
+                    priority_level=rec["level"],
                     pid=rec["pid"],
                     asl_host=rec["host"],
                     sender=rec["sender"],

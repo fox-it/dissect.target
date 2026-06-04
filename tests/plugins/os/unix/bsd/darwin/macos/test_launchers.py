@@ -72,10 +72,20 @@ def test_launch_agents(
             "/System/Library/PrivateFrameworks/Ecosystem.framework/Support/ecosystemagent"
         ]
         assert results[0].keep_alive is None
+        assert results[0].on_demand is None
+        assert results[0].disabled is None
         assert results[0].run_at_load is None
+        assert results[0].launch_only_once is None
         assert results[0].process_type == "Background"
+        assert results[0].wait is None
         assert results[0].limit_load_to_session_type is None
+        assert results[0].limit_load_to_developer_mode is None
+        assert results[0].limit_load_from_variant is None
+        assert results[0].limit_load_to_variant is None
+        assert results[0].limit_load_from_boot_mode is None
+        assert results[0].limit_load_to_boot_mode == []
         assert results[0].limit_load_from_hardware == []
+        assert results[0].limit_load_to_hardware == []
         assert results[0].launch_events == []
         assert results[0].mach_services == [
             "('com.apple.ecosystem.agent.clear-notifications', True)",
@@ -87,9 +97,30 @@ def test_launch_agents(
         assert results[0].enable_transactions
         assert results[0].environment_variables == []
         assert results[0].user_name is None
+        assert results[0].init_groups is None
+        assert results[0].group_name is None
+        assert results[0].start_interval is None
+        assert results[0].start_calendar_interval == []
+        assert results[0].throttle_interval is None
+        assert results[0].enable_globbing is None
+        assert results[0].standard_in_path is None
+        assert results[0].standard_out_path is None
+        assert results[0].standard_error_path is None
+        assert results[0].nice is None
+        assert results[0].abandon_process_group is None
         assert results[0].low_priority_io
+        assert results[0].root_directory is None
+        assert results[0].working_directory is None
+        assert results[0].umask is None
+        assert results[0].time_out is None
+        assert results[0].exit_time_out is None
         assert results[0].watch_paths == []
         assert results[0].queue_directories == []
+        assert results[0].start_on_mount is None
+        assert results[0].soft_resource_limits == []
+        assert results[0].hard_resource_limits == []
+        assert results[0].debug is None
+        assert results[0].wait_for_debugger is None
         assert results[0].plist_path is None
         assert results[0].source == "/System/Library/LaunchAgents/com.apple.ecosystemagent.plist"
 
@@ -117,21 +148,57 @@ def test_launch_agents(
 
         assert results[3].un_notification_icon_default == "notification-settings"
         assert results[3].un_notification_icon_settings == "notification-settings"
-
         assert results[3].plist_path == "UNUserNotificationCenter/UNNotificationIcons"
         assert results[3].source == "/System/Library/LaunchAgents/com.apple.ecosystemagent.plist"
 
         assert results[4].label == "com.openssh.ssh-agent"
         assert results[4].program is None
         assert results[4].program_arguments == ["/usr/bin/ssh-agent", "-l"]
+        assert results[4].keep_alive is None
+        assert results[4].on_demand is None
+        assert results[4].disabled is None
+        assert results[4].run_at_load is None
+        assert results[4].launch_only_once is None
         assert results[4].process_type is None
+        assert results[4].wait is None
+        assert results[4].limit_load_to_session_type is None
+        assert results[4].limit_load_to_developer_mode is None
+        assert results[4].limit_load_from_variant is None
+        assert results[4].limit_load_to_variant is None
+        assert results[4].limit_load_from_boot_mode is None
+        assert results[4].limit_load_to_boot_mode == []
+        assert results[4].limit_load_from_hardware == []
+        assert results[4].limit_load_to_hardware == []
+        assert results[4].launch_events == []
         assert results[4].mach_services == []
         assert results[4].enable_pressured_exit is None
         assert results[4].enable_transactions
         assert results[4].environment_variables == []
         assert results[4].user_name is None
+        assert results[4].init_groups is None
+        assert results[4].group_name is None
+        assert results[4].start_interval is None
+        assert results[4].start_calendar_interval == []
+        assert results[4].throttle_interval is None
+        assert results[4].enable_globbing is None
+        assert results[4].standard_in_path is None
+        assert results[4].standard_out_path is None
+        assert results[4].standard_error_path is None
+        assert results[4].nice is None
+        assert results[4].abandon_process_group is None
+        assert results[4].low_priority_io is None
+        assert results[4].root_directory is None
+        assert results[4].working_directory is None
+        assert results[4].umask is None
+        assert results[4].time_out is None
+        assert results[4].exit_time_out is None
         assert results[4].watch_paths == []
         assert results[4].queue_directories == []
+        assert results[4].start_on_mount is None
+        assert results[4].soft_resource_limits == []
+        assert results[4].hard_resource_limits == []
+        assert results[4].debug is None
+        assert results[4].wait_for_debugger is None
         assert results[4].plist_path is None
         assert results[4].source == "/Users/user/Library/LaunchAgents/com.openssh.ssh-agent.plist"
 
@@ -149,7 +216,6 @@ def test_launch_agents(
         assert results[5].sock_path_group is None
         assert results[5].bonjour is None
         assert results[5].multicast_group is None
-        assert results[5].receive_packet_info is None
         assert results[5].plist_path == "Sockets/Listeners"
         assert results[5].source == "/Users/user/Library/LaunchAgents/com.openssh.ssh-agent.plist"
 
@@ -241,6 +307,11 @@ def test_launch_daemons(
         assert results[0].queue_directories == []
         assert results[0].start_on_mount is None
         assert results[0].soft_resource_limits == []
+        assert results[0].hard_resource_limits == []
+        assert results[0].debug is None
+        assert results[0].wait_for_debugger is None
+        assert results[0].plist_path is None
+        assert results[0].source == "/System/Library/LaunchDaemons/org.cups.cupsd.plist"
 
         assert results[1].socket_key is None
         assert results[1].sock_type is None
@@ -256,6 +327,5 @@ def test_launch_daemons(
         assert results[1].sock_path_group is None
         assert results[1].bonjour is None
         assert results[1].multicast_group is None
-        assert results[1].receive_packet_info is None
         assert results[1].plist_path == "Sockets/Listeners[0]"
         assert results[1].source == "/System/Library/LaunchDaemons/org.cups.cupsd.plist"

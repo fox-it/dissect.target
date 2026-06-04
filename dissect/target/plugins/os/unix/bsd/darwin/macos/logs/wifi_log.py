@@ -44,19 +44,20 @@ WifiLogRecord = TargetRecordDescriptor(
 
 
 class WifiLogPlugin(Plugin):
-    """macOS WiFi logs plugin."""
+    """Plugin to parse WiFi logs on macOS.
+
+    Contains information on WiFi connections and known hotspots
+
+    References:
+        - https://www.cyberengage.org/post/macos-incident-response-tactics-log-analysis-and-forensic-tools
+        - https://www.hackthelogs.com/MacLogs.html
+    """
 
     PATH = "/var/log/wifi.log"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.file = None
-        self._resolve_file()
-
-    def _resolve_file(self) -> None:
-        path = self.target.fs.path(self.PATH)
-        if path.exists():
-            self.file = path
+        self.file = self.target.fs.path(self.PATH) if self.target.fs.path(self.PATH).exists() else None
 
     def check_compatible(self) -> None:
         if not self.file:
@@ -64,7 +65,17 @@ class WifiLogPlugin(Plugin):
 
     @export(record=WifiLogRecord)
     def wifi_log(self) -> Iterator[WifiLogRecord]:
-        """Return all macOS WiFi log messages."""
+        """Return all macOS Wi-Fi log messages.
+
+        Yields WifiLogRecord with the following fields:
+
+        .. code-block:: text
+
+            ts (datetime): Timestamp (UTC) derived from the log line.
+            host (string): Hostname parsed from the log entry.
+            message (string): Log message content.
+            source (path): Path to the wifi.log file.
+        """
         current_buf = ""
 
         for ts, line in year_rollover_helper(

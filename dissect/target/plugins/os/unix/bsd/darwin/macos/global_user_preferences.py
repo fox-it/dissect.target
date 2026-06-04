@@ -15,23 +15,28 @@ if TYPE_CHECKING:
 
 
 class GlobalUserPreferencesPlugin(Plugin):
-    """macOS global user preferences plugin."""
+    """macOS global user preferences plugin.
+
+    .GlobalPreferences.plist files are located in each user's
+    ~/Library/Preferences directory. This property list contains
+    system-wide preference settings that apply across applications for the user.
+    """
 
     PATHS = ("Library/Preferences/.GlobalPreferences.plist",)
 
     def __init__(self, target: Target):
         super().__init__(target)
-
-        self.files = set()
-        self._find_files()
+        self.files = self._find_files()
 
     def check_compatible(self) -> None:
         if not (self.files):
             raise UnsupportedPluginError("No global user preferences files found")
 
-    def _find_files(self) -> None:
+    def _find_files(self) -> set:
+        files = set()
         for _, path in _build_userdirs(self, self.PATHS):
-            self.files.add(path)
+            files.add(path)
+        return files
 
     @export(record=DynamicDescriptor(["string"]))
     def global_user_preferences(self) -> Iterator[DynamicDescriptor]:

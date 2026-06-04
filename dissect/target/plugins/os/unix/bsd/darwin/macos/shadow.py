@@ -26,26 +26,42 @@ ShadowRecord = TargetRecordDescriptor(
 
 
 class ShadowPlugin(Plugin):
-    """Unix shadow passwords plugin."""
+    """macOS shadow plugin.
+
+    Parses user password hashes plist files.
+    """
 
     USER_FILE_GLOB = "/var/db/dslocal/nodes/Default/users/*.plist"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.user_files = set()
-        self._resolve_files()
+        self.user_files = self._resolve_files()
 
     def check_compatible(self) -> None:
         if not self.user_files:
             raise UnsupportedPluginError("No shadow files found")
 
-    def _resolve_files(self) -> None:
+    def _resolve_files(self) -> set:
+        user_files = set()
         for file in self.target.fs.glob(self.USER_FILE_GLOB):
-            self.user_files.add(file)
+            user_files.add(file)
+        return user_files
 
     @export(record=ShadowRecord)
     def passwords(self) -> Iterator[ShadowRecord]:
-        """Yield shadow records from macOS user plist files."""
+        """Return user password hashes from macOS user plist files.
+
+        Yields ShadowRecords with the following fields:
+
+        .. code-block:: text
+
+            name (string): Username associated with the hash.
+            hash (string): Hex-encoded password hash.
+            salt (string): Hex-encoded salt used for key derivation.
+            iterations (varint): Number of iterations used by the hashing algorithm.
+            algorithm (string): Hashing algorithm identifier.
+            source (path): Path to the plist file.
+        """
         for path in self.user_files:
             path = self.target.fs.path(path)
             user = plistlib.load(path.open())

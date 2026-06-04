@@ -17,12 +17,11 @@ ContentsVersionRecord = TargetRecordDescriptor(
     "macos/contents_version",
     [
         ("string", "build_alias_of"),
-        ("string", "relevance_platform"),
-        ("string", "build_version"),
+        ("varint", "build_version"),
         ("string", "cf_bundle_short_version_string"),
         ("string", "cf_bundle_version"),
         ("string", "project_name"),
-        ("string", "source_version"),
+        ("varint", "source_version"),
         ("path", "source"),
     ],
 )
@@ -32,7 +31,6 @@ ContentsVersionRecords = (ContentsVersionRecord,)
 
 FIELD_MAPPINGS = {
     "BuildAliasOf": "build_alias_of",
-    "RelevancePlatform": "relevance_platform",
     "BuildVersion": "build_version",
     "CFBundleShortVersionString": "cf_bundle_short_version_string",
     "CFBundleVersion": "cf_bundle_version",
@@ -42,7 +40,14 @@ FIELD_MAPPINGS = {
 
 
 class ContentsVersionPlugin(Plugin):
-    """macOS Contents version.plist file."""
+    """macOS contents version plugin.
+
+    The version.plist file is a property list found in macOS bundles.
+
+    References:
+    - https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleversion
+    - https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleshortversionstring
+    """
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -54,5 +59,18 @@ class ContentsVersionPlugin(Plugin):
 
     @export(record=ContentsVersionRecord)
     def contents_version(self) -> Iterator[ContentsVersionRecord]:
-        """Yield contents version.plist information."""
+        """Return macOS version.plist entries.
+
+        Yields ContentsVersionRecord with the following fields:
+
+        .. code-block:: text
+
+            build_alias_of (string): Name of another component this entry is associated with.
+            build_version (varint): Build version number.
+            cf_bundle_short_version_string (string): The release or version number of the bundle.
+            cf_bundle_version (string): The version of the build that identifies an iteration of the bundle.
+            project_name (string): Project name.
+            source_version (varint): Internal source version.
+            source (path): Path to the version.plist file.
+        """
         yield from build_plist_records(self, self.files, ContentsVersionRecords, field_mappings=FIELD_MAPPINGS)

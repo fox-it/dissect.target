@@ -5,7 +5,7 @@ import plistlib
 import re
 import uuid
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from itertools import product
 from typing import TYPE_CHECKING, Any, BinaryIO
@@ -32,6 +32,7 @@ def build_sqlite_records(
     record_descriptors: tuple | None = None,
     joins: tuple = (),
     field_mappings: dict | None = None,
+    convert_timestamps: dict | None = None,
 ) -> Iterator[TargetRecordDescriptor]:
     joins_by_table1 = defaultdict(list)
     joins_by_table2 = defaultdict(list)
@@ -67,7 +68,7 @@ def build_sqlite_records(
                                         )
                                 else:
                                     yield from build_record_from_data(
-                                        plugin, file, value, record_descriptors, field_mappings
+                                        plugin, file, value, record_descriptors, field_mappings, convert_timestamps
                                     )
                                     row_dict.pop(key)
 
@@ -75,7 +76,9 @@ def build_sqlite_records(
                             for j2 in joins_by_table2[table.name]:
                                 if row_dict.get(j2["key2"]) is None:
                                     row_dict["table"] = table.name
-                                    yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
+                                    yield build_record(
+                                        plugin, row_dict, file, record_descriptors, field_mappings, convert_timestamps
+                                    )
                                     break
                                 else:
                                     match = False
@@ -87,7 +90,14 @@ def build_sqlite_records(
 
                                     if not match:
                                         row_dict["table"] = table.name
-                                        yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
+                                        yield build_record(
+                                            plugin,
+                                            row_dict,
+                                            file,
+                                            record_descriptors,
+                                            field_mappings,
+                                            convert_timestamps,
+                                        )
                                         break
 
                         elif table.name in joins_by_table1:
@@ -125,13 +135,18 @@ def build_sqlite_records(
                                         combined_row,
                                         file,
                                         record_descriptors,
+                                        convert_timestamps=convert_timestamps,
                                     )
                             else:
-                                yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
+                                yield build_record(
+                                    plugin, row_dict, file, record_descriptors, field_mappings, convert_timestamps
+                                )
 
                         else:
                             row_dict["table"] = table.name
-                            yield build_record(plugin, row_dict, file, record_descriptors, field_mappings)
+                            yield build_record(
+                                plugin, row_dict, file, record_descriptors, field_mappings, convert_timestamps
+                            )
         except Exception:
             plugin.target.log.exception("Failed to process SQLite file: %s", file)
 
@@ -232,6 +247,7 @@ def build_plist_records(
     record_descriptors: tuple | None = None,
     collapse_paths: set[tuple[str, bool]] | None = None,
     field_mappings: dict | None = None,
+    convert_timestamps: dict | None = None,
     function_name: str | None = None,
 ) -> Iterator[Record]:
     for file in files:
@@ -256,6 +272,7 @@ def build_plist_records(
                 record_descriptors=record_descriptors,
                 collapse_paths=collapse_paths,
                 field_mappings=field_mappings,
+                convert_timestamps=convert_timestamps,
                 function_name=function_name,
             )
 
@@ -269,6 +286,7 @@ def build_record_from_data(
     raw_data: bytes,
     record_descriptors: tuple | None = None,
     field_mappings: dict | None = None,
+    convert_timestamps: dict | None = None,
     function_name: str | None = None,
 ) -> Iterator[Record]:
     try:
@@ -287,6 +305,7 @@ def build_record_from_data(
             file,
             record_descriptors=record_descriptors,
             field_mappings=field_mappings,
+            convert_timestamps=convert_timestamps,
             function_name=function_name,
         )
 
@@ -330,31 +349,38 @@ def select_descriptor(
     plugin: Plugin,
     source: Path | None,
 ) -> TargetRecordDescriptor | None:
-    rdict_keys = {format_key(k) for k in rdict}
+    formatted_rdict = {format_key(k): type(v).__name__ for k, v in rdict.items()}
 
     selected_record = None
     best_match_count = 0
+    best_match_length = 0
 
     for record in record_descriptors:
         record_keys = set(record.fields.keys())
 
-        matched_keys = rdict_keys & record_keys
+        matched_keys = set(formatted_rdict.keys()) & record_keys
         match_count = len(matched_keys)
 
         if match_count > best_match_count:
             best_match_count = match_count
+            best_match_length = len(record_keys)
+            selected_record = record
+
+        elif match_count == best_match_count and len(record_keys) < best_match_length:
+            best_match_length = len(record_keys)
             selected_record = record
 
     if best_match_count == 0:
         return None
 
-    missing_fields = rdict_keys - set(selected_record.fields.keys())
+    missing_fields = {key: type_name for key, type_name in formatted_rdict.items() if key not in selected_record.fields}
+
     if missing_fields:
-        print(rdict)
+        formatted = ", ".join(f"{k} ({v})" for k, v in sorted(missing_fields.items()))
         plugin.target.log.warning(
             "Source %s contains fields not defined in the selected record descriptor: %s",
             source,
-            sorted(missing_fields),
+            formatted,
         )
 
     return selected_record
@@ -366,6 +392,7 @@ def build_record(
     source: Path | None,
     record_descriptors: tuple | None = None,
     field_mappings: dict | None = None,
+    convert_timestamps: dict | None = None,
 ) -> Record:
     if field_mappings:
         for key in list(rdict):
@@ -392,9 +419,22 @@ def build_record(
     }
 
     for k, v in filtered_rdict.items():
-        record_values[format_key(k)] = v
+        key = format_key(k)
+        if convert_timestamps and key in convert_timestamps:
+            v = convert_timestamp(v, convert_timestamps[key])
+        record_values[key] = v
 
     return desc(**record_values)
+
+
+def convert_timestamp(value: Any, mode: str) -> datetime | None:
+    if value is None or isinstance(value, datetime):
+        return value
+
+    if mode == "2001":
+        return datetime(2001, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=float(value))
+
+    return value
 
 
 def create_event_descriptor(function_name: str, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
@@ -442,6 +482,7 @@ def emit_dict_records(
     record_descriptors: tuple | None = None,
     collapse_paths: set[tuple[str, bool]] | None = None,
     field_mappings: dict | None = None,
+    convert_timestamps: dict | None = None,
     function_name: str | None = None,
 ) -> Iterator[Record]:
     if path and path.endswith("$class"):
@@ -472,7 +513,6 @@ def emit_dict_records(
 
             if cleaned_list or not contains_dict:
                 attributes[k] = cleaned_list
-
         else:
             attributes[k] = v
 
@@ -490,7 +530,7 @@ def emit_dict_records(
         if record_descriptors is None:
             yield dynamic_build_record(plugin, function_name, record_data, source)
         else:
-            yield build_record(plugin, record_data, source, record_descriptors, field_mappings)
+            yield build_record(plugin, record_data, source, record_descriptors, field_mappings, convert_timestamps)
 
     for k, child in child_dicts.items():
         child_path = f"{path}/{k}" if path else k
@@ -503,6 +543,7 @@ def emit_dict_records(
             record_descriptors=record_descriptors,
             collapse_paths=collapse_paths,
             field_mappings=field_mappings,
+            convert_timestamps=convert_timestamps,
             function_name=function_name,
         )
 

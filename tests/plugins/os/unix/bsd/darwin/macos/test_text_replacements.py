@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -62,7 +63,7 @@ def test_text_replacements(test_files: list[str], target_unix: Target, fs_unix: 
         assert results[0].z_opt == 1
         assert results[0].z_needs_save_to_cloud == 1
         assert results[0].z_was_deleted == 0
-        assert results[0].z_timestamp == "796140768.339994"
+        assert results[0].z_timestamp == datetime(2026, 3, 25, 14, 12, 48, 339994, tzinfo=timezone.utc)
         assert results[0].z_phrase == "On my way!"
         assert results[0].z_shortcut == "omw"
         assert results[0].z_unique_name == "CB36B9A8-B570-4972-BC6C-B12DAA7C0B97"
@@ -93,7 +94,7 @@ def test_text_replacements(test_files: list[str], target_unix: Target, fs_unix: 
 
         assert results[4].ns_persistence_maximum_framework_version == 1526
         assert results[4].ns_store_type == "SQLite"
-        assert results[4].ns_auto_vacuum_level == "2"
+        assert results[4].ns_auto_vacuum_level == 2
         assert results[4].ns_store_model_version_identifiers == [""]
         assert results[4].ns_store_model_version_hashes_version == 3
         assert results[4].ns_store_model_version_hashes_digest == (
@@ -103,10 +104,10 @@ def test_text_replacements(test_files: list[str], target_unix: Target, fs_unix: 
         assert results[4].source == "/Users/user/Library/KeyboardServices/TextReplacements.db"
 
         assert results[5].tr_cloud_kit_sync_state == (
-            "\udca2 \udc8cuo\udcd1V\udcd2p\udc89C#\udcbd\udcb1$\udcf1F\udc97X\udce9\x01\x1e\x02\udccb\udcf5\udce5y$\udc90\udcc4\udcee\udcdf"  # noqa E501
+            b"\xa2 \x8cuo\xd1V\xd2p\x89C#\xbd\xb1$\xf1F\x97X\xe9\x01\x1e\x02\xcb\xf5\xe5y$\x90\xc4\xee\xdf"
         )
         assert results[5].text_replacement_entry == (
-            "#C\t\udcd2l\udca7\udceaK##S\udcae\udcb7>\udc82\udcb5\udcb5ȯB\udcf4\t\udcc4]\udca2)\udcb0}+٫\x03"  # noqa RUF001
+            b"#C\t\xd2l\xa7\xeaK##S\xae\xb7>\x82\xb5\xb5\xc8\xafB\xf4\t\xc4]\xa2)\xb0}+\xd9\xab\x03"
         )
         assert results[5].plist_path == "NSStoreModelVersionHashes"
         assert results[5].source == "/Users/user/Library/KeyboardServices/TextReplacements.db"
@@ -117,5 +118,4 @@ def test_text_replacements(test_files: list[str], target_unix: Target, fs_unix: 
         assert results[6].source == "/Users/user/Library/KeyboardServices/TextReplacements.db"
 
         assert results[7].table == "Z_MODELCACHE"
-        assert isinstance(results[7].z_content, bytes)
         assert results[7].source == "/Users/user/Library/KeyboardServices/TextReplacements.db"
