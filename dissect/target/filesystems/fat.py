@@ -6,10 +6,10 @@ import stat
 from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.fat import exceptions as fat_exc
-from dissect.fat import fat
+import dissect.fat as fat
+from dissect.fat import fat as fatfs
 
-from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
+from dissect.target.exceptions import FileNotFoundError, IsADirectoryError, NotADirectoryError
 from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
@@ -22,7 +22,7 @@ class FatFilesystem(Filesystem):
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
-        self.fatfs = fat.FATFS(fh)
+        self.fatfs = fatfs.FATFS(fh)
         # FAT timestamps are in local time, so to prevent skewing them even more, we specify UTC by default.
         # However, it should be noted that they are not actual UTC timestamps!
         # Implementers can optionally set the tzinfo attribute of this class to get correct UTC timestamps.
@@ -32,8 +32,8 @@ class FatFilesystem(Filesystem):
     def _detect(fh: BinaryIO) -> bool:
         """Detect a FAT filesystem on a given file-like object."""
         try:
-            fat.validate_bpb(fh.read(512))
-        except fat_exc.InvalidBPB:
+            fatfs.validate_boot_sector(fh.read(512))
+        except fat.InvalidBootSector:
             return False
         else:
             return True
@@ -42,16 +42,16 @@ class FatFilesystem(Filesystem):
         return FatFilesystemEntry(self, path, self._get_entry(path))
 
     def _get_entry(
-        self, path: str, entry: fat.RootDirectory | fat.DirectoryEntry | None = None
-    ) -> fat.RootDirectory | fat.DirectoryEntry:
+        self, path: str, entry: fatfs.RootDirectory | fatfs.DirectoryEntry | None = None
+    ) -> fatfs.RootDirectory | fatfs.DirectoryEntry:
         """Returns an internal FAT entry for a given path and optional relative entry."""
         try:
             return self.fatfs.get(path, dirent=entry)
-        except fat_exc.FileNotFoundError as e:
+        except fat.FileNotFoundError as e:
             raise FileNotFoundError(path) from e
-        except fat_exc.NotADirectoryError as e:
+        except fat.NotADirectoryError as e:
             raise NotADirectoryError(path) from e
-        except fat_exc.Error as e:
+        except fat.Error as e:
             raise FileNotFoundError(path) from e
 
     @cached_property
@@ -72,7 +72,7 @@ class FatDirEntry(DirEntry):
 
 class FatFilesystemEntry(FilesystemEntry):
     fs: FatFilesystem
-    entry: fat.RootDirectory | fat.DirectoryEntry
+    entry: fatfs.RootDirectory | fatfs.DirectoryEntry
 
     def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""

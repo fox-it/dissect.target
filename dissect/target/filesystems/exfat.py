@@ -1,112 +1,95 @@
 from __future__ import annotations
 
+import math
 import stat
-from datetime import timedelta, timezone
 from functools import cached_property
-from typing import TYPE_CHECKING, BinaryIO, Optional
+from typing import TYPE_CHECKING, BinaryIO
 
+import dissect.fat as fat
 from dissect.fat import exfat
-from dissect.util.stream import RunlistStream
-from dissect.util.ts import dostimestamp
 
-from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
+from dissect.target.exceptions import FileNotFoundError, IsADirectoryError, NotADirectoryError
 from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-ExfatFileTree = tuple[exfat.c_exfat.FILE, dict[str, Optional["ExfatFileTree"]]]
 
-
-class ExfatFilesystem(Filesystem):
+class ExFatFilesystem(Filesystem):
     __type__ = "exfat"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
         self.exfat = exfat.ExFAT(fh)
-        self.cluster_size = self.exfat.cluster_size
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
-        return fh.read(11)[3:] == b"EXFAT   "
+        """Detect an exFAT filesystem on a given file-like object."""
+        try:
+            exfat.validate_boot_sector(fh.read(512))
+        except fat.InvalidBootSector:
+            return False
+        else:
+            return True
 
-    def get(self, path: str) -> ExfatFilesystemEntry:
-        return ExfatFilesystemEntry(self, path, self._get_entry(path))
+    def get(self, path: str) -> FilesystemEntry:
+        return ExFatFilesystemEntry(self, path, self._get_entry(path))
 
-    def _get_entry(self, path: str, root: ExfatFileTree | None = None) -> ExfatFileTree:
-        dirent = root if root is not None else self.exfat.files["/"]
-
-        # Programmatically we will often use the `/` separator, so replace it
-        # with the native path separator of exFAT `/` is an illegal character
-        # in exFAT filenames, so it's safe to replace
-        parts = path.replace("/", "\\").split("\\")
-
-        for part in parts:
-            if not part:
-                continue
-
-            file_tree = dirent[1]
-            if file_tree is None:
-                raise NotADirectoryError(f"Not a directory: {path}")
-
-            for entry_name, entry_file_tree in file_tree.items():
-                if entry_name.upper() == part.upper():
-                    dirent = entry_file_tree
-                    break
-            else:
-                raise FileNotFoundError(f"File not found: {path}")
-
-        return dirent
+    def _get_entry(
+        self, path: str, entry: exfat.RootDirectory | exfat.DirectoryEntry | None = None
+    ) -> exfat.RootDirectory | exfat.DirectoryEntry:
+        """Returns an internal exFAT entry for a given path and optional relative entry."""
+        try:
+            return self.exfat.get(path, dirent=entry)
+        except fat.FileNotFoundError as e:
+            raise FileNotFoundError(path) from e
+        except fat.NotADirectoryError as e:
+            raise NotADirectoryError(path) from e
+        except fat.Error as e:
+            raise FileNotFoundError(path) from e
 
     @cached_property
     def serial(self) -> int | str | None:
-        return self.exfat.vbr.volume_serial
+        return int(self.exfat.volume_id, 16)
 
 
-class ExfatDirEntry(DirEntry):
-    fs: ExfatFilesystem
-    entry: ExfatFileTree
+class ExFatDirEntry(DirEntry):
+    fs: ExFatFilesystem
+    entry: exfat.RootDirectory | exfat.DirectoryEntry
 
-    def get(self) -> ExfatFilesystemEntry:
-        return ExfatFilesystemEntry(self.fs, self.path, self.entry)
+    def get(self) -> ExFatFilesystemEntry:
+        return ExFatFilesystemEntry(self.fs, self.path, self.entry)
 
     def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self.get().stat(follow_symlinks=follow_symlinks)
 
 
-class ExfatFilesystemEntry(FilesystemEntry):
-    def __init__(
-        self,
-        fs: ExfatFilesystem,
-        path: str,
-        entry: ExfatFileTree,
-    ):
-        super().__init__(fs, path, entry)
-        self.size = self.entry[0].stream.data_length
-        self.cluster = self.entry[0].stream.location
+class ExFatFilesystemEntry(FilesystemEntry):
+    fs: ExFatFilesystem
+    entry: exfat.RootDirectory | exfat.DirectoryEntry
 
-    def get(self, path: str) -> ExfatFilesystemEntry:
+    def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
-        return ExfatFilesystemEntry(self.fs, full_path, self.fs._get_entry(path, self.entry))
+        return ExFatFilesystemEntry(self.fs, full_path, self.fs._get_entry(path, self.entry))
 
     def open(self) -> BinaryIO:
-        if self.entry[0].stream.flags.not_fragmented:
-            runlist = self.fs.exfat.runlist(self.cluster, True, self.size)
-        else:
-            runlist = self.fs.exfat.runlist(self.cluster, False)
-        return RunlistStream(self.fs.exfat.filesystem, runlist, self.size, self.fs.cluster_size)
+        """Returns file handle (file-like object)."""
+        if self.is_dir():
+            raise IsADirectoryError(self.path)
+        return self.entry.open()
 
-    def scandir(self) -> Iterator[ExfatDirEntry]:
+    def scandir(self) -> Iterator[FilesystemEntry]:
+        """List the directory contents of this directory. Returns a generator of filesystem entries."""
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        for name, file_tree in self.entry[1].items():
-            if name in (".", ".."):
+        for entry in self.entry.iterdir():
+            if entry.name in (".", ".."):
                 continue
 
-            yield ExfatDirEntry(self.fs, self.path, name, file_tree)
+            yield ExFatDirEntry(self.fs, self.path, entry.name, entry)
 
     def is_symlink(self) -> bool:
         """Return whether this entry is a link."""
@@ -114,48 +97,34 @@ class ExfatFilesystemEntry(FilesystemEntry):
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         """Return whether this entry is a directory."""
-        return bool(self.entry[0].metadata.attributes.directory)
+        return self.entry.is_directory()
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         """Return whether this entry is a file."""
         return not self.is_dir()
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        """Return the stat information of this entry."""
         return self.lstat()
 
     def lstat(self) -> fsutil.stat_result:
-        """Return the stat information of this entry."""
-        fe = self.entry[0]
-        size = fe.stream.data_length
-        addr = fe.stream.location
-
-        # exfat stores additional offsets for ctime and mtime to get 10 millisecond precision
-        fe = fe.metadata
-
-        # all timestamps are recorded in local time. the utc offset (of the system generating the timestamp in question)
-        # is recorded in the associated tz byte
-        c_tz = self.fs.exfat._utc_timezone(fe.create_timezone)
-        c_tzinfo = timezone(timedelta(minutes=c_tz["offset"]), c_tz["name"])
-        m_tz = self.fs.exfat._utc_timezone(fe.modified_timezone)
-        m_tzinfo = timezone(timedelta(minutes=m_tz["offset"]), m_tz["name"])
-        a_tz = self.fs.exfat._utc_timezone(fe.access_timezone)
-        a_tzinfo = timezone(timedelta(minutes=a_tz["offset"]), a_tz["name"])
-
-        ctime = dostimestamp(fe.create_time, fe.create_offset).replace(tzinfo=c_tzinfo)
-        mtime = dostimestamp(fe.modified_time, fe.modified_offset).replace(tzinfo=m_tzinfo)
-        atime = dostimestamp(fe.access_time).replace(tzinfo=a_tzinfo)
-
+        """Return the stat information of the given path, without resolving links."""
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
-        st_info = [
-            (stat.S_IFDIR if self.is_dir() else stat.S_IFREG) | 0o777,
-            addr,
-            id(self.fs),
-            0,
-            0,
-            0,
-            size,
-            atime.timestamp(),
-            mtime.timestamp(),
-            ctime.timestamp(),
-        ]
-        return fsutil.stat_result(st_info)
+        st_info = fsutil.stat_result(
+            [
+                (stat.S_IFDIR if self.is_dir() else stat.S_IFREG) | 0o777,
+                self.entry.cluster,
+                id(self.fs),
+                1,
+                0,
+                0,
+                self.entry.size,
+                self.entry.atime.timestamp(),
+                self.entry.mtime.timestamp(),
+                self.entry.ctime.timestamp(),
+            ]
+        )
+
+        st_info.st_blocks = math.ceil(self.entry.size / self.entry.fs.cluster_size)
+        st_info.st_blksize = self.entry.fs.cluster_size
+        return st_info
