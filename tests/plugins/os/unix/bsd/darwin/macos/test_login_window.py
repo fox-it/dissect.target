@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
 
@@ -37,8 +36,6 @@ def test_login_window(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
 ) -> None:
-    stat_results = []
-    entries = []
     user = UnixUserRecord(
         name="user",
         uid=501,
@@ -51,42 +48,32 @@ def test_login_window(
     for name, path in zip(names, paths, strict=True):
         data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/login_window/{name}")
         fs_unix.map_file(path, data_file)
-        entry = fs_unix.get(path)
-        stat_result = entry.stat()
-        stat_result.st_mtime = 1704067199
-        stat_results.append(stat_result)
-        entries.append(entry)
 
-    with (
-        patch.object(entries[0], "stat", return_value=stat_results[0]),
-        patch.object(entries[1], "stat", return_value=stat_results[1]),
-        patch.object(entries[2], "stat", return_value=stat_results[2]),
-    ):
-        target_unix.add_plugin(LoginWindowPlugin)
+    target_unix.add_plugin(LoginWindowPlugin)
 
-        results = list(target_unix.login_window())
-        results.sort(key=lambda r: r.source)
+    results = list(target_unix.login_window())
+    results.sort(key=lambda r: r.source)
 
-        assert len(results) == 5
+    assert len(results) == 5
 
-        assert not results[0].hide
-        assert results[0].bundle_id == "com.apple.finder"
-        assert results[0].path == "/System/Library/CoreServices/Finder.app"
-        assert results[0].background_state == 2
-        assert results[0].plist_path == "TALAppsToRelaunchAtLogin[0]"
-        assert (
-            results[0].source
-            == "/Users/user/Library/Preferences/ByHost/com.apple.loginwindow.16130786-970B-53D1-A07B-005E50471D95.plist"
-        )
+    assert not results[0].hide
+    assert results[0].bundle_id == "com.apple.finder"
+    assert results[0].path == "/System/Library/CoreServices/Finder.app"
+    assert results[0].background_state == 2
+    assert results[0].plist_path == "TALAppsToRelaunchAtLogin[0]"
+    assert (
+        results[0].source
+        == "/Users/user/Library/Preferences/ByHost/com.apple.loginwindow.16130786-970B-53D1-A07B-005E50471D95.plist"
+    )
 
-        assert not results[3].mini_buddy_launch
-        assert (
-            results[3].source
-            == "/Users/user/Library/Preferences/ByHost/com.apple.loginwindow.E253F552-3A40-5010-9ACE-98662C9CFE20.plist"
-        )
+    assert not results[3].mini_buddy_launch
+    assert (
+        results[3].source
+        == "/Users/user/Library/Preferences/ByHost/com.apple.loginwindow.E253F552-3A40-5010-9ACE-98662C9CFE20.plist"
+    )
 
-        assert results[4].build_version_as_string == "25E246"
-        assert results[4].build_version_stamp_as_number == 52698816
-        assert results[4].system_version_stamp_as_string == "26.4"
-        assert results[4].system_version_stamp_as_number == 436469760
-        assert results[4].source == "/Users/user/Library/Preferences/loginwindow.plist"
+    assert results[4].build_version_as_string == "25E246"
+    assert results[4].build_version_stamp_as_number == 52698816
+    assert results[4].system_version_stamp_as_string == "26.4"
+    assert results[4].system_version_stamp_as_number == 436469760
+    assert results[4].source == "/Users/user/Library/Preferences/loginwindow.plist"

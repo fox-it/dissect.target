@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
 
@@ -26,20 +25,14 @@ def test_at_jobs(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem
     tz = timezone.utc
     data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/{test_file}")
     fs_unix.map_file(f"/usr/lib/cron/jobs/{test_file}", data_file)
-    entry = fs_unix.get(f"/usr/lib/cron/jobs/{test_file}")
-    stat_result = entry.stat()
-    stat_result.st_mtime = 1704067199
 
-    with patch.object(entry, "stat") as mock_stat:
-        mock_stat.return_value = stat_result
+    target_unix.add_plugin(AtJobsPlugin)
 
-        target_unix.add_plugin(AtJobsPlugin)
+    results = list(target_unix.at_jobs())
+    assert len(results) == 1
 
-        results = list(target_unix.at_jobs())
-        assert len(results) == 1
-
-        assert results[0].queue == "a"
-        assert results[0].seq == 9
-        assert results[0].execution_time == datetime(2026, 5, 12, 16, 0, 0, tzinfo=tz)
-        assert results[0].command == 'say "hello"'
-        assert results[0].source == "/usr/lib/cron/jobs/a0000901c45260"
+    assert results[0].queue == "a"
+    assert results[0].seq == 9
+    assert results[0].execution_time == datetime(2026, 5, 12, 16, 0, 0, tzinfo=tz)
+    assert results[0].command == 'say "hello"'
+    assert results[0].source == "/usr/lib/cron/jobs/a0000901c45260"

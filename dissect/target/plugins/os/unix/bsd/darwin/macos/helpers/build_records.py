@@ -70,7 +70,6 @@ def build_sqlite_records(
         if j["join"] == "ignore":
             key = (j["table1"], j["table2"])
             ignore_joins_map[key].append(j)
-
     for file in files:
         try:
             with SQLite3(file) as database:
@@ -575,10 +574,11 @@ def build_record(
     desc = select_descriptor(record_descriptors, rdict, plugin, source)
 
     if desc is None:
+        typed_fields = ", ".join(f"{format_key(k)} ({type(v).__name__})" for k, v in sorted(rdict.items()))
         plugin.target.log.exception(
             "No matching record descriptor for %s with fields %s",
             source,
-            sorted(map(format_key, rdict)),
+            typed_fields,
         )
         return None
 

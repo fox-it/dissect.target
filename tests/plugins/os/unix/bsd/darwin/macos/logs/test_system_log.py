@@ -23,7 +23,6 @@ if TYPE_CHECKING:
 def test_system_log(test_files: list[str], target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     tz = timezone.utc
     stat_results = []
-
     entries = []
     for test_file in test_files:
         data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/logs/system_log/{test_file}")

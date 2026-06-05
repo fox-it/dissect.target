@@ -184,6 +184,8 @@ NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
     ],
 )
 
+# Contains additional Z_CONTENT field which is a binary blob. This field been removed
+# from the record descriptor. The field's presence will still be mentioned in a warning.
 ZModelCacheRecord = TargetRecordDescriptor(
     "macos/user_accounts/z_model_cache",
     [

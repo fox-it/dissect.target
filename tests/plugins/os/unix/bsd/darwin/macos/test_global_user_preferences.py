@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
 
@@ -63,57 +62,45 @@ def test_global_user_preferences(
         securityagent,
         root,
     ]
-    stat_results = []
-    entries = []
     for name, path in zip(names, paths, strict=True):
         data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/global_user_preferences/{name}")
         fs_unix.map_file(path, data_file)
-        entry = fs_unix.get(path)
-        stat_result = entry.stat()
-        stat_result.st_mtime = 1704067199
-        stat_results.append(stat_result)
-        entries.append(entry)
 
-    with (
-        patch.object(entries[0], "stat", return_value=stat_results[0]),
-        patch.object(entries[1], "stat", return_value=stat_results[1]),
-        patch.object(entries[2], "stat", return_value=stat_results[2]),
-    ):
-        target_unix.add_plugin(GlobalUserPreferencesPlugin)
+    target_unix.add_plugin(GlobalUserPreferencesPlugin)
 
-        results = list(target_unix.global_user_preferences())
-        results.sort(key=lambda r: r.source)
+    results = list(target_unix.global_user_preferences())
+    results.sort(key=lambda r: r.source)
 
-        assert len(results) == 4
+    assert len(results) == 4
 
-        assert results[0].AKLastLocale == "en_US@rg=nlzzzz"
-        assert results[0].com_apple_sound_beep_flash == 0
-        assert not results[0].AppleMiniaturizeOnDoubleClick
-        assert results[0].NSAutomaticPeriodSubstitutionEnabled
-        assert results[0].NSSpellCheckerDictionaryContainerTransitionComplete
-        assert results[0].com_apple_springing_delay == "0.5"
-        assert results[0].ACDMonthlyAnalyticsLastPosted == "796140692.59226"
-        assert results[0].AKLastIDMSEnvironment == 0
-        assert results[0].NSAutomaticCapitalizationEnabled
-        assert results[0].NSLinguisticDataAssetsRequestTime == "2026-03-25 14:12:53.295950"
-        assert results[0].AppleAntiAliasingThreshold == 4
-        assert results[0].com_apple_springing_enabled
-        assert results[0].AppleLocale == "en_US@rg=nlzzzz"
-        assert results[0].com_apple_trackpad_forceClick
-        assert results[0].NSLinguisticDataAssetsRequestLastInterval == "86400.0"
-        assert results[0].AppleLanguagesSchemaVersion == 5400
-        assert results[0].source == "/Users/user/Library/Preferences/.GlobalPreferences.plist"
+    assert results[0].AKLastLocale == "en_US@rg=nlzzzz"
+    assert results[0].com_apple_sound_beep_flash == 0
+    assert not results[0].AppleMiniaturizeOnDoubleClick
+    assert results[0].NSAutomaticPeriodSubstitutionEnabled
+    assert results[0].NSSpellCheckerDictionaryContainerTransitionComplete
+    assert results[0].com_apple_springing_delay == "0.5"
+    assert results[0].ACDMonthlyAnalyticsLastPosted == "796140692.59226"
+    assert results[0].AKLastIDMSEnvironment == 0
+    assert results[0].NSAutomaticCapitalizationEnabled
+    assert results[0].NSLinguisticDataAssetsRequestTime == "2026-03-25 14:12:53.295950"
+    assert results[0].AppleAntiAliasingThreshold == 4
+    assert results[0].com_apple_springing_enabled
+    assert results[0].AppleLocale == "en_US@rg=nlzzzz"
+    assert results[0].com_apple_trackpad_forceClick
+    assert results[0].NSLinguisticDataAssetsRequestLastInterval == "86400.0"
+    assert results[0].AppleLanguagesSchemaVersion == 5400
+    assert results[0].source == "/Users/user/Library/Preferences/.GlobalPreferences.plist"
 
-        assert results[1].replace == "omw"
-        assert results[1].on == 1
-        assert getattr(results[1], "with") == "On my way!"
-        assert results[1].plist_path == "NSUserDictionaryReplacementItems[0]"
-        assert results[1].source == "/Users/user/Library/Preferences/.GlobalPreferences.plist"
+    assert results[1].replace == "omw"
+    assert results[1].on == 1
+    assert getattr(results[1], "with") == "On my way!"
+    assert results[1].plist_path == "NSUserDictionaryReplacementItems[0]"
+    assert results[1].source == "/Users/user/Library/Preferences/.GlobalPreferences.plist"
 
-        assert results[2].AppleKeyboardUIMode == 2
-        assert results[2].source == "/private/var/db/securityagent/Library/Preferences/.GlobalPreferences.plist"
+    assert results[2].AppleKeyboardUIMode == 2
+    assert results[2].source == "/private/var/db/securityagent/Library/Preferences/.GlobalPreferences.plist"
 
-        assert results[3].AppleLocale == "en_US"
-        assert results[3].AppleKeyboardUIMode == 3
-        assert results[3].com_apple_sound_beep_flash == 0
-        assert results[3].source == "/private/var/root/Library/Preferences/.GlobalPreferences.plist"
+    assert results[3].AppleLocale == "en_US"
+    assert results[3].AppleKeyboardUIMode == 3
+    assert results[3].com_apple_sound_beep_flash == 0
+    assert results[3].source == "/private/var/root/Library/Preferences/.GlobalPreferences.plist"

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
 
@@ -22,20 +21,14 @@ if TYPE_CHECKING:
 def test_system_preferences(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/{test_file}")
     fs_unix.map_file(f"/Library/Preferences/SystemConfiguration/{test_file}", data_file)
-    entry = fs_unix.get(f"/Library/Preferences/SystemConfiguration/{test_file}")
-    stat_result = entry.stat()
-    stat_result.st_mtime = 1704067199
 
-    with patch.object(entry, "stat") as mock_stat:
-        mock_stat.return_value = stat_result
+    target_unix.add_plugin(SystemPreferencesPlugin)
 
-        target_unix.add_plugin(SystemPreferencesPlugin)
+    results = list(target_unix.system_preferences())
+    assert len(results) == 1
 
-        results = list(target_unix.system_preferences())
-        assert len(results) == 1
-
-        assert results[0].Counter == 2
-        assert results[0].DeviceUUID == "0527924E-C5F8-4703-BDDC-9283B6E9FDAE"
-        assert results[0].Version == 7200
-        assert results[0].PreferredOrder == []
-        assert results[0].source == "/Library/Preferences/SystemConfiguration/com.apple.airport.preferences.plist"
+    assert results[0].Counter == 2
+    assert results[0].DeviceUUID == "0527924E-C5F8-4703-BDDC-9283B6E9FDAE"
+    assert results[0].Version == 7200
+    assert results[0].PreferredOrder == []
+    assert results[0].source == "/Library/Preferences/SystemConfiguration/com.apple.airport.preferences.plist"
