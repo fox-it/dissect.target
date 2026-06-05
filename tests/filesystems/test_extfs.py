@@ -56,7 +56,7 @@ def test_stat_information() -> None:
 
 def test_ext_identifier_no_guid() -> None:
     """EXT.identifier fallback using extfs.identifier when volume.guid is None."""
-    fs = ExtFilesystem(fh=absolute_path("_data/filesystems/symlink_disk.ext4").open("rb"))
+    fs = ExtFilesystem(fh=absolute_path("_data/filesystems/filesystem.ext4").open("rb"))
     fs.volume = Mock(guid=None)
     fs.extfs = Mock(uuid="e0c3d987-a36c-4f9e-9b2f-90e633d7d7a1")
 

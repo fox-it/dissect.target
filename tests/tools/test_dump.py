@@ -100,28 +100,18 @@ def test_execute_pipeline(
 
         target_name = target_win_iis_amcache.name
 
-        # verify that iis records are in place
-
-        assert (output_dir / target_name / "iis").exists()
-
         serialization_ext = SERIALIZERS[serialization]["ext"]
         compression_ext = COMPRESSION_TO_EXT[compression]
 
-        iis_sink_filename = f"application_webserver_iis_log.{serialization_ext}"
+        iis_sink_filename = f"iis_logs.{serialization_ext}"
         if compression_ext:
             iis_sink_filename += f".{compression_ext}"
 
-        assert (output_dir / target_name / "iis" / iis_sink_filename).exists()
-
-        # verify that amcache.applications records are in place
-
-        assert (output_dir / target_name / "amcache").exists()
-
-        amcache_sink_filename = f"windows_appcompat_InventoryApplication.{serialization_ext}"
+        amcache_sink_filename = f"amcache_applications.{serialization_ext}"
         if compression_ext:
             amcache_sink_filename += f".{compression_ext}"
 
-        assert (output_dir / target_name / "amcache" / amcache_sink_filename).exists()
+        assert (output_dir / target_name / amcache_sink_filename).exists()
 
         # verify that serialized state is in place
         state_path = output_dir / STATE_FILE_NAME
@@ -145,13 +135,13 @@ def test_execute_pipeline(
         iis_sink_blob = next(s for s in state_blob["sinks"] if s["func"] == "iis.logs")
         assert iis_sink_blob["record_count"] == 10
         assert iis_sink_blob["target_path"] == str(target_win_iis_amcache.path)
-        assert iis_sink_blob["path"] == str(pathlib.Path(target_name) / "iis" / iis_sink_filename)
+        assert iis_sink_blob["path"] == str(pathlib.Path(target_name) / iis_sink_filename)
 
         # validate amcache sink blob
         amcache_sink_blob = next(s for s in state_blob["sinks"] if s["func"] == "amcache.applications")
         assert amcache_sink_blob["record_count"] == 118
         assert amcache_sink_blob["target_path"] == str(target_win_iis_amcache.path)
-        assert amcache_sink_blob["path"] == str(pathlib.Path(target_name) / "amcache" / amcache_sink_filename)
+        assert amcache_sink_blob["path"] == str(pathlib.Path(target_name) / amcache_sink_filename)
 
 
 @pytest.mark.parametrize("limit", [5, 15, None])
@@ -196,13 +186,10 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
 
         target_name = target_win_iis_amcache.name
 
-        # verify that iis records are in place
-        assert (output_dir / target_name / "iis").exists()
-
         serialization_ext = SERIALIZERS[Serialization.JSONLINES]["ext"]
-        iis_sink_filename = f"application_webserver_iis_log.{serialization_ext}"
+        iis_sink_filename = f"iis_logs.{serialization_ext}"
 
-        assert (output_dir / target_name / "iis" / iis_sink_filename).exists()
+        assert (output_dir / target_name / iis_sink_filename).exists()
 
         # verify that serialized state is in place
         state_path = output_dir / STATE_FILE_NAME
@@ -218,7 +205,7 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
         # verify that amcache.applications records are absent if `limit` is smaller/equal than 10 (the number
         # of iis records), and present if `limit` is `None` or larger than 10.
         if limit and limit <= 10:
-            assert not (output_dir / target_name / "amcache").exists()
+            assert not (output_dir / target_name / f"amcache_applications.{serialization_ext}").exists()
 
             assert len(sink_blobs) == 1
             assert {s["func"] for s in sink_blobs} == {"iis.logs"}
@@ -231,9 +218,8 @@ def test_execute_pipeline_limited(limit: int | None, target_win_iis_amcache: Tar
                 assert not iis_sink_blob["is_dirty"]
 
         else:
-            assert (output_dir / target_name / "amcache").exists()
-            amcache_sink_filename = f"windows_appcompat_InventoryApplication.{serialization_ext}"
-            assert (output_dir / target_name / "amcache" / amcache_sink_filename).exists()
+            amcache_sink_filename = f"amcache_applications.{serialization_ext}"
+            assert (output_dir / target_name / amcache_sink_filename).exists()
 
             assert len(sink_blobs) == 2
             assert {s["func"] for s in sink_blobs} == set(functions.split(","))
@@ -298,7 +284,7 @@ def test_dump(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
 
         assert tmp_path.joinpath("target-dump.state.json").exists()
 
-        entry = tmp_path.joinpath("test-archive.tar.gz/walkfs/filesystem_entry.jsonl")
+        entry = tmp_path.joinpath("test-archive.tar.gz/walkfs.jsonl")
         assert entry.exists()
         assert "test-file.txt" in entry.read_text()
 
@@ -323,8 +309,8 @@ def test_dump_excluded_plugins(monkeypatch: pytest.MonkeyPatch, tmp_path: pathli
 
         assert tmp_path.joinpath("target-dump.state.json").exists()
 
-        entry = tmp_path.joinpath("test-archive.tar.gz/walkfs/filesystem_entry.jsonl")
+        entry = tmp_path.joinpath("test-archive.tar.gz/walkfs.jsonl")
         assert entry.exists()
         assert "test-file.txt" in entry.read_text()
 
-        assert not tmp_path.joinpath("test-archive.tar.gz/mft").exists()
+        assert not tmp_path.joinpath("test-archive.tar.gz/mft.jsonl").exists()

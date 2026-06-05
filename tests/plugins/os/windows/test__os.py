@@ -324,3 +324,26 @@ def test_windows_hostname(
     hive_hklm.map_key(key_name, key)
 
     assert target_win_users.hostname == expected_hostname
+
+
+@pytest.mark.parametrize(
+    ("reg_value", "expected_triple"),
+    [
+        ("AMD64", "x86_64-pc-windows"),
+        ("IA64", "ia_64-pc-windows"),
+        ("ARM64", "aarch64-pc-windows"),
+        ("x86", "x86-pc-windows"),
+        ("EM64T", "x86_64-pc-windows"),
+    ],
+)
+def test_windows_architecture(
+    target_win_users: Target, hive_hklm: VirtualHive, reg_value: str, expected_triple: str
+) -> None:
+    """Test if we can parse windows architectures correctly."""
+    key_name = "SYSTEM\\ControlSet001\\Control\\Session Manager\\Environment"
+    key = VirtualKey(hive_hklm, key_name)
+    key.add_value("PROCESSOR_ARCHITECTURE", reg_value)
+    hive_hklm.map_key(key_name, key)
+
+    assert target_win_users.os == "windows"
+    assert target_win_users.architecture == expected_triple

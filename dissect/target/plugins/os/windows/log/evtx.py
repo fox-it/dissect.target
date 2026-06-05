@@ -6,6 +6,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 from dissect.eventlog import evtx
+from dissect.eventlog.bxml import BxmlSub
 from dissect.eventlog.exceptions import MalformedElfChnkException
 from flow.record import utils
 
@@ -183,7 +184,7 @@ def format_value(value: Any) -> Any:
     if value is None or value == "-":
         return None
 
-    if isinstance(value, evtx.BxmlSub):
+    if isinstance(value, BxmlSub):
         value = value.get()
 
     if isinstance(value, (datetime.datetime, list)):
