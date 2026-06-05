@@ -261,6 +261,15 @@ def test_grouped_record_properties(
     assert_func(next(iter(grouped_records)))
 
 
+def test_task_trigger_records_with_padding(target_win: Target, setup_tasks_test: None) -> None:
+    records = list(target_win.tasks(group=False))
+    trigger_records = [r for r in records if r._desc.name == "filesystem/windows/task/trigger"]
+    assert len(trigger_records) == 12
+
+    at_task_triggers = [r for r in trigger_records if r.padding == 0]
+    assert len(at_task_triggers) == 4
+
+
 def test_xml_task_invalid(
     target_win: Target, setup_invalid_tasks_test: pytest.fixture, caplog: pytest.LogCaptureFixture
 ) -> None:
