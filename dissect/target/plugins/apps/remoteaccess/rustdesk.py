@@ -30,7 +30,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
     __namespace__ = "rustdesk"
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/rustdesk/log", GENERIC_LOG_RECORD_FIELDS
+        "application/remoteaccess/rustdesk/log", GENERIC_LOG_RECORD_FIELDS
     )
 
     # Rustdesk logs when installed as a service/server

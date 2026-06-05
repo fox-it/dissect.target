@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import LayerFilesystemEntry
 from dissect.target.helpers.magic import magic
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
@@ -15,6 +15,7 @@ from dissect.target.plugins.filesystem.unix.capability import parse_entry as par
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.filesystem import FilesystemEntry
     from dissect.target.target import Target
 
 FilesystemRecord = TargetRecordDescriptor(
@@ -26,6 +27,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("datetime", "btime"),
         ("varint", "ino"),
         ("path", "path"),
+        ("path", "link"),
         ("filesize", "size"),
         ("uint32", "mode"),
         ("uint32", "uid"),
@@ -79,6 +81,7 @@ class WalkFsPlugin(Plugin):
             btime (datetime): birth timestamp indicates the time when a file was created.
             ino (varint): number of the corresponding underlying filesystem inode.
             path (path): path location of the entry.
+            link (path): if the entry is a symlink, the target of the symlink.
             size (filesize): size of the file in bytes on the filesystem.
             mode (uint32): contains the file type and mode.
             uid (uint32): the user id of the owner of the entry.
@@ -88,7 +91,6 @@ class WalkFsPlugin(Plugin):
             attr (string[]): list of key-value pair attributes separated by '='.
             fs_types (string[]): list of filesystem type(s) of the entry.
         """
-
         path = self.target.fs.path(walkfs_path)
 
         if not path.exists():
@@ -154,6 +156,7 @@ def generate_record(
         "btime": from_unix(entry_stat.st_birthtime) if entry_stat.st_birthtime else None,
         "ino": entry_stat.st_ino,
         "path": entry.path,
+        "link": entry.readlink() if ftype == "symlink" else None,
         "size": entry_stat.st_size,
         "mode": entry_stat.st_mode,
         "uid": entry_stat.st_uid,

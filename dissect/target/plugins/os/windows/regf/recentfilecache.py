@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 recent_files_def = """
     struct header {
         uint32  magic;

@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from tests.plugins.os.windows.test_lsa import map_lsa_system_keys
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 try:

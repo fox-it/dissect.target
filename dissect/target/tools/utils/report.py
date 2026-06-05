@@ -4,12 +4,13 @@ import dataclasses
 import textwrap
 from typing import TYPE_CHECKING, Any
 
-from dissect.target.target import Event, Target
+from dissect.target.target import Event
 
 if TYPE_CHECKING:
     import argparse
 
     from dissect.target.plugin import FunctionDescriptor, Plugin, PluginRegistry
+    from dissect.target.target import Target
 
 BLOCK_INDENT = 4 * " "
 

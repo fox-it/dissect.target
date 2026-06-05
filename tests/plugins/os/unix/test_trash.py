@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if GNOME Trash plugin finds all deleted files including recursively deleted folders and expunged items."""
-
     fs_unix.map_file_fh("etc/hostname", BytesIO(b"hostname"))
     fs_unix.map_dir("home/user/.local/share/Trash", absolute_path("_data/plugins/os/unix/trash"))
     target_unix_users.add_plugin(UnixPlugin)
@@ -86,7 +85,6 @@ def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
 
 def test_gnome_trash_mounts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if GNOME Trash plugin finds Trash files in mounted devices from ``/etc/fstab``, ``/mnt`` and ``/media``."""
-
     fs_unix.map_file_fh("etc/hostname", BytesIO(b"hostname"))
     fs_unix.map_dir("home/user/.local/share/Trash", absolute_path("_data/plugins/os/unix/trash"))
     fs_unix.map_dir("mnt/example/.Trash-1234", absolute_path("_data/plugins/os/unix/trash"))

@@ -7,9 +7,7 @@ from dissect.util.stream import AlignedStream
 
 from dissect.target.exceptions import FilesystemError, NotASymlinkError
 from dissect.target.filesystem import (
-    DirEntry,
     Filesystem,
-    FilesystemEntry,
     VirtualDirectory,
     VirtualFile,
     VirtualFilesystem,
@@ -19,6 +17,10 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.filesystem import (
+        DirEntry,
+        FilesystemEntry,
+    )
     from dissect.target.loaders.itunes import FileInfo, ITunesBackup
 
 

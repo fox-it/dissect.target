@@ -40,7 +40,7 @@ except ImportError:
 
 
 class _DissectScandirIterator:
-    """This class implements a ScandirIterator for dissect's scandir()
+    """This class implements a ScandirIterator for dissect's scandir().
 
     The _DissectScandirIterator provides a context manager, so scandir can be called as:
 

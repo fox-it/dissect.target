@@ -434,7 +434,6 @@ def test_chrome_windows_11_decryption(target_win_11_users_dpapi: Target, fs_win:
         (chrome.exe|msedge.exe) --enable-field-trial-config --enable-features=UseElevator,AppBoundEncryptionKeyV3
 
     """
-
     keychain.register_key(
         key_type=keychain.KeyType.PASSPHRASE,
         value="password",
@@ -491,7 +490,6 @@ def test_benchmark_chrome_userdirs(
     target_win_users: Target, fs_win: VirtualFilesystem, benchmark: BenchmarkFixture
 ) -> None:
     """Benchmark :class:`ChromiumMixin` ``_build_userdirs`` performance."""
-
     for i in range(3):
         fs_win.map_dir(
             f"Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Profile {i}",

@@ -5,11 +5,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.filesystems.cramfs import CramfsFilesystem, CramfsFilesystemEntry, c_cramfs
+from dissect.target.filesystems.cramfs import CramfsFilesystem, c_cramfs
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.target.filesystems.cramfs import CramfsFilesystemEntry
 
 
 def test_cramfs_detect() -> None:

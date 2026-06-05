@@ -73,7 +73,6 @@ class MssqlPlugin(Plugin):
         References:
             - https://learn.microsoft.com/en-us/sql/relational-databases/logs/view-offline-log-files
         """
-
         for instance, log_path in self.instances:
             for errorlog in log_path.glob(self.FILE_GLOB):
                 # The errorlog includes a BOM, so endianess gets determined automatically

@@ -13,21 +13,25 @@ from dissect.target.helpers import fsutil
 from dissect.target.helpers.nfs.client.mount import Client as MountClient
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.nfs3 import (
-    EntryPlus,
-    FileAttributes,
     FileHandle,
     FileType,
     MountProc,
     NfsProgram,
     NfsVersion,
 )
-from dissect.target.helpers.sunrpc.client import AuthScheme, LocalPortPolicy, auth_null
+from dissect.target.helpers.sunrpc.client import AuthScheme, auth_null
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from typing_extensions import Self
+
+    from dissect.target.helpers.nfs.nfs3 import (
+        EntryPlus,
+        FileAttributes,
+    )
+    from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 
 ConCredentials = TypeVar("ConCredentials")
 ConVerifier = TypeVar("ConVerifier")
@@ -51,7 +55,7 @@ class AuthFlavorNotSupported(Exception):
 
 
 class NfsFilesystem(Filesystem):
-    """Filesystem implementation of a NFS share
+    """Filesystem implementation of a NFS share.
 
     The connection is lazily established to not waste resources.
     Use the ``connect`` method to conveniently create a new instance.
@@ -120,7 +124,6 @@ class NfsFilesystem(Filesystem):
             path: The path to the entry. The path is relative to ``relentry``, if provided.
             relentry: The relative entry to start from. If not provided, the root entry is used.
         """
-
         current_handle = relentry.entry if relentry else self._root_handle
         path = fsutil.normalize(path, self.alt_separator).strip("/")
 
@@ -160,7 +163,7 @@ class NfsFilesystemEntry(FilesystemEntry):
         return self._backing_attributes
 
     def get(self, path: str) -> NfsFilesystemEntry:
-        """Get a new filesystem entry relative to this entry"""
+        """Get a new filesystem entry relative to this entry."""
         if not self.is_dir():
             raise NotADirectoryError
 

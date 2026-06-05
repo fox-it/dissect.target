@@ -14,8 +14,7 @@ if TYPE_CHECKING:
 
 
 def test_dpapi_keyprovider_winlogon(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """test if we find a Winlogon DefaultPassword entry in the registry."""
-
+    """Test if we find a Winlogon DefaultPassword entry in the registry."""
     winlogon_path = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
     winlogon_key = VirtualKey(hive_hklm, winlogon_path)
     winlogon_key.add_value("DefaultPassword", "password")

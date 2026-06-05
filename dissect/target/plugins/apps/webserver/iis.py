@@ -23,7 +23,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-LOG_RECORD_NAME = "filesystem/windows/iis/logs"
+
+LOG_RECORD_NAME = "application/webserver/iis/log"
 
 BASIC_RECORD_FIELDS = [
     ("datetime", "ts"),
@@ -139,7 +140,6 @@ class IISLogsPlugin(WebserverPlugin):
 
         Supported log formats: IIS, W3C.
         """
-
         # We handle direct files here because _get_paths cannot select (filter) on the type of logfile.
         if self.target.is_direct:
             for log_file in self.get_paths():
@@ -208,7 +208,6 @@ def parse_w3c_format_log(target: Target, path: Path) -> Iterator[TargetRecordDes
         - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596%28v=ws.10%29
         - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile
     """
-
     basic_fields = {
         "c-ip",
         "s-ip",
@@ -319,7 +318,6 @@ def parse_iis_format_log(target: Target, path: Path) -> Iterator[BasicRecordDesc
         - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311%28v=ws.10%29
         - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile
     """
-
     target_tz = target.datetime.tzinfo
 
     for line in path.open().readlines():

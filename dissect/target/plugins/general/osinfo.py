@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator
+from typing import TYPE_CHECKING
 
 from flow.record import GroupedRecord
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 OSInfoRecord = TargetRecordDescriptor(
     "generic/osinfo",

@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 APT_LOG_OPERATIONS = ["Install", "Reinstall", "Upgrade", "Downgrade", "Remove", "Purge"]
 REGEX_PACKAGE_NAMES = re.compile(r"(.*?\)),?")
 
@@ -120,6 +121,5 @@ def split_package_names(package_names: str) -> list[str]:
     Returns:
         A list of package names, e.g. ``['linux-headers-5.4.0-126:amd64 (5.4.0-126.142, automatic)', ...]``
     """
-
     package_names = REGEX_PACKAGE_NAMES.findall(package_names)
     return [name.strip() for name in package_names]

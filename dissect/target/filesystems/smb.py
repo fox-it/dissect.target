@@ -18,6 +18,8 @@ from dissect.target.helpers.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from impacket.smbconnection import SMBConnection
+
 try:
     from impacket.nt_errors import STATUS_NOT_A_DIRECTORY
     from impacket.smb import ATTR_DIRECTORY, SharedFile
@@ -28,7 +30,7 @@ try:
         FILE_READ_DATA,
         FILE_SHARE_READ,
     )
-    from impacket.smbconnection import SessionError, SMBConnection
+    from impacket.smbconnection import SessionError
 
     HAS_IMPACKET = True
 except ImportError:

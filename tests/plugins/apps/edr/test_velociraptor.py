@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 mock_velociraptor_dir  # noqa: B018
 
 

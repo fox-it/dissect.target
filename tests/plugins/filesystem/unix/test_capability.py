@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
-from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import VirtualFile
 from dissect.target.plugins.filesystem.unix.capability import CapabilityPlugin
 
 if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
 

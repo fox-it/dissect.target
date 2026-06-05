@@ -5,7 +5,7 @@ import stat
 from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
+from dissect.ntfs import NTFS, NTFS_SIGNATURE
 from dissect.ntfs.exceptions import Error as NtfsError
 from dissect.ntfs.exceptions import FileNotFoundError as NtfsFileNotFoundError
 from dissect.ntfs.exceptions import NotADirectoryError as NtfsNotADirectoryError
@@ -23,6 +23,7 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.ntfs import IndexEntry, MftRecord
     from dissect.ntfs.attr import FileName, StandardInformation
     from dissect.ntfs.util import AttributeMap
 

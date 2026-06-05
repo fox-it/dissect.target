@@ -5,13 +5,14 @@ import re
 from datetime import datetime
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.certificate import parse_x509
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.webserver.webserver import (
+    LogFormat,
     WebserverAccessLogRecord,
     WebserverCertificateRecord,
     WebserverErrorLogRecord,
@@ -22,12 +23,8 @@ from dissect.target.plugins.apps.webserver.webserver import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
-
-
-class LogFormat(NamedTuple):
-    name: str
-    pattern: re.Pattern
 
 
 # e.g. ServerRoot "/etc/httpd"
@@ -153,6 +150,24 @@ RE_ERROR_COMMON_PATTERN = r"""
     (?P<message>.*)                     # The actual log message.
 """
 
+RE_FIRST_LINE_OF_REQUEST = r"""
+    "
+    (
+        -                               # Malformed requests may result in the value "-"
+        |
+        (
+            (?P<method>.*?)             # The HTTP Method used for the request.
+            \s
+            (?P<uri>.*?)                # The HTTP URI of the request.
+            \s
+            ?(?P<protocol>HTTP\/.*?)?   # The request protocol.
+        )
+        |
+        (?P<request_line>.*?)           # Malformed or invalid requests can contain raw bytes
+    )
+    "
+"""
+
 RE_ENV_VAR_IN_STRING = re.compile(r"\$\{(?P<env_var>[^\"\s$]+)\}", re.VERBOSE)
 
 RE_VIRTUALHOST = re.compile(r"^\<VirtualHost (?P<addr>[^\s:]+)(?:\:(?P<port>\d+))?", re.IGNORECASE)
@@ -263,7 +278,6 @@ class ApachePlugin(WebserverPlugin):
             - https://www.cyberciti.biz/faq/apache-logs/
             - https://unix.stackexchange.com/a/269090
         """
-
         # Check if any well known default Apache log locations exist
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ACCESS_LOG_NAMES):
             self.access_paths.update(self.target.fs.path(log_dir).glob(f"*{log_name}*"))
@@ -331,7 +345,7 @@ class ApachePlugin(WebserverPlugin):
 
             elif "include" in line_lower:
                 if not (match := RE_CONFIG_INCLUDE.match(line)):
-                    self.target.log.warning("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
+                    self.target.log.debug("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
                     continue
 
                 location = match.groupdict().get("location")
@@ -423,16 +437,20 @@ class ApachePlugin(WebserverPlugin):
                 if response_time := log.get("response_time"):
                     response_time = apache_response_time_to_ms(response_time)
 
+                ts = datetime.strptime(log["ts"], logformat.timestamp or "%d/%b/%Y:%H:%M:%S %z")  # noqa: DTZ007
+                if logformat.timestamp and "%z" not in logformat.timestamp:
+                    ts.replace(tzinfo=self.target.datetime.tzinfo)
+
                 yield WebserverAccessLogRecord(
-                    ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
+                    ts=ts,
                     webserver=self.__namespace__,
-                    remote_user=clean_value(log["remote_user"]),
+                    remote_user=clean_value(log.get("remote_user")),
                     remote_ip=log["remote_ip"],
                     local_ip=clean_value(log.get("local_ip")),
                     method=log["method"],
                     uri=log["uri"],
                     protocol=log["protocol"],
-                    status_code=log["status_code"],
+                    status_code=log.get("status_code"),
                     bytes_sent=clean_value(log["bytes_sent"]) or 0,
                     pid=log.get("pid"),
                     referer=clean_value(log.get("referer")),
@@ -616,7 +634,6 @@ class ApachePlugin(WebserverPlugin):
 
 def clean_value(value: str | None) -> str | None:
     """Clean the given value by replacing empty strings and ``"-"`` with ``None``."""
-
     if value in ("-", ""):
         return None
 

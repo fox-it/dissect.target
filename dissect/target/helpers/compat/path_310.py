@@ -346,12 +346,10 @@ class TargetPath(Path, PureDissectPath):
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
     def resolve(self, strict: bool = False) -> Self:
-        """
-        Make the path absolute, resolving all symlinks on the way and also
+        """Make the path absolute, resolving all symlinks on the way and also
         normalizing it (for example turning slashes into backslashes under
         Windows).
         """
-
         s = self._accessor.realpath(self, strict=strict)
         p = self._from_parts((self._fs, s))
 
@@ -366,8 +364,7 @@ class TargetPath(Path, PureDissectPath):
         return p
 
     def stat(self, *, follow_symlinks: bool = True) -> stat_result:
-        """
-        Return the result of the stat() system call on this path, like
+        """Return the result of the stat() system call on this path, like
         os.stat() does.
         """
         return self._accessor.stat(self, follow_symlinks=follow_symlinks)
@@ -390,35 +387,27 @@ class TargetPath(Path, PureDissectPath):
         return self._accessor.open(self, mode, buffering, encoding, errors, newline)
 
     def write_bytes(self, data: bytes) -> int:
-        """
-        Open the file in bytes mode, write to it, and close the file.
-        """
+        """Open the file in bytes mode, write to it, and close the file."""
         raise NotImplementedError("TargetPath.write_bytes() is unsupported")
 
     def write_text(
         self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None
     ) -> int:
-        """
-        Open the file in text mode, write to it, and close the file.
-        """
+        """Open the file in text mode, write to it, and close the file."""
         raise NotImplementedError("TargetPath.write_text() is unsupported")
 
     def readlink(self) -> Self:
-        """
-        Return the path to which the symbolic link points.
-        """
+        """Return the path to which the symbolic link points."""
         path = self._accessor.readlink(self)
         return self._from_parts((self._fs, path))
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def is_junction(self) -> bool:
-        """
-        Whether this path is a junction.
-        """
+        """Whether this path is a junction."""
         return self._accessor.isjunction(self)
 
     def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
-        (as returned by os.path.expanduser)
+        (as returned by os.path.expanduser).
         """
         raise NotImplementedError("TargetPath.expanduser() is unsupported")

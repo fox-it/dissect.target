@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 TEST_ARGUMENTS = {
     SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER: {"path_len": 1},
     SHIMCACHE_WIN_TYPE.VERSION_WIN81: {"ts": 0, "pkg_len": 0, "pkg": "", "path_len": 0},

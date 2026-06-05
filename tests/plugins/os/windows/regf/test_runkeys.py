@@ -18,7 +18,6 @@ def add_key(hive: VirtualHive, path: str, key_name: str, value: str | bytes) -> 
 
 def test_runkeys(target_win_users: Target, hive_hklm: VirtualHive, hive_hku: VirtualHive) -> None:
     """Test if we can detect and parse Windows runkeys."""
-
     add_key(
         hive_hklm,
         "Software\\Microsoft\\Windows\\CurrentVersion\\Run",

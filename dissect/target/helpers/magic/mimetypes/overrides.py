@@ -1,6 +1,6 @@
+# Manual overrides for types freedesktop does not (yet) support.
 from __future__ import annotations
 
-# Manual overrides for types freedesktop does not (yet) support.
 TYPES = [
     {
         "type": "application/x-compress",
@@ -315,6 +315,40 @@ TYPES = [
         "magic": [
             {"offset": 0, "value": b"PuTTY-User-Key-File-2:"},
             {"offset": 0, "value": b"PuTTY-User-Key-File-3:"},
+        ],
+    },
+    {
+        "type": "application/vnd.ms-powerpoint",
+        "name": "PowerPoint presentation",
+        "pattern": ["*.ppz", "*.ppt", "*.pps", "*.pot", "*.pptx"],
+        "magic": [
+            {"offset": 592, "value": b"\x10\x8d\x81\x64\x9b\x4f\xcf\x11\x86\xea\x00\xaa\x00\xb9\x29\xe8"},
+            {"offset": 592, "value": b"\x70\xae\x7b\xea\x3b\xfb\xcd\x11\xa9\x03\x00\xaa\x00\x51\x0e\xa3"},
+        ],
+    },
+    {
+        "type": "application/vnd.ms-excel",
+        "name": "Excel spreadsheet",
+        "pattern": ["*.xls", "*.xlc", "*.xll", "*.xlm", "*.xlw", "*.xla", "*.xlt", "*.xld", "*.xlsx"],
+        "magic": [
+            {"offset": 592, "value": b"\x10\x08\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00\x46"},
+            {"offset": 592, "value": b"\x20\x08\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00\x46"},
+            {"offset": 2080, "value": b"Microsoft Excel 5.0 Worksheet"},
+        ],
+    },
+    {
+        "type": "application/msword",
+        "name": "Word document",
+        "pattern": ["*.doc", "*.docx"],
+        "magic": [
+            {"offset": 0, "value": b"1\xbe\x00\x00"},
+            {"offset": 0, "value": b"PO^Q`"},
+            {"offset": 0, "value": b"\xfe7\x00#"},
+            {"offset": 0, "value": b"\xdb\xa5-\x00\x00\x00"},
+            {"offset": 2112, "value": b"Microsoft Word document data"},
+            {"offset": 2080, "value": b"\x0a\x00\x00\x00MSWordDoc\x00"},
+            {"offset": 592, "value": b"\x00\x09\x02\x00\x00\x00\x00\x00\x00\xc0\x46\x00\x00\x00\x00\x00"},
+            {"offset": 592, "value": b"\x06\x09\x02\x00\x00\x00\x00\x00\x00\xc0\x46\x00\x00\x00\x00\x00"},
         ],
     },
 ]

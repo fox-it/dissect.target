@@ -40,7 +40,6 @@ class WinlogonPlugin(WindowsCredentialPlugin):
         References:
             - https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
         """
-
         for key in self.target.registry.keys(self.WINLOGON_KEY):
             try:
                 yield WinlogonRecord(

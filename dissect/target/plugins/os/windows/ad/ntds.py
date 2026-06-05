@@ -160,7 +160,6 @@ class NtdsPlugin(Plugin):
     @export(record=NtdsGPORecord)
     def group_policies(self) -> Iterator[NtdsGPORecord]:
         """Extract all group policy objects (GPO) NTDS.dit database."""
-
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
                 cn=gpo.cn,
@@ -176,7 +175,6 @@ class NtdsPlugin(Plugin):
     @export(output="yield")
     def secretsdump(self) -> Iterator[str]:
         """Extract credentials in secretsdump format. Because it's a popular format."""
-
         # Keep impacket defined constants in the method so we don't polute our own
         kerberos_key_type = {
             1: "dec-cbc-crc",
@@ -228,7 +226,6 @@ class NtdsPlugin(Plugin):
 
 def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
-
     lm_hash = des_decrypt(lm_pwd, user.rid).hex() if (lm_pwd := user.get("dBCSPwd")) else DEFAULT_LM_HASH
     nt_hash = des_decrypt(nt_pwd, user.rid).hex() if (nt_pwd := user.get("unicodePwd")) else DEFAULT_NT_HASH
 

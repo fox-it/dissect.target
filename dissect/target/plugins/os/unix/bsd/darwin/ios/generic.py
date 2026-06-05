@@ -20,13 +20,11 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def activity(self) -> datetime | None:
         """Return last seen activity based on filesystem timestamps."""
-
         return calculate_last_activity(self.target.fs.path("/private/var/log"), recursive=True)
 
     @export(property=True)
     def install_date(self) -> datetime | None:
         """Return the likely install date of the operating system."""
-
         # prng.seed seems to be created when iOS is first installed and not touched afterwards,
         # this is an educated guess without any further research.
         for path in ["/private/var/db/prng.seed"]:

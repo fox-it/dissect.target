@@ -18,7 +18,7 @@ from itertools import chain, zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeAlias
 
-from flow.record import Record, RecordDescriptor
+from flow.record import RecordDescriptor
 
 import dissect.target.plugins.os.default as default
 from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
@@ -31,6 +31,7 @@ from dissect.target.helpers.utils import StrEnum
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from flow.record import Record
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
@@ -285,7 +286,6 @@ def arg(*args, **kwargs) -> Callable[..., Any]:
 
 def alias(*args, **kwargs: dict[str, Any]) -> Callable[..., Any]:
     """Decorator to be used on :class:`Plugin` functions to register an alias of that function."""
-
     if not kwargs.get("name") and not args:
         raise ValueError("Missing argument 'name'")
 
@@ -303,7 +303,6 @@ def alias(*args, **kwargs: dict[str, Any]) -> Callable[..., Any]:
 
 def clone_alias(cls: type, attr: Callable[..., Any], alias: str) -> None:
     """Clone the given attribute to an alias in the provided class."""
-
     # Clone the function object
     clone = type(attr)(attr.__code__, attr.__globals__, alias, attr.__defaults__, attr.__closure__)
     clone.__kwdefaults__ = attr.__kwdefaults__
@@ -715,7 +714,6 @@ def plugins(osfilter: type[OSPlugin] | None = None, *, index: str = "__regular__
     Yields:
         Plugin descriptors in the plugin registry based on the given filter criteria.
     """
-
     plugin_index: dict[str, PluginDescriptor] = getattr(_get_plugins().__plugins__, index, {})
 
     # This is implemented as a list comprehension for performance reasons!
@@ -747,7 +745,6 @@ def functions(osfilter: type[OSPlugin] | None = None, *, index: str = "__regular
     Yields:
         Function descriptors in the plugin registry based on the given filter criteria.
     """
-
     function_index: dict[str, dict[str, FunctionDescriptor]] = getattr(_get_plugins().__functions__, index, {})
 
     # This is implemented as a list comprehension for performance reasons!
@@ -772,7 +769,6 @@ def lookup(
     Yields:
         Function descriptors that match the given function name and filter criteria.
     """
-
     function_index: dict[str, FunctionDescriptor] = getattr(_get_plugins().__functions__, index, {}).get(
         function_name, {}
     )
@@ -1270,7 +1266,6 @@ class OSPlugin(Plugin):
         Example:
             ("c:/Windows/ServiceProfiles/LocalService", ("sid", "S-1-5-19"))
         """
-
         # Consider moving this to the UsersPlugin class, and create separate UsersPlugin subclasses for each OS
         # when the machinery concerning users and user_paths becomes more complex.
         raise NotImplementedError
@@ -1293,11 +1288,9 @@ class OSPlugin(Plugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        """Return a slug of the target's OS architecture.
+        """Return a target triple slug of the target's instruction set architecture, vendor and OS.
 
-        Returns:
-            A slug of the OS architecture, e.g. 'x86_32-unix', 'MIPS-linux' or
-            'AMD64-win32', or 'unknown' if the architecture is unknown.
+        See :func:`dissect.target.helpers.arch.target_triple` for implementation details.
         """
         raise NotImplementedError
 

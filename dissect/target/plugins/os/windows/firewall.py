@@ -134,7 +134,6 @@ class WindowsFirewallPlugin(Plugin):
             desc (string): The Desc of the rule.
             embed_ctxt (string): The EmbedCtxt of the rule.
         """  # noqa: E501
-
         FIELD_MAP: Final[dict[str, str]] = {
             "app": "path",
             "active": "boolean",
@@ -237,7 +236,6 @@ class WindowsFirewallPlugin(Plugin):
             path (string): Direction of the traffic, either SEND, RECEIVE, FORWARD or UNKNOWN.
             source (path): Source path of the record log line.
         """
-
         for path in self.log_paths:
             with path.open("rt") as fh:
                 try:

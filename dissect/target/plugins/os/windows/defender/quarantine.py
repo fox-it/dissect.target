@@ -194,7 +194,6 @@ def recover_quarantined_file_streams(fh: BinaryIO, filename: str) -> Iterator[tu
 
     Yields tuples of the output filename and the corresponding output data.
     """
-
     buf = BytesIO(rc4_crypt(fh.read()))
 
     while True:

@@ -17,7 +17,6 @@ from dissect.target.helpers.nfs.nfs3 import (
     ReadDirPlusParams,
     ReadDirPlusResult,
     ReadlinkResult,
-    ReadParams,
     ReadResult,
     SpecData,
 )
@@ -31,6 +30,10 @@ from dissect.target.helpers.sunrpc.sunrpc import Bool
 
 if TYPE_CHECKING:
     import io
+
+    from dissect.target.helpers.nfs.nfs3 import (
+        ReadParams,
+    )
 
 
 class MountResultDeserializer(XdrDeserializer[MountOK | MountStat]):

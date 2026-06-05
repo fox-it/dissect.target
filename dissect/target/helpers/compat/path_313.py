@@ -155,8 +155,7 @@ class TargetPath(Path, PureDissectPath):
         return self._entry
 
     def stat(self, *, follow_symlinks: bool = True) -> stat_result:
-        """
-        Return the result of the stat() system call on this path, like
+        """Return the result of the stat() system call on this path, like
         os.stat() does.
         """
         if follow_symlinks:
@@ -164,8 +163,7 @@ class TargetPath(Path, PureDissectPath):
         return self.get().lstat()
 
     def exists(self, *, follow_symlinks: bool = True) -> bool:
-        """
-        Whether this path exists.
+        """Whether this path exists.
 
         This method normally follows symlinks; to check whether a symlink exists,
         add the argument follow_symlinks=False.
@@ -181,9 +179,7 @@ class TargetPath(Path, PureDissectPath):
     is_mount = PathBase.is_mount
 
     def is_junction(self) -> bool:
-        """
-        Whether this path is a junction.
-        """
+        """Whether this path is a junction."""
         return self.parser.isjunction(self)
 
     def open(
@@ -204,17 +200,13 @@ class TargetPath(Path, PureDissectPath):
         return path_common.io_open(self, mode, buffering, encoding, errors, newline)
 
     def write_bytes(self, data: bytes) -> int:
-        """
-        Open the file in bytes mode, write to it, and close the file.
-        """
+        """Open the file in bytes mode, write to it, and close the file."""
         raise UnsupportedOperation(self._unsupported_msg("write_bytes()"))
 
     def write_text(
         self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None
     ) -> int:
-        """
-        Open the file in text mode, write to it, and close the file.
-        """
+        """Open the file in text mode, write to it, and close the file."""
         raise UnsupportedOperation(self._unsupported_msg("write_text()"))
 
     def iterdir(self) -> Iterator[Self]:
@@ -268,7 +260,7 @@ class TargetPath(Path, PureDissectPath):
 
     def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
-        (as returned by os.path.expanduser)
+        (as returned by os.path.expanduser).
         """
         raise UnsupportedOperation(self._unsupported_msg("expanduser()"))
 
@@ -280,18 +272,14 @@ class TargetPath(Path, PureDissectPath):
         raise UnsupportedOperation(cls._unsupported_msg("home()"))
 
     def readlink(self) -> Self:
-        """
-        Return the path to which the symbolic link points.
-        """
+        """Return the path to which the symbolic link points."""
         return self.with_segments(self.get().readlink())
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
     def resolve(self, strict: bool = False) -> Self:
-        """
-        Make the path absolute, resolving all symlinks on the way and also
+        """Make the path absolute, resolving all symlinks on the way and also
         normalizing it.
         """
-
         s = self.parser.realpath(self, strict=strict)
         p = self.with_segments(s)
 
@@ -306,35 +294,28 @@ class TargetPath(Path, PureDissectPath):
         return p
 
     def symlink_to(self, target: str, target_is_directory: bool = False) -> None:
-        """
-        Make this path a symlink pointing to the target path.
+        """Make this path a symlink pointing to the target path.
         Note the order of arguments (link, target) is the reverse of os.symlink.
         """
         raise UnsupportedOperation(self._unsupported_msg("symlink_to()"))
 
     def hardlink_to(self, target: str) -> None:
-        """
-        Make this path a hard link pointing to the same file as *target*.
+        """Make this path a hard link pointing to the same file as *target*.
 
         Note the order of arguments (self, target) is the reverse of os.link's.
         """
         raise UnsupportedOperation(self._unsupported_msg("hardlink_to()"))
 
     def touch(self, mode: int = 0o666, exist_ok: bool = True) -> None:
-        """
-        Create this file with the given access mode, if it doesn't exist.
-        """
+        """Create this file with the given access mode, if it doesn't exist."""
         raise UnsupportedOperation(self._unsupported_msg("touch()"))
 
     def mkdir(self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
-        """
-        Create a new directory at this given path.
-        """
+        """Create a new directory at this given path."""
         raise UnsupportedOperation(self._unsupported_msg("mkdir()"))
 
     def rename(self, target: str) -> Self:
-        """
-        Rename this path to the target path.
+        """Rename this path to the target path.
 
         The target path may be absolute or relative. Relative paths are
         interpreted relative to the current working directory, *not* the
@@ -345,8 +326,7 @@ class TargetPath(Path, PureDissectPath):
         raise UnsupportedOperation(self._unsupported_msg("rename()"))
 
     def replace(self, target: str) -> Self:
-        """
-        Rename this path to the target path, overwriting if that path exists.
+        """Rename this path to the target path, overwriting if that path exists.
 
         The target path may be absolute or relative. Relative paths are
         interpreted relative to the current working directory, *not* the
@@ -357,41 +337,31 @@ class TargetPath(Path, PureDissectPath):
         raise UnsupportedOperation(self._unsupported_msg("replace()"))
 
     def chmod(self, mode: int, *, follow_symlinks: bool = True) -> None:
-        """
-        Change the permissions of the path, like os.chmod().
-        """
+        """Change the permissions of the path, like os.chmod()."""
         raise UnsupportedOperation(self._unsupported_msg("chmod()"))
 
     def lchmod(self, mode: int) -> None:
-        """
-        Like chmod(), except if the path points to a symlink, the symlink's
+        """Like chmod(), except if the path points to a symlink, the symlink's
         permissions are changed, rather than its target's.
         """
         raise UnsupportedOperation(self._unsupported_msg("lchmod()"))
 
     def unlink(self, missing_ok: bool = False) -> None:
-        """
-        Remove this file or link.
+        """Remove this file or link.
         If the path is a directory, use rmdir() instead.
         """
         raise UnsupportedOperation(self._unsupported_msg("unlink()"))
 
     def rmdir(self) -> None:
-        """
-        Remove this directory.  The directory must be empty.
-        """
+        """Remove this directory.  The directory must be empty."""
         raise UnsupportedOperation(self._unsupported_msg("rmdir()"))
 
     def owner(self) -> str:
-        """
-        Return the login name of the file owner.
-        """
+        """Return the login name of the file owner."""
         raise UnsupportedOperation(self._unsupported_msg("owner()"))
 
     def group(self) -> str:
-        """
-        Return the group name of the file gid.
-        """
+        """Return the group name of the file gid."""
         raise UnsupportedOperation(self._unsupported_msg("group()"))
 
 

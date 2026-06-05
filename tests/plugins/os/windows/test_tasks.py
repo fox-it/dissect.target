@@ -8,13 +8,14 @@ from typing import TYPE_CHECKING
 import pytest
 from flow.record import GroupedRecord
 
-from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord, TasksPlugin
+from dissect.target.plugins.os.windows.tasks._plugin import TasksPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord
     from dissect.target.target import Target
 
 
@@ -170,8 +171,8 @@ def assert_at_task_grouped_padding(at_task_grouped: GroupedRecord) -> None:
 
 
 def assert_at_task_grouped_monthlydow(at_task_grouped: GroupedRecord) -> None:
-    assert at_task_grouped.records[0].enabled
-    assert at_task_grouped.records[1].trigger_enabled
+    assert at_task_grouped.__records__[0].enabled
+    assert at_task_grouped.__records__[1].trigger_enabled
     assert at_task_grouped.start_boundary == datetime.fromisoformat("2023-05-11 00:00:00+00:00")
     assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-20 00:00:00+00:00")
     assert at_task_grouped.repetition_interval == "PT1M"
@@ -185,8 +186,8 @@ def assert_at_task_grouped_monthlydow(at_task_grouped: GroupedRecord) -> None:
 
 
 def assert_at_task_grouped_weekly(at_task_grouped: GroupedRecord) -> None:
-    assert at_task_grouped.records[0].enabled
-    assert at_task_grouped.records[1].trigger_enabled
+    assert at_task_grouped.__records__[0].enabled
+    assert at_task_grouped.__records__[1].trigger_enabled
     assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-27 00:00:00+00:00")
     assert at_task_grouped.execution_time_limit == "P3D"
     assert at_task_grouped.repetition_duration == "PT1H"
@@ -200,8 +201,8 @@ def assert_at_task_grouped_weekly(at_task_grouped: GroupedRecord) -> None:
 
 
 def assert_at_task_grouped_monthly_date(at_task_grouped: GroupedRecord) -> None:
-    assert at_task_grouped.records[0].enabled
-    assert at_task_grouped.records[1].trigger_enabled
+    assert at_task_grouped.__records__[0].enabled
+    assert at_task_grouped.__records__[1].trigger_enabled
     assert at_task_grouped.day_of_month == [15]
     assert at_task_grouped.months_of_year == ["March", "May", "June", "July", "August", "October"]
     assert at_task_grouped.end_boundary == datetime.fromisoformat("2023-05-29 00:00:00+00:00")
@@ -213,8 +214,8 @@ def assert_at_task_grouped_monthly_date(at_task_grouped: GroupedRecord) -> None:
 
 
 def assert_xml_task_trigger_properties(xml_task: GroupedRecord) -> None:
-    assert xml_task.records[0].enabled
-    assert xml_task.records[1].trigger_enabled
+    assert xml_task.__records__[0].enabled
+    assert xml_task.__records__[1].trigger_enabled
     assert xml_task.days_between_triggers == 1
     assert xml_task.start_boundary == datetime.fromisoformat("2023-05-12 00:00:00+00:00")
 

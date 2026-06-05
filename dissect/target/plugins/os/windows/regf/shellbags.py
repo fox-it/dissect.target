@@ -772,7 +772,6 @@ class ShellBagsPlugin(Plugin):
 
 def parse_shell_item_list(buf: bytes) -> Iterator[SHITEM]:
     """Parse a shellbag item from the given bytes."""
-
     offset = 0
     end = len(buf)
     list_buf = memoryview(buf)

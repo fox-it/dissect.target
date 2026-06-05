@@ -81,7 +81,6 @@ class DPAPIPlugin(InternalPlugin):
 
     def _load_master_keys_from_path(self, sid: str, path: Path) -> Iterator[tuple[str, MasterKeyFile]]:
         """Iterate over the provided ``path`` and search for master key files for the given user SID."""
-
         if not path.exists():
             self.target.log.info("Unable to load master keys from path as it does not exist: %s", path)
             return
@@ -194,7 +193,6 @@ class DPAPIPlugin(InternalPlugin):
         Returns:
             Decrypted bytes.
         """  # noqa: E501
-
         if not sid and not username:
             raise ValueError("Either sid or username argument is required")
 

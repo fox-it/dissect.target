@@ -63,7 +63,6 @@ class SessionManagerPlugin(Plugin):
             - https://en.wikipedia.org/wiki/Session_Manager_Subsystem
             - https://www.microsoftpressstore.com/articles/article.aspx?p=2762082&seqNum=2
         """
-
         for key, name in self.keys:
             user = self.target.registry.get_user(key)
 
