@@ -80,11 +80,13 @@ def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFile
     ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw
     ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw comment
     ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw long comment with spaces
-    command="foo bar" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw
-    command="foo bar" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw with a comment
     # Invalid
     ssh-ed25519
-    """
+    foo-bar
+    command="foo bar" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw
+    command="foo bar" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw with a comment
+    command="foo bar",some-option,another-option ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw with a comment
+    """  # noqa: E501
 
     target_system = Alternatives.from_target(target)
 
@@ -100,42 +102,49 @@ def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFile
     plugin = OpenSSHPlugin(target)
 
     results = list(plugin.authorized_keys())
-    assert len(results) == 10
+    assert len(results) == 6 * 2
 
     assert results[0].key_type == "ssh-ed25519"
-    assert results[0].options is None
+    assert results[0].options == []
     assert results[0].comment == ""
     assert results[0].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
     assert results[0].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
     assert results[0].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
     assert results[1].key_type == "ssh-ed25519"
-    assert results[1].options is None
+    assert results[1].options == []
     assert results[1].comment == "comment"
     assert results[1].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
     assert results[1].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
     assert results[1].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
     assert results[2].key_type == "ssh-ed25519"
-    assert results[2].options is None
+    assert results[2].options == []
     assert results[2].comment == "long comment with spaces"
     assert results[2].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
     assert results[2].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
     assert results[2].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
     assert results[3].key_type == "ssh-ed25519"
-    assert results[3].options == 'command="foo bar"'
+    assert results[3].options == ['command="foo bar"']
     assert results[3].comment == ""
     assert results[3].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
     assert results[3].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
     assert results[3].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
     assert results[4].key_type == "ssh-ed25519"
-    assert results[4].options == 'command="foo bar"'
+    assert results[4].options == ['command="foo bar"']
     assert results[4].comment == "with a comment"
     assert results[4].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
     assert results[4].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
     assert results[4].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
+
+    assert results[5].key_type == "ssh-ed25519"
+    assert results[5].options == ['command="foo bar"', "some-option", "another-option"]
+    assert results[5].comment == "with a comment"
+    assert results[5].fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
+    assert results[5].fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
+    assert results[5].fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
 
 
 def test_known_hosts_plugin(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:

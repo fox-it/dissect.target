@@ -12,14 +12,6 @@ if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
-# https://en.wikipedia.org/wiki/Mach-O
-ARCH_MAP = {
-    b"\x0c\x00\x00\x01": "arm64",  # big endian, x64
-    b"\x01\x00\x00\x0c": "arm64",  # little endian, x64
-    b"\x0c\x00\x00\x00": "arm32",  # big endian, x32
-    b"\x00\x00\x00\x0c": "arm32",  # little endian, x32
-}
-
 
 class DarwinPlugin(BsdPlugin):
     """Darwin plugin."""
@@ -42,10 +34,10 @@ class DarwinPlugin(BsdPlugin):
             yield from ((entry, None) for entry in user_path.iterdir() if entry.is_dir())
 
 
-def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> str | None:
-    """Detect the architecture of the system by reading the Mach-O headers of the provided binaries.
+def macho_cpu_type(paths: list[str | Path], fs: Filesystem | None = None) -> int | None:
+    """Extract the Mach-O CPU type of a target by reading the Mach-O header of the supplied binar(y|ies).
 
-    We could use the mach-o magic headers (feedface, feedfacf, cafebabe), but the mach-o cpu type
+    We could use Macho-O magic headers (``feedface``, ``feedfacf``, ``cafebabe``), but the Mach-O CPU type
     also contains bitness.
 
     Args:
@@ -53,7 +45,7 @@ def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> 
         fs: Optional filesystem to search the provided paths in. Required if ``paths`` is a list of strings.
 
     Returns:
-        Detected architecture (e.g. ``arm64``) or ``None``.
+        Mach-O CPU type integer.
 
     References:
         - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
@@ -70,7 +62,7 @@ def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> 
         try:
             with path.open("rb") as fh:
                 fh.seek(4)
-                return ARCH_MAP.get(fh.read(4))  # mach-o cpu type
+                return int.from_bytes(fh.read(4), "big")  # Mach-O CPU type. Header is big endian
         except Exception:
             pass
 
