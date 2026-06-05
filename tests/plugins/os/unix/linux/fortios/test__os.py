@@ -83,7 +83,7 @@ def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert target_unix.version == "FortiGate VM 7.4.2 (build 2571, 2023-12-19)"
     assert target_unix.ips == ["1.2.3.4"]
     assert target_unix.dns == ["96.45.45.45", "96.45.46.46"]
-    assert target_unix.architecture == "x86_64-unix"
+    assert target_unix.architecture == "x86_64-unknown-unix"
     assert target_unix.language == "en_US"
     assert target_unix.timezone == "US/Pacific"
 

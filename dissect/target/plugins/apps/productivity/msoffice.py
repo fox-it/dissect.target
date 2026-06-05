@@ -260,6 +260,7 @@ class MSOffice(Plugin):
                     type=addin_type,
                     manifest=windows_path(manifest_path_str) if manifest_path_str else None,
                     codebases=executables,
+                    _target=self.target,
                 )
 
     @export(record=OfficeStartupItem)
@@ -365,6 +366,7 @@ class MSOffice(Plugin):
             provider_name=manifest_tree.findtext(".//ProviderName", namespaces=ns),
             source_locations=filter(None, source_locations),
             modification_time=manifest_path.stat().st_mtime,
+            _target=self.target,
         )
 
     def _office_install_root(self, component: Literal["Word", "Excel"]) -> str:
