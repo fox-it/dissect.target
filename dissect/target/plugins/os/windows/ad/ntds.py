@@ -77,7 +77,6 @@ ACCOUNT_FIELDS = [
     ("string", "sfu_password"),
     ("string[]", "supplemental_credentials"),
     ("string", "info"),
-    ("string", "comment"),
     ("string", "email"),
     ("string", "title"),
     ("string", "telephone_number"),
@@ -105,7 +104,6 @@ NtdsComputerRecord = TargetRecordDescriptor(
         ("string", "dns_hostname"),
         ("string", "operating_system"),
         ("string", "operating_system_version"),
-        ("string[]", "service_principal_name"),
         ("varint", "allowed_to_act"),
         ("boolean", "has_laps"),
         ("string", "legacy_laps"),
@@ -231,7 +229,6 @@ class NtdsPlugin(Plugin):
                 dns_hostname=computer.get("dNSHostName"),
                 operating_system=computer.get("operatingSystem"),
                 operating_system_version=computer.get("operatingSystemVersion"),
-                service_principal_name=computer.get("servicePrincipalName"),
                 allowed_to_act=computer.get("msDS-AllowedToActOnBehalfOfOtherIdentity"),
                 dump_smsa_password=dump_smsa_password,
                 _target=self.target,
@@ -447,7 +444,7 @@ def extract_account_info(account: User | Computer, target: Target) -> dict[str, 
         user_password = None
 
     try:
-        unix_password = account.get("unixPassword")
+        unix_password = account.get("unixUserPassword")
     except Exception:
         unix_password = None
 
@@ -465,8 +462,8 @@ def extract_account_info(account: User | Computer, target: Target) -> dict[str, 
         "lm_history": lm_history,
         "nt": nt_hash,
         "nt_history": nt_history,
-        "user_password": user_password if user_password else None,
-        "unix_password": unix_password if unix_password else None,
+        "user_password": user_password or None,
+        "unix_password": unix_password or None,
         "sfu_password": sfu_password,
         "supplemental_credentials": list(get_supplemental_credentials(account)),
         "user_account_control": account.user_account_control.name.split("|"),
@@ -474,7 +471,6 @@ def extract_account_info(account: User | Computer, target: Target) -> dict[str, 
         "member_of": member_of,
         "allowed_to_delegate": account.get("msDS-AllowedToDelegateTo"),
         "info": account.get("info"),
-        "comment": account.get("comment"),
         "email": account.get("mail"),
         "title": account.get("title"),
         "telephone_number": account.get("telephoneNumber"),
