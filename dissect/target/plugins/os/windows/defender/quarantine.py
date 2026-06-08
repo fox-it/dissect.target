@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import struct
 from typing import TYPE_CHECKING, BinaryIO
 
 import dissect.util.ts as ts
@@ -37,6 +38,21 @@ DefenderFileQuarantineRecord = TargetRecordDescriptor(
         ("datetime", "last_write_time"),
         ("datetime", "last_accessed_time"),
         ("string", "resource_id"),
+        ("varint", "file_size"),
+    ],
+)
+
+DefenderTaskSchedulerQuarantineRecord = TargetRecordDescriptor(
+    "filesystem/windows/defender/quarantine/taskscheduler",
+    [
+        ("datetime", "ts"),
+        ("string", "quarantine_id"),
+        ("string", "scan_id"),
+        ("varint", "threat_id"),
+        ("string", "detection_type"),
+        ("string", "detection_name"),
+        ("string", "detection_path"),
+        ("varint", "file_size"),
     ],
 )
 
@@ -106,7 +122,8 @@ enum FIELD_IDENTIFIER : WORD {
     Unknown                 = 0x0E,
     CreationTime            = 0x0F,
     LastAccessTime          = 0x10,
-    LastWriteTime           = 0x11
+    LastWriteTime           = 0x11,
+    FileSize                = 0x12,
 };
 
 enum FIELD_TYPE : WORD {
@@ -267,6 +284,7 @@ class QuarantineEntryResource:
 
         # It is possible that certain fields miss from a QuarantineEntryResource even though we expect them. Thus, we
         # initialize them in advance with a None value.
+        self.file_size = None
         self.resource_id = None
         self.creation_time = None
         self.last_access_time = None
@@ -299,5 +317,7 @@ class QuarantineEntryResource:
             self.last_access_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
         elif field.Identifier == FIELD_IDENTIFIER.LastWriteTime:
             self.last_write_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
+        elif field.Identifier == FIELD_IDENTIFIER.FileSize:
+            self.file_size = struct.unpack("<Q", field.Data)[0]
         elif field.Identifier not in FIELD_IDENTIFIER:
             self.unknown_fields.append(field)

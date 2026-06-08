@@ -30,6 +30,7 @@ from dissect.target.plugins.os.windows.defender.mplog import (
 from dissect.target.plugins.os.windows.defender.quarantine import (
     DefenderFileQuarantineRecord,
     DefenderQuarantineRecord,
+    DefenderTaskSchedulerQuarantineRecord,
     QuarantineEntry,
     recover_quarantined_file_streams,
 )
@@ -111,7 +112,7 @@ DEFENDER_MPCMDRUN_SYSTEM_DIRS = (
     "sysvol/Windows/Microsoft Antimalware/Tmp",
 )
 DEFENDER_MPCMDRUN_USER_DIRS = ("AppData/Local/Temp",)
-DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey", b"startup"]
+DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey", b"startup", b"taskscheduler"]
 
 DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
 
@@ -230,8 +231,18 @@ class MicrosoftDefenderPlugin(Plugin):
 
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
-    @export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
-    def quarantine(self) -> Iterator[DefenderQuarantineRecord | DefenderFileQuarantineRecord]:
+    @export(
+        record=[
+            DefenderQuarantineRecord,
+            DefenderFileQuarantineRecord,
+            DefenderTaskSchedulerQuarantineRecord,
+        ]
+    )
+    def quarantine(
+        self,
+    ) -> Iterator[
+        DefenderQuarantineRecord | DefenderFileQuarantineRecord | DefenderTaskSchedulerQuarantineRecord
+    ]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in
@@ -250,16 +261,23 @@ class MicrosoftDefenderPlugin(Plugin):
                 fields.update({"detection_type": resource.detection_type})
                 if resource.detection_type in (b"file", b"startup"):
                     # These fields are only available for file based detections
-                    fields.update(
-                        {
-                            "detection_path": resource.detection_path,
-                            "creation_time": resource.creation_time,
-                            "last_write_time": resource.last_write_time,
-                            "last_accessed_time": resource.last_access_time,
-                            "resource_id": resource.resource_id,
-                        }
+                    yield DefenderFileQuarantineRecord(
+                        **fields,
+                        detection_path=resource.detection_path,
+                        creation_time=resource.creation_time,
+                        last_write_time=resource.last_write_time,
+                        last_accessed_time=resource.last_access_time,
+                        resource_id=resource.resource_id,
+                        file_size=resource.file_size,
+                        _target=self.target,
                     )
-                    yield DefenderFileQuarantineRecord(**fields, _target=self.target)
+                elif resource.detection_type == b"taskscheduler":
+                    yield DefenderTaskSchedulerQuarantineRecord(
+                        **fields,
+                        detection_path=resource.detection_path,
+                        file_size=resource.file_size,
+                        _target=self.target,
+                    )
                 else:
                     # For these types, we know that they have no known additional data to add to the Quarantine Record.
                     if resource.detection_type not in DEFENDER_KNOWN_DETECTION_TYPES:
