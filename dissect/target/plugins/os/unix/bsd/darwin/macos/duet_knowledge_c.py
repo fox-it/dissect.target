@@ -106,7 +106,7 @@ ZSourceRecord = TargetRecordDescriptor(
     ],
 )
 
-# ZSTRUCTUREDMETADATA table ~200+ more columns, most of which are None in the majority of rows.
+# ZSTRUCTUREDMETADATA table contains 200+ more columns, most of which are None in the majority of rows.
 # Reduced record descriptor to core fields, other fields will be included in a warning.
 ZStructuredMetadataRecord = TargetRecordDescriptor(
     "macos/duet_knowledge_c/z_structured_metadata",
@@ -142,7 +142,7 @@ ZMetadataRecord = TargetRecordDescriptor(
 )
 
 ZPlistRecord = TargetRecordDescriptor(
-    "macos/duet_activity_scheduler/z_plist",
+    "macos/duet_knowledge_c/z_plist",
     [
         ("varint", "ns_persistence_maximum_framework_version"),
         ("string[]", "ns_store_model_version_identifiers"),
@@ -157,7 +157,7 @@ ZPlistRecord = TargetRecordDescriptor(
 )
 
 NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
-    "macos/duet_activity_scheduler/ns_store_model_version_hashes",
+    "macos/duet_knowledge_c/ns_store_model_version_hashes",
     [
         ("bytes", "addition_change_set"),
         ("bytes", "category_hash"),
@@ -296,12 +296,10 @@ CONVERT_TIMESTAMPS = {
 class DuetKnowledgeCPlugin(Plugin):
     """macOS Duet KnowledgeC Plugin.
 
-    The KnowledgeC database is known for storing a wealth of data, including but not limited to: Application Activity,
-    Application Focus, Device Battery Percentage, Device Lock State, and Device Orientation.
-    Some of this data is being migrated to the Biome framework in newer macOS versions.
+    Parses information about app and system activities. 
 
     References:
-        - https://belkasoft.com/lagging-for-win
+        - https://www.msab.com/blog/hidden-gems-in-apple-ios-digital-forensics/
         - https://fatbobman.com/en/posts/tables_and_fields_of_coredata/
         - https://developer.apple.com/documentation/coredata/nsstoremodelversionidentifierskey
     """
@@ -400,7 +398,7 @@ class DuetKnowledgeCPlugin(Plugin):
                 z_value_double (varint): Double value.
                 z_double_value (varint): Double value? (Usually None)
                 z_uuid (string): The ID identifier (UUID type) of the current database file.
-                z_stream_name (string): Name of associated stream.
+                z_stream_name (string): Name of associated stream, identifies the activity.
                 z_value_string (string): String value.
                 z_string (string): Additional string field.
                 z_metadata (string): Metadata.
@@ -420,7 +418,7 @@ class DuetKnowledgeCPlugin(Plugin):
                 z_source_id (string): Unique source identifier.
                 source (path): Path to the knowledgeC.db database file.
 
-            ZStructuredMetadataRecord (table contains ~200+ more columns):
+            ZStructuredMetadataRecord (table contains 200+ more columns):
                 table (string): Name of the source table (ZSTRUCTUREDMETADATA).
                 z_pk (varint): The autoincrement primary key of the table.
                 z_ent (varint): The ID of the table.
@@ -451,7 +449,7 @@ class DuetKnowledgeCPlugin(Plugin):
                 ns_store_model_version_hashes_digest (string): Digest of model version hashes.
                 ns_store_model_version_checksum_key (string): Model version checksum key.
                 ns_persistence_framework_version (varint): Persistence framework version.
-                ns_store_model_version_hashes_version (varint): Version of the hashes.
+                ns_store_model_version_hashes_version (varint): Version of the ns store version hashes.
                 source (path): Path to the knowledgeC.db database file.
 
             NSStoreModelVersionHashesRecord:

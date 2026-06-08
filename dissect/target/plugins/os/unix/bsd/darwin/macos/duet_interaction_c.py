@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_paths import _build_userdirs
 from dissect.target.plugins.os.unix.bsd.darwin.macos.helpers.build_records import build_sqlite_records
 
 if TYPE_CHECKING:
@@ -13,40 +12,8 @@ if TYPE_CHECKING:
 
     from dissect.target import Target
 
-
-ZTextReplacementEntryRecord = TargetRecordDescriptor(
-    "macos/text_replacements/z_text_replacement_entry",
-    [
-        ("string", "table"),
-        ("varint", "z_pk"),
-        ("varint", "z_ent"),
-        ("varint", "z_opt"),
-        ("varint", "z_was_deleted"),
-        ("varint", "z_needs_save_to_cloud"),
-        ("datetime", "z_timestamp"),
-        ("string", "z_phrase"),
-        ("string", "z_shortcut"),
-        ("string", "z_unique_name"),
-        ("string", "z_remote_record_info"),
-        ("path", "source"),
-    ],
-)
-
-ZTrCloudKitSyncStateRecord = TargetRecordDescriptor(
-    "macos/text_replacements/z_tr_cloud_kit_sync_state",
-    [
-        ("string", "table"),
-        ("varint", "z_pk"),
-        ("varint", "z_ent"),
-        ("varint", "z_opt"),
-        ("varint", "z_did_pull_once"),
-        ("string", "z_fetch_change_token"),
-        ("path", "source"),
-    ],
-)
-
 ZPrimaryKeyRecord = TargetRecordDescriptor(
-    "macos/text_replacements/z_primary_key",
+    "macos/duet_interaction_c/z_primary_key",
     [
         ("string", "table"),
         ("varint", "z_ent"),
@@ -58,7 +25,7 @@ ZPrimaryKeyRecord = TargetRecordDescriptor(
 )
 
 ZMetadataRecord = TargetRecordDescriptor(
-    "macos/text_replacements/z_metadata",
+    "macos/duet_interaction_c/z_metadata",
     [
         ("string", "table"),
         ("varint", "z_version"),
@@ -68,7 +35,7 @@ ZMetadataRecord = TargetRecordDescriptor(
 )
 
 ZPlistRecord = TargetRecordDescriptor(
-    "macos/text_replacements/z_plist",
+    "macos/duet_interaction_c/z_plist",
     [
         ("varint", "ns_persistence_maximum_framework_version"),
         ("string[]", "ns_store_model_version_identifiers"),
@@ -83,11 +50,42 @@ ZPlistRecord = TargetRecordDescriptor(
 )
 
 NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
-    "macos/text_replacements/ns_store_model_version_hashes",
+    "macos/duet_interaction_c/ns_store_model_version_hashes",
     [
-        ("bytes", "tr_cloud_kit_sync_state"),
-        ("bytes", "text_replacement_entry"),
+        ("bytes", "attachment"),
+        ("bytes", "contacts"),
+        ("bytes", "interactions"),
+        ("bytes", "keywords"),
+        ("bytes", "metadata"),
+        ("bytes", "version"),
         ("string", "plist_path"),
+        ("path", "source"),
+    ],
+)
+
+ZKeyValueMetadataRecord = TargetRecordDescriptor(
+    "macos/duet_interaction_c/z_key_value_metadata",
+    [
+        ("string", "table"),
+        ("varint", "z_pk"),
+        ("varint", "z_ent"),
+        ("varint", "z_opt"),
+        ("string", "z_key"),
+        ("string", "z_value"),
+        ("path", "source"),
+    ],
+)
+
+ZVersionRecord = TargetRecordDescriptor(
+    "macos/duet_interaction_c/z_key_value_metadata",
+    [
+        ("string", "table"),
+        ("varint", "z_pk"),
+        ("varint", "z_ent"),
+        ("varint", "z_opt"),
+        ("varint", "z_number"),
+        ("datetime", "z_creation_date"),
+        ("string", "z_key"),
         ("path", "source"),
     ],
 )
@@ -95,39 +93,31 @@ NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
 # Contains additional Z_CONTENT field which is a binary blob. This field been removed
 # from the record descriptor. The field's presence will still be mentioned in a warning.
 ZModelCacheRecord = TargetRecordDescriptor(
-    "macos/text_replacements/z_model_cache",
+    "macos/duet_interaction_c/z_model_cache",
     [
         ("string", "table"),
         ("path", "source"),
     ],
 )
 
-TextReplacementsRecords = (
-    ZTextReplacementEntryRecord,
-    ZTrCloudKitSyncStateRecord,
+DuetInteractionCRecords = (
     ZPrimaryKeyRecord,
     ZMetadataRecord,
     ZPlistRecord,
     NSStoreModelVersionHashesRecord,
     ZModelCacheRecord,
+    ZKeyValueMetadataRecord,
+    ZVersionRecord,
 )
 
 FIELD_MAPPINGS = {
     "Z_PK": "z_pk",
     "Z_ENT": "z_ent",
     "Z_OPT": "z_opt",
-    "ZWASDELETED": "z_was_deleted",
-    "ZNEEDSSAVETOCLOUD": "z_needs_save_to_cloud",
-    "ZTIMESTAMP": "z_timestamp",
-    "ZPHRASE": "z_phrase",
-    "ZSHORTCUT": "z_shortcut",
-    "ZUNIQUENAME": "z_unique_name",
-    "ZREMOTERECORDINFO": "z_remote_record_info",
-    "ZDIDPULLONCE": "z_did_pull_once",
-    "ZFETCHCHANGETOKEN": "z_fetch_change_token",
     "Z_NAME": "z_name",
     "Z_SUPER": "z_super",
     "Z_MAX": "z_max",
+    "ZNAME": "z_name",
     "Z_VERSION": "z_version",
     "Z_UUID": "z_uuid",
     "NSPersistenceMaximumFrameworkVersion": "ns_persistence_maximum_framework_version",
@@ -138,72 +128,54 @@ FIELD_MAPPINGS = {
     "NSStoreModelVersionChecksumKey": "ns_store_model_version_checksum_key",
     "NSPersistenceFrameworkVersion": "ns_persistence_framework_version",
     "NSStoreModelVersionHashesVersion": "ns_store_model_version_hashes_version",
-    "TRCloudKitSyncState": "tr_cloud_kit_sync_state",
-    "TextReplacementEntry": "text_replacement_entry",
+    "ZKEY": "z_key",
+    "ZVALUE": "z_value",
+    "ZNUMBER": "z_number",
+    "ZCREATIONDATE": "z_creation_date",
+    "Attachment": "attachment",
+    "Contacts": "contacts",
+    "Interactions": "interactions",
+    "Keywords": "keywords",
+    "Metadata": "metadata",
+    "Version": "version",
 }
 
 CONVERT_TIMESTAMPS = {
-    "z_timestamp": "2001",
+    "z_creation_date": "2001",
 }
 
 
-class TextReplacementsPlugin(Plugin):
-    """macOS text replacements plugin.
+class DuetInteractionCPlugin(Plugin):
+    """macOS Duet InteractionC plugin.
+
+    Parses basic information about recent app activity.
 
     References:
+        - https://www.msab.com/blog/hidden-gems-in-apple-ios-digital-forensics/
         - https://fatbobman.com/en/posts/tables_and_fields_of_coredata/
         - https://developer.apple.com/documentation/coredata/nsstoremodelversionidentifierskey
     """
 
-    PATH = ("Library/KeyboardServices/TextReplacements.db",)
+    PATH = "/var/db/CoreDuet/People/interactionC.db"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.files = self._find_files()
+        self.file = self.target.fs.path(self.PATH) if self.target.fs.path(self.PATH).exists() else None
 
     def check_compatible(self) -> None:
-        if not (self.files):
-            raise UnsupportedPluginError("No TextReplacements.db files found")
+        if not self.file:
+            raise UnsupportedPluginError("No interactionC.db file found")
 
-    def _find_files(self) -> set:
-        files = set()
-        for _, path in _build_userdirs(self, self.PATH):
-            files.add(path)
-        return files
-
-    @export(record=TextReplacementsRecords)
-    def text_replacements(
+    @export(record=DuetInteractionCRecords)
+    def duet_interaction_c(
         self,
-    ) -> Iterator[TextReplacementsRecords]:
-        """Return text replacements information.
+    ) -> Iterator[DuetInteractionCRecords]:
+        """Return macOS Duet InteractionC database entries.
 
         Yields the following record types extracted from the
-        TextReplacements.db database:
+        interactionC.db database:
 
         .. code-block:: text
-
-            ZTextReplacementEntryRecord:
-                table (string): Name of the source table (ZTEXTREPLACEMENTENTRY).
-                z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
-                z_opt (varint): The version number of the data record.
-                z_was_deleted (varint): Indicates if the record was deleted.
-                z_needs_save_to_cloud (varint): Indicates if the record needs to be saved to cloud.
-                z_timestamp (datetime): Timestamp associated with the record.
-                z_phrase (string): Full replacement text (what gets inserted).
-                z_shortcut (string): Shortcut text that triggers the replacement.
-                z_unique_name (string): Unique identifier for the replacement entry.
-                z_remote_record_info (string): Remote record info.
-                source (path): Path to the TextReplacements.db file.
-
-            ZTrCloudKitSyncStateRecord:
-                table (string): Name of the source table (ZTRCLOUDKITSYNCSTATE).
-                z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
-                z_opt (varint): The version number of the data record.
-                z_did_pull_once (varint): Indicates if initial CloudKit sync has occurred.
-                z_fetch_change_token (string): CloudKit change token for sync state tracking.
-                source (path): Path to the TextReplacements.db file.
 
             ZPrimaryKeyRecord:
                 table (string): Name of the source table (Z_PRIMARYKEY).
@@ -212,13 +184,13 @@ class TextReplacementsPlugin(Plugin):
                 z_super (varint): This value corresponds to the Z_ENT of the parent entity.
                     0 indicates that the entity has no parent entity.
                 z_max (varint): Marks the last used z_pk value for each registry table.
-                source (path): Path to the TextReplacements.db file.
+                source (path): Path to the interactionC.db file.
 
             ZMetadataRecord:
                 table (string): Name of the source table (Z_METADATA).
                 z_version (varint): The specific purpose is unknown, value is always 1.
                 z_uuid (string): The ID identifier (UUID type) of the current database file.
-                source (path): Path to the TextReplacements.db file.
+                source (path): Path to the interactionC.db file.
 
             ZPlistRecord (Plist extracted from Z_METADATA's Z_PLIST field):
                 ns_persistence_maximum_framework_version (varint): Maximum supported persistence framework version.
@@ -230,22 +202,46 @@ class TextReplacementsPlugin(Plugin):
                 ns_store_model_version_checksum_key (string): Model version checksum key.
                 ns_persistence_framework_version (varint): Persistence framework version.
                 ns_store_model_version_hashes_version (varint): Version of the ns store version hashes.
-                source (path): Path to the TextReplacements.db file.
+                source (path): Path to the interactionC.db file.
 
             NSStoreModelVersionHashesRecord:
-                tr_cloud_kit_sync_state (bytes): Hash for ZTRCLOUDKITSYNCSTATE entity.
-                text_replacement_entry (bytes): Hash for ZTEXTREPLACEMENTENTRY entity.
+                attachment (bytes): Hash for ZATTACHMENT entity.
+                contacts (bytes): Hash for ZCONTACTS entity.
+                interactions (bytes): Hash for ZINTERACTIONS entity.
+                keywords (bytes): Hash for ZKEYWORDS entity.
+                metadata (bytes): Hash for ZMETADATA entity.
+                version (bytes): Hash for ZVERSION entity.
                 plist_path (string): Path pointing to the location of the entry within the plist structure.
-                source (path): Path to the TextReplacements.db file.
+                source (path): Path to the knowledgeC.db database file.
 
             ZModelCacheRecord (contains Z_CONTENT field with binary data):
                 table (string): Name of the source table (Z_MODELCACHE).
-                source (path): Path to the TextReplacements.db file.
+                source (path): Path to the interactionC.db file.
+
+            ZKeyValueMetadataRecord:
+                table (string): Name of the source table (ZMETADATA).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): The ID of the table.
+                z_opt (varint): The version number of the data record.
+                z_key (string): Property key.
+                z_value (string): Property value.
+                source (path): Path to the knowledgeC.db database file.
+
+            ZVersionRecord:
+                table (string): Name of the source table (ZVERSION).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): The ID of the table.
+                z_opt (varint): The version number of the data record.
+                z_creation_date (datetime): Creation timestamp.
+                z_key (string): Property key.
         """
         yield from build_sqlite_records(
             self,
-            self.files,
-            TextReplacementsRecords,
+            (self.file,),
+            DuetInteractionCRecords,
             field_mappings=FIELD_MAPPINGS,
             convert_timestamps=CONVERT_TIMESTAMPS,
         )
+
+        # TODO: Add ZATTACHMENT, Z_1INTERACTIONS, ZCONTACTS, Z_2INTERACTIONRECIPIENT,
+        # ZINTERACTIONS, `Z_3KEYWORDS, ZKEYWORDS tables

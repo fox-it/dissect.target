@@ -183,7 +183,7 @@ class DuetActivitySchedulerPlugin(Plugin):
                 ns_store_model_version_hashes_digest (string): Digest of model version hashes.
                 ns_store_model_version_checksum_key (string): Model version checksum key.
                 ns_persistence_framework_version (varint): Persistence framework version.
-                ns_store_model_version_hashes_version (varint): Version of the hashes.
+                ns_store_model_version_hashes_version (varint): Version of the ns store version hashes.
                 source (path): Path to the DuetActivitySchedulerClassC.db file.
 
             ActivityRecord:

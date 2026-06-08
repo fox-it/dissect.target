@@ -91,10 +91,34 @@ def build_sqlite_records(
                                             key,
                                         )
                                 else:
-                                    yield from build_record_from_data(
-                                        plugin, file, value, record_descriptors, field_mappings, convert_timestamps
-                                    )
-                                    row_dict.pop(key)
+                                    try:
+                                        plist_data = (
+                                            load_plist_data(value)
+                                            if b"$archiver" in value[:128]
+                                            else plistlib.loads(value)
+                                        )
+
+                                        if isinstance(plist_data, dict):
+                                            yield from emit_dict_records(
+                                                plugin,
+                                                plist_data,
+                                                file,
+                                                record_descriptors=record_descriptors,
+                                                field_mappings=field_mappings,
+                                                convert_timestamps=convert_timestamps,
+                                            )
+                                            row_dict.pop(key)
+                                        else:
+                                            row_dict[key] = plist_data
+
+                                    except Exception:
+                                        plugin.target.log.exception(
+                                            "Failed to parse plist in %s (table=%s, key=%s)",
+                                            file,
+                                            table.name,
+                                            key,
+                                        )
+                                        row_dict.pop(key)
 
                         if table.name in joins_by_table2:
                             for j2 in joins_by_table2[table.name]:
@@ -379,58 +403,6 @@ def build_plist_records(
 
         except Exception:
             plugin.target.log.exception("Failed to parse %s", file)
-
-
-def build_record_from_data(
-    plugin: Plugin,
-    file: str,
-    raw_data: bytes,
-    record_descriptors: tuple | None = None,
-    field_mappings: dict | None = None,
-    convert_timestamps: dict | None = None,
-    function_name: str | None = None,
-) -> Iterator[Record]:
-    """Extract and normalize records from raw binary data containing plist content.
-
-    Detects whether the input data is a binary plist and whether it contains
-    NSKeyedArchiver-encoded content. Parses the data accordingly, then passes
-    the resulting structure to emit_dict_records for recursive traversal
-    and record construction.
-
-    Args:
-        plugin (Plugin): Plugin instance providing logging and target access.
-        file (str): File from which the raw_data was extracted.
-        raw_data (bytes): Raw binary data to parse.
-        record_descriptors (tuple | None): Optional descriptors for record construction.
-        field_mappings (dict | None): Optional field name mappings.
-        convert_timestamps (dict | None): Optional timestamp conversion rules.
-        function_name (str | None): Optional name used for dynamic record creation.
-
-    Yields:
-        Record: Normalized records constructed from plist contents.
-    """
-    try:
-        if not raw_data:
-            return
-
-        if raw_data.startswith(b"bplist00"):
-            data = load_plist_data(raw_data) if b"$archiver" in raw_data[:128] else plistlib.loads(raw_data)
-
-        else:
-            data = plistlib.load(io.BytesIO(raw_data))
-
-        yield from emit_dict_records(
-            plugin,
-            data,
-            file,
-            record_descriptors=record_descriptors,
-            field_mappings=field_mappings,
-            convert_timestamps=convert_timestamps,
-            function_name=function_name,
-        )
-
-    except Exception:
-        plugin.target.log.exception("Failed to parse %s", file)
 
 
 def dynamic_build_record(plugin: Plugin, function_name: str, rdict: dict, source: Path) -> Record:
