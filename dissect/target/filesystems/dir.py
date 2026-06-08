@@ -109,12 +109,6 @@ class DirectoryFilesystemEntry(FilesystemEntry):
         for item in self._resolve().entry.iterdir():
             yield DirectoryDirEntry(self.fs, self.path, item.name, item)
 
-    def exists(self) -> bool:
-        try:
-            return self._resolve().entry.exists()
-        except FilesystemError:
-            return False
-
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:
             return self._resolve(follow_symlinks=follow_symlinks).entry.is_dir()
