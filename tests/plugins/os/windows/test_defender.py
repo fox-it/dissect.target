@@ -109,7 +109,6 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     ie_startup_record = ie_records[1]
     assert ie_startup_record.detection_type == "startup"
     assert ie_startup_record.detection_path == "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
-    assert ie_startup_record.file_size is None
 
     tasksched_records = [r for r in records if r.quarantine_id == "3c1f228000000000270c270b71d096cd"]
     assert len(tasksched_records) == 5

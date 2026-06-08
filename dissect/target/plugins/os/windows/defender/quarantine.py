@@ -69,6 +69,20 @@ DefenderRegKeyQuarantineRecord = TargetRecordDescriptor(
     ],
 )
 
+DefenderStartupQuarantineRecord = TargetRecordDescriptor(
+    "filesystem/windows/defender/quarantine/startup",
+    [
+        ("datetime", "ts"),
+        ("string", "quarantine_id"),
+        ("string", "scan_id"),
+        ("varint", "threat_id"),
+        ("string", "detection_type"),
+        ("string", "detection_name"),
+        ("string", "detection_path"),
+    ],
+)
+
+
 # Source: https://github.com/brad-sp/cuckoo-modified/blob/master/lib/cuckoo/common/quarantine.py#L188
 # fmt: off
 DEFENDER_QUARANTINE_RC4_KEY = [

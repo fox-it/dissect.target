@@ -31,6 +31,7 @@ from dissect.target.plugins.os.windows.defender.quarantine import (
     DefenderFileQuarantineRecord,
     DefenderQuarantineRecord,
     DefenderRegKeyQuarantineRecord,
+    DefenderStartupQuarantineRecord,
     DefenderTaskSchedulerQuarantineRecord,
     QuarantineEntry,
     recover_quarantined_file_streams,
@@ -237,6 +238,7 @@ class MicrosoftDefenderPlugin(Plugin):
             DefenderQuarantineRecord,
             DefenderFileQuarantineRecord,
             DefenderRegKeyQuarantineRecord,
+            DefenderStartupQuarantineRecord,
             DefenderTaskSchedulerQuarantineRecord,
         ]
     )
@@ -246,6 +248,7 @@ class MicrosoftDefenderPlugin(Plugin):
         DefenderQuarantineRecord
         | DefenderFileQuarantineRecord
         | DefenderRegKeyQuarantineRecord
+        | DefenderStartupQuarantineRecord
         | DefenderTaskSchedulerQuarantineRecord
     ]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
@@ -264,8 +267,7 @@ class MicrosoftDefenderPlugin(Plugin):
             }
             for resource in entry.resources:
                 fields.update({"detection_type": resource.detection_type})
-                if resource.detection_type in (b"file", b"startup"):
-                    # These fields are only available for file based detections
+                if resource.detection_type == b"file":
                     yield DefenderFileQuarantineRecord(
                         **fields,
                         detection_path=resource.detection_path,
@@ -278,6 +280,12 @@ class MicrosoftDefenderPlugin(Plugin):
                     )
                 elif resource.detection_type == b"regkey":
                     yield DefenderRegKeyQuarantineRecord(
+                        **fields,
+                        detection_path=resource.detection_path,
+                        _target=self.target,
+                    )
+                elif resource.detection_type == b"startup":
+                    yield DefenderStartupQuarantineRecord(
                         **fields,
                         detection_path=resource.detection_path,
                         _target=self.target,
