@@ -117,6 +117,8 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     regkey_records = [r for r in tasksched_records if r.detection_type == "regkey"]
     assert len(regkey_records) == 2
     assert regkey_records[0].detection_name == "HackTool:Win32/AutoKMS"
+    assert regkey_records[0].detection_path == "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tree\\KMSAuto"
+    assert regkey_records[1].detection_path == "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tasks\\{EBCB386F-05C8-4545-9455-922990114435}"
 
     file_records = [r for r in tasksched_records if r.detection_type == "file"]
     assert len(file_records) == 2

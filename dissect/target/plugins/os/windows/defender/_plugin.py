@@ -30,6 +30,7 @@ from dissect.target.plugins.os.windows.defender.mplog import (
 from dissect.target.plugins.os.windows.defender.quarantine import (
     DefenderFileQuarantineRecord,
     DefenderQuarantineRecord,
+    DefenderRegKeyQuarantineRecord,
     DefenderTaskSchedulerQuarantineRecord,
     QuarantineEntry,
     recover_quarantined_file_streams,
@@ -235,13 +236,17 @@ class MicrosoftDefenderPlugin(Plugin):
         record=[
             DefenderQuarantineRecord,
             DefenderFileQuarantineRecord,
+            DefenderRegKeyQuarantineRecord,
             DefenderTaskSchedulerQuarantineRecord,
         ]
     )
     def quarantine(
         self,
     ) -> Iterator[
-        DefenderQuarantineRecord | DefenderFileQuarantineRecord | DefenderTaskSchedulerQuarantineRecord
+        DefenderQuarantineRecord
+        | DefenderFileQuarantineRecord
+        | DefenderRegKeyQuarantineRecord
+        | DefenderTaskSchedulerQuarantineRecord
     ]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
@@ -269,6 +274,12 @@ class MicrosoftDefenderPlugin(Plugin):
                         last_accessed_time=resource.last_access_time,
                         resource_id=resource.resource_id,
                         file_size=resource.file_size,
+                        _target=self.target,
+                    )
+                elif resource.detection_type == b"regkey":
+                    yield DefenderRegKeyQuarantineRecord(
+                        **fields,
+                        detection_path=resource.detection_path,
                         _target=self.target,
                     )
                 elif resource.detection_type == b"taskscheduler":
