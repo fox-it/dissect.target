@@ -78,7 +78,7 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
 
     records = list(target_win.defender.quarantine())
 
-    assert len(records) == 1
+    assert len(records) == 3
 
     # Test whether the quarantining of a Mimikatz binary is properly parsed.
     mimikatz_record = records[0]
@@ -96,6 +96,17 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert mimikatz_record.quarantine_id == "a762038000000000fb1112639186e0d6"
     assert mimikatz_record.scan_id == "cdbe4600e43a964b8dc2416b0ef7a207"
     assert mimikatz_record.threat_id == 2147705511
+
+    ie_records = [r for r in records if r.quarantine_id == "229c0170000000004d02ef183c202f42"]
+    assert len(ie_records) == 2
+
+    ie_file_record = ie_records[0]
+    assert ie_file_record.detection_type == "file"
+    assert ie_file_record.detection_path == "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
+
+    ie_startup_record = ie_records[1]
+    assert ie_startup_record.detection_type == "startup"
+    assert ie_startup_record.detection_path == "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
 
 
 def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:

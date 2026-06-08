@@ -111,7 +111,7 @@ DEFENDER_MPCMDRUN_SYSTEM_DIRS = (
     "sysvol/Windows/Microsoft Antimalware/Tmp",
 )
 DEFENDER_MPCMDRUN_USER_DIRS = ("AppData/Local/Temp",)
-DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey"]
+DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey", b"startup"]
 
 DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
 
@@ -248,7 +248,7 @@ class MicrosoftDefenderPlugin(Plugin):
             }
             for resource in entry.resources:
                 fields.update({"detection_type": resource.detection_type})
-                if resource.detection_type == b"file":
+                if resource.detection_type in (b"file", b"startup"):
                     # These fields are only available for file based detections
                     fields.update(
                         {
