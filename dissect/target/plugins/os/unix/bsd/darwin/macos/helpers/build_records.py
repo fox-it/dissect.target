@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import plistlib
 import re
 import uuid
@@ -42,17 +41,26 @@ def build_sqlite_records(
     filter rows across related tables.
 
     Join behavior is controlled via the `joins` configuration:
-        - iterate: iterates over rows of table2 and merges them with
+        iterate: iterates over rows of table2 and merges them with
             matching table1 entries. Table2 rows that do not match with any table1
             will be yielded separately.
-        - nested: adds a field to table1 rows containing all of the matching table2 rows.
-    - ignore: removes specific fields when values match, used to avoid duplicate fields on joins.
+        nested: adds a field to table1 rows containing all of the matching table2 rows.
+        ignore: removes specific fields when values match, used to avoid duplicate fields on joins.
 
     Args:
         plugin (Plugin): Plugin instance providing logging and target access.
         files (set[str]): Paths to SQLite database files.
         record_descriptors (tuple | None): Optional descriptors for record construction.
-        joins (tuple): Join configuration dictionary defining relationships between tables.
+        joins (tuple): Collection of join configuration dictionaries defining relationships between tables.
+            Each item is a dict describing a join rule between two tables:
+                table1 (str): Name of the primary table.
+                key1 (str): Column in table1 used for joining.
+                table2 (str): Name of the secondary table.
+                key2 (str): Column in table2 used for joining.
+                join (str): Join type to apply:
+                    iterate = Create separate records for each matching row in table2.
+                    nested = Attach matching table2 rows as a nested dict in table1 records.
+                    ignore = Used to omit duplicate or redundant fields during joins.
         field_mappings (dict | None): Optional field name mappings.
         convert_timestamps (dict | None): Optional timestamp conversion rules.
 
@@ -78,6 +86,7 @@ def build_sqlite_records(
                         row_dict = {k: v for k, v in row}  # noqa C416
 
                         for key, value in list(row_dict.items()):
+                            # Decode binary plist values (including NSKeyedArchiver blobs)
                             if isinstance(value, (bytes, bytearray)) and value.startswith(b"bplist00"):
                                 if is_nskeyedarchive_blob(value):
                                     try:
@@ -109,6 +118,8 @@ def build_sqlite_records(
                                             )
                                             row_dict.pop(key)
                                         else:
+                                            # If binary plist is an attribute and not a dict
+                                            # replace binary plist with extracted value
                                             row_dict[key] = plist_data
 
                                     except Exception:
@@ -121,6 +132,7 @@ def build_sqlite_records(
                                         row_dict.pop(key)
 
                         if table.name in joins_by_table2:
+                            # Yield table2 rows that don't have a matching table1
                             for j2 in joins_by_table2[table.name]:
                                 if row_dict.get(j2["key2"]) is None:
                                     row_dict["table"] = table.name
@@ -153,6 +165,7 @@ def build_sqlite_records(
                             iterate_rows = defaultdict(list)
                             tables.add(table.name)
 
+                            # Handle joins
                             for j in joins_by_table1[table.name]:
                                 ignore_joins = ignore_joins_map[(j["table1"], j["table2"])]
 
@@ -165,6 +178,7 @@ def build_sqlite_records(
                                 elif j["join"] == "nested":
                                     handle_nested_join(database, row_dict, j, ignore_joins, tables)
 
+                            # If there were iterate joins, yield records for every combination
                             if len(iterate_rows) > 0:
                                 row_dict = prefix_row(row_dict, table.name)
                                 keys = list(iterate_rows.keys())
@@ -186,10 +200,11 @@ def build_sqlite_records(
                                         convert_timestamps=convert_timestamps,
                                     )
                             else:
+                                # Yield row as record without iterate joins
                                 yield build_record(
                                     plugin, row_dict, file, record_descriptors, field_mappings, convert_timestamps
                                 )
-
+                        # Yield row as record without joins
                         else:
                             row_dict["table"] = table.name
                             yield build_record(

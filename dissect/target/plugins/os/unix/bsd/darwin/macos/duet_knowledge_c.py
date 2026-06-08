@@ -296,7 +296,7 @@ CONVERT_TIMESTAMPS = {
 class DuetKnowledgeCPlugin(Plugin):
     """macOS Duet KnowledgeC Plugin.
 
-    Parses information about app and system activities. 
+    Parses information about app and system activities.
 
     References:
         - https://www.msab.com/blog/hidden-gems-in-apple-ios-digital-forensics/

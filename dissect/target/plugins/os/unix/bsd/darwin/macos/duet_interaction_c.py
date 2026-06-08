@@ -52,12 +52,12 @@ ZPlistRecord = TargetRecordDescriptor(
 NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
     "macos/duet_interaction_c/ns_store_model_version_hashes",
     [
-        ("bytes", "attachment"),
+        ("bytes", "attachment_hash"),
         ("bytes", "contacts"),
         ("bytes", "interactions"),
-        ("bytes", "keywords"),
+        ("bytes", "keywords_hash"),
         ("bytes", "metadata"),
-        ("bytes", "version"),
+        ("bytes", "version_hash"),
         ("string", "plist_path"),
         ("path", "source"),
     ],
@@ -77,7 +77,7 @@ ZKeyValueMetadataRecord = TargetRecordDescriptor(
 )
 
 ZVersionRecord = TargetRecordDescriptor(
-    "macos/duet_interaction_c/z_key_value_metadata",
+    "macos/duet_interaction_c/z_version",
     [
         ("string", "table"),
         ("varint", "z_pk"),
@@ -132,12 +132,12 @@ FIELD_MAPPINGS = {
     "ZVALUE": "z_value",
     "ZNUMBER": "z_number",
     "ZCREATIONDATE": "z_creation_date",
-    "Attachment": "attachment",
+    "Attachment": "attachment_hash",
     "Contacts": "contacts",
     "Interactions": "interactions",
-    "Keywords": "keywords",
+    "Keywords": "keywords_hash",
     "Metadata": "metadata",
-    "Version": "version",
+    "Version": "version_hash",
 }
 
 CONVERT_TIMESTAMPS = {
@@ -205,12 +205,12 @@ class DuetInteractionCPlugin(Plugin):
                 source (path): Path to the interactionC.db file.
 
             NSStoreModelVersionHashesRecord:
-                attachment (bytes): Hash for ZATTACHMENT entity.
+                attachment_hash (bytes): Hash for ZATTACHMENT entity.
                 contacts (bytes): Hash for ZCONTACTS entity.
                 interactions (bytes): Hash for ZINTERACTIONS entity.
-                keywords (bytes): Hash for ZKEYWORDS entity.
+                keywords_hash (bytes): Hash for ZKEYWORDS entity.
                 metadata (bytes): Hash for ZMETADATA entity.
-                version (bytes): Hash for ZVERSION entity.
+                version_hash (bytes): Hash for ZVERSION entity.
                 plist_path (string): Path pointing to the location of the entry within the plist structure.
                 source (path): Path to the knowledgeC.db database file.
 
