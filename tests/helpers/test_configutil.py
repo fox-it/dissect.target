@@ -16,6 +16,7 @@ from dissect.target.helpers.configutil import (
     Indentation,
     Json,
     Leases,
+    Nix,
     ScopeManager,
     SystemD,
     parse,
@@ -403,3 +404,39 @@ def test_leases_parser(string_data: str, expected_output: dict) -> None:
     parser.parse_file(StringIO(string_data))
 
     assert parser.parsed_data == expected_output
+
+
+def test_nix_parser_syntax() -> None:
+    """Test Nix parser syntax: function headers, dotted keys, types, lists, lib.mkForce, comments."""
+    data = textwrap.dedent("""\
+        { lib, ... }:
+        # Comment
+        {
+          a.b = "1"; a.c = "2";
+          types = { bool = true; int = 42; empty = {}; };
+          items = [ "x" { address = "10.0.0.1"; prefixLength = 24; } ];
+          forced = lib.mkForce false;
+        }
+    """)
+    result = parse_data(Nix, data)
+    assert result["a"] == {"b": "1", "c": "2"}
+    assert result["types"] == {"bool": True, "int": 42, "empty": {}}
+    assert result["items"] == ["x", {"address": "10.0.0.1", "prefixLength": 24}]
+    assert result["forced"] is False
+
+
+def test_nix_parser_networking_fixture() -> None:
+    """Test full networking.nix fixture from nixos-infect."""
+    fixture = Path(absolute_path("_data/plugins/os/unix/linux/nixos/networking.nix"))
+    result = parse_data(Nix, fixture.read_text())
+
+    networking = result["networking"]
+    assert networking["nameservers"] == ["10.13.37.1", "10.13.37.2"]
+    assert networking["defaultGateway"] == "10.13.37.0"
+    assert networking["defaultGateway6"] == {"address": "", "interface": "eth0"}
+    assert networking["dhcpcd"]["enable"] is False
+    assert networking["usePredictableInterfaceNames"] is False
+
+    eth0 = networking["interfaces"]["eth0"]
+    assert eth0["ipv4"]["addresses"] == [{"address": "10.13.37.10", "prefixLength": 24}]
+    assert eth0["ipv6"]["addresses"] == [{"address": "2001:db8::1", "prefixLength": 64}]
