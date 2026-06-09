@@ -313,7 +313,7 @@ class UserAccountsPlugin(Plugin):
             ZAccessOptionsKeyRecord:
                 table (string): Name of the source table (ZACCESSOPTIONSKEY).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_enum_value (varint): Enumeration value.
                 z_name (string): The name of the entity in the data model.
@@ -328,7 +328,7 @@ class UserAccountsPlugin(Plugin):
             ZAccountRecord:
                 table (string): Name of the source table (ZACCOUNT).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_active (varint): Indicates whether the account is active:
                     0 = False.
@@ -368,7 +368,7 @@ class UserAccountsPlugin(Plugin):
             ZAccountPropertyRecord:
                 table (string): Name of the source table (ZACCOUNTPROPERTY).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_owner (varint): Reference to z_pk of owning ZACCOUNT.
                 z_key (string): Property key.
@@ -378,7 +378,7 @@ class UserAccountsPlugin(Plugin):
             ZAccountTypeRecord:
                 table (string): Name of the source table (ZACCOUNTTYPE).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_obsolete (varint): Indicates whether account type is obsolute:
                     0 = False.
@@ -413,7 +413,7 @@ class UserAccountsPlugin(Plugin):
 
             ZPrimaryKeyRecord:
                 table (string): Name of the source table (Z_PRIMARYKEY).
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_name (string): The name of the entity in the data model.
                 z_super (varint): This value corresponds to the Z_ENT of the parent entity.
                     0 indicates that the entity has no parent entity.

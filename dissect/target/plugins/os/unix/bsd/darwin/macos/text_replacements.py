@@ -185,7 +185,7 @@ class TextReplacementsPlugin(Plugin):
             ZTextReplacementEntryRecord:
                 table (string): Name of the source table (ZTEXTREPLACEMENTENTRY).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_was_deleted (varint): Indicates if the record was deleted.
                 z_needs_save_to_cloud (varint): Indicates if the record needs to be saved to cloud.
@@ -199,7 +199,7 @@ class TextReplacementsPlugin(Plugin):
             ZTrCloudKitSyncStateRecord:
                 table (string): Name of the source table (ZTRCLOUDKITSYNCSTATE).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_did_pull_once (varint): Indicates if initial CloudKit sync has occurred.
                 z_fetch_change_token (string): CloudKit change token for sync state tracking.
@@ -207,7 +207,7 @@ class TextReplacementsPlugin(Plugin):
 
             ZPrimaryKeyRecord:
                 table (string): Name of the source table (Z_PRIMARYKEY).
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_name (string): The name of the entity in the data model.
                 z_super (varint): This value corresponds to the Z_ENT of the parent entity.
                     0 indicates that the entity has no parent entity.

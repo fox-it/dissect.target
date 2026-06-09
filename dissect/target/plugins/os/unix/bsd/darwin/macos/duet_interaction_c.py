@@ -179,7 +179,7 @@ class DuetInteractionCPlugin(Plugin):
 
             ZPrimaryKeyRecord:
                 table (string): Name of the source table (Z_PRIMARYKEY).
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_name (string): The name of the entity in the data model.
                 z_super (varint): This value corresponds to the Z_ENT of the parent entity.
                     0 indicates that the entity has no parent entity.
@@ -221,7 +221,7 @@ class DuetInteractionCPlugin(Plugin):
             ZKeyValueMetadataRecord:
                 table (string): Name of the source table (ZMETADATA).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_key (string): Property key.
                 z_value (string): Property value.
@@ -230,7 +230,7 @@ class DuetInteractionCPlugin(Plugin):
             ZVersionRecord:
                 table (string): Name of the source table (ZVERSION).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_creation_date (datetime): Creation timestamp.
                 z_key (string): Property key.

@@ -23,10 +23,13 @@ def _build_userdirs(plugin: Plugin, hist_paths: list[str]) -> set[tuple[UserDeta
     for user_details in plugin.target.user_details.all_with_home():
         for d in hist_paths:
             home_dir: Path = user_details.home_path
-            for cur_dir in home_dir.glob(d):
-                cur_dir = cur_dir.resolve()
-                if cur_dir.exists():
-                    users_dirs.add((user_details, cur_dir))
+            try:
+                for cur_dir in home_dir.glob(d):
+                    cur_dir = cur_dir.resolve()
+                    if cur_dir.exists():
+                        users_dirs.add((user_details, cur_dir))
+            except Exception:
+                pass
     return users_dirs
 
 

@@ -336,7 +336,7 @@ class DuetKnowledgeCPlugin(Plugin):
             ZKeyValueRecord:
                 table (string): Name of the source table (Z_KEYVALUE).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_domain (string): Domain of the key/value pair.
                 z_key (string): Property key.
@@ -346,7 +346,7 @@ class DuetKnowledgeCPlugin(Plugin):
             ZContextualChangeRegistrationRecord:
                 table (string): Name of the source table (ZCONTEXTUALCHANGEREGISTRATION).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_is_active (varint): Whether the registration is active:
                     0 = False.
@@ -362,7 +362,7 @@ class DuetKnowledgeCPlugin(Plugin):
             ZObjectRecord:
                 table (string): Name of the source table (ZOBJECT).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_uuid_hash (varint): Hash of the UUID.
                 z_event (string): Associated event.
@@ -407,7 +407,7 @@ class DuetKnowledgeCPlugin(Plugin):
             ZSourceRecord:
                 table (string): Name of the source table (ZSOURCE).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_user_id (string): User identifier.
                 z_bundle_id (string): Application bundle ID.
@@ -421,13 +421,13 @@ class DuetKnowledgeCPlugin(Plugin):
             ZStructuredMetadataRecord (table contains 200+ more columns):
                 table (string): Name of the source table (ZSTRUCTUREDMETADATA).
                 z_pk (varint): The autoincrement primary key of the table.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 source (path): Path to the knowledgeC.db database file.
 
             ZPrimaryKeyRecord:
                 table (string): Name of the source table (Z_PRIMARYKEY).
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_name (string): The name of the entity in the data model.
                 z_super (varint): This value corresponds to the Z_ENT of the parent entity.
                     0 indicates that the entity has no parent entity.

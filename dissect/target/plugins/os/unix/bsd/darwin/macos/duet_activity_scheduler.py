@@ -152,7 +152,7 @@ class DuetActivitySchedulerPlugin(Plugin):
 
             ZPrimaryKeyRecord:
                 table (string): Name of the source table (Z_PRIMARYKEY).
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_name (string): The name of the entity in the data model.
                 z_super (varint): This value corresponds to the Z_ENT of the parent entity.
                     0 indicates that the entity has no parent entity.
@@ -163,7 +163,7 @@ class DuetActivitySchedulerPlugin(Plugin):
                 table (string): Name of the source table (ZGROUP).
                 z_max_concurrent (varint): Maximum number of concurrent activities allowed.
                 z_name (string): The name of the entity in the data model.
-                z_ent (varint): The ID of the table.
+                z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
                 z_pk (varint): The autoincrement primary key of the table.
                 source (path): Path to the DuetActivitySchedulerClassC.db file.

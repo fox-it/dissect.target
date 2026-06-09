@@ -81,6 +81,12 @@ def build_sqlite_records(
     for file in files:
         try:
             with SQLite3(file) as database:
+                # for table in database.tables():
+                #     print(table.name)
+                #     for row in table.rows():
+                #         print(row)
+                #         break
+                #     print()
                 for table in database.tables():
                     for row in table.rows():
                         row_dict = {k: v for k, v in row}  # noqa C416
