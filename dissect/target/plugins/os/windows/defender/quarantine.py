@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from io import BytesIO
-import struct
 from typing import TYPE_CHECKING, BinaryIO
 
 import dissect.util.ts as ts
@@ -345,6 +344,6 @@ class QuarantineEntryResource:
         elif field.Identifier == FIELD_IDENTIFIER.LastWriteTime:
             self.last_write_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
         elif field.Identifier == FIELD_IDENTIFIER.FileSize:
-            self.file_size = struct.unpack("<Q", field.Data)[0]
+            self.file_size = int.from_bytes(field.Data, "little")
         elif field.Identifier not in FIELD_IDENTIFIER:
             self.unknown_fields.append(field)

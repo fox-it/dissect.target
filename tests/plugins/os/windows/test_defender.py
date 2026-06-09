@@ -103,12 +103,16 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
 
     ie_file_record = ie_records[0]
     assert ie_file_record.detection_type == "file"
-    assert ie_file_record.detection_path == "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
+    assert ie_file_record.detection_path == (
+        "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
+    )
     assert ie_file_record.file_size == 1784
 
     ie_startup_record = ie_records[1]
     assert ie_startup_record.detection_type == "startup"
-    assert ie_startup_record.detection_path == "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
+    assert ie_startup_record.detection_path == (
+        "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
+    )
 
     tasksched_records = [r for r in records if r.quarantine_id == "3c1f228000000000270c270b71d096cd"]
     assert len(tasksched_records) == 5
@@ -116,8 +120,13 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     regkey_records = [r for r in tasksched_records if r.detection_type == "regkey"]
     assert len(regkey_records) == 2
     assert regkey_records[0].detection_name == "HackTool:Win32/AutoKMS"
-    assert regkey_records[0].detection_path == "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tree\\KMSAuto"
-    assert regkey_records[1].detection_path == "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tasks\\{EBCB386F-05C8-4545-9455-922990114435}"
+    assert regkey_records[0].detection_path == (
+        "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tree\\KMSAuto"
+    )
+    assert regkey_records[1].detection_path == (
+        "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\"
+        "Tasks\\{EBCB386F-05C8-4545-9455-922990114435}"
+    )
 
     file_records = [r for r in tasksched_records if r.detection_type == "file"]
     assert len(file_records) == 2
