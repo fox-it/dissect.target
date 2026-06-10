@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import struct
 from typing import TYPE_CHECKING
 
@@ -113,8 +114,12 @@ MSOfficeMRURecord = UserRegistryRecordDescriptor(
         ("varint", "index"),
         ("string", "value"),
         ("string", "key"),
+        ("string", "metadata"),
     ],
 )
+
+RE_OFFICEMRU_VALUE_NAME = re.compile(r"^Item (\d+)$")
+RE_OFFICEMRU_METADATA_VALUE_NAME = re.compile(r"^Item Metadata (\d+)$")
 
 
 class MRUPlugin(Plugin):
@@ -434,20 +439,25 @@ def parse_office_mru(target: Target, key: RegistryKey, record: TargetRecordDescr
 def parse_office_mru_key(target: Target, key: RegistryKey, record: TargetRecordDescriptor) -> Iterator[Record]:
     user = target.registry.get_user(key)
 
+    mru_metadata = {}
+    mru_data = []
+
     for value in key.values():
-        if not value.name.startswith("Item"):
-            continue
+        if match := RE_OFFICEMRU_METADATA_VALUE_NAME.fullmatch(value.name):
+            mru_metadata[int(match.group(1))] = value.value
+        elif match := RE_OFFICEMRU_VALUE_NAME.fullmatch(value.name):
+            entry_index = int(match.group(1))
+            info_str, path = value.value.split("*", 1)
+            info = {part[0]: int(part[1:], 16) for part in info_str.strip("[]").split("][")}
+            mru_data.append((entry_index, info, path))
 
-        entry_index = int(value.name.split(" ")[1])
-        info_str, path = value.value.split("*", 1)
-
-        info = {part[0]: int(part[1:], 16) for part in info_str.strip("[]").split("][")}
-
+    for entry_index, info, path in mru_data:
         yield record(
             ts=wintimestamp(info["T"]),
             regf_mtime=key.ts,
             index=entry_index,
             value=path,
+            metadata=mru_metadata.get(entry_index),
             _target=target,
             _user=user,
             _key=key,
