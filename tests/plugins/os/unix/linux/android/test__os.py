@@ -14,11 +14,23 @@ if TYPE_CHECKING:
 
 
 def test_android_os(target_android: Target) -> None:
+    """Test generic AndroidPlugin OS properties."""
     target_android.add_plugin(AndroidPlugin)
 
+    # Detection
     assert target_android.os == "android"
-    assert target_android.version == "Android 4.4.2 (2013-10-31)"
+
+    # Parsing of build.prop
+    assert target_android.version == "Android 14 UQ1A.240105.004 (2024-01-05)"
     assert target_android.hostname == "TMG28071935"
+    assert target_android.device == "Google LYNX Pixel 7a (lynx)"
+
+    # Parsing of persistent_properties protobuf file
+    assert target_android.timezone == "America/New_York"
+    assert target_android.language == ["en_US"]
+
+    # Parsing of ELF
+    assert target_android.architecture == "aarch64-linux-android"
 
 
 @pytest.mark.parametrize(
@@ -38,7 +50,7 @@ def test_android_os_detect_props(target_bare: Target, build_prop_locations: list
     fs.makedirs("/product")
 
     for prop, prop_file in build_prop_locations:
-        fs.map_file(prop, absolute_path(f"_data/plugins/os/unix/linux/android/{prop_file}"))
+        fs.map_file(prop, absolute_path(f"_data/plugins/os/unix/linux/android/system/{prop_file}"))
 
     # prop file that should not be found
     fs.map_file_fh("/foo/bar/too/deep/build.prop", BytesIO(b"ro.not.found='true'"))

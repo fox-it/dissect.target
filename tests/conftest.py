@@ -313,7 +313,12 @@ def fs_android() -> VirtualFilesystem:
     fs.makedirs("/system")
     fs.makedirs("/vendor")
     fs.makedirs("/product")
-    fs.map_file("/build.prop", absolute_path("_data/plugins/os/unix/linux/android/build.prop"))
+    fs.map_file("/build.prop", absolute_path("_data/plugins/os/unix/linux/android/system/build.prop"))
+    fs.map_file(
+        "/data/property/persistent_properties",
+        absolute_path("_data/plugins/os/unix/linux/android/system/persistent_properties"),
+    )
+    fs.map_file("/system/bin/sh", absolute_path("_data/plugins/os/unix/linux/android/system/sh.truncated"))
     return fs
 
 
