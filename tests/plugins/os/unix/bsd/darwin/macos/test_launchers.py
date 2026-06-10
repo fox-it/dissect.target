@@ -108,6 +108,9 @@ def test_launch_agents(
     assert results[0].hard_resource_limits == []
     assert results[0].debug is None
     assert results[0].wait_for_debugger is None
+    assert results[0].path_state == []
+    assert results[0].other_job_enabled == []
+    assert results[0].low_priority_background_io is None
     assert results[0].plist_path is None
     assert results[0].source == "/System/Library/LaunchAgents/com.apple.ecosystemagent.plist"
 
@@ -186,6 +189,9 @@ def test_launch_agents(
     assert results[4].hard_resource_limits == []
     assert results[4].debug is None
     assert results[4].wait_for_debugger is None
+    assert results[4].path_state == []
+    assert results[4].other_job_enabled == []
+    assert results[4].low_priority_background_io is None
     assert results[4].plist_path is None
     assert results[4].source == "/Users/user/Library/LaunchAgents/com.openssh.ssh-agent.plist"
 
@@ -284,6 +290,9 @@ def test_launch_daemons(
     assert results[0].hard_resource_limits == []
     assert results[0].debug is None
     assert results[0].wait_for_debugger is None
+    assert results[0].path_state == []
+    assert results[0].other_job_enabled == []
+    assert results[0].low_priority_background_io is None
     assert results[0].plist_path is None
     assert results[0].source == "/System/Library/LaunchDaemons/org.cups.cupsd.plist"
 

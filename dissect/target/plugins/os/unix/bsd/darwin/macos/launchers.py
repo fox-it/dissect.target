@@ -62,6 +62,9 @@ LauncherRecord = [
     ("string[]", "hard_resource_limits"),
     ("boolean", "debug"),
     ("boolean", "wait_for_debugger"),
+    ("string[]", "path_state"),
+    ("string[]", "other_job_enabled"),
+    ("boolean", "low_priority_background_io"),
     ("string", "plist_path"),
     ("path", "source"),
 ]
@@ -161,6 +164,9 @@ FIELD_MAPPINGS = {
     "HardResourceLimits": "hard_resource_limits",
     "Debug": "debug",
     "WaitForDebugger": "wait_for_debugger",
+    "path_state": "PathState",
+    "other_job_enabled": "OtherJobEnabled",
+    "low_priority_background_io": "LowPriorityBackgroundIO",
     # SocketRecord
     "SocketKey": "socket_key",
     "SockType": "sock_type",

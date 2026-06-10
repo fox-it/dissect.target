@@ -56,6 +56,5 @@ class TimeMachinePlugin(Plugin):
             _target=self.target,
         )
 
-
 # I was only able to find a preferences_version field in the plist file on a fresh Tahoe system.
-# It could be that more fields will show up in the plist file depending on user activity.
+# TODO: Check if more fields show up in the plist file depending on user activity.
