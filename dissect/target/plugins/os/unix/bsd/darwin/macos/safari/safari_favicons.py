@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from dissect.target import Target
 
 PageURLRecord = TargetRecordDescriptor(
-    "macos/safari/favicon/page_url",
+    "macos/safari_favicons/page_url",
     [
         ("string", "table"),
         ("string", "url"),
@@ -24,7 +24,7 @@ PageURLRecord = TargetRecordDescriptor(
 )
 
 IconInfoRecord = TargetRecordDescriptor(
-    "macos/safari/favicon/icon_info",
+    "macos/safari_favicons/icon_info",
     [
         ("string", "table"),
         ("string", "uuid"),
@@ -38,7 +38,7 @@ IconInfoRecord = TargetRecordDescriptor(
 )
 
 RejectedResourcesRecord = TargetRecordDescriptor(
-    "macos/safari/favicon/rejected_resources",
+    "macos/safari_favicons/rejected_resources",
     [
         ("string", "table"),
         ("string", "page_url"),

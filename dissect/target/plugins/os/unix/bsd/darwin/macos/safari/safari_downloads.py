@@ -13,25 +13,26 @@ if TYPE_CHECKING:
 
     from dissect.target import Target
 
-SafariPreferencesRecord = TargetRecordDescriptor(
-    "macos/safari_preferences",
+SafariDownloadsRecord = TargetRecordDescriptor(
+    "macos/safari_downloads",
     [
-        ("varint", "iio_launch_info"),
+        ("string[]", "download_history"),
         ("path", "source"),
     ],
 )
 
 
-class SafariPreferencesPlugin(Plugin):
+class SafariDownloadsPlugin(Plugin):
     """macOS Safari property list (plist) plugin.
 
-    Parses Safari's configuration settings and a list of recent searches performed by the user.
+    This plist file contains a record of downloaded files.
+    This data is automatically deleted after one day by default.
 
     References:
         - https://medium.com/@cyberengage.org/p13-analyzing-safari-browser-apple-mail-data-and-recents-database-artifacts-on-macos-9b58848d70ec
     """
 
-    USER_PATH = ("Library/Preferences/com.apple.Safari.plist",)
+    USER_PATH = ("Library/Safari/Downloads.plist",)
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -39,7 +40,7 @@ class SafariPreferencesPlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not (self.files):
-            raise UnsupportedPluginError("No com.apple.Safari.plist files found")
+            raise UnsupportedPluginError("No Downloads.plist files found")
 
     def _find_files(self) -> set:
         files = set()
@@ -47,26 +48,26 @@ class SafariPreferencesPlugin(Plugin):
             files.add(path)
         return files
 
-    @export(record=SafariPreferencesRecord)
-    def safari_preferences(self) -> Iterator[SafariPreferencesRecord]:
-        """Return macOS Safari preferences.
+    @export(record=SafariDownloadsRecord)
+    def safari_downloads(self) -> Iterator[SafariDownloadsRecord]:
+        """Return macOS Safari downloads.
 
-        Yields SafariPreferencesRecords with the following fields:
+        Yields SafariDownloadsRecords with the following fields:
 
         .. code-block:: text
 
-            iio_launch_info (varint): Image I/O launch info.
-            source (path): Path to the com.apple.Safari.plist file.
+            download_history (string[]): Download history.
+            source (path): Path to the Downloads.plist file.
         """
         for file in self.files:
             plist = plistlib.load(file.open())
 
-            yield SafariPreferencesRecord(
-                iio_launch_info=plist.get("IIO_LaunchInfo"),
+            yield SafariDownloadsRecord(
+                download_history=plist.get("DownloadHistory"),
                 source=file,
                 _target=self.target,
             )
 
 
-# I was only able to find a IIO_LaunchInfo field in the plist file on a fresh Tahoe system.
-# TODO: Check if more fields show up in the plist file depending on user activity.
+# Download history is empty in current test data
+# TODO: Get test file with actual data

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 SQLiteSequenceRecord = TargetRecordDescriptor(
-    "macos/per_site_preferences/sqlite_sequence",
+    "macos/safari_per_site_preferences/sqlite_sequence",
     [
         ("string", "table"),
         ("string", "name"),
@@ -25,7 +25,7 @@ SQLiteSequenceRecord = TargetRecordDescriptor(
 )
 
 PreferencesValuesRecord = TargetRecordDescriptor(
-    "macos/safari/per_site_preferences/preferences_values",
+    "macos/safari_per_site_preferences/preferences_values",
     [
         ("string", "table"),
         ("varint", "id"),

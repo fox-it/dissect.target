@@ -401,8 +401,13 @@ def build_plist_records(
         try:
             if b"$archiver" in fh.peek(64):
                 fh.seek(0)
-                data = load_plist_data(fh)
+                try:
+                    data = load_plist_data(fh)
+                except Exception:
+                    fh.seek(0)
+                    data = plistlib.load(fh)
             else:
+                fh.seek(0)
                 data = plistlib.load(fh)
 
             yield from emit_dict_records(
