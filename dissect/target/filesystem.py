@@ -873,6 +873,9 @@ class FilesystemEntry:
             return hashutil.custom(self.open(), algos)
         return hashutil.common(self.open())
 
+    def realname(self) -> str:
+        return self.name
+
 
 class DirEntry:
     """Directory entry base class. Closely models ``os.DirEntry``.
@@ -1708,6 +1711,9 @@ class LayerFilesystemEntry(FilesystemEntry):
 
     def lattr(self) -> Any:
         return self._exec("lattr")
+
+    def realname(self) -> str:
+        return self._exec("realname")
 
 
 class RootFilesystem(LayerFilesystem):
