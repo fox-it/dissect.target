@@ -41,7 +41,7 @@ def target_win_mru(target_win_users: Target) -> Target:
     )
     recentdocs_key.add_value("0", VirtualValue(user_hive, "0", recentdocs_value))
 
-    # value name is not present in MRUListEx, but should be still found with index 9999
+    # value name is not present in MRUListEx, but should be still found with index None
     recentdocs_key.add_value("1", VirtualValue(user_hive, "42", recentdocs_value))
 
     # OpenSaveMRU
