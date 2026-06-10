@@ -32,7 +32,7 @@ IconInfoRecord = TargetRecordDescriptor(
         ("datetime", "timestamp"),
         ("varint", "width"),
         ("varint", "height"),
-        ("varint", "has_generated_representations"),
+        ("boolean", "has_generated_representations"),
         ("path", "source"),
     ],
 )
@@ -98,9 +98,7 @@ class SafariFaviconsPlugin(Plugin):
                 timestamp (datetime): Timestamp.
                 width (varint): Width of the favicon.
                 height (varint): Height of the favicon.
-                has_generated_representations (varint): Indicates whether the favicon has generated representations:
-                    0 = False.
-                    1 = True.
+                has_generated_representations (boolean): Indicates whether the favicon has generated representations.
                 source (path): Path to the favicons.db database file.
 
             RejectedResourcesRecord:

@@ -34,8 +34,8 @@ ZContextualChangeRegistrationRecord = TargetRecordDescriptor(
         ("varint", "z_pk"),
         ("varint", "z_ent"),
         ("varint", "z_opt"),
-        ("varint", "z_is_active"),
-        ("varint", "z_is_multi_device_registration"),
+        ("boolean", "z_is_active"),
+        ("boolean", "z_is_multi_device_registration"),
         ("datetime", "z_creation_date"),
         ("string", "z_identifier"),
         ("string", "z_properties"),
@@ -58,8 +58,8 @@ ZObjectRecord = TargetRecordDescriptor(
         ("varint", "z_compatibility_version"),
         ("varint", "z_end_day_of_week"),
         ("varint", "z_end_second_of_day"),
-        ("varint", "z_has_custom_metadata"),
-        ("varint", "z_has_structured_metadata"),
+        ("boolean", "z_has_custom_metadata"),
+        ("boolean", "z_has_structured_metadata"),
         ("varint", "z_seconds_from_gmt"),
         ("varint", "z_should_sync"),
         ("varint", "z_start_day_of_week"),
@@ -348,12 +348,8 @@ class DuetKnowledgeCPlugin(Plugin):
                 z_pk (varint): The autoincrement primary key of the table.
                 z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
-                z_is_active (varint): Whether the registration is active:
-                    0 = False.
-                    1 = True.
-                z_is_multi_device_registration (varint): Whether the registration is a multi-device registration:
-                    0 = False.
-                    1 = True.
+                z_is_active (boolean): Whether the registration is active.
+                z_is_multi_device_registration (boolean): Whether the registration is a multi-device registration.
                 z_creation_date (datetime): Creation timestamp.
                 z_identifier (string): Identifier of the registration.
                 z_properties (string): Properties of the registration.
@@ -372,12 +368,8 @@ class DuetKnowledgeCPlugin(Plugin):
                 z_compatibility_version (varint): Compatibility version.
                 z_end_day_of_week (varint): End day of week.
                 z_end_second_of_day (varint): End second of day.
-                z_has_custom_metadata (varint): Whether entry has custom metadata:
-                    0 = False.
-                    1 = True.
-                z_has_structured_metadata (varint): Whether entry has structured metadata:
-                    0 = False.
-                    1 = True.
+                z_has_custom_metadata (boolean): Whether entry has custom metadata.
+                z_has_structured_metadata (boolean): Whether entry has structured metadata.
                 z_seconds_from_gmt (varint): Timezone offset from gmt.
                 z_should_sync (varint): Sync flag.
                 z_start_day_of_week (varint): Start day of week.

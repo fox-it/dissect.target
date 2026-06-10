@@ -48,16 +48,16 @@ def test_notes(test_files: list[str], target_unix: Target, fs_unix: VirtualFiles
     assert results[0].z_pk == 1
     assert results[0].z_ent == 4
     assert results[0].z_opt == 2
-    assert results[0].z_allow_insecure_authentication == 0
-    assert results[0].z_did_choose_to_migrate == 1
-    assert results[0].z_enabled == 1
+    assert not results[0].z_allow_insecure_authentication
+    assert results[0].z_did_choose_to_migrate
+    assert results[0].z_enabled
     assert results[0].z_root_folder == 2
     assert results[0].z6_root_folder == 6
     assert results[0].z_trash_folder == 1
     assert results[0].z_gmail_capabilities_support is None
     assert results[0].z_port is None
     assert results[0].z_security_layer_type is None
-    assert results[0].z_migration_offered == 0
+    assert not results[0].z_migration_offered
     assert results[0].z_account_description == "On My Mac"
     assert results[0].z_email_address is None
     assert results[0].z_full_name is None

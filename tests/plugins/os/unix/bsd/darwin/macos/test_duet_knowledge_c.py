@@ -81,8 +81,8 @@ def test_duet_knowledge_c(
     assert results[4].z_compatibility_version == 0
     assert results[4].z_end_day_of_week == 2
     assert results[4].z_end_second_of_day == 41368
-    assert results[4].z_has_custom_metadata == 0
-    assert results[4].z_has_structured_metadata == 1
+    assert not results[4].z_has_custom_metadata
+    assert results[4].z_has_structured_metadata
     assert results[4].z_seconds_from_gmt == -25200
     assert results[4].z_should_sync == 0
     assert results[4].z_start_day_of_week == 2

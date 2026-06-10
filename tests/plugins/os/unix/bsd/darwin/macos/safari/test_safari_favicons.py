@@ -58,7 +58,7 @@ def test_safari_favicons(test_files: list[str], target_unix: Target, fs_unix: Vi
     assert results[113].timestamp == datetime(2026, 5, 4, 11, 39, 58, 200725, tzinfo=timezone.utc)
     assert results[113].width == 32
     assert results[113].height == 32
-    assert results[113].has_generated_representations == 1
+    assert results[113].has_generated_representations
     assert results[113].source == "/Users/user/Library/Safari/Favicon Cache/favicons.db"
 
     assert results[137].table == "rejected_resources"

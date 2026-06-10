@@ -22,16 +22,16 @@ ZAccountRecord = TargetRecordDescriptor(
         ("varint", "z_pk"),
         ("varint", "z_ent"),
         ("varint", "z_opt"),
-        ("varint", "z_allow_insecure_authentication"),
-        ("varint", "z_did_choose_to_migrate"),
-        ("varint", "z_enabled"),
+        ("boolean", "z_allow_insecure_authentication"),
+        ("boolean", "z_did_choose_to_migrate"),
+        ("boolean", "z_enabled"),
         ("varint", "z_root_folder"),
         ("varint", "z6_root_folder"),
         ("varint", "z_trash_folder"),
         ("string", "z_gmail_capabilities_support"),
         ("string", "z_port"),
         ("string", "z_security_layer_type"),
-        ("varint", "z_migration_offered"),
+        ("boolean", "z_migration_offered"),
         ("string", "z_account_description"),
         ("string", "z_email_address"),
         ("string", "z_full_name"),
@@ -60,7 +60,7 @@ ZFolderRecord = TargetRecordDescriptor(
         ("varint", "z1_account"),
         ("varint", "z_parent"),
         ("varint", "z6_parent"),
-        ("string", "z_is_distinguished"),
+        ("boolean", "z_is_distinguished"),
         ("string", "z_alleged_highest_modification_sequence"),
         ("string", "z_computed_highest_modification_sequence"),
         ("string", "z_uid_next"),
@@ -359,22 +359,16 @@ class NotesPlugin(Plugin):
                 z_pk (varint): The autoincrement primary key of the table.
                 z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
-                z_allow_insecure_authentication (varint): Indicates whether insecure authentication is allowed:
-                    0 = False.
-                    1 = True.
-                z_did_choose_to_migrate (varint): Indicates if migration was selected:
-                    0 = False.
-                    1 = True.
-                z_enabled (varint): Indicates whether the account is enabled.
+                z_allow_insecure_authentication (boolean): Indicates whether insecure authentication is allowed.
+                z_did_choose_to_migrate (boolean): Indicates if migration was selected.
+                z_enabled (boolean): Indicates whether the account is enabled.
                 z_root_folder (varint): Reference to the root folder.
                 z6_root_folder (varint): Alternate root folder reference.
                 z_trash_folder (varint): Reference to the trash folder.
                 z_gmail_capabilities_support (string): Gmail capability support flag.
                 z_port (string): Port value.
                 z_security_layer_type (string): Security layer type.
-                z_migration_offered (varint): Indicates if migration was offered:
-                    0 = False.
-                    1 = True.
+                z_migration_offered (boolean): Indicates if migration was offered.
                 z_account_description (string): Account description:
                 z_email_address (string): Associated email address.
                 z_full_name (string): Full name of the account.
@@ -399,9 +393,7 @@ class NotesPlugin(Plugin):
                 z1_account (varint): Alternate reference to Z_PK in ZACCOUNT.
                 z_parent (varint): Parent folder reference.
                 z6_parent (varint): Alternate parent reference.
-                z_is_distinguished (varint): Whether entry is distinguished:
-                    0 = False.
-                    1 = True.
+                z_is_distinguished (boolean): Whether entry is distinguished.
                 z_alleged_highest_modification_sequence (string): Alleged highest modification sequence.
                 z_computed_highest_modification_sequence (string): Computed highest modification sequence.
                 z_uid_next (string): Next UID value.

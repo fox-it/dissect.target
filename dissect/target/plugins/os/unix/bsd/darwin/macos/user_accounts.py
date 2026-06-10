@@ -46,11 +46,11 @@ ZAccountRecord = TargetRecordDescriptor(
         ("varint", "z_pk"),
         ("varint", "z_ent"),
         ("varint", "z_opt"),
-        ("varint", "z_active"),
-        ("varint", "z_authenticated"),
-        ("varint", "z_supports_authentication"),
-        ("varint", "z_visible"),
-        ("varint", "z_warming_up"),
+        ("boolean", "z_active"),
+        ("boolean", "z_authenticated"),
+        ("boolean", "z_supports_authentication"),
+        ("boolean", "z_visible"),
+        ("boolean", "z_warming_up"),
         ("varint", "z_account_type"),
         ("varint", "z_parent_account"),
         ("datetime", "z_date"),
@@ -98,10 +98,10 @@ ZAccountTypeRecord = TargetRecordDescriptor(
         ("varint", "z_pk"),
         ("varint", "z_ent"),
         ("varint", "z_opt"),
-        ("varint", "z_obsolete"),
-        ("varint", "z_supports_authentication"),
-        ("varint", "z_supports_multiple_accounts"),
-        ("varint", "z_visibility"),
+        ("boolean", "z_obsolete"),
+        ("boolean", "z_supports_authentication"),
+        ("boolean", "z_supports_multiple_accounts"),
+        ("boolean", "z_visibility"),
         ("string", "z_account_type_description"),
         ("string", "z_credential_protection_policy"),
         ("string", "z_credential_type"),
@@ -330,21 +330,11 @@ class UserAccountsPlugin(Plugin):
                 z_pk (varint): The autoincrement primary key of the table.
                 z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
-                z_active (varint): Indicates whether the account is active:
-                    0 = False.
-                    1 = True.
-                z_authenticated (varint): Indicates whether the account is authenticated:
-                    0 = False.
-                    1 = True.
-                z_supports_authentication (varint): Indicates if authentication is supported:
-                    0 = False.
-                    1 = True.
-                z_visible (varint): Indicates whether account is visible:
-                    0 = False.
-                    1 = True.
-                z_warming_up (varint): Indicates account initialization state:
-                    0 = False.
-                    1 = True.
+                z_active (boolean): Indicates whether the account is active.
+                z_authenticated (boolean): Indicates whether the account is authenticated.
+                z_supports_authentication (boolean): Indicates if authentication is supported.
+                z_visible (boolean): Indicates whether account is visible.
+                z_warming_up (boolean): Indicates account initialization state.
                 z_account_type (varint): Reference to z_pk in ZACCOUNTTYPE.
                 z_parent_account (varint): Reference to z_pk of parent account.
                 z_date (datetime): Timestamp.
@@ -380,18 +370,10 @@ class UserAccountsPlugin(Plugin):
                 z_pk (varint): The autoincrement primary key of the table.
                 z_ent (varint): Entity identifier.
                 z_opt (varint): The version number of the data record.
-                z_obsolete (varint): Indicates whether account type is obsolute:
-                    0 = False.
-                    1 = True.
-                z_supports_authentication (varint): Indicates whether authentication is supported:
-                    0 = False.
-                    1 = True.
-                z_supports_multiple_accounts (varint): Indicates whether multiple accounts are supported:
-                    0 = False.
-                    1 = True.
-                z_visibility (varint): Indicates visibility of the account type:
-                    0 = False.
-                    1 = True.
+                z_obsolete (boolean): Indicates whether account type is obsolute.
+                z_supports_authentication (boolean): Indicates whether authentication is supported.
+                z_supports_multiple_accounts (boolean): Indicates whether multiple accounts are supported.
+                z_visibility (boolean): Indicates visibility of the account type.
                 z_account_type_description (string): Description of account type.
                 z_credential_protection_policy (string): Credential protection policy.
                 z_credential_type (string): Credential type.

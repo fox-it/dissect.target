@@ -60,11 +60,11 @@ def test_user_accounts(test_files: list[str], target_unix: Target, fs_unix: Virt
     assert results[19].z_pk == 1
     assert results[19].z_ent == 2
     assert results[19].z_opt == 7
-    assert results[19].z_active == 0
-    assert results[19].z_authenticated == 0
-    assert results[19].z_supports_authentication == 1
-    assert results[19].z_visible == 1
-    assert results[19].z_warming_up == 0
+    assert not results[19].z_active
+    assert not results[19].z_authenticated
+    assert results[19].z_supports_authentication
+    assert results[19].z_visible
+    assert not results[19].z_warming_up
     assert results[19].z_account_type == 50
     assert results[19].z_parent_account is None
     assert results[19].z_date.isoformat() == "1995-03-25T14:11:32.168510+00:00"
@@ -97,10 +97,10 @@ def test_user_accounts(test_files: list[str], target_unix: Target, fs_unix: Virt
     assert results[36].z_pk == 1
     assert results[36].z_ent == 4
     assert results[36].z_opt == 1
-    assert results[36].z_obsolete == 0
-    assert results[36].z_supports_authentication == 1
-    assert results[36].z_supports_multiple_accounts == 1
-    assert results[36].z_visibility == 0
+    assert not results[36].z_obsolete
+    assert results[36].z_supports_authentication
+    assert results[36].z_supports_multiple_accounts
+    assert not results[36].z_visibility
     assert results[36].z_account_type_description == "Gmail"
     assert results[36].z_credential_protection_policy is None
     assert results[36].z_credential_type == "oauth2"
