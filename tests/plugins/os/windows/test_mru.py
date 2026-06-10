@@ -41,6 +41,9 @@ def target_win_mru(target_win_users: Target) -> Target:
     )
     recentdocs_key.add_value("0", VirtualValue(user_hive, "0", recentdocs_value))
 
+    # value name is not present in MRUListEx, but should be still found with index None
+    recentdocs_key.add_value("1", VirtualValue(user_hive, "42", recentdocs_value))
+
     # OpenSaveMRU
     opensave_key = VirtualKey(
         user_hive, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU"
@@ -204,7 +207,8 @@ def test_mru_plugin(target_win_mru: Target) -> None:
     msoffice = list(target_win_mru.mru.msoffice())
 
     assert len(run) == 2
-    assert len(recentdocs) == 1
+    assert len(recentdocs) == 2
+    assert any(r.index is None for r in recentdocs)
     assert len(opensave) == 6
     # test if opensave_pidl_key is correctly resolved
     assert opensave[4].value == "My Computer\\Z:\\Web Optimizer.zip"
@@ -218,4 +222,4 @@ def test_mru_plugin(target_win_mru: Target) -> None:
     assert len(mstsc) == 3
     assert len(msoffice) == 6
 
-    assert len(list(target_win_mru.mru())) == 26
+    assert len(list(target_win_mru.mru())) == 27

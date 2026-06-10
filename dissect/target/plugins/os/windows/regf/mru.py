@@ -364,7 +364,10 @@ def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescr
         if value.name == "MRUListEx":
             continue
 
-        entry_index = mrulist_ex.index(int(value.name))
+        # value can be missing in MRUListEx
+        # instead of skipping, set entry_index to None for it to separate from correct entries
+        entry_index = None if int(value.name) not in mrulist_ex else mrulist_ex.index(int(value.name))
+
         if record != OpenSaveMRURecord:
             path = next(read_wstrings(value.value))
             bag = value.value[len(path) + 2 :]
