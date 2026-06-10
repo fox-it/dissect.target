@@ -3,22 +3,18 @@ from __future__ import annotations
 from io import BytesIO
 from unittest.mock import Mock, create_autospec, patch
 
+import dissect.fat as fat
 import pytest
 
-from dissect.target.filesystems.fat import (
-    FatFilesystem,
-    FileNotFoundError,
-    NotADirectoryError,
-    fat_exc,
-)
+from dissect.target.filesystems.fat import FatFilesystem
 
 
 @pytest.mark.parametrize(
     ("raised_exception", "expected_exception"),
     [
-        (fat_exc.FileNotFoundError, FileNotFoundError),
-        (fat_exc.Error, FileNotFoundError),
-        (fat_exc.NotADirectoryError, NotADirectoryError),
+        (fat.FileNotFoundError, FileNotFoundError),
+        (fat.Error, FileNotFoundError),
+        (fat.NotADirectoryError, NotADirectoryError),
     ],
 )
 def test_get_entry(raised_exception: Exception, expected_exception: Exception) -> None:
