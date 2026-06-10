@@ -109,6 +109,24 @@ def target_win_mru(target_win_users: Target) -> Target:
         ),
     )
 
+    opensave_pidl_contacts_subkey = VirtualKey(user_hive, opensave_pidl_key.path + "\\info/contacts")
+    opensave_pidl_contacts_subkey.add_value(
+        "MRUListEx",
+        VirtualValue(user_hive, "MRUListEx", b"\x00\x00\x00\x00\xff\xff\xff\xff"),
+    )
+    contacts_data = bytes.fromhex(
+        "14001F6880531C87A0426910A2EA08002B30309D"
+        "4A0061800000000068007400740070003A002F00"
+        "2F007700770077002E0074006500730074003000"
+        "31002E0069006E0066006F002F0063006F006E00"
+        "74006100630074007300000000000000"
+    )
+    opensave_pidl_contacts_subkey.add_value(
+        "0",
+        VirtualValue(user_hive, "0", contacts_data),
+    )
+    opensave_pidl_key.add_subkey("info/contacts", opensave_pidl_contacts_subkey)
+
     # ACMru
     acmru_key = VirtualKey(user_hive, "Software\\Microsoft\\Search Assistant\\ACMru\\5603")
     acmru_key.add_value("000", VirtualValue(user_hive, "000", "value"))
@@ -187,9 +205,10 @@ def test_mru_plugin(target_win_mru: Target) -> None:
 
     assert len(run) == 2
     assert len(recentdocs) == 1
-    assert len(opensave) == 5
+    assert len(opensave) == 6
     # test if opensave_pidl_key is correctly resolved
     assert opensave[4].value == "My Computer\\Z:\\Web Optimizer.zip"
+    assert any("http://www.test01.info/contacts" in r.value for r in opensave)
     assert len(lastvisited) == 3
     # test if lastvisited_pidl_key is correctly resolved
     assert lastvisited[2].filename == "KeePass.exe"
@@ -199,4 +218,4 @@ def test_mru_plugin(target_win_mru: Target) -> None:
     assert len(mstsc) == 3
     assert len(msoffice) == 6
 
-    assert len(list(target_win_mru.mru())) == 25
+    assert len(list(target_win_mru.mru())) == 26
