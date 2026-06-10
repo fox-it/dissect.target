@@ -690,6 +690,8 @@ def emit_dict_records(
         scalar values are retained as attributes
         dictionary elements are treated as child nodes and processed recursively.
 
+    Supports decoding of binary plist values and NSKeyedArchiver blobs.
+
     Collapses specified paths into attribute values instead of recursing.
 
     Generates records for nodes containing attribute data, using either dynamic
@@ -739,6 +741,43 @@ def emit_dict_records(
 
             if cleaned_list or not contains_dict:
                 attributes[k] = cleaned_list
+
+        elif isinstance(v, (bytes, bytearray)) and v.startswith(b"bplist00"):
+            if is_nskeyedarchive_blob(v):
+                try:
+                    archiver = NSKeyedArchiver(BytesIO(v))
+                    decoded_value = archiver.top.get("root")
+                    attributes[k] = decoded_value
+                except Exception:
+                    plugin.target.log.exception(
+                        "Failed to decode %s value for key %s",
+                        child_path,
+                        k,
+                    )
+            else:
+                try:
+                    plist_data = load_plist_data(v) if b"$archiver" in v[:128] else plistlib.loads(v)
+
+                    if isinstance(plist_data, dict):
+                        yield from emit_dict_records(
+                            plugin,
+                            plist_data,
+                            source,
+                            record_descriptors=record_descriptors,
+                            field_mappings=field_mappings,
+                            convert_timestamps=convert_timestamps,
+                        )
+                    else:
+                        # If binary plist is an attribute and not a dict
+                        attributes[k] = plist_data
+
+                except Exception:
+                    plugin.target.log.exception(
+                        "Failed to parse plist in %s (plist_path=%s, key=%s)",
+                        source,
+                        child_path,
+                        k,
+                    )
         else:
             attributes[k] = v
 
