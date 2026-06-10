@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import stat
-import zipfile
+import zipfile as zf
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, BinaryIO
-
-from dissect.util.stream import BufferedStream
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -14,24 +12,11 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import (
-    Filesystem,
-    FilesystemEntry,
-    VirtualDirectory,
-    VirtualFilesystem,
-)
+from dissect.target.filesystem import DirEntry, Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
-from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from dissect.target.filesystem import (
-        DirEntry,
-    )
-
-
-log = get_logger(__name__)
 
 
 class ZipFilesystem(Filesystem):
@@ -47,47 +32,73 @@ class ZipFilesystem(Filesystem):
         self,
         fh: BinaryIO,
         base: str | None = None,
-        *args,
+        *,
+        zipfile: zf.ZipFile | None = None,
         **kwargs,
     ):
-        super().__init__(fh, *args, **kwargs)
+        super().__init__(fh, **kwargs)
 
-        fh.seek(0)
+        if zipfile:
+            self.zip = zipfile
+        else:
+            fh.seek(0)
+            self.zip = zf.ZipFile(fh, mode="r")
 
-        self.zip = zipfile.ZipFile(fh, mode="r")
-        self.base = base or ""
+        self.base = self._resolve_path(base) if base else ""
+        if self.base and not self.base.endswith("/"):
+            self.base += "/"
 
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
-
-        for member in self.zip.infolist():
-            if not member.filename.startswith(self.base) or member.filename in (".", "./"):
-                continue
-
-            rel_name = self._resolve_path(member.filename).strip("/")
-            self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
+        # Ideally we just use zf.Path, but it doesn't handle absolute paths or relative paths (e.g., "./") correctly
+        # We can at least steal the namelist with implied directories and go from there
+        self._namemap = {}
+        for name in zf.Path(self.zip).root.namelist():
+            normalized = self._resolve_path(name)
+            if self.base:
+                if not normalized.startswith(self.base):
+                    continue
+                normalized = normalized.removeprefix(self.base)
+            self._namemap[normalized] = name
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         """Detect a zip file on a given file-like object."""
-        return zipfile.is_zipfile(fh)
+        return zf.is_zipfile(fh)
 
     def _resolve_path(self, path: str) -> str:
-        return fsutil.normpath(path.removeprefix(self.base), alt_separator=self.alt_separator)
+        if not self.case_sensitive:
+            path = path.lower()
 
-    def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
+        return fsutil.normpath(path, alt_separator=self.alt_separator).lstrip("/")
+
+    def get(self, path: str) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path, relentry=relentry)
+        path = fsutil.normpath(path.strip("/"))
+        path = path.lower() if not self.case_sensitive else path
+        if (normpath := self._namemap.get(path)) is None:
+            if path == "":
+                return ZipFilesystemEntry(self, "/", zf.ZipInfo(filename=self.base or "/"))
+            raise FileNotFoundError(path)
+
+        return ZipFilesystemEntry(self, path, self.zip.getinfo(normpath))
 
 
-# Note: We subclass from VirtualDirectory because VirtualFilesystem is currently only compatible with VirtualDirectory
-# Subclass from VirtualDirectory so we get that compatibility for free, and override the rest to do our own thing
-class ZipFilesystemEntry(VirtualDirectory):
+class ZipDirEntry(DirEntry):
     fs: ZipFilesystem
-    entry: zipfile.ZipInfo
+    entry: zf.ZipInfo
 
-    def __init__(self, fs: ZipFilesystem, path: str, entry: zipfile.ZipInfo):
-        super().__init__(fs, path)
-        self.entry = entry
+    def get(self) -> FilesystemEntry:
+        return ZipFilesystemEntry(self.fs, self.path, self.entry)
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
+
+class ZipFilesystemEntry(FilesystemEntry):
+    fs: ZipFilesystem
+    entry: zf.ZipInfo
+
+    def get(self, path: str) -> FilesystemEntry:
+        return self.fs.get(fsutil.join(self.path, path, alt_separator=self.fs.alt_separator))
 
     def open(self) -> BinaryIO:
         if self.is_dir():
@@ -97,77 +108,79 @@ class ZipFilesystemEntry(VirtualDirectory):
             return self._resolve().open()
 
         try:
-            return BufferedStream(self.fs.zip.open(self.entry), size=self.entry.file_size)
+            return self.fs.zip.open(self.entry)
         except Exception:
             raise FileNotFoundError(self.path)
 
-    def scandir(self) -> Iterator[DirEntry]:
+    def _is_child(self, path: str) -> bool:
+        if path == "":
+            return False
+        return fsutil.dirname(path.strip("/"), alt_separator=self.fs.alt_separator) == self.path.strip("/")
+
+    def _iterdir(self) -> Iterator[str]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        if isinstance(entry := self._resolve(), ZipFilesystemEntry):
-            return super(ZipFilesystemEntry, entry).scandir()
-        return entry.scandir()
+        if self.is_symlink():
+            yield from self.readlink_ext()._iterdir()
+        else:
+            yield from filter(self._is_child, self.fs._namemap.keys())
+
+    def iterdir(self) -> Iterator[str]:
+        yield from map(fsutil.basename, self._iterdir())
+
+    def scandir(self) -> Iterator[DirEntry]:
+        for name in self._iterdir():
+            entry = self.fs.zip.getinfo(self.fs._namemap.get(name, name))
+            yield ZipDirEntry(self.fs, self.path, fsutil.basename(name), entry)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:
-            entry = self._resolve(follow_symlinks=follow_symlinks)
+            return self._resolve(follow_symlinks=follow_symlinks).entry.is_dir()
         except FilesystemError:
             return False
-
-        if isinstance(entry, ZipFilesystemEntry):
-            return entry.entry.is_dir()
-        return isinstance(entry, VirtualDirectory)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
-        try:
-            entry = self._resolve(follow_symlinks=follow_symlinks)
-        except FilesystemError:
-            return False
-
-        if isinstance(entry, ZipFilesystemEntry):
-            return not entry.entry.is_dir()
-        return False
+        return not self.is_dir(follow_symlinks=follow_symlinks)
 
     def is_symlink(self) -> bool:
-        return stat.S_ISLNK(self.entry.external_attr >> 16)
+        return stat.S_ISLNK(self.lstat().st_mode)
 
     def readlink(self) -> str:
         if not self.is_symlink():
             raise NotASymlinkError
-        return self.fs.zip.open(self.entry).read().decode()
-
-    def readlink_ext(self) -> FilesystemEntry:
-        return FilesystemEntry.readlink_ext(self)
+        return self.fs.zip.open(self.entry).read().decode("utf-8")
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
-        """Return the stat information of the given path, without resolving links."""
-        # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
-        mode = self.entry.external_attr >> 16
+        info = self.entry
 
-        if self.entry.is_dir() and not stat.S_ISDIR(mode):
+        if not (mode := info.external_attr >> 16):
+            mode = 0o777
+
+        if info.is_dir() and not stat.S_ISDIR(mode):
             mode = stat.S_IFDIR | mode
-        elif not self.entry.is_dir() and not stat.S_ISREG(mode):
+        elif not info.is_dir() and not stat.S_ISREG(mode):
             mode = stat.S_IFREG | mode
 
         try:
-            mtime = datetime(*self.entry.date_time, tzinfo=timezone.utc)
+            mtime = datetime(*info.date_time, tzinfo=timezone.utc)
         except ValueError:
-            mtime_tuple = (2107, 12, 31, 23, 59, 59) if self.entry.date_time[0] >= 2107 else (1980, 1, 1, 0, 0, 0)
+            mtime_tuple = (2107, 12, 31, 23, 59, 59) if info.date_time[0] >= 2107 else (1980, 1, 1, 0, 0, 0)
             mtime = datetime(*mtime_tuple, tzinfo=timezone.utc)
 
+        # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         return fsutil.stat_result(
             [
                 mode,
-                self.entry.header_offset,
+                getattr(info, "header_offset", id(info)),
                 id(self.fs),
                 1,
                 0,
                 0,
-                self.entry.file_size,
+                info.file_size,
                 0,
                 mtime.timestamp(),
                 0,

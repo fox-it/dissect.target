@@ -49,7 +49,11 @@ def dirname(path: str, alt_separator: str = "") -> str:
 
 
 def normpath(path: str, alt_separator: str = "") -> str:
-    return posixpath.normpath(normalize(path, alt_separator=alt_separator))
+    path = posixpath.normpath(normalize(path, alt_separator=alt_separator))
+    # TODO: to hold us over until the path changes are merged
+    if path == ".":
+        path = ""
+    return path
 
 
 def abspath(path: str, cwd: str = "", alt_separator: str = "") -> str:
