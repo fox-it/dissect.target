@@ -3,10 +3,10 @@
 Update periodically.
 
 Commit we're in sync with:
-Hash:       e54225545866d780b12d8e70c33d25fc13b2c3a9
-Date:       2026-03-02T11:56:28.000Z
+Hash:       01c6d3d76bf222d8b847c97e0a3d3fad0c1b1fe3
+Date:       2026-05-25T07:33:54.000Z
 Branch:     main (3.15)
-URL:        https://github.com/python/cpython/commit/e54225545866d780b12d8e70c33d25fc13b2c3a9
+URL:        https://github.com/python/cpython/commit/01c6d3d76bf222d8b847c97e0a3d3fad0c1b1fe3
 
 Notes:
     - https://github.com/python/cpython/blob/main/Lib/glob.py
@@ -38,15 +38,15 @@ def translate(
 ) -> str:
     """Translate a pathname with shell wildcards to a regular expression.
 
-    If `recursive` is true, the pattern segment '**' will match any number of
-    path segments.
+    If `recursive` is true, the pattern segment '**' will match any number
+    of path segments.
 
     If `include_hidden` is true, wildcards can match path segments beginning
     with a dot ('.').
 
     If a sequence of separator characters is given to `seps`, they will be
-    used to split the pattern into segments and match path separators. If not
-    given, os.path.sep and os.path.altsep (where available) are used.
+    used to split the pattern into segments and match path separators. If
+    not given, os.path.sep and os.path.altsep (where available) are used.
     """
     if not seps:
         seps = (os.path.sep, os.path.altsep) if os.path.altsep else os.path.sep
