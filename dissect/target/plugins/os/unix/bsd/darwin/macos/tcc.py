@@ -20,8 +20,8 @@ AccessRecord = TargetRecordDescriptor(
         ("string", "service"),
         ("string", "client"),
         ("varint", "client_type"),
-        ("varint", "auth_value"),
-        ("varint", "auth_reason"),
+        ("string", "auth_value"),
+        ("string", "auth_reason"),
         ("varint", "auth_version"),
         ("bytes", "csreq"),
         ("string", "policy_id"),
@@ -52,6 +52,29 @@ TCCRecords = (
     AccessRecord,
     KeyValueRecord,
 )
+
+VALUE_MAPPINGS = {
+    "auth_value": {
+        0: "Denied",
+        1: "Unknown",
+        2: "Allowed",
+        3: "Limited",
+    },
+    "auth_reason": {
+        1: "Error",
+        2: "User Consent",
+        3: "User Set",
+        4: "System Set",
+        5: "Service Policy",
+        6: "MDM Policy",
+        7: "Override Policy",
+        8: "Missing usage string",
+        9: "Prompt Timeout",
+        10: "Preflight Unknown",
+        11: "Entitled",
+        12: "App Type Policy.",
+    },
+}
 
 
 class TCCPlugin(Plugin):
@@ -97,25 +120,8 @@ class TCCPlugin(Plugin):
                 service (string): What service access is being restricted to.
                 client (string):  Bundle Identifier or absolute path to the program that wants to use the service.
                 client_type (varint): Whether client is a Bundle Identifier(0) or an absolute path(1)
-                auth_value (varint): Authorization decision:
-                    0 = denied.
-                    1 = unknown.
-                    2 = allowed
-                    3 = limited.
-                    Observed auth_value = 5 in macOS Tahoe, but unsure about it's meaning.
-                auth_reason (varint): A code indicating how this auth_value was set:
-                    1 = Error.
-                    2 = User Consent.
-                    3 =  User Set.
-                    4 = System Set.
-                    5 = Service Policy.
-                    6 = MDM Policy.
-                    7 = Override Policy.
-                    8 = Missing usage string.
-                    9 = Prompt Timeout.
-                    10 = Preflight Unknown.
-                    11 = Entitled.
-                    12 = App Type Policy.
+                auth_value (string): Authorization value.
+                auth_reason (string): Indicates how this auth_value was set.
                 auth_version (varint): Always 1 as of macOS Tahoe.
                 csreq (bytes): Binary code signing requirement blob that the client must
                     satisfy in order for access to be granted.
@@ -141,6 +147,6 @@ class TCCPlugin(Plugin):
                 value (string): Value associated with the key.
                 source (path): Path to the TCC.db database file.
         """
-        yield from build_sqlite_records(self, self.files, TCCRecords)
+        yield from build_sqlite_records(self, self.files, TCCRecords, value_mappings=VALUE_MAPPINGS)
 
         # TODO: Add policies, active_policy, access_overrides, expired tables

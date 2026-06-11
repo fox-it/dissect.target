@@ -31,6 +31,7 @@ def build_sqlite_records(
     record_descriptors: tuple | None = None,
     joins: tuple = (),
     field_mappings: dict | None = None,
+    value_mappings: dict | None = None,
     convert_timestamps: dict | None = None,
 ) -> Iterator[TargetRecordDescriptor]:
     """Extract and normalize records from SQLite databases.
@@ -62,6 +63,7 @@ def build_sqlite_records(
                     nested = Attach matching table2 rows as a nested dict in table1 records.
                     ignore = Used to omit duplicate or redundant fields during joins.
         field_mappings (dict | None): Optional field name mappings.
+        value_mappings (dict| None): Optional value mappings.
         convert_timestamps (dict | None): Optional timestamp conversion rules.
 
     Yields:
@@ -125,6 +127,7 @@ def build_sqlite_records(
                                                 path=path,
                                                 record_descriptors=record_descriptors,
                                                 field_mappings=field_mappings,
+                                                value_mappings=value_mappings,
                                                 convert_timestamps=convert_timestamps,
                                             )
                                             row_dict.pop(key)
@@ -148,7 +151,13 @@ def build_sqlite_records(
                                 if row_dict.get(j2["key2"]) is None:
                                     row_dict["table"] = table.name
                                     yield build_record(
-                                        plugin, row_dict, file, record_descriptors, field_mappings, convert_timestamps
+                                        plugin,
+                                        row_dict,
+                                        file,
+                                        record_descriptors,
+                                        field_mappings,
+                                        value_mappings,
+                                        convert_timestamps,
                                     )
                                     break
                                 else:
@@ -167,6 +176,7 @@ def build_sqlite_records(
                                             file,
                                             record_descriptors,
                                             field_mappings,
+                                            value_mappings,
                                             convert_timestamps,
                                         )
                                         break
@@ -213,13 +223,25 @@ def build_sqlite_records(
                             else:
                                 # Yield row as record without iterate joins
                                 yield build_record(
-                                    plugin, row_dict, file, record_descriptors, field_mappings, convert_timestamps
+                                    plugin,
+                                    row_dict,
+                                    file,
+                                    record_descriptors,
+                                    field_mappings,
+                                    value_mappings,
+                                    convert_timestamps,
                                 )
                         # Yield row as record without joins
                         else:
                             row_dict["table"] = table.name
                             yield build_record(
-                                plugin, row_dict, file, record_descriptors, field_mappings, convert_timestamps
+                                plugin,
+                                row_dict,
+                                file,
+                                record_descriptors,
+                                field_mappings,
+                                value_mappings,
+                                convert_timestamps,
                             )
         except Exception:
             plugin.target.log.exception("Failed to process SQLite file: %s", file)
@@ -390,6 +412,7 @@ def build_plist_records(
     record_descriptors: tuple | None = None,
     collapse_paths: set[tuple[str, bool]] | None = None,
     field_mappings: dict | None = None,
+    value_mappings: dict | None = None,
     convert_timestamps: dict | None = None,
     function_name: str | None = None,
 ) -> Iterator[Record]:
@@ -408,6 +431,7 @@ def build_plist_records(
         record_descriptors (tuple | None): Optional descriptors for record construction.
         collapse_paths (set[tuple[str, bool]] | None): Plist paths to collapse during recursive traversal.
         field_mappings (dict | None): Optional field name mappings.
+        value_mappings (dict| None): Optional value mappings.
         convert_timestamps (dict | None): Optional timestamp conversion rules.
         function_name (str | None): Optional name used for dynamic record creation.
 
@@ -441,6 +465,7 @@ def build_plist_records(
                 record_descriptors=record_descriptors,
                 collapse_paths=collapse_paths,
                 field_mappings=field_mappings,
+                value_mappings=value_mappings,
                 convert_timestamps=convert_timestamps,
                 function_name=function_name,
             )
@@ -560,13 +585,14 @@ def build_record(
     source: Path,
     record_descriptors: tuple,
     field_mappings: dict | None = None,
+    value_mappings: dict | None = None,
     convert_timestamps: dict | None = None,
 ) -> Record:
     """Construct a record from a dictionary using a matching record descriptor.
 
     Applies provided field mappings, selects an appropriate descriptor based on
-    the fields in the dictionary, filters unsupported fields, and performs provided
-    timestamp conversions before instantiating the record.
+    the fields in the dictionary, filters unsupported fields, performs provided
+    timestamp and value conversions before instantiating the record.
 
     If no matching descriptor is found, logs an error and returns None.
 
@@ -576,6 +602,7 @@ def build_record(
         source (Path): Source path associated with the record.
         record_descriptors (tuple): Available record descriptors.
         field_mappings (dict | None): Optional field name mappings.
+        value_mappings (dict| None): Optional value mappings.
         convert_timestamps (dict | None): Optional timestamp conversion rules.
 
     Returns:
@@ -610,9 +637,72 @@ def build_record(
         key = format_key(k)
         if convert_timestamps and key in convert_timestamps:
             v = convert_timestamp(v, convert_timestamps[key])
+
+        if value_mappings and key in value_mappings:
+            v = convert_value(plugin, key, v, value_mappings, source)
+
         record_values[key] = v
 
     return desc(**record_values)
+
+
+def convert_value(
+    plugin: Plugin,
+    key: str,
+    value: Any,
+    value_mappings: dict,
+    source: str,
+) -> Any:
+    """Convert a value using configured value mappings.
+
+    Applies direct value mappings where available, and decodes bitmask-style
+    combined values for integer inputs. If no mapping is found, the original
+    value is returned and a warning is logged.
+
+    Args:
+        plugin (Plugin): Plugin instance providing logging and target access.
+        key (str): Field name associated with the value.
+        value (Any): Input value to convert.
+        value_mappings (dict): Mapping of field names to value maps.
+        source (Path): Source path associated with the record.
+
+    Returns:
+        Any: Converted value if mapping is found, otherwise the original value.
+    """
+    if not value_mappings or key not in value_mappings:
+        return value
+
+    value_mapping = value_mappings[key]
+
+    # Try direct mapping
+    new_value = value_mapping.get(value)
+    if new_value is not None:
+        return new_value
+
+    # Try bitmask decoding
+    if isinstance(value, int) and is_bitmask_mapping(value_mapping):
+        if value == 0:
+            return None
+
+        matched = [mapped_value for raw_value, mapped_value in value_mapping.items() if value & raw_value]
+
+        if matched:
+            return matched
+
+    # No mapping found → log + fallback
+    plugin.target.log.warning(
+        "No value mapping defined for field '%s' with value '%s' in %s",
+        key,
+        value,
+        source,
+    )
+
+    return value
+
+
+def is_bitmask_mapping(mapping: dict) -> bool:
+    """Check if all non-zero keys are powers of two (bitmask flags)."""
+    return all(isinstance(k, int) and (k & (k - 1) == 0) for k in mapping if k != 0)
 
 
 def convert_timestamp(value: Any, mode: str) -> datetime | Any:
@@ -703,6 +793,7 @@ def emit_dict_records(
     record_descriptors: tuple | None = None,
     collapse_paths: set[tuple[str, bool]] | None = None,
     field_mappings: dict | None = None,
+    value_mappings: dict | None = None,
     convert_timestamps: dict | None = None,
     function_name: str | None = None,
 ) -> Iterator[Record]:
@@ -731,6 +822,7 @@ def emit_dict_records(
         record_descriptors (tuple | None): Optional descriptors for record construction.
         collapse_paths (set[tuple[str, bool]] | None): Paths to collapse instead of recurse.
         field_mappings (dict | None): Optional field name mappings.
+        value_mappings (dict| None): Optional value mappings.
         convert_timestamps (dict | None): Optional timestamp conversion rules.
         function_name (str | None): Optional name for dynamic record creation.
 
@@ -789,6 +881,7 @@ def emit_dict_records(
                             source,
                             record_descriptors=record_descriptors,
                             field_mappings=field_mappings,
+                            value_mappings=value_mappings,
                             convert_timestamps=convert_timestamps,
                         )
                     else:
@@ -819,7 +912,9 @@ def emit_dict_records(
         if record_descriptors is None:
             yield dynamic_build_record(plugin, function_name, record_data, source)
         else:
-            yield build_record(plugin, record_data, source, record_descriptors, field_mappings, convert_timestamps)
+            yield build_record(
+                plugin, record_data, source, record_descriptors, field_mappings, value_mappings, convert_timestamps
+            )
 
     for k, child in child_dicts.items():
         child_path = f"{path}/{k}" if path else k
@@ -832,6 +927,7 @@ def emit_dict_records(
             record_descriptors=record_descriptors,
             collapse_paths=collapse_paths,
             field_mappings=field_mappings,
+            value_mappings=value_mappings,
             convert_timestamps=convert_timestamps,
             function_name=function_name,
         )

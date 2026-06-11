@@ -22,7 +22,7 @@ LoginItemsRecord = TargetRecordDescriptor(
         ("string", "container"),
         ("string", "designated_requirement"),
         ("string", "developer_name"),
-        ("varint", "login_item_disposition"),
+        ("string", "login_item_disposition"),
         ("datetime", "executable_modification_date"),
         ("path", "executable_path"),
         ("varint", "flags"),
@@ -34,7 +34,7 @@ LoginItemsRecord = TargetRecordDescriptor(
         ("string", "program_arguments"),
         ("string", "sha256"),
         ("string", "team_identifier"),
-        ("varint", "login_item_type"),
+        ("string", "login_item_type"),
         ("string", "url"),
         ("string", "uuid"),
         ("string[]", "items"),
@@ -73,6 +73,27 @@ FIELD_MAPPINGS = {
     "backgroundAppRefreshLoadCount": "background_app_refresh_load_count",
     "launchServicesItemsImported": "launch_services_items_imported",
     "serviceManagementLoginItemsMigrated": "service_management_login_items_migrated",
+}
+
+VALUE_MAPPINGS = {
+    "login_item_disposition": {
+        1: "Enabled",
+        2: "Allowed",
+        4: "Hidden",
+        8: "Notified",
+    },
+    "login_item_type": {
+        1: "user item",
+        2: "app",
+        4: "login item",
+        8: "agent",
+        16: "daemon",
+        32: "developer",
+        64: "spotlight",
+        2048: "quicklook",
+        65536: "legacy",
+        524288: "curated",
+    },
 }
 
 CONVERT_TIMESTAMPS = {
@@ -134,11 +155,7 @@ class LoginItemsPlugin(Plugin):
                 container (string): Containing app or bundle.
                 designated_requirement (string): Code signing designated requirement.
                 developer_name (string): Developer name.
-                login_item_disposition (varint): Numeric value describing state:
-                    1 = Enabled.
-                    2 = Allowed.
-                    4 = Hidden.
-                    8 = Notified.
+                login_item_disposition (string): Numeric value describing state.
                 executable_modification_date (datetime): Last modification time of the executable.
                 executable_path (path): Path to the executable.
                 flags (varint): Additional flags associated with the item.
@@ -150,17 +167,7 @@ class LoginItemsPlugin(Plugin):
                 program_arguments (string): Program arguments for execution.
                 sha256 (string): SHA256 hash of the executable.
                 team_identifier (string): Apple developer team identifier.
-                login_item_type (varint): Numeric value describing the item type:
-                        1 = user item.
-                        2 = app.
-                        4 = login item.
-                        8 = agent.
-                        16 = daemon.
-                        32 = developer.
-                        64 = spotlight.
-                        2048 = quicklook.
-                        65536 = legacy.
-                        524288 = curated.
+                login_item_type (string): Numeric value describing the item type.
                 url (string): URL associated with the item.
                 uuid (string): Universally unique identifier.
                 items (string[]): List of items.
@@ -180,5 +187,6 @@ class LoginItemsPlugin(Plugin):
             self.login_items_files,
             LoginItemsRecords,
             field_mappings=FIELD_MAPPINGS,
+            value_mappings=VALUE_MAPPINGS,
             convert_timestamps=CONVERT_TIMESTAMPS,
         )

@@ -57,7 +57,7 @@ ASLRecord = TargetRecordDescriptor(
     "macos/logs/asl",
     [
         ("datetime", "ts"),
-        ("varint", "priority_level"),
+        ("string", "priority_level"),
         ("varint", "pid"),
         ("string", "asl_host"),
         ("string", "sender"),
@@ -187,6 +187,18 @@ def _parse_asl_file(data: bytes) -> Iterator[dict[str, Any]]:
         pos += rec_len + 2
 
 
+PRIORITY_LEVEL_MAP = {
+    0: "Emergency",
+    1: "Alert",
+    2: "Critical",
+    3: "Error",
+    4: "Warning",
+    5: "Notice",
+    6: "Informational",
+    7: "Debug",
+}
+
+
 class ASLPlugin(Plugin):
     """Plugin to parse macOS Apple System Log (ASL) databases.
 
@@ -232,15 +244,7 @@ class ASLPlugin(Plugin):
         .. code-block:: text
 
             ts (datetime): Timestamp (UTC).
-            priority_level (varint): ASL priority level:
-                0 = Emergency.
-                1 = Alert.
-                2 = Critical.
-                3 = Error.
-                4 = Warning.
-                5 = Notice.
-                6 = Informational.
-                7 = Debug.
+            priority_level (string): ASL priority level.
             pid (varint): Process ID.
             asl_host (string): Hostname as stored in the ASL record.
             sender (string): Sender process name.
@@ -258,9 +262,12 @@ class ASLPlugin(Plugin):
                 continue
 
             for rec in records:
+                level = rec["level"]
+                priority_level = PRIORITY_LEVEL_MAP.get(level, level)
+
                 yield ASLRecord(
                     ts=rec["ts"],
-                    priority_level=rec["level"],
+                    priority_level=priority_level,
                     pid=rec["pid"],
                     asl_host=rec["host"],
                     sender=rec["sender"],

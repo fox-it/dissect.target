@@ -70,8 +70,8 @@ def test_tcc(
         == "/System/Library/PrivateFrameworks/VoiceShortcuts.framework/Versions/A/Support/siriactionsd"
     )
     assert results[1].client_type == 1
-    assert results[1].auth_value == 0
-    assert results[1].auth_reason == 5
+    assert results[1].auth_value == "Denied"
+    assert results[1].auth_reason == "Service Policy"
     assert results[1].auth_version == 1
     assert (
         results[1].csreq

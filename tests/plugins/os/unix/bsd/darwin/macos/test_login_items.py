@@ -59,7 +59,7 @@ def test_login_items(
         "/* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = UBF8T346G9"  # noqa E501
     )
     assert results[0].developer_name is None
-    assert results[0].login_item_disposition == 3
+    assert results[0].login_item_disposition == "['Enabled', 'Allowed']"
     assert results[0].executable_modification_date == datetime(1970, 1, 1, 0, 0, tzinfo=tz)
     assert results[0].executable_path is None
     assert results[0].flags == 0
@@ -72,7 +72,7 @@ def test_login_items(
     assert results[0].program_arguments is None
     assert results[0].sha256 is None
     assert results[0].team_identifier == "UBF8T346G9"
-    assert results[0].login_item_type == 2
+    assert results[0].login_item_type == "app"
     assert results[0].url == "file:///Applications/Visual%20Studio%20Code.app/"
     assert results[0].uuid == "6f541698-5211-4cf2-95b7-e97534baee39"
     assert results[0].items == []
