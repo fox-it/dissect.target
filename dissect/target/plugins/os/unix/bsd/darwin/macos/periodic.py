@@ -137,6 +137,10 @@ PeriodicConfMonthlyRecord = TargetRecordDescriptor(
     ],
 )
 
+# Part of the official FreeBSD periodic.conf documentation.
+# Used by scripts in /etc/periodic/security.
+# I was not able to find this folder nor these fields on a macOS Ventura system however.
+# TODO: Look into this and remove this record descriptor if not applicable to macOS.
 PeriodicConfSecurityRecord = TargetRecordDescriptor(
     "macos/periodic_conf/security",
     [
