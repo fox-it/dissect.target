@@ -108,10 +108,21 @@ def build_sqlite_records(
                                         )
 
                                         if isinstance(plist_data, dict):
+                                            pk = table.primary_key
+                                            if pk:
+                                                # Add the source row to the plist_path
+                                                # format -> "<table>/<pk>=<value>"
+                                                pk_value = row_dict[pk]
+                                                path = "/".join([table.name, f"{pk}={pk_value}"])
+                                            else:
+                                                # Add the source row to the plist_path
+                                                # format -> "<table>"
+                                                path = table.name
                                             yield from emit_dict_records(
                                                 plugin,
                                                 plist_data,
                                                 file,
+                                                path=path,
                                                 record_descriptors=record_descriptors,
                                                 field_mappings=field_mappings,
                                                 convert_timestamps=convert_timestamps,
@@ -272,6 +283,17 @@ def handle_iterate_join(
         for ij in ignore_joins:
             if parent_dict.get(ij["key1"]) == child_dict.get(ij["key2"]):
                 child_dict.pop(ij["key2"], None)
+
+        # Remove fields from child_dict that will be yielded as separate plists
+        for k, v in child_dict.items():
+            if isinstance(v, (bytes, bytearray)) and v.startswith(b"bplist00") and not is_nskeyedarchive_blob(v):
+                try:
+                    plist_data = load_plist_data(v) if b"$archiver" in v[:128] else plistlib.loads(v)
+
+                    if isinstance(plist_data, dict):
+                        child_dict.pop(k)
+                except Exception:
+                    child_dict.pop(k)
 
         downstream_iterate_rows = defaultdict(list)
         for j in joins_by_table1[current_join["table2"]]:

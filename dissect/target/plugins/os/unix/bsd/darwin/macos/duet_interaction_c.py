@@ -45,6 +45,7 @@ ZPlistRecord = TargetRecordDescriptor(
         ("string", "ns_store_model_version_checksum_key"),
         ("varint", "ns_persistence_framework_version"),
         ("varint", "ns_store_model_version_hashes_version"),
+        ("string", "plist_path"),
         ("path", "source"),
     ],
 )
@@ -202,6 +203,7 @@ class DuetInteractionCPlugin(Plugin):
                 ns_store_model_version_checksum_key (string): Model version checksum key.
                 ns_persistence_framework_version (varint): Persistence framework version.
                 ns_store_model_version_hashes_version (varint): Version of the ns store version hashes.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
                 source (path): Path to the interactionC.db file.
 
             NSStoreModelVersionHashesRecord:

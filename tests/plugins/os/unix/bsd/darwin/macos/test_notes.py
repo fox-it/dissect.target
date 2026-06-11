@@ -115,9 +115,9 @@ def test_notes(test_files: list[str], target_unix: Target, fs_unix: VirtualFiles
     assert results[29].ns_store_model_version_hashes_version == 3
     assert results[29].ns_store_model_version_identifiers == "['']"
     assert results[29].ns_store_type == "SQLite"
+    assert results[29].plist_path == "Z_METADATA/Z_VERSION=1"
     assert results[29].source == "/Users/user/Library/Containers/com.apple.Notes/Data/Library/Notes/NotesV7.storedata"
 
-    assert results[30].plist_path == "NSStoreModelVersionHashes"
     assert results[30].account_hash is not None
     assert isinstance(results[30].account_hash, (bytes, bytearray))
     assert results[30].attachment_hash is not None
@@ -162,6 +162,7 @@ def test_notes(test_files: list[str], target_unix: Target, fs_unix: VirtualFiles
     assert isinstance(results[30].update_folder_action, (bytes, bytearray))
     assert results[30].update_note_action is not None
     assert isinstance(results[30].update_note_action, (bytes, bytearray))
+    assert results[30].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"
     assert results[30].source == "/Users/user/Library/Containers/com.apple.Notes/Data/Library/Notes/NotesV7.storedata"
 
     assert results[31].table == "Z_METADATA"

@@ -139,19 +139,7 @@ def test_duet_knowledge_c(
     assert results[875].ns_store_model_version_checksum_key == "1nRfv9qJjn86Sz4iC1FpuA6z3NAw1YNPMMABL4ISiEA="
     assert results[875].ns_persistence_framework_version == 1526
     assert results[875].ns_store_model_version_hashes_version == 3
-    assert results[875].source == "/Users/user/Library/Application Support/Knowledge/knowledgeC.db"
-
-    assert results[875].ns_persistence_maximum_framework_version == 1526
-    assert results[875].ns_store_model_version_identifiers == ["34"]
-    assert results[875].ns_store_type == "SQLite"
-    assert results[875].ns_auto_vacuum_level == 2
-    assert (
-        results[875].ns_store_model_version_hashes_digest
-        == "3qw03JLBtryClpLQRtPhA43k8KZaw9qHvu+RVzuPBYSEm8++KjboFwDAjFByeXrvryJrBSPo/o4LL6G9pmuo8Q=="
-    )
-    assert results[875].ns_store_model_version_checksum_key == "1nRfv9qJjn86Sz4iC1FpuA6z3NAw1YNPMMABL4ISiEA="
-    assert results[875].ns_persistence_framework_version == 1526
-    assert results[875].ns_store_model_version_hashes_version == 3
+    assert results[875].plist_path == "Z_METADATA/Z_VERSION=1"
     assert results[875].source == "/Users/user/Library/Application Support/Knowledge/knowledgeC.db"
 
     assert (
@@ -218,7 +206,7 @@ def test_duet_knowledge_c(
         results[876].sync_peer
         == b"\xb4q\xdc\xac\x9f\x14\x0c\xc6X\x00\x18i\xce\x80\x11\xfc\x8b\x1c\x85\x95\xf44\x17\x8a\xe1MC\xc3\x05\x809l"
     )
-    assert results[876].plist_path == "NSStoreModelVersionHashes"
+    assert results[876].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"
     assert results[876].source == "/Users/user/Library/Application Support/Knowledge/knowledgeC.db"
 
     assert results[877].table == "Z_METADATA"

@@ -137,6 +137,7 @@ def test_user_accounts(test_files: list[str], target_unix: Target, fs_unix: Virt
     assert results[286].ns_store_model_version_hashes_version == 3
     assert results[286].ns_store_model_version_identifiers == "['30']"
     assert results[286].ns_store_type == "SQLite"
+    assert results[286].plist_path == "Z_METADATA/Z_VERSION=1"
     assert results[286].source == "/Users/user/Library/Accounts/Accounts4.sqlite"
 
     assert results[287].access_options_key is not None
@@ -153,7 +154,7 @@ def test_user_accounts(test_files: list[str], target_unix: Target, fs_unix: Virt
     assert isinstance(results[287].credential_item, (bytes, bytearray))
     assert results[287].dataclass is not None
     assert isinstance(results[287].dataclass, (bytes, bytearray))
-    assert results[287].plist_path == "NSStoreModelVersionHashes"
+    assert results[287].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"
     assert results[287].source == "/Users/user/Library/Accounts/Accounts4.sqlite"
 
     assert results[288].table == "Z_METADATA"

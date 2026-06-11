@@ -29,7 +29,7 @@ TimeMachineRecord = TargetRecordDescriptor(
 )
 
 DestinationsRecord = TargetRecordDescriptor(
-    "macos/time_machine",
+    "macos/time_machine/destination",
     [
         ("string[]", "destination_uuids"),
         ("string", "last_known_volume_name"),

@@ -89,6 +89,7 @@ def test_text_replacements(test_files: list[str], target_unix: Target, fs_unix: 
         "nb/qJ+hB9auf83oGYKFndhE+Etk/7JNbNosAbVi5Zu0biqTNK/UfC4ofTqRhou6nHBT1ci00ct9E+U9vnbhfPw=="
     )
     assert results[4].ns_store_model_version_checksum_key == ("c4ljuOCxf+SvLXrpw0Xcnwe7kkFsMpkUuv43N2r16m4=")
+    assert results[4].plist_path == "Z_METADATA/Z_VERSION=1"
     assert results[4].source == "/Users/user/Library/KeyboardServices/TextReplacements.db"
 
     assert results[5].tr_cloud_kit_sync_state == (
@@ -97,7 +98,7 @@ def test_text_replacements(test_files: list[str], target_unix: Target, fs_unix: 
     assert results[5].text_replacement_entry == (
         b"#C\t\xd2l\xa7\xeaK##S\xae\xb7>\x82\xb5\xb5\xc8\xafB\xf4\t\xc4]\xa2)\xb0}+\xd9\xab\x03"
     )
-    assert results[5].plist_path == "NSStoreModelVersionHashes"
+    assert results[5].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"
     assert results[5].source == "/Users/user/Library/KeyboardServices/TextReplacements.db"
 
     assert results[6].table == "Z_METADATA"

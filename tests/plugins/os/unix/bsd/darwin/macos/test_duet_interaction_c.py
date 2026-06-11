@@ -68,6 +68,7 @@ def test_duet_activity_scheduler(test_files: list[str], target_unix: Target, fs_
     assert results[8].ns_store_model_version_checksum_key == "yBhxwKvskbIdxbJOzzLgxhbLYTjrWz9otOnAd9BgKA0="
     assert results[8].ns_persistence_framework_version == 1526
     assert results[8].ns_store_model_version_hashes_version == 3
+    assert results[8].plist_path == "Z_METADATA/Z_VERSION=1"
     assert results[8].source == "/var/db/CoreDuet/People/interactionC.db"
 
     assert (
@@ -94,7 +95,7 @@ def test_duet_activity_scheduler(test_files: list[str], target_unix: Target, fs_
         results[9].version_hash
         == b"\x94\x07\xac\x82%\x9f22\x9c\x162\xe9\xc5\xdb7\xb9\x1e\xf8\x8c(\x8e\xb1\xd7JT\xfd*\xe0\xad\x7f5\x01"
     )
-    assert results[9].plist_path == "NSStoreModelVersionHashes"
+    assert results[9].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"
     assert results[9].source == "/var/db/CoreDuet/People/interactionC.db"
 
     assert results[10].table == "Z_METADATA"

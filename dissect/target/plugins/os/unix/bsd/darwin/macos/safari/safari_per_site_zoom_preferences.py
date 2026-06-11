@@ -57,7 +57,9 @@ class SafariPerSiteZoomPreferencesPlugin(Plugin):
         return files
 
     @export(record=(SafariPerSiteZoomPreferencesRecord, HostnameToZoomPreferencesMapRecord))
-    def safari_per_site_zoom_preferences(self) -> Iterator[(SafariPerSiteZoomPreferencesRecord, HostnameToZoomPreferencesMapRecord)]:
+    def safari_per_site_zoom_preferences(
+        self,
+    ) -> Iterator[(SafariPerSiteZoomPreferencesRecord, HostnameToZoomPreferencesMapRecord)]:
         """Return macOS Safari per site zoom preferences.
 
         Yields the following record types extracted from the
@@ -95,6 +97,7 @@ class SafariPerSiteZoomPreferencesPlugin(Plugin):
                     source=file,
                     _target=self.target,
                 )
+
 
 # MapOfCKRecordNamesToCKRecords fields are empty in current test data
 # TODO: Look into MapOfCKRecordNamesToCKRecords field and whether

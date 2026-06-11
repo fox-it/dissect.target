@@ -165,6 +165,7 @@ ZPlistRecord = TargetRecordDescriptor(
         ("varint", "ns_store_model_version_hashes_version"),
         ("string", "ns_store_model_version_identifiers"),
         ("string", "ns_store_type"),
+        ("string", "plist_path"),
         ("path", "source"),
     ],
 )
@@ -419,6 +420,7 @@ class UserAccountsPlugin(Plugin):
                 ns_store_model_version_checksum_key (string): Model version checksum key.
                 ns_persistence_framework_version (varint): Persistence framework version.
                 ns_store_model_version_hashes_version (varint): Version of the ns store version hashes.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
                 source (path): Path to the Accounts*.sqlite database file.
 
             NSStoreModelVersionHashesRecord:

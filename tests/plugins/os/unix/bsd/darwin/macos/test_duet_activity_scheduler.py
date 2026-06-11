@@ -58,6 +58,7 @@ def test_duet_activity_scheduler(test_files: list[str], target_unix: Target, fs_
     assert results[51].ns_store_model_version_checksum_key == "rXdwmenydb+cl65S3tSy9rIL6lkwSXqL7UvaJVK21Lc="
     assert results[51].ns_persistence_framework_version == 1526
     assert results[51].ns_store_model_version_hashes_version == 3
+    assert results[51].plist_path == "Z_METADATA/Z_VERSION=1"
     assert results[51].source == "/var/db/DuetActivityScheduler/DuetActivitySchedulerClassC.db"
 
     assert results[52].activity is not None
@@ -66,7 +67,7 @@ def test_duet_activity_scheduler(test_files: list[str], target_unix: Target, fs_
     assert isinstance(results[52].group_binary, (bytes, bytearray))
     assert results[52].trigger is not None
     assert isinstance(results[52].trigger, (bytes, bytearray))
-    assert results[52].plist_path == "NSStoreModelVersionHashes"
+    assert results[52].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"
     assert results[52].source == "/var/db/DuetActivityScheduler/DuetActivitySchedulerClassC.db"
 
     assert results[53].table == "Z_METADATA"

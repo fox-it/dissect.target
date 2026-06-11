@@ -73,9 +73,10 @@ def test_call_history(test_files: list[str], target_unix: Target, fs_unix: Virtu
     assert results[5].ns_store_model_version_hashes_version == 3
     assert results[5].ns_store_model_version_identifiers == "['43']"
     assert results[5].ns_store_type == "SQLite"
+    assert results[5].plist_path == "Z_METADATA/Z_VERSION=1"
     assert results[5].source == "/Users/user/Library/Application Support/CallHistoryDB/CallHistory.storedata"
 
-    assert results[6].plist_path == "NSStoreModelVersionHashes"
+    assert results[6].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"
 
     assert results[6].call_db_properties is not None
     assert isinstance(results[6].call_db_properties, (bytes, bytearray))
