@@ -34,7 +34,7 @@ def test_stat_information_file_blocksize(sector_size: int, filesize: int, expect
         mtime=timestamp,
     )
 
-    fs_entry = BtrfsFilesystemEntry(Mock(), "some/path", entry)
+    fs_entry = BtrfsFilesystemEntry(Mock(sep="/"), "some/path", entry)
 
     stat_info = fs_entry.lstat()
 
@@ -76,7 +76,7 @@ def test_stat_directory() -> None:
         mtime=timestamp,
     )
 
-    fs_entry = BtrfsFilesystemEntry(Mock(), "some/path", entry)
+    fs_entry = BtrfsFilesystemEntry(Mock(sep="/"), "some/path", entry)
 
     stat_info = fs_entry.lstat()
 
