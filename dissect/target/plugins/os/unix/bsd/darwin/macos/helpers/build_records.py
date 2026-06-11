@@ -217,6 +217,8 @@ def build_sqlite_records(
 def prefix_row(row_dict: dict, table: str) -> dict:
     """Prefix all keys in a row dictionary with the table name.
 
+    This prevents duplicate field names when joining multiple tables.
+
     Args:
         row_dict (dict): Row data as key-value pairs.
         table (str): Table name to prepend to each key.
