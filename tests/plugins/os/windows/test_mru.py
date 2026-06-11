@@ -41,6 +41,9 @@ def target_win_mru(target_win_users: Target) -> Target:
     )
     recentdocs_key.add_value("0", VirtualValue(user_hive, "0", recentdocs_value))
 
+    # value name is not present in MRUListEx, but should be still found with index None
+    recentdocs_key.add_value("1", VirtualValue(user_hive, "42", recentdocs_value))
+
     # OpenSaveMRU
     opensave_key = VirtualKey(
         user_hive, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU"
@@ -155,6 +158,8 @@ def target_win_mru(target_win_users: Target) -> Target:
     excel_15_file_key = VirtualKey(user_hive, "Software\\Microsoft\\Office\\15.0\\Excel\\File MRU")
     excel_15_file_key.add_value("Item 1", VirtualValue(user_hive, "Item 1", office_value))
     excel_15_file_key.add_value("Item 2", VirtualValue(user_hive, "Item 2", office_value))
+    metadata_value = "<Metadata><AppSpecific><OneNoteNotebookUrl>C:\\Path</OneNoteNotebookUrl></AppSpecific></Metadata>"
+    excel_15_file_key.add_value("Item Metadata 1", VirtualValue(user_hive, "Item Metadata 1", metadata_value))
     excel_16_place_key = VirtualKey(user_hive, "Software\\Microsoft\\Office\\16.0\\Excel\\Place MRU")
     excel_16_place_key.add_value("Item 1", VirtualValue(user_hive, "Item 1", office_value))
     excel_16_place_key.add_value("Item 2", VirtualValue(user_hive, "Item 2", office_value))
@@ -204,7 +209,8 @@ def test_mru_plugin(target_win_mru: Target) -> None:
     msoffice = list(target_win_mru.mru.msoffice())
 
     assert len(run) == 2
-    assert len(recentdocs) == 1
+    assert len(recentdocs) == 2
+    assert any(r.index is None for r in recentdocs)
     assert len(opensave) == 6
     # test if opensave_pidl_key is correctly resolved
     assert opensave[4].value == "My Computer\\Z:\\Web Optimizer.zip"
@@ -218,4 +224,10 @@ def test_mru_plugin(target_win_mru: Target) -> None:
     assert len(mstsc) == 3
     assert len(msoffice) == 6
 
-    assert len(list(target_win_mru.mru())) == 26
+    msoffice_with_metadata = [r for r in msoffice if r.metadata is not None]
+    assert len(msoffice_with_metadata) == 1
+    assert msoffice_with_metadata[0].metadata == (
+        "<Metadata><AppSpecific><OneNoteNotebookUrl>C:\\Path</OneNoteNotebookUrl></AppSpecific></Metadata>"
+    )
+
+    assert len(list(target_win_mru.mru())) == 27
