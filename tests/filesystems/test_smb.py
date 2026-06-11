@@ -66,7 +66,7 @@ def test_smb_filesystem_windows(mock_impacket: MagicMock) -> None:
     mock_conn.listPath.return_value = [mock_file]
 
     entries = list(entry.listdir_ext())
-    mock_conn.listPath.assert_called_with("C$", "testdir/*")
+    mock_conn.listPath.assert_called_with("C$", "testdir\\*")
 
     assert len(entries) == 1
     assert entries[0].path == "testdir/testfile.txt"
