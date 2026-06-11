@@ -40,9 +40,18 @@ def test_safari_per_site_zoom_preferences(test_file: str, target_unix: Target, f
 
     results = list(target_unix.safari_per_site_zoom_preferences())
 
-    assert len(results) == 1
+    assert len(results) == 3
 
-    assert results[0].map_of_hostnames_to_zoom_preferences == "{}"
     assert results[0].map_of_ck_record_names_to_ck_records == "{}"
     assert results[0].zoom_preference_version == 1
     assert results[0].source == "/Users/user/Library/Safari/PerSiteZoomPreferences.plist"
+
+    assert results[1].site == "google.com"
+    assert results[1].page_zoom_factor == 0
+    assert results[1].text_zoom_factor == 1
+    assert results[1].source == "/Users/user/Library/Safari/PerSiteZoomPreferences.plist"
+
+    assert results[2].site == "apple.com"
+    assert results[2].page_zoom_factor == 1
+    assert results[2].text_zoom_factor == 1
+    assert results[2].source == "/Users/user/Library/Safari/PerSiteZoomPreferences.plist"

@@ -16,9 +16,18 @@ if TYPE_CHECKING:
 SafariPerSiteZoomPreferencesRecord = TargetRecordDescriptor(
     "macos/safari_per_site_zoom_preferences",
     [
-        ("string", "map_of_hostnames_to_zoom_preferences"),
         ("string", "map_of_ck_record_names_to_ck_records"),
         ("varint", "zoom_preference_version"),
+        ("path", "source"),
+    ],
+)
+
+HostnameToZoomPreferencesMapRecord = TargetRecordDescriptor(
+    "macos/safari_per_site_zoom_preferences/hostnames_to_zoom_preferences_map",
+    [
+        ("string", "site"),
+        ("varint", "page_zoom_factor"),
+        ("varint", "text_zoom_factor"),
         ("path", "source"),
     ],
 )
@@ -47,30 +56,46 @@ class SafariPerSiteZoomPreferencesPlugin(Plugin):
             files.add(path)
         return files
 
-    @export(record=SafariPerSiteZoomPreferencesRecord)
-    def safari_per_site_zoom_preferences(self) -> Iterator[SafariPerSiteZoomPreferencesRecord]:
+    @export(record=(SafariPerSiteZoomPreferencesRecord, HostnameToZoomPreferencesMapRecord))
+    def safari_per_site_zoom_preferences(self) -> Iterator[(SafariPerSiteZoomPreferencesRecord, HostnameToZoomPreferencesMapRecord)]:
         """Return macOS Safari per site zoom preferences.
 
-        Yields SafariPerSiteZoomPreferencesRecords with the following fields:
+        Yields the following record types extracted from the
+        PerSiteZoomPreferences.plist files:
 
         .. code-block:: text
 
-            map_of_hostnames_to_zoom_preferences (string): map of hostnames to zoom preferences.
-            map_of_ck_record_names_to_ck_records (string): map of ck record names to ck records.
-            zoom_preference_version (varint): Zoom preference version.
-            source (path): Path to the PerSiteZoomPreferences.plist file.
+            SafariPerSiteZoomPreferencesRecord:
+                map_of_ck_record_names_to_ck_records (string): map of ck record names to ck records.
+                zoom_preference_version (varint): Zoom preference version.
+                source (path): Path to the PerSiteZoomPreferences.plist file.
+
+            HostnameToZoomPreferencesMapRecord:
+                site (string): Site the preference applies to.
+                page_zoom_factor (varint): Page zoom factor.
+                text_zoom_factor (varint): Text zoom factor.
+                source (path): Path to the PerSiteZoomPreferences.plist file.
         """
         for file in self.files:
             plist = plistlib.load(file.open())
 
             yield SafariPerSiteZoomPreferencesRecord(
-                map_of_hostnames_to_zoom_preferences=plist.get("MapOfHostnamesToZoomPreferences"),
                 map_of_ck_record_names_to_ck_records=plist.get("MapOfCKRecordNamesToCKRecords"),
                 zoom_preference_version=plist.get("ZoomPreferenceVersion"),
                 source=file,
                 _target=self.target,
             )
 
+            map_of_hostnames_to_zoom_preferences = plist.get("MapOfHostnamesToZoomPreferences")
+            for site, preferences in map_of_hostnames_to_zoom_preferences.items():
+                yield HostnameToZoomPreferencesMapRecord(
+                    site=site,
+                    page_zoom_factor=preferences.get("PageZoomFactor"),
+                    text_zoom_factor=preferences.get("TextZoomFactor"),
+                    source=file,
+                    _target=self.target,
+                )
 
-# MapOfHostnamesToZoomPreferences and MapOfCKRecordNamesToCKRecords fields are empty in current test data
-# TODO: Get test file with actual data
+# MapOfCKRecordNamesToCKRecords fields are empty in current test data
+# TODO: Look into MapOfCKRecordNamesToCKRecords field and whether
+# it should form a separate record like MapOfHostnamesToZoomPreferences
