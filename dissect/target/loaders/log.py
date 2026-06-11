@@ -45,7 +45,7 @@ class LogLoader(Loader):
         return False
 
     def map(self, target: Target) -> None:
-        vfs = VirtualFilesystem(case_sensitive=False, alt_separator=target.fs.alt_separator)
+        vfs = VirtualFilesystem(case_sensitive=False, sep=target.fs.sep, altsep=target.fs.altsep)
         target.filesystems.add(vfs)
         target.fs.mount("/", vfs)
         for entry in self.path.parent.glob(self.path.name):
