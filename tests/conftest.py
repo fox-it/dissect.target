@@ -152,10 +152,10 @@ def make_mock_targets(request: pytest.FixtureRequest, tmp_path: pathlib.Path) ->
 
 
 @pytest.fixture
-def fs_win(tmp_path: pathlib.Path) -> VirtualFilesystem:
-    fs = VirtualFilesystem(case_sensitive=False, alt_separator="\\")
-    fs.map_dir("windows/system32", tmp_path)
-    fs.map_dir("windows/system32/config/", tmp_path)
+def fs_win() -> VirtualFilesystem:
+    fs = VirtualFilesystem(case_sensitive=False, sep="\\")
+    fs.makedirs("windows/system32")
+    fs.makedirs("windows/system32/config")
     return fs
 
 
@@ -370,11 +370,12 @@ def target_win(tmp_path: pathlib.Path, hive_hklm: VirtualHive, fs_win: Filesyste
         "HKEY_LOCAL_MACHINE",
         "HKEY_LOCAL_MACHINE",
         hive_hklm,
-        TargetPath(mock_target.fs, ""),
+        mock_target.fs.path(""),
     )
-    mock_target.fs.mount("c:", fs_win)
-
     mock_target.apply()
+    assert mock_target.fs.sep == "\\"
+    assert mock_target.fs.altsep == "/"
+    mock_target.fs.mount("c:", fs_win)
 
     return mock_target
 
