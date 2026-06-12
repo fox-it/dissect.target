@@ -15,15 +15,25 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.parametrize(
-    "test_files",
+    ("names", "paths"),
     [
-        [
-            "NotesV7.storedata",
-            "NotesV7.storedata-wal",
-        ]
+        (
+            (
+                "NotesV7.storedata",
+                "NotesV7.storedata-wal",
+                "NoteStore.sqlite",
+                "NoteStore.sqlite-wal",
+            ),
+            (
+                "Users/user/Library/Containers/com.apple.Notes/Data/Library/Notes/NotesV7.storedata",
+                "Users/user/Library/Containers/com.apple.Notes/Data/Library/Notes/NotesV7.storedata-wal",
+                "Users/user/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite",
+                "Users/user/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite-wal",
+            ),
+        ),
     ],
 )
-def test_notes(test_files: list[str], target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_notes(names: tuple[str, ...], paths: tuple[str, ...], target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     user = UnixUserRecord(
         name="user",
         uid=501,
@@ -34,15 +44,16 @@ def test_notes(test_files: list[str], target_unix: Target, fs_unix: VirtualFiles
     target_unix.users = lambda: [
         user,
     ]
-    for test_file in test_files:
-        data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/notes/{test_file}")
-        fs_unix.map_file(f"Users/user/Library/Containers/com.apple.Notes/Data/Library/Notes/{test_file}", data_file)
+    for name, path in zip(names, paths, strict=True):
+        data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/notes/{name}")
+        fs_unix.map_file(path, data_file)
 
     target_unix.add_plugin(NotesPlugin)
 
     results = list(target_unix.notes())
+    results.sort(key=lambda r: r.source)
 
-    assert len(results) == 42
+    assert len(results) == 1026
 
     assert results[0].table == "ZACCOUNT"
     assert results[0].z_pk == 1
@@ -206,3 +217,97 @@ def test_notes(test_files: list[str], target_unix: Target, fs_unix: VirtualFiles
     assert results[40].z_opt is None
     assert results[40].z_name == "com.apple.Notes"
     assert results[40].source == "/Users/user/Library/Containers/com.apple.Notes/Data/Library/Notes/NotesV7.storedata"
+
+    assert results[42].table == "ZICCLOUDSTATE"
+    assert results[42].z_pk == 1
+    assert results[42].z_ent == 2
+    assert results[42].z_opt == 1
+    assert results[42].z_current_local_version == 1
+    assert not results[42].z_in_cloud
+    assert results[42].z_latest_version_synced_to_cloud == 0
+    assert results[42].z_cloud_syncing_object is None
+    assert results[42].z3_cloud_syncing_object is None
+    assert results[42].z_local_version_date is not None
+    assert results[42].source == "/Users/user/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+
+    assert results[48].table == "ZICCLOUDSYNCINGOBJECT"
+    assert results[48].z_pk == 1
+    assert results[48].z_ent == 14
+    assert results[48].z_opt == 3
+    assert results[48].z_cloud_state == 2
+    assert results[48].z_crypto_iteration_count == 0
+    assert not results[48].z_is_password_protected
+    assert not results[48].z_is_share_dirty
+    assert not results[48].marked_for_deletion
+    assert results[48].minimum_supported_notes_version == 0
+    assert not results[48].z_needs_initial_fetch_from_cloud
+    assert results[48].z_identifier == "LocalAccount"
+    assert results[48].source == "/Users/user/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+
+    assert results[54].table == "ZICNOTEDATA"
+    assert results[54].z_pk == 1
+    assert results[54].z_ent == 19
+    assert results[54].z_opt == 114
+    assert results[54].z_note == 4
+    assert results[54].z_crypto_initialization_vector is None
+    assert results[54].z_crypto_tag is None
+    assert results[54].z_data is not None
+    assert isinstance(results[54].z_data, (bytes, bytearray))
+    assert b"This is another note" in results[54].z_data
+    assert results[54].source == "/Users/user/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+
+    assert results[56].table == "ZICSEARCHINDEXSTATE"
+    assert results[56].z_pk == 1
+    assert results[56].z_ent == 21
+    assert results[56].z_opt == 15
+    assert results[56].z_state_value == 4
+    assert results[56].z_identifier.startswith("x-coredata://")
+    assert "/ICFolder/" in results[56].z_identifier
+    assert results[56].source == "/Users/user/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+
+    assert results[87].ic_account is not None
+    assert isinstance(results[87].ic_account, (bytes, bytearray))
+    assert results[87].ic_account_data is not None
+    assert isinstance(results[87].ic_account_data, (bytes, bytearray))
+    assert results[87].ic_asset_signature is not None
+    assert isinstance(results[87].ic_asset_signature, (bytes, bytearray))
+    assert results[87].ic_attachment is not None
+    assert isinstance(results[87].ic_attachment, (bytes, bytearray))
+    assert results[87].ic_attachment_location is not None
+    assert isinstance(results[87].ic_attachment_location, (bytes, bytearray))
+    assert results[87].ic_attachment_preview_image is not None
+    assert isinstance(results[87].ic_attachment_preview_image, (bytes, bytearray))
+    assert results[87].ic_cloud_state is not None
+    assert isinstance(results[87].ic_cloud_state, (bytes, bytearray))
+    assert results[87].ic_cloud_syncing_object is not None
+    assert isinstance(results[87].ic_cloud_syncing_object, (bytes, bytearray))
+    assert results[87].ic_device_migration_state is not None
+    assert isinstance(results[87].ic_device_migration_state, (bytes, bytearray))
+    assert results[87].ic_folder is not None
+    assert isinstance(results[87].ic_folder, (bytes, bytearray))
+    assert results[87].ic_hashtag is not None
+    assert isinstance(results[87].ic_hashtag, (bytes, bytearray))
+    assert results[87].ic_inline_attachment is not None
+    assert isinstance(results[87].ic_inline_attachment, (bytes, bytearray))
+    assert results[87].ic_invitation is not None
+    assert isinstance(results[87].ic_invitation, (bytes, bytearray))
+    assert results[87].ic_legacy_tombstone is not None
+    assert isinstance(results[87].ic_legacy_tombstone, (bytes, bytearray))
+    assert results[87].ic_location is not None
+    assert isinstance(results[87].ic_location, (bytes, bytearray))
+    assert results[87].ic_media is not None
+    assert isinstance(results[87].ic_media, (bytes, bytearray))
+    assert results[87].ic_note is not None
+    assert isinstance(results[87].ic_note, (bytes, bytearray))
+    assert results[87].ic_note_container is not None
+    assert isinstance(results[87].ic_note_container, (bytes, bytearray))
+    assert results[87].ic_note_data is not None
+    assert isinstance(results[87].ic_note_data, (bytes, bytearray))
+    assert results[87].ic_note_participant is not None
+    assert isinstance(results[87].ic_note_participant, (bytes, bytearray))
+    assert results[87].ic_search_index_state is not None
+    assert isinstance(results[87].ic_search_index_state, (bytes, bytearray))
+    assert results[87].ic_server_change_token is not None
+    assert isinstance(results[87].ic_server_change_token, (bytes, bytearray))
+    assert results[87].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"
+    assert results[87].source == "/Users/user/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"

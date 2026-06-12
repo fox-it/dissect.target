@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 
     from dissect.target import Target
 
+# TODO: Look into changing the implementation to yield 1 record per existing
+# or deleted note instead of yielding records for every row in the databases.
+
 ZAccountRecord = TargetRecordDescriptor(
     "macos/notes/z_account",
     [
@@ -146,6 +149,36 @@ NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
     ],
 )
 
+iCloudNSStoreModelVersionHashesRecord = TargetRecordDescriptor(
+    "macos/notes/icloud_ns_store_model_version_hashes",
+    [
+        ("bytes", "ic_account"),
+        ("bytes", "ic_account_data"),
+        ("bytes", "ic_asset_signature"),
+        ("bytes", "ic_attachment"),
+        ("bytes", "ic_attachment_location"),
+        ("bytes", "ic_attachment_preview_image"),
+        ("bytes", "ic_cloud_state"),
+        ("bytes", "ic_cloud_syncing_object"),
+        ("bytes", "ic_device_migration_state"),
+        ("bytes", "ic_folder"),
+        ("bytes", "ic_hashtag"),
+        ("bytes", "ic_inline_attachment"),
+        ("bytes", "ic_invitation"),
+        ("bytes", "ic_legacy_tombstone"),
+        ("bytes", "ic_location"),
+        ("bytes", "ic_media"),
+        ("bytes", "ic_note"),
+        ("bytes", "ic_note_container"),
+        ("bytes", "ic_note_data"),
+        ("bytes", "ic_note_participant"),
+        ("bytes", "ic_search_index_state"),
+        ("bytes", "ic_server_change_token"),
+        ("string", "plist_path"),
+        ("path", "source"),
+    ],
+)
+
 # Contains additional Z_CONTENT field which is a binary blob. This field been removed
 # from the record descriptor. The field's presence will still be mentioned in a warning.
 ZModelCacheRecord = TargetRecordDescriptor(
@@ -205,6 +238,72 @@ ATransactionStringRecord = TargetRecordDescriptor(
     ],
 )
 
+ZICCloudStateRecord = TargetRecordDescriptor(
+    "macos/notes/z_ic_cloud_state",
+    [
+        ("string", "table"),
+        ("varint", "z_pk"),
+        ("varint", "z_ent"),
+        ("varint", "z_opt"),
+        ("varint", "z_current_local_version"),
+        ("boolean", "z_in_cloud"),
+        ("varint", "z_latest_version_synced_to_cloud"),
+        ("string", "z_cloud_syncing_object"),
+        ("string", "z3_cloud_syncing_object"),
+        ("datetime", "z_local_version_date"),
+        ("path", "source"),
+    ],
+)
+
+# ZICCLOUDSYNCINGOBJECT table contains 200+ more columns, most of which are None in the majority of rows.
+# Reduced record descriptor to core fields, other fields will be included in a warning.
+ZICCloudSyncingRecord = TargetRecordDescriptor(
+    "macos/notes/z_ic_cloud_syncing_object",
+    [
+        ("string", "table"),
+        ("varint", "z_pk"),
+        ("varint", "z_ent"),
+        ("varint", "z_opt"),
+        ("varint", "z_cloud_state"),
+        ("varint", "z_crypto_iteration_count"),
+        ("boolean", "z_is_password_protected"),
+        ("boolean", "z_is_share_dirty"),
+        ("boolean", "marked_for_deletion"),
+        ("varint", "minimum_supported_notes_version"),
+        ("boolean", "z_needs_initial_fetch_from_cloud"),
+        ("string", "z_identifier"),
+        ("path", "source"),
+    ],
+)
+
+ZICNoteDataRecord = TargetRecordDescriptor(
+    "macos/notes/z_ic_note_data",
+    [
+        ("string", "table"),
+        ("varint", "z_pk"),
+        ("varint", "z_ent"),
+        ("varint", "z_opt"),
+        ("varint", "z_note"),
+        ("string", "z_crypto_initialization_vector"),
+        ("string", "z_crypto_tag"),
+        ("bytes", "z_data"),
+        ("path", "source"),
+    ],
+)
+
+ZICSearchIndexStateRecord = TargetRecordDescriptor(
+    "macos/notes/z_ic_search_index_state",
+    [
+        ("string", "table"),
+        ("varint", "z_pk"),
+        ("varint", "z_ent"),
+        ("varint", "z_opt"),
+        ("varint", "z_state_value"),
+        ("string", "z_identifier"),
+        ("path", "source"),
+    ],
+)
+
 NotesRecords = (
     ZAccountRecord,
     ZFolderRecord,
@@ -212,10 +311,15 @@ NotesRecords = (
     ZMetadataRecord,
     ZPlistRecord,
     NSStoreModelVersionHashesRecord,
+    iCloudNSStoreModelVersionHashesRecord,
     ZModelCacheRecord,
     AChangeRecord,
     ATransactionRecord,
     ATransactionStringRecord,
+    ZICCloudStateRecord,
+    ZICCloudSyncingRecord,
+    ZICNoteDataRecord,
+    ZICSearchIndexStateRecord,
 )
 
 FIELD_MAPPINGS = {
@@ -311,10 +415,52 @@ FIELD_MAPPINGS = {
     "TrashFolder": "trash_folder",
     "UpdateFolderAction": "update_folder_action",
     "UpdateNoteAction": "update_note_action",
+    "ICAccount": "ic_account",
+    "ICAccountData": "ic_account_data",
+    "ICAssetSignature": "ic_asset_signature",
+    "ICAttachment": "ic_attachment",
+    "ICAttachmentLocation": "ic_attachment_location",
+    "ICAttachmentPreviewImage": "ic_attachment_preview_image",
+    "ICCloudState": "ic_cloud_state",
+    "ICCloudSyncingObject": "ic_cloud_syncing_object",
+    "ICDeviceMigrationState": "ic_device_migration_state",
+    "ICFolder": "ic_folder",
+    "ICHashtag": "ic_hashtag",
+    "ICInlineAttachment": "ic_inline_attachment",
+    "ICInvitation": "ic_invitation",
+    "ICLegacyTombstone": "ic_legacy_tombstone",
+    "ICLocation": "ic_location",
+    "ICMedia": "ic_media",
+    "ICNote": "ic_note",
+    "ICNoteContainer": "ic_note_container",
+    "ICNoteData": "ic_note_data",
+    "ICNoteParticipant": "ic_note_participant",
+    "ICSearchIndexState": "ic_search_index_state",
+    "ICServerChangeToken": "ic_server_change_token",
+    "ZCURRENTLOCALVERSION": "z_current_local_version",
+    "ZINCLOUD": "z_in_cloud",
+    "ZLATESTVERSIONSYNCEDTOCLOUD": "z_latest_version_synced_to_cloud",
+    "ZCLOUDSYNCINGOBJECT": "z_cloud_syncing_object",
+    "Z3_CLOUDSYNCINGOBJECT": "z3_cloud_syncing_object",
+    "ZLOCALVERSIONDATE": "z_local_version_date",
+    "ZNOTE": "z_note",
+    "ZCRYPTOINITIALIZATIONVECTOR": "z_crypto_initialization_vector",
+    "ZCRYPTOTAG": "z_crypto_tag",
+    "ZDATA": "z_data",
+    "ZSTATEVALUE": "z_state_value",
+    "ZCLOUDSTATE": "z_cloud_state",
+    "ZCRYPTOITERATIONCOUNT": "z_crypto_iteration_count",
+    "ZISPASSWORDPROTECTED": "z_is_password_protected",
+    "ZISSHAREDIRTY": "z_is_share_dirty",
+    "ZMARKEDFORDELETION": "marked_for_deletion",
+    "ZMINIMUMSUPPORTEDNOTESVERSION": "minimum_supported_notes_version",
+    "ZNEEDSINITIALFETCHFROMCLOUD": "z_needs_initial_fetch_from_cloud",
+    "ZIDENTIFIER": "z_identifier",
 }
 
 CONVERT_TIMESTAMPS = {
     "z_timestamp": "2001",
+    "z_local_version_date": "2001",
 }
 
 
@@ -326,9 +472,13 @@ class NotesPlugin(Plugin):
     References:
         - https://fatbobman.com/en/posts/tables_and_fields_of_coredata/
         - https://developer.apple.com/documentation/coredata/nsstoremodelversionidentifierskey
+        - https://stackoverflow.com/questions/13503243/what-does-dirty-flag-dirty-values-mean
     """
 
-    USER_PATH = ("Library/Containers/com.apple.Notes/Data/Library/Notes/NotesV*.storedata",)
+    USER_PATH = (
+        "Library/Containers/com.apple.Notes/Data/Library/Notes/NotesV*.storedata",
+        "Library/Group Containers/group.com.apple.notes/NoteStore.sqlite",
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -351,7 +501,7 @@ class NotesPlugin(Plugin):
         """Return notes information.
 
         Yields the following record types extracted from the
-        NotesV*.storedata databases:
+        NotesV*.storedata and NoteStore.sqlite databases:
 
         .. code-block:: text
 
@@ -465,8 +615,82 @@ class NotesPlugin(Plugin):
                 plist_path (string): Path pointing to the location of the entry within the plist structure.
                 source (path): Path to the database file.
 
+            iCloudNSStoreModelVersionHashesRecord:
+                ic_account (bytes): Hash for account.
+                ic_account_data (bytes): Hash for account data.
+                ic_asset_signature (bytes): Hash for ZICASSETSIGNATURE table.
+                ic_attachment (bytes): Hash for attachment.
+                ic_attachment_location (bytes): Hash for attachment location.
+                ic_attachment_preview_image (bytes): Hash for attachment preview image.
+                ic_cloud_state (bytes): Hash for ZICCLOUDSTATE table.
+                ic_cloud_syncing_object (bytes): Hash for ZICCLOUDSYNCINGOBJECT table.
+                ic_device_migration_state (bytes): Hash for device migration state.
+                ic_folder (bytes): Hash for folder.
+                ic_hashtag (bytes): Hash for hashtag.
+                ic_inline_attachment (bytes): Hash for inline attachment.
+                ic_invitation (bytes): Hash for ZICINVITATION table.
+                ic_legacy_tombstone (bytes): Hash for legacy tombstone data.
+                ic_location (bytes): Hash for ZICLOCATION table.
+                ic_media (bytes): Hash for media.
+                ic_note (bytes): Hash for note.
+                ic_note_container (bytes): Hash for note container.
+                ic_note_data (bytes): Hash for ZICNOTEDATA table.
+                ic_note_participant (bytes): Hash for ZICNOTEPARTICIPANT table.
+                ic_search_index_state (bytes): Hash for ZICSEARCHINDEXSTATE table.
+                ic_server_change_token (bytes): Hash for ZICSERVERCHANGETOKEN table.
+                plist_path (string): Path pointing to the location of the entry within the plist structure.
+                source (path): Path to the database file.
+
             ZModelCacheRecord (contains Z_CONTENT field with binary data):
                 table (string): Name of the source table (Z_MODELCACHE).
+                source (path): Path to the database file.
+
+            ZICCloudStateRecord:
+                table (string): Name of the source table (ZICCLOUDSTATE).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): Entity identifier.
+                z_opt (varint): The version number of the data record.
+                z_current_local_version (varint): Current local version of the object.
+                z_in_cloud (boolean): Indicates whether the object exists in the cloud.
+                z_latest_version_synced_to_cloud (varint): Latest version synced to the cloud.
+                z_cloud_syncing_object (string): Reference to the associated ZICCLOUDSYNCINGOBJECT.
+                z3_cloud_syncing_object (string): Alternate reference to the ZICCLOUDSYNCINGOBJECT.
+                z_local_version_date (datetime): Timestamp of the local version.
+                source (path): Path to the database file.
+
+            ZICCloudSyncingRecord:
+                table (string): Name of the source table (ZICCLOUDSYNCINGOBJECT).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): Entity identifier (determines object type).
+                z_opt (varint): The version number of the data record.
+                z_cloud_state (varint): Cloud state of the object.
+                z_crypto_iteration_count (varint): Cryptographic iteration count.
+                z_is_password_protected (boolean): Indicates whether the object is password protected.
+                z_is_share_dirty (boolean): Indicates whether the shared object has unsynced changes.
+                marked_for_deletion (boolean): Indicates whether the object is marked for deletion.
+                minimum_supported_notes_version (varint): Minimum supported notes version.
+                z_needs_initial_fetch_from_cloud (boolean): Indicates whether initial cloud fetch is required.
+                z_identifier (string): Identifier for the object.
+                source (path): Path to the database file.
+
+            ZICNoteDataRecord:
+                table (string): Name of the source table (ZICNOTEDATA).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): Entity identifier.
+                z_opt (varint): The version number of the data record.
+                z_note (varint): Reference to the associated note.
+                z_crypto_initialization_vector (string): Initialization vector used for cryptographic encryption.
+                z_crypto_tag (string): Cryptography tag.
+                z_data (bytes): Note data blob, contains note body.
+                source (path): Path to the database file.
+
+            ZICSearchIndexStateRecord:
+                table (string): Name of the source table (ZICSEARCHINDEXSTATE).
+                z_pk (varint): The autoincrement primary key of the table.
+                z_ent (varint): Entity identifier.
+                z_opt (varint): The version number of the data record.
+                z_state_value (varint): State value of the search index.
+                z_identifier (string): Identifier for the indexed object.
                 source (path): Path to the database file.
 
             AChangeRecord:
@@ -510,4 +734,7 @@ class NotesPlugin(Plugin):
             self, self.files, NotesRecords, field_mappings=FIELD_MAPPINGS, convert_timestamps=CONVERT_TIMESTAMPS
         )
 
-        # TODO: Add ZNOTE, ZNOTEBODY, ZOFFLINEACTION, ZATTACHMENT, tables
+        # TODO: Add ZNOTE, ZNOTEBODY, ZOFFLINEACTION, ZATTACHMENT, tables for NotesV*.storedata
+
+        # TODO: Add ZICASSETSIGNATURE, ZICINVITATION, ZICLOCATION, ZICNOTEPARTICIPANT,
+        # ZICSERVERCHANGETOKEN, tables for NoteStore.sqlite

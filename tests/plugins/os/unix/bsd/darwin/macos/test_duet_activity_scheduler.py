@@ -63,8 +63,8 @@ def test_duet_activity_scheduler(test_files: list[str], target_unix: Target, fs_
 
     assert results[52].activity is not None
     assert isinstance(results[52].activity, (bytes, bytearray))
-    assert results[52].group_binary is not None
-    assert isinstance(results[52].group_binary, (bytes, bytearray))
+    assert results[52].group_hash is not None
+    assert isinstance(results[52].group_hash, (bytes, bytearray))
     assert results[52].trigger is not None
     assert isinstance(results[52].trigger, (bytes, bytearray))
     assert results[52].plist_path == "Z_METADATA/Z_VERSION=1/NSStoreModelVersionHashes"

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 from dissect.database.sqlite3 import SQLite3
 from dissect.util.plist import NSDictionary, NSKeyedArchiver
 
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 if TYPE_CHECKING:
@@ -37,7 +38,7 @@ def build_sqlite_records(
     """Extract and normalize records from SQLite databases.
 
     Iterates over provided SQLite files, reads all tables and rows, and converts
-    them into dictionaries. Supports decoding of binary plist values and
+    them into dictionaries. Supports decompression. Supports decoding of binary plist values and
     NSKeyedArchiver blobs. The optional joins arg can be used to combine and
     filter rows across related tables.
 
@@ -88,6 +89,19 @@ def build_sqlite_records(
                         row_dict = {k: v for k, v in row}  # noqa C416
 
                         for key, value in list(row_dict.items()):
+                            # Try decompressing binary fields
+                            if isinstance(value, (bytes, bytearray)) and len(value) > 4:
+                                try:
+                                    bio = BytesIO(value)
+                                    decompressed = open_decompress(fileobj=bio).read()
+
+                                    if decompressed != value:
+                                        row_dict[key] = decompressed
+                                        value = decompressed
+
+                                except Exception:
+                                    pass
+
                             # Decode binary plist values (including NSKeyedArchiver blobs)
                             if isinstance(value, (bytes, bytearray)) and value.startswith(b"bplist00"):
                                 if is_nskeyedarchive_blob(value):
@@ -566,7 +580,11 @@ def select_descriptor(
     if best_match_count == 0:
         return None
 
-    missing_fields = {key: type_name for key, type_name in formatted_rdict.items() if key not in selected_record.fields}
+    missing_fields = {
+        key: type_name
+        for key, type_name in formatted_rdict.items()
+        if key not in selected_record.fields and type_name != "NoneType"
+    }
 
     if missing_fields:
         formatted = ", ".join(f"{k} ({v})" for k, v in sorted(missing_fields.items()))
@@ -805,7 +823,7 @@ def emit_dict_records(
         scalar values are retained as attributes
         dictionary elements are treated as child nodes and processed recursively.
 
-    Supports decoding of binary plist values and NSKeyedArchiver blobs.
+    Supports decompression. Supports decoding of binary plist values and NSKeyedArchiver blobs.
 
     Collapses specified paths into attribute values instead of recursing.
 
@@ -858,43 +876,56 @@ def emit_dict_records(
             if cleaned_list or not contains_dict:
                 attributes[k] = cleaned_list
 
-        elif isinstance(v, (bytes, bytearray)) and v.startswith(b"bplist00"):
-            if is_nskeyedarchive_blob(v):
+        elif isinstance(v, (bytes, bytearray)):
+            if len(v) > 4:
                 try:
-                    archiver = NSKeyedArchiver(BytesIO(v))
-                    decoded_value = archiver.top.get("root")
-                    attributes[k] = decoded_value
-                except Exception:
-                    plugin.target.log.exception(
-                        "Failed to decode %s value for key %s",
-                        child_path,
-                        k,
-                    )
-            else:
-                try:
-                    plist_data = load_plist_data(v) if b"$archiver" in v[:128] else plistlib.loads(v)
+                    bio = BytesIO(v)
+                    decompressed = open_decompress(fileobj=bio).read()
 
-                    if isinstance(plist_data, dict):
-                        yield from emit_dict_records(
-                            plugin,
-                            plist_data,
-                            source,
-                            record_descriptors=record_descriptors,
-                            field_mappings=field_mappings,
-                            value_mappings=value_mappings,
-                            convert_timestamps=convert_timestamps,
+                    if decompressed != v:
+                        v = decompressed
+
+                except Exception:
+                    pass
+            if isinstance(v, (bytes, bytearray)) and v.startswith(b"bplist00"):
+                if is_nskeyedarchive_blob(v):
+                    try:
+                        archiver = NSKeyedArchiver(BytesIO(v))
+                        decoded_value = archiver.top.get("root")
+                        attributes[k] = decoded_value
+                    except Exception:
+                        plugin.target.log.exception(
+                            "Failed to decode %s value for key %s",
+                            child_path,
+                            k,
                         )
-                    else:
-                        # If binary plist is an attribute and not a dict
-                        attributes[k] = plist_data
+                else:
+                    try:
+                        plist_data = load_plist_data(v) if b"$archiver" in v[:128] else plistlib.loads(v)
 
-                except Exception:
-                    plugin.target.log.exception(
-                        "Failed to parse plist in %s (plist_path=%s, key=%s)",
-                        source,
-                        child_path,
-                        k,
-                    )
+                        if isinstance(plist_data, dict):
+                            yield from emit_dict_records(
+                                plugin,
+                                plist_data,
+                                source,
+                                record_descriptors=record_descriptors,
+                                field_mappings=field_mappings,
+                                value_mappings=value_mappings,
+                                convert_timestamps=convert_timestamps,
+                            )
+                        else:
+                            # If binary plist is an attribute and not a dict
+                            attributes[k] = plist_data
+
+                    except Exception:
+                        plugin.target.log.exception(
+                            "Failed to parse plist in %s (plist_path=%s, key=%s)",
+                            source,
+                            child_path,
+                            k,
+                        )
+            else:
+                attributes[k] = v
         else:
             attributes[k] = v
 

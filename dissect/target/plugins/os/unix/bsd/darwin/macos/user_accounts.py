@@ -62,7 +62,7 @@ ZAccountRecord = TargetRecordDescriptor(
         ("string", "z_modification_id"),
         ("string", "z_owning_bundle_id"),
         ("string", "z_username"),
-        ("bytes", "z_dataclass_properties"),
+        ("string", "z_dataclass_properties"),
         ("path", "source"),
     ],
 )
@@ -347,7 +347,7 @@ class UserAccountsPlugin(Plugin):
                 z_modification_id (string): Modification identifier.
                 z_owning_bundle_id (string): Bundle ID of owning service/app.
                 z_username (string): Username for the account.
-                z_dataclass_properties (bytes): Dataclass properties.
+                z_dataclass_properties (string): Dataclass properties.
                 source (path): Path to the Accounts*.sqlite database file.
 
             ZEnabledDataClassesRecord:

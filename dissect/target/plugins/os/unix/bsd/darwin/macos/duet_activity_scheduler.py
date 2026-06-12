@@ -63,11 +63,11 @@ ZPlistRecord = TargetRecordDescriptor(
     ],
 )
 
-ActivityRecord = TargetRecordDescriptor(
-    "macos/duet_activity_scheduler/activity",
+NSStoreModelVersionHashesRecord = TargetRecordDescriptor(
+    "macos/duet_activity_scheduler/ns_store_model_version_hashes",
     [
         ("bytes", "activity"),
-        ("bytes", "group_binary"),
+        ("bytes", "group_hash"),
         ("bytes", "trigger"),
         ("string", "plist_path"),
         ("path", "source"),
@@ -89,7 +89,7 @@ DuetActivityRecords = (
     ZGroupRecord,
     ZMetadataRecord,
     ZPlistRecord,
-    ActivityRecord,
+    NSStoreModelVersionHashesRecord,
     ZModelCacheRecord,
 )
 
@@ -113,7 +113,7 @@ FIELD_MAPPINGS = {
     "NSPersistenceFrameworkVersion": "ns_persistence_framework_version",
     "NSStoreModelVersionHashesVersion": "ns_store_model_version_hashes_version",
     "Activity": "activity",
-    "Group": "group_binary",
+    "Group": "group_hash",
     "Trigger": "trigger",
 }
 
@@ -189,10 +189,10 @@ class DuetActivitySchedulerPlugin(Plugin):
                     Z_PLIST row that this record was extracted from.
                 source (path): Path to the DuetActivitySchedulerClassC.db file.
 
-            ActivityRecord:
-                activity (bytes): Binary identifier of the activity.
-                group_binary (bytes): Binary identifier referencing a group.
-                trigger (bytes): Binary identifier referencing a trigger.
+            NSStoreModelVersionHashesRecord:
+                activity (bytes): Hash for ZACTIVITY entity.
+                group_hash (bytes): Hash for ZGROUP entity.
+                trigger (bytes): Hash for ZTRIGGER entity.
                 plist_path (string): Path pointing to the location of the entry within the plist structure.
                 source (path): Path to the DuetActivitySchedulerClassC.db file.
 
