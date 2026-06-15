@@ -19,7 +19,7 @@ RunKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, Us
         ("datetime", "ts"),
         ("wstring", "name"),
         ("command", "command"),
-        ("string", "key"),
+        ("string", "source"),
     ],
 )
 
@@ -28,6 +28,7 @@ class RunKeysPlugin(Plugin):
     """Plugin that iterates various Runkey locations."""
 
     KEYS = (
+        # System-wide ASEP
         "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run",
         "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
         "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
@@ -38,16 +39,31 @@ class RunKeysPlugin(Plugin):
         "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",
         "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx",
         "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run",
+        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",  # noqa: E501
+        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",  # noqa: E501
+        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx",  # noqa: E501
+        # Per user ASEP
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run",
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx",
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\Run",
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\Load",
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",  # noqa: E501
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",  # noqa: E501
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx",  # noqa: E501
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell",
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run",
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Run",
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup",
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx",
+        # Service start-up
+        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices",
+        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce",
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices",
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce",
     )
 
     def check_compatible(self) -> None:
@@ -64,6 +80,8 @@ class RunKeysPlugin(Plugin):
 
         References:
             - https://docs.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
+            - https://attack.mitre.org/techniques/T1547/001/
+            - https://www.nextron-systems.com/2025/07/29/detecting-the-most-popular-mitre-persistence-method-registry-run-keys-startup-folder/
 
         Yields RunKeyRecords with fields:
 
@@ -74,18 +92,18 @@ class RunKeysPlugin(Plugin):
             ts (datetime): The registry key last modified timestamp.
             name (string): The run key name.
             command (command): The run key command.
-            key (string): The source key for this run key.
+            source (string): The source registry key for this run key.
         """
-        for key in self.KEYS:
-            for r in self.target.registry.keys(key):
-                user = self.target.registry.get_user(r)
-                for entry in r.values():
+        for key_path in self.KEYS:
+            for key in self.target.registry.keys(key_path):
+                user = self.target.registry.get_user(key)
+                for entry in key.values():
                     yield RunKeyRecord(
-                        ts=r.ts,
+                        ts=key.ts,
                         name=entry.name,
                         command=entry.value or None,
-                        key=key,
+                        source=key_path,
                         _target=self.target,
-                        _key=r,
+                        _key=key,
                         _user=user,
                     )

@@ -287,7 +287,6 @@ class AuthLogRecordBuilder:
 
     def build_record(self, ts: datetime, source: Path, line: str) -> TargetRecordDescriptor:
         """Builds an ``AuthLog`` event record."""
-
         record_fields = [
             ("datetime", "ts"),
             ("path", "source"),

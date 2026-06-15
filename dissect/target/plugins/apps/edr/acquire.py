@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 AcquireOpenHandlesRecord = TargetRecordDescriptor(
-    "filesystem/acquire_open_handles",
+    "application/edr/acquire/open_handle",
     [
         ("path", "name"),
         ("string", "handle_type"),
@@ -30,7 +30,7 @@ AcquireOpenHandlesRecord = TargetRecordDescriptor(
 )
 
 AcquireHashRecord = TargetRecordDescriptor(
-    "filesystem/acquire_hash",
+    "application/edr/acquire/hash",
     [
         ("path", "path"),
         ("filesize", "filesize"),

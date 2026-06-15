@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 WgetHstsRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "apps/shell/wget/hsts",
+    "application/shell/wget/hsts",
     [
         ("datetime", "ts_created"),
         ("uri", "host"),

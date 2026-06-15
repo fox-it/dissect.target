@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
     from dissect.target.plugin import Plugin
 
+
 NO_DOCS = "No documentation"
 
 FUNCTION_OUTPUT_DESCRIPTION = {

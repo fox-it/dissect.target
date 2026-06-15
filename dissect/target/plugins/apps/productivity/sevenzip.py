@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
     from dissect.target.helpers.regutil import RegistryKey
 
+
 PanelPathRecord = TargetRecordDescriptor(
     "application/productivity/sevenzip/panelpath",
     [

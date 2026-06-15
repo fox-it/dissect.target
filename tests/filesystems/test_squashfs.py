@@ -11,7 +11,6 @@ from tests._utils import absolute_path
 @pytest.mark.parametrize("type", ["gzip", "gzip-opts", "lz4", "lzma", "lzo", "xz", "zstd"])
 def test_filesystem_squashfs(type: str) -> None:
     """Test if we detect and correctly iterate SquashFS filesystems."""
-
     if type == "lzma" and platform.system() == "Windows":
         pytest.skip(reason="SquashFS LZMA misbehaves on Windows")
 

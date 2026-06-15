@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.linux.redhat._os import RedHatPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @pytest.mark.parametrize(
@@ -19,7 +24,6 @@ from dissect.target.target import Target
 )
 def test_unix_linux_redhat_os_detection(target_bare: Target, file_name: str) -> None:
     """Test if we detect RedHat OS correctly."""
-
     fs = VirtualFilesystem()
     fs.map_file_fh(file_name, BytesIO())
 

@@ -10,8 +10,7 @@ if TYPE_CHECKING:
 
 
 def test_dpapi_keyprovider_empty(target_win: Target) -> None:
-    """test if we yield an empty key correctly."""
-
+    """Test if we yield an empty key correctly."""
     target_win.add_plugin(DPAPIPlugin, check_compatible=False)
     target_win.add_plugin(EmptyKeyProviderPlugin)
 

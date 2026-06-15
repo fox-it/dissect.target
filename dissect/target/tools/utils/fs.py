@@ -6,12 +6,13 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, TextIO
 
 from dissect.target.exceptions import FileNotFoundError
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import LayerFilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from dissect.target.filesystem import FilesystemEntry
     from dissect.target.helpers.fsutil import TargetPath
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']

@@ -6,6 +6,7 @@ from pathlib import Path
 TYPES = []
 MAP = set()
 PATTERNS: set[tuple[int, tuple[str]]] = set()
+PATTERN_WINDOW_SIZE = 0
 
 files = [
     Path(__file__).parent.joinpath("freedesktop.py").resolve(),
@@ -42,4 +43,9 @@ for i, definition in enumerate(TYPES):
         if "value" not in magic:
             raise ValueError(f"Magic definition missing value in {definition}")
 
-        MAP.add((i, magic.get("offset", 0), magic["value"]))
+        offset = magic.get("offset", 0)
+        value = magic["value"]
+        MAP.add((offset, i, value))
+
+        if offset + len(value) > PATTERN_WINDOW_SIZE:
+            PATTERN_WINDOW_SIZE = offset + len(value)

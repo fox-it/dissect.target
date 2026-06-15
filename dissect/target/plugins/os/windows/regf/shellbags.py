@@ -460,7 +460,10 @@ class URI(SHITEM):
         super().__init__(buf)
         self.uri = None
         if self.item.data_size < self.size - 6:
-            self.data = self.fh.read(self.item.data_size - 2)
+            if self.item.data_size > 2:
+                self.data = self.fh.read(self.item.data_size - 2)
+            else:
+                self.fh.seek(8)  # No data, URI string starts at offset 0x8
             if self.item.flags & 0x80:
                 self.uri = c_bag.wchar[None](self.fh)
             else:
@@ -772,7 +775,6 @@ class ShellBagsPlugin(Plugin):
 
 def parse_shell_item_list(buf: bytes) -> Iterator[SHITEM]:
     """Parse a shellbag item from the given bytes."""
-
     offset = 0
     end = len(buf)
     list_buf = memoryview(buf)

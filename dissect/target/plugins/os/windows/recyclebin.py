@@ -65,13 +65,11 @@ class RecyclebinPlugin(Plugin):
 
         The sysvol is skipped so that there are no duplicated with drive letter that maps to sysvol.
         """
-
         return path.name != "sysvol" and path.joinpath("$recycle.bin").exists()
 
     @export(record=RecycleBinRecord)
     def recyclebin(self) -> Iterator[RecycleBinRecord]:
-        """
-        Return files located in the recycle bin ($Recycle.Bin).
+        """Return files located in the recycle bin ($Recycle.Bin).
 
         Yields RecycleBinRecords with fields:
 
@@ -87,7 +85,6 @@ class RecyclebinPlugin(Plugin):
           user_id (string): SID of the user deleted the file, parsed from $I filepath
           user (string): Username matching SID, lookup using Dissect user plugin
         """
-
         for recyclebin in self.recyclebin_paths:
             yield from self.read_recycle_bin(recyclebin)
 
@@ -153,7 +150,6 @@ class RecyclebinPlugin(Plugin):
 
     def select_header(self, data: bytes) -> c_recyclebin.header_v1 | c_recyclebin.header_v2:
         """Selects the correct header based on the version field in the header."""
-
         header_version = c_recyclebin.uint64(data[:8])
         if header_version == 2:
             return c_recyclebin.header_v2

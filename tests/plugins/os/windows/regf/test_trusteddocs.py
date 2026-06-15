@@ -3,10 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.trusteddocs import TrustedDocumentsPlugin
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

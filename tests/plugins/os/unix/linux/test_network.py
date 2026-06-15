@@ -12,7 +12,6 @@ import pytest
 from dissect.target.plugins.os.default.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
     DhclientLeaseParser,
-    LinuxNetworkConfigParser,
     LinuxNetworkPlugin,
     NetworkManagerConfigParser,
     NetworkManagerLeaseParser,
@@ -24,6 +23,9 @@ from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.plugins.os.unix.linux.network import (
+        LinuxNetworkConfigParser,
+    )
     from dissect.target.target import Target
 
 
@@ -210,7 +212,6 @@ def test_systemd_network_drop(target_linux: Target, fs_linux: VirtualFilesystem)
 
 def test_linux_network_plugin_interfaces(target_linux: Target) -> None:
     """Assert that the LinuxNetworkPlugin aggregates from all Config Parsers."""
-
     MockLinuxConfigParser1: LinuxNetworkConfigParser = MagicMock()
     MockLinuxConfigParser1.return_value.interfaces.return_value = []
 
@@ -403,7 +404,6 @@ def test_proc_config_parser(target_linux: Target, fs_linux: VirtualFilesystem) -
 )
 def test_ips_dhcp(target_unix_users: Target, fs_unix: VirtualFilesystem, expected_record: dict, messages: str) -> None:
     """Test DHCP lease messages from /var/log/syslog."""
-
     fs_unix.map_file_fh(
         "/var/log/syslog",
         BytesIO(textwrap.dedent(messages).encode()),

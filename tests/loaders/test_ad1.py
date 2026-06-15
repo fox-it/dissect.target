@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 )
 def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``AD1Loader`` when opening a ``Target``."""
-
     path = absolute_path("_data/filesystems/ad1/encrypted-small.ad1")
 
     with pytest.raises(TargetError):

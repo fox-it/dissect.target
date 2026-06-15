@@ -48,23 +48,23 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
     )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/cookie", GENERIC_COOKIE_FIELDS
+        "application/browser/chrome/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
+        "application/browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/extension", GENERIC_EXTENSION_RECORD_FIELDS
+        "application/browser/chrome/extension", GENERIC_EXTENSION_RECORD_FIELDS
     )
 
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/password", GENERIC_PASSWORD_RECORD_FIELDS
+        "application/browser/chrome/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     @export(record=BrowserHistoryRecord)

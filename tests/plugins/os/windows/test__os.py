@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 from flow.record.fieldtypes import windows_path
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.generic import ComputerSidRecord
@@ -14,6 +14,7 @@ from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
@@ -282,7 +283,6 @@ def test_windows_user_from_sam(target_win_users: Target) -> None:
     References:
         - https://learn.microsoft.com/en-us/previous-versions/troubleshoot/windows-client/renaming-user-account-not-change-profile-path
     """
-
     fake_sam_user = Mock()
     fake_sam_user.rid = 1002
     fake_sam_user.username = "Jane"  # Should override "John" from home folder
@@ -318,10 +318,32 @@ def test_windows_hostname(
     registry_value: bytes, expected_hostname: str, target_win_users: Target, hive_hklm: VirtualHive
 ) -> None:
     """Test if we can parse windows hostnames correctly."""
-
     key_name = "SYSTEM\\ControlSet001\\Control\\ComputerName\\ComputerName"
     key = VirtualKey(hive_hklm, key_name)
     key.add_value("ComputerName", VirtualValue(hive_hklm, "ComputerName", registry_value.decode()))
     hive_hklm.map_key(key_name, key)
 
     assert target_win_users.hostname == expected_hostname
+
+
+@pytest.mark.parametrize(
+    ("reg_value", "expected_triple"),
+    [
+        ("AMD64", "x86_64-pc-windows"),
+        ("IA64", "ia_64-pc-windows"),
+        ("ARM64", "aarch64-pc-windows"),
+        ("x86", "x86-pc-windows"),
+        ("EM64T", "x86_64-pc-windows"),
+    ],
+)
+def test_windows_architecture(
+    target_win_users: Target, hive_hklm: VirtualHive, reg_value: str, expected_triple: str
+) -> None:
+    """Test if we can parse windows architectures correctly."""
+    key_name = "SYSTEM\\ControlSet001\\Control\\Session Manager\\Environment"
+    key = VirtualKey(hive_hklm, key_name)
+    key.add_value("PROCESSOR_ARCHITECTURE", reg_value)
+    hive_hklm.map_key(key_name, key)
+
+    assert target_win_users.os == "windows"
+    assert target_win_users.architecture == expected_triple

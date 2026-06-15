@@ -71,7 +71,6 @@ def test_services(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None
 
 def test_services_systemd_drop_folder(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we correctly parse systemd ``.service`` and drop folder ``.conf`` files. Data based on Ubuntu 22.04 LTS default files."""  # noqa: E501
-
     fs_unix.map_file(
         "/lib/systemd/system/systemd-localed.service",
         str(absolute_path("_data/plugins/os/unix/linux/services/systemd-localed.service")),

@@ -24,6 +24,5 @@ class WinlogonDefaultPasswordKeyProviderPlugin(DefaultPasswordKeyProvider):
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
         """Yield Windows Winlogon DefaultPassword strings."""
-
         for record in self.target.credential.winlogon():
             yield self.__namespace__, record.password

@@ -306,7 +306,6 @@ def path_key4_primary_password(fs_unix: VirtualFilesystem) -> TargetPath:
 
 def test_passwords(path_key4: TargetPath) -> None:
     """Test if we can decrypt a password entry with an empty Firefox primary password."""
-
     key = decrypt_master_key(path_key4, b"")
 
     b64_username = "MDoEEPgAAAAAAAAAAAAAAAAAAAEwFAYIKoZIhvcNAwcECIFVMX6MyYxpBBC2j8K+bCEaE9/FmqE1wo2A"
@@ -321,7 +320,6 @@ def test_passwords(path_key4: TargetPath) -> None:
 
 def test_passwords_primary_password(path_key4_primary_password: TargetPath) -> None:
     """Test if we can decrypt a password entry with a Firefox primary password."""
-
     key = decrypt_master_key(path_key4_primary_password, b"PrimaryPassword")
 
     b64_username = "MDoEEPgAAAAAAAAAAAAAAAAAAAEwFAYIKoZIhvcNAwcECPEZvPh6dhBkBBB3/O2puJy1NiBUo5gS8hZh"
@@ -335,21 +333,18 @@ def test_passwords_primary_password(path_key4_primary_password: TargetPath) -> N
 
 def test_passwords_no_master_key() -> None:
     """Test if a fitting exception is raised when omitting a decryption key."""
-
     with pytest.raises(ValueError, match="Not a valid TDES key"):
         decrypt_value("MDoEEPgAAAAAAAAAAAAAAAAAAAEwFAYIKoZIhvcNAwcECIFVMX6MyYxpBBC2j8K+bCEaE9/FmqE1wo2A", b"")
 
 
 def test_passwords_decrypt_master_key_invalid_primary_password(path_key4_primary_password: TargetPath) -> None:
     """Test if a fitting exception is raised when providing an invalid primary password."""
-
     with pytest.raises(ValueError, match=re.escape("Master key decryption failed.")):
         decrypt_master_key(path_key4_primary_password, b"BAD_PRIMARY_PASSWORD")
 
 
 def test_passwords_decrypt_master_key(path_key4: TargetPath) -> None:
     """Test if we can decrypt a master key with no primary password."""
-
     key = decrypt_master_key(path_key4, b"")
     assert key.hex() == "452c2f920285f794614af1c2d99ed331940d73298a526140"
 
@@ -360,7 +355,6 @@ def test_passwords_decrypt_aes() -> None:
     ``key4.db`` file contains an empty entry in the ``nssPrivate`` table to test if we correctly grab
     the last row of the table when decrypting the master key.
     """
-
     key4_file = absolute_path("_data/plugins/apps/browser/firefox/passwords/144.0/key4.db")
     key = decrypt_master_key(key4_file, b"")
 
@@ -378,7 +372,6 @@ def test_passwords_decrypt_aes() -> None:
 
 def test_passwords_backup(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we find ``logins-backup.json`` files."""
-
     fs_win.map_dir(
         "Users/John/AppData/Roaming/Mozilla/Firefox/Profiles/8jb1c7qs.default-release",
         absolute_path("_data/plugins/apps/browser/firefox/passwords/144.0/"),
@@ -396,7 +389,6 @@ def test_passwords_backup(target_win_users: Target, fs_win: VirtualFilesystem) -
 
 def test_firefox_linux_xdg_config_home(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we find Mozilla Firefox Linux default XDG_CONFIG_HOME locations."""
-
     fs_unix.map_dir(
         "/home/user/.config/mozilla/firefox/g1rbw8y7.Profile Name",
         absolute_path("_data/plugins/apps/browser/firefox/generic"),

@@ -32,7 +32,6 @@ def encrypted_volume() -> Iterator[BinaryIO]:
 @pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_failure(target_win: Target, encrypted_volume: BinaryIO) -> None:
     """Test if not providing a key to decrypt a BDE volume results in no mounted volume."""
-
     enc_vol = volume.Volume(encrypted_volume, 1, 0, None, None, None, disk=encrypted_volume)
     target_win.volumes.add(enc_vol)
     target_win.volumes.apply()
@@ -44,7 +43,6 @@ def test_bde_volume_failure(target_win: Target, encrypted_volume: BinaryIO) -> N
 @pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_recovery_key(target_win: Target, encrypted_volume: BinaryIO) -> None:
     """Test if we can decrypt a BDE volume using a recovery key."""
-
     recovery_key = "272316-265804-640728-713570-509047-503305-045837-324731"
 
     with patch.object(keychain, "KEYCHAIN", []):
@@ -74,7 +72,6 @@ def test_bde_volume_with_recovery_key(target_win: Target, encrypted_volume: Bina
 @pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_passphrase(target_win: Target, encrypted_volume: BinaryIO) -> None:
     """Test if we can decrypt a BDE volume using a passphrase."""
-
     identifier = "B6AD258A-2725-4A42-93C6-844478BF7A90"
     passphrase = "Password1234"
 
@@ -105,7 +102,6 @@ def test_bde_volume_with_passphrase(target_win: Target, encrypted_volume: Binary
 @pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_wildcard_key(target_win: Target, encrypted_volume: BinaryIO) -> None:
     """Test if we can decrypt a BDE volume using a wildcard keychain key."""
-
     with patch.object(keychain, "KEYCHAIN", []):
         keychain.register_wildcard_value("Password1234")
 
@@ -128,7 +124,6 @@ def test_bde_volume_with_wildcard_key(target_win: Target, encrypted_volume: Bina
 @pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_raw_key(target_win: Target, encrypted_volume: BinaryIO) -> None:
     """Test if we can decrypt a BDE volume using a raw FVEK key."""
-
     with patch.object(keychain, "KEYCHAIN", []):
         keychain.register_wildcard_value("ab60a58f1a0b60be91ffa2b40ec338a072a011302a8ff58fc45eee742711dc7f")
 

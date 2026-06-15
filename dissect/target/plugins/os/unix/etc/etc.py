@@ -85,7 +85,6 @@ class EtcTree(Plugin):
             key (string): The configuration key returned by parsing.
             value (string[]): The configuration value belonging to the key.
         """
-
         for entry, _, items in self.target.fs.walk(root):
             for item in items:
                 path = self.target.fs.path(entry) / item

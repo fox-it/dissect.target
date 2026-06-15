@@ -6,10 +6,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.plugins.apps.vpn.openvpn import (
-    OpenVPNClient,
     OpenVPNParser,
     OpenVPNPlugin,
-    OpenVPNServer,
 )
 from tests._utils import absolute_path
 
@@ -17,6 +15,10 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.plugins.apps.vpn.openvpn import (
+        OpenVPNClient,
+        OpenVPNServer,
+    )
     from dissect.target.target import Target
 
 

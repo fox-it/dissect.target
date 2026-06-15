@@ -51,7 +51,6 @@ def test_podman_images(target_unix_podman: Target, fs_unix: VirtualFilesystem) -
                                              /=<BASE64>
                                              /manifest
     """
-
     target_unix_podman.add_plugin(PodmanPlugin)
     records = list(target_unix_podman.container.images())
 
@@ -72,7 +71,6 @@ def test_podman_images(target_unix_podman: Target, fs_unix: VirtualFilesystem) -
 
 def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can detect Podman containers on a target based on a SQLite3 database."""
-
     target_unix_podman.add_plugin(PodmanPlugin)
     records = list(target_unix_podman.container.containers())
 
@@ -122,7 +120,6 @@ def test_podman_containers(target_unix_podman: Target, fs_unix: VirtualFilesyste
 
 def test_podman_logs(target_unix_podman: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse non-default Podman json-file log driver entries."""
-
     fs_unix.map_file(
         "/home/user/.local/share/containers/storage/overlay-containers/350f9f5489aebd1d33aa9ed17450270f5a5502d8548df8085d88eccccf2182f1/userdata/ctr.log",
         absolute_path("_data/plugins/apps/container/podman/ctr.log"),

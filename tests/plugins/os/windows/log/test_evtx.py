@@ -121,7 +121,6 @@ def test_evtx_scraping(target_win: Target) -> None:
 
 def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we normalize certain evtx fields correctly."""
-
     # Example Security.evtx originates from Windows 10 22H2 Pro build 19045.2006,
     # events exported after clean virtual machine post-install.
     security_evtx = absolute_path("_data/plugins/os/windows/log/evtx/Security.evtx")
@@ -161,7 +160,6 @@ def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) ->
 )
 def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> None:
     """Test if ``unique_keys`` correctly deduplicates key values."""
-
     assert evtx.unique_key(key, keys) == expected_key
 
 

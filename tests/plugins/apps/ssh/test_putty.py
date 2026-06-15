@@ -7,12 +7,13 @@ from typing import TYPE_CHECKING
 import pytest
 from flow.record.fieldtypes import path
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.apps.ssh.putty import PuTTYPlugin, construct_public_key
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

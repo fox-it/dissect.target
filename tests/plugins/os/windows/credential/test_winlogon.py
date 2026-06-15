@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 def test_windows_credential_winlogon(target_win: Target, hive_hklm: VirtualHive) -> None:
     """Test if we can find a Winlogon DefaultPassword entry in the registry."""
-
     winlogon_path = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon"
     winlogon_key = VirtualKey(hive_hklm, winlogon_path)
     winlogon_key.timestamp = datetime(2025, 12, 31, 13, 37, 0, tzinfo=timezone.utc)

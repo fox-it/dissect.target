@@ -107,5 +107,4 @@ class AppxDebugKeysPlugin(Plugin):
             user_group (string): The group of the user this key belongs to.
             user_home (string): The home directory of the user this key belongs to.
         """
-
         yield from self._debug_keys()

@@ -22,5 +22,4 @@ def test_helpers_localeutil_normalize_timezone() -> None:
 )
 def test_helpers_localeutil_normalize_language(language_input: str, expected_output: str) -> None:
     """Test if we normalize languages to ISO-3166 correctly."""
-
     assert normalize_language(language_input) == expected_output

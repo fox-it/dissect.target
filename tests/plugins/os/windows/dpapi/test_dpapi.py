@@ -100,7 +100,6 @@ def test_dpapi_decrypt_blob_win_10(
     plaintext: str,
 ) -> None:
     """Test decrypting a windows 10 dpapi system and user blob."""
-
     add_win_user(
         hive_hklm,
         hive_hku,
@@ -224,7 +223,6 @@ def test_dpapi_decrypt_blob_win_7(
     plaintext: str,
 ) -> None:
     """Test decrypting a windows 7 user and system blob."""
-
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(
         hive_hklm,
@@ -472,7 +470,6 @@ def test_dpapi_decrypt_blob_win_xp(
     plaintext: str,
 ) -> None:
     """Test decrypting a windows xp user and system blob."""
-
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(
         hive_hklm,
@@ -551,7 +548,6 @@ def test_dpapi_master_keys_deduplicate(
     target_win: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive, hive_hku: VirtualHive
 ) -> None:
     """Test if we correctly deduplicate master keys."""
-
     add_win_user(
         hive_hklm,
         hive_hku,

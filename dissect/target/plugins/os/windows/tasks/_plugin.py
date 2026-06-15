@@ -20,6 +20,7 @@ from dissect.target.plugins.os.windows.tasks.records import (
     LogonTriggerRecord,
     MonthlyDateTriggerRecord,
     MonthlyDowTriggerRecord,
+    PaddingTriggerRecord,
     RegistrationTrigger,
     SendEmailRecord,
     SessionStateChangeTriggerRecord,
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
+
 
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
@@ -106,6 +108,7 @@ TriggerRecord = TargetRecordDescriptor(
         *LogonTriggerRecord.target_fields,
         *MonthlyDateTriggerRecord.target_fields,
         *MonthlyDowTriggerRecord.target_fields,
+        *PaddingTriggerRecord.target_fields,
         *RegistrationTrigger.target_fields,
         *SessionStateChangeTriggerRecord.target_fields,
         *TimeTriggerRecord.target_fields,

@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 try:
     import paho.mqtt.client as mqtt
 
@@ -471,12 +472,13 @@ def port(value: str) -> int:
 
     Args:
         value (str): The string representation of the port number.
+
     Returns:
         int: The port number as an integer.
+
     Raises:
         argparse.ArgumentTypeError: If the port number is not an integer or out of the valid range (1-65535).
     """
-
     try:
         port = int(value)
     except ValueError:
@@ -502,7 +504,6 @@ def case(value: str) -> str:
     Raises:
         argparse.ArgumentTypeError: If the case name does not match the required pattern.
     """
-
     if re.match(r"^[a-zA-Z0-9_]+$", value):
         return value
 

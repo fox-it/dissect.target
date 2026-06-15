@@ -221,7 +221,6 @@ class Target:
     @property
     def _generic_name(self) -> str:
         """Return a generic name for this target."""
-
         generic_name = (self.path and self.path.name) or None
 
         if not generic_name:
@@ -281,7 +280,6 @@ class Target:
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
         """
-
         spec = path
 
         # If the path is a URI-like string, separate the path component
@@ -321,7 +319,12 @@ class Target:
 
     @classmethod
     def open_all(
-        cls, paths: str | Path | list[str | Path], include_children: bool = False, *, apply: bool = True
+        cls,
+        paths: str | Path | list[str | Path],
+        *,
+        include_children: bool = False,
+        recursive: bool = False,
+        apply: bool = True,
     ) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
 
@@ -332,13 +335,16 @@ class Target:
                    If the path is a ``os.PathLike`` object, it will be used as-is.
                    If the path is a string and looks like a URI, it will be parsed as such.
                    If the path is a string and does not look like a URI, it will be treated as a local path.
-            include_children: Whether to recursively open child targets.
+            include_children: Whether to open child targets.
+            recursive: Whether to open child targets recursively.
 
         Raises:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
-        def _open_all(spec: str | Path, include_children: bool = False, *, apply: bool = True) -> Iterator[Target]:
+        def _open_all(
+            spec: str | Path, include_children: bool = False, recursive: bool = False, *, apply: bool = True
+        ) -> Iterator[Target]:
             # If the path is a URI-like string, separate the path component
             adjusted_path, parsed_path = parse_path_uri(spec)
             # We always need a path to work with, so convert the spec into one if it's not one already
@@ -404,7 +410,7 @@ class Target:
 
                 if include_children:
                     try:
-                        yield from target.open_children(apply=apply)
+                        yield from target.open_children(recursive=recursive, apply=apply)
                     except Exception as e:
                         get_target_logger(load_spec).error("Failed to load child target from %s", target, exc_info=e)
 
@@ -417,7 +423,7 @@ class Target:
         for spec in paths:
             loaded = False
 
-            for target in _open_all(spec, include_children=include_children, apply=apply):
+            for target in _open_all(spec, include_children=include_children, recursive=recursive, apply=apply):
                 loaded = True
                 at_least_one_loaded = True
                 yield target
@@ -438,7 +444,9 @@ class Target:
 
                 if path.is_dir():
                     for entry in path.iterdir():
-                        for target in _open_all(entry, include_children=include_children, apply=apply):
+                        for target in _open_all(
+                            entry, include_children=include_children, recursive=recursive, apply=apply
+                        ):
                             at_least_one_loaded = True
                             yield target
 
@@ -586,7 +594,6 @@ class Target:
         Returns:
             A fresh ``Target`` object
         """
-
         if self._loader and self.path:
             return self._load(self.path, self._loader, apply=apply)
 

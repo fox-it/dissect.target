@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 try:
     from asn1crypto.cms import ContentInfo
     from asn1crypto.core import Sequence

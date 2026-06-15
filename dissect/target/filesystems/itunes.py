@@ -7,9 +7,7 @@ from dissect.util.stream import AlignedStream
 
 from dissect.target.exceptions import FilesystemError, NotASymlinkError
 from dissect.target.filesystem import (
-    DirEntry,
     Filesystem,
-    FilesystemEntry,
     VirtualDirectory,
     VirtualFile,
     VirtualFilesystem,
@@ -19,6 +17,10 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.filesystem import (
+        DirEntry,
+        FilesystemEntry,
+    )
     from dissect.target.loaders.itunes import FileInfo, ITunesBackup
 
 
@@ -31,7 +33,7 @@ class ITunesFilesystem(Filesystem):
         super().__init__(None, *args, **kwargs)
         self.backup = backup
 
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
+        self._fs = VirtualFilesystem(sep=self.sep, altsep=self.altsep, case_sensitive=self.case_sensitive)
 
         for file in self.backup.files():
             entry_cls = (
@@ -95,7 +97,7 @@ class ITunesFilesystemEntry(VirtualFile):
     def readlink_ext(self) -> FilesystemEntry:
         """Read the link if this entry is a symlink. Returns a filesystem entry."""
         # Can't use the one in VirtualFile as it overrides the FilesystemEntry
-        return fsutil.resolve_link(self.fs, self.readlink(), self.path, alt_separator=self.fs.alt_separator)
+        return fsutil.resolve_link(self.fs, self.readlink(), self.path, sep=self.fs.sep)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""

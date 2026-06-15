@@ -41,7 +41,6 @@ def test_windows_credential_defaultpassword_lsa(
     target_win: Target, reg_key: str, reg_value: bytes, expected_value: str
 ) -> None:
     """Test if we can parse a DefaultPassword LSA entry."""
-
     with mock.patch(
         "dissect.target.plugins.os.windows.lsa.LSAPlugin._secrets",
         new_callable=mock.PropertyMock,

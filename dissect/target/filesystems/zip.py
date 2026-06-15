@@ -15,7 +15,6 @@ from dissect.target.exceptions import (
     NotASymlinkError,
 )
 from dissect.target.filesystem import (
-    DirEntry,
     Filesystem,
     FilesystemEntry,
     VirtualDirectory,
@@ -26,6 +25,10 @@ from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.target.filesystem import (
+        DirEntry,
+    )
 
 
 log = get_logger(__name__)
@@ -54,14 +57,13 @@ class ZipFilesystem(Filesystem):
         self.zip = zipfile.ZipFile(fh, mode="r")
         self.base = base or ""
 
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
+        self._fs = VirtualFilesystem(sep=self.sep, altsep=self.altsep, case_sensitive=self.case_sensitive)
 
         for member in self.zip.infolist():
-            mname = member.filename.strip("/")
-            if not mname.startswith(self.base) or mname == ".":
+            if not member.filename.startswith(self.base) or member.filename in (".", "./"):
                 continue
 
-            rel_name = self._resolve_path(mname)
+            rel_name = self._resolve_path(member.filename).strip("/")
             self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
 
     @staticmethod
@@ -70,7 +72,7 @@ class ZipFilesystem(Filesystem):
         return zipfile.is_zipfile(fh)
 
     def _resolve_path(self, path: str) -> str:
-        return fsutil.normpath(path[len(self.base) :], alt_separator=self.alt_separator)
+        return fsutil.normpath(path.removeprefix(self.base), sep=self.sep)
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""

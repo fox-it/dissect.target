@@ -18,6 +18,8 @@ from dissect.target.helpers.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from impacket.smbconnection import SMBConnection
+
 try:
     from impacket.nt_errors import STATUS_NOT_A_DIRECTORY
     from impacket.smb import ATTR_DIRECTORY, SharedFile
@@ -28,7 +30,7 @@ try:
         FILE_READ_DATA,
         FILE_SHARE_READ,
     )
-    from impacket.smbconnection import SessionError, SMBConnection
+    from impacket.smbconnection import SessionError
 
     HAS_IMPACKET = True
 except ImportError:
@@ -44,7 +46,7 @@ class SmbFilesystem(Filesystem):
     __type__ = "smb"
 
     def __init__(self, conn: SMBConnection, share_name: str, *args, **kwargs):
-        super().__init__(None, *args, **kwargs, alt_separator="\\", case_sensitive=False)
+        super().__init__(None, *args, **kwargs, sep="\\", case_sensitive=False)
 
         if not HAS_IMPACKET:
             raise ImportError(
@@ -61,7 +63,7 @@ class SmbFilesystem(Filesystem):
 
     def get(self, path: str) -> FilesystemEntry:
         """Returns a SmbFilesystemEntry object corresponding to the given path."""
-        path = fsutil.normalize(path, self.alt_separator)
+        path = fsutil.normalize(path, sep=self.sep)
         return SmbFilesystemEntry(self, path, self._get_entry(path))
 
     def _get_entry(self, path: str) -> SharedFile:
@@ -112,13 +114,13 @@ class SmbFilesystemEntry(FilesystemEntry):
     entry: SharedFile
 
     def get(self, path: str) -> FilesystemEntry:
-        return self.fs.get(fsutil.join(self.path, path, alt_separator=self.fs.alt_separator))
+        return self.fs.get(fsutil.join(self.path, path, sep=self.fs.sep))
 
     def scandir(self) -> Iterator[SmbDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        path = fsutil.join(self.path, "*", alt_separator=self.fs.alt_separator)
+        path = fsutil.join(self.path, "*", sep=self.fs.sep)
         try:
             entry: SharedFile
             for entry in self.fs.conn.listPath(self.fs.share_name, path):
@@ -161,7 +163,7 @@ class SmbFilesystemEntry(FilesystemEntry):
         mode = stat.S_IFDIR if self.is_dir() else stat.S_IFREG
         st_info = [
             mode | 0o755,
-            fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),
+            fsutil.generate_addr(self.path, sep=self.fs.sep),
             id(self.fs),
             1,
             0,

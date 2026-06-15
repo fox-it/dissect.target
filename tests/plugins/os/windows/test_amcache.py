@@ -8,7 +8,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
 from dissect.target.plugins.os.windows.log.amcache import AmcacheInstallPlugin
 from tests._utils import absolute_path
@@ -175,6 +174,54 @@ def test_parse_inventory_application_file(
         call_kwargs = mock_record.call_args.kwargs
 
         assert call_kwargs.get("digest", None) == (None, expected_file_id, None)
+
+
+def mock_read_key_subkeys_bad_link_date(self: AmcachePlugin, key: str) -> Iterator[Mock]:
+    base_values = {
+        "AppxPackageFullName": "Microsoft.Microsoft3DViewer_7.2105.4012.0_x64__8wekyb3d8bbwe",
+        "AppxPackageRelativeId": "Microsoft.Microsoft3DViewer",
+        "BinFileVersion": "7.2105.4012.0",
+        "BinProductVersion": "7.2105.4012.0",
+        "BinaryType": "pe64_amd64",
+        "Language": 0,
+        "LinkDate": "7.2105.4012.0",
+        "LongPathHash": "3dviewer.exe|40f275349895ac70",
+        "LowerCaseLongPath": "c:\\program files\\windowsapps\\microsoft.0_x64__8wekyb3d8bbwe\\3dviewer.exe",
+        "Name": "3DViewer.exe",
+        "OriginalFileName": "3dviewer.exe",
+        "ProductName": "view 3d",
+        "ProductVersion": "7.2105.4012.0",
+        "ProgramId": "0000df892556c2f7a6b7fa69f7009b5c08cb00000904",
+        "Publisher": "microsoft corporation",
+        "Size": 19456,
+        "Usn": 32259776,
+        "Version": "7.2105.4012.0",
+        "FileId": "00008e01cdeb9a1c23cee421a647f29c45f67623be97",
+    }
+
+    mock_values = []
+    for key, value in base_values.items():
+        mock_value = Mock()
+        mock_value.name = key
+        mock_value.value = value
+        mock_values.append(mock_value)
+
+    mock_entry = Mock()
+    mock_entry.timestamp = datetime.datetime(2021, 12, 31, tzinfo=datetime.timezone.utc)
+    mock_entry.values = Mock(return_value=mock_values)
+
+    yield mock_entry
+
+
+@patch.object(AmcachePlugin, "read_key_subkeys", mock_read_key_subkeys_bad_link_date)
+def test_parse_inventory_application_file_bad_link_date(target_win: Target) -> None:
+    with patch("dissect.target.plugins.os.windows.amcache.ApplicationFileAppcompatRecord") as mock_record:
+        amcache_plugin = AmcachePlugin(target_win)
+        list(amcache_plugin.parse_inventory_application_file())
+
+        call_kwargs = mock_record.call_args.kwargs
+        assert call_kwargs["link_date"] is None
+        assert call_kwargs["name"] == "3DViewer.exe"
 
 
 def test_amcache_install_entry(target_win: Target) -> None:

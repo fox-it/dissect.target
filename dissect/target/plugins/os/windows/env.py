@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 EnvironmentRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/environment",
     [
@@ -264,7 +265,7 @@ class EnvironmentVariablePlugin(Plugin):
         return env_vars
 
     def _get_system_env_vars(self) -> OrderedDict[str, str]:
-        """Get the system environment variables
+        """Get the system environment variables.
 
         An OrderedDict is returned with the variable names as the keys and the
         variable values as the values. The values ARE expanded with the values

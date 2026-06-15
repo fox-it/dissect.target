@@ -11,8 +11,6 @@ from flow.record.fieldtypes import digest
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import (
-    UnixUserRecord,
-    WindowsUserRecord,
     create_extended_descriptor,
 )
 from dissect.target.plugin import alias, export
@@ -22,6 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.helpers.record import WindowsUserRecord
     from dissect.target.target import Target
 
 # Thanks to @Nordgaren, @daddycocoaman, @JustArion and @ogmini for their suggestions and feedback in the PR
@@ -30,25 +29,25 @@ if TYPE_CHECKING:
 
 windowstab_def = """
 struct file_header {
-    char        magic[2]; // NP
-    uleb128     updateNumber; // increases on every settings update when fileType=9,
-                              // doesn't seem to change on fileType 0 or 1
-    uleb128     fileType; // 0 if unsaved, 1 if saved, 9 if contains settings?
+    char        magic[2];                       // b"NP"
+    uleb128     updateNumber;                   // increases on every settings update when fileType=9,
+                                                // doesn't seem to change on fileType 0 or 1
+    uleb128     fileType;                       // 0 if unsaved, 1 if saved, 9 if contains settings?
 }
 
 struct tab_header_saved {
     uleb128     filePathLength;
     wchar       filePath[filePathLength];
-    uleb128     fileSize; // likely similar to fixedSizeBlockLength
+    uleb128     fileSize;                       // likely similar to fixedSizeBlockLength
     uleb128     encoding;
     uleb128     carriageReturnType;
-    uleb128     timestamp; // Windows Filetime format (not unix timestamp)
+    uleb128     timestamp;                      // Windows Filetime format (not unix timestamp)
     char        sha256[32];
     char        unk0;
     char        unk1;
     uleb128     fixedSizeBlockLength;
     uleb128     fixedSizeBlockLengthDuplicate;
-    uint8       wordWrap; // 1 if wordwrap enabled, 0 if disabled
+    uint8       wordWrap;                       // 1 if wordwrap enabled, 0 if disabled
     uint8       rightToLeft;
     uint8       showUnicode;
     uint8       optionsVersion;
@@ -56,9 +55,9 @@ struct tab_header_saved {
 
 struct tab_header_unsaved {
     char        unk0;
-    uleb128     fixedSizeBlockLength; // will always be 00 when unsaved because size is not yet known
-    uleb128     fixedSizeBlockLengthDuplicate; // will always be 00 when unsaved because size is not yet known
-    uint8       wordWrap; // 1 if wordwrap enabled, 0 if disabled
+    uleb128     fixedSizeBlockLength;           // will always be 00 when unsaved because size is not yet known
+    uleb128     fixedSizeBlockLengthDuplicate;  // will always be 00 when unsaved because size is not yet known
+    uint8       wordWrap;                       // 1 if wordwrap enabled, 0 if disabled
     uint8       rightToLeft;
     uint8       showUnicode;
     uint8       optionsVersion;
@@ -90,10 +89,18 @@ struct options_v1 {
 };
 
 struct options_v2 {
-    uleb128     unk1; // likely autocorrect or spellcheck
-    uleb128     unk2; // likely autocorrect or spellcheck
+    uleb128     unk1;                           // likely autocorrect or spellcheck
+    uleb128     unk2;                           // likely autocorrect or spellcheck
+};
+
+struct options_v3 {
+    uleb128     unk1;
+    uleb128     unk2;
+    uleb128     formatting;                     // 1=unformatted, 2=markdown formatted, 3=markdown syntax
 };
 """
+c_windowstab = cstruct().load(windowstab_def)
+
 
 GENERIC_TAB_CONTENTS_RECORD_FIELDS = [
     ("string", "content"),
@@ -103,20 +110,21 @@ GENERIC_TAB_CONTENTS_RECORD_FIELDS = [
 
 WindowsNotepadUnsavedTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "application/editor/windowsnotepad/tab/unsaved",
-    COMMON_EDITOR_FIELDS + GENERIC_TAB_CONTENTS_RECORD_FIELDS,
+    [
+        *COMMON_EDITOR_FIELDS,
+        *GENERIC_TAB_CONTENTS_RECORD_FIELDS,
+    ],
 )
 
 WindowsNotepadSavedTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "application/editor/windowsnotepad/tab/saved",
-    COMMON_EDITOR_FIELDS
-    + GENERIC_TAB_CONTENTS_RECORD_FIELDS
-    + [
+    [
+        *COMMON_EDITOR_FIELDS,
+        *GENERIC_TAB_CONTENTS_RECORD_FIELDS,
         ("digest", "digest"),
         ("path", "saved_path"),
     ],
 )
-
-c_windowstab = cstruct().load(windowstab_def)
 
 
 def _calc_crc32(data: bytes) -> bytes:
@@ -137,7 +145,7 @@ class WindowsNotepadTab:
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__} saved={self.is_saved} "
-            f"content_size={len(self.content)} has_deleted_content={self.deleted_content is not None}>"
+            f"content_size={len(self.content) if self.content else None} has_deleted_content={self.deleted_content is not None}>"  # noqa: E501
         )
 
     def _process_tab_file(self) -> None:
@@ -160,17 +168,20 @@ class WindowsNotepadTab:
             # that is parsed, so just going with the 'optionsVersion' type for now.
             # We don't use the options, but since they are required for the CRC32 checksum
             # we store the byte representation
-            if self.tab_header.optionsVersion == 0:
+            options_version = self.tab_header.optionsVersion
+            if options_version == 0:
                 # No options specified
                 self.options = b""
-            elif self.tab_header.optionsVersion == 1:
+            elif options_version == 1:
                 self.options = c_windowstab.options_v1(fh).dumps()
-            elif self.tab_header.optionsVersion == 2:
+            elif options_version == 2:
                 self.options = c_windowstab.options_v2(fh).dumps()
+            elif options_version == 3:
+                self.options = c_windowstab.options_v3(fh).dumps()
             else:
                 # Raise an error, since we don't know how many bytes future optionVersions will occupy.
                 # Now knowing how many bytes to parse can mess up the alignment and structs.
-                raise NotImplementedError("Unknown Windows Notepad tab option version")
+                raise NotImplementedError(f"Unknown Windows Notepad tab option version {options_version!r}")
 
             # If the file is not saved to disk and no fixedSizeBlockLength is present, an extra checksum stub
             # is present. So parse that first
@@ -271,7 +282,7 @@ class WindowsNotepadTab:
                 self.content += text
 
         # Set None if no deleted content was found
-        self.deleted_content = deleted_content if deleted_content else None
+        self.deleted_content = deleted_content or None
 
 
 class WindowsNotepadPlugin(EditorPlugin):
@@ -283,7 +294,7 @@ class WindowsNotepadPlugin(EditorPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.users_tabs: set[TargetPath, UnixUserRecord | WindowsUserRecord] = set()
+        self.users_tabs: set[tuple[TargetPath, WindowsUserRecord]] = set()
         for user_details in self.target.user_details.all_with_home():
             for tab_file in user_details.home_path.glob(self.GLOB):
                 # These files contain information on different settings / configurations, and are skipped for now.
@@ -334,7 +345,9 @@ class WindowsNotepadPlugin(EditorPlugin):
                     content=tab.content,
                     path=tab.file,
                     deleted_content=tab.deleted_content,
-                    digest=digest((None, None, tab.tab_header.sha256.hex())),
+                    digest=digest((None, None, tab.tab_header.sha256.hex()))
+                    if tab.tab_header.sha256 != 32 * b"\x00"
+                    else None,
                     saved_path=tab.tab_header.filePath,
                     source=file,
                     _user=user,

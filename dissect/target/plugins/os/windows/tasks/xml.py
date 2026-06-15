@@ -89,9 +89,9 @@ def str_to_bool(string_to_convert: str) -> bool | None:
         return None
 
     string_to_convert_lower = string_to_convert.strip().lower()
-    if string_to_convert_lower == "true":
+    if string_to_convert_lower in ("true", "1"):
         return True
-    if string_to_convert_lower == "false":
+    if string_to_convert_lower in ("false", "0"):
         return False
 
     raise ValueError(f"Invalid boolean string: '{string_to_convert}' (expected 'true' or 'false')")
