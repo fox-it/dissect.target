@@ -36,7 +36,11 @@ class VeraCryptVolumeSystem(EncryptedVolumeSystem):
 
     def __init__(self, fh: BinaryIO | Volume, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
-        self.veracrypt = VeraCrypt(fh.disk if isinstance(fh, Volume) else fh, is_system=True)
+
+        if is_system := is_system_volume(fh):
+            fh = fh.disk
+
+        self.veracrypt = VeraCrypt(fh, is_system=is_system)
 
     @staticmethod
     def _detect(fh: BinaryIO | Volume) -> bool:
@@ -63,11 +67,7 @@ class VeraCryptVolumeSystem(EncryptedVolumeSystem):
                 "name": None,
             }
 
-        try:
-            stream = self.unlock_volume()
-        except VeraCryptVolumeSystemError:
-            return
-
+        stream = self.unlock_volume()
         yield Volume(
             fh=stream,
             size=stream.size,
@@ -117,3 +117,46 @@ class VeraCryptVolumeSystem(EncryptedVolumeSystem):
             return self.veracrypt.open()
 
         raise VeraCryptVolumeSystemError("Failed to unlock VeraCrypt volume")
+
+
+def is_system_volume(fh: BinaryIO | Volume) -> bool:
+    """Using some heuristics we attempt to detect if this file handle is an encrypted *system* volume or not.
+
+    This will might produce unexpected results for custom partitioning schemes.
+
+    By default a Windows GPT disk will have the following volumes:
+        - EFI partition (100 MB >)
+        - Reserved partition (MSR) (16 MB)
+        - Sysvol partition
+        - Recovery partition (WinRE) (750 MB >)
+
+    A Windows MBR disk will have the following volumes:
+        - Boot partition (100 MB)
+        - System partition
+        - Recovery partition (WinRE) (750 MB >)
+
+    We check if the preceding volumes look like a reserved partition and an EFI partition. If so, this is
+    likely the system volume.
+
+    For performance reasons we do not attempt to load the uninitialized filesystems of these partitions.
+    A future version could check if the last partition of the disk is the WinRE partition, as that seems
+    to be a requirement for recent Windows versions.
+    """
+    if not isinstance(fh, Volume):
+        return False
+
+    index = fh.vs.volumes.index(fh)
+
+    # If there is not at least one preceding volume on this disk (EFI or EFI and MSR),
+    # this is likely not a system partition.
+    if index < 1 or len(fh.vs.volumes) < 3:
+        return False
+
+    # The preceding volume can either be the MSR (on GPT disks) or boot partition (on MBR disks).
+    preceding_volume = fh.vs.volumes[index - 1]
+    approx_16mb = range(15 * 1024 * 1024, 17 * 1024 * 1024)
+    approx_100mb = range(99 * 1024 * 1024, 101 * 1024 * 1024)
+
+    return (preceding_volume.name == "Microsoft reserved partition" and preceding_volume.size in approx_16mb) or (
+        preceding_volume.name == "Basic data partition" and preceding_volume.size in approx_100mb
+    )
