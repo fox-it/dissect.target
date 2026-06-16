@@ -172,7 +172,6 @@ def test_detect_buffer(file: str, tmp_path: Path) -> None:
 
 def test_skip_folder_member_if_previously_mapped() -> None:
     """Test if we skip a directory tar member if the path of said directory is already mapped."""
-
     path = absolute_path("_data/loaders/tar/test-dir.tar")
     loader = loader_open(path)
     target = Target()
