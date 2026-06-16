@@ -69,7 +69,9 @@ class _OverrideRequiredAction(argparse.Action):
 
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
-    parser.add_argument("-Kv", "--keychain-value", action="append", help="passphrase, recovery key or key file path value")
+    parser.add_argument(
+        "-Kv", "--keychain-value", action="append", help="passphrase, recovery key or key file path value"
+    )
     parser.add_argument("-L", "--loader", help="select a specific loader (i.e. vmx, raw)")
     parser.add_argument("--child", help="load child of target by path of index (see --list-children)")
     parser.add_argument("--children", action="store_true", help="include children (depth=1 or use --recursive)")
