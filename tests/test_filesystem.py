@@ -1335,3 +1335,24 @@ def test_filesystem_identifier_string_when_no_guid_or_name() -> None:
     fs.volume.name = None
 
     assert fs.identifier == repr(fs)
+
+
+def test_filesystem_clobber_behavior(tmp_path: Path) -> None:
+    """Test if we skip a direntry if the path of said direntry is already mapped."""
+    fs = VirtualFilesystem()
+    fs.map_file_fh("folder/file", BytesIO(b"file contents"))
+
+    fs.makedirs("folder")
+    assert fs.exists("folder/file")
+
+    tmp_path.joinpath("file").write_bytes(b"tmp duplicate")
+    with pytest.raises(KeyError, match="Entry 'file' already exists in <VirtualDirectory 'folder'>"):
+        fs.map_dir("folder", tmp_path)
+
+    with pytest.raises(KeyError, match="Entry 'file' already exists in <VirtualDirectory 'folder'>"):
+        fs.map_file_fh("folder/file", BytesIO(b"duplicate file"))
+
+    assert fs.path("folder/file").read_text() == "file contents"
+
+    fs.map_file_fh("folder/file", BytesIO(b"duplicate file"), clobber=True)
+    assert fs.path("folder/file").read_text() == "duplicate file"
