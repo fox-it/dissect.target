@@ -77,7 +77,6 @@ class LoginWindowPlugin(Plugin):
     SYSTEM_LOGIN_WINDOW_PATHS = (
         "/Library/Preferences/com.apple.loginwindow.plist",
         "/var/root/Library/Preferences/com.apple.loginwindow.plist",
-        "/private/var/root/Library/Preferences/com.apple.loginwindow.plist",
     )
 
     USER_LOGIN_WINDOW_PATHS = (
