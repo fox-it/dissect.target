@@ -64,7 +64,10 @@ class ZipFilesystem(Filesystem):
                 continue
 
             rel_name = self._resolve_path(member.filename).strip("/")
-            self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
+            try:
+                self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
+            except KeyError as e:
+                log.debug("Skipping directory member %r in zip as %r is already mapped: %s", member, rel_name, e)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
