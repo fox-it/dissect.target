@@ -39,4 +39,4 @@ def test_snap_packages(target_unix_users: Target, fs_unix: VirtualFilesystem) ->
     assert results[0].version == "129.0.2-1"
     assert results[0].author is None
     assert results[0].type is None
-    assert results[0].path == "/var/lib/snapd/snaps/firefox_12345.snap"
+    assert results[0].source == "/var/lib/snapd/snaps/firefox_12345.snap"

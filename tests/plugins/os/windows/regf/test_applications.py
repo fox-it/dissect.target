@@ -84,7 +84,7 @@ def test_windows_applications(target_win_users: Target, hive_hklm: VirtualHive) 
     assert results[1].version == "122.0.6261.95"
     assert results[1].author == "Google LLC"
     assert results[1].type == "user"
-    assert results[1].path == "C:\\Users\\user\\Desktop\\GoogleChromeEnterpriseBundle64\\Installers\\"
+    assert results[1].source == "C:\\Users\\user\\Desktop\\GoogleChromeEnterpriseBundle64\\Installers\\"
 
     assert results[2].ts_installed == datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc)
     assert results[2].name == "Microsoft Visual C++ 2022 X64 Minimum Runtime - 14.36.32532"
@@ -92,7 +92,7 @@ def test_windows_applications(target_win_users: Target, hive_hklm: VirtualHive) 
     assert results[2].author == "Microsoft Corporation"
     assert results[2].type == "system"
     assert (
-        results[2].path
+        results[2].source
         == "C:\\ProgramData\\Package Cache\\{D5D19E2F-7189-42FE-8103-92CD1FA457C2}v14.36.32532\\packages\\vcRuntimeMinimum_amd64\\"  # noqa: E501
     )
 
@@ -101,4 +101,4 @@ def test_windows_applications(target_win_users: Target, hive_hklm: VirtualHive) 
     assert results[3].version == "123.0.1"
     assert results[3].author == "Mozilla"
     assert results[3].type == "user"
-    assert results[3].path == "C:\\Program Files\\Mozilla Firefox\\firefox.exe,0"
+    assert results[3].source == "C:\\Program Files\\Mozilla Firefox\\firefox.exe,0"
