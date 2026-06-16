@@ -31,7 +31,7 @@ def test_stat_information() -> None:
 
     entry.inode = c_ext.ext4_inode(BytesIO(inode_bytes))
 
-    fs_entry = ExtFilesystemEntry(Mock(), "some/path", entry)
+    fs_entry = ExtFilesystemEntry(Mock(sep="/"), "some/path", entry)
 
     stat_info = fs_entry.lstat()
 

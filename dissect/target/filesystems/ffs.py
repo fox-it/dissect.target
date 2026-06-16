@@ -69,7 +69,7 @@ class FfsFilesystemEntry(FilesystemEntry):
     entry: ffs.INode
 
     def get(self, path: str) -> FilesystemEntry:
-        entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        entry_path = fsutil.join(self.path, path, sep=self.fs.sep)
         entry = self.fs._get_node(path, self.entry)
         return FfsFilesystemEntry(self.fs, entry_path, entry)
 

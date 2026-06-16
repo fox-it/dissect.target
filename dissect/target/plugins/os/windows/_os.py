@@ -46,7 +46,7 @@ class WindowsPlugin(OSPlugin):
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.case_sensitive = False
-        target.fs.alt_separator = "\\"
+        target.fs.sep = "\\"
         target.fs.mount("sysvol", sysvol)
 
         # Mount EFI
@@ -58,7 +58,7 @@ class WindowsPlugin(OSPlugin):
         # Mount WinRE
         if not sysvol.exists("winre/Recovery/WindowsRE"):
             for fs in target.filesystems:
-                if fs.exists("Recovery/WindowsRE"):
+                if fs.exists("Recovery/WindowsRE") and not fs.exists("Windows/System32"):
                     target.fs.mount("winre", fs)
 
         return cls(target)
