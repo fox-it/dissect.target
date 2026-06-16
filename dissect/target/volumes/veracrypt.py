@@ -142,7 +142,7 @@ def is_system_volume(fh: BinaryIO | Volume) -> bool:
     A future version could check if the last partition of the disk is the WinRE partition, as that seems
     to be a requirement for recent Windows versions.
     """
-    if not isinstance(fh, Volume):
+    if not isinstance(fh, Volume) or not fh.vs:
         return False
 
     index = fh.vs.volumes.index(fh)
