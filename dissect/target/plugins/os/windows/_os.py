@@ -58,7 +58,7 @@ class WindowsPlugin(OSPlugin):
         # Mount WinRE
         if not sysvol.exists("winre/Recovery/WindowsRE"):
             for fs in target.filesystems:
-                if fs.exists("Recovery/WindowsRE"):
+                if fs.exists("Recovery/WindowsRE") and not fs.exists("Windows/System32"):
                     target.fs.mount("winre", fs)
 
         return cls(target)
