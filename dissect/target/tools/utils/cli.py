@@ -567,7 +567,7 @@ def args_to_uri(target: str | Path, loader: str | type[Loader], args: list[str] 
     )
     for load_arg in getattr(loader_cls, "__args__", []):
         arg_opts, arg_kwargs = load_arg
-        kw = dict(arg_kwargs)
+        kw = dict(arg_kwargs)  # Defensive copy to avoid mutating the loader class
         # If no explicit dest provided, prefer the long option string as dest
         if "dest" not in kw:
             long_opts = [o for o in arg_opts if o.startswith("--")]
