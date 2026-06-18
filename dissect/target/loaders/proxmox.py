@@ -39,10 +39,10 @@ class ProxmoxLoader(Loader):
     def map(self, target: Target) -> None:
         with self.path.open("rt") as fh:
             for line in fh:
-                if not (line := line.strip()):
+                if not (line := line.strip()) or line.startswith("#"):
                     continue
 
-                key, value = line.split(":", 1)
+                key, _, value = line.partition(":")
                 value = value.strip()
 
                 # https://pve.proxmox.com/wiki/Storage
