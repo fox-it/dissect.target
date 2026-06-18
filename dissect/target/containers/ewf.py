@@ -58,5 +58,8 @@ class EwfContainer(Container):
         return self._stream.tell()
 
     def close(self) -> None:
-        self._stream.close()
-        self.ewf.close()
+        if hasattr(self, "_stream") and not self._stream.closed:
+            self._stream.close()
+
+        if hasattr(self, "ewf"):
+            self.ewf.close()
