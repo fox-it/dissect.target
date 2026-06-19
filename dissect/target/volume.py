@@ -31,6 +31,8 @@ bde = import_lazy("dissect.target.volumes.bde")
 """A lazy import of :mod:`dissect.target.volumes.bde`."""
 luks = import_lazy("dissect.target.volumes.luks")
 """A lazy import of :mod:`dissect.target.volumes.luks`."""
+veracrypt = import_lazy("dissect.target.volumes.veracrypt")
+"""A lazy import of :mod:`dissect.target.volumes.veracrypt`."""
 
 
 log = get_logger(__name__)
@@ -43,7 +45,11 @@ LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [
     ddf.DdfVolumeSystem,
 ]
 """All available :class:`LogicalVolumeSystem` classes."""
-ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem, luks.LUKSVolumeSystem]
+ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [
+    bde.BitlockerVolumeSystem,
+    luks.LUKSVolumeSystem,
+    veracrypt.VeraCryptVolumeSystem,
+]
 """All available :class:`EncryptedVolumeSystem` classes."""
 
 
