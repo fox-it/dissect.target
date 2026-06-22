@@ -281,6 +281,18 @@ class WindowsPlugin(OSPlugin):
         except RegistryError:
             pass
 
+    @export(property=True)
+    def device(self) -> str | None:
+        """Returns OEM information for this Windows system."""
+        key = "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation"
+        try:
+            key = self.target.registry.key(key)
+            manufacturer = key.value("Manufacturer").value or ""
+            model = key.value("Model").value or ""
+            return f"{manufacturer} {model}".strip()
+        except RegistryError:
+            pass
+
     @cached_property
     def _sam_by_sid(self) -> dict[str, SamRecord]:
         if not (machine_sid := next(self.target.machine_sid(), None)):
