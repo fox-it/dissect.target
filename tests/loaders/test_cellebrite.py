@@ -23,23 +23,23 @@ if TYPE_CHECKING:
 )
 def test_target_open(opener: Callable[[str | Path], Target]) -> None:
     """Test that we correctly use ``CellebriteLoader`` when opening a ``Target``."""
-    path = absolute_path("_data/loaders/cellebrite/EvidenceCollection.ufdx")
+    path = absolute_path("_data/loaders/cellebrite/ios/EvidenceCollection.ufdx")
 
     target = opener(path)
     assert isinstance(target._loader, CellebriteLoader)
     assert target.path == path
 
 
-def test_loader() -> None:
+def test_loader_ios() -> None:
     """Test if we correctly detect and load a Cellebrite UFDX FFS zip extraction from DigitalCorpora (``iOS_17``).
 
     The content of the ``EXTRACTION_FFS.zip`` file has been replaced with a minimal linux folder structure
     for performance reasons.
 
     References:
-        - https://corp.digitalcorpora.org/corpora/iOS17/
+        - https://digitalcorpora.s3.amazonaws.com/s3_browser.html#corpora/mobile/iOS17/
     """
-    path = absolute_path("_data/loaders/cellebrite/EvidenceCollection.ufdx")
+    path = absolute_path("_data/loaders/cellebrite/ios/EvidenceCollection.ufdx")
 
     loader = loader_open(path)
     assert isinstance(loader, CellebriteLoader)
@@ -85,3 +85,35 @@ def test_loader() -> None:
 
     assert t.os == "linux"
     assert t.hostname == "example"
+
+
+def test_loader_android() -> None:
+    """Test if we correctly detect and load a Cellebrite UFDX FFS zip extraction from DigitalCorpora (``android_14``).
+
+    The content of ``EXTRACTION_FFS.zip`` has been replaced with a minimal folder structure for performance reasons.
+
+    References:
+        - https://digitalcorpora.s3.amazonaws.com/s3_browser.html#corpora/mobile/android_14/
+    """
+    path = absolute_path("_data/loaders/cellebrite/android/EvidenceCollection.ufdx")
+
+    loader = loader_open(path)
+    assert isinstance(loader, CellebriteLoader)
+
+    t = Target()
+    loader.map(t)
+    t.apply()
+
+    assert len(t.filesystems) == 1
+    assert isinstance(t.filesystems[0], CellebriteFilesystem)
+
+    assert sorted(map(str, t.fs.path("/").iterdir())) == [
+        "/$fs$",
+        "/data",
+        "/product",
+        "/system",
+        "/vendor",
+    ]
+
+    assert t.os == "android"
+    assert t.hostname == "abfarm-release-rbe-32-2004-00109"

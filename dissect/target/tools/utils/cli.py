@@ -69,7 +69,9 @@ class _OverrideRequiredAction(argparse.Action):
 
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
-    parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
+    parser.add_argument(
+        "-Kv", "--keychain-value", action="append", help="passphrase, recovery key or key file path value"
+    )
     parser.add_argument("-L", "--loader", help="select a specific loader (i.e. vmx, raw)")
     parser.add_argument("--child", help="load child of target by path of index (see --list-children)")
     parser.add_argument("--children", action="store_true", help="include children (depth=1 or use --recursive)")
@@ -123,7 +125,8 @@ def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Na
         keychain.register_keychain_file(args.keychain_file)
 
     if args.keychain_value:
-        keychain.register_wildcard_value(args.keychain_value)
+        for value in args.keychain_value:
+            keychain.register_wildcard_value(value)
 
     paths = get_external_module_paths(args.plugin_path or [])
     load_modules_from_paths(paths)
