@@ -23,8 +23,13 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from pathlib import Path, PurePosixPath
+from pprint import pprint
 from tarfile import BLKTYPE, CHRTYPE, DIRTYPE, FIFOTYPE, LNKTYPE, REGTYPE, SYMTYPE
 from typing import TYPE_CHECKING, Any, BinaryIO, ClassVar, TextIO
+
+from defusedxml import ElementTree
+
+from dissect.target.plugins.os.unix.linux.android.util.abx import AbxFile
 
 try:
     # Allow disabling prompt_toolkit via environment variable
@@ -1501,6 +1506,22 @@ class TargetCli(TargetCmd):
                     print(fh.read(args.length).hex(), file=stdout)
                 else:
                     print(hexdump(fh.read(args.length), output="string", pretty=True), file=stdout)
+
+        return False
+
+    @arg("path", type=TargetPathArgument)
+    def cmd_abx(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Print the contents of an Android ABX file."""
+        paths = list(self.resolve_glob_path(args.path))
+        for path in paths:
+            if len(paths) > 1:
+                print(path)
+            try:
+                abx = AbxFile(path, to_str=True)
+                pprint(ElementTree.tostring(abx.tree.getroot()).decode(), stream=stdout)
+            except ValueError as e:
+                print(f"Failed to parse file {path}: {e}")
+                continue
 
         return False
 
