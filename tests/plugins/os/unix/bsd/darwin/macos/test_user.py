@@ -21,4 +21,4 @@ def test_unix_bsd_darwin_macos_user(target_macos_users: Target) -> None:
     assert results[0].failed_login_time is None
     assert results[0].failed_login_count is None
     assert results[0].generateduid == "BD6AC542-F7BE-1337-B2DB-30F9EE37E133"
-    assert results[0].source == "/var/db/dslocal/nodes/Default/users/_dissect.plist"
+    assert results[0].source == "/private/var/db/dslocal/nodes/Default/users/_dissect.plist"

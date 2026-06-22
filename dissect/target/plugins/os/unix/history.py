@@ -46,6 +46,7 @@ class CommandHistoryPlugin(Plugin):
         ("python", ".python_history"),
         ("sqlite", ".sqlite_history"),
         ("zsh", ".zsh_history"),
+        ("zsh", ".zsh_sessions/*.history"),
         ("ash", ".ash_history"),
         ("dissect", ".dissect_history"),  # wow so meta
     )
@@ -63,9 +64,19 @@ class CommandHistoryPlugin(Plugin):
         history_files = []
         for user_details in self.target.user_details.all_with_home():
             for shell, history_relative_path in self.COMMAND_HISTORY_RELATIVE_PATHS:
-                history_path = user_details.home_path.joinpath(history_relative_path)
-                if history_path.is_file():
-                    history_files.append((shell, history_path, user_details.user))
+                if "*" in history_relative_path:
+                    base, _, glob = history_relative_path.partition("*")
+                    history_dir = user_details.home_path.joinpath(base)
+                    if history_dir.is_dir():
+                        history_files.extend(
+                            (shell, history_path, user_details.user)
+                            for history_path in history_dir.glob(f"*{glob}")
+                            if history_path.is_file()
+                        )
+                else:
+                    history_path = user_details.home_path.joinpath(history_relative_path)
+                    if history_path.is_file():
+                        history_files.append((shell, history_path, user_details.user))
         return history_files
 
     @alias("bashhistory")

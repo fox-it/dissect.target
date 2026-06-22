@@ -30,7 +30,7 @@ class UserPlugin(Plugin):
     # TODO: Parse additional user data like: HeimdalSRPKey, KerberosKeys, ShadowHashData, LinkedIdentity,
     # inputSources, smartCardSecureTokenData, smartCardSecureTokenUUID, unlockOptions, smb_sid
 
-    USER_PATH = "/var/db/dslocal/nodes/Default/users"
+    USER_PATH = "/private/var/db/dslocal/nodes/Default/users"
 
     def check_compatible(self) -> None:
         if not self.target.fs.path(self.USER_PATH).exists():
