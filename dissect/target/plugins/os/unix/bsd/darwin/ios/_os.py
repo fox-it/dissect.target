@@ -99,7 +99,7 @@ class IOSPlugin(DarwinPlugin):
     def device(self) -> str | None:
         """Return the device name of this Apple machine."""
         # Our first bet is to translate the model identifier to a model name.
-        if (model_id := self._config.SYSTEM.get("Model")):
+        if model_id := self._config.SYSTEM.get("Model"):
             model, _ = MODELS.get(model_id, (None, None))
 
         # Fallback to the device type from ``ProductName`` (e.g. ``iPhone OS```).
