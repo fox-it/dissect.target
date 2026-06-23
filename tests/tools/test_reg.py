@@ -10,6 +10,8 @@ from dissect.target.tools.reg import main as target_reg
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from _pytest.fixtures import FixtureRequest
 
     from dissect.target.filesystem import VirtualFilesystem
@@ -90,3 +92,72 @@ def test_reg_output(
         print(out, err)
         assert expected_output in out or expected_output in err
         assert expected_log in caplog.text
+
+
+def test_reg_export_to_stdout(
+    target_win_reg: Target,
+    capsys: pytest.CaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--export writes a valid .reg file to stdout for the requested key."""
+    key = "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\ComputerName"
+    with patch("dissect.target.Target.open_all", return_value=[target_win_reg]), monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-reg", "foo", "--export", "--key", key])
+        target_reg()
+
+    out, _ = capsys.readouterr()
+    assert out.startswith("Windows Registry Editor Version 5.00")
+    assert f";   {key}" in out
+    assert f"[{key}]" in out
+    assert '"ComputerName"=' in out
+
+
+def test_reg_export_multiple_keys(
+    target_win_reg: Target,
+    capsys: pytest.CaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Multiple -k flags each appear as path comments and key headers in the export."""
+    key1 = "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\ComputerName"
+    key2 = "HKLM\\SYSTEM\\ControlSet001\\Control\\Lsa\\Data"
+    with patch("dissect.target.Target.open_all", return_value=[target_win_reg]), monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-reg", "foo", "--export", "--key", key1, "--key", key2])
+        target_reg()
+
+    out, _ = capsys.readouterr()
+    assert f";   {key1}" in out
+    # key2 shortname should be expanded in the comment
+    assert ";   HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\Data" in out
+    assert f"[{key1}]" in out
+    assert "[HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\Data]" in out
+
+
+def test_reg_export_to_file(
+    target_win_reg: Target,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--export --output writes the .reg file to the given path."""
+    key = "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\ComputerName"
+    output_file = tmp_path / "export.reg"
+    with patch("dissect.target.Target.open_all", return_value=[target_win_reg]), monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-reg", "foo", "--export", "--key", key, "--output", str(output_file)])
+        target_reg()
+
+    content = output_file.read_text(encoding="utf-8")
+    assert content.startswith("Windows Registry Editor Version 5.00")
+    assert f"[{key}]" in content
+    assert '"ComputerName"=' in content
+
+
+def test_reg_export_missing_key(
+    target_win_reg: Target,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--export logs an error for a key that does not exist and continues."""
+    with patch("dissect.target.Target.open_all", return_value=[target_win_reg]), monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-reg", "foo", "--export", "--key", "HKEY_LOCAL_MACHINE\\DOESNOTEXIST"])
+        target_reg()
+
+    assert "does not exist" in caplog.text
