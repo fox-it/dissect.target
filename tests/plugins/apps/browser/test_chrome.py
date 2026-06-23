@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import pytest
@@ -499,3 +500,41 @@ def test_benchmark_chrome_userdirs(
     benchmark(
         lambda: target_win_users.add_plugin(ChromePlugin, check_compatible=True) and list(target_win_users.chrome())
     )
+
+
+def test_chrome_windows_11_cache(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
+    """Test if we can detect and parse Chromium Disk Cache."""
+    fs_win.map_dir_from_tar(
+        "Users/John/AppData/Local/Google/Chrome/User Data/Default/Cache/Cache_Data",
+        absolute_path("_data/plugins/apps/browser/chrome/Windows_Cache_Data.tgz"),
+    )
+
+    records = sorted(target_win_users.chrome.cache(), key=lambda r: r.url)
+    assert len(records) == 18
+
+    assert records[0].ts_created == datetime(2026, 4, 30, 12, 11, 48, 207695, tzinfo=timezone.utc)
+    assert records[0].url == "http://172.16.82.1:8000/"
+    assert records[0].mimetype == "text/html"
+    assert records[0].digest.sha1 == "6e97ee99cb8da5960da3b6f41238a498552a3805"
+    assert (
+        records[0].source == "\\C:\\Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cache\\Cache_Data"
+    )
+    assert records[0].username == "John"
+
+
+def test_chrome_linux_cache(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we can detect and parse Chromium Simple Cache."""
+    fs_unix.map_dir_from_tar(
+        "/root/.config/google-chrome/Default/Cache/Cache_Data",
+        absolute_path("_data/plugins/apps/browser/chrome/Linux_Cache_Data.tgz"),
+    )
+
+    records = sorted(target_unix_users.chrome.cache(), key=lambda r: r.url)
+    assert len(records) == 19
+
+    assert records[0].ts_created
+    assert records[0].url == "http://172.16.82.1:8000/"
+    assert records[0].mimetype == "text/html"
+    assert records[0].digest.sha1 == "6e97ee99cb8da5960da3b6f41238a498552a3805"
+    assert records[0].source == "/root/.config/google-chrome/Default/Cache/Cache_Data/dedf005cc082b363_0"
+    assert records[0].username == "root"

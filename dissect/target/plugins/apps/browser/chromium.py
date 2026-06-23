@@ -5,18 +5,26 @@ import itertools
 import json
 from collections import defaultdict
 from dataclasses import dataclass
+from io import BytesIO
+from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from dissect.cstruct import cstruct
+from dissect.database.chromium.cache import DiskCache, SimpleDiskCache
+from dissect.database.chromium.cache.cache import CacheEntryStore
+from dissect.database.chromium.cache.simple import SimpleCacheFile
 from dissect.database.exception import Error as DBError
 from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
+from dissect.target.helpers import hashutil, magic
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import OperatingSystem, export
+from dissect.target.plugin import OperatingSystem, arg, export
 from dissect.target.plugins.apps.browser.browser import (
+    GENERIC_CACHE_FIELDS,
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
@@ -28,7 +36,6 @@ from dissect.target.plugins.apps.browser.browser import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -83,6 +90,8 @@ DOWNLOAD_STATES = {
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
+    target: Target
+
     DIRS = ()
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -91,6 +100,11 @@ class ChromiumMixin:
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "application/browser/chromium/cookie", GENERIC_COOKIE_FIELDS
+    )
+
+    BrowserCacheRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "application/browser/chromium/cache",
+        GENERIC_CACHE_FIELDS,
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -128,7 +142,12 @@ class ChromiumMixin:
                         users_dirs.add((user_details, cur_dir))
         return users_dirs
 
-    def _iter_db(self, filename: str, subdirs: list[str] | None = None) -> Iterator[tuple[UserDetails, Path, SQLite3]]:
+    def _iter_db(
+        self,
+        filename: str,
+        subdirs: list[str] | None = None,
+        db_type: SQLite3 | DiskCache | SimpleDiskCache = SQLite3,
+    ) -> Iterator[tuple[UserDetails, Path, SQLite3 | DiskCache | SimpleDiskCache]]:
         """Iterate database files of all users.
 
         Args:
@@ -136,7 +155,8 @@ class ChromiumMixin:
             subdirs: Optional list of subdirectory names to iterate for every user directory.
 
         Yields:
-            Tuple of :class:`UserDetails`, :class:`Path` of SQLite3 file and :class:`SQLite3` instance.
+            Tuple of :class:`UserDetails`, :class:`Path` of database file
+            and :class:`SQLite3`, :class:`DiskCache` or :class:`SimpleDiskCache` instance.
         """
         seen = set()
         userdirs = self.userdirs
@@ -150,18 +170,24 @@ class ChromiumMixin:
                 },
             )
 
+        if db_type not in (SQLite3, DiskCache, SimpleDiskCache):
+            raise ValueError(f"Unknown db_type {db_type!r}")
+
         for user, cur_dir in userdirs:
             db_file = cur_dir.joinpath(filename)
+
+            if not db_file.exists():
+                continue
 
             if db_file in seen:
                 continue
             seen.add(db_file)
 
             try:
-                yield user, db_file, SQLite3(db_file)
+                yield user, db_file, db_type(db_file)
             except FileNotFoundError:
                 self.target.log.warning("Could not find %s file: %s", filename, db_file)
-            except DBError as e:
+            except (DBError, ValueError) as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -333,6 +359,50 @@ class ChromiumMixin:
             except DBError as e:
                 self.target.log.warning("Error processing cookie file %s: %s", db_file, e)
                 self.target.log.debug("", exc_info=e)
+
+    @arg("--export", type=Path, help="export cache files to provided directory")
+    def cache(self, browser_name: str | None = None, export: Path | None = None) -> Iterator[BrowserCacheRecord]:
+        """Return browser cache records from supported Chromium-based browsers."""
+        if export:
+            if not export.is_dir():
+                self.target.log.error("Output directory %s does not exist", export)
+                return
+            if list(export.iterdir()):
+                self.target.log.error("Output directory %s is not empty", export)
+                return
+
+        for user, db_file, db in itertools.chain(
+            self._iter_db("Cache/Cache_Data", db_type=DiskCache),
+            self._iter_db("Cache/Cache_Data", db_type=SimpleDiskCache),
+        ):
+            for entry in db.entries():
+                if export:
+                    url_path = urlparse(entry.resource_url).path
+                    file_path = Path(url_path).name
+                    out = export.joinpath(file_path)
+                    print(f"Exporting {file_path} to {out}..", end="")
+                    out.write_bytes(entry.data)
+                    print(" done")
+                    continue
+
+                if isinstance(entry, CacheEntryStore):
+                    ts_created = entry.creation_time
+                    source = db_file
+
+                elif isinstance(entry, SimpleCacheFile):
+                    ts_created = entry.path.stat().st_mtime
+                    source = entry.path
+
+                yield self.BrowserCacheRecord(
+                    ts_created=ts_created,
+                    browser=browser_name,
+                    url=entry.resource_url,
+                    mimetype=magic.from_buffer(entry.data, mime=True),
+                    digest=hashutil.common(BytesIO(entry.data)),
+                    source=source,
+                    _user=user.user,
+                    _target=self.target,
+                )
 
     def downloads(self, browser_name: str | None = None) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from supported Chromium-based browsers.
@@ -721,6 +791,12 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
     def cookies(self) -> Iterator[ChromiumMixin.BrowserCookieRecord]:
         """Return browser cookie records for Chromium browser."""
         yield from super().cookies("chromium")
+
+    @export(record=ChromiumMixin.BrowserCacheRecord)
+    @arg("--export", type=Path, help="export cache files to provided directory")
+    def cache(self, export: Path | None = None) -> Iterator[ChromiumMixin.BrowserCacheRecord]:
+        """Return browser cache records for Chromium browser."""
+        yield from super().cache("chromium", export)
 
     @export(record=ChromiumMixin.BrowserDownloadRecord)
     def downloads(self) -> Iterator[ChromiumMixin.BrowserDownloadRecord]:
