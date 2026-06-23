@@ -322,14 +322,25 @@ def test_list_json(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatc
     }
 
     # regular plugin
-    sam_plugin = get_plugin(output, "sam")
+    sam_plugin = get_plugin(output, "sam.users")
     assert sam_plugin == {
-        "name": "sam",
-        "description": "Dump SAM entries.",
+        "name": "sam.users",
+        "description": "Dump SAM user entries.",
         "output": "record",
         "arguments": [],
         "alias": False,
-        "path": "os.windows.sam.sam",
+        "path": "os.windows.sam.users",
+    }
+
+    # regular plugin
+    sam_plugin = get_plugin(output, "sam.groups")
+    assert sam_plugin == {
+        "name": "sam.groups",
+        "description": "Dump SAM group memberships.",
+        "output": "record",
+        "arguments": [],
+        "alias": False,
+        "path": "os.windows.sam.groups",
     }
 
     # plugin with arguments
