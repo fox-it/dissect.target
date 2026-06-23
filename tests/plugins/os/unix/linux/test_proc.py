@@ -30,6 +30,11 @@ def test_process(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -
     assert environ[0].variable == "VAR"
     assert environ[0].contents == "1"
 
+    fd = list(process.fd())
+    assert "socket" in fd[0].link.name
+    assert fd[0].info["pos"] == "0"
+    assert fd[0].info["flags"] == "00000002"
+
 
 def test_process_not_found(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
@@ -52,6 +57,11 @@ def test_processes(target_linux_users: Target, fs_linux_proc: VirtualFilesystem)
             assert env.variable == "VAR"
             assert env.contents == "1"
 
+        for fd in process.fd():
+            assert "socket" in fd.link.name
+            assert fd.info["pos"] == "0"
+            assert fd.info["flags"] == "00000002"
+
 
 def test_processes_without_boottime(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
@@ -69,6 +79,11 @@ def test_processes_without_boottime(target_linux_users: Target, fs_linux_proc: V
             for env in process.environ():
                 assert env.variable == "VAR"
                 assert env.contents == "1"
+
+            for fd in process.fd():
+                assert "socket" in fd.link.name
+                assert fd.info["pos"] == "0"
+                assert fd.info["flags"] == "00000002"
 
 
 def test_proc_plugin_incompatible(target_linux_users: Target, fs_linux: VirtualFilesystem) -> None:
