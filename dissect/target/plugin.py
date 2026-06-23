@@ -1294,6 +1294,11 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
+    @export(property=True)
+    def device(self) -> str | None:
+        """Return vendor OEM device information (e.g. manufacturer and model) of the target."""
+        raise NotImplementedError
+
 
 class ChildTargetPlugin(Plugin):
     """A Child target is a special plugin that can list more Targets.

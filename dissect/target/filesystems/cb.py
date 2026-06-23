@@ -45,13 +45,13 @@ class CbFilesystem(Filesystem):
         self.prefix = prefix.lower()
 
         if self.session.os_type == OS.WINDOWS:
-            alt_separator = "\\"
+            sep = "\\"
             case_sensitive = False
         else:
-            alt_separator = ""
+            sep = "/"
             case_sensitive = True
 
-        super().__init__(*args, alt_separator=alt_separator, case_sensitive=case_sensitive, **kwargs)
+        super().__init__(*args, sep=sep, case_sensitive=case_sensitive, **kwargs)
 
     @staticmethod
     def detect(fh: BinaryIO) -> bool:
@@ -59,7 +59,7 @@ class CbFilesystem(Filesystem):
 
     def get(self, path: str) -> CbFilesystemEntry:
         """Returns a CbFilesystemEntry object corresponding to the given path."""
-        cbpath = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
+        cbpath = fsutil.normalize(path, sep=self.sep).strip("/")
         if self.session.os_type == OS.WINDOWS:
             cbpath = cbpath.replace("/", "\\")
 
@@ -119,8 +119,7 @@ class CbFilesystemEntry(FilesystemEntry):
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        separator = self.fs.alt_separator or "/"
-        for entry in self.fs.session.list_directory(self.cbpath + separator):
+        for entry in self.fs.session.list_directory(self.cbpath + self.fs.sep):
             if entry["filename"] in (".", ".."):
                 continue
 
@@ -128,7 +127,7 @@ class CbFilesystemEntry(FilesystemEntry):
                 self.fs,
                 self.path,
                 entry["filename"],
-                (entry, separator.join([self.cbpath, entry["filename"]])),
+                (entry, self.fs.sep.join([self.cbpath, entry["filename"]])),
             )
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:

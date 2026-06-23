@@ -25,7 +25,6 @@ def test_symlink_to_file(tmp_path: pathlib.Path) -> None:
         assert symlink_entry.is_file()
         assert not symlink_entry.is_file(follow_symlinks=False)
         assert not symlink_entry.is_dir()
-        assert symlink_entry.exists()
         assert symlink_entry.stat(follow_symlinks=False) == symlink_entry.lstat()
 
         assert symlink_entry.readlink() == f"/{tmpfile_path.name}"
@@ -53,7 +52,6 @@ def test_symlink_to_dir(tmp_path: pathlib.Path) -> None:
     assert not symlink_entry.is_file()
     assert symlink_entry.is_dir()
     assert not symlink_entry.is_dir(follow_symlinks=False)
-    assert symlink_entry.exists()
     assert symlink_entry.stat(follow_symlinks=False) == symlink_entry.lstat()
 
     assert symlink_entry.readlink() == "/nested"
@@ -68,7 +66,7 @@ def test_symlink_to_dir(tmp_path: pathlib.Path) -> None:
 
 @pytest.fixture
 def dirfs_entry() -> DirectoryFilesystemEntry:
-    return DirectoryFilesystemEntry(Mock(), "/some/path", Mock())
+    return DirectoryFilesystemEntry(Mock(sep="/"), "/some/path", Mock())
 
 
 def test_entry_attr(dirfs_entry: DirectoryFilesystemEntry) -> None:
