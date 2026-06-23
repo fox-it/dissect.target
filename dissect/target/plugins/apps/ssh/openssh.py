@@ -27,23 +27,21 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def find_sshd_directory(target: Target) -> TargetPath:
+def find_sshd_directory(target: Target) -> TargetPath | None:
+    """finds which sshd directory exists on a given target, returns None if none exist"""
     SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
 
     for sshd in SSHD_DIRECTORIES:
         if (target_path := target.fs.path(sshd)).exists():
             return target_path
 
-    # A default, so there is no need to check for None
-    return target.fs.path("/etc/ssh/")
+    return None
 
 
 class OpenSSHPlugin(SSHPlugin):
     """OpenSSH plugin."""
 
     __namespace__ = "openssh"
-
-    SSHD_DIRECTORIES = ("/sysvol/ProgramData/ssh", "/etc/ssh")
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -54,14 +52,14 @@ class OpenSSHPlugin(SSHPlugin):
             user_details.home_path.joinpath(".ssh").exists()
             for user_details in self.target.user_details.all_with_home()
         )
-        if not ssh_user_dirs and not self.sshd_directory.exists():
+        if not ssh_user_dirs and not self.sshd_directory:
             raise UnsupportedPluginError("No OpenSSH directories found")
 
     def ssh_directory_globs(self, glob_user: str, glob_sshd: str) -> Iterator[tuple[UserDetails | None, TargetPath]]:
         for user_details in self.target.user_details.all_with_home():
             yield from product([user_details], user_details.home_path.glob(f".ssh/{glob_user}"))
-
-        yield from product([None], self.sshd_directory.glob(glob_sshd))
+        if self.sshd_directory is not None:
+            yield from product([None], self.sshd_directory.glob(glob_sshd))
 
     @export(record=AuthorizedKeysRecord)
     def authorized_keys(self) -> Iterator[AuthorizedKeysRecord]:
