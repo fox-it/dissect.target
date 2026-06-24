@@ -154,6 +154,48 @@ class Environ:
     variable: str
     contents: str
 
+class FileDescriptor:
+    def __init__(self, proc: Path, fd_num: str):
+        self.proc = proc
+        self.number = fd_num
+
+    @property
+    def path(self) -> Path:
+        """The path to the file descriptor symlink."""
+        return self.proc.joinpath(self.number)
+
+    @property
+    def info_path(self) -> Path:
+        """The path to the fdinfo entry."""
+        return self.proc.parent.joinpath("fdinfo", self.number)
+
+    @cached_property
+    def link(self) -> str:
+        """Returns the resolved symlink."""
+        try:
+            return  str(self.path.readlink())
+        except Exception:
+            return "unknown"
+
+    @cached_property
+    def info(self)-> dict[str, str]:
+        """Parsed key-value pairs from fdinfo."""
+        data = {}
+        if not self.info_path.exists():
+            return data
+
+        for line in self.info_path.read_text().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split(None, 1)
+            if len(parts) != 2:
+                continue
+            key, value = parts
+            data[key] = value
+
+        return data
 
 class ProcessStateEnum(StrEnum):
     R = "Running"  # Running
@@ -488,6 +530,15 @@ class ProcProcess:
 
             yield Environ(variable, contents)
 
+    def _parse_fd(self) -> Iterator[FileDescriptor]:
+        """Internal function to parse entries in ``/proc/[pid]/fd/[fd_num]`` and ``/proc/[pid]/fdinfo/[fd_num]``."""
+        if not (fd_path := self.get("fd")).exists():
+            return
+
+        for fd_link in fd_path.iterdir():
+            yield FileDescriptor(fd_path, fd_link.name)
+
+
     @property
     def _boottime(self) -> int | None:
         """Returns the boot time of the system.
@@ -582,6 +633,10 @@ class ProcProcess:
     def environ(self) -> Iterator[Environ]:
         """Yields the content of the environ file associated with the process."""
         yield from self._parse_environ()
+
+    def fd(self) -> Iterator[FileDescriptor]:
+        """Yields the file descriptors associated with the process."""
+        yield from self._parse_fd()
 
     @property
     def uptime(self) -> timedelta:
