@@ -58,18 +58,6 @@ def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
     return ""
 
 
-def get_volume_identifier(fs: NtfsFilesystem) -> str | None:
-    """Return the filesystem GUID or serial, if available."""
-    if fs.volume and (guid := getattr(fs.volume, "guid", None)):
-        return guid
-
-    # Fallback to NTFS serial if volume GUID is not available
-    if fs.ntfs.serial:
-        return str(fs.ntfs.serial)
-
-    return None
-
-
 def get_owner_and_group(entry: MftRecord, fs: NtfsFilesystem) -> tuple[str | None, str | None]:
     owner, group = None, None
     try:
