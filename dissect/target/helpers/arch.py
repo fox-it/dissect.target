@@ -63,11 +63,11 @@ MACHINE_MAP_DARWIN = {
 # Translate the operating system to it's corresponding vendor name.
 # Linux derivatives generally translate to 'unknown', except Android, which translates to 'linux'.
 OS_TO_VENDOR = {
-    OperatingSystem.WINDOWS.value: "pc",
-    OperatingSystem.MACOS.value: "apple",
-    OperatingSystem.OSX.value: "apple",
-    OperatingSystem.IOS.value: "apple",
-    OperatingSystem.ANDROID.value: "linux",  # yes, really..
+    OperatingSystem.WINDOWS: "pc",
+    OperatingSystem.MACOS: "apple",
+    OperatingSystem.OSX: "apple",
+    OperatingSystem.IOS: "apple",
+    OperatingSystem.ANDROID: "linux",  # yes, really..
 }
 
 
@@ -97,12 +97,12 @@ def target_triple(os: str, machine: str | int, bitness: int | None = None, endia
     """
     vendor = OS_TO_VENDOR.get(os, "unknown")
 
-    if os == OperatingSystem.WINDOWS.value:
+    if os == OperatingSystem.WINDOWS:
         if not isinstance(machine, str):
             raise ValueError(f"Unexpected machine type for windows: {machine!r}")
         machine = MACHINE_MAP_WINDOWS.get(machine, machine)
 
-    elif os in (OperatingSystem.MACOS.value, OperatingSystem.OSX.value, OperatingSystem.IOS.value):
+    elif os in (OperatingSystem.MACOS, OperatingSystem.OSX, OperatingSystem.IOS):
         if not isinstance(machine, int):
             raise ValueError(f"Unexpected machine type for darwin: {machine!r}")
         machine = MACHINE_MAP_DARWIN.get(machine, machine)

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
-from dissect.target.plugin import ChildTargetPlugin
+from dissect.target.plugin import ChildTargetPlugin, OperatingSystem
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -16,7 +16,7 @@ class ProxmoxChildTargetPlugin(ChildTargetPlugin):
     __type__ = "proxmox"
 
     def check_compatible(self) -> None:
-        if self.target.os != "proxmox":
+        if self.target.os != OperatingSystem.PROXMOX:
             raise UnsupportedPluginError("Not a Proxmox operating system")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:

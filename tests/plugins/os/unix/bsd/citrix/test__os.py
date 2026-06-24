@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from flow.record.fieldtypes import posix_path
 
+from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ def test_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
 
     target_citrix.add_plugin(CitrixPlugin)
 
-    assert target_citrix.os == "citrix-netscaler"
+    assert target_citrix.os == OperatingSystem.CITRIX == "citrix-netscaler"
     hostname = target_citrix.hostname
     version = target_citrix.version
     users = sorted(target_citrix.users(), key=lambda user: (user.name, str(user.home) if user.home else ""))

@@ -83,6 +83,8 @@ DOWNLOAD_STATES = {
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
+    target: Target
+
     DIRS = ()
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -283,7 +285,7 @@ class ChromiumMixin:
         for user, db_file, db in self._iter_db("Cookies", subdirs=["Network"]):
             keys = {}
 
-            if self.target.os == OperatingSystem.WINDOWS.value:
+            if self.target.os == OperatingSystem.WINDOWS:
                 try:
                     local_state_parent = db_file.parent.parent
                     if db_file.parent.name == "Network":
@@ -513,7 +515,7 @@ class ChromiumMixin:
         for user, db_file, db in self._iter_db("Login Data"):
             keys = {}
 
-            if self.target.os == OperatingSystem.WINDOWS.value:
+            if self.target.os == OperatingSystem.WINDOWS:
                 try:
                     local_state_path = db_file.parent.parent.joinpath("Local State")
                     keys = self.decryption_keys(local_state_path, user.user.name)
@@ -679,16 +681,16 @@ class ChromiumMixin:
     def decrypt_value(self, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes:
         """Attempt to decrypt the given encrypted bytes."""
         DECRYPT_MAP = {
-            OperatingSystem.WINDOWS.value: {
+            OperatingSystem.WINDOWS: {
                 b"\x01\x00\x00": decrypt_dpapi,  # First three bytes of DPAPI blob signature.
                 b"v10": decrypt_v10_windows,
                 b"v20": decrypt_v20_windows,
             },
-            OperatingSystem.UNIX.value: {
+            OperatingSystem.UNIX: {
                 b"v10": decrypt_v10_linux,
                 b"v11": decrypt_v11_linux,
             },
-            OperatingSystem.LINUX.value: {
+            OperatingSystem.LINUX: {
                 b"v10": decrypt_v10_linux,
                 b"v11": decrypt_v11_linux,
             },

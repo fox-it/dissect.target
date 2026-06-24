@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import OperatingSystem, Plugin, export
 from dissect.target.plugins.filesystem.walkfs import FilesystemRecord
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ class SuidPlugin(Plugin):
     """Unix SUID binary plugin."""
 
     def check_compatible(self) -> None:
-        if not self.target.has_function("walkfs") or self.target.os == "windows":
+        if not self.target.has_function("walkfs") or self.target.os == OperatingSystem.WINDOWS:
             raise UnsupportedPluginError("Unsupported plugin")
 
     @export(record=SuidRecord)

@@ -4,7 +4,7 @@ import json as jsonlib
 from typing import TYPE_CHECKING, TextIO, TypeAlias
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import Plugin, arg, export, internal
+from dissect.target.plugin import OperatingSystem, Plugin, arg, export, internal
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
@@ -26,7 +26,7 @@ class EsxConfPlugin(Plugin):
                 self._config = parse_esx_conf(fh)
 
     def check_compatible(self) -> None:
-        if self.target.os != "esxi":
+        if self.target.os != OperatingSystem.ESXI:
             raise UnsupportedPluginError("ESXi specific plugin loaded on non-ESXi target")
 
         if not self._config:

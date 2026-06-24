@@ -4,6 +4,7 @@ import gzip
 from io import BytesIO
 from typing import TYPE_CHECKING
 
+from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.linux.fortios._os import FortiOSPlugin
 from dissect.target.plugins.os.unix.linux.fortios.generic import GenericPlugin
 from dissect.target.plugins.os.unix.linux.fortios.locale import FortiOSLocalePlugin
@@ -73,12 +74,12 @@ def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     target_unix.add_plugin(GenericPlugin)
 
     # tests FortiOSPlugin.detect() indirectly
-    assert target_unix.os == "fortios"
+    assert target_unix.os == OperatingSystem.FORTIOS == "fortios"
 
     target_unix._os_plugin = FortiOSPlugin
     target_unix.apply()
 
-    assert target_unix.os == "fortios"
+    assert target_unix.os == OperatingSystem.FORTIOS == "fortios"
     assert target_unix.hostname == "FortiGate-VM64"
     assert target_unix.version == "FortiGate VM 7.4.2 (build 2571, 2023-12-19)"
     assert target_unix.ips == ["1.2.3.4"]
