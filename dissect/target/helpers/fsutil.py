@@ -644,8 +644,8 @@ def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator
 def fs_attrs(
     path: os.PathLike | str | bytes,
     follow_symlinks: bool = True,
-) -> dict[os.PathLike | str | bytes, bytes]:
-    """Return the extended attributes for a given path on the local filesystem.
+) -> dict[str, bytes]:
+    """Return the extended attributes for a given path on the *host* filesystem.
 
     This is currently only implemented for Linux using os.listxattr and related functions.
 
@@ -657,6 +657,12 @@ def fs_attrs(
         A dict containing the attribute names as keys and their values.
     """
     attrs = {}
+
+    if isinstance(path, TargetPath):
+        # Could return different attr implementations, e.g. ExtFS :class:`XAttr` or NTFS :class:`AttributeMap`
+        # This should be unified to a single format, see https://github.com/fox-it/dissect.target/issues/918
+        return path.get().attr()
+
     if hasattr(os, "listxattr"):
         # os.listxattr etc. are only available on Linux
         attr_names = os.listxattr(path, follow_symlinks=follow_symlinks)
