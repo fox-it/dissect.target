@@ -18,6 +18,7 @@ from dissect.target.helpers.configutil import (
     Leases,
     ScopeManager,
     SystemD,
+    Xml,
     parse,
 )
 from tests._utils import absolute_path
@@ -402,4 +403,45 @@ def test_leases_parser(string_data: str, expected_output: dict) -> None:
     parser = Leases()
     parser.parse_file(StringIO(string_data))
 
+    assert parser.parsed_data == expected_output
+
+
+@pytest.mark.parametrize(
+    ("input", "namespace", "expected_output"),
+    [
+        pytest.param(
+            """\
+            <?xml version="1.0" encoding="UTF-8"?>
+            <example xmlns="http://example.com/example" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                <foo>
+                    <attr>value</attr>
+                </foo>
+                <bar>
+                    <attr>bar-1</attr>
+                </bar>
+                <bar>
+                    <attr>bar-2</attr>
+                </bar>
+            </example>
+            """,
+            "{http://example.com/example}",
+            {
+                "example": {
+                    "bar": [
+                        {"attr": "bar-1"},
+                        {"attr": "bar-2"},
+                    ],
+                    "foo": {
+                        "attr": "value",
+                    },
+                }
+            },
+            id="xml-without-attributes",
+        )
+    ],
+)
+def test_xml_parser(input: str, namespace: str, expected_output: dict) -> None:
+    """Test the XML config parser."""
+    parser = Xml(namespace=namespace)
+    parser.parse_file(StringIO(textwrap.dedent(input)))
     assert parser.parsed_data == expected_output
