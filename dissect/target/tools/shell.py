@@ -1941,6 +1941,9 @@ if HAS_PROMPT_TOOLKIT:
 
         def load_history_strings(self) -> Iterable[str]:
             """Yield most recent history strings from the readline history file."""
+            if not self.histfile.is_file():
+                return
+
             try:
                 readline.read_history_file(self.histfile)
             except OSError as e:
