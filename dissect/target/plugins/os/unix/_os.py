@@ -156,6 +156,10 @@ class UnixPlugin(OSPlugin):
         return self._get_architecture(self.os)
 
     @export(property=True)
+    def device(self) -> str | None:
+        pass
+
+    @export(property=True)
     def hostname(self) -> str | None:
         return self._hostname or self._hosts_dict.get("hostname", "localhost")
 

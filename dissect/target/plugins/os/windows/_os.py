@@ -46,7 +46,7 @@ class WindowsPlugin(OSPlugin):
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.case_sensitive = False
-        target.fs.alt_separator = "\\"
+        target.fs.sep = "\\"
         target.fs.mount("sysvol", sysvol)
 
         # Mount EFI
@@ -58,7 +58,7 @@ class WindowsPlugin(OSPlugin):
         # Mount WinRE
         if not sysvol.exists("winre/Recovery/WindowsRE"):
             for fs in target.filesystems:
-                if fs.exists("Recovery/WindowsRE"):
+                if fs.exists("Recovery/WindowsRE") and not fs.exists("Windows/System32"):
                     target.fs.mount("winre", fs)
 
         return cls(target)
@@ -278,6 +278,18 @@ class WindowsPlugin(OSPlugin):
         try:
             machine = self.target.registry.key(key).value("PROCESSOR_ARCHITECTURE").value
             return target_triple(self.os, machine)
+        except RegistryError:
+            pass
+
+    @export(property=True)
+    def device(self) -> str | None:
+        """Returns OEM information for this Windows system."""
+        key = "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation"
+        try:
+            key = self.target.registry.key(key)
+            manufacturer = key.value("Manufacturer").value or ""
+            model = key.value("Model").value or ""
+            return f"{manufacturer} {model}".strip()
         except RegistryError:
             pass
 

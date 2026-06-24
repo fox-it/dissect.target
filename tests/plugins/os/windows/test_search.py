@@ -61,7 +61,7 @@ def test_windows_search_esedb(
     assert (
         records[-1].activity_id == "ECB32AF3-1440-4086-94E3-5311F97F89C4\\{ThisPCDesktopFolder}\\This is test PPT.pptx"
     )
-    assert records[-1].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
+    assert records[-1].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
 
     # SearchIndexRecord (file)
     assert records[1175].ts == datetime(2023, 2, 16, 14, 36, 23, 877518, tzinfo=timezone.utc)
@@ -72,7 +72,7 @@ def test_windows_search_esedb(
     assert records[1175].type == "text/plain"
     assert records[1175].size == 50
     assert records[1175].data == "Example File from Stroz Friedberg.\r\nHappy Testing!"
-    assert records[1175].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
+    assert records[1175].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
 
     # SearchIndexRecord (file)
     assert records[1120].ts == datetime(2023, 2, 14, 15, 14, 40, 984222, tzinfo=timezone.utc)
@@ -86,7 +86,7 @@ def test_windows_search_esedb(
         records[1120].data
         == "Line 1\r\nLine 2\r\nLine 3\r\nLine 4\r\nLine 5\r\nLine 6\r\nLine 7\r\nLine 8\r\nLine 9\r\nLine 10\r\nLine 11\r\nLine 12\r\nLine 13\r\nLine 14\r\nLine 15\r\nLine 16\r\nLine 17\r\nLine 18\r\nLine 19\r\nLine 20\r\nLine 21\r\nLine 22\r\nLine 23\r\nLine 24\r\nLine 25\r\nLine 26\r\nLine 27\r\nLine 28\r\nLine 29\r\nLine 30\r\nLine 31\r\nLine 32\r\nLine 33\r\nLine 34\r\nLine 35\r\nLine 36\r\nLine 37\r\nLine 38\r\nLine 39\r\nLine 40\r\nLine 41\r\nLine 42\r\nLine 43\r\nLine 44\r\nLine 45\r\nLine 46\r\nLine 47\r\nLine 48\r\nLine 49\r\nLine 50\r\nLine 51\r\nLine 52\r\nLine 53\r\nLine 54\r\nLine 55\r\nLine 56\r\nLine 57\r\nLine \r\n"  # noqa: E501
     )
-    assert records[1120].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
+    assert records[1120].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
 
     # SearchIndexRecord (folder)
     assert records[1116].ts == datetime(2023, 2, 14, 13, 59, 31, 356632, tzinfo=timezone.utc)
@@ -97,7 +97,7 @@ def test_windows_search_esedb(
     assert records[1116].type == "File folder"  # no mimetype available?
     assert not records[1116].size
     assert not records[1116].data
-    assert records[1116].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
+    assert records[1116].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
 
     # BrowserHistoryRecord (iehistory)
     assert records[995].ts == datetime(2023, 2, 13, 14, 17, 22, 448000, tzinfo=timezone.utc)
@@ -108,7 +108,7 @@ def test_windows_search_esedb(
     )
     assert records[995].host == "support.microsoft.com"
     assert records[995].title == "This website doesn't work in Internet Explorer - Microsoft Support"
-    assert records[995].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
+    assert records[995].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
     assert records[995].user_id == user_sid
 
 
@@ -148,7 +148,7 @@ def test_windows_search_sqlite(
     assert records[698].application_name == "notepad++.exe"
     assert records[698].application_id == "{6D809377-6AF0-444B-8957-A3773F02200E}\\Notepad++\\notepad++.exe"
     assert records[698].activity_id == "ECB32AF3-1440-4086-94E3-5311F97F89C4\\{Public}\\Threat\\becon.xml"
-    assert records[698].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
+    assert records[698].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
 
     # SearchIndexRecord (file)
     assert records[837].ts == datetime(2023, 1, 31, 2, 45, 2, 871614, tzinfo=timezone.utc)
@@ -159,7 +159,7 @@ def test_windows_search_sqlite(
     assert records[837].type == "text/xml"
     assert int(records[837].size) == 174
     assert not records[837].data
-    assert records[837].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
+    assert records[837].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
 
     # BrowserHistoryRecord (edge)
     assert records[711].ts == datetime(2023, 1, 31, 0, 9, 47, 972897, tzinfo=timezone.utc)
@@ -169,5 +169,5 @@ def test_windows_search_sqlite(
         == "https://www.bing.com/search?q=install+chrome&cvid=2ce0f71581824fda82398075bb250924&aqs=edge.0.0j69i57j0l7.2774j0j7&FORM=ANNTA0&PC=U531"
     )
     assert records[711].host == "www.bing.com"
-    assert records[711].source == "\\sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
+    assert records[711].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
     assert records[711].user_id == user_sid
