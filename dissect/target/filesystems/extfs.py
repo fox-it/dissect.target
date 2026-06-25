@@ -52,6 +52,20 @@ class ExtFilesystem(Filesystem):
     def uuid(self) -> UUID | None:
         return self.extfs.uuid
 
+    def allocated_space_iter(self) -> Iterator[BinaryIO]:
+        for group_num in range(self.extfs.groups_count):
+            _, allocated = self.extfs.get_group_data_block_allocation(group_num)
+            yield allocated
+
+    def unallocated_space_iter(self) -> Iterator[BinaryIO]:
+        for group_num in range(self.extfs.groups_count):
+            unallocated, _ = self.extfs.get_group_data_block_allocation(group_num)
+            yield unallocated
+
+    def space_allocation_iter(self) -> Iterator[tuple[BinaryIO, BinaryIO]]:
+        for group_num in range(self.extfs.groups_count):
+            yield self.extfs.get_group_data_block_allocation(group_num)
+
 
 class ExtDirEntry(DirEntry):
     fs: ExtFilesystem
