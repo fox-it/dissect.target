@@ -22,11 +22,17 @@ class ConfigstorePlugin(Plugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._configstore = {}
-
+        path = None
         # ESXi 7 introduced the configstore
         # It's made available at /etc/vmware/configstore/current-store-1 during boot, but stored at
-        # the path used below in local.tgz
-        if (path := target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")).exists():
+        # /var/lib/vmware/configstore/backup/current-store-1  in local.tgz
+        # On live collection (uac, vm-support), this is file is located at the /etc path
+        # As this plugin is used by the EsxiOs plugin, we test both paths.
+        if (path := self.target.fs.path("/etc/vmware/configstore/current-store-1")).exists() or (
+            path := self.target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")
+        ).exists():
+            # Path is stored, so we can easily use it to provided the source for some plugins.
+            self.path = path
             self._configstore = parse_config_store(path)
 
     def check_compatible(self) -> None:
@@ -35,9 +41,54 @@ class ConfigstorePlugin(Plugin):
             raise UnsupportedPluginError("ESXi configstore not found on target")
 
     @internal
-    def get(self, key: str, default: Any = None) -> dict[str, Any]:
-        """Get configstore value for the specified key."""
-        return self._configstore.get(key, default)
+    def get(
+        self,
+        component: str,
+        config_groupe: str | None = None,
+        value_groupe_name: str | None = None,
+        identifier: str | None = None,
+        default: Any = None,
+    ) -> dict[str, Any]:
+        """Get configstore value for the specified key.
+        Subkey order is component -> config_group -> value_group_name -> identifier.
+
+        Sub subkey are used only previous subkey are defined. E.g is value_group_name is None, identifier will be
+        ignored
+
+        Configstore is a SQlite3 Db with the following schema
+
+            CREATE TABLE Config(Component TEXT
+                ConfigGroup TEXT
+                Name TEXT
+                Identifier TEXT NOT NULL DEFAULT ''
+                ModifiedTime DATETIME DEFAULT (datetime(CURRENT_TIMESTAMP))
+                CreationTime DATETIME
+                Version TEXT DEFAULT ''
+                Success BOOLEAN DEFAULT 1
+                AutoConfValue TEXT
+                 UserValue TEXT
+                 VitalValue TEXT
+                 CachedValue TEXT
+                 DesiredValue TEXT
+                 Revision INTEGER DEFAULT 0
+                 PRIMARY KEY(Component
+                     ConfigGroup
+                     Name
+                     Identifier)
+            );
+        """
+        if identifier is not None and value_groupe_name is not None and config_groupe is not None:
+            return (
+                self._configstore.get(component, {})
+                .get(config_groupe, {})
+                .get(value_groupe_name, {})
+                .get(identifier, default)
+            )
+        if value_groupe_name is not None and config_groupe is not None:
+            return self._configstore.get(component, {}).get(config_groupe, {}).get(value_groupe_name, default)
+        if config_groupe is not None:
+            return self._configstore.get(component, {}).get(config_groupe, default)
+        return self._configstore.get(component, default)
 
 
 def parse_config_store(path: Path) -> dict[str, Any]:
