@@ -241,7 +241,7 @@ class AtTask:
             7: "EVENT_AT_LOGON",
         }
         for trigger in self.at_data.task_triggers:
-            trigger_type = TRIGGER_TYPE_NAMES.get(trigger.trigger_type, None)
+            trigger_type = TRIGGER_TYPE_NAMES.get(trigger.trigger_type)
             trigger_enabled = not trigger.trigger_flags.trigger_disabled
 
             s_year = trigger.begin_year

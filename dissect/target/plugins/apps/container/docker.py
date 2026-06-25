@@ -409,7 +409,7 @@ def convert_ports(ports: dict[str, list | dict]) -> Iterator[str]:
 
 def hash_to_image_id(hash: str) -> str:
     """Convert the hash to an abbrevated docker image id."""
-    return hash.split(":")[-1][:12]
+    return hash.rsplit(":", maxsplit=1)[-1][:12]
 
 
 def strip_log(input: str | bytes, exc_backspace: bool = False) -> str:

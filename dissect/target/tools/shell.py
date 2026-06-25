@@ -832,7 +832,7 @@ class TargetCli(TargetCmd):
         return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
-        path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
+        path = self.resolve_path(line[:begidx].rsplit(" ", maxsplit=1)[-1])
         textlower = text.lower()
 
         suggestions = []
@@ -1668,7 +1668,7 @@ class RegistryCli(TargetCmd):
         return "(registry) " + self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
-        path = line[:begidx].rsplit(" ")[-1]
+        path = line[:begidx].rsplit(" ", maxsplit=1)[-1]
         return [fname for _, fname in self.scandir(path) if fname.lower().startswith(text.lower())]
 
     def resolve_key(self, path: str) -> regutil.RegistryKey:
