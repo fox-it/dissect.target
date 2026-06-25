@@ -70,6 +70,8 @@ class CronjobPlugin(Plugin):
         "/var/spool/cron/crontabs",
         "/etc/cron.d",
         "/usr/local/etc/cron.d",  # FreeBSD
+        "/usr/lib/cron/tabs",  # macOS
+        "/var/at/tabs",
     )
 
     CRONTAB_FILES = (
