@@ -4,7 +4,7 @@ import contextlib
 import json
 import re
 from typing import TYPE_CHECKING, Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -220,7 +220,21 @@ def mock_execute_function(
     return (func.output, func.name)
 
 
-def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_filtered_functions(mock_plugins: PluginRegistry, monkeypatch: pytest.MonkeyPatch) -> None:
+    class MockQueryArgsPlugin(Plugin):
+        def check_compatible(self) -> None:
+            pass
+
+        @export(output="none")
+        @arg("-j", "--json", action="store_true")
+        @arg("--compact", action="store_true")
+        def mock_function(self, json: bool, compact: bool) -> None:
+            pass
+
+    def mock_query_plugin_args() -> list[tuple[list[str], dict[str, Any]]]:
+        return getattr(MockQueryArgsPlugin(MagicMock()).mock_function, "__args__", [])
+
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
@@ -235,6 +249,12 @@ def test_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
         with (
+            patch.object(
+                FunctionDescriptor,
+                "args",
+                new_callable=PropertyMock,
+                side_effect=mock_query_plugin_args,
+            ),
             patch(
                 "dissect.target.tools.utils.cli.find_functions",
                 autospec=True,
@@ -441,6 +461,9 @@ def test_arguments_passed_correctly(
             assert json is True
             assert compact is True
 
+    def mock_query_plugin_args() -> list[tuple[list[str], dict[str, Any]]]:
+        return getattr(MockPlugin(MagicMock()).mock_function, "__args__", [])
+
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
@@ -454,6 +477,12 @@ def test_arguments_passed_correctly(
         )
 
         with (
+            patch.object(
+                FunctionDescriptor,
+                "args",
+                new_callable=PropertyMock,
+                side_effect=mock_query_plugin_args,
+            ),
             patch(
                 "dissect.target.tools.utils.cli.find_functions",
                 autospec=True,
@@ -511,3 +540,53 @@ def test_direct_mode(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPa
         target_query()
         out, _ = capsys.readouterr()
     assert len(out.splitlines()) == 3
+
+
+def test_plugin_argument_handling(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test argument handling of target-query for a plugin with arguments."""
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-q",
+                "-s",  # output as text records
+                "-f",
+                "walkfs",
+                "--walkfs-path",
+                "/path/to/symlink",
+                str(absolute_path("_data/filesystems/symlink_disk.ext4")),
+            ],
+        )
+
+        target_query()
+
+    out, _ = capsys.readouterr()
+    assert "ino=14" in out
+    assert "ino=15" in out
+    assert len(out.splitlines()) == 2
+
+
+def test_plugin_argument_unknown(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that unknown plugin arguments are caught and logged."""
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-q",
+                "-s",  # output as text records
+                "-f",
+                "walkfs,yara",
+                "--some-unknown-arg=/usr/local/bin",
+                "--rules",
+                str(absolute_path("tests/_data/plugins/filesystem/yara/rule-dir/rule.yar")),
+                str(absolute_path("_data/filesystems/symlink_disk.ext4")),
+            ],
+        )
+
+        with pytest.raises(SystemExit):
+            target_query()
+
+    _, err = capsys.readouterr()
+    assert "error: unrecognized arguments: --some-unknown-arg" in err
