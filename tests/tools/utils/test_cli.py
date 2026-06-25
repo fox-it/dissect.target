@@ -51,23 +51,30 @@ def test_persist_execution_report() -> None:
 
 
 @pytest.mark.parametrize(
-    ("targets", "loader_name", "args", "uris"),
+    ("target", "loader_name", "args", "uri"),
     [
-        (["/path/to/somewhere"], "loader", ["--loader-option", "1"], ["loader:///path/to/somewhere?option=1"]),
-        (["/path/to/somewhere"], "loader", ["--loader-option", "2"], ["loader:///path/to/somewhere?option=2"]),
-        (["/path/to/somewhere"], "unknown", ["--unknown-option", "3"], ["unknown:///path/to/somewhere"]),
-        (["/path/to/somewhere"], "loader", ["--ignored-option", "4"], ["loader:///path/to/somewhere"]),
-        (["/path/to/somewhere"], "loader", [], ["loader:///path/to/somewhere"]),
-        (["/path/to/somewhere"], "invalid", [], ["invalid:///path/to/somewhere"]),
+        ("/path/to/somewhere", "loader", ["--loader-option", "1"], "loader:///path/to/somewhere?option=1"),
+        ("/path/to/somewhere", "loader", ["--loader-option", "2"], "loader:///path/to/somewhere?option=2"),
+        ("/path/to/somewhere", "unknown", ["--unknown-option", "3"], "unknown:///path/to/somewhere"),
+        ("/path/to/somewhere", "loader", ["--ignored-option", "4"], "loader:///path/to/somewhere"),
+        ("/path/to/somewhere", "loader", [], "loader:///path/to/somewhere"),
+        ("/path/to/somewhere", "invalid", [], "invalid:///path/to/somewhere"),
+        # Already a URI — must be returned unchanged regardless of loader args
+        (
+            "loader:///path/to/somewhere?option=1",
+            "loader",
+            ["--loader-option", "2"],
+            "loader:///path/to/somewhere?option=1",
+        ),
     ],
 )
-def test_args_to_uri(targets: list[str], loader_name: str, args: list[str], uris: list[str]) -> None:
+def test_args_to_uri(target: str, loader_name: str, args: list[str], uri: str) -> None:
     @arg("--loader-option", dest="option")
     class FakeLoader:
         pass
 
     with patch("dissect.target.tools.utils.cli.LOADERS_BY_SCHEME", {"loader": FakeLoader}):
-        assert args_to_uri(targets, loader_name, args) == uris
+        assert args_to_uri(target, loader_name, args) == uri
 
 
 def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -102,7 +109,7 @@ def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
             patch("dissect.target.tools.utils.cli.sys.exit") as mocked_exit,
             patch(
                 "dissect.target.tools.utils.cli.args_to_uri",
-                return_value=["loader_name://target1", "loader_name://target2"],
+                side_effect=lambda t, loader: f"{loader}://{t}",
             ) as mocked_args_to_uri,
             patch("dissect.target.tools.utils.cli.keychain.register_keychain_file") as mocked_register_keychain_file,
             patch("dissect.target.tools.utils.cli.keychain.register_wildcard_value") as mocked_register_wildcard_value,
@@ -116,7 +123,9 @@ def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
             mocked_configure_logging.assert_called_once_with(0, False, as_plain_text=True)
             mocked_version.assert_called_once_with("dissect.target")
             mocked_exit.assert_called_once_with(0)
-            mocked_args_to_uri.assert_called_once_with(["target1", "target2"], "loader_name")
+            mocked_args_to_uri.assert_any_call("target1", "loader_name")
+            mocked_args_to_uri.assert_any_call("target2", "loader_name")
+            assert mocked_args_to_uri.call_count == 2
             mocked_register_keychain_file.assert_called_once_with(Path("/path/to/keychain.csv"))
             mocked_register_wildcard_value.assert_called_once_with("some_value")
             mocked_get_external_module_paths.assert_called_once_with([Path("/path/to/plugins")])

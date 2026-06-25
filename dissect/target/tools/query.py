@@ -18,6 +18,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import cache, record_modifier
 from dissect.target.helpers.logging import get_logger
+from dissect.target.loader import LOADERS_BY_SCHEME, infer_loader
 from dissect.target.plugin import (
     PLUGINS,
 )
@@ -28,6 +29,7 @@ from dissect.target.tools.utils.cli import (
     configure_plugin_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
+    generate_argparse_for_loader_class,
     open_targets,
     persist_execution_report,
     process_generic_arguments,
@@ -113,9 +115,22 @@ def main() -> int:
 
     args, rest = parser.parse_known_args()
 
-    # Show help for target-query
+    # Show help for target-query. If a loader can be determined, show loader-specific help.
     if not args.function and ("-h" in rest or "--help" in rest):
-        parser.print_help()
+        loader_cls = None
+        if args.loader:
+            loader_cls = LOADERS_BY_SCHEME.get(args.loader)
+        elif args.targets:
+            result = infer_loader(args.targets[0])
+            if result is not None:
+                loader_cls = result[0]
+
+        if loader_cls is None:
+            parser.print_help()
+            return 0
+
+        loader_parser = generate_argparse_for_loader_class(loader_cls)
+        loader_parser.print_help()
         return 0
 
     process_generic_arguments(parser, args)
