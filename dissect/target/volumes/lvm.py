@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.volume import lvm
 
@@ -31,13 +31,20 @@ KNOWN_SKIP_TYPES = (
 class LvmVolumeSystem(LogicalVolumeSystem):
     __type__ = "lvm"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
-        self.lvm = lvm.LVM2(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO],
+        *args,
+        devices: list[lvm.LVM2Device] | None = None,
+        **kwargs,
+    ):
+        self.lvm = lvm.LVM2(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         devices: dict[str, list[lvm.LVM2Device]] = {}
+        source_disks: dict[str, set[BinaryIO]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -48,9 +55,18 @@ class LvmVolumeSystem(LogicalVolumeSystem):
                 vg_name = next(key for key, value in metadata.items() if isinstance(value, dict))
                 devices.setdefault(vg_name, []).append(dev)
 
-        for pvs in devices.values():
+                disk = vol.disk if isinstance(vol, Volume) else vol
+                source_disks.setdefault(vg_name, set()).add(disk)
+
+        for vg_name, pvs in devices.items():
             try:
-                yield cls(pvs, disk=[pv.fh for pv in pvs])
+                disks = list(source_disks[vg_name])
+                source_fhs = [pv.fh for pv in pvs]
+                yield cls(
+                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    devices=pvs,
+                    disk=disks[0] if len(disks) == 1 else disks,
+                )
             except Exception:  # noqa: PERF203
                 continue
 
@@ -63,6 +79,10 @@ class LvmVolumeSystem(LogicalVolumeSystem):
     def _detect_volume(fh: BinaryIO) -> bool:
         buf = fh.read(4096)
         return b"LABELONE" in buf
+
+    @property
+    def backing_objects(self) -> list[Any]:
+        return self.fh if isinstance(self.fh, list) else [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         num = 1

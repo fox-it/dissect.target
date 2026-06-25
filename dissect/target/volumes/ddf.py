@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.volume.ddf.ddf import DDF, DEFAULT_SECTOR_SIZE, DDFPhysicalDisk
 
@@ -16,24 +16,40 @@ if TYPE_CHECKING:
 class DdfVolumeSystem(LogicalVolumeSystem):
     __type__ = "ddf"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
-        self.ddf = DDF(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO],
+        *args,
+        devices: list[DDFPhysicalDisk] | None = None,
+        **kwargs,
+    ):
+        self.ddf = DDF(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         sets: dict[bytes, list[DDFPhysicalDisk]] = {}
+        source_disks: dict[bytes, set[BinaryIO]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
                 continue
 
-            disk = DDFPhysicalDisk(vol)
-            sets.setdefault(disk.anchor.DDF_Header_GUID, []).append(disk)
+            ddf_disk = DDFPhysicalDisk(vol)
+            sets.setdefault(ddf_disk.anchor.DDF_Header_GUID, []).append(ddf_disk)
 
-        for devs in sets.values():
+            disk = vol.disk if isinstance(vol, Volume) else vol
+            source_disks.setdefault(ddf_disk.anchor.DDF_Header_GUID, set()).add(disk)
+
+        for guid, devs in sets.items():
             try:
-                yield cls(devs)
+                disks = list(source_disks[guid])
+                source_fhs = [dev.fh for dev in devs]
+                yield cls(
+                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    devices=devs,
+                    disk=disks[0] if len(disks) == 1 else disks,
+                )
             except Exception:  # noqa: PERF203
                 continue
 
@@ -46,6 +62,10 @@ class DdfVolumeSystem(LogicalVolumeSystem):
     def _detect_volume(fh: BinaryIO) -> bool:
         fh.seek(-DEFAULT_SECTOR_SIZE, io.SEEK_END)
         return int.from_bytes(fh.read(4), "big") == 0xDE11DE11
+
+    @property
+    def backing_objects(self) -> list[Any]:
+        return self.fh if isinstance(self.fh, list) else [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         # MD only supports one configuration and virtual disk but doing this as a loop

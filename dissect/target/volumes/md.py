@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.volume.md.md import MD, MDPhysicalDisk, find_super_block
 
@@ -16,13 +16,20 @@ if TYPE_CHECKING:
 class MdVolumeSystem(LogicalVolumeSystem):
     __type__ = "md"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO] | None, *args, **kwargs):
-        self.md = MD(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO] | None,
+        *args,
+        devices: list[MDPhysicalDisk] | None = None,
+        **kwargs,
+    ):
+        self.md = MD(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         devices: dict[UUID, list[MDPhysicalDisk]] = {}
+        source_disks: dict[UUID, set[BinaryIO]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -31,9 +38,18 @@ class MdVolumeSystem(LogicalVolumeSystem):
             device = MDPhysicalDisk(vol)
             devices.setdefault(device.set_uuid, []).append(device)
 
-        for devs in devices.values():
+            disk = vol.disk if isinstance(vol, Volume) else vol
+            source_disks.setdefault(device.set_uuid, set()).add(disk)
+
+        for uuid, devs in devices.items():
             try:
-                yield cls(devs, disk=[dev.fh for dev in devs])
+                disks = list(source_disks[uuid])
+                source_fhs = [dev.fh for dev in devs]
+                yield cls(
+                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    devices=devs,
+                    disk=disks[0] if len(disks) == 1 else disks,
+                )
             except Exception:  # noqa: PERF203
                 continue
 
@@ -46,6 +62,10 @@ class MdVolumeSystem(LogicalVolumeSystem):
     def _detect_volume(fh: BinaryIO) -> bool:
         offset, _, _ = find_super_block(fh)
         return offset is not None
+
+    @property
+    def backing_objects(self) -> list[Any]:
+        return self.fh if isinstance(self.fh, list) else [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         # MD only supports one configuration and virtual disk but doing this as a loop
