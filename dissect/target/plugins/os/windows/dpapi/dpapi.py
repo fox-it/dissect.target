@@ -53,15 +53,16 @@ class DPAPIPlugin(InternalPlugin):
         # Search for SYSTEM master keys
         master_keys[self.SYSTEM_SID] = {}
 
-        system_master_key_path = self.target.resolve(f"%windir%/System32/Microsoft/Protect/{self.SYSTEM_SID}")
+        system_master_key_path: Path = self.target.resolve(f"%windir%/System32/Microsoft/Protect/{self.SYSTEM_SID}")  # type: ignore
         system_user_master_key_path = system_master_key_path.joinpath("User")
 
-        for dir in [system_master_key_path, system_user_master_key_path]:
-            user_mks = self._load_master_keys_from_path(self.SYSTEM_SID, dir)
-            master_keys[self.SYSTEM_SID].update(user_mks)
+        for dir in (system_master_key_path, system_user_master_key_path):
+            if dir.is_dir():
+                user_mks = self._load_master_keys_from_path(self.SYSTEM_SID, dir)
+                master_keys[self.SYSTEM_SID].update(user_mks)
 
         # Search for user master keys, generally located at $HOME/AppData/Roaming/Microsoft/Protect/{user_sid}/{mk_guid}
-        PROTECT_DIRS = [
+        USER_PROTECT_DIRS = [
             # Windows Vista and newer
             "AppData/Roaming/Microsoft/Protect",
             # Windows XP
@@ -72,8 +73,10 @@ class DPAPIPlugin(InternalPlugin):
             sid = user.user.sid
             master_keys.setdefault(sid, {})
 
-            for protect_dir in PROTECT_DIRS:
-                path = user.home_path.joinpath(protect_dir).joinpath(sid)
+            for protect_dir in USER_PROTECT_DIRS:
+                if not (path := user.home_path.joinpath(protect_dir).joinpath(sid)).is_dir():
+                    continue
+
                 if user_mks := self._load_master_keys_from_path(sid, path):
                     master_keys[sid] |= user_mks
 
@@ -81,10 +84,6 @@ class DPAPIPlugin(InternalPlugin):
 
     def _load_master_keys_from_path(self, sid: str, path: Path) -> Iterator[tuple[str, MasterKeyFile]]:
         """Iterate over the provided ``path`` and search for master key files for the given user SID."""
-        if not path.exists():
-            self.target.log.info("Unable to load master keys from path as it does not exist: %s", path)
-            return
-
         for file in path.iterdir():
             if not self.RE_MASTER_KEY.findall(file.name):
                 continue
@@ -94,8 +93,7 @@ class DPAPIPlugin(InternalPlugin):
 
             self._seen_mks.add((file.name, sid))
 
-            with file.open() as fh:
-                mkf = MasterKeyFile(fh)
+            mkf = MasterKeyFile(file)
 
             # Decrypt SYSTEM master key using the DPAPI_SYSTEM LSA secret.
             if sid == self.SYSTEM_SID:
@@ -154,7 +152,7 @@ class DPAPIPlugin(InternalPlugin):
                         pass
 
                 if not mkf.decrypted:
-                    self.target.log.warning("Could not decrypt master key '%s' for SID '%s'", file.name, sid)
+                    self.target.log.debug("Could not decrypt DPAPI master key '%s' for SID '%s'", file.name, sid)
 
                 yield file.name, mkf
 
@@ -179,7 +177,7 @@ class DPAPIPlugin(InternalPlugin):
         return self.decrypt_user_blob(data, sid=self.SYSTEM_SID, **kwargs)
 
     def decrypt_user_blob(self, data: bytes, username: str | None = None, sid: str | None = None, **kwargs) -> bytes:
-        """Decrypt the given bytes using the master key of the given SID or username.
+        """Decrypt the given bytes using a master key of the given SID or username.
 
         Args:
             data: Bytes of DPAPI blob to decrypt.
@@ -207,11 +205,14 @@ class DPAPIPlugin(InternalPlugin):
         except EOFError as e:
             raise ValueError(f"Failed to parse DPAPI blob: {e}")
 
-        if not (mk := self.master_keys.get(sid, {}).get(blob.guid)):
+        if not (master_keys := self.master_keys.get(sid)):
+            raise ValueError(f"We have no master keys for SID {sid}")
+
+        if not (master_key := master_keys.get(blob.guid)):
             raise ValueError(f"Blob is encrypted using master key {blob.guid} that we do not have for SID {sid}")
 
-        if not blob.decrypt(mk.key, **kwargs):
-            raise ValueError(f"Failed to decrypt blob for SID {sid}")
+        if not blob.decrypt(master_key.key, **kwargs):
+            raise ValueError(f"Failed to decrypt blob {blob.guid} for SID {sid}")
 
         return blob.clear_text
 
@@ -233,9 +234,9 @@ class DPAPIPlugin(InternalPlugin):
         except EOFError as e:
             raise ValueError(f"Failed to parse DPAPI blob: {e}")
 
-        for user in self.master_keys:
-            for mk in self.master_keys[user].values():
-                if blob.decrypt(mk.key, **kwargs):
+        for keys in self.master_keys.values():
+            for master_key in keys.values():
+                if blob.decrypt(master_key.key, **kwargs):
                     return blob.clear_text
 
         raise ValueError("Failed to decrypt blob using any available master key")
