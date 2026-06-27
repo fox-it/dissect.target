@@ -275,6 +275,7 @@ register("cellebrite", "CellebriteLoader")
 register("target", "TargetLoader")
 # Disabling ResLoader because of DIS-536
 # register("res", "ResLoader")
+register("dem", "DemLoader")
 register("overlay2", "Overlay2Loader")
 register("overlay", "OverlayLoader")
 register("phobos", "PhobosLoader")
