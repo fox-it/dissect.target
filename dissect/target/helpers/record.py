@@ -142,7 +142,7 @@ COMMON_UNIX_FIELDS = [
     ("varint", "gid"),
     ("string", "gecos"),
     ("path", "home"),
-    ("string", "shell"),
+    ("path", "shell"),
     ("string", "source"),
 ]
 

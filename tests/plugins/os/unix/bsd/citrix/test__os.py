@@ -83,4 +83,4 @@ def test_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
 
     assert users[7].name == "root"  # User entry for /root, from /etc/passwd
     assert users[7].home == posix_path("/root")
-    assert users[7].shell == "/usr/bin/bash"
+    assert users[7].shell == posix_path("/usr/bin/bash")
