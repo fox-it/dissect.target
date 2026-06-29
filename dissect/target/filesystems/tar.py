@@ -14,9 +14,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     Filesystem,
-    FilesystemEntry,
     VirtualDirectory,
-    VirtualDirEntry,
     VirtualFile,
     VirtualFilesystem,
 )
@@ -25,6 +23,11 @@ from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.target.filesystem import (
+        FilesystemEntry,
+        VirtualDirEntry,
+    )
 
 
 log = get_logger(__name__)
@@ -54,18 +57,22 @@ class TarFilesystem(Filesystem):
 
         self.base = base or ""
 
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
+        self._fs = VirtualFilesystem(sep=self.sep, altsep=self.altsep, case_sensitive=self.case_sensitive)
 
         for member in self.tar.getmembers():
-            mname = member.name.removeprefix("./").strip("/")
+            mname = member.name.removeprefix("./")
             if not mname.startswith(self.base) or mname == ".":
                 continue
 
-            rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
+            rel_name = fsutil.normpath(mname.removeprefix(self.base), sep=self.sep).strip("/")
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             file_entry = entry_cls(self, rel_name, member)
-            self._fs.map_file_entry(rel_name, file_entry)
+
+            try:
+                self._fs.map_file_entry(rel_name, file_entry)
+            except KeyError as e:
+                log.debug("Skipping directory member %r in tar as %r is already mapped: %s", member, file_entry.path, e)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
@@ -126,7 +133,7 @@ class TarFilesystemEntry(VirtualFile):
     def readlink_ext(self) -> FilesystemEntry:
         """Read the link if this entry is a symlink. Returns a filesystem entry."""
         # Can't use the one in VirtualFile as it overrides the FilesystemEntry
-        return fsutil.resolve_link(self.fs, self.readlink(), self.path, alt_separator=self.fs.alt_separator)
+        return fsutil.resolve_link(self.fs, self.readlink(), self.path, sep=self.fs.sep)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""

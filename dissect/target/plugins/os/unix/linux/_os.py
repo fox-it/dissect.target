@@ -38,7 +38,6 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
             - https://refspecs.linuxfoundation.org/fhs.shtml
             - https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard
         """
-
         # NOTE: dirs like /opt, /mnt, /media, /tmp and /proc are not Linux-specific.
         LINUX_PATHS = {
             "/run",

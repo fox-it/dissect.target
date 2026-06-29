@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.database.ese import ESE, Record, Table
+from dissect.database.ese import ESE
 from dissect.database.ese.exception import KeyNotFoundError
 from dissect.util.ts import wintimestamp
 
@@ -20,6 +20,8 @@ from dissect.target.plugins.apps.browser.browser import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
+
+    from dissect.database.ese import Record, Table
 
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
@@ -94,11 +96,11 @@ class InternetExplorerPlugin(BrowserPlugin):
     CACHE_FILENAME = "WebCacheV01.dat"
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/ie/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+        "application/browser/ie/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
     def __init__(self, target: Target):

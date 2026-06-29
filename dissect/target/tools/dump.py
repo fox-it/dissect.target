@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 import structlog
-from flow.record import Record, RecordDescriptor, RecordStreamWriter
+from flow.record import Record, RecordStreamWriter
 from flow.record.adapter.jsonfile import JsonfileWriter
 from flow.record.jsonpacker import JsonRecordPacker
 
@@ -55,7 +55,7 @@ from dissect.target.tools.utils.cli import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
 
-    from flow.record import Record
+    from flow.record import Record, RecordDescriptor
     from typing_extensions import Self
 
     from dissect.target.helpers.record import TargetRecordDescriptor
@@ -86,7 +86,6 @@ def execute_function(
 
     Only output type ``record`` is supported for plugin functions.
     """
-
     local_log = log.bind(func=function, target=target)
     local_log.debug("Function execution")
 
@@ -144,7 +143,7 @@ def produce_target_func_pairs(
 
     for target in targets:
         for func_def in find_and_filter_plugins(state.functions, target, state.excluded_functions):
-            if state and (target.path, func_def.name) in pairs_to_skip:
+            if state and (str(target.path), func_def.name) in pairs_to_skip:
                 log.info(
                     "Skipping target/func pair since its marked as done in provided state",
                     target=target.path,
@@ -410,13 +409,14 @@ class DumpState:
         """Return sinks that have a mismatch between recorded size and a real file size."""
         invalid_sinks = []
         for sink in self.sinks:
+            full_sink_path = self.get_full_sink_path(sink)
             # sink file does not exist
-            if not self.get_full_sink_path(sink).exists():
+            if not full_sink_path.exists():
                 invalid_sinks.append(sink)
                 continue
 
             # recorded file size for a clean sink is incorrect
-            if not sink.is_dirty and sink.size_bytes != sink.path.stat().st_size:
+            if not sink.is_dirty and sink.size_bytes != full_sink_path.stat().st_size:
                 invalid_sinks.append(sink)
                 continue
 
@@ -547,35 +547,19 @@ def get_nested_attr(obj: Any, nested_attr: str) -> Any:
     return functools.reduce(getattr, [obj, *parts])
 
 
-@functools.lru_cache(maxsize=DEST_DIR_CACHE_SIZE)
-def get_sink_dir_by_target(target: Target, function: FunctionDescriptor) -> Path:
-    func_first_name, _, _ = function.name.partition(".")
-    return Path(target.name) / func_first_name
-
-
-@functools.lru_cache(maxsize=DEST_DIR_CACHE_SIZE)
-def get_sink_dir_by_func(target: Target, function: FunctionDescriptor) -> Path:
-    func_first_name, _, _ = function.name.partition(".")
-    return Path(func_first_name) / target.name
-
-
-def slugify_descriptor_name(descriptor_name: str) -> str:
-    return descriptor_name.replace("/", "_")
-
-
 @functools.lru_cache(maxsize=DEST_FILENAME_CACHE_SIZE)
 def get_sink_filename(
-    record_descriptor: RecordDescriptor,
+    function_descriptor: FunctionDescriptor,
     serialization: Serialization,
     compression: Compression | None = None,
 ) -> str:
-    """Return a sink filename for provided record descriptor, serialization and compression."""
-    record_type = slugify_descriptor_name(record_descriptor.name)
+    """Return a sink filename for provided function name, serialization and compression."""
+    function_name = function_descriptor.name.replace(".", "_")
 
     serialization_details = SERIALIZERS[serialization]
     serialization_ext = serialization_details["ext"]
 
-    parts = [record_type, serialization_ext]
+    parts = [function_name, serialization_ext]
 
     compression_ext = COMPRESSION_TO_EXT[compression]
     if compression_ext:
@@ -588,8 +572,8 @@ def get_relative_sink_path(
     element: RecordStreamElement, serialization: str, compression: Compression | None = None
 ) -> Path:
     """Return a sink path relative to an output directory."""
-    sink_dir = get_sink_dir_by_target(element.target, element.func)
-    sink_filename = get_sink_filename(element.record._desc, serialization, compression)
+    sink_dir = Path(element.target.name)
+    sink_filename = get_sink_filename(element.func, serialization, compression)
     return sink_dir / sink_filename
 
 
@@ -753,7 +737,6 @@ def execute_pipeline(
     limit: int | None = None,
 ) -> None:
     """Run the record generation, processing and sinking pipeline."""
-
     target_func_pairs_stream = produce_target_func_pairs(targets, state)
     record_stream = itertools.islice(execute_functions(target_func_pairs_stream, dry_run, arguments), limit)
     record_stream = sink_records(record_stream, state)

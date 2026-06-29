@@ -37,7 +37,6 @@ def mock_target(target_bare: Target) -> Target:
 
 def test_qfind(mock_target: Target) -> None:
     """Test if qfind can find a simple short needle."""
-
     results = list(mock_target.qfind(["B"]))
 
     assert len(results) == 2
@@ -45,7 +44,6 @@ def test_qfind(mock_target: Target) -> None:
 
 def test_qfind_hex(mock_target: Target) -> None:
     """Test if qfind can find hex needles."""
-
     results: list[QFindMatchRecord] = list(mock_target.qfind(["ABCD"]))
 
     assert len(results) == 2
@@ -63,7 +61,6 @@ def test_qfind_hex(mock_target: Target) -> None:
 
 def test_qfind_needle_file(mock_target: Target, tmp_path: Path) -> None:
     """Test if qfind can work with a needle file."""
-
     needle_file = tmp_path.joinpath("needles.txt")
     needle_file.write_text("ABCD\n")
 
@@ -82,7 +79,6 @@ def test_qfind_needle_file(mock_target: Target, tmp_path: Path) -> None:
 
 def test_qfind_codecs(mock_target: Target) -> None:
     """Test if qfind can handle utf-8, utf-16-le and hex needles."""
-
     results: list[QFindMatchRecord] = list(mock_target.qfind(["ABCD"], encoding="utf-16-le"))
     assert len(results) == 3
 
@@ -114,7 +110,6 @@ def test_qfind_codecs(mock_target: Target) -> None:
 
 def test_qfind_ignore_case(mock_target: Target) -> None:
     """Test if qfind can ignore case sensitivity of utf-8 needles."""
-
     results: list[QFindMatchRecord] = list(mock_target.qfind(["abcd"], ignore_case=True))
 
     assert len(results) == 2
@@ -133,7 +128,6 @@ def test_qfind_ignore_case(mock_target: Target) -> None:
 
 def test_qfind_regex(mock_target: Target) -> None:
     """Test if qfind can compile and search for regex needles."""
-
     results: list[QFindMatchRecord] = list(mock_target.qfind([r"[a-d]{4}"], regex=True, ignore_case=True))
 
     assert len(results) == 1
@@ -146,7 +140,6 @@ def test_qfind_regex(mock_target: Target) -> None:
 
 def test_qfind_unique(target_bare: Target, capsys: pytest.CaptureFixture) -> None:
     """Test if qfind returns unique records when using the ``unique`` argument."""
-
     target_bare.add_plugin(QFindPlugin)
 
     buf = (b"\x00" * 512) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4)) + (b"ABCD" + b"\x00" * ((1024 * 8) - 4))

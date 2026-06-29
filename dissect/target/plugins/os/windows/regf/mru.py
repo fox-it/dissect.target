@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import struct
 from typing import TYPE_CHECKING
 
@@ -10,7 +11,7 @@ from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
-from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.regf.shellbags import (
     FILE_ENTRY,
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
 
     from flow.record import Record
 
+    from dissect.target.helpers.record import TargetRecordDescriptor
     from dissect.target.helpers.regutil import RegistryKey
     from dissect.target.target import Target
 
@@ -112,8 +114,12 @@ MSOfficeMRURecord = UserRegistryRecordDescriptor(
         ("varint", "index"),
         ("string", "value"),
         ("string", "key"),
+        ("string", "metadata"),
     ],
 )
+
+RE_OFFICEMRU_VALUE_NAME = re.compile(r"^Item (\d+)$")
+RE_OFFICEMRU_METADATA_VALUE_NAME = re.compile(r"^Item Metadata (\d+)$")
 
 
 class MRUPlugin(Plugin):
@@ -157,7 +163,6 @@ class MRUPlugin(Plugin):
         References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
-
         KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs"
 
         for key in self.target.registry.keys(KEY):
@@ -174,7 +179,6 @@ class MRUPlugin(Plugin):
         References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
-
         KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU"
         PIDL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU"
 
@@ -196,7 +200,6 @@ class MRUPlugin(Plugin):
         References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
-
         KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedMRU"
         PIDL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedPidlMRU"
 
@@ -225,7 +228,6 @@ class MRUPlugin(Plugin):
             - 5604: "Word or phrase in a file" dialog box
             - 5647: "For computers or people" selection in Search Results dialog box
         """
-
         KEY = "HKCU\\Software\\Microsoft\\Search Assistant\\ACMru"
 
         for key in self.target.registry.keys(KEY):
@@ -257,7 +259,6 @@ class MRUPlugin(Plugin):
         References:
             - https://winreg-kb.readthedocs.io/en/latest/sources/explorer-keys/Most-recently-used.html#keys-with-a-mrulist-value
         """
-
         KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Map Network Drive MRU"
 
         for key in self.target.registry.keys(KEY):
@@ -266,7 +267,6 @@ class MRUPlugin(Plugin):
     @export(record=TerminalServerMRURecord)
     def mstsc(self) -> Iterator[TerminalServerMRURecord]:
         """Return Terminal Server Client MRU data."""
-
         KEY = "HKCU\\Software\\Microsoft\\Terminal Server Client\\Default"
 
         for key in self.target.registry.keys(KEY):
@@ -287,7 +287,6 @@ class MRUPlugin(Plugin):
     @export(record=MSOfficeMRURecord)
     def msoffice(self) -> Iterator[MSOfficeMRURecord]:
         """Return MS Office MRU keys."""
-
         KEY = "HKCU\\Software\\Microsoft\\Office"
         SUBKEYS = [
             "Common",
@@ -370,7 +369,10 @@ def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescr
         if value.name == "MRUListEx":
             continue
 
-        entry_index = mrulist_ex.index(int(value.name))
+        # value can be missing in MRUListEx
+        # instead of skipping, set entry_index to None for it to separate from correct entries
+        entry_index = None if int(value.name) not in mrulist_ex else mrulist_ex.index(int(value.name))
+
         if record != OpenSaveMRURecord:
             path = next(read_wstrings(value.value))
             bag = value.value[len(path) + 2 :]
@@ -437,20 +439,25 @@ def parse_office_mru(target: Target, key: RegistryKey, record: TargetRecordDescr
 def parse_office_mru_key(target: Target, key: RegistryKey, record: TargetRecordDescriptor) -> Iterator[Record]:
     user = target.registry.get_user(key)
 
+    mru_metadata = {}
+    mru_data = []
+
     for value in key.values():
-        if not value.name.startswith("Item"):
-            continue
+        if match := RE_OFFICEMRU_METADATA_VALUE_NAME.fullmatch(value.name):
+            mru_metadata[int(match.group(1))] = value.value
+        elif match := RE_OFFICEMRU_VALUE_NAME.fullmatch(value.name):
+            entry_index = int(match.group(1))
+            info_str, path = value.value.split("*", 1)
+            info = {part[0]: int(part[1:], 16) for part in info_str.strip("[]").split("][")}
+            mru_data.append((entry_index, info, path))
 
-        entry_index = int(value.name.split(" ")[1])
-        info_str, path = value.value.split("*", 1)
-
-        info = {part[0]: int(part[1:], 16) for part in info_str.strip("[]").split("][")}
-
+    for entry_index, info, path in mru_data:
         yield record(
             ts=wintimestamp(info["T"]),
             regf_mtime=key.ts,
             index=entry_index,
             value=path,
+            metadata=mru_metadata.get(entry_index),
             _target=target,
             _user=user,
             _key=key,

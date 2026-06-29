@@ -67,11 +67,11 @@ class AnydeskPlugin(RemoteAccessPlugin):
     )
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/anydesk/log", GENERIC_LOG_RECORD_FIELDS
+        "application/remoteaccess/anydesk/log", GENERIC_LOG_RECORD_FIELDS
     )
 
     RemoteAccessFileTransferRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/anydesk/filetransfer", GENERIC_FILE_TRANSFER_RECORD_FIELDS
+        "application/remoteaccess/anydesk/filetransfer", GENERIC_FILE_TRANSFER_RECORD_FIELDS
     )
 
     def __init__(self, target: Target):

@@ -3,7 +3,7 @@ from __future__ import annotations
 from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Union, get_args
 
-from flow.record.fieldtypes.net import IPAddress, IPNetwork
+from flow.record.fieldtypes.net import IPNetwork
 
 from dissect.target.helpers.record import (
     MacOSInterfaceRecord,
@@ -14,6 +14,8 @@ from dissect.target.plugin import Plugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+
+    from flow.record.fieldtypes.net import IPAddress
 
     from dissect.target.target import Target
 

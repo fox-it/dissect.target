@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 # https://learn.microsoft.com/en-us/windows/win32/wmisdk/--eventconsumer
 COMMON_ELEMENTS = [
     ("string", "creator_sid"),

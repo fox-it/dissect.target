@@ -3,7 +3,7 @@ from __future__ import annotations
 import stat
 from typing import TYPE_CHECKING, BinaryIO
 
-from dissect.squashfs import INode, SquashFS, c_squashfs, exceptions
+from dissect.squashfs import SquashFS, c_squashfs, exceptions
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -17,6 +17,8 @@ from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.squashfs import INode
 
 
 class SquashFSFilesystem(Filesystem):
@@ -62,7 +64,7 @@ class SquashFSFilesystemEntry(FilesystemEntry):
     entry: INode
 
     def get(self, path: str) -> FilesystemEntry:
-        entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        entry_path = fsutil.join(self.path, path, sep=self.fs.sep)
         entry = self.fs._get_node(path, self.entry)
         return SquashFSFilesystemEntry(self.fs, entry_path, entry)
 

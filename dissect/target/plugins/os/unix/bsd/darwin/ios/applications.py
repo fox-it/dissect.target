@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import plistlib
-from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.util.plist import NSKeyedArchiver
 
@@ -10,6 +12,9 @@ from dissect.target.helpers.record import (
     TargetRecordDescriptor,
 )
 from dissect.target.plugin import OperatingSystem, Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 IOSApplicationRecord = TargetRecordDescriptor(
     "ios/application",
@@ -29,7 +34,6 @@ class IOSApplicationsPlugin(Plugin):
     @export(record=IOSApplicationRecord)
     def applications(self) -> Iterator[IOSApplicationRecord]:
         """Yield installed iOS apps."""
-
         for app_dir in self.target.fs.path(self.PATH).glob("*"):
             if not app_dir.is_dir():
                 continue

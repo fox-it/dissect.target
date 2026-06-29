@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 from statistics import median
 from typing import TYPE_CHECKING
@@ -29,7 +28,6 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def install_date(self) -> datetime | None:
         """Return the likely install date of the operating system."""
-
         # Although this purports to be a generic function for Unix targets,
         # these paths are Linux specific.
         files = [

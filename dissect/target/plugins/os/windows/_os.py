@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
+from dissect.target.helpers.arch import target_triple
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export, internal
 
@@ -16,16 +17,8 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
-    from dissect.target.plugins.os.windows.credential.sam import SamRecord
+    from dissect.target.plugins.os.windows.sam import SamRecord
     from dissect.target.target import Target
-
-ARCH_MAP = {
-    "x86": 32,
-    "IA64": 64,
-    "ARM64": 64,
-    "EM64T": 64,
-    "AMD64": 64,
-}
 
 
 class WindowsPlugin(OSPlugin):
@@ -53,13 +46,20 @@ class WindowsPlugin(OSPlugin):
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.case_sensitive = False
-        target.fs.alt_separator = "\\"
+        target.fs.sep = "\\"
         target.fs.mount("sysvol", sysvol)
 
+        # Mount EFI
         if not sysvol.exists("boot/BCD"):
             for fs in target.filesystems:
                 if fs.exists("boot/BCD") or fs.exists("EFI/Microsoft/Boot/BCD"):
                     target.fs.mount("efi", fs)
+
+        # Mount WinRE
+        if not sysvol.exists("winre/Recovery/WindowsRE"):
+            for fs in target.filesystems:
+                if fs.exists("Recovery/WindowsRE") and not fs.exists("Windows/System32"):
+                    target.fs.mount("winre", fs)
 
         return cls(target)
 
@@ -273,16 +273,23 @@ class WindowsPlugin(OSPlugin):
         Returns:
             Target triple string.
         """
-
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
 
         try:
-            arch = self.target.registry.key(key).value("PROCESSOR_ARCHITECTURE").value
-            bits = ARCH_MAP.get(arch)
+            machine = self.target.registry.key(key).value("PROCESSOR_ARCHITECTURE").value
+            return target_triple(self.os, machine)
+        except RegistryError:
+            pass
 
-            if bits == 64:
-                return f"{arch}-win{bits}".lower()
-            return f"{arch}_{bits}-win{bits}".lower()
+    @export(property=True)
+    def device(self) -> str | None:
+        """Returns OEM information for this Windows system."""
+        key = "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation"
+        try:
+            key = self.target.registry.key(key)
+            manufacturer = key.value("Manufacturer").value or ""
+            model = key.value("Model").value or ""
+            return f"{manufacturer} {model}".strip()
         except RegistryError:
             pass
 

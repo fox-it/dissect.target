@@ -342,7 +342,6 @@ def test_target_diff_query(capsys: pytest.CaptureFixture, monkeypatch: pytest.Mo
 
 def test_target_diff_fs_reverse_read(target_unix_factory: TargetUnixFactory) -> None:
     """Test if we detect the difference in an appended file correctly."""
-
     src_target, fs_src = target_unix_factory.new("src_target")
     dst_target, fs_dst = target_unix_factory.new("dst_target")
     fs_src.map_file_fh("var/log/example.log", BytesIO(b"A" * 1024 * 20))

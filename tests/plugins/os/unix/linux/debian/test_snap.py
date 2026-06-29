@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 def test_snap_packages(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if snap packages are discovered on unix systems."""
-
     fs_unix.map_file_fh("/etc/hostname", BytesIO(b"hostname"))
     fs_unix.map_file(
         "/var/lib/snapd/snaps/firefox_12345.snap",

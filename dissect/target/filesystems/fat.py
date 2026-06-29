@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import math
 import stat
+from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.fat import exceptions as fat_exc
@@ -20,7 +21,7 @@ class FatFilesystem(Filesystem):
     __type__ = "fat"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
-        super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
+        super().__init__(fh, *args, case_sensitive=False, sep="\\", **kwargs)
         self.fatfs = fat.FATFS(fh)
         # FAT timestamps are in local time, so to prevent skewing them even more, we specify UTC by default.
         # However, it should be noted that they are not actual UTC timestamps!
@@ -53,6 +54,10 @@ class FatFilesystem(Filesystem):
         except fat_exc.Error as e:
             raise FileNotFoundError(path) from e
 
+    @cached_property
+    def serial(self) -> int | str | None:
+        return int(self.fatfs.volume_id, 16)
+
 
 class FatDirEntry(DirEntry):
     fs: FatFilesystem
@@ -71,7 +76,7 @@ class FatFilesystemEntry(FilesystemEntry):
 
     def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""
-        full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        full_path = fsutil.join(self.path, path, sep=self.fs.sep)
         return FatFilesystemEntry(self.fs, full_path, self.fs._get_entry(path, self.entry))
 
     def open(self) -> BinaryIO:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import stat
 from datetime import timedelta, timezone
+from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO, Optional
 
 from dissect.fat import exfat
@@ -22,7 +23,7 @@ class ExfatFilesystem(Filesystem):
     __type__ = "exfat"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
-        super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
+        super().__init__(fh, *args, case_sensitive=False, sep="\\", **kwargs)
         self.exfat = exfat.ExFAT(fh)
         self.cluster_size = self.exfat.cluster_size
 
@@ -58,6 +59,10 @@ class ExfatFilesystem(Filesystem):
 
         return dirent
 
+    @cached_property
+    def serial(self) -> int | str | None:
+        return self.exfat.vbr.volume_serial
+
 
 class ExfatDirEntry(DirEntry):
     fs: ExfatFilesystem
@@ -83,7 +88,7 @@ class ExfatFilesystemEntry(FilesystemEntry):
 
     def get(self, path: str) -> ExfatFilesystemEntry:
         """Get a filesystem entry relative from the current one."""
-        full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        full_path = fsutil.join(self.path, path, sep=self.fs.sep)
         return ExfatFilesystemEntry(self.fs, full_path, self.fs._get_entry(path, self.entry))
 
     def open(self) -> BinaryIO:

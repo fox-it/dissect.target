@@ -10,12 +10,13 @@ from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
-from dissect.target.helpers.record import WindowsUserRecord, create_extended_descriptor
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.helpers.record import WindowsUserRecord
     from dissect.target.helpers.regutil import RegistryKey
 
 TrustedDocumentsRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(

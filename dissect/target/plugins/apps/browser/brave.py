@@ -48,23 +48,23 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
     )
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/brave/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/brave/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/brave/cookie", GENERIC_COOKIE_FIELDS
+        "application/browser/brave/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/brave/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
+        "application/browser/brave/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/brave/extension", GENERIC_EXTENSION_RECORD_FIELDS
+        "application/browser/brave/extension", GENERIC_EXTENSION_RECORD_FIELDS
     )
 
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/brave/password", GENERIC_PASSWORD_RECORD_FIELDS
+        "application/browser/brave/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     @export(record=BrowserHistoryRecord)

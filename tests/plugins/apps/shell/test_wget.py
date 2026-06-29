@@ -29,6 +29,7 @@ def test_wget_hsts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Non
         google.com	0	1	1711711711	31536000
         www.python.org	0	1	1713143141	63072000
         github.com	0	1	1713371337	31536000
+        test.fr	9999	1	1696384240	31536000
         """
             ).encode()
         ),
@@ -39,11 +40,12 @@ def test_wget_hsts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Non
 
     results = sorted(target_unix_users.wget.hsts(), key=lambda r: r.host)
 
-    assert len(results) == 4
+    assert len(results) == 5
     assert [r.host for r in results] == [
         "github.com",
         "google.com",
         "mozilla.org",
+        "test.fr",
         "www.python.org",
     ]
 
@@ -52,7 +54,12 @@ def test_wget_hsts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Non
     assert results[0].username == "user"
     assert results[0].host == "github.com"
     assert not results[0].explicit_port
+    assert results[0].port is None
     assert results[0].include_subdomains
     assert results[0].ts_created == datetime(2024, 4, 17, 16, 28, 57, tzinfo=timezone.utc)
     assert results[0].max_age == datetime(2025, 4, 17, 16, 28, 57, tzinfo=timezone.utc)
     assert results[0].source == "/home/user/.wget-hsts"
+
+    assert results[3].host == "test.fr"
+    assert results[3].explicit_port
+    assert results[3].port == 9999

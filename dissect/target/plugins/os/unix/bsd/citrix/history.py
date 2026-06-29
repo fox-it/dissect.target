@@ -89,7 +89,6 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         Some entries are returned in reverse chronological order and can contain negative command order integers due
         to the way Citrix stores bash history commands.
         """
-
         for shell, history_path, user in self._history_files:
             if shell == "citrix-netscaler-cli":
                 yield from self.parse_netscaler_cli_history(history_path, user)
@@ -100,7 +99,6 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
 
     def parse_netscaler_bash_history(self, path: TargetPath) -> Iterator[CommandHistoryRecord]:
         """Parse bash.log* contents."""
-
         i = 0
         for ts, line in year_rollover_helper(path, RE_CITRIX_NETSCALER_BASH_HISTORY_DATE, "%b %d %H:%M:%S "):
             line = line.strip()

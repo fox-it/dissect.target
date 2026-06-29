@@ -6,10 +6,11 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import VirtualFile
 from dissect.target.plugins.filesystem.resolver import ResolverPlugin
 
 if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
 
@@ -72,72 +73,72 @@ def mock_user_env(user: str | None) -> OrderedDict[str, str]:
         (
             "/systemroot/test",
             None,
-            "/%systemroot%/test",
+            "\\%systemroot%\\test",
         ),
         (
             "\\systemroot\\test",
             None,
-            "/%systemroot%/test",
+            "\\%systemroot%\\test",
         ),
         (
             "/??/C:/test",
             None,
-            "C:/test",
+            "C:\\test",
         ),
         (
             "\\??\\C:\\test",
             None,
-            "C:/test",
+            "C:\\test",
         ),
         (
             '"\\??\\C:\\windows\\system32\\calc.exe" -args',
             None,
-            "C:/windows/system32/calc.exe",
+            "C:\\windows\\system32\\calc.exe",
         ),
         (
             "\\\\?\\C:\\Users\\Testpath\\Testfile",
             None,
-            "C:/Users/Testpath/Testfile",
+            "C:\\Users\\Testpath\\Testfile",
         ),
         (
             "C:/windows/system32/calc.exe -args",
             None,
-            "C:/windows/system32/calc.exe",
+            "C:\\windows\\system32\\calc.exe",
         ),
         (
             "C:/some dir with spaces/calc.exe",
             None,
-            "C:/some dir with spaces/calc.exe",
+            "C:\\some dir with spaces\\calc.exe",
         ),
         (
             "C:/some dir with spaces/calc.exe -with -arguments",
             None,
-            "C:/some dir with spaces/calc.exe",
+            "C:\\some dir with spaces\\calc.exe",
         ),
         (
             "C:/windows/system32/calc -args",
             None,
-            "C:/windows/system32/calc.exe",
+            "C:\\windows\\system32\\calc.exe",
         ),
         (
             "calc -args",
             None,
-            "sysvol/windows/syswow64/calc.exe",
+            "sysvol\\windows\\syswow64\\calc.exe",
         ),
         (
             "calc",
             "no_env_use_fallback",
-            "sysvol/windows/system32/calc.exe",
+            "sysvol\\windows\\system32\\calc.exe",
         ),
         (
             "calc",
             "1337",
-            "sysvol/some_dir/calc.exe",
+            "sysvol\\some_dir\\calc.exe",
         ),
         (
             "foo",
             "1337",
-            "sysvol/other_dir/foo.bat",
+            "sysvol\\other_dir\\foo.bat",
         ),
     ],
 )

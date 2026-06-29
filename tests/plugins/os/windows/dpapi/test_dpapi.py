@@ -16,14 +16,14 @@ from dissect.target.plugins.os.windows.dpapi.crypto import (
 from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIBlob, DPAPIPlugin, MasterKeyFile
 from tests._utils import absolute_path
 from tests.conftest import add_win_user
-from tests.plugins.os.windows.credential.test_lsa import (
+from tests.plugins.os.windows.test__os import map_version_value
+from tests.plugins.os.windows.test_lsa import (
     POLICY_KEY_PATH_NT5,
     POLICY_KEY_PATH_NT6,
     map_lsa_polkey,
     map_lsa_secrets,
     map_lsa_system_keys,
 )
-from tests.plugins.os.windows.test__os import map_version_value
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
@@ -100,7 +100,6 @@ def test_dpapi_decrypt_blob_win_10(
     plaintext: str,
 ) -> None:
     """Test decrypting a windows 10 dpapi system and user blob."""
-
     add_win_user(
         hive_hklm,
         hive_hku,
@@ -224,7 +223,6 @@ def test_dpapi_decrypt_blob_win_7(
     plaintext: str,
 ) -> None:
     """Test decrypting a windows 7 user and system blob."""
-
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(
         hive_hklm,
@@ -472,7 +470,6 @@ def test_dpapi_decrypt_blob_win_xp(
     plaintext: str,
 ) -> None:
     """Test decrypting a windows xp user and system blob."""
-
     add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
     add_win_user(
         hive_hklm,
@@ -551,7 +548,6 @@ def test_dpapi_master_keys_deduplicate(
     target_win: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive, hive_hku: VirtualHive
 ) -> None:
     """Test if we correctly deduplicate master keys."""
-
     add_win_user(
         hive_hklm,
         hive_hku,

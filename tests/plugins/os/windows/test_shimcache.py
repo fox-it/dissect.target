@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 TEST_ARGUMENTS = {
     SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER: {"path_len": 1},
     SHIMCACHE_WIN_TYPE.VERSION_WIN81: {"ts": 0, "pkg_len": 0, "pkg": "", "path_len": 0},
@@ -275,3 +276,19 @@ def test_gracefull_shutdown_crc(target_win: Target, mocked_shimcache: ShimCache)
     with patch(f"{ShimcachePlugin.__module__}.ShimcacheRecord") as mocked_record:
         list_gen = list_generator([CRCMismatchException(), (0, "path")])
         assert list(plugin._get_records(None, list_gen)) == [mocked_record.return_value]
+
+
+def test_shimcache_cachemainsdb_entry() -> None:
+    cache_data = bytes.fromhex(
+        "31307473ddeab51228000000220049004300450073006f0075006e006400410050004f00360034002e0064006c006c0000040000"
+    )
+
+    cache = ShimCache(fh=BytesIO(cache_data), ntversion="10.0", noheader=True)
+
+    assert cache.version == SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER
+
+    results = list(cache)
+    assert len(results) == 1
+    ts, path = results[0]
+    assert ts is None
+    assert path == "ICEsoundAPO64.dll"

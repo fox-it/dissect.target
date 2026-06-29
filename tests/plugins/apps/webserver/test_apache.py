@@ -12,12 +12,14 @@ from dissect.target.plugins.apps.webserver.apache import (
     LOG_FORMAT_ACCESS_COMMON,
     LOG_FORMAT_ACCESS_VHOST_COMBINED,
     ApachePlugin,
-    LogFormat,
 )
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.plugins.apps.webserver.apache import (
+        LogFormat,
+    )
     from dissect.target.target import Target
 
 
@@ -58,7 +60,7 @@ if TYPE_CHECKING:
     ],
 )
 def test_infer_access_log_format(log_line: str, expected_log_format: LogFormat) -> None:
-    """test if we infer the access log format for given log lines correctly."""
+    """Test if we infer the access log format for given log lines correctly."""
     assert ApachePlugin.infer_access_log_format(log_line) == expected_log_format
 
 
@@ -381,7 +383,6 @@ def test_all_error_log_formats(target_unix: Target, fs_unix: VirtualFilesystem) 
 
 def test_apache_virtual_hosts(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can find and parse virtual host configurations correctly."""
-
     fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(b'ServerRoot "/etc/apache2"\n'))
 
     site = r"""
@@ -419,7 +420,6 @@ def test_apache_virtual_hosts(target_unix: Target, fs_unix: VirtualFilesystem) -
 
 def test_apache_access_format_malformed_regression(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we correctly detect and parse some "malformed" access log formats."""
-
     # Combined format without e.g. 'GET / HTTP/1.1' but instead '"-"'.
     combined_without_http_phrase = b'1.2.3.4 - - [11/Nov/2025:12:34:56 +0100] "-" 418 - "-" "-"'
 
@@ -468,7 +468,6 @@ def test_apache_access_format_malformed_regression(target_unix: Target, fs_unix:
 
 def test_apache_hosts_certificates(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we can parse Apache ``VirtualHost`` certificates."""
-
     fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(b'ServerRoot "/etc/apache2"\n'))
 
     site = r"""
@@ -590,7 +589,6 @@ def test_apache_hosts_certificates_negative_serial_number(
         DNS.2 = www.monserveur.example.com
         IP.1  = 192.168.1.100
     """
-
     fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(b'ServerRoot "/etc/apache2"\n'))
 
     site = r"""

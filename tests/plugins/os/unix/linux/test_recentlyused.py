@@ -1,13 +1,19 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.recentlyused import RecentlyUsedPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_recently_used(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """Verify parsing of valid recently-used.xbel file"""
+    """Verify parsing of valid recently-used.xbel file."""
     data_file = absolute_path("_data/plugins/os/unix/linux/recently-used.xbel")
     fs_unix.map_file("/home/user/.local/share/recently-used.xbel", data_file)
     target_unix_users.add_plugin(RecentlyUsedPlugin)
@@ -27,7 +33,7 @@ def test_recently_used(target_unix_users: Target, fs_unix: VirtualFilesystem) ->
 
 
 def test_recently_used_invalid_data(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """Verify that the plugin doesn't error out on invalid data"""
+    """Verify that the plugin doesn't error out on invalid data."""
     data_file = absolute_path("_data/plugins/os/unix/linux/recently-used-invalid-data.xbel")
     fs_unix.map_file("/home/user/.local/share/recently-used.xbel", data_file)
     target_unix_users.add_plugin(RecentlyUsedPlugin)
@@ -37,7 +43,7 @@ def test_recently_used_invalid_data(target_unix_users: Target, fs_unix: VirtualF
 
 
 def test_recently_used_broken_xml(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """Verify that the plugin doesn't error out on broken XML structure"""
+    """Verify that the plugin doesn't error out on broken XML structure."""
     data_file = absolute_path("_data/plugins/os/unix/linux/recently-used-broken-xml.xbel")
     fs_unix.map_file("/home/user/.local/share/recently-used.xbel", data_file)
     target_unix_users.add_plugin(RecentlyUsedPlugin)

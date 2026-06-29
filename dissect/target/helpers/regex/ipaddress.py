@@ -53,5 +53,4 @@ def extract_ips(text: str) -> list[str]:
         - https://github.com/GCHQ/CyberChef/blob/main/src/core/operations/ExtractIPAddresses.mjs
         - https://gist.github.com/dfee/6ed3a4b05cfe7a6faf40a2102408d5d8
     """
-
     return list({match.group() for match in IP_REGEX.finditer(text)})

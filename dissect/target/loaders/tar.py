@@ -4,7 +4,7 @@ import tarfile as tf
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target import filesystem, target
+from dissect.target import filesystem
 from dissect.target.filesystems.tar import (
     TarFilesystemDirectoryEntry,
     TarFilesystemEntry,
@@ -17,6 +17,8 @@ from dissect.target.loader import Loader, SubLoader
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
+
+    from dissect.target import target
 
 
 log = get_logger(__name__)
@@ -114,7 +116,11 @@ class GenericTarSubLoader(TarSubLoader):
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             entry = entry_cls(volume, fsutil.normpath(mname), member)
-            volume.map_file_entry(entry.path, entry)
+
+            try:
+                volume.map_file_entry(entry.path, entry)
+            except KeyError as e:
+                log.debug("Skipping directory member %r in tar as %r is already mapped: %s", member, entry.path, e)
 
         for vol_name, vol in volumes.items():
             loaderutil.add_virtual_ntfs_filesystem(

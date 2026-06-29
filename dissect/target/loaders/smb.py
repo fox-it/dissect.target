@@ -19,7 +19,6 @@ from dissect.target.helpers.regutil import (
     RegistryHive,
     RegistryKey,
     RegistryValue,
-    ValueType,
 )
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
@@ -30,12 +29,16 @@ if TYPE_CHECKING:
     from pathlib import Path
     from urllib.parse import ParseResult
 
+    from impacket.dcerpc.v5 import rpcrt
     from impacket.dcerpc.v5.srvs import SHARE_INFO_1
 
+    from dissect.target.helpers.regutil import (
+        ValueType,
+    )
     from dissect.target.target import Target
 
 try:
-    from impacket.dcerpc.v5 import rpcrt, rrp, scmr, transport
+    from impacket.dcerpc.v5 import rrp, scmr, transport
     from impacket.dcerpc.v5.rpcrt import DCERPCException
     from impacket.smbconnection import SessionError, SMBConnection
 
