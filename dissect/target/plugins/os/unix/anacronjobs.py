@@ -90,7 +90,6 @@ class AnacronjobPlugin(Plugin):
         for file in self.anacrontabs:
             for line in file.open("rt"):
                 line = line.strip()
-                ts_first_exec = None
                 ts_last_exec = None
                 if line.startswith("#") or not line:
                     continue
@@ -111,7 +110,6 @@ class AnacronjobPlugin(Plugin):
                         delay_in_minutes=match.get("delay", None),
                         job_identify=job_identify,
                         command=command,
-                        ts_first_exec=ts_first_exec,
                         ts_last_exec=ts_last_exec,
                         source=file,
                         _target=self.target,
@@ -131,7 +129,6 @@ class AnacronjobPlugin(Plugin):
                                     delay_in_minutes=match.get("delay", None),
                                     job_identify=job_identify,
                                     command=f,
-                                    ts_first_exec=ts_first_exec,
                                     ts_last_exec=ts_last_exec,
                                     source=file,
                                     _target=self.target,
