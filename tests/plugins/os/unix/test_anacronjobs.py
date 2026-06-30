@@ -75,6 +75,8 @@ def test_unix_anacrontab(target_unix_users: Target, fs_unix: VirtualFilesystem) 
     assert anacronjob_records[0].job_identify == "cron.daily"
     assert anacronjob_records[0].command == "nice run-parts /etc/cron.daily"
     assert anacronjob_records[0].ts_last_exec == dt("2026-02-06 00:00:00+00:00")
+    assert anacronjob_records[0].source == "/etc/anacrontab"
+    assert anacronjob_records[0].hostname == "localhost"
 
     assert anacronjob_records[1].period_name == "1"
     assert anacronjob_records[1].delay_in_minutes == 5
@@ -82,6 +84,8 @@ def test_unix_anacrontab(target_unix_users: Target, fs_unix: VirtualFilesystem) 
     assert anacronjob_records[1].command == "/etc/cron.daily/logrotate"
     # If ts associated to timestamps files are not consistent with date in file, fallback to file content date
     assert anacronjob_records[1].ts_last_exec == dt("2026-02-06 00:00:00+00:00")
+    assert anacronjob_records[1].source == "/etc/anacrontab"
+    assert anacronjob_records[1].hostname == "localhost"
 
     assert anacronjob_records[2].period_name == "7"
     assert anacronjob_records[2].delay_in_minutes == 0
@@ -96,8 +100,11 @@ def test_unix_anacrontab(target_unix_users: Target, fs_unix: VirtualFilesystem) 
 
     assert anacronjob_records[3].ts_last_exec is None
 
+    # Test env variable
     assert environmentvariable_records[0].key == "SHELL"
     assert environmentvariable_records[0].value == "/bin/sh"
+    assert environmentvariable_records[0].source == "/etc/anacrontab"
+    assert environmentvariable_records[0].hostname == "localhost"
 
     assert environmentvariable_records[1].key == "PATH"
     assert environmentvariable_records[1].value == "/sbin:/bin:/usr/sbin:/usr/bin"
