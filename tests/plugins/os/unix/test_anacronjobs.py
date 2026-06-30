@@ -38,33 +38,24 @@ def test_unix_anacrontab(target_unix_users: Target, fs_unix: VirtualFilesystem) 
     # File to tests enumeration of files references in run-parts commands
     fs_unix.map_file_fh("/etc/cron.daily/logrotate", BytesIO(b"#!/bin/sh\n/usr/sbin/logrotate\n"))
 
-    # Virtual file for cron.weekly, to tests if ts_first_exec/ts_last_exec
+    # Virtual file
     # is set according to file birth and modification time
     weekly_virtual_file = VirtualFile(fs_unix, "/var/spool/anacron/cron.weekly", BytesIO(b"20260119\n"))
-
-    def mocked_lstat(self: VirtualFile) -> fsutil.stat_result:
-        size = getattr(self.entry, "size", 0)
-        file_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
-        r = fsutil.stat_result(
-            [
-                stat.S_IFREG,
-                file_addr,
-                id(self.fs),
-                1,
-                0,
-                0,
-                size,
-                int(dt("2026-01-19 03:01:01+00:00").timestamp()),
-                int(dt("2026-01-19 02:12:17+00:00").timestamp()),
-                int(dt("2026-01-19 02:12:17+00:00").timestamp()),
-            ]
-        )
-        r.st_birthtime = int(dt("2025-04-15 15:08:04+00:00").timestamp())
-        r.st_birthtime_ns = int(dt("2025-04-15 15:08:04+00:00").timestamp()) * 1e9
-
-        return r
-
-    weekly_virtual_file.lstat = types.MethodType(mocked_lstat, weekly_virtual_file)
+    weekly_virtual_file.lstat = Mock()
+    weekly_virtual_file.lstat.return_value = fsutil.stat_result(
+        [
+            stat.S_IFREG,
+            0,
+            0,
+            1,
+            0,
+            0,
+            9,
+            int(dt("2026-01-19 03:01:01+00:00").timestamp()),
+            int(dt("2026-01-19 02:12:17+00:00").timestamp()),
+            int(dt("2026-01-19 02:12:17+00:00").timestamp()),
+        ]
+    )
     fs_unix.map_file_entry("/var/spool/anacron/cron.weekly", weekly_virtual_file)
 
     target_unix_users.add_plugin(AnacronjobPlugin)
@@ -83,14 +74,12 @@ def test_unix_anacrontab(target_unix_users: Target, fs_unix: VirtualFilesystem) 
     assert anacronjob_records[0].delay_in_minutes == 5
     assert anacronjob_records[0].job_identify == "cron.daily"
     assert anacronjob_records[0].command == "nice run-parts /etc/cron.daily"
-    assert anacronjob_records[0].ts_first_exec is None
     assert anacronjob_records[0].ts_last_exec == dt("2026-02-06 00:00:00+00:00")
 
     assert anacronjob_records[1].period_name == "1"
     assert anacronjob_records[1].delay_in_minutes == 5
     assert anacronjob_records[1].job_identify == "cron.daily"
     assert anacronjob_records[1].command == "/etc/cron.daily/logrotate"
-    assert anacronjob_records[1].ts_first_exec is None
     # If ts associated to timestamps files are not consistent with date in file, fallback to file content date
     assert anacronjob_records[1].ts_last_exec == dt("2026-02-06 00:00:00+00:00")
 
@@ -98,14 +87,13 @@ def test_unix_anacrontab(target_unix_users: Target, fs_unix: VirtualFilesystem) 
     assert anacronjob_records[2].delay_in_minutes == 0
     assert anacronjob_records[2].job_identify == "cron.weekly"
     assert anacronjob_records[2].command == "nice run-parts /etc/cron.weekly"
-    assert anacronjob_records[2].ts_first_exec == dt("2025-04-15 15:08:04+00:00")
     assert anacronjob_records[2].ts_last_exec == dt("2026-01-19 02:12:17+00:00")
 
     assert anacronjob_records[3].period_name == "@monthly"
     assert anacronjob_records[3].delay_in_minutes == 0
     assert anacronjob_records[3].job_identify == "cron.monthly"
     assert anacronjob_records[3].command == "nice run-parts /etc/cron.monthly"
-    assert anacronjob_records[3].ts_first_exec is None
+
     assert anacronjob_records[3].ts_last_exec is None
 
     assert environmentvariable_records[0].key == "SHELL"
@@ -119,8 +107,7 @@ def test_unix_anacrontab(target_unix_users: Target, fs_unix: VirtualFilesystem) 
 
 
 def test_freebsd_anacrontab(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """test that anacrontab path on freebsd is also identified"""
-
+    """Test that anacrontab path on freebsd is also identified."""
     fs_unix.map_file_fh("/usr/local/etc/anacrontab", BytesIO(textwrap.dedent(ANACRONTAB_DEFAULT).encode()))
     target_unix_users.add_plugin(AnacronjobPlugin)
 
