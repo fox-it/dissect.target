@@ -27,7 +27,6 @@ AnacronjobRecord = TargetRecordDescriptor(
         ("varint", "delay_in_minutes"),
         ("string", "job_identify"),
         ("string", "command"),
-        ("datetime", "ts_first_exec"),  # /var/spool/anacron/job_identify birth time
         ("datetime", "ts_last_exec"),  # based on /var/spool/anacron/job_identify content and last modification time
         ("path", "source"),
     ],
