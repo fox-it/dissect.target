@@ -48,7 +48,9 @@ RE_ANACRONJOB = re.compile(
     re.VERBOSE,
 )
 
-# Spaces around VAR are removed.  No spaces around	VALUE are allowed (unless  you want them to be part of the value).
+
+# From man :
+# ``Spaces around VAR are removed. No spaces around VALUE are allowed (unless you want them to be part of the value).``
 
 RE_ENVVAR = re.compile(r"^\s*(?P<key>[a-zA-Z_]+[a-zA-Z[0-9_])\s*=(?P<value>.*)")
 
@@ -63,10 +65,10 @@ class AnacronjobPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.ancrontabs = list(self.get_paths())
+        self.anacrontabs = list(self.get_paths())
 
     def check_compatible(self) -> None:
-        if not self.ancrontabs:
+        if not self.anacrontabs:
             raise UnsupportedPluginError("No anacrontab found on target")
 
     def _get_paths(self) -> Iterator[Path]:
@@ -76,7 +78,7 @@ class AnacronjobPlugin(Plugin):
 
     @export(record=[AnacronjobRecord, EnvironmentVariableRecord])
     def anacronjobs(self) -> Iterator[AnacronjobRecord | EnvironmentVariableRecord]:
-        """Yield anacron jobs, and their configured environment variables on a Unix system
+        """Yield anacron jobs, and their configured environment variables on a Unix system.
 
         An anacron job is a scheduled task/command on a Unix based system. Adversaries may use anacronjobs to gain
         persistence on the system. This plugins also iterate over files executed using run-parts
@@ -86,8 +88,7 @@ class AnacronjobPlugin(Plugin):
             - https://man.freebsd.org/cgi/man.cgi?anacron(8)
             - https://linux.die.net/man/8/anacron
         """
-
-        for file in self.ancrontabs:
+        for file in self.anacrontabs:
             for line in file.open("rt"):
                 line = line.strip()
                 ts_first_exec = None
@@ -101,16 +102,8 @@ class AnacronjobPlugin(Plugin):
                     command = match.get("command", None)
                     if (ts_file := self.target.fs.path(f"/var/spool/anacron/{job_identify}")).exists():
                         ts_file_stat = ts_file.stat()
-                        ts_first_exec = (
-                            None
-                            if getattr(ts_file_stat, "st_birthtime", None) is None
-                            else ts.from_unix(getattr(ts_file_stat, "st_birthtime", None))
-                        )
                         ts_last_exec = ts.from_unix(ts_file_stat.st_mtime)
                         anacron_ts_value = ts_file.read_text(errors="backslashreplace").strip()
-                        if ts_first_exec and ts_first_exec.strftime("%Y%m%d") > anacron_ts_value:
-                            # incoherent value, maybe related to ts modification/data loss during collection
-                            ts_first_exec = None
                         if ts_last_exec.strftime("%Y%m%d") != anacron_ts_value:
                             # incoherent value, maybe related to ts modification/data loss during collection
                             ts_last_exec = datetime.datetime.strptime(anacron_ts_value, "%Y%m%d")  # noqa: DTZ007

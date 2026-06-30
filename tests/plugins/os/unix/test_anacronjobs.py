@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import stat
 import textwrap
-import types
 from io import BytesIO
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 from flow.record.fieldtypes import datetime as dt
 
