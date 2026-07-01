@@ -49,7 +49,7 @@ class GnomeTrashPlugin(Plugin):
 
         # mounted devices trash folders
         for mount_path in [*self.target.fs.mounts, "/mnt", "/media"]:
-            if mount_path == "/":
+            if mount_path in ("/", "/boot", "/boot/efi"):
                 continue
 
             for mount_trash in self.target.fs.path(mount_path).rglob(".Trash-*"):

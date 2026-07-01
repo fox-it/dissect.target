@@ -91,7 +91,10 @@ def test_gnome_trash_mounts(target_unix_users: Target, fs_unix: VirtualFilesyste
     fs_unix.map_dir("tmp/example/.Trash-5678", absolute_path("_data/plugins/os/unix/trash"))
     fs_unix.map_dir("media/user/example/.Trash-1000", absolute_path("_data/plugins/os/unix/trash"))
 
-    with patch.object(target_unix_users.fs, "mounts", {"/tmp/example": None, "/mnt/example": None}):
+    # Make sure boot partitions are ignored as it does not make sense to scan those for Trash folders.
+    fs_unix.makedirs("boot/efi/.Trash-1337")
+
+    with patch.object(target_unix_users.fs, "mounts", {"/tmp/example": None, "/mnt/example": None, "/boot/efi": None}):
         target_unix_users.add_plugin(UnixPlugin)
         plugin = GnomeTrashPlugin(target_unix_users)
 
