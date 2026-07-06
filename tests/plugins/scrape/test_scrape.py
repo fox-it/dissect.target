@@ -138,5 +138,5 @@ def test_find(target_bare: Target) -> None:
         assert offset == 1024 * 64
         assert not match  # only for regex matches
 
-    for i in range(0, 1024 * 128, 8192):
+    for i in range(0, 1024 * 128, io.DEFAULT_BUFFER_SIZE):
         mock_progress.assert_any_call(mock_disk, i, 1024 * 128)
