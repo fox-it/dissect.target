@@ -226,6 +226,9 @@ class ShimCache:
             self.noheader = True
             return SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER
 
+        if magic == MAGIC_WIN81 and self.noheader:
+            return SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER
+
         if len(d) >= 0x84 and c_shim.uint32(d[0x80:0x84]) == MAGIC_WIN81:
             return SHIMCACHE_WIN_TYPE.VERSION_WIN81
 

@@ -42,7 +42,7 @@ class ApfsFilesystem(Filesystem):
                 log.debug("", exc_info=e)
             else:
                 self._volumes.append(vol)
-                self.vfs.map_file_entry(vol.volume.name, vol.get("/"))
+                self.vfs.map_file_entry(vol.apfs.name, vol.get("/"))
 
     def __repr__(self) -> str:
         return f"<Filesystem type={self.__type__} volumes={len(self._volumes)}>"
@@ -98,7 +98,8 @@ class ApfsVolumeFilesystem(Filesystem):
 
         super().__init__(
             container.volume,
-            alt_separator=container.alt_separator,
+            sep=container.sep,
+            altsep=container.altsep,
             case_sensitive=not self.apfs.is_case_insensitive,
         )
 
@@ -152,7 +153,7 @@ class ApfsFilesystemEntry(FilesystemEntry):
     entry: INode
 
     def get(self, path: str) -> FilesystemEntry:
-        entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        entry_path = fsutil.join(self.path, path, sep=self.fs.sep)
         entry = self.fs._get_node(path, self.entry)
         return ApfsFilesystemEntry(self.fs, entry_path, entry)
 
