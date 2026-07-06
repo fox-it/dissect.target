@@ -65,14 +65,11 @@ class CommandHistoryPlugin(Plugin):
         for user_details in self.target.user_details.all_with_home():
             for shell, history_relative_path in self.COMMAND_HISTORY_RELATIVE_PATHS:
                 if "*" in history_relative_path:
-                    base, _, glob = history_relative_path.partition("*")
-                    history_dir = user_details.home_path.joinpath(base)
-                    if history_dir.is_dir():
-                        history_files.extend(
-                            (shell, history_path, user_details.user)
-                            for history_path in history_dir.glob(f"*{glob}")
-                            if history_path.is_file()
-                        )
+                    history_files.extend(
+                        (shell, history_path, user_details.user)
+                        for history_path in user_details.home_path.glob(history_relative_path)
+                        if history_path.is_file()
+                    )
                 else:
                     history_path = user_details.home_path.joinpath(history_relative_path)
                     if history_path.is_file():
