@@ -61,19 +61,6 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         ("citrix-netscaler-cli", ".nscli_history"),
     )
 
-    def _find_history_files(self) -> list[tuple[str, TargetPath, UnixUserRecord | None]]:
-        """Find history files on the target that this plugin can parse."""
-        history_files = []
-        for shell, history_absolute_path_glob in self.COMMAND_HISTORY_ABSOLUTE_PATHS:
-            history_files.extend(
-                (shell, path, None) for path in self.target.fs.path("/").glob(history_absolute_path_glob.lstrip("/"))
-            )
-
-        # Also utilize the _find_history_files function of the parent class for relative paths.
-        history_files.extend(super()._find_history_files())
-
-        return history_files
-
     def _find_user_by_name(self, username: str) -> UnixUserRecord | None:
         """Cached function to return the matching UnixUserRecord for a given username."""
         if username is None:
