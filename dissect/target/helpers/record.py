@@ -161,6 +161,17 @@ IOSUserRecord = TargetRecordDescriptor(
     COMMON_UNIX_FIELDS,
 )
 
+AndroidUserRecord = TargetRecordDescriptor(
+    "android/user",
+    [
+        *COMMON_UNIX_FIELDS,
+        ("string", "usertype"),
+        ("datetime", "last_login"),
+        ("datetime", "last_foreground"),
+        ("varint", "flags"),
+    ],
+)
+
 EmptyRecord = RecordDescriptor(
     "empty",
     [],
