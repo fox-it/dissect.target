@@ -28,35 +28,35 @@ def test_macos_os(target_macos_users: Target, fs_macos: VirtualFilesystem) -> No
     assert target_macos_users.version == "macOS 15.4 (24E248)"
     assert target_macos_users.architecture == "x86_64-apple-macos"
 
-    users = list(target_macos_users.users())
+    users = sorted(target_macos_users.users(), key=lambda r: r.name)
     assert len(users) == 3
 
-    assert users[0].name == "root"
+    assert users[0].name == "_dissect"
     assert users[0].passwd == "*"
-    assert users[0].uid == 0
-    assert users[0].gid == 0
-    assert users[0].gecos == "System Administrator"
-    assert users[0].home == "/var/root"
-    assert users[0].shell == "/bin/sh"
-    assert users[0].source == "/private/var/db/dslocal/nodes/Default/users/root.plist"
+    assert users[0].uid == 1337
+    assert users[0].gid == 1337
+    assert users[0].gecos == "Dissect"
+    assert users[0].home == "/Users/dissect"
+    assert users[0].shell == "/usr/bin/false"
+    assert users[0].source == "/private/var/db/dslocal/nodes/Default/users/_dissect.plist"
 
-    assert users[1].name == "_dissect"
-    assert users[1].passwd == "*"
-    assert users[1].uid == 1337
-    assert users[1].gid == 1337
-    assert users[1].gecos == "Dissect"
-    assert users[1].home == "/Users/dissect"
-    assert users[1].shell == "/usr/bin/false"
-    assert users[1].source == "/private/var/db/dslocal/nodes/Default/users/_dissect.plist"
+    assert users[1].name == "alexmaurie"
+    assert users[1].passwd == "********"
+    assert users[1].uid == 501
+    assert users[1].gid == 20
+    assert users[1].gecos == "Alex Maurie"
+    assert users[1].home == "/Users/alexmaurie"
+    assert users[1].shell == "/bin/zsh"
+    assert users[1].source == "/private/var/db/dslocal/nodes/Default/users/alexmaurie.plist"
 
-    assert users[2].name == "alexmaurie"
-    assert users[2].passwd == "********"
-    assert users[2].uid == 501
-    assert users[2].gid == 20
-    assert users[2].gecos == "Alex Maurie"
-    assert users[2].home == "/Users/alexmaurie"
-    assert users[2].shell == "/bin/zsh"
-    assert users[2].source == "/private/var/db/dslocal/nodes/Default/users/alexmaurie.plist"
+    assert users[2].name == "root"
+    assert users[2].passwd == "*"
+    assert users[2].uid == 0
+    assert users[2].gid == 0
+    assert users[2].gecos == "System Administrator"
+    assert users[2].home == "/var/root"
+    assert users[2].shell == "/bin/sh"
+    assert users[2].source == "/private/var/db/dslocal/nodes/Default/users/root.plist"
 
 
 def test_apfs_mounts(target_bare: Target) -> None:
