@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-AndroidTombstonesRecord = TargetRecordDescriptor(
+AndroidTombstoneRecord = TargetRecordDescriptor(
     "android/tombstone",
     [
         ("datetime", "ts"),
@@ -31,16 +31,24 @@ AndroidTombstonesRecord = TargetRecordDescriptor(
 )
 
 
-class AndroidTombstonesPlugin(Plugin):
-    """Android tombstones plugin."""
+class AndroidTombstonePlugin(Plugin):
+    """Android tombstone plugin."""
 
     def check_compatible(self) -> None:
         if self.target.os != OperatingSystem.ANDROID:
             raise UnsupportedPluginError("Target is not Android")
 
-    @export(record=AndroidTombstonesRecord)
-    def tombstones(self) -> Iterator[AndroidTombstonesRecord]:
+    @export(record=AndroidTombstoneRecord)
+    def tombstones(self) -> Iterator[AndroidTombstoneRecord]:
         """Yield Android tombstone records.
+
+        When a dynamically linked executable starts on Android, several signal handlers are registered that,
+        in the event of a crash, cause a basic crash dump to be written to logcat and a more detailed tombstone
+        file to be written to ``/data/tombstones/``.
+
+        The tombstone is a file with extra data about the crashed process. In particular, it contains stack traces
+        for all the threads in the crashing process (not just the thread that caught the signal), a full memory map,
+        and a list of all open file descriptors.
 
         References:
             - https://source.android.com/docs/core/tests/debug
@@ -48,9 +56,13 @@ class AndroidTombstonesPlugin(Plugin):
         for path in self.target.fs.path("/").glob("*/tombstones/tombstone_*"):
             if path.suffix == ".pb":
                 continue
-            yield self.read_tombstone(path)
+            try:
+                yield self.read_tombstone(path)
+            except Exception as e:
+                self.target.log.warning("Failed to parse tombstone file %s: %s", path, e)
+                self.target.log.debug("", exc_info=e)
 
-    def read_tombstone(self, path: Path) -> AndroidTombstonesRecord:
+    def read_tombstone(self, path: Path) -> AndroidTombstoneRecord:
         """Read and parse a tombstone file."""
         timestamp = None
         app_id = None
@@ -61,34 +73,35 @@ class AndroidTombstonesPlugin(Plugin):
         signal_uid = None
         signal_pid = None
 
-        for i, line in enumerate(path.open("rt")):
-            # Prevent reading too far into signal or backtrace as most
-            # metadata is put in the first 10 lines of the tombstone.
-            if i > 10:
-                break
+        with path.open("rt") as fh:
+            for i, line in enumerate(fh):
+                # Prevent reading too far into signal or backtrace as most
+                # metadata is put in the first 10 lines of the tombstone.
+                if i > 10:
+                    break
 
-            if line.startswith("Timestamp: "):
-                timestamp = parse_long_ms_ts(line.split(": ")[1].strip())
-            if line.startswith("Process uptime: "):
-                process_uptime = int(line.split(": ")[1].strip().replace("s", ""))
-            if line.startswith("Cmdline: "):
-                cmd_line = line.split(": ")[1].strip()
-            if line.startswith("pid: "):
-                parts = line.split(": ")
-                pid = int(parts[1].split(",")[0])
-                tid = int(parts[2].split(",")[0])
-            if line.startswith("uid: "):
-                signal_uid = int(line.split(": ")[-1].strip())
-            if ">>>" in line and "<<<" in line:
-                app_id = line.split(">>>")[1].split("<<<")[0].strip()
-            if "from pid " in line:
-                signal_pid = int(line.split("from pid ")[-1].split(",")[0].strip())
+                if line.startswith("Timestamp: "):
+                    timestamp = parse_long_ms_ts(line.split(": ")[1].strip())
+                if line.startswith("Process uptime: "):
+                    process_uptime = int(line.split(": ")[1].strip().replace("s", ""))
+                if line.startswith("Cmdline: "):
+                    cmd_line = line.split(": ")[1].strip()
+                if line.startswith("pid: "):
+                    parts = line.split(": ")
+                    pid = int(parts[1].split(",")[0])
+                    tid = int(parts[2].split(",")[0])
+                if line.startswith("uid: "):
+                    signal_uid = int(line.split(": ")[-1].strip())
+                if ">>>" in line and "<<<" in line:
+                    app_id = line.split(">>>")[1].split("<<<")[0].strip()
+                if "from pid " in line:
+                    signal_pid = int(line.split("from pid ")[-1].split(",")[0].strip())
 
         if timestamp is None:
             stat = path.stat()
             timestamp = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
 
-        return AndroidTombstonesRecord(
+        return AndroidTombstoneRecord(
             ts=timestamp,
             app_id=app_id,
             pid=pid,

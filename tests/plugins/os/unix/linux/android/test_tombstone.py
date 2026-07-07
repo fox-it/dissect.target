@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING
 
-from dissect.target.plugins.os.unix.linux.android.tombstones import AndroidTombstonesPlugin
+from dissect.target.plugins.os.unix.linux.android.tombstone import AndroidTombstonePlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -17,7 +17,7 @@ def test_android_tombstone(target_android: Target, fs_android: VirtualFilesystem
         "/data/tombstones/tombstone_01", absolute_path("_data/plugins/os/unix/linux/android/system/tombstone_01")
     )
 
-    target_android.add_plugin(AndroidTombstonesPlugin)
+    target_android.add_plugin(AndroidTombstonePlugin)
     records = list(target_android.tombstones())
 
     assert records[0].ts == datetime.datetime.fromisoformat("2026-05-04 15:30:00.123456+00:00")
