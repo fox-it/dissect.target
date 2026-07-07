@@ -61,3 +61,7 @@ class DefaultOSPlugin(OSPlugin):
     @export(property=True)
     def architecture(self) -> str | None:
         pass
+
+    @export(property=True)
+    def device(self) -> str | None:
+        pass

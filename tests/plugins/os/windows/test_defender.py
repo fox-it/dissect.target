@@ -76,9 +76,9 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
 
     target_win.add_plugin(MicrosoftDefenderPlugin)
 
-    records = list(target_win.defender.quarantine())
+    records = sorted(target_win.defender.quarantine(), key=lambda r: r.ts)
 
-    assert len(records) == 1
+    assert len(records) == 8
 
     # Test whether the quarantining of a Mimikatz binary is properly parsed.
     mimikatz_record = records[0]
@@ -92,10 +92,61 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert mimikatz_record.creation_time.date() == detection_date
     assert mimikatz_record.last_write_time.date() == detection_date
     assert mimikatz_record.last_accessed_time.date() == detection_date
+    assert mimikatz_record.file_size == 37376
 
     assert mimikatz_record.quarantine_id == "a762038000000000fb1112639186e0d6"
     assert mimikatz_record.scan_id == "cdbe4600e43a964b8dc2416b0ef7a207"
     assert mimikatz_record.threat_id == 2147705511
+
+    ie_records = sorted(
+        [r for r in records if r.quarantine_id == "229c0170000000004d02ef183c202f42"], key=lambda r: r.ts
+    )
+    assert len(ie_records) == 2
+
+    ie_file_record = ie_records[0]
+    assert ie_file_record.detection_type == "file"
+    assert ie_file_record.detection_path == (
+        "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
+    )
+    assert ie_file_record.file_size == 1784
+
+    ie_startup_record = ie_records[1]
+    assert ie_startup_record.detection_type == "startup"
+    assert ie_startup_record.detection_path == (
+        "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
+    )
+
+    tasksched_records = sorted(
+        [r for r in records if r.quarantine_id == "3c1f228000000000270c270b71d096cd"], key=lambda r: r.ts
+    )
+    assert len(tasksched_records) == 5
+
+    regkey_records = sorted([r for r in tasksched_records if r.detection_type == "regkey"], key=lambda r: r.ts)
+    assert len(regkey_records) == 2
+    assert regkey_records[0].detection_name == "HackTool:Win32/AutoKMS"
+    assert regkey_records[0].detection_path == (
+        "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\Tree\\KMSAuto"
+    )
+    assert regkey_records[1].detection_path == (
+        "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\"
+        "Tasks\\{EBCB386F-05C8-4545-9455-922990114435}"
+    )
+
+    file_records = sorted([r for r in tasksched_records if r.detection_type == "file"], key=lambda r: r.ts)
+    assert len(file_records) == 2
+    assert file_records[0].detection_path == "C:\\WINDOWS\\System32\\Tasks\\KMSAuto"
+    assert file_records[0].resource_id == "FCC63B61E24395BA6AA3E40EA16E3D2DD24A2916"
+    assert file_records[0].file_size == 3108
+    assert file_records[1].detection_path == "C:\\Windows\\KMSAutoS\\KMSAuto x64.exe"
+    assert file_records[1].file_size == 1711464
+
+    ts_records = sorted([r for r in tasksched_records if r.detection_type == "taskscheduler"], key=lambda r: r.ts)
+    assert len(ts_records) == 1
+    ts_record = ts_records[0]
+    assert ts_record.detection_type == "taskscheduler"
+    assert ts_record.detection_name == "HackTool:Win32/AutoKMS"
+    assert ts_record.detection_path == "C:\\WINDOWS\\System32\\Tasks\\KMSAuto"
+    assert ts_record.file_size is None
 
 
 def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:

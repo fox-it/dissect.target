@@ -81,7 +81,7 @@ class DirectoryFilesystemEntry(FilesystemEntry):
     entry: Path
 
     def get(self, path: str) -> FilesystemEntry:
-        path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        path = fsutil.join(self.path, path, sep=self.fs.sep)
         return self.fs.get(path)
 
     def open(self) -> BinaryIO:
@@ -108,12 +108,6 @@ class DirectoryFilesystemEntry(FilesystemEntry):
 
         for item in self._resolve().entry.iterdir():
             yield DirectoryDirEntry(self.fs, self.path, item.name, item)
-
-    def exists(self) -> bool:
-        try:
-            return self._resolve().entry.exists()
-        except FilesystemError:
-            return False
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

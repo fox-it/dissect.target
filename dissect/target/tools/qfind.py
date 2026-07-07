@@ -105,7 +105,7 @@ def main() -> int:
                         if not NO_COLOR
                         else None
                     )
-                    utils.hexdump(hit.buffer, palette, offset=before_offset)
+                    utils.hexdump(hit.buffer, palette=palette, offset=before_offset)
 
                 else:
                     codec = "utf-8" if hit.codec == "hex" else hit.codec
