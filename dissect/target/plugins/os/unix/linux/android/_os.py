@@ -5,11 +5,6 @@ from typing import TYPE_CHECKING
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
-from dissect.target.plugins.os.unix.linux.android.util.properties import (
-    find_build_props,
-    parse_build_props,
-    read_persistent_props,
-)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -24,15 +19,6 @@ class AndroidPlugin(LinuxPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self.target = target
-        self.props = {}
-
-        # Populate props with Android build.prop files.
-        self.build_prop_paths = list(find_build_props(self.target.fs))
-        self.props.update(parse_build_props(self.build_prop_paths))
-
-        # Add persistent properties (``persist.*``) to props.
-        if (dir := self.target.fs.path("/data/property")).is_dir():
-            self.props.update(read_persistent_props(dir))
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
@@ -50,7 +36,7 @@ class AndroidPlugin(LinuxPlugin):
 
     @export(property=True)
     def hostname(self) -> str | None:
-        return self.props.get("ro.build.host")
+        return self.target.property.get("ro.build.host")
 
     @export(property=True)
     def ips(self) -> list[str]:
@@ -61,13 +47,13 @@ class AndroidPlugin(LinuxPlugin):
         """Return the version of this Android system."""
         version = "Android"
 
-        if release_version := self.props.get("ro.build.version.release"):
+        if release_version := self.target.property.get("ro.build.version.release"):
             version += f" {release_version}"
 
-        if build_id := self.props.get("ro.build.id"):
+        if build_id := self.target.property.get("ro.build.id"):
             version += f" {build_id}"
 
-        if security_patch_version := self.props.get("ro.build.version.security_patch"):
+        if security_patch_version := self.target.property.get("ro.build.version.security_patch"):
             version += f" ({security_patch_version})"
 
         return version
@@ -86,11 +72,11 @@ class AndroidPlugin(LinuxPlugin):
     @export(property=True)
     def device(self) -> str | None:
         """Return the device brand, model and name of this Android system."""
-        manufacturer = self.props.get("ro.product.vendor.manufacturer", "").capitalize()
-        device = self.props.get("ro.product.vendor.device", "").upper()
-        model = self.props.get("ro.product.vendor.model", "")
+        manufacturer = self.target.property.get("ro.product.vendor.manufacturer", "").capitalize()
+        device = self.target.property.get("ro.product.vendor.device", "").upper()
+        model = self.target.property.get("ro.product.vendor.model", "")
         _device = f"{manufacturer} {device} {model}"
-        if name := self.props.get("ro.product.vendor.name"):
+        if name := self.target.property.get("ro.product.vendor.name"):
             _device += f" ({name})"
 
         return _device.strip() or None

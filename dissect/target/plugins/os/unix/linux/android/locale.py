@@ -15,11 +15,11 @@ class LocalePlugin(Plugin):
     @export(property=True)
     def timezone(self) -> str | None:
         """Return the configured localtime of the Android system."""
-        return self.target._os.props.get("persist.sys.timezone")
+        return self.target.property.get("persist.sys.timezone")
 
     @export(property=True)
     def language(self) -> list[str]:
         """Return the configured language(s) of the Android system."""
-        if locale := self.target._os.props.get("persist.sys.locale"):
+        if locale := self.target.property.get("persist.sys.locale"):
             return [normalize_language(locale)]
         return []

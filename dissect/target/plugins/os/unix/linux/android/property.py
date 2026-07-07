@@ -4,17 +4,48 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.cstruct import cstruct
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import configutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.protobuf import ProtobufVarint
+from dissect.target.plugin import InternalPlugin, OperatingSystem
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
+
 
 log = get_logger(__name__)
+
+
+class PropertyPlugin(InternalPlugin):
+    """Android Property plugin."""
+
+    __namespace__ = "property"
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+
+        self.props: dict[str, Any] = {}
+
+        # Populate props with Android build.prop files.
+        self.build_prop_paths = list(find_build_props(self.target.fs))
+        self.props.update(parse_build_props(self.build_prop_paths))
+
+        # Add persistent properties (``persist.*``) to props.
+        if (dir := self.target.fs.path("/data/property")).is_dir():
+            self.props.update(read_persistent_props(dir))
+
+    def check_compatible(self) -> None:
+        if self.target.os != OperatingSystem.ANDROID:
+            raise UnsupportedPluginError("Target is not Android")
+
+    def get(self, key: str, default: Any | None = None) -> Any | None:
+        """Attempt to return the value of the provided property key."""
+        return self.props.get(key, default)
 
 
 def find_build_props(fs: Filesystem) -> Iterator[Path]:
