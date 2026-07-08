@@ -543,9 +543,9 @@ def _get_log_dir_from_target(target: Target) -> str:
     log_dir = "/scratch/log"
     if target.has_function("configstore.get"):
         try:
-            log_dir = target.configstore.get(
-                "esx", "syslog", "global_settings", "", default={}
-            )["user_value"]["log_dir"]
+            log_dir = target.configstore.get("esx", "syslog", "global_settings", "", default={})["user_value"][
+                "log_dir"
+            ]
         except KeyError:
             target.log.warning("Failed to read log_dir from configstore, falling back to /scratch/log")
 
