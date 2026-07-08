@@ -555,15 +555,17 @@ def test_plugin_argument_handling(capsys: pytest.CaptureFixture, monkeypatch: py
                 "walkfs",
                 "--walkfs-path",
                 "/path/to/symlink",
-                str(absolute_path("_data/filesystems/symlink_disk.ext4")),
+                str(absolute_path("_data/filesystems/filesystem.ext4")),
             ],
         )
 
         target_query()
 
-    out, _ = capsys.readouterr()
+    out, _err = capsys.readouterr()
+
+    # We expect these two inodes in /path/to/symlink
     assert "ino=14" in out
-    assert "ino=15" in out
+    assert "ino=16" in out
     assert len(out.splitlines()) == 2
 
 
@@ -581,7 +583,7 @@ def test_plugin_argument_unknown(capsys: pytest.CaptureFixture, monkeypatch: pyt
                 "--some-unknown-arg=/usr/local/bin",
                 "--rules",
                 str(absolute_path("tests/_data/plugins/filesystem/yara/rule-dir/rule.yar")),
-                str(absolute_path("_data/filesystems/symlink_disk.ext4")),
+                str(absolute_path("_data/filesystems/filesystem.ext4")),
             ],
         )
 
