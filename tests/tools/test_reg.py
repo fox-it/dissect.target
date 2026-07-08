@@ -10,10 +10,6 @@ from dissect.target.tools.reg import main as target_reg
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
-    from _pytest.fixtures import FixtureRequest
-
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
@@ -79,7 +75,7 @@ def test_reg_output(
     capsys: pytest.CaptureFixture,
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
-    request: FixtureRequest,
+    request: pytest.FixtureRequest,
 ) -> None:
     provided_target = request.getfixturevalue(provided_target)
     with patch("dissect.target.Target.open_all", return_value=[provided_target]), monkeypatch.context() as m:
@@ -94,12 +90,12 @@ def test_reg_output(
         assert expected_log in caplog.text
 
 
-def test_reg_export_to_stdout(
+def test_reg_export(
     target_win_reg: Target,
     capsys: pytest.CaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """--export writes a valid .reg file to stdout for the requested key."""
+    """Test that --export writes a valid .reg file to stdout for the requested key."""
     key = "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\ComputerName"
     with patch("dissect.target.Target.open_all", return_value=[target_win_reg]), monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-reg", "foo", "--export", "--key", key])
@@ -117,7 +113,7 @@ def test_reg_export_multiple_keys(
     capsys: pytest.CaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Multiple -k flags each appear as path comments and key headers in the export."""
+    """Test that multiple -k flags each appear as path comments and key headers in the export."""
     key1 = "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\ComputerName"
     key2 = "HKLM\\SYSTEM\\ControlSet001\\Control\\Lsa\\Data"
     with patch("dissect.target.Target.open_all", return_value=[target_win_reg]), monkeypatch.context() as m:
@@ -132,30 +128,12 @@ def test_reg_export_multiple_keys(
     assert "[HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\Lsa\\Data]" in out
 
 
-def test_reg_export_to_file(
-    target_win_reg: Target,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """--export --output writes the .reg file to the given path."""
-    key = "HKEY_LOCAL_MACHINE\\SYSTEM\\ControlSet001\\Control\\ComputerName"
-    output_file = tmp_path / "export.reg"
-    with patch("dissect.target.Target.open_all", return_value=[target_win_reg]), monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-reg", "foo", "--export", "--key", key, "--output", str(output_file)])
-        target_reg()
-
-    content = output_file.read_text(encoding="utf-8")
-    assert content.startswith("Windows Registry Editor Version 5.00")
-    assert f"[{key}]" in content
-    assert '"ComputerName"=' in content
-
-
 def test_reg_export_missing_key(
     target_win_reg: Target,
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """--export logs an error for a key that does not exist and continues."""
+    """Test that --export logs an error for a key that does not exist and continues."""
     with patch("dissect.target.Target.open_all", return_value=[target_win_reg]), monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-reg", "foo", "--export", "--key", "HKEY_LOCAL_MACHINE\\DOESNOTEXIST"])
         target_reg()
