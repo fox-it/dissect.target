@@ -42,7 +42,7 @@ class ApfsFilesystem(Filesystem):
                 log.debug("", exc_info=e)
             else:
                 self._volumes.append(vol)
-                self.vfs.map_file_entry(vol.volume.name, vol.get("/"))
+                self.vfs.map_file_entry(vol.apfs.name, vol.get("/"))
 
     def __repr__(self) -> str:
         return f"<Filesystem type={self.__type__} volumes={len(self._volumes)}>"
