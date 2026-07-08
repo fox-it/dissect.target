@@ -344,7 +344,8 @@ def generate_argparse_for_method(
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
-    _add_args_to_parser(parser, getattr(method, "__args__", []))
+    for args, kwargs in getattr(method, "__args__", []):
+        parser.add_argument(*args, **kwargs)
 
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
@@ -369,7 +370,8 @@ def generate_argparse_for_plugin_class(
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
-    _add_args_to_parser(parser, getattr(plugin_cls.__call__, "__args__", []))
+    for args, kwargs in getattr(plugin_cls.__call__, "__args__", []):
+        parser.add_argument(*args, **kwargs)
 
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
@@ -392,27 +394,6 @@ def generate_argparse_for_plugin(
         raise ValueError(f"Plugin `{plugin_instance}` is not a namespace plugin and is not callable")
 
     return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
-
-
-def _add_args_to_parser(
-    parser: argparse.ArgumentParser,
-    fargs: list[tuple[list[str], dict[str, Any]]],
-) -> None:
-    groups = {}
-    default_group_options = {"required": False}
-    for args, kwargs in fargs:
-        if "group" in kwargs:
-            group_name = kwargs.pop("group")
-            options = kwargs.pop("group_options") if "group_options" in kwargs else default_group_options
-            if group_name not in groups:
-                group = parser.add_mutually_exclusive_group(**options)
-                groups[group_name] = group
-            else:
-                group = groups[group_name]
-
-            group.add_argument(*args, **kwargs)
-        else:
-            parser.add_argument(*args, **kwargs)
 
 
 def execute_function_on_target(

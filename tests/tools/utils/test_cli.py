@@ -152,20 +152,6 @@ def test_plugin_name_confusion_regression(target_unix_users: Target, pattern: st
     assert expected_function in str(exc_info.value)
 
 
-def test_plugin_mutual_exclusive_arguments() -> None:
-    fargs = [
-        (("--aa",), {"group": "aa"}),
-        (("--bb",), {"group": "aa"}),
-        (("--cc",), {"group": "bb"}),
-        (("--dd",), {"group": "bb"}),
-    ]
-    method = test_plugin_mutual_exclusive_arguments
-    method.__args__ = fargs
-    with patch("inspect.isfunction", return_value=True):
-        parser = generate_argparse_for_method(method)
-    assert len(parser._mutually_exclusive_groups) == 2
-
-
 def test_namespace_plugin_args() -> None:
     class Fake(Plugin):
         __namespace__ = "fake"
