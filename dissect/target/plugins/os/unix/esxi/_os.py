@@ -297,9 +297,7 @@ class ESXiPlugin(UnixPlugin):
             self.target.log.warning("No configstore found, unable to mount NFS shares")
             return
 
-        nfs_shares: dict[str, Any] = self.target.configstore.get(
-            "esx", "storage", "nfs_v3_datastores", default={}
-        )
+        nfs_shares: dict[str, Any] = self.target.configstore.get("esx", "storage", "nfs_v3_datastores", default={})
         if not nfs_shares:
             if self._is_nfs_enabled:
                 self.target.log.info("No NFS shares found in datastore")
