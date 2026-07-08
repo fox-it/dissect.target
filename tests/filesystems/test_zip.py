@@ -250,3 +250,21 @@ def test_benchmark_zip_filesystem(
         list(fs.get("LARGE").scandir())
 
     benchmark(benchy)
+
+
+def test_skip_folder_member_if_previously_mapped() -> None:
+    """Test if we skip a directory zip member if the path of said directory is already mapped."""
+    buf = io.BytesIO()
+    zf = zipfile.ZipFile(file=buf, mode="w")
+    zf.writestr("folder/file", b"file contents")  # write the file member first
+    _mkdir(zf, "folder")  # then write the 'empty' dir member
+    zf.close()
+    buf.seek(0)
+    fs = ZipFilesystem(buf)
+
+    # Sanity check
+    assert list(fs.get("/").iterdir()) == ["folder"]
+
+    # Make sure the /folder/file entry is mapped.
+    assert list(fs.get("/folder").iterdir()) == ["file"]
+    assert fs.get("/folder/file").open().read() == b"file contents"
