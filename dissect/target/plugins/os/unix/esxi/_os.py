@@ -298,7 +298,7 @@ class ESXiPlugin(UnixPlugin):
             return
 
         nfs_shares: dict[str, Any] = self.target.configstore.get(
-            component="esx", config_groupe="storage", value_groupe_name="nfs_v3_datastores", default={}
+            "esx", "storage", "nfs_v3_datastores", default={}
         )
         if not nfs_shares:
             if self._is_nfs_enabled:
