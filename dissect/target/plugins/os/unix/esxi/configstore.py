@@ -26,7 +26,7 @@ class ConfigstorePlugin(Plugin):
         # ESXi 7 introduced the configstore
         # It's made available at /etc/vmware/configstore/current-store-1 during boot, but stored at
         # /var/lib/vmware/configstore/backup/current-store-1 in local.tgz
-        # On live collection (uac, vm-support), this is file is located at the /etc path
+        # On live collection (uac, vm-support), this file is located at the /etc path
         # As this plugin is used by the EsxiOs plugin, we test both paths.
         if (path := self.target.fs.path("/etc/vmware/configstore/current-store-1")).exists() or (
             path := self.target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")
