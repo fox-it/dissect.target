@@ -541,7 +541,7 @@ def _get_log_dir_from_target(target: Target) -> str:
     # After ESXi7, log dir location is stored in the configstore.
     # As retrieving version is not easy, we just check if configstore exists.
     log_dir = "/scratch/log"
-    if target.has_function("configstore.get"):
+    if target.has_function("configstore"):
         try:
             log_dir = target.configstore.get("esx", "syslog", "global_settings", "", default={})["user_value"][
                 "log_dir"
