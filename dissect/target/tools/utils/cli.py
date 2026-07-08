@@ -494,8 +494,20 @@ def args_to_uri(targets: list[str], loader_name: str, args: list[str] | None = N
 
 
 def find_and_filter_plugins(
-    functions: str, target: Target, excluded_func_paths: set[str] | None = None
+    functions: str,
+    target: Target,
+    excluded_func_paths: set[str] | None = None,
+    plugin_paths: list[Path] | None = None,
 ) -> Iterator[FunctionDescriptor]:
+    """Find and filter plugins for the given functions and target.
+
+    If ``plugin_paths`` are provided, they are loaded before plugin discovery
+    to ensure external plugins are included in the results.
+    """
+    if plugin_paths:
+        paths = get_external_module_paths(plugin_paths)
+        load_modules_from_paths(paths)
+
     # Keep a set of plugins that were already executed on the target.
     executed_plugins = set()
     excluded_func_paths = excluded_func_paths or set()

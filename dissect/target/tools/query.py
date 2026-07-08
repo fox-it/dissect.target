@@ -125,6 +125,7 @@ def main() -> int:
         functions=args.function or "",
         target=None,
         excluded_func_paths=args.excluded_functions,
+        plugin_paths=args.plugin_path or [],
     ):
         plugin_args = func_desc.args
         for opts, kwargs in plugin_args:
