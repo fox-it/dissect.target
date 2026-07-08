@@ -130,7 +130,7 @@ class ESXiPlugin(UnixPlugin):
 
     @export(property=True)
     def hostname(self) -> str:
-        if self.target.has_function("configstore.get"):
+        if self.target.has_function("configstore"):
             # Configstore available on ESX7+, but not used to store hostname related information until 8+
             hostname = (
                 self.target.configstore.get(

@@ -27,10 +27,10 @@ class ConfigstorePlugin(Plugin):
         # It's made available at /etc/vmware/configstore/current-store-1 during boot, but stored at
         # /var/lib/vmware/configstore/backup/current-store-1 in local.tgz
         # On live collection (uac, vm-support), this file is located at the /etc path
-        # As this plugin is used by the EsxiOs plugin, we test both paths.
-        if (path := self.target.fs.path("/etc/vmware/configstore/current-store-1")).exists() or (
-            path := self.target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")
-        ).exists():
+        for path in ("/etc/vmware/configstore/current-store-1", "/var/lib/vmware/configstore/backup/current-store-1"):
+            if (p := self.target.fs.path(path)).exists():
+                self.path = p
+                self._configstore = parse_config_store(p)
             # Path is stored, so we can easily use it to provided the source for some plugins.
             self.path = path
             self._configstore = parse_config_store(path)
@@ -44,8 +44,8 @@ class ConfigstorePlugin(Plugin):
     def get(
         self,
         component: str,
-        config_groupe: str | None = None,
-        value_groupe_name: str | None = None,
+        config_group: str | None = None,
+        value_group: str | None = None,
         identifier: str | None = None,
         default: Any = None,
     ) -> dict[str, Any]:
