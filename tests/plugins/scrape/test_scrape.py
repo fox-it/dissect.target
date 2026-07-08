@@ -37,7 +37,7 @@ class MockFactory:
     @staticmethod
     def create_volume(name: str, backing_disk: Mock, offset: int, size: int) -> Mock:
         vol = Mock(name=name)
-        vol.disk = backing_disk
+        vol.disk = [backing_disk]  # Backing disk(s) are always a list
         vol.offset = offset
         vol.size = size
         vol.vs = None  # Default to no file system
@@ -336,13 +336,13 @@ def test_find_needles_in_contiguous_regions(target_bare: Target) -> None:
 
     # First volume covers first half
     volume1 = io.BytesIO(buffer[:half])
-    volume1.disk = disk
+    volume1.disk = [disk]
     volume1.offset = 0
     volume1.size = half
 
     # Second volume covers second half
     volume2 = io.BytesIO(buffer[half:])
-    volume2.disk = disk
+    volume2.disk = [disk]
     volume2.offset = half
     volume2.size = half
 
@@ -385,13 +385,13 @@ def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
 
     # Create vol1 (LVM base volume)
     vol1 = io.BytesIO(buf[vol1_offset : vol1_offset + vol1_size])
-    vol1.disk = disk
+    vol1.disk = [disk]
     vol1.offset = vol1_offset
     vol1.size = vol1_size
 
     # Create volB (regular volume)
     volB = io.BytesIO(buf[volB_offset : volB_offset + volB_size])
-    volB.disk = disk
+    volB.disk = [disk]
     volB.offset = volB_offset
     volB.size = volB_size
 

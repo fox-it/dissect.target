@@ -8,7 +8,7 @@ from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.logging import get_logger
-from dissect.target.helpers.utils import readinto
+from dissect.target.helpers.utils import readinto, to_list
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -64,7 +64,7 @@ class VolumeSystem:
 
     Args:
         fh: The source file-like object(s) on which to open the volume system.
-        disk: A reference to the source disk or container. Defaults to ``fh`` if not provided.
+        disk: A reference to the source disk(s) or container(s). Defaults to ``fh`` if not provided.
         serial: Serial number of the volume system, if any.
     """
 
@@ -77,7 +77,7 @@ class VolumeSystem:
         self, fh: BinaryIO | list[BinaryIO], disk: BinaryIO | list[BinaryIO] | None = None, serial: str | None = None
     ):
         self.fh = fh
-        self.disk = disk or fh
+        self.disk = to_list(disk or fh)
         self.serial = serial
 
         if self.__type__ is None:
@@ -250,7 +250,7 @@ class Volume(io.IOBase):
         name: The name of the volume.
         guid: The unique identifier of the volume.
         raw: A reference to the implementation specific object that the volume system uses for representing the volume.
-        disk: A reference to the associated :class:`~dissect.target.container.Container`.
+        disk: A reference to the associated backing disk(s) or :class:`~dissect.target.container.Container`.
         vs: A reference to the associated :class:`VolumeSystem`.
         fs: A reference to the :class:`~dissect.target.filesystem.Filesystem` that is on this ``Volume``.
         drive_letter: The letter associated to the ``Volume``, such as `c` or `d` in Windows.
@@ -281,7 +281,7 @@ class Volume(io.IOBase):
 
         # Shorthand access to raw volume, disk, vs and fs objects
         self.raw = raw
-        self.disk = disk
+        self.disk = to_list(disk)
         self.vs = vs
         self.fs = fs
         self.drive_letter = drive_letter

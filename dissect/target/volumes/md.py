@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume.md.md import MD, MDPhysicalDisk, find_super_block
 
+from dissect.target.helpers.utils import to_list
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
@@ -23,7 +24,7 @@ class MdVolumeSystem(LogicalVolumeSystem):
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         devices: dict[UUID, list[MDPhysicalDisk]] = {}
-        source_disks: dict[UUID, set[BinaryIO]] = {}
+        source_disks: dict[UUID, dict[BinaryIO, None]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -32,13 +33,13 @@ class MdVolumeSystem(LogicalVolumeSystem):
             device = MDPhysicalDisk(vol)
             devices.setdefault(device.set_uuid, []).append(device)
 
-            disk = vol.disk if isinstance(vol, Volume) else vol
-            source_disks.setdefault(device.set_uuid, set()).add(disk)
+            disks = source_disks.setdefault(device.set_uuid, {})
+            for disk in to_list(vol.disk if isinstance(vol, Volume) else vol):
+                disks[disk] = None
 
         for uuid, devs in devices.items():
             try:
-                disks = list(source_disks[uuid])
-                yield cls(devs, disk=disks[0] if len(disks) == 1 else disks)
+                yield cls(devs, disk=list(source_disks[uuid]))
             except Exception:  # noqa: PERF203
                 continue
 

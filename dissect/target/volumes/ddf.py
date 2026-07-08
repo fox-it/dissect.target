@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume.ddf.ddf import DDF, DEFAULT_SECTOR_SIZE, DDFPhysicalDisk
 
+from dissect.target.helpers.utils import to_list
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
@@ -23,22 +24,23 @@ class DdfVolumeSystem(LogicalVolumeSystem):
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         sets: dict[bytes, list[DDFPhysicalDisk]] = {}
-        source_disks: dict[bytes, set[BinaryIO]] = {}
+        source_disks: dict[bytes, dict[BinaryIO, None]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
                 continue
 
             ddf_disk = DDFPhysicalDisk(vol)
-            sets.setdefault(ddf_disk.anchor.DDF_Header_GUID, []).append(ddf_disk)
+            guid = ddf_disk.anchor.DDF_Header_GUID
+            sets.setdefault(guid, []).append(ddf_disk)
 
-            disk = vol.disk if isinstance(vol, Volume) else vol
-            source_disks.setdefault(ddf_disk.anchor.DDF_Header_GUID, set()).add(disk)
+            disks = source_disks.setdefault(guid, {})
+            for disk in to_list(vol.disk if isinstance(vol, Volume) else vol):
+                disks[disk] = None
 
         for guid, devs in sets.items():
             try:
-                disks = list(source_disks[guid])
-                yield cls(devs, disk=disks[0] if len(disks) == 1 else disks)
+                yield cls(devs, disk=list(source_disks[guid]))
             except Exception:  # noqa: PERF203
                 continue
 

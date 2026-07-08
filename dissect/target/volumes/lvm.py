@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, BinaryIO
 from dissect.volume import lvm
 
 from dissect.target.helpers.logging import get_logger
+from dissect.target.helpers.utils import to_list
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
@@ -38,7 +39,7 @@ class LvmVolumeSystem(LogicalVolumeSystem):
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         devices: dict[str, list[lvm.LVM2Device]] = {}
-        source_disks: dict[str, set[BinaryIO]] = {}
+        source_disks: dict[str, dict[BinaryIO, None]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -49,13 +50,13 @@ class LvmVolumeSystem(LogicalVolumeSystem):
                 vg_name = next(key for key, value in metadata.items() if isinstance(value, dict))
                 devices.setdefault(vg_name, []).append(dev)
 
-                disk = vol.disk if isinstance(vol, Volume) else vol
-                source_disks.setdefault(vg_name, set()).add(disk)
+                disks = source_disks.setdefault(vg_name, {})
+                for disk in to_list(vol.disk if isinstance(vol, Volume) else vol):
+                    disks[disk] = None
 
         for vg_name, pvs in devices.items():
             try:
-                disks = list(source_disks[vg_name])
-                yield cls(pvs, disk=disks[0] if len(disks) == 1 else disks)
+                yield cls(pvs, disk=list(source_disks[vg_name]))
             except Exception:  # noqa: PERF203
                 continue
 

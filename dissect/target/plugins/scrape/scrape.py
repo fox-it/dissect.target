@@ -296,7 +296,7 @@ class ScrapePlugin(Plugin):
             yield from sorted(disk.vs.volumes, key=lambda v: v.offset)
         else:
             for volume in sorted(self.target.volumes, key=lambda v: v.offset or 0):
-                if volume.disk == disk and not volume.vs:
+                if disk in volume.disk and not volume.vs:
                     yield volume
 
 
