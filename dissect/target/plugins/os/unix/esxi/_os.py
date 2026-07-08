@@ -134,10 +134,10 @@ class ESXiPlugin(UnixPlugin):
             # Configstore available on ESX7+, but not used to store hostname related information until 8+
             hostname = (
                 self.target.configstore.get(
-                    component="esx",
-                    config_groupe="advanced_options",
-                    value_groupe_name="misc",
-                    identifier="",
+                    "esx",
+                    "advanced_options",
+                    "misc",
+                    "",
                     default={},
                 )
                 .get("vital_value", {})
@@ -160,15 +160,15 @@ class ESXiPlugin(UnixPlugin):
         result = set()
         host_ip = None
         mgmt_ip = None
-        if self.target.has_function("configstore.get"):
+        if self.target.has_function("configstore"):
             # Configstore available on ESX7+, but not used to store IP related information until 8+
 
             mgmt_ip = (
                 self.target.configstore.get(
-                    component="esx",
-                    config_groupe="advanced_options",
-                    value_groupe_name="net",
-                    identifier="",
+                    "esx",
+                    "advanced_options",
+                    "net",
+                    "",
                     default={},
                 )
                 .get("vital_value", {})
@@ -176,10 +176,10 @@ class ESXiPlugin(UnixPlugin):
             )
             host_ip = (
                 self.target.configstore.get(
-                    component="esx",
-                    config_groupe="advanced_options",
-                    value_groupe_name="misc",
-                    identifier="",
+                    "esx",
+                    "advanced_options",
+                    "misc",
+                    "",
                     default={},
                 )
                 .get("vital_value", {})
@@ -241,10 +241,8 @@ class ESXiPlugin(UnixPlugin):
             )
             for record in super().users(sessions=False)
         }
-        if self.target.has_function("configstore.get"):
-            users = self.target.configstore.get(
-                component="esx", config_groupe="authentication", value_groupe_name="user_accounts", default={}
-            )
+        if self.target.has_function("configstore"):
+            users = self.target.configstore.get("esx", "authentication", "user_accounts", default={})
             for v in users.values():
                 user_value = v.get("user_value", {})
                 vital_value = v.get("vital_value", {})
@@ -293,7 +291,7 @@ class ESXiPlugin(UnixPlugin):
 
     def _mount_nfs_shares(self) -> None:
         """Mount NFS shares found in the configstore."""
-        if not self.target.has_function("configstore.get"):
+        if not self.target.has_function("configstore"):
             self.target.log.warning("No configstore found, unable to mount NFS shares")
             return
 

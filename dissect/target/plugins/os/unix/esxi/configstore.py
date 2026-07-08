@@ -31,9 +31,6 @@ class ConfigstorePlugin(Plugin):
             if (p := self.target.fs.path(path)).exists():
                 self.path = p
                 self._configstore = parse_config_store(p)
-            # Path is stored, so we can easily use it to provided the source for some plugins.
-            self.path = path
-            self._configstore = parse_config_store(path)
 
     def check_compatible(self) -> None:
         # NOTE: Unable to use OS specific functions here, as this method can be called in ESXiPlugin.create
@@ -48,14 +45,29 @@ class ConfigstorePlugin(Plugin):
         value_group: str | None = None,
         identifier: str | None = None,
         default: Any = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | Any:
         """Get configstore value for the specified key.
-        Subkey order is component -> config_group -> value_group_name -> identifier.
+        Subkey order is component -> config_group -> value_group -> identifier.
 
-        Sub subkey are used only previous subkey are defined. E.g is value_group_name is None, identifier will be
-        ignored
+        Sub subkey are used only previous subkey are defined. E.g. is value_group is None, identifier will be ignored.
+        """
+        step_value = self._configstore
+        for step_name in [component, config_group, value_group, identifier]:
+            if step_name is None:
+                return step_value
+            if step_name not in step_value:
+                return default
+            step_value = step_value.get(step_name)
+        return step_value
 
-        Configstore is a SQlite3 Db with the following schema
+
+def parse_config_store(path: Path) -> dict[str, Any]:
+    """Parse ESXi configstore and create a tree-like dictionary with values.
+
+
+    Note: Configstore is a SQlite3 Db with the following schema
+
+        .. code-block:: sql
 
             CREATE TABLE Config(Component TEXT
                 ConfigGroup TEXT
@@ -76,22 +88,7 @@ class ConfigstorePlugin(Plugin):
                      Name
                      Identifier)
             );
-        """
-        if identifier is not None and value_groupe_name is not None and config_groupe is not None:
-            return (
-                self._configstore.get(component, {})
-                .get(config_groupe, {})
-                .get(value_groupe_name, {})
-                .get(identifier, default)
-            )
-        if value_groupe_name is not None and config_groupe is not None:
-            return self._configstore.get(component, {}).get(config_groupe, {}).get(value_groupe_name, default)
-        if config_groupe is not None:
-            return self._configstore.get(component, {}).get(config_groupe, default)
-        return self._configstore.get(component, default)
-
-
-def parse_config_store(path: Path) -> dict[str, Any]:
+    """
     with SQLite3(path) as db:
         store = {}
 
