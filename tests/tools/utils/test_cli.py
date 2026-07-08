@@ -14,7 +14,6 @@ from dissect.target.tools.utils.cli import (
     args_to_uri,
     configure_generic_arguments,
     execute_function_on_target,
-    generate_argparse_for_method,
     persist_execution_report,
     process_generic_arguments,
 )
