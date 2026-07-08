@@ -69,7 +69,7 @@ class ScrapePlugin(Plugin):
         # Format: {volume_obj: (map_key, region_key)}
         volume_region_map = {}
 
-        # We execute a iterative dependency resolution algorithm to ensure that all layered volumes
+        # We use an iterative dependency resolution algorithm to ensure that all layered volumes
         # are properly handled.
         #
         # --- Optimization Candidates & Alternatives ---
@@ -94,6 +94,7 @@ class ScrapePlugin(Plugin):
         #
         # Compared to the implemented solution, which has O(V*V), this has complexity O(V*D), where
         # D is the depth of the stack. However, the logic is more abstract, and V is generally small in practice.
+        # (famous last words)
         #
         # III. Physical region mapping
         # Start off by filling the scrape map with the gaps between volumes to the scrape map.
@@ -104,8 +105,8 @@ class ScrapePlugin(Plugin):
         # disks. In the case that `all` is true, all physical regions need to be somehow dedupicated.
 
         # Build initial map from physical disks
-        offset = 0
         for disk in self.target.disks:
+            offset = 0
             for volume in self._get_disk_vols(disk):
                 if offset != volume.offset:
                     # We don't add gaps (source=disk) to the volume_region_map

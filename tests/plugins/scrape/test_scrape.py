@@ -189,6 +189,71 @@ def test_create_streams_lvm_shared_pv(target_bare: Target) -> None:
         assert call(0, 500, lv2, 0) in mock_add.call_args_list
 
 
+def test_create_streams_raid_spanning_disks(target_bare: Target) -> None:
+    """Test scrape streams for a RAID array (e.g. md/ddf) spanning multiple physical disks.
+
+    RAID volume systems are ``LogicalVolumeSystem`` subclasses, so they resolve through the same
+    layer-resolution path as LVM. The member volume on each physical disk should be consumed and a
+    single reconstructed stream should be yielded for the assembled array.
+    """
+    target_bare.add_plugin(ScrapePlugin)
+
+    # Two physical disks, each holding one RAID member volume spanning the whole disk
+    disk_a = MockFactory.create_disk("raid_disk_a", size=1000)
+    member_a = MockFactory.create_volume("member_a", disk_a, offset=0, size=1000)
+
+    disk_b = MockFactory.create_disk("raid_disk_b", size=1000)
+    member_b = MockFactory.create_volume("member_b", disk_b, offset=0, size=1000)
+
+    # The reconstructed RAID array spans both members (LogicalVolumeSystem, like md/ddf)
+    raid = MockFactory.make_lvm("md0", [member_a, member_b], size=1800)
+
+    target_bare.disks = {disk_a, disk_b}
+    target_bare.volumes.entries = [raid]
+
+    with patch("dissect.util.stream.MappingStream.add") as mock_add:
+        streams = list(target_bare.scrape.create_streams(lvm=True))
+
+        calls = mock_add.call_args_list
+
+        # A single reconstructed stream for the assembled array
+        assert len(streams) == 1
+        assert streams[0][0] == raid
+        assert call(0, 1800, raid, 0) in calls
+
+        # Both raw members are consumed, not scraped separately
+        assert call(0, 1000, member_a, 0) not in calls
+        assert call(0, 1000, member_b, 0) not in calls
+
+
+def test_create_streams_raid_spanning_disks_all(target_bare: Target) -> None:
+    """Test that ``all=True`` keeps the raw RAID members in addition to the reconstructed array."""
+    target_bare.add_plugin(ScrapePlugin)
+
+    disk_a = MockFactory.create_disk("raid_disk_a", size=1000)
+    member_a = MockFactory.create_volume("member_a", disk_a, offset=0, size=1000)
+
+    disk_b = MockFactory.create_disk("raid_disk_b", size=1000)
+    member_b = MockFactory.create_volume("member_b", disk_b, offset=0, size=1000)
+
+    raid = MockFactory.make_lvm("md0", [member_a, member_b], size=1800)
+
+    target_bare.disks = {disk_a, disk_b}
+    target_bare.volumes.entries = [raid]
+
+    with patch("dissect.util.stream.MappingStream.add") as mock_add:
+        list(target_bare.scrape.create_streams(lvm=True, all=True))
+
+        calls = mock_add.call_args_list
+
+        # Reconstructed array is present
+        assert call(0, 1800, raid, 0) in calls
+
+        # Raw members are retained as well
+        assert call(0, 1000, member_a, 0) in calls
+        assert call(0, 1000, member_b, 0) in calls
+
+
 @pytest.mark.parametrize(
     ("encrypted", "all_flag", "expect_raw", "expect_decrypted", "expect_inplace"),
     [
@@ -285,7 +350,6 @@ def test_create_streams_lvm(target_bare: Target, lvm: bool, all_flag: bool, expe
 
 def test_create_streams_two_raw_disks(target_bare: Target) -> None:
     """Test Scenario: Two separate raw disks (no partition table)."""
-
     target_bare.add_plugin(ScrapePlugin)
 
     disk_a, vol_a = MockFactory.create_raw_disk("disk_a", "vol_a_whole", size=1000)
@@ -360,7 +424,6 @@ def test_find_needles_in_contiguous_regions(target_bare: Target) -> None:
 
 def test_find_needle_in_lvm_and_other_volume(target_bare: Target) -> None:
     """Test finding needles in non-contiguous regions."""
-
     # Layout: [---vol1(LVM)---][---volB---][---rest---]
     needle = b"NEEDLE"
     disk_size = 4096 * 4
