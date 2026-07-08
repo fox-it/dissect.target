@@ -103,7 +103,7 @@ class ESXiPlugin(UnixPlugin):
     def create(cls, target: Target, sysvol: Filesystem) -> Self:
         if sysvol.path("/etc/vmware/esx.conf").exists():
             target.fs.mount("/", sysvol)
-            _link_log_dir_live_system_collection(target)
+            _link_log_dir(target)
             return cls(target)
 
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
@@ -124,7 +124,7 @@ class ESXiPlugin(UnixPlugin):
         obj = cls(target)
 
         # Symlink the /var/run/log directory to the correct destination (if available)
-        _link_log_dir_raw_disk(target)
+        _link_log_dir(target)
 
         return obj
 
@@ -564,38 +564,28 @@ def _get_log_dir_from_target(target: Target) -> str:
     return log_dir
 
 
-def _link_log_dir_live_system_collection(target: Target) -> None:
-    """Link log directories on a live system collection.
+def _link_log_dir(target: Target) -> None:
+    """Link log directories.
 
     Ensure symlink from log_dir (usually /scratch/log) to /var/run/log or vice versa
     As sometime log_dir is collected, sometime only /var/run/log is collected
     """
     log_dir = _get_log_dir_from_target(target)
+
+    # /var/log also contains some log files,
+    # but it symlinked file, by file (only currently append files, not <>.X.gz.
+    # Furthermore, it does not contain all log and may already contain some files/directories
+    # Not symlinked files seems to be RAM only, but some of them are present on live collection such as tech support.
+    # e.g tallylog
+    # Thus we only symlink the /var/run/log
     if target.fs.exists("/var/run/log") and target.fs.exists(log_dir):
-        pass
+        target.log.warning("/var/run/log already exists. Does not create symlink from log dir : %s", log_dir)
     elif target.fs.exists("/var/run/log"):
         target.fs.symlink("/var/run/log", log_dir)
     elif target.fs.exists(log_dir):
         target.fs.symlink(log_dir, "/var/run/log")
     else:
         target.log.warning("Failed to symlink log_dir neither /var/run/log or log_dir : %s exists", log_dir)
-
-
-def _link_log_dir_raw_disk(target: Target) -> None:
-    """Link log directory from a disk system : symlink from log_dir (usually /scratch/log) to /var/run/log."""
-    # Don't really know how ESXi does this, but let's just take a shortcut for now
-    log_dir = _get_log_dir_from_target(target)
-
-    # /var/log also contains some log files,
-    # but it symlinked file, by file (only currently append files, not <>.X.gz.
-    # Furthermore, it does not contain all log and may already contain some files/directories
-    # Not symlinked files seems to be RAM only.
-    # e.g tallylog
-    # Thus we only symlink the /var/run/log
-    if not target.fs.exists("/var/run/log"):
-        target.fs.symlink(log_dir, "/var/run/log")
-    else:
-        target.log.warning("/var/run/log already exists. Does not create symlink from log dir : %s", log_dir)
 
 
 def parse_boot_cfg(fh: TextIO) -> dict[str, str]:
