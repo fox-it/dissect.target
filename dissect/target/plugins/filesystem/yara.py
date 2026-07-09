@@ -33,6 +33,9 @@ YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",
     [
         ("datetime", "ts_mtime"),
+        ("datetime", "ts_atime"),
+        ("datetime", "ts_ctime"),
+        ("datetime", "ts_btime"),
         ("path", "path"),
         ("string", "rule"),
         ("string[]", "matches"),
@@ -103,8 +106,9 @@ class YaraPlugin(Plugin):
             for file in files:
                 fhandles = []
                 try:
-                    if (file_size := file.stat().st_size) > max_size:
-                        self.target.log.info("Not scanning file of %s MB: '%s'", (file_size // 1024 // 1024), file)
+                    fstat = file.stat()
+                    if fstat.st_size > max_size:
+                        self.target.log.info("Not scanning file of %s MB: '%s'", (fstat.st_size // 1024 // 1024), file)
                         continue
 
                     fh_original = file.open()
@@ -132,7 +136,10 @@ class YaraPlugin(Plugin):
                                 string_matches.extend(f"{string}={instance}" for instance in string.instances)
 
                             yield YaraMatchRecord(
-                                ts_mtime=file.stat().st_mtime,
+                                ts_mtime=fstat.st_mtime,
+                                ts_atime=fstat.st_atime,
+                                ts_ctime=fstat.st_ctime,
+                                ts_btime=fstat.st_birthtime if hasattr(fstat, "st_birthtime") else None,
                                 path=self.target.fs.path(file.path),
                                 rule=match.rule,
                                 matches=string_matches,
