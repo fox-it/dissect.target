@@ -62,9 +62,8 @@ class LvmVolumeSystem(LogicalVolumeSystem):
 
         for vg_name, pvs in devices.items():
             try:
-                source_fhs = [pv.fh for pv in pvs]
                 yield cls(
-                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    [pv.fh for pv in pvs],
                     devices=pvs,
                     disk=list(source_disks[vg_name]),
                 )

@@ -46,9 +46,8 @@ class DdfVolumeSystem(LogicalVolumeSystem):
 
         for guid, devs in sets.items():
             try:
-                source_fhs = [dev.fh for dev in devs]
                 yield cls(
-                    source_fhs[0] if len(source_fhs) == 1 else source_fhs,
+                    [dev.fh for dev in devs],
                     devices=devs,
                     disk=list(source_disks[guid]),
                 )

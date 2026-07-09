@@ -312,7 +312,7 @@ def process_lvm_layer(context: ScrapeContext, volume: Volume) -> bool:
         return False
 
     backing_regions_info = []
-    for backing_vol_obj in volume.vs.backing_objects:
+    for backing_vol_obj in volume.vs.fhs:
         if backing_vol_obj not in context.volume_region_map:
             return False
 
@@ -346,7 +346,7 @@ def process_encrypted_layer(context: ScrapeContext, volume: Volume) -> bool:
     if not (context.encrypted and isinstance(volume.vs, EncryptedVolumeSystem)):
         return False
 
-    backing_vol_obj = None if volume.vs is None else next(iter(volume.vs.backing_objects), None)
+    backing_vol_obj = None if volume.vs is None else next(iter(volume.vs.fhs), None)
     if backing_vol_obj is None or backing_vol_obj not in context.volume_region_map:
         return False
 
