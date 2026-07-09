@@ -30,6 +30,7 @@ from dissect.target.plugin import (
     _find_py_files,
     _save_plugin_import_failure,
     alias,
+    arg,
     environment_variable_paths,
     export,
     find_functions,
@@ -1396,10 +1397,11 @@ def test_function_required_arguments(target_default: Target) -> None:
     assert envfile_fd
     assert envfile_fd.args == [
         (
-            ("--env-path",),
+            ("--path",),
             {
                 "help": "path to scan environment files in",
                 "required": True,
+                "type": Path,
             },
         ),
         (
@@ -1420,12 +1422,12 @@ def test_plugin_runtime_info() -> None:
     assert func_desc.cls is EnvironmentFilePlugin
     assert func_desc.func is EnvironmentFilePlugin.envfile
     assert func_desc.record is EnvironmentFilePlugin.envfile.__record__
-    assert func_desc.args == EnvironmentFilePlugin.envfile.__args__
+    assert func_desc.args == EnvironmentFilePlugin.__args__
 
 
 def test_find_by_record_field_type(target_default: Target) -> None:
     assert "filesystem.walkfs.walkfs" in [desc.path for desc in find_functions_by_record_field_type("path")]
-    assert "apps.other.env.envfile" in [
+    assert "filesystem.yara.yara" in [
         desc.path for desc in find_functions_by_record_field_type("path", target_default, compatibility=True)
     ]
 
@@ -1691,8 +1693,7 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     assert_compliant_rst(class_doc_str)
 
     # Arguments of the plugin should define their type and if they are required (explicitly or implicitly).
-    for arg in descriptor.args:
-        names, settings = arg
+    for names, settings in descriptor.args:
         is_bool_action = settings.get("action", "") in (
             "store_true",
             "store_false",
@@ -1711,16 +1712,18 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
         assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.func.__qualname__}"
 
         dest = settings.get("dest") or names[-1].strip("-").replace("-", "_")
-        assert dest in annotations, (
-            f"Missing type annotation for argument {dest} in function {descriptor.func.__qualname__}"
-        )
 
-        # TODO: More strictly check type annotation, use a contains right now to also match optionals
-        type_ = "bool" if is_bool_action else getattr(settings.get("type"), "__name__", "str")
-        assert type_ in annotations[dest], (
-            f"Invalid type annotation for argument {dest} in function {descriptor.func.__qualname__} "
-            f"({annotations[dest]} instead of {type_})"
-        )
+        if dest not in {name[-1].strip("-").replace("-", "_") for name, _ in getattr(descriptor.cls, "__args__", [])}:
+            assert dest in annotations, (
+                f"Missing type annotation for argument {dest} in function {descriptor.func.__qualname__}"
+            )
+
+            # TODO: More strictly check type annotation, use a contains right now to also match optionals
+            type_ = "bool" if is_bool_action else getattr(settings.get("type"), "__name__", "str")
+            assert type_ in annotations[dest], (
+                f"Invalid type annotation for argument {dest} in function {descriptor.func.__qualname__} "
+                f"({annotations[dest]} instead of {type_})"
+            )
 
         assert settings.get("type") is not str, (
             f"Superfluous type of str for argument {names[0]} in function {descriptor.func.__qualname__}: "
@@ -1948,3 +1951,39 @@ def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
     assert descriptor.cls.__subclasses__(), (
         f"NamespacePlugin {descriptor.module}.{descriptor.qualname} has no subclasses, are you sure you're using NamespacePlugin correctly?"  # noqa: E501
     )
+
+
+@arg("--my-arg", help="Example plugin argument")
+class ExampleArgumentPlugin(Plugin):
+    """Example plugin with argument."""
+
+    __register__ = False
+
+    def check_compatible(self) -> None:
+        if self.get_args().my_arg != "example-plugin-value":
+            raise UnsupportedPluginError
+
+    @export(output="yield")
+    @arg("--my-func-arg", help="Example function argument")
+    def example_func(self, my_func_arg: str) -> Iterator[str]:
+        """Example function."""
+        yield my_func_arg
+
+
+def test_plugin_arguments(target_bare: Target) -> None:
+    """Test if we handle :class:`Plugin` arguments correctly."""
+    # Simulate arguments passed to ``target-query``
+    target_bare.unknown_args = ["--my-arg=example-plugin-value", "--some-other-unrelated-argument=1"]
+
+    # Register the plugin with the target.
+    plugin = target_bare.add_plugin(ExampleArgumentPlugin)
+
+    # Check if the possible arguments for this plugin were registered.
+    assert plugin.__args__ == [(("--my-arg",), {"help": "Example plugin argument"})]
+
+    # Check if we return the plugin argument.
+    args = plugin.get_args()
+    assert args.my_arg == "example-plugin-value"
+
+    # Check if the plugin function could access it's own argument.
+    assert next(plugin.example_func("foo")) == "foo"

@@ -121,13 +121,15 @@ def main() -> int:
         return 0
 
     # Dynamically add plugin arguments for the specified function(s)
+    all_plugin_args = []
     for func_desc in find_and_filter_plugins(
         functions=args.function or "",
         target=None,
         excluded_func_paths=args.excluded_functions,
         plugin_paths=args.plugin_path or [],
     ):
-        plugin_args = func_desc.args
+        plugin_args = func_desc.args + getattr(func_desc.cls, "__args__", [])
+        all_plugin_args += plugin_args
         for opts, kwargs in plugin_args:
             parser.add_argument(*opts, **kwargs)
 
@@ -175,8 +177,15 @@ def main() -> int:
     execution_report.set_cli_args(args)
     execution_report.set_event_callbacks(Target)
 
+    # Extract unknown arguments for passing on to Plugin argument parsing
+    arg_names = [name.strip("-") for names, _ in all_plugin_args for name in names]
+    unknown_args = []
+    for k, v in args.__dict__.items():
+        if k in arg_names:
+            unknown_args.extend([f"--{k}", v])
+
     try:
-        for target in open_targets(args):
+        for target in open_targets(args, unknown_args=unknown_args):
             record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []

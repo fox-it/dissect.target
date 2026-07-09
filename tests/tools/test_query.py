@@ -255,6 +255,12 @@ def test_filtered_functions(mock_plugins: PluginRegistry, monkeypatch: pytest.Mo
                 new_callable=PropertyMock,
                 side_effect=mock_query_plugin_args,
             ),
+            patch.object(
+                FunctionDescriptor,
+                "cls",
+                new_callable=PropertyMock,
+                side_effect=MockQueryArgsPlugin(MagicMock()),
+            ),
             patch(
                 "dissect.target.tools.utils.cli.find_functions",
                 autospec=True,
@@ -482,6 +488,12 @@ def test_arguments_passed_correctly(
                 "args",
                 new_callable=PropertyMock,
                 side_effect=mock_query_plugin_args,
+            ),
+            patch.object(
+                FunctionDescriptor,
+                "cls",
+                new_callable=PropertyMock,
+                side_effect=MockPlugin(MagicMock()),
             ),
             patch(
                 "dissect.target.tools.utils.cli.find_functions",
