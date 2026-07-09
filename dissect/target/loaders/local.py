@@ -15,6 +15,7 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.loader import Loader
+from dissect.target.plugin import arg
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -39,11 +40,18 @@ WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
 
 
+@arg("--force-directory-fs", action="store_true", help="Force the use of DirectoryFilesystem on all drives.")
+@arg(
+    "--fallback-to-directory-fs",
+    action="store_true",
+    help="Fallback to DirectoryFilesystem if a filesystem cannot be opened.",
+)
 class LocalLoader(Loader):
     """Load local filesystem."""
 
     def __init__(self, path: Path, **kwargs):
-        kwargs["parsed_path"] = urllib.parse.urlparse(str(path))
+        if not kwargs.get("parsed_path"):
+            kwargs["parsed_path"] = urllib.parse.urlparse(str(path))
         super().__init__(path, **kwargs, resolve=False)
 
     @staticmethod

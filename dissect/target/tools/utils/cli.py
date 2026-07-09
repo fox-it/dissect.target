@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
-from dissect.target.loader import LOADERS_BY_SCHEME
+from dissect.target.loader import LOADERS_BY_SCHEME, infer_loader
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from datetime import datetime
 
+    from dissect.target.loader import Loader
     from dissect.target.plugin import FunctionDescriptor
 
 
@@ -106,7 +107,18 @@ def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Na
 
     targets = args.targets if hasattr(args, "targets") else [args.target] if hasattr(args, "target") else []
     if targets and args.loader:
-        targets = args_to_uri(targets, args.loader)
+        targets = [args_to_uri(t, args.loader) for t in targets]
+    elif targets:
+        # No explicit -L: infer the loader per target and encode any declared loader args into the URI
+        converted = []
+        for target in targets:
+            result = infer_loader(target)
+            if result:
+                loader_cls, _, _ = result
+                converted.append(args_to_uri(target, loader_cls))
+                continue
+            converted.append(target)
+        targets = converted
 
     if hasattr(args, "targets"):
         args.targets = targets
@@ -355,6 +367,26 @@ def generate_argparse_for_method(
     return parser
 
 
+def generate_argparse_for_loader_class(
+    loader_cls: type[Loader],
+    usage_tmpl: str | None = None,
+) -> argparse.ArgumentParser:
+    """Generate an ``argparse.ArgumentParser`` for a :class:`~dissect.target.loader.Loader` class."""
+    desc = get_docstring(loader_cls)
+
+    help_formatter = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(
+        prog=f"target-query -L {loader_cls.__name__.lower().removesuffix('loader')}",
+        description=desc,
+        formatter_class=help_formatter,
+        add_help=False,
+    )
+
+    _add_args_to_parser(parser, getattr(loader_cls, "__args__", []))
+
+    return parser
+
+
 def generate_argparse_for_plugin_class(
     plugin_cls: type[Plugin],
     usage_tmpl: str | None = None,
@@ -491,8 +523,8 @@ def catch_sigpipe(func: Callable) -> Callable:
     return wrapper
 
 
-def args_to_uri(targets: list[str], loader_name: str, args: list[str] | None = None) -> list[str]:
-    """Converts argument-style ``-L`` to URI-style.
+def args_to_uri(target: str | Path, loader: str | type[Loader], args: list[str] | None = None) -> str:
+    """Converts argument-style ``-L`` to URI-style for a single target.
 
     Turns:
         ``target-query /evtxs/* -L log --log-hint="evtx" -f evtx``
@@ -500,16 +532,55 @@ def args_to_uri(targets: list[str], loader_name: str, args: list[str] | None = N
         ``target-query "log:///evtxs/*?hint=evtx" -f evtx``
 
     For loaders providing ``@arg()`` arguments.
+
+    If ``target`` is already a URI with a scheme it is returned unchanged; any
+    CLI loader args are ignored because the URI is the authoritative
+    specification.  When ``-L`` is specified alongside a URI target, the
+    explicitly requested loader overrides the one encoded in the URI scheme.
+
+    Args:
+        target: A single target path or URI string.
+        loader: Either the scheme name (``str``) as passed via ``-L``, or the
+            :class:`~dissect.target.loader.Loader` class inferred from the
+            target path.
+        args: Optional list of raw CLI tokens to parse; defaults to
+            ``sys.argv``.
     """
-    loader = LOADERS_BY_SCHEME.get(loader_name, None)
+    # If the target is already a full URI (multi-character scheme), leave it
+    # untouched — the URI is the complete specification.
+    target = str(target)
+    parsed_target = urllib.parse.urlparse(target)
+    if parsed_target.scheme and not (len(parsed_target.scheme) == 1 and parsed_target.scheme.isalpha()):
+        return target
+
+    if isinstance(loader, str):
+        scheme = loader
+        loader_cls = LOADERS_BY_SCHEME.get(scheme)
+    else:
+        loader_cls = loader
+        scheme = next((k for k, v in LOADERS_BY_SCHEME.items() if v is loader_cls), None)
+        if not scheme:
+            return target
 
     parser = argparse.ArgumentParser(
-        argument_default=argparse.SUPPRESS, description="\n".join(textwrap.wrap(get_docstring(loader)))
+        argument_default=argparse.SUPPRESS, description="\n".join(textwrap.wrap(get_docstring(loader_cls)))
     )
-    for load_arg in getattr(loader, "__args__", []):
-        parser.add_argument(*load_arg[0], **load_arg[1])
-    args = vars(parser.parse_known_args(args)[0])
-    return [f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else "") for target in targets]
+    for load_arg in getattr(loader_cls, "__args__", []):
+        arg_opts, arg_kwargs = load_arg
+        kw = dict(arg_kwargs)  # Defensive copy to avoid mutating the loader class
+        # If no explicit dest provided, prefer the long option string as dest
+        if "dest" not in kw:
+            long_opts = [o for o in arg_opts if o.startswith("--")]
+            if long_opts:
+                kw["dest"] = long_opts[0].lstrip("-")
+
+        parser.add_argument(*arg_opts, **kw)
+
+    ns, _ = parser.parse_known_args(args)
+    params = {k: (1 if v is True else 0 if v is False else v) for k, v in vars(ns).items()}
+
+    q = ("?" + urllib.parse.urlencode(params, doseq=True)) if params else ""
+    return f"{scheme}://{target}{q}"
 
 
 def find_and_filter_plugins(

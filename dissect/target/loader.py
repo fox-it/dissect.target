@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 __all__ = [
     "Loader",
     "RawLoader",
+    "infer_loader",
     "open",
     "register",
 ]
@@ -151,6 +152,32 @@ class SubLoader(Loader, Generic[T]):
 
     def map(self, target: Target) -> None:
         raise NotImplementedError
+
+
+def infer_loader(
+    spec: str | Path,
+) -> tuple[type[Loader], Path, urllib.parse.ParseResult | None] | None:
+    """Infer the loader class for a given target specification.
+
+    Uses the same logic as :meth:`Target.open_all <dissect.target.target.Target.open_all>` to determine
+    which :class:`Loader` class would be used for the given ``spec``.
+
+    Args:
+        spec: A target path or URI to infer the loader for.
+
+    Returns:
+        A tuple of ``(loader_cls, path, parsed_path)`` if a suitable loader was found, or ``None`` otherwise.
+    """
+    adjusted_path, parsed_path = parse_path_uri(spec)
+    path = Path(spec) if not isinstance(spec, os.PathLike) else spec
+
+    if parsed_path is not None and (loader_cls := find_loader_by_scheme(parsed_path.scheme)):
+        return loader_cls, adjusted_path, parsed_path
+
+    if loader_cls := find_loader(path, fallbacks=[DirLoader, RawLoader]):
+        return loader_cls, path, None
+
+    return None
 
 
 def register(module_name: str, class_name: str, internal: bool = True) -> None:
