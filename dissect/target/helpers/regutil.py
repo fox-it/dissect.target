@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
-from typing import TYPE_CHECKING, BinaryIO, NewType, TextIO
+from typing import TYPE_CHECKING, BinaryIO, Final, NewType, TextIO
 
 from dissect.regf import c_regf, regf
 
@@ -29,6 +29,15 @@ log = get_logger(__name__)
 RE_GLOB_INDEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
 RE_GLOB_MAGIC = re.compile(r"[*?[]")
 RE_REGFLEX_NAME_VALUE = re.compile(r'^"(?P<name>(?:[^"\\]|\\.)*?)"=(?P<value>.*)')
+
+# Define Registry Hive short-to-longname conversion locally.
+SHORTNAMES: Final[dict[str, str]] = {
+    "HKLM": "HKEY_LOCAL_MACHINE",
+    "HKCC": "HKEY_CURRENT_CONFIG",
+    "HKCU": "HKEY_CURRENT_USER",
+    "HKCR": "HKEY_CLASSES_ROOT",
+    "HKU": "HKEY_USERS",
+}
 
 
 KeyType = regf.IndexLeaf | regf.FastLeaf | regf.HashLeaf | regf.IndexRoot | regf.KeyNode
@@ -764,7 +773,12 @@ class RegFlex:
                     vhive.map_key(vkey.path, vkey)
 
                 hive, _, path = line[1:-1].partition("\\")
+
+                # Always expand shortname to longname
                 hive = hive.upper()
+                if hive in SHORTNAMES:
+                    hive = SHORTNAMES[hive]
+
                 if hive not in self.hives:
                     self.hives[hive] = RegFlexHive()
 
