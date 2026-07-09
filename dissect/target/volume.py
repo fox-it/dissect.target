@@ -136,7 +136,7 @@ class VolumeSystem:
         Returns:
             A list of all the raw file-like objects that this volume system is based on.
         """
-        raise NotImplementedError
+        return to_list(self.fh)
 
     @cached_property
     def volumes(self) -> list[Volume]:

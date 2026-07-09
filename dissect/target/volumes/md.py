@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume.md.md import MD, MDPhysicalDisk, find_super_block
 
@@ -63,10 +63,6 @@ class MdVolumeSystem(LogicalVolumeSystem):
     def _detect_volume(fh: BinaryIO) -> bool:
         offset, _, _ = find_super_block(fh)
         return offset is not None
-
-    @property
-    def backing_objects(self) -> list[Any]:
-        return self.fh if isinstance(self.fh, list) else [self.fh]
 
     def _volumes(self) -> Iterator[Volume]:
         # MD only supports one configuration and virtual disk but doing this as a loop
