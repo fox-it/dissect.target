@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from typing import TYPE_CHECKING
-from unittest.mock import Mock, PropertyMock, call, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 

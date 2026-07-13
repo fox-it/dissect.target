@@ -77,9 +77,7 @@ class VolumeSystem:
         self, fh: BinaryIO | list[BinaryIO], disk: BinaryIO | list[BinaryIO] | None = None, serial: str | None = None
     ):
         self.fh = fh
-        self.fhs = to_list(fh)
         self.disk = disk or fh
-        self.disks = to_list(self.disk)
         self.serial = serial
 
         if self.__type__ is None:
@@ -127,6 +125,16 @@ class VolumeSystem:
             An iterator of all :class:`Volume` of the ``VolumeSystem``.
         """
         raise NotImplementedError
+
+    @property
+    def fhs(self) -> list[BinaryIO]:
+        """A list of all the file-like objects that make up this volume system."""
+        return to_list(self.fh)
+
+    @property
+    def disks(self) -> list[BinaryIO]:
+        """A list of all the disks or containers that make up this volume system."""
+        return to_list(self.disk)
 
     @cached_property
     def volumes(self) -> list[Volume]:
