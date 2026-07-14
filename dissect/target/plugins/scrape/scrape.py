@@ -153,7 +153,7 @@ class ScrapePlugin(Plugin):
                     )
                 else:
                     self.target.log.warning("Could not resolve storage dependencies, set lvm and encrypted flags")
-                    break
+                break
 
         # Generate streams from the scrape_map
         for disk, volumes in scrape_map.items():
