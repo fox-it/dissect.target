@@ -391,6 +391,130 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
         return ip_address(value)
 
 
+class NixOSConfigParser(LinuxNetworkConfigParser):
+    """NixOS declarative network configuration parser.
+
+    NixOS uses the Nix functional language for system configuration. Network settings
+    are declared in ``/etc/nixos/configuration.nix`` or imported ``.nix`` files
+    (commonly ``networking.nix``). This parser uses :func:`configutil.parse` with
+    ``hint="nix"`` to parse ``.nix`` files into dictionaries, then extracts network
+    interface information from the resulting structure.
+
+    References:
+        - https://nixos.org/manual/nixos/stable/#sec-networking
+    """
+
+    config_paths: tuple[str, ...] = ("/etc/nixos/",)
+
+    def interfaces(self) -> Iterator[UnixInterfaceRecord]:
+        if not (
+            self._target.fs.path("/etc/NIXOS").exists()
+            or self._target.fs.path("/etc/nixos/configuration.nix").exists()
+        ):
+            return
+
+        for config_file in self._config_files(self.config_paths, "*.nix"):
+            try:
+                config = configutil.parse(config_file, hint="nix")
+            except Exception as e:
+                self._target.log.warning("Error parsing NixOS config file %s", config_file)
+                self._target.log.debug("", exc_info=e)
+                continue
+
+            networking = config.get("networking", {})
+            if not networking:
+                continue
+
+            dns: set[NetAddress] = set()
+            for server in networking.get("nameservers", []):
+                try:
+                    dns.add(ip_address(str(server)))
+                except ValueError:
+                    self._target.log.debug("Invalid NixOS DNS server: %s", server)
+
+            gateways: set[NetAddress] = set()
+            for gw_key in ("defaultGateway", "defaultGateway6"):
+                gw = networking.get(gw_key)
+                if isinstance(gw, str) and gw:
+                    try:
+                        gateways.add(ip_address(gw))
+                    except ValueError:
+                        self._target.log.debug("Invalid NixOS gateway: %s", gw)
+                elif isinstance(gw, dict):
+                    gw_addr = gw.get("address", "")
+                    if gw_addr:
+                        try:
+                            gateways.add(ip_address(str(gw_addr)))
+                        except ValueError:
+                            self._target.log.debug("Invalid NixOS gateway: %s", gw_addr)
+
+            use_dhcp = networking.get("useDHCP", False) is True
+            dhcpcd = networking.get("dhcpcd", {})
+            if isinstance(dhcpcd, dict) and dhcpcd.get("enable") is True:
+                use_dhcp = True
+
+            interfaces_cfg = networking.get("interfaces", {})
+            if not isinstance(interfaces_cfg, dict):
+                interfaces_cfg = {}
+
+            if not interfaces_cfg:
+                if dns or gateways or use_dhcp:
+                    yield UnixInterfaceRecord(
+                        name=None,
+                        type="dhcp" if use_dhcp else "static",
+                        enabled=None,
+                        dns=list(dns),
+                        gateway=list(gateways),
+                        source=str(config_file),
+                        dhcp_ipv4=use_dhcp,
+                        dhcp_ipv6=use_dhcp,
+                        configurator="nixos",
+                        _target=self._target,
+                    )
+                continue
+
+            for iface_name, iface_cfg in sorted(interfaces_cfg.items()):
+                if not isinstance(iface_cfg, dict):
+                    continue
+
+                ip_interfaces: set[NetInterface] = set()
+                iface_dhcp = use_dhcp
+
+                if iface_cfg.get("useDHCP") is True:
+                    iface_dhcp = True
+                elif iface_cfg.get("useDHCP") is False:
+                    iface_dhcp = False
+
+                for ip_version in ("ipv4", "ipv6"):
+                    ip_cfg = iface_cfg.get(ip_version, {})
+                    if not isinstance(ip_cfg, dict):
+                        continue
+                    for addr_entry in ip_cfg.get("addresses", []):
+                        if not isinstance(addr_entry, dict):
+                            continue
+                        addr = addr_entry.get("address")
+                        prefix = addr_entry.get("prefixLength")
+                        if addr and prefix is not None:
+                            try:
+                                ip_interfaces.add(ip_interface(f"{addr}/{prefix}"))
+                            except ValueError:
+                                self._target.log.debug("Invalid NixOS address: %s/%s", addr, prefix)
+
+                yield UnixInterfaceRecord(
+                    name=iface_name,
+                    type="dhcp" if iface_dhcp else "static",
+                    enabled=None,
+                    cidr=ip_interfaces,
+                    gateway=list(gateways),
+                    dns=list(dns),
+                    source=str(config_file),
+                    dhcp_ipv4=iface_dhcp,
+                    dhcp_ipv6=iface_dhcp,
+                    configurator="nixos",
+                    _target=self._target,
+                )
+
+
 class DhclientLeaseParser(LinuxNetworkConfigParser):
     """Parse network interfaces from dhclient DHCP ``.leases`` files.
 
@@ -750,5 +874,5 @@ def parse_debian_centos_dhclient_lease(log_record: LogRecord) -> DhcpLease | Non
     return DhcpLease(None, ip_interface(ip), None) if (ip := match.group(1)) else None
 
 
-MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, ProcConfigParser]
+MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser, NixOSConfigParser, ProcConfigParser]
 LEASERS = [DhclientLeaseParser, NetworkManagerLeaseParser]
