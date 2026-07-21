@@ -27,7 +27,10 @@ class DirLoader(Loader):
         return find_entry_path(path) is not None
 
     def map(self, target: Target) -> None:
-        path = self.absolute_path.joinpath(find_entry_path(self.absolute_path))
+        if (entry_path := find_entry_path(self.absolute_path)):
+            path = self.absolute_path.joinpath(entry_path)
+        else:
+            path = self.absolute_path
         find_and_map_dirs(target, path)
 
 
