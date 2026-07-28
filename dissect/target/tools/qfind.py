@@ -7,7 +7,7 @@ import random
 import sys
 from typing import TYPE_CHECKING
 
-from dissect.cstruct import utils
+from dissect.cstruct import util
 
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.logging import get_logger
@@ -92,7 +92,7 @@ def main() -> int:
                 header = f"[{hit.offset:#08x} @ {hit.needle} ({hit.codec})]"
 
                 if not NO_COLOR:
-                    header = utils.COLOR_WHITE_BOLD + header + utils.COLOR_CLEAR
+                    header = util.COLOR_WHITE_BOLD + header + util.COLOR_CLEAR
 
                 before_offset = max(0, hit.offset - args.window)
                 needle_len = len(hit.match)
@@ -101,11 +101,11 @@ def main() -> int:
 
                 if args.raw:
                     palette = (
-                        [(hit.offset - before_offset, utils.COLOR_CLEAR), (needle_len, utils.COLOR_BG_RED)]
+                        [(hit.offset - before_offset, util.COLOR_CLEAR), (needle_len, util.COLOR_BG_RED)]
                         if not NO_COLOR
                         else None
                     )
-                    utils.hexdump(hit.buffer, palette=palette, offset=before_offset)
+                    util.hexdump(hit.buffer, palette=palette, offset=before_offset)
 
                 else:
                     codec = "utf-8" if hit.codec == "hex" else hit.codec
@@ -117,9 +117,9 @@ def main() -> int:
                     )
                     hit = (
                         before_part,
-                        (utils.COLOR_BG_RED if not NO_COLOR else ""),
+                        (util.COLOR_BG_RED if not NO_COLOR else ""),
                         after_part[:needle_len],
-                        (utils.COLOR_CLEAR if not NO_COLOR else ""),
+                        (util.COLOR_CLEAR if not NO_COLOR else ""),
                         after_part[needle_len:],
                     )
                     print("".join(hit))
@@ -316,13 +316,13 @@ def progress_handler(target: Target) -> Callable[[Container | Volume, int, int],
         nonlocal current_disk, char
 
         if current_disk is None:
-            sys.stderr.write(f"{utils.COLOR_WHITE_BOLD}{target}{utils.COLOR_CLEAR}\n")
+            sys.stderr.write(f"{util.COLOR_WHITE_BOLD}{target}{util.COLOR_CLEAR}\n")
 
         if current_disk != disk:
-            sys.stderr.write(f"\n{utils.COLOR_WHITE_BOLD}[Current disk: {disk}]{utils.COLOR_CLEAR}\n")
+            sys.stderr.write(f"\n{util.COLOR_WHITE_BOLD}[Current disk: {disk}]{util.COLOR_CLEAR}\n")
             current_disk = disk
 
-        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_CLEAR}")
+        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{util.COLOR_CLEAR}")
         sys.stderr.flush()
 
         if offset % (1337 * 3) == 0:
