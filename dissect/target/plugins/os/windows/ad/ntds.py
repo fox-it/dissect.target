@@ -93,7 +93,7 @@ NtdsDnsNodeRecord = TargetRecordDescriptor(
         ("datetime", "last_modified_time"),
         ("datetime", "last_modified_time"),
         ("string", "dns_name"),
-        ("dictlist", "records"),
+        ("string[]", "records"),
     ],
 )
 
@@ -241,7 +241,7 @@ class NtdsPlugin(Plugin):
         for dns_node in self.ntds.dns_nodes():
             yield NtdsDnsNodeRecord(
                 dns_name=dns_node.dns_name,
-                records=[r.as_dict() for r in dns_node.dns_record],
+                records=[str(r) for r in dns_node.dns_record],
                 creation_time=dns_node.when_created,
                 last_modified_time=dns_node.when_changed,
                 _target=self.target,
