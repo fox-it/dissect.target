@@ -85,6 +85,18 @@ NtdsGPORecord = TargetRecordDescriptor(
     ],
 )
 
+
+NtdsDnsNodeRecord = TargetRecordDescriptor(
+    "windows/ad/dns_node",
+    [
+        ("datetime", "creation_time"),
+        ("datetime", "last_modified_time"),
+        ("datetime", "last_modified_time"),
+        ("string", "dns_name"),
+        ("dictlist", "records"),
+    ],
+)
+
 # NTDS Registry consts
 NTDS_PARAMETERS_REGISTRY_PATH = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\NTDS\\Parameters"
 NTDS_PARAMETERS_DB_VALUE = "DSA Database file"
@@ -222,6 +234,18 @@ class NtdsPlugin(Plugin):
 
                 if "Primary:CLEARTEXT" in supplemental:
                     yield f"{username}:CLEARTEXT:{supplemental['Primary:CLEARTEXT']}"
+
+    @export(record=NtdsDnsNodeRecord)
+    def dns_nodes(self) -> Iterator[NtdsDnsNodeRecord]:
+        """Extract all DNS nodes from NTDS.dit database."""
+        for dns_node in self.ntds.dns_nodes():
+            yield NtdsDnsNodeRecord(
+                dns_name=dns_node.dns_name,
+                records=[r.as_dict() for r in dns_node.dns_record],
+                creation_time=dns_node.when_created,
+                last_modified_time=dns_node.when_changed,
+                _target=self.target,
+            )
 
 
 def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:

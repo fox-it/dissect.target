@@ -109,3 +109,10 @@ def test_secretsdump(target_win_ntds: Target) -> None:
     )
     assert results[10] == "krbtgt_history0:502:7bd05f9617e7f15e3a6ca037e55f713f:988160b622eb37838dbff2523015e44c:::"
     assert results[-1] == "ESSOS$:des-cbc-md5:f715e30273382546"
+
+
+def test_dns_nodes(target_win_ntds: Target) -> None:
+    results = list(target_win_ntds.ad.dns_nodes())
+    #    results.sort(key=lambda x: getattr(x, "creation_time"))
+    #    assert results[0].dns_name == ""
+    assert len(results) == 113
