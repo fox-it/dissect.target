@@ -16,6 +16,7 @@ from dissect.target.tools.query import record_output
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
 )
@@ -55,7 +56,7 @@ logging.raiseExceptions = False
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="target-info",
+        description=f"target-info {get_dissect_target_version()} : shows info on a target (version, hostname etc...).",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
