@@ -156,7 +156,7 @@ def test_dns_records(target_win_ntds: Target) -> None:
 
 
 def test_dns_as_flow_record() -> None:
-    """Test records type no present in the GOAD ntds."""
+    """Test dns records type no present in the GOAD ntds."""
     generic = {
         "ts": dt("2025-12-19 18:00:00+00:00"),
         "dns_name": "sevenkingdoms.local",
