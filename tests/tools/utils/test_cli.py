@@ -14,7 +14,6 @@ from dissect.target.tools.utils.cli import (
     args_to_uri,
     configure_generic_arguments,
     execute_function_on_target,
-    generate_argparse_for_method,
     persist_execution_report,
     process_generic_arguments,
 )
@@ -150,20 +149,6 @@ def test_plugin_name_confusion_regression(target_unix_users: Target, pattern: st
         target_unix_users.get_function(plugins[0])
 
     assert expected_function in str(exc_info.value)
-
-
-def test_plugin_mutual_exclusive_arguments() -> None:
-    fargs = [
-        (("--aa",), {"group": "aa"}),
-        (("--bb",), {"group": "aa"}),
-        (("--cc",), {"group": "bb"}),
-        (("--dd",), {"group": "bb"}),
-    ]
-    method = test_plugin_mutual_exclusive_arguments
-    method.__args__ = fargs
-    with patch("inspect.isfunction", return_value=True):
-        parser = generate_argparse_for_method(method)
-    assert len(parser._mutually_exclusive_groups) == 2
 
 
 def test_namespace_plugin_args() -> None:

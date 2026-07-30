@@ -354,6 +354,8 @@ def test_isabs(path: str, sep: str, result: str) -> None:
         pytest.param("C:\\some\\..\\file", "\\", "C:\\file", id="windows-drive-up-level"),
         pytest.param("C:\\some\\..\\..\\sysvol\\file", "\\", "sysvol\\file", id="windows-drive-up-level-sysvol"),
         pytest.param("\\sysvol\\some\\..\\file", "\\", "sysvol\\file", id="windows-sysvol"),
+        pytest.param("\\sysvol\\sysvol\\abc", "\\", "sysvol\\sysvol\\abc", id="windows-sysvol-sysvol"),
+        pytest.param("\\efi\\EFI\\abc", "\\", "efi\\EFI\\abc", id="windows-efi-efi"),
     ],
 )
 def test_normpath(path: str, sep: str, result: str) -> None:
@@ -384,7 +386,13 @@ def test_normpath(path: str, sep: str, result: str) -> None:
         pytest.param("some/dir", "/my\\cwd/", "/", "/my\\cwd/some/dir", id="posix-rel-cwd-backslash"),
         pytest.param("some\\dir", "/my\\cwd/", "\\", "\\my\\cwd\\some\\dir", id="windows-rel-cwd-mixed"),
         pytest.param("some/dir", "C:\\my\\cwd\\", "\\", "C:\\my\\cwd\\some\\dir", id="windows-rel-cwd-drive"),
+        pytest.param("sysvol", "", "\\", "sysvol", id="windows-sysvol"),
         pytest.param("sysvol/dir", "", "\\", "sysvol\\dir", id="windows-sysvol-rel"),
+        pytest.param("sysvol", "sysvol", "\\", "sysvol\\sysvol", id="windows-sysvol-sysvol"),
+        pytest.param("EFI", "", "\\", "EFI", id="windows-efi"),
+        pytest.param("EFI", "efi", "\\", "efi\\EFI", id="windows-efi-efi"),
+        pytest.param("EFI", "", "/", "/EFI", id="posix-efi"),
+        pytest.param("EFI", "/efi", "/", "/efi/EFI", id="posix-efi-efi"),
     ],
 )
 def test_abspath(path: str, cwd: str, sep: str, result: str) -> None:

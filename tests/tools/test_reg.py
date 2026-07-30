@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def target_win_reg(target_win: Target, fs_win: VirtualFilesystem) -> Target:
-    fs_win.map_file("Windows/System32/config/SYSTEM", absolute_path("_data/tools/reg/SYSTEM.gz"), "gzip")
+    fs_win.map_file("Windows/System32/config/SYSTEM", absolute_path("_data/tools/reg/SYSTEM.gz"), compression="gzip")
     target_win.apply()
     target_win.add_plugin(RegistryPlugin)
     return target_win
