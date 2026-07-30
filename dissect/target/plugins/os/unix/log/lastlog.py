@@ -132,9 +132,11 @@ class LastLogPlugin(Plugin):
     def __init__(self, target: Target):
         super().__init__(target)
 
-        self.paths = list(self.target.fs.path("/").glob("var/log/lastlog*")) + list(
-            self.target.fs.path("/").glob("var/lib/lastlog/lastlog2*")
-        )
+        self.paths = list(self.get_paths())
+
+    def _get_paths(self) -> Iterator[Path]:
+        yield from self.target.fs.path("/").glob("var/log/lastlog*")
+        yield from self.target.fs.path("/").glob("var/lib/lastlog/lastlog2*")
 
     def check_compatible(self) -> None:
         if not self.paths:
