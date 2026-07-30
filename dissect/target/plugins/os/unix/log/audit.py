@@ -36,13 +36,13 @@ class AuditPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.log_paths = self.get_log_paths()
+        self.log_paths = list(self.get_paths())
 
     def check_compatible(self) -> None:
         if not len(self.log_paths):
             raise UnsupportedPluginError("No audit path found")
 
-    def get_log_paths(self) -> list[Path]:
+    def _get_paths(self) -> Iterator[Path]:
         log_paths = []
 
         log_paths.extend(self.target.fs.path("/var/log/audit").glob("audit.log*"))
@@ -58,7 +58,7 @@ class AuditPlugin(Plugin):
                 parent_folder = self.target.fs.path(log_path).parent
                 log_paths.extend(path for path in parent_folder.glob(f"{basename(log_path)}*") if path not in log_paths)
 
-        return log_paths
+        yield from log_paths
 
     @export(record=AuditRecord)
     def audit(self) -> Iterator[AuditRecord]:
