@@ -58,7 +58,7 @@ def test_helpers_fsutil_year_rollover_helper() -> None:
     path = vfs.path("file")
 
     mocked_stat = fsutil.stat_result([stat.S_IFREG, 1337, id(vfs), 0, 0, 0, len(content), 0, 3384460800, 0])
-    with patch.object(path, "stat", return_value=mocked_stat):
+    with patch.object(type(path), "stat", return_value=mocked_stat):
         result = list(utils.year_rollover_helper(path, re_ts, ts_fmt))
         assert len(result) == 10
 
@@ -74,7 +74,7 @@ def test_helpers_fsutil_year_rollover_helper() -> None:
     mtime = datetime.datetime(2023, 1, 1, 3, tzinfo=datetime.timezone.utc)
     tzinfo = datetime.timezone(datetime.timedelta(hours=-8))
     mocked_stat = fsutil.stat_result([stat.S_IFREG, 1337, id(vfs), 0, 0, 0, len(content), 0, mtime.timestamp(), 0])
-    with patch.object(path, "stat", return_value=mocked_stat):
+    with patch.object(type(path), "stat", return_value=mocked_stat):
         result = list(utils.year_rollover_helper(path, re_ts, ts_fmt, tzinfo))
         year_line = [(ts.year, line) for ts, line in result]
 
@@ -101,6 +101,6 @@ def test_helpers_fsutil_year_rollover_helper_leap_day() -> None:
         [stat.S_IFREG, 1337, id(fs), 0, 0, 0, len(content), 0, 1709294400, 0]
     )  # mtime is set to 2024-03-01.
 
-    with patch.object(path, "stat", return_value=mocked_stat):
+    with patch.object(type(path), "stat", return_value=mocked_stat):
         result = list(utils.year_rollover_helper(path, re_ts, ts_fmt))
         assert len(result) == 3

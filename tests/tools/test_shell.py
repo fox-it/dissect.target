@@ -468,7 +468,7 @@ def test_target_cli_save(
 
     def _map_function(path: Path) -> str:
         relative_path = str(path.relative_to(output_dir))
-        return normalize(relative_path, alt_separator=target_win.fs.alt_separator)
+        return normalize(relative_path, sep=target_win.fs.sep)
 
     path_map = (_map_function(path) for path in output_dir.rglob("*"))
     tree = "|".join(sorted(path_map))

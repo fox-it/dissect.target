@@ -1496,6 +1496,10 @@ class MockOS1(OSPlugin):
     def architecture(self) -> str | None:
         pass
 
+    @export(property=True)
+    def device(self) -> str | None:
+        pass
+
 
 class MockOS2(OSPlugin):
     __register__ = False
@@ -1523,6 +1527,10 @@ class MockOS2(OSPlugin):
     @export(property=True)
     def architecture(self) -> str | None:
         """Test docstring architecture."""
+
+    @export(property=True)
+    def device(self) -> str | None:
+        pass
 
 
 @pytest.mark.parametrize(

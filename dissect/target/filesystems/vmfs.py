@@ -85,7 +85,7 @@ class VmfsFilesystemEntry(FilesystemEntry):
 
     def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""
-        full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        full_path = fsutil.join(self.path, path, sep=self.fs.sep)
         return VmfsFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
 
     def open(self) -> BinaryIO:
