@@ -20,9 +20,9 @@ if TYPE_CHECKING:
     from dissect.database.ese.ntds.objects import (
         Computer,
         DomainDNS,
+        Group,
         Object,
         OrganizationalUnit,
-        SecurityObject,
         TrustedDomain,
         User,
     )
@@ -218,19 +218,13 @@ class NtdsPlugin(Plugin):
     def computers(self) -> Iterator[NtdsComputerRecord]:
         """Extract all computer accounts from the NTDS.dit database."""
         for computer in self.ntds.computers():
-            try:
-                dump_smsa_password = computer.get("msDS-ManagedPassword")
-            except Exception:
-                dump_smsa_password = None
-
             yield NtdsComputerRecord(
                 **extract_account_info(computer, self.target),
                 **extract_laps(computer),
-                dns_hostname=computer.get("dNSHostName"),
-                operating_system=computer.get("operatingSystem"),
-                operating_system_version=computer.get("operatingSystemVersion"),
-                allowed_to_act=computer.get("msDS-AllowedToActOnBehalfOfOtherIdentity"),
-                dump_smsa_password=dump_smsa_password,
+                dns_hostname=computer.dns_host_name,
+                operating_system=computer.operating_system,
+                operating_system_version=computer.operating_system_version,
+                allowed_to_act=computer.allowed_to_act_on_behalf_of_other_identity,
                 _target=self.target,
             )
 
@@ -266,22 +260,21 @@ class NtdsPlugin(Plugin):
         for trusted_domain in self.ntds.trusts():
             yield NtdsTrustedDomainRecord(
                 **extract_domain_info(trusted_domain),
-                trust_partner=trusted_domain.get("trustPartner"),
-                trust_direction=trusted_domain.get("trustDirection"),
-                trust_type=trusted_domain.get("trustType"),
-                trust_attributes=trusted_domain.get("trustAttributes"),
-                security_identifier=trusted_domain.get("securityIdentifier"),
+                trust_partner=trusted_domain.trust_partner,
+                trust_direction=trusted_domain.trust_direction,
+                trust_type=trusted_domain.trust_type,
+                trust_attributes=trusted_domain.trust_attributes,
+                security_identifier=trusted_domain.security_identifier,
                 _target=self.target,
             )
 
     @export(record=NtdsOURecord)
     def organizational_units(self) -> Iterator[NtdsOURecord]:
         """Extract all organizational units from the NTDS.dit database."""
-        for ou in self.ntds.search(objectClass="organizationalUnit"):
-            gp_options = ou.get("gPOptions")
+        for ou in self.ntds.organizational_units():
             yield NtdsOURecord(
                 **extract_container_info(ou),
-                blocks_inheritance=bool(gp_options & 1) if gp_options is not None else False,
+                blocks_inheritance=bool(ou.gp_options & 1) if ou.gp_options is not None else False,
                 _target=self.target,
             )
 
@@ -291,7 +284,7 @@ class NtdsPlugin(Plugin):
         for gpo in self.ntds.group_policies():
             yield NtdsGPORecord(
                 **extract_container_info(gpo),
-                gpc_path=gpo.get("gPCFileSysPath"),
+                gpc_path=gpo.file_path,
                 _target=self.target,
             )
 
@@ -362,8 +355,6 @@ def get_supplemental_credentials(account: User | Computer) -> Iterator[str]:
 
 def extract_object_info(obj: Object) -> dict[str, Any]:
     """Extract generic information from an Object."""
-    description = obj.get("description")
-    description = description.pop() if description else None
     return {
         "cn": obj.cn,
         "sid": obj.sid,
@@ -372,24 +363,24 @@ def extract_object_info(obj: Object) -> dict[str, Any]:
         "pdnt": obj.pdnt,
         "name": obj.name,
         "display_name": obj.display_name,
-        "description": description,
+        "description": obj.description.pop() if obj.description else None,
         "object_classes": obj.object_class,
         "distinguished_name": obj.distinguished_name,
         "guid": obj.guid,
         "creation_time": obj.when_created,
         "last_modified_time": obj.when_changed,
         "is_deleted": obj.is_deleted,
-        "nt_security_descriptor": obj.get("nTSecurityDescriptor"),
+        "nt_security_descriptor": obj.sd,
     }
 
 
-def extract_security_info(security_obj: SecurityObject) -> dict[str, Any]:
+def extract_security_info(security_obj: User | Group | Computer) -> dict[str, Any]:
     """Extract generic information from a Security Object."""
     return {
         **extract_object_info(security_obj),
         "sam_name": security_obj.sam_account_name,
         "sam_type": security_obj.get("sAMAccountType"),
-        "admin_count": bool(security_obj.get("adminCount")),
+        "admin_count": bool(security_obj.admin_count),
         "sid_history": security_obj.get("sIDHistory"),
     }
 
@@ -439,11 +430,6 @@ def extract_account_info(account: User | Computer, target: Target) -> dict[str, 
         sfu_password = None
 
     try:
-        user_password = account.get("userPassword")
-    except Exception:
-        user_password = None
-
-    try:
         unix_password = account.get("unixUserPassword")
     except Exception:
         unix_password = None
@@ -462,7 +448,7 @@ def extract_account_info(account: User | Computer, target: Target) -> dict[str, 
         "lm_history": lm_history,
         "nt": nt_hash,
         "nt_history": nt_history,
-        "user_password": user_password or None,
+        "user_password": account.user_password,
         "unix_password": unix_password or None,
         "sfu_password": sfu_password,
         "supplemental_credentials": list(get_supplemental_credentials(account)),
@@ -471,12 +457,12 @@ def extract_account_info(account: User | Computer, target: Target) -> dict[str, 
         "member_of": member_of,
         "allowed_to_delegate": account.get("msDS-AllowedToDelegateTo"),
         "info": account.get("info"),
-        "email": account.get("mail"),
-        "title": account.get("title"),
-        "telephone_number": account.get("telephoneNumber"),
-        "home_directory": account.get("homeDirectory"),
-        "logon_script": account.get("scriptPath"),
-        "service_principal_names": account.get("servicePrincipalName"),
+        "email": account.mail,
+        "title": account.title,
+        "telephone_number": account.telephone_number,
+        "home_directory": account.home_directory,
+        "logon_script": account.script_path,
+        "service_principal_names": account.service_principal_name,
     }
 
 
