@@ -405,7 +405,7 @@ class BloodHound(Plugin):
         if ad_object.sid is None and ad_object.guid is None:
             return None
 
-        return ad_object.sid if ad_object.sid else str(ad_object.guid)
+        return ad_object.sid or str(ad_object.guid)
 
     def get_object_identity(self, ad_object: Object) -> dict[str, str] | None:
         """Get the unique identity for an AD object.
@@ -634,7 +634,9 @@ class BloodHound(Plugin):
                     in computer.user_account_control,
                     "operatingsystem": computer.operating_system,
                     "haslaps": computer.has_laps.value,
-                    "DumpSMSAPassword": computer.dump_smsa_password,
+                    # TODO: Extract the DN from the 'msDS-HostServiceAccount' attribute on this computer object,
+                    # resolve that DN to its corresponding SID, and append it to this list.
+                    "DumpSMSAPassword": [],
                     # TODO:
                     # We can't populate Sessions without session data (Offline collection),
                     # so we'll just put a placeholder here for now
