@@ -325,6 +325,11 @@ def find_installs(target: Target) -> Iterator[Path]:
         "sysvol/ProgramData/docker",
     ]
 
+    user_data_paths = [
+        # MacOS
+        "Library/Containers/com.docker.docker/Data/vms/0/data",
+    ]
+
     default_config_paths = [
         # Linux
         "/etc/docker/daemon.json",
@@ -341,6 +346,11 @@ def find_installs(target: Target) -> Iterator[Path]:
     for path in default_data_paths:
         if (path := target.fs.path(path)).exists():
             yield path
+
+    for path in user_data_paths:
+        for user_details in target.user_details.all_with_home():
+            if (user_path := user_details.home_path.joinpath(path)).exists():
+                yield user_path
 
     for path in default_config_paths:
         if (config_file := target.fs.path(path)).exists():

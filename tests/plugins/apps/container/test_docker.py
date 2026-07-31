@@ -53,6 +53,24 @@ def test_docker_plugin_data_roots_empty(target_unix_users: Target, fs_unix: Virt
     ]
 
 
+def test_docker_plugin_data_roots_empty_darwin(target_macos_users: Target, fs_unix: VirtualFilesystem) -> None:
+    target_macos_users.fs.makedirs("/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data")
+    fs_unix.map_file_fh("/User/dissect/.docker/daemon.json", BytesIO(b"{}"))
+
+    assert [str(p) for p in find_installs(target_macos_users)] == [
+        "/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data",
+    ]
+
+
+def test_docker_plugin_data_roots_darwin(target_macos_users: Target, fs_unix: VirtualFilesystem) -> None:
+    target_macos_users.fs.makedirs("/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data")
+    fs_unix.map_file_fh("/User/dissect/.docker/daemon.json", BytesIO(b'{"data-root": "/tmp/foo/bar"}'))
+
+    assert [str(p) for p in find_installs(target_macos_users)] == [
+        "/tmp/foo/bar",
+    ]
+
+
 def test_docker_plugin_images(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file(
         "/var/lib/docker/image/overlay2/repositories.json",
