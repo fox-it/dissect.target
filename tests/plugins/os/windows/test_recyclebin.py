@@ -142,13 +142,13 @@ def test_reading_deleted_directory_entries(target_win: Target, tmp_path: Path) -
     records = list(target_win.recyclebin())
     start_dir = records[0]
     assert start_dir.path == filename.rstrip("\0")
-    assert start_dir.deleted_path == "\\c:\\$recycle.bin\\$Rhello_world"
-    assert start_dir.source == "\\c:\\$recycle.bin\\$Ihello_world"
+    assert start_dir.deleted_path == "c:\\$recycle.bin\\$Rhello_world"
+    assert start_dir.source == "c:\\$recycle.bin\\$Ihello_world"
 
     file_dir = records[1]
     assert file_dir.path == str(path.joinpath("data.txt"))
-    assert file_dir.deleted_path == "\\c:\\$recycle.bin\\$Rhello_world\\data.txt"
-    assert file_dir.source == "\\c:\\$recycle.bin\\$Ihello_world"
+    assert file_dir.deleted_path == "c:\\$recycle.bin\\$Rhello_world\\data.txt"
+    assert file_dir.source == "c:\\$recycle.bin\\$Ihello_world"
 
 
 def test_recyclebin_wrong_prefix(target_win: Target, recycle_bin: VirtualFilesystem) -> None:

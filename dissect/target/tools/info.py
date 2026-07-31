@@ -35,6 +35,7 @@ InfoRecord = TargetRecordDescriptor(
         ("string", "os_family"),
         ("string", "os_version"),
         ("string", "architecture"),
+        ("string", "device"),
         ("string[]", "language"),
         ("string", "timezone"),
         ("string[]", "disks"),
@@ -108,7 +109,7 @@ def main() -> int:
     return 0
 
 
-def get_target_info(target: Target, recursive: bool = False) -> dict[str, str | list[str]]:
+def get_target_info(target: Target, recursive: bool = False) -> dict[str, str | list | None]:
     return {
         "disks": get_disks_info(target),
         "volumes": get_volumes_info(target),
@@ -120,6 +121,7 @@ def get_target_info(target: Target, recursive: bool = False) -> dict[str, str | 
         "os_family": get_property(target, "os"),
         "os_version": get_property(target, "version"),
         "architecture": get_property(target, "architecture"),
+        "device": get_property(target, "device"),
         "language": get_property(target, "language"),
         "timezone": get_property(target, "timezone"),
         "install_date": get_property(target, "install_date"),
