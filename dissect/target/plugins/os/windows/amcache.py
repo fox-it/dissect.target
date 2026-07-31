@@ -710,7 +710,10 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
 
 def parse_win_datetime(value: str) -> datetime | None:
     if value:
-        return datetime.strptime(value, "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+        try:
+            return datetime.strptime(value, "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
     return None
 
 

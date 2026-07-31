@@ -152,10 +152,10 @@ def make_mock_targets(request: pytest.FixtureRequest, tmp_path: pathlib.Path) ->
 
 
 @pytest.fixture
-def fs_win(tmp_path: pathlib.Path) -> VirtualFilesystem:
-    fs = VirtualFilesystem(case_sensitive=False, alt_separator="\\")
-    fs.map_dir("windows/system32", tmp_path)
-    fs.map_dir("windows/system32/config/", tmp_path)
+def fs_win() -> VirtualFilesystem:
+    fs = VirtualFilesystem(case_sensitive=False, sep="\\")
+    fs.makedirs("windows/system32")
+    fs.makedirs("windows/system32/config")
     return fs
 
 
@@ -313,7 +313,12 @@ def fs_android() -> VirtualFilesystem:
     fs.makedirs("/system")
     fs.makedirs("/vendor")
     fs.makedirs("/product")
-    fs.map_file("/build.prop", absolute_path("_data/plugins/os/unix/linux/android/build.prop"))
+    fs.map_file("/build.prop", absolute_path("_data/plugins/os/unix/linux/android/system/build.prop"))
+    fs.map_file(
+        "/data/property/persistent_properties",
+        absolute_path("_data/plugins/os/unix/linux/android/system/persistent_properties"),
+    )
+    fs.map_file("/system/bin/sh", absolute_path("_data/plugins/os/unix/linux/android/system/sh.truncated"))
     return fs
 
 
@@ -370,11 +375,12 @@ def target_win(tmp_path: pathlib.Path, hive_hklm: VirtualHive, fs_win: Filesyste
         "HKEY_LOCAL_MACHINE",
         "HKEY_LOCAL_MACHINE",
         hive_hklm,
-        TargetPath(mock_target.fs, ""),
+        mock_target.fs.path(""),
     )
-    mock_target.fs.mount("c:", fs_win)
-
     mock_target.apply()
+    assert mock_target.fs.sep == "\\"
+    assert mock_target.fs.altsep == "/"
+    mock_target.fs.mount("c:", fs_win)
 
     return mock_target
 
@@ -405,15 +411,16 @@ def target_suse(tmp_path: pathlib.Path, fs_suse: Filesystem) -> Target:
 
 
 @pytest.fixture
-def target_macos(tmp_path: pathlib.Path, fs_macos: Filesystem) -> Target:
+def target_macos(tmp_path: pathlib.Path, fs_macos: VirtualFilesystem) -> Target:
     mock_target = make_os_target(tmp_path, MacOSPlugin, root_fs=fs_macos)
-
-    version = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/SystemVersion.plist")
-    fs_macos.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
-
-    system = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/preferences.plist")
-    fs_macos.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
-
+    fs_macos.map_file(
+        "/System/Library/CoreServices/SystemVersion.plist",
+        absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/SystemVersion.plist"),
+    )
+    fs_macos.map_file(
+        "/Library/Preferences/SystemConfiguration/preferences.plist",
+        absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/preferences.plist"),
+    )
     return mock_target
 
 
@@ -568,14 +575,20 @@ def target_linux_users(target_linux: Target, fs_linux: VirtualFilesystem) -> Tar
 
 @pytest.fixture
 def target_macos_users(target_macos: Target, fs_macos: VirtualFilesystem) -> Target:
-    dissect = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/dissect.plist")
-    fs_macos.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
-
-    test = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/test.plist")
-    fs_macos.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
-
+    fs_macos.makedirs("/Users/Shared")
     fs_macos.makedirs("/Users/dissect")
-
+    fs_macos.makedirs("/Users/alexmaurie")
+    fs_macos.map_dir(
+        "/private/var/db/dslocal/nodes/Default/users",
+        absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/users"),
+    )
+    fs_macos.map_file(
+        "/System/Library/Kernels/kernel", absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/kernel")
+    )
+    fs_macos.map_file(
+        "/private/var/db/dhcpclient/leases/en0.plist",
+        absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/en0.plist"),
+    )
     return target_macos
 
 
