@@ -100,3 +100,17 @@ def test_locale_etc_localtime_regular_file(target_unix_users: Target, fs_unix: V
 def test_locale_timezone_string_normalize(input: str, expected_output: str) -> None:
     """Test if we normalize zoneinfo paths correctly."""
     assert timezone_from_path(Path(input)) == expected_output
+
+
+@pytest.mark.parametrize(
+    "content",
+    [b"", b" ", b"\n"],
+)
+def test_locale_empty_timezone(target_unix: Target, fs_unix: VirtualFilesystem, content: bytes) -> None:
+    """Test if timezone can still be detected if ``/etc/timezone`` is empty."""
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(content))
+    fs_unix.map_file_fh("/usr/share/zoneinfo/Europe/Amsterdam", BytesIO(b""))
+    fs_unix.link("/usr/share/zoneinfo/Europe/Amsterdam", "/etc/localtime")
+    target_unix.add_plugin(UnixLocalePlugin)
+
+    assert target_unix.timezone == "Europe/Amsterdam"

@@ -58,7 +58,7 @@ def test_loader(descriptor_dir: str, disk_dir: str, target_bare: Target) -> None
     gen1_vmcx_filename = "EC04F346-DB96-4700-AF5B-77B3C56C38BD.vmcx"
     gen2_vmcx_filename = "993F7B33-6057-4D1E-A1FE-A1A1D77BE974.vmcx"
 
-    vfs = VirtualFilesystem(case_sensitive=False, alt_separator="\\")
+    vfs = VirtualFilesystem(sep="\\", case_sensitive=False)
     vfs.map_file(f"{descriptor_dir}\\{gen1_xml_filename}", absolute_path(f"_data/loaders/hyperv/{gen1_xml_filename}"))
     vfs.map_file(f"{descriptor_dir}\\{gen2_xml_filename}", absolute_path(f"_data/loaders/hyperv/{gen2_xml_filename}"))
     vfs.map_file(f"{descriptor_dir}\\{gen1_vmcx_filename}", absolute_path(f"_data/loaders/hyperv/{gen1_vmcx_filename}"))

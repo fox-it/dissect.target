@@ -347,3 +347,24 @@ def test_windows_architecture(
 
     assert target_win_users.os == "windows"
     assert target_win_users.architecture == expected_triple
+
+
+@pytest.mark.parametrize(
+    ("reg_value", "expected_device"),
+    [
+        (("Cyberdyne Systems", "Skynet"), "Cyberdyne Systems Skynet"),
+        ((None, "Skynet"), "Skynet"),
+    ],
+)
+def test_windows_oem_device(
+    target_win_users: Target, hive_hklm: VirtualHive, reg_value: tuple[str, str], expected_device: str
+) -> None:
+    """Test if we can parse windows OEM information correctly."""
+    key_name = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation"
+    key = VirtualKey(hive_hklm, key_name)
+    key.add_value("Manufacturer", reg_value[0])
+    key.add_value("Model", reg_value[1])
+    hive_hklm.map_key(key_name, key)
+
+    assert target_win_users.os == "windows"
+    assert target_win_users.device == expected_device

@@ -81,7 +81,7 @@ class DirectoryFilesystemEntry(FilesystemEntry):
     entry: Path
 
     def get(self, path: str) -> FilesystemEntry:
-        path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        path = fsutil.join(self.path, path, sep=self.fs.sep)
         return self.fs.get(path)
 
     def open(self) -> BinaryIO:
