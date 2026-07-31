@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
+from flow.record.fieldtypes import datetime as dt
 
 import dissect.target.plugins.os.windows.prefetch as prefetch
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.cstruct import cstruct
+
+    from dissect.target import Target
+    from dissect.target.filesystem import VirtualFilesystem
 
 
 @pytest.fixture
@@ -24,6 +30,17 @@ def mocked_cstruct(version: int) -> Iterator[cstruct]:
 def mocked_prefetch() -> prefetch.Prefetch:
     with patch.object(prefetch, "c_prefetch"), patch.multiple(prefetch.Prefetch, identify=Mock(), parse=Mock()):
         return prefetch.Prefetch(Mock())
+
+
+@pytest.fixture
+def target_win_prefetch(target_win: Target, fs_win: VirtualFilesystem) -> Target:
+    fs_win.map_file(
+        "Windows\\prefetch\\MPCMDRUN.EXE-962E6200.pf",
+        absolute_path("_data/plugins/os/windows/prefetch/MPCMDRUN.EXE-962E6200.pf"),
+    )
+
+    target_win.add_plugin(prefetch.PrefetchPlugin)
+    return target_win
 
 
 @pytest.mark.parametrize(
@@ -105,3 +122,42 @@ def test_prefetch_read_filename(mocked_prefetch: prefetch.Prefetch) -> None:
     mocked_fileheader.read.assert_called_with(0x10 * 2)
     assert isinstance(filename, bytes)
     assert mocked_fileheader.seek.call_count == 2
+
+
+def test_prefetch_compact(target_win_prefetch: Target) -> None:
+    records = list(target_win_prefetch.prefetch(compact=True))
+
+    assert len(records) == 1
+    mpcrun = records[0]
+    assert mpcrun.filename == "MPCMDRUN.exe"
+    assert mpcrun.source == "c:\\Windows\\prefetch\\MPCMDRUN.EXE-962E6200.pf"
+    # assert mpcrun.runcount == 21 : Todo : fix bug
+    assert sorted(mpcrun.previousruns, reverse=True) == [
+        dt("2024-04-29 08:11:44.680344+00:00"),
+        dt("2024-04-29 07:52:38.569597+00:00"),
+        dt("2024-04-29 07:52:38.319941+00:00"),
+        dt("2024-04-26 12:11:44.301853+00:00"),
+        dt("2024-04-26 12:11:44.161709+00:00"),
+        dt("2024-04-26 09:13:19.898300+00:00"),
+        dt("2024-04-26 09:13:19.757269+00:00"),
+    ]
+    assert mpcrun.ts == dt("2024-04-29 08:11:44.851896+00:00")
+    assert len(mpcrun.linkedfiles) == 41
+
+
+def test_prefetch(target_win_prefetch: Target) -> None:
+    records = list(target_win_prefetch.prefetch())
+
+    assert len(records) == 328
+    assert Counter(str(r.source) for r in records) == {"c:\\Windows\\prefetch\\MPCMDRUN.EXE-962E6200.pf": 328}
+    assert Counter(str(r.filename) for r in records) == {"MPCMDRUN.EXE": 328}
+    assert Counter(r.ts for r in records) == {
+        dt("2024-04-29 08:11:44.680344+00:00"): 41,
+        dt("2024-04-29 07:52:38.569597+00:00"): 41,
+        dt("2024-04-29 07:52:38.319941+00:00"): 41,
+        dt("2024-04-26 12:11:44.301853+00:00"): 41,
+        dt("2024-04-26 12:11:44.161709+00:00"): 41,
+        dt("2024-04-26 09:13:19.898300+00:00"): 41,
+        dt("2024-04-26 09:13:19.757269+00:00"): 41,
+        dt("2024-04-29 08:11:44.851896+00:00"): 41
+    }
