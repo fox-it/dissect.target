@@ -101,6 +101,7 @@ DEFENDER_EVTX_FIELDS = [
     ("string", "Type_ID"),
     ("string", "Type_Name"),
     ("string", "Version"),
+    ("path", "source"),
 ]
 
 DEFENDER_LOG_DIR = "%windir%/system32/winevt/logs"

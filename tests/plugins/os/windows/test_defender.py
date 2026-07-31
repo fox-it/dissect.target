@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
@@ -67,6 +68,9 @@ def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_p
     assert {r.Channel for r in records} == {"Microsoft-Windows-Windows Defender/Operational"}
     # Both informational records (no threat name) and detections are present
     assert {r.Threat_Name for r in records} == {None, "TrojanDropper:PowerShell/PowerSploit.S!MSR"}
+    assert Counter(str(r.source) for r in records) == {
+        "c:\\Windows\\system32\\winevt\\logs\\Microsoft-Windows-Windows Defender%4Operational.evtx": 9
+    }
 
 
 def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesystem) -> None:

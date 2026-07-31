@@ -22,7 +22,7 @@ def test_sru_plugin(target_win: Target, fs_win: VirtualFilesystem, caplog: pytes
     target_win.add_plugin(sru.SRUPlugin)
     sru_records = list(target_win.sru())
     assert len(sru_records) == 220
-    assert Counter(str(r.source) for r in sru_records) == {'c:\\Windows\\System32\\sru\\SRUDB.dat': 220}
+    assert Counter(str(r.source) for r in sru_records) == {"c:\\Windows\\System32\\sru\\SRUDB.dat": 220}
     assert len(list(target_win.sru.application())) == 203
     assert len(list(target_win.sru.network_connectivity())) == 3
     assert len(list(target_win.sru.sdp_volume_provider())) == 6
