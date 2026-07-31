@@ -220,13 +220,11 @@ class MftPlugin(Plugin):
     )
     @arg(
         "--compact",
-        group="fmt",
         action="store_true",
         help="compacts the MFT entry timestamps into a single record",
     )
     @arg(
         "--macb",
-        group="fmt",
         action="store_true",
         help="compacts MFT timestamps into MACB bitfield (format: MACB[standard|ads]/MACB[filename])",
     )

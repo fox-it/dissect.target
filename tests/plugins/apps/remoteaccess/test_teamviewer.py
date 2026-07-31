@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 def test_teamviewer_global_log(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     teamviewer_logfile = absolute_path("_data/plugins/apps/remoteaccess/teamviewer/TestTeamviewer.log")
-    target_logfile_name = "/sysvol/Program Files/TeamViewer/TestTeamviewer.log"
+    target_logfile_name = "sysvol/Program Files/TeamViewer/TestTeamviewer.log"
 
     _, _, map_path = target_logfile_name.partition("sysvol/")
     fs_win.map_file(map_path, teamviewer_logfile)
