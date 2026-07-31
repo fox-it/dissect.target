@@ -110,7 +110,6 @@ NtdsComputerRecord = TargetRecordDescriptor(
         ("datetime", "legacy_laps_expiration"),
         ("string", "windows_laps"),
         ("datetime", "windows_laps_expiration"),
-        ("string", "dump_smsa_password"),
     ],
 )
 
