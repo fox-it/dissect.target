@@ -417,7 +417,7 @@ class MicrosoftDefenderPlugin(Plugin):
 
         yield DefenderMPLogRTPRecord(
             _target=self.target,
-            source_log=data["source_log"],
+            source=data["source"],
             **times,
             plugin_states=re.findall(r"^\s+(.*)$", data["plugin_states"])[0],
             process_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["process_exclusions"]),
@@ -448,7 +448,7 @@ class MicrosoftDefenderPlugin(Plugin):
             if match := pattern.match(mplog_line):
                 data = match.groupdict()
                 data["_target"] = self.target
-                data["source_log"] = source
+                data["source"] = source
                 yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data, tzinfo=tzinfo)
 
     def _mplog_block(
@@ -469,7 +469,7 @@ class MicrosoftDefenderPlugin(Plugin):
 
                 data = match.groupdict()
                 data["_target"] = self.target
-                data["source_log"] = source
+                data["source"] = source
                 yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data, tzinfo=tzinfo)
 
     def _mplog(
