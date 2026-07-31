@@ -1877,6 +1877,30 @@ def test_plugin_record_field_and_name_consistency() -> None:
         )
 
 
+def test_plugin_record_field_have_source_field() -> None:
+    """Test that ensures that every plugin have the "source" field, containing path."""
+    record_without_source: set[str] = set()
+
+    for descriptor in find_functions("*", Target(), compatibility=False, show_hidden=True)[0]:
+        # Test if plugin function record fields make sense and do not conflict with other records.
+        if descriptor.output != "record" or not hasattr(descriptor, "record"):
+            continue
+
+        # Functions can yield a single record or a list of records.
+        records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+
+        for record in records:
+            fields = [name for name, field in record.fields.items()]
+            if "source" not in fields and "path" not in fields:
+                record_without_source.add(record.name)
+
+    if record_without_source:
+        pytest.fail(
+            f"Found {len(record_without_source)} inconsistencies in "
+            f"RecordDescriptors:\n" + "\n".join(record_without_source)
+        )
+
+
 def assert_valid_rst(src: str) -> None:
     """Attempts to compile the given string to rst."""
     try:
