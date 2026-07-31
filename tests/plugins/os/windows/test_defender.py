@@ -97,7 +97,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert mimikatz_record.quarantine_id == "a762038000000000fb1112639186e0d6"
     assert mimikatz_record.scan_id == "cdbe4600e43a964b8dc2416b0ef7a207"
     assert mimikatz_record.threat_id == 2147705511
-
+    assert mimikatz_record.source == (
+        r"sysvol\\programdata\\microsoft\\"
+        r"windows defender\\quarantine\\entries\\{800362A7-0000-0000-FB11-12639186E0D6}"
+    )
     ie_records = sorted(
         [r for r in records if r.quarantine_id == "229c0170000000004d02ef183c202f42"], key=lambda r: r.ts
     )
@@ -115,6 +118,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert ie_startup_record.detection_path == (
         "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
     )
+    assert ie_startup_record.source == (
+        r"sysvol\\programdata\\microsoft\\"
+        r"windows defender\\quarantine\\entries\\{8006A512-0000-0000-2E01-A7D5DA185F14}"
+    )
 
     tasksched_records = sorted(
         [r for r in records if r.quarantine_id == "3c1f228000000000270c270b71d096cd"], key=lambda r: r.ts
@@ -130,6 +137,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert regkey_records[1].detection_path == (
         "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\"
         "Tasks\\{EBCB386F-05C8-4545-9455-922990114435}"
+    )
+    assert regkey_records[1].source == (
+        r"sysvol\\programdata\\microsoft\\"
+        r"windows defender\\quarantine\\entries\\{8006A512-0000-0000-2E11-A7D5DA185F24}"
     )
 
     file_records = sorted([r for r in tasksched_records if r.detection_type == "file"], key=lambda r: r.ts)
@@ -147,6 +158,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert ts_record.detection_name == "HackTool:Win32/AutoKMS"
     assert ts_record.detection_path == "C:\\WINDOWS\\System32\\Tasks\\KMSAuto"
     assert ts_record.file_size is None
+    assert ts_record.source == (
+        r"sysvol\\programdata\\microsoft\\"
+        r"windows defender\\quarantine\\entries\\{8006A512-0000-0000-2E11-A7D5DA185F24}"
+    )
 
 
 def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
