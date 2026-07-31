@@ -69,7 +69,8 @@ def test_winnt(tmp_path: Path) -> None:
 def test_windows_drive_letters(tmp_path: Path) -> None:
     """Test the ``DirLoader`` with Windows drive letters."""
     root = tmp_path
-    mkdirs(root, ["C/windows/system32", "D/test", "E/test"])
+    mkdirs(root, ["C/windows/system32/config", "D/test", "E/test"])
+    (root / "C" / "windows" / "system32" / "config" / "software").write_bytes(b"test")
 
     os_type, dirs = find_dirs(root)
     assert os_type == OperatingSystem.WINDOWS
@@ -83,12 +84,17 @@ def test_windows_drive_letters(tmp_path: Path) -> None:
     assert len(t.filesystems) == 3
     assert len(t.fs.mounts) == 3
 
+    t.apply()  # apply to create sysvol mapping
+    assert t.fs.path("sysvol/windows/system32/config/software").exists()
+    assert t.fs.path("sysvol/Windows/System32/config/SOFTWARE").exists()
+    assert t.fs.path("sysvol/Windows/System32/config/SOFTWARE").read_bytes() == b"test"
+
 
 def test_linux(tmp_path: Path) -> None:
     """Test the ``DirLoader`` for Linux directories."""
     root = tmp_path
     mkdirs(root, ["etc", "var"])
-
+    (root / "etc" / "hostname").write_bytes(b"test")
     os_type, dirs = find_dirs(root)
     assert os_type == OperatingSystem.LINUX
     assert len(dirs) == 1
@@ -99,6 +105,11 @@ def test_linux(tmp_path: Path) -> None:
     t = Target()
     loader.map(t)
     assert len(t.filesystems) == 1
+    t.apply()
+
+    assert t.fs.path("/etc/hostname").read_bytes() == b"test"
+    assert not t.fs.path("/etC/hostname").exists()  # Linux is considered as case sensitive
+    assert not t.fs.path("/etc/Hostname").exists()
 
 
 def test_macos(tmp_path: Path) -> None:
