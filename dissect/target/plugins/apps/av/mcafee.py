@@ -139,7 +139,7 @@ class McAfeePlugin(Plugin):
                             message=self._clean_message(entry.details_info),
                             keywords=",".join(log_fields.values()),
                             fkey=entry.fkey,
-                            source=source_log_file
+                            source=source_log_file,
                         )
                     else:
                         yield McAfeeMscFirewallRecord(
