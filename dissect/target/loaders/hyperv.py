@@ -143,7 +143,7 @@ class HyperVLoader(Loader):
                         continue
 
                     filepath = drive["pathname"]
-                    filename = fsutil.basename(filepath, alt_separator="\\")
+                    filename = fsutil.basename(filepath, sep="\\")
 
                     # First attempt path relative to .vmcx/.xml file
                     disk_path = self.base_path.joinpath(filename)

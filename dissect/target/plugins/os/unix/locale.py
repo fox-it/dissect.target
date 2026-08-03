@@ -47,14 +47,13 @@ class UnixLocalePlugin(LocalePlugin):
     @export(property=True)
     def timezone(self) -> str | None:
         """Get the timezone of the system."""
-        # /etc/timezone should contain a simple timezone string
-        # on most unix systems
+        # /etc/timezone should contain a simple timezone string on most unix systems
         if (path := self.target.fs.path("/etc/timezone")).exists():
             for line in path.open("rt"):
-                return timezone_from_path(Path(line.strip()))
+                if stripped_line := line.strip():
+                    return timezone_from_path(stripped_line)
 
-        # /etc/localtime can be a symlink, hardlink or a copy of:
-        # eg. /usr/share/zoneinfo/America/New_York
+        # /etc/localtime can be a symlink, hardlink or a copy of: eg. /usr/share/zoneinfo/America/New_York
         p_localtime = self.target.fs.path("/etc/localtime")
 
         # If it's a symlink, read the path of the symlink

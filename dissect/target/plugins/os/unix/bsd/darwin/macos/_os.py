@@ -91,7 +91,7 @@ class MacOSPlugin(DarwinPlugin):
     @export(record=MacOSUserRecord)
     def users(self) -> Iterator[MacOSUserRecord]:
         try:
-            for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
+            for path in self.target.fs.path("/private/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
                 user = plistlib.load(path.open())
 
                 # The home directory of a user account can be null,
@@ -124,6 +124,9 @@ class MacOSPlugin(DarwinPlugin):
                 "/bin/cp",
                 "/bin/ls",
                 "/bin/ps",
+                # Some tool acquisitions might not include ``/bin``, so we use a version-agnostic mach-o file
+                # accessible by regular users.
+                "/System/Library/Kernels/kernel",
             ],
             fs=self.target.fs,
         ):
