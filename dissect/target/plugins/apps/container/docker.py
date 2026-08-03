@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from dissect.cstruct import cstruct
 from dissect.util import ts
 
+from dissect.target import container, filesystem, volume
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.logging import get_logger
@@ -101,6 +102,22 @@ class DockerPlugin(ContainerPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self.installs = set(find_installs(target))
+
+        for install in self.installs:
+            # macOS installs are within Docker.raw
+            if (docker_path := install.joinpath("Docker.raw")).exists():
+                vs = volume.open(container.open(docker_path))
+                if len(vs.volumes) > 1:
+                    self.target.log.warning(
+                        "Docker container %s has multiple volumes, only using first volume", install.name
+                    )
+
+                fs = filesystem.open(vs.volumes[0])
+
+                if not fs.get("/docker"):
+                    self.target.log.warning("Docker.raw misses docker directory")
+                else:
+                    self.target.fs.mount(str(install), fs.get("/docker"))
 
     def check_compatible(self) -> None:
         if not self.installs:
@@ -308,7 +325,7 @@ def get_data_path(path: Path) -> str | None:
         log.debug(exc_info=e)
         return None
 
-    return config.get("data-root")
+    return config.get("data-root") or config.get("DataFolder")
 
 
 def find_installs(target: Target) -> Iterator[Path]:
@@ -341,6 +358,8 @@ def find_installs(target: Target) -> Iterator[Path]:
     user_config_paths = [
         # Docker Desktop (macOS/Windows/Linux)
         ".docker/daemon.json",
+        # macOS Docker Desktop internal configuration
+        "Library/Group Containers/group.com.docker/settings-store.json",
     ]
 
     for path in default_data_paths:
