@@ -143,7 +143,7 @@ class _DES3(CipherAlgorithm):
         if len(key) != 24:
             raise ValueError(f"Invalid DES3 CBC key length {len(key)}")
 
-        cipher = DES3.new(key, DES3.MODE_CBC, iv=iv if iv else b"\x00" * 8)
+        cipher = DES3.new(key, DES3.MODE_CBC, iv=iv or b"\x00" * 8)
         return cipher.decrypt(data)
 
 
