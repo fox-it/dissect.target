@@ -105,6 +105,15 @@ BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtensio
     "application/browser/password", GENERIC_PASSWORD_RECORD_FIELDS
 )
 
+GENERIC_CACHE_FIELDS = [
+    ("datetime", "ts_created"),
+    ("string", "browser"),
+    ("string", "url"),
+    ("string", "mimetype"),
+    ("digest", "digest"),
+    ("path", "source"),
+]
+
 
 class BrowserPlugin(NamespacePlugin):
     __namespace__ = "browser"
