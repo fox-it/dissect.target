@@ -117,6 +117,8 @@ def main() -> int:
 
     # Show help for target-query. If a loader can be determined, show loader-specific help.
     if not args.function and ("-h" in rest or "--help" in rest):
+        parser.print_help()
+
         loader_cls = None
         if args.loader:
             loader_cls = LOADERS_BY_SCHEME.get(args.loader)
@@ -126,10 +128,10 @@ def main() -> int:
                 loader_cls = result[0]
 
         if loader_cls is None:
-            parser.print_help()
             return 0
 
         loader_parser = generate_argparse_for_loader_class(loader_cls)
+        print("\nLoader-specific options:\n")
         loader_parser.print_help()
         return 0
 
