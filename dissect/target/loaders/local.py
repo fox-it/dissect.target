@@ -65,7 +65,9 @@ class LocalLoader(Loader):
         os_name = _get_os_name()
 
         if os_name == "windows":
-            map_windows_mounted_drives(target, force_dirfs=force_directory_fs, fallback_to_dirfs=fallback_to_directory_fs)
+            map_windows_mounted_drives(
+                target, force_dirfs=force_directory_fs, fallback_to_dirfs=fallback_to_directory_fs
+            )
         else:
             if fallback_to_directory_fs or force_directory_fs:
                 # Where Windows does some sophisticated fallback, for other

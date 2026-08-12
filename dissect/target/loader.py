@@ -96,7 +96,6 @@ class Loader:
         # Do like generate_argparse_for_method in cli.py
         parser = argparse.ArgumentParser(
             prog=f"loader:{cls.__name__.lower()}",
-            description=f"Options for the '{cls.__name__}' loader.",
             add_help=False,
         )
         for args, kwargs in getattr(cls, "__args__", []):

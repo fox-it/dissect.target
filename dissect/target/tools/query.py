@@ -106,16 +106,17 @@ def main() -> int:
 
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
-        if not args.loader:
-            parser.print_help()
-            return 0
+        parser.print_help()
 
-        if (loader_cls := LOADERS_BY_SCHEME.get(args.loader, None)) is None:
-            print(f"Error: Loader '{args.loader}' not found.")
-            return 1
+        # Additionally show the loader's specific arguments if a loader is specified.
+        if args.loader:
+            if (loader_cls := LOADERS_BY_SCHEME.get(args.loader, None)) is None:
+                print(f"Error: Loader '{args.loader}' not found.")
+                return 1
 
-        # The loader now knows how to print its own help.
-        loader_cls.print_help()
+            print()
+            loader_cls.print_help()
+
         return 0
 
     process_generic_arguments(parser, args)
