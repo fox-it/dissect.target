@@ -37,14 +37,30 @@ def main() -> int:
         formatter_class=help_formatter,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="+", help="Targets to load")
-    parser.add_argument("-k", "--key", required=True, help="key to query")
+    parser.add_argument(
+        "-k",
+        "--key",
+        action="append",
+        metavar="KEY",
+        dest="keys",
+        help="key to query or export; can be repeated with --export to select multiple paths",
+    )
     parser.add_argument("-kv", "--value", help="value to query")
     parser.add_argument("-d", "--depth", type=int, const=0, nargs="?", default=1, help="max depth of subkeys to print")
     parser.add_argument("-l", "--length", type=int, default=100, help="max length of key value to print")
+    parser.add_argument(
+        "-e",
+        "--export",
+        action="store_true",
+        help="export registry keys to .reg file format instead of the default tree view",
+    )
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
     process_generic_arguments(parser, args)
+
+    if not args.export and not args.keys:
+        parser.error("argument -k/--key is required when not using --export")
 
     try:
         for target in open_targets(args):
@@ -52,27 +68,34 @@ def main() -> int:
                 target.log.error("Target has no Windows Registry")
                 continue
 
-            try:
-                keys = target.registry.keys(args.key)
-                first_key = next(keys)
+            if args.export:
+                for line in target.registry.export(args.keys):
+                    print(line)
+            else:
+                try:
+                    keys = target.registry.keys(args.keys)
+                    first_key = next(keys)
 
-                print(target)
+                    print(target)
 
-                for key in itertools.chain([first_key], keys):
-                    try:
-                        if args.value:
-                            print(key.value(args.value))
-                        else:
-                            recursor(key, args.depth, 0, args.length)
-                    except RegistryError:  # noqa: PERF203
-                        log.exception("Failed to find registry value")
+                    for key in itertools.chain([first_key], keys):
+                        try:
+                            if args.value:
+                                print(key.value(args.value))
+                            else:
+                                recursor(key, args.depth, 0, args.length)
+                        except RegistryError:  # noqa: PERF203
+                            log.exception("Failed to find registry value")
 
-            except (RegistryKeyNotFoundError, StopIteration):
-                target.log.error("Key %r does not exist", args.key)  # noqa: TRY400
+                except (RegistryKeyNotFoundError, StopIteration):
+                    # Use the first key for the error message to preserve existing behaviour
+                    key_display = args.keys[0] if len(args.keys) == 1 else args.keys
+                    target.log.error("Key %r does not exist", key_display)  # noqa: TRY400
 
-            except Exception as e:
-                target.log.error("Failed to iterate key: %s", e)  # noqa: TRY400
-                target.log.debug("", exc_info=e)
+                except Exception as e:
+                    target.log.error("Failed to iterate key: %s", e)  # noqa: TRY400
+                    target.log.debug("", exc_info=e)
+
     except TargetError as e:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
