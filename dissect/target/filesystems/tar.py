@@ -40,7 +40,7 @@ class TarFilesystem(Filesystem):
 
     def __init__(
         self,
-        fh: BinaryIO,
+        fh: BinaryIO | None,
         base: str | None = None,
         *,
         tarinfo: tf.TarInfo | None = None,
@@ -51,9 +51,11 @@ class TarFilesystem(Filesystem):
 
         if tarfile:
             self.tar = tarfile
-        else:
+        elif fh:
             fh.seek(0)
             self.tar = tf.open(mode="r", fileobj=fh, tarinfo=tarinfo)  # noqa: SIM115
+        else:
+            raise ValueError("fh or tarfile required")
 
         self.base = base or ""
 
