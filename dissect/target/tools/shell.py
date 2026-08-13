@@ -64,6 +64,7 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
     TargetError,
+    UnsupportedPluginError,
 )
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
@@ -689,6 +690,9 @@ class TargetCmd(ExtendedCmd):
         def _exec_(argparts: list[str], stdout: TextIO) -> None:
             try:
                 output, value = execute_function_on_target(self.target, func, argparts)
+            except UnsupportedPluginError as e:
+                print(e)
+                return
             except SystemExit:
                 return
 

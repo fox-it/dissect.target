@@ -1082,3 +1082,10 @@ def test_target_cli_tar_unknown_path(tmp_path: Path, capsys: pytest.CaptureFixtu
     captured = capsys.readouterr()
     assert captured.err == "tar: missing.txt: No such file or directory\n"
     assert outpath.is_file()
+
+
+def test_target_cli_unsupported_plugin(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """Test if the output of an unsupported plugin invocation in target-shell is not too verbose."""
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "msn")
+    assert out == "ubuntu:/$ Unsupported function `msn` for this target with OS linux\nubuntu:/$ \n"
