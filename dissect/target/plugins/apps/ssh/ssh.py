@@ -14,7 +14,7 @@ rfc4716_def = """
 struct ssh_string {
     uint32 length;
     char value[length];
-}
+};
 
 struct ssh_private_key {
     char magic[15];
@@ -27,7 +27,7 @@ struct ssh_private_key {
 
     ssh_string public;
     ssh_string private;
-}
+};
 """
 
 c_rfc4716 = cstruct(endian=">").load(rfc4716_def)
