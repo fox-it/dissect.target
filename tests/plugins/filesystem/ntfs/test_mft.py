@@ -9,7 +9,7 @@ import pytest
 from dissect.ntfs.c_ntfs import ATTRIBUTE_TYPE_CODE
 from dissect.ntfs.exceptions import Error
 
-from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.plugins.filesystem.ntfs.mft import (
     FilesystemFilenameRecord,
@@ -20,7 +20,6 @@ from dissect.target.plugins.filesystem.ntfs.mft import (
 from dissect.target.plugins.filesystem.ntfs.utils import (
     get_drive_letter,
     get_owner_and_group,
-    get_volume_identifier,
 )
 from tests._utils import absolute_path
 
@@ -105,39 +104,6 @@ def test_get_owner_and_group_none_attr() -> None:
     mocked_entry = Mock()
     mocked_entry.attributes = {ATTRIBUTE_TYPE_CODE.STANDARD_INFORMATION: [None]}
     assert get_owner_and_group(mocked_entry, Mock()) == (None, None)
-
-
-@pytest.mark.parametrize(
-    ("guid", "serial", "expected_result"),
-    [
-        ("7dc1a62c-c488-47c5-8eab-09240f38894e", 0x9E0C158A4CE55327, "7dc1a62c-c488-47c5-8eab-09240f38894e"),
-        (None, 0x2B4A7D188A9163F2, "3119443236264961010"),
-        ("", None, None),
-        (None, None, None),
-    ],
-)
-def test_volume_identifier(guid: str, serial: int, expected_result: str | None | int) -> None:
-    filesystem = Mock()
-    filesystem.ntfs.serial = serial
-    filesystem.volume.guid = guid
-    assert get_volume_identifier(filesystem) == expected_result
-
-
-def test_volume_identifier_no_volume() -> None:
-    filesystem = Mock()
-    filesystem.volume = None
-    filesystem.ntfs.serial = None
-    assert get_volume_identifier(filesystem) is None
-
-    filesystem.ntfs.serial = 0x2B4A7D188A9163F2
-    assert get_volume_identifier(filesystem) == "3119443236264961010"
-
-
-def test_volume_identifier_none_guid() -> None:
-    filesystem = Mock()
-    filesystem.volume.guid = None
-    filesystem.ntfs.serial = None
-    assert get_volume_identifier(filesystem) is None
 
 
 @pytest.mark.parametrize(
