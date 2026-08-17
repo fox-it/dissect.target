@@ -163,4 +163,5 @@ class PLocatePlugin(BaseLocatePlugin):
             yield PLocateRecord(
                 path=self.target.fs.path(path),
                 source=self.path,
+                _target=self.target
             )
