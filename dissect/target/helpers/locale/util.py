@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-import importlib
-import importlib.resources
 from locale import normalize
-from pathlib import Path
 
-import defusedxml.ElementTree as ET
+from dissect.target.helpers.locale.windows_zones import WINDOWS_ZONE_MAP
 
 
 def normalize_timezone(input: str) -> str:
-    """Returns normalized timezone format per IANA TZ standard.
+    """Return normalized timezone format per IANA TZ standard.
 
     Takes a Windows registry ``TimeZoneKeyName`` string as input and translates it to IANA TZ format.
     Will return the IANA preferred territory ``001`` value of the corresponding timezone.
 
     For example, ``Pacific Standard Time`` is translated to ``America/Los_Angeles``.
+
+    Returns the original input string if the input does not exist in the CLDR ``WindowsZones.xml`` document.
     """
     return WINDOWS_ZONE_MAP.get(input, input)
 
@@ -31,28 +30,3 @@ def normalize_language(input: str) -> str:
         - https://en.wikipedia.org/wiki/ISO_3166-2
     """
     return normalize(input.replace("-", "_", 1)).split(".")[0]
-
-
-def get_resource_string(path: str) -> str:
-    return _get_resource_path(path).read_text()
-
-
-def _get_resource_path(path: str) -> Path:
-    root = importlib.resources.files(__package__) if __package__ else Path(__file__).parent
-    fpath = root.joinpath(path)
-
-    if not fpath.exists():
-        raise IOError(f"Can't find resource {fpath}")
-
-    return fpath
-
-
-WINDOWS_ZONE_MAP = {
-    child.attrib["other"]: child.attrib["type"]
-    for child in ET.fromstring(get_resource_string("data/windowsZones.xml")).findall(
-        "./windowsZones/mapTimezones/mapZone"
-    )
-    if child.attrib["territory"] == "001"
-}
-
-WINDOWS_ZONE_MAP["UTC"] = "UTC"  # Change 'Etc/UTC' to 'UTC' to be consistent across operating systems.
