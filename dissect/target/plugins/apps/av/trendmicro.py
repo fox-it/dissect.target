@@ -97,7 +97,7 @@ class TrendMicroPlugin(Plugin):
                     threat=cells[2],
                     path=self.target.fs.path(cells[6] + cells[7]),
                     lineno=lineno,
-                    _target=self.target
+                    _target=self.target,
                 )
 
     @export(record=TrendMicroWFFirewallRecord)

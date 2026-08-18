@@ -352,19 +352,24 @@ class TargetComparison:
                     src_records_seen.add(dst_record)
                     if not only_changed:
                         yield RecordUnchangedRecord(
-                            src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record,
-                        _target=self.src_target
-
+                            src_target=self.src_target.path,
+                            dst_target=self.dst_target.path,
+                            record=dst_record,
+                            _target=self.src_target,
                         )
                 else:
                     yield RecordCreatedRecord(
-                        src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record,
-                        _target=self.src_target
+                        src_target=self.src_target.path,
+                        dst_target=self.dst_target.path,
+                        record=dst_record,
+                        _target=self.src_target,
                     )
             for record in src_records - src_records_seen:
                 yield RecordDeletedRecord(
-                    src_target=self.src_target.path, dst_target=self.dst_target.path, record=record,
-                    _target=self.src_target
+                    src_target=self.src_target.path,
+                    dst_target=self.dst_target.path,
+                    record=record,
+                    _target=self.src_target,
                 )
 
 
@@ -886,7 +891,7 @@ def differentiate_target_filesystems(
                         diff=entry_difference.diff,
                         src_target=src_target.path,
                         dst_target=dst_target.path,
-                        _target=src_target
+                        _target=src_target,
                     )
 
 

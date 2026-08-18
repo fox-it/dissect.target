@@ -217,6 +217,7 @@ def test_mft_plugin_macb_nodup() -> None:
         ts = randrange(1, 10)
         tss.add(ts)
         return ts
+
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=MissingTargetInRecordWarning)
         for _ in range(100):

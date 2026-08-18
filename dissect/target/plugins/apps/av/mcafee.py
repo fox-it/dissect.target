@@ -147,5 +147,5 @@ class McAfeePlugin(Plugin):
                             message=self._clean_message(entry.details_info),
                             keywords=",".join(log_fields.values()),
                             fkey=entry.fkey,
-                            _target=self.target
+                            _target=self.target,
                         )

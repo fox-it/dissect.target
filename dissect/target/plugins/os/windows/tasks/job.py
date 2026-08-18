@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from dissect.cstruct import cstruct
 from flow.record import GroupedRecord
 
-from dissect.target import Target
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.plugins.os.windows.tasks.records import (
     BaseTriggerRecord,
@@ -21,6 +20,7 @@ from dissect.target.plugins.os.windows.tasks.records import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target import Target
     from dissect.target.helpers.fsutil import TargetPath
 
 atjob_def = """
@@ -148,7 +148,9 @@ class AtTask:
         target: the target system.
     """
 
-    def __init__(self, job_file: TargetPath, tzinfo: datetime.tzinfo = datetime.timezone.utc, target : Target|None= None):
+    def __init__(
+        self, job_file: TargetPath, tzinfo: datetime.tzinfo = datetime.timezone.utc, target: Target | None = None
+    ):
         try:
             self.at_data = c_atjob.ATJOB_DATA(job_file.open())
         except Exception as e:
@@ -220,11 +222,7 @@ class AtTask:
         wrkdir = self.at_data.working_dir.rstrip("\x00")
 
         yield ExecRecord(
-            action_type=action_type,
-            command=command,
-            arguments=args,
-            working_directory=wrkdir,
-            _target=self.target
+            action_type=action_type, command=command, arguments=args, working_directory=wrkdir, _target=self.target
         )
 
     def get_triggers(self) -> Iterator[GroupedRecord]:
@@ -272,7 +270,7 @@ class AtTask:
                 repetition_duration=repetition_duration,
                 repetition_stop_duration_end=repetition_stop_duration_end,
                 execution_time_limit=execution_time_limit,
-                _target=self.target
+                _target=self.target,
             )
             padding_record = PaddingTriggerRecord(
                 padding=trigger.padding, reserved2=trigger.reserved2, reserved3=trigger.reserved3, _target=self.target
@@ -298,12 +296,7 @@ class AtTask:
                 interval = trigger.trigger_specific0
                 unused = [trigger.trigger_specific1, trigger.trigger_specific2]
 
-                record = DailyTriggerRecord(
-                    days_between_triggers=interval,
-                    unused=unused,
-                    _target=self.target
-
-                )
+                record = DailyTriggerRecord(days_between_triggers=interval, unused=unused, _target=self.target)
 
                 yield GroupedRecord("filesystem/windows/task/daily", [base, record, padding_record])
 
@@ -315,11 +308,7 @@ class AtTask:
                 unused = [trigger.trigger_specific2]
 
                 record = WeeklyTriggerRecord(
-                    weeks_between_triggers=interval,
-                    days_of_week=days_of_week,
-                    unused=unused,
-                    _target=self.target
-
+                    weeks_between_triggers=interval, days_of_week=days_of_week, unused=unused, _target=self.target
                 )
 
                 yield GroupedRecord("filesystem/windows/task/weekly", [base, record, padding_record])
@@ -349,10 +338,7 @@ class AtTask:
                 days = self.get_days_of_week(trigger.trigger_specific1)
                 months = self.get_months_of_year(trigger.trigger_specific2)
                 record = MonthlyDowTriggerRecord(
-                    which_week=[week],
-                    days_of_week=days,
-                    months_of_year=months,
-                    _target=self.target
+                    which_week=[week], days_of_week=days, months_of_year=months, _target=self.target
                 )
 
                 yield GroupedRecord("filesystem/windows/task/monthly_dow", [base, record, padding_record])

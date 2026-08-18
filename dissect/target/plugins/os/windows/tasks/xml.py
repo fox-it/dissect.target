@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from defusedxml import ElementTree
 from flow.record import GroupedRecord
 
-from dissect.target import Target
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.plugins.os.windows.tasks.records import (
     BaseTriggerRecord,
@@ -32,6 +31,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from xml.etree.ElementTree import Element
 
+    from dissect.target import Target
     from dissect.target.helpers.fsutil import TargetPath
 
 
@@ -59,7 +59,7 @@ class ScheduledTasks:
         """
         if data.tag.startswith("{"):
             ns_length = data.tag.find("}")
-            ns = data.tag[0: ns_length + 1]
+            ns = data.tag[0 : ns_length + 1]
             for element in data.iter():
                 element.tag = element.tag.removeprefix(ns)
         return data
@@ -69,7 +69,10 @@ class ScheduledTasks:
         if self.xml_data.tag == "Task":
             tasks.append(XmlTask(self.xml_data, self.task_path, self.target))
         else:
-            tasks.extend(XmlTask(task_element, self.task_path, self.target) for task_element in self.xml_data.findall(".//{*}Task"))
+            tasks.extend(
+                XmlTask(task_element, self.task_path, self.target)
+                for task_element in self.xml_data.findall(".//{*}Task")
+            )
 
         return tasks
 
@@ -110,7 +113,7 @@ class XmlTask:
         task_path: The path of the task in the target system.
     """
 
-    def __init__(self, task_element: Element, task_path: TargetPath, target :Target|None = None):
+    def __init__(self, task_element: Element, task_path: TargetPath, target: Target | None = None):
         self.task_path = task_path
         self.task_element = task_element
         self.target = target
@@ -199,7 +202,7 @@ class XmlTask:
         """
         if data.tag.startswith("{"):
             ns_length = data.tag.find("}")
-            ns = data.tag[0: ns_length + 1]
+            ns = data.tag[0 : ns_length + 1]
             for element in data.iter():
                 element.tag = element.tag.removeprefix(ns)
         return data
@@ -269,15 +272,12 @@ class XmlTask:
                 delay=delay,
                 random_delay=random_delay,
                 trigger_data=trigger_data,
-                _target=self.target
+                _target=self.target,
             )
 
             if trigger_type == "LogonTrigger":
                 user_id = self.get_element("UserId", trigger)
-                record = LogonTriggerRecord(
-                    user_id=user_id,
-                    _target=self.target
-                )
+                record = LogonTriggerRecord(user_id=user_id, _target=self.target)
                 yield GroupedRecord(LogonTriggerRecord.name, [base, record])
 
             elif trigger_type == "BootTrigger":
@@ -302,7 +302,7 @@ class XmlTask:
                     number_of_occurences=number_of_occurences,
                     matching_elements=matching_elements,
                     value_queries=value_queries,
-                    _target=self.target
+                    _target=self.target,
                 )
 
                 yield GroupedRecord(EventTriggerRecord.name, [base, record])
@@ -312,35 +312,28 @@ class XmlTask:
                 state_change = self.get_element("StateChange", trigger)
 
                 record = SessionStateChangeTriggerRecord(
-                    user_id=user_id,
-                    state_change=state_change,
-                    _target=self.target
+                    user_id=user_id, state_change=state_change, _target=self.target
                 )
 
                 yield GroupedRecord(SessionStateChangeTriggerRecord.name, [base, record])
 
             elif trigger_type == "CalendarTrigger":
                 if days_between_triggers := self.get_element("ScheduleByDay/DaysInterval", trigger):
-                    record = DailyTriggerRecord(
-                        days_between_triggers=int(days_between_triggers),
-                        _target=self.target
-                    )
+                    record = DailyTriggerRecord(days_between_triggers=int(days_between_triggers), _target=self.target)
 
                 elif weeks_between_triggers := self.get_element("ScheduleByWeek/WeeksInterval", trigger):
                     days_of_week = [day.tag for day in trigger.find("ScheduleByWeek/DaysOfWeek/").iter("*")]
                     record = WeeklyTriggerRecord(
                         weeks_between_triggers=int(weeks_between_triggers),
                         days_of_week=days_of_week,
-                        _target=self.target
+                        _target=self.target,
                     )
 
                 elif trigger.find("ScheduleByMonth/") is not None:
                     day_of_month = [int(day.text) for day in trigger.iter("Day")]
                     months_of_year = [month.tag for month in trigger.findall("*/Months/*")]
                     record = MonthlyDateTriggerRecord(
-                        day_of_month=day_of_month,
-                        months_of_year=months_of_year,
-                        _target=self.target
+                        day_of_month=day_of_month, months_of_year=months_of_year, _target=self.target
                     )
 
                 elif trigger.find("ScheduleByMonthDayOfWeek/") is not None:

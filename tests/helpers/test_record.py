@@ -5,7 +5,7 @@ from typing import NoReturn
 
 import pytest
 
-from dissect.target.exceptions import PluginError, MissingTargetInRecordWarning
+from dissect.target.exceptions import MissingTargetInRecordWarning, PluginError
 from dissect.target.helpers.descriptor_extensions import (
     TargetRecordDescriptorExtension,
     UserRecordDescriptorExtension,

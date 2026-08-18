@@ -160,8 +160,4 @@ class PLocatePlugin(BaseLocatePlugin):
         plocate_file = PLocateFile(plocate.open())
 
         for path in plocate_file:
-            yield PLocateRecord(
-                path=self.target.fs.path(path),
-                source=self.path,
-                _target=self.target
-            )
+            yield PLocateRecord(path=self.target.fs.path(path), source=self.path, _target=self.target)

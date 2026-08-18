@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import traceback
 import warnings
 from typing import Any
 
-from dissect.target.exceptions import PluginError, MissingTargetInRecordWarning
+from dissect.target.exceptions import MissingTargetInRecordWarning, PluginError
 
 
 class RecordDescriptorExtensionBase:
@@ -94,7 +93,9 @@ class TargetRecordDescriptorExtension(RecordDescriptorExtensionBase):
         # In test following pattern is often, used `assert isinstance(log, type(HitmanAlertRecord()))`
         # Checking the record kwargs in not empty allows to filter out these false positive
         elif record_kwargs:
-            warnings.warn("Current record does not define the _target field :", MissingTargetInRecordWarning, stacklevel=3)
+            warnings.warn(
+                "Current record does not define the _target field :", MissingTargetInRecordWarning, stacklevel=3
+            )
         record_kwargs["hostname"] = hostname
         record_kwargs["domain"] = domain
         # Reserved keywords are never part of the args of a Record's __init__.

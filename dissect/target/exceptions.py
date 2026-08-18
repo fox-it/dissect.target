@@ -137,9 +137,7 @@ class TargetPathNotFoundError(TargetError):
 
 class DissectWarning(Warning):
     """Custom warning for dissect. Mainly related to improper plugin implementation."""
-    pass
 
 
 class MissingTargetInRecordWarning(DissectWarning):
     """Warning related to an unspecified _target field in a record."""
-    pass

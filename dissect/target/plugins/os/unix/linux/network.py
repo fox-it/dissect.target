@@ -657,7 +657,7 @@ class SyslogConfigParser(LinuxNetworkConfigParser):
                         cidr={dhcp_lease.interface},
                         gateway={dhcp_lease.gateway} if dhcp_lease.gateway else set(),
                         source="syslog",
-                        _target=self._target
+                        _target=self._target,
                     )
                     break
 

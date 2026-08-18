@@ -545,7 +545,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
             yield ShortcutAppcompatRecord(
                 mtime_regf=entry.timestamp,
                 path=self.target.fs.path(entry.value("ShortCutPath").value),
-                _target=self.target,
+                #                _target=self.target,
             )
 
     def parse_inventory_device_container(self) -> Iterator[ContainerAppcompatRecord]:

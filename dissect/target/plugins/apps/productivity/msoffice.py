@@ -319,7 +319,9 @@ class MSOffice(Plugin):
                 item_startup = current_path / plugin_file
                 stats = item_startup.stat()
                 yield OfficeStartupItem(
-                    path=item_startup, creation_time=stats.st_birthtime, modification_time=stats.st_mtime,
+                    path=item_startup,
+                    creation_time=stats.st_birthtime,
+                    modification_time=stats.st_mtime,
                     _target=self.target,
                 )
 

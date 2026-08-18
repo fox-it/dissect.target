@@ -29,7 +29,7 @@ def network_record(request: pytest.FixtureRequest) -> InterfaceRecord:
         dns=["8.8.8.8", "1.1.1.1"],
         mac=["DE:AD:BE:EF:00:00"],
         source="some_file",
-        _target=MockTarget()
+        _target=MockTarget(),
     )
 
 
