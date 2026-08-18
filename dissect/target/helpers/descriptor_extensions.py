@@ -94,7 +94,7 @@ class TargetRecordDescriptorExtension(RecordDescriptorExtensionBase):
         # Checking the record kwargs in not empty allows to filter out these false positive
         elif record_kwargs:
             warnings.warn(
-                "Current record does not define the _target field :", MissingTargetInRecordWarning, stacklevel=3
+                "Current record does not define the _target field", MissingTargetInRecordWarning, stacklevel=3
             )
         record_kwargs["hostname"] = hostname
         record_kwargs["domain"] = domain
