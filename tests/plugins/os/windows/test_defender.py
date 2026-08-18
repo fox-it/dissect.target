@@ -67,6 +67,7 @@ def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_p
     assert {r.Channel for r in records} == {"Microsoft-Windows-Windows Defender/Operational"}
     # Both informational records (no threat name) and detections are present
     assert {r.Threat_Name for r in records} == {None, "TrojanDropper:PowerShell/PowerSploit.S!MSR"}
+    assert None not in {r._source for r in records} # Ensure _target is provided
 
 
 def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -79,6 +80,7 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     records = sorted(target_win.defender.quarantine(), key=lambda r: r.ts)
 
     assert len(records) == 8
+    assert None not in {r._source for r in records} # Ensure _target is provided
 
     # Test whether the quarantining of a Mimikatz binary is properly parsed.
     mimikatz_record = records[0]
@@ -265,7 +267,7 @@ def test_defender_mplogs_rtp(target_win: Target, fs_win: VirtualFilesystem, tmp_
         ["C:\\Windows\\Security\\Database\\*.chk", "%windidr%\\SoftwareDistribution\\Datastore\\*.*"]
     )
     assert sorted(record.ext_exclusions) == sorted([".DBF", ".NDF", ".RAR", ".XML", ".IDX", ".BAK", ".PDF", ".BKP"])
-
+    assert record._source is not None
 
 def test_defender_mplogs_resource_scan(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "resourcescan").pop()
@@ -333,6 +335,7 @@ def test_defender_mplogs_bmtelemetry(target_win: Target, fs_win: VirtualFilesyst
 def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     records = _mplog_records(target_win, fs_win, tmp_path, "lines")
     assert len(records) == 10
+    assert None not in {r._source for r in records}
 
     # Process Image
     assert records[0].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"

@@ -30,6 +30,7 @@ def test_trendmicro_plugin_worryfree_firewall(target_win: Target, fs_win: Virtua
     assert records[0].port == 444
     assert str(records[0].path) == "C:\\WINDOWS\\SYSTEM32\\SVCHOST.EXE"
     assert records[0].description == "SecurityLevelDrop"
+    assert None not in {r._source for r in records} # Ensure _target is provided
 
 
 def test_trendmicro_plugin_worryfree_log(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -43,3 +44,4 @@ def test_trendmicro_plugin_worryfree_log(target_win: Target, fs_win: VirtualFile
     assert records[0].threat == "Eicar_test_file"
     assert str(records[0].path) == "C:\\Users\\admin\\Desktop\\test\\eicarcom2.zip"
     assert records[0].lineno == 0
+    assert None not in {r._source for r in records} # Ensure _target is provided

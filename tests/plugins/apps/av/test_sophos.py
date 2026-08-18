@@ -41,6 +41,7 @@ def test_sophos_home_plugin_log_3_9_4_1(target_win: Target, fs_win: VirtualFiles
     assert isinstance(log, type(SophosLogRecord()))
     assert log.description == "EICAR-AV-Test"
     assert str(log.path) == "C:\\eicar_com.zip"
+    assert None not in {r._source for r in logs} # Ensure _target is provided
 
 
 def test_sophos_home_plugin_log_3_10_3(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -54,3 +55,4 @@ def test_sophos_home_plugin_log_3_10_3(target_win: Target, fs_win: VirtualFilesy
     assert isinstance(log, type(SophosLogRecord()))
     assert log.description == "EICAR-AV-Test"
     assert str(log.path) == "C:\\eicar_com.zip"
+    assert None not in {r._source for r in logs} # Ensure _target is provided

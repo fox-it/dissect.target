@@ -83,7 +83,7 @@ class IOSPlugin(DarwinPlugin):
     @export(record=IOSUserRecord)
     def users(self) -> Iterator[IOSUserRecord]:
         for user in super().users():
-            yield IOSUserRecord(**user._asdict())
+            yield IOSUserRecord(**user._asdict(), _target=self.target)
 
     @export(property=True)
     def os(self) -> str:

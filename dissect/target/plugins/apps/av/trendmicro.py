@@ -97,6 +97,7 @@ class TrendMicroPlugin(Plugin):
                     threat=cells[2],
                     path=self.target.fs.path(cells[6] + cells[7]),
                     lineno=lineno,
+                    _target=self.target
                 )
 
     @export(record=TrendMicroWFFirewallRecord)
@@ -129,6 +130,7 @@ class TrendMicroPlugin(Plugin):
                             direction=("out" if entry.direction == b"\x01" else "in"),
                             path=self.target.fs.path(entry.path.strip(b"\x00").decode(self.codepage)),
                             description=entry.description.strip("\x00"),
+                            _target=self.target,
                         )
                 except EOFError:
                     pass

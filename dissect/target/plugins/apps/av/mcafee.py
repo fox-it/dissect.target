@@ -136,6 +136,7 @@ class McAfeePlugin(Plugin):
                             message=self._clean_message(entry.details_info),
                             keywords=",".join(log_fields.values()),
                             fkey=entry.fkey,
+                            _target=self.target,
                         )
                     else:
                         yield McAfeeMscFirewallRecord(
@@ -146,4 +147,5 @@ class McAfeePlugin(Plugin):
                             message=self._clean_message(entry.details_info),
                             keywords=",".join(log_fields.values()),
                             fkey=entry.fkey,
+                            _target=self.target
                         )
