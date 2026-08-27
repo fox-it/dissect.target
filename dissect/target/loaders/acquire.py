@@ -51,14 +51,7 @@ class AcquireTarSubLoader(TarSubLoader):
             if member.name == ".":
                 continue
 
-            if member.name.startswith(("/fs/", "fs/")):
-                # Current acquire
-                parts = member.name.replace("fs/", "").split("/")
-                if parts[0] == "":
-                    parts.pop(0)
-            else:
-                # Legacy acquire
-                parts = member.name.lstrip("/").split("/")
+            parts = member.name.removeprefix("/").removeprefix("fs/").split("/")
             volume_name = parts[0].lower()
 
             # NOTE: older versions of acquire would write to "sysvol" instead of a driver letter

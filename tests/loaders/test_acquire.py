@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tarfile
 from typing import TYPE_CHECKING
 
 import pytest
@@ -11,6 +12,7 @@ from dissect.target.loaders.zip import ZipLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
+from tests.filesystems.test_tar import _mkdir, _mkfile
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -103,9 +105,38 @@ def test_windows_sysvol_formats_zip() -> None:
     assert isinstance(loader.subloader, AcquireZipSubLoader)
 
     assert WindowsPlugin.detect(t)
-    # NOTE: for the sysvol archives, this also tests the backwards compatibility
+    # NOTE: for the sysvol archives, this also tests the backwards compatibilityk
     assert sorted(t.fs.mounts.keys()) == ["c:"]
     assert t.fs.get("c:/Windows/System32/foo.txt")
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [
+        "fs/",
+        "/fs/",
+    ],
+)
+def test_linux_acquire_with_fs_subfolder(prefix: str, tmp_path: Path) -> None:
+    """Test that we correctly handle Linux Acquire archives with a subfolder called named fs."""
+    path = tmp_path.joinpath("target.tar.gz")
+    with tarfile.open(path, "w:gz") as tf:
+        _mkdir(tf, f"{prefix}$rootfs$/")
+        _mkdir(tf, f"{prefix}$rootfs$/")
+        _mkdir(tf, f"{prefix}$rootfs$/etc")
+        _mkdir(tf, f"{prefix}$rootfs$/etc/fs/")
+        _mkfile(tf, f"{prefix}$rootfs$/etc/test", b"testdata1")
+        _mkfile(tf, f"{prefix}$rootfs$/etc/fs/test", b"testdata2")
+
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
+    t = Target()
+    loader.map(t)
+    assert isinstance(loader.subloader, AcquireTarSubLoader)
+
+    assert t.fs.get("/etc/test").open().read() == b"testdata1"
+    assert t.fs.get("/etc/fs/test").open().read() == b"testdata2"
 
 
 def test_anonymous_filesystems() -> None:
