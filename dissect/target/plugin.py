@@ -1193,7 +1193,7 @@ class OSPlugin(Plugin):
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
-        """Provide detection of this OSPlugin on a given filesystem.
+        """Provide detection of this :class:`OSPlugin` on a given :class:`~dissect.target.target.Target`.
 
         Args:
             target: :class:`~dissect.target.target.Target` to detect an OS on.
