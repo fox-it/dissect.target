@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from dissect.database.bbolt import Bbolt
+
 from dissect.target.filesystem import LayerFilesystem, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.logging import get_logger
+from dissect.target.plugins.apps.container.containerd import infer_bbolt_namespace
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -156,3 +159,54 @@ def oci_layers(path: Path) -> Iterator[tuple[str, Path]]:
     for symlink in path.joinpath("lower").read_text().split(":"):
         if symlink:
             yield ("/", path.parent.joinpath(symlink).resolve())
+
+
+class OverlayFsFilesystem(LayerFilesystem):
+    """Containerd overlayfs filesystem implementation.
+
+    Initialization expects a ``path`` argument in the format:
+        /var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db/<container id>
+
+    The root ``/var/lib/containerd/`` part can be different than the containerd default.
+
+    References:
+        - https://github.com/containerd/containerd/blob/main/docs/content-flow.md
+        - https://github.com/containerd/containerd/blob/main/core/metadata/buckets.go
+        - https://detect.fyi/adrift-in-the-cloud-a-forensic-dive-info-container-drift-f29524f4f6c4
+    """
+
+    __type__ = "overlayfs"
+
+    def __init__(self, path: Path, **kwargs):
+        super().__init__(**kwargs)
+        self.base_path = path
+        containerd_root = path.parents[2]
+
+        # First we initialize the bbolt database and infer the namespace.
+        meta_db = Bbolt(path.parent)
+        ns = infer_bbolt_namespace(meta_db)
+
+        # Then we find the identifier e.g. 'moby/123/<container id>' based on just the container id.
+        id = meta_db.get(f"v1 {ns} snapshots overlayfs {path.name} name")
+
+        # Next we find the directory name based on that identifier inside the snapshotter database.
+        metadata_path = containerd_root.joinpath("io.containerd.snapshotter.v1.overlayfs/metadata.db")
+        metadata_db = Bbolt(metadata_path)
+
+        # Finally we iterate over all layers by traversing the 'parent' key of each layer.
+        while True:
+            name = metadata_db.get(f"v1 snapshots {id} id", decode=False)
+            dir = str(int.from_bytes(name))
+            layer = containerd_root.joinpath(f"io.containerd.snapshotter.v1.overlayfs/snapshots/{dir}/fs")
+
+            if layer.is_dir():
+                log.debug("Adding layer %s to destination /", layer)
+                self.append_layer().mount("/", DirectoryFilesystem(layer))
+            else:
+                log.warning("Layer %s does not exist on host target", layer)
+
+            if not (id := metadata_db.get(f"v1 snapshots {id} parent")):
+                break
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.base_path}>"
