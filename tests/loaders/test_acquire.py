@@ -120,13 +120,9 @@ def test_windows_sysvol_formats_zip() -> None:
     ],
 )
 def test_linux_acquire_with_fs_subfolder(prefix: str, subfolder: str, tmp_path: Path) -> None:
-    """Test that we correctly handle Linux Acquire archives with a subfolder called named fs."""
+    """Test that we correctly handle Linux Acquire archives with a subfolder containing 'fs/'."""
     path = tmp_path.joinpath("target.tar.gz")
     with tarfile.open(path, "w:gz") as tf:
-        _mkdir(tf, f"{prefix}$rootfs$/")
-        _mkdir(tf, f"{prefix}$rootfs$/")
-        _mkdir(tf, f"{prefix}$rootfs$/etc")
-        _mkdir(tf, f"{prefix}$rootfs$/etc/{subfolder}/")
         _mkfile(tf, f"{prefix}$rootfs$/etc/test", b"testdata1")
         _mkfile(tf, f"{prefix}$rootfs$/etc/{subfolder}/test", b"testdata2")
 
