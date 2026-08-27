@@ -1181,23 +1181,25 @@ class OSPlugin(Plugin):
                     method = method.__func__
                 method.__doc__ = os_docstring
 
-    def check_compatible(self) -> bool:
-        """OSPlugin's use a different compatibility check, override the one from the :class:`Plugin` class.
+    def check_compatible(self) -> None:
+        """:class:`OSPlugin` uses a different compatibility check.
+
+        As a workaround we override :meth:`Plugin.check_compatible` here.
 
         Returns:
-            This function always returns ``True``.
+            This function always returns ``None``.
         """
-        return True
+        return
 
     @classmethod
-    def detect(cls, fs: Filesystem) -> Filesystem | None:
+    def detect(cls, target: Target) -> Filesystem | None:
         """Provide detection of this OSPlugin on a given filesystem.
 
         Args:
-            fs: :class:`~dissect.target.filesystem.Filesystem` to detect the OS on.
+            target: :class:`~dissect.target.target.Target` to detect an OS on.
 
         Returns:
-            The root filesystem / sysvol when found.
+            The OS :class:`dissect.target.filesystem.Filesystem` when found.
         """
         raise NotImplementedError
 
