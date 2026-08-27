@@ -12,7 +12,7 @@ from dissect.target.loaders.zip import ZipLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
-from tests.filesystems.test_tar import _mkdir, _mkfile
+from tests.filesystems.test_tar import _mkfile
 
 if TYPE_CHECKING:
     from collections.abc import Callable
