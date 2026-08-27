@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.loader import open as loader_open
-from dissect.target.loaders.acquire import AcquireTarSubLoader, AcquireZipSubLoader
+from dissect.target.loaders.acquire import FILESYSTEMS_ROOT, AcquireTarSubLoader, AcquireZipSubLoader
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.loaders.zip import ZipLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
@@ -105,28 +105,30 @@ def test_windows_sysvol_formats_zip() -> None:
     assert isinstance(loader.subloader, AcquireZipSubLoader)
 
     assert WindowsPlugin.detect(t)
-    # NOTE: for the sysvol archives, this also tests the backwards compatibilityk
+    # NOTE: for the sysvol archives, this also tests the backwards compatibility
     assert sorted(t.fs.mounts.keys()) == ["c:"]
     assert t.fs.get("c:/Windows/System32/foo.txt")
 
 
 @pytest.mark.parametrize(
-    "prefix",
+    ("prefix", "subfolder"),
     [
-        "fs/",
-        "/fs/",
+        (f"{FILESYSTEMS_ROOT}/", "java.prefs"),
+        (f"{FILESYSTEMS_ROOT}/", FILESYSTEMS_ROOT),
+        (f"/{FILESYSTEMS_ROOT}/", "java.prefs"),
+        (f"/{FILESYSTEMS_ROOT}/", FILESYSTEMS_ROOT),
     ],
 )
-def test_linux_acquire_with_fs_subfolder(prefix: str, tmp_path: Path) -> None:
+def test_linux_acquire_with_fs_subfolder(prefix: str, subfolder: str, tmp_path: Path) -> None:
     """Test that we correctly handle Linux Acquire archives with a subfolder called named fs."""
     path = tmp_path.joinpath("target.tar.gz")
     with tarfile.open(path, "w:gz") as tf:
         _mkdir(tf, f"{prefix}$rootfs$/")
         _mkdir(tf, f"{prefix}$rootfs$/")
         _mkdir(tf, f"{prefix}$rootfs$/etc")
-        _mkdir(tf, f"{prefix}$rootfs$/etc/fs/")
+        _mkdir(tf, f"{prefix}$rootfs$/etc/{subfolder}/")
         _mkfile(tf, f"{prefix}$rootfs$/etc/test", b"testdata1")
-        _mkfile(tf, f"{prefix}$rootfs$/etc/fs/test", b"testdata2")
+        _mkfile(tf, f"{prefix}$rootfs$/etc/{subfolder}/test", b"testdata2")
 
     loader = loader_open(path)
     assert isinstance(loader, TarLoader)
@@ -135,8 +137,14 @@ def test_linux_acquire_with_fs_subfolder(prefix: str, tmp_path: Path) -> None:
     loader.map(t)
     assert isinstance(loader.subloader, AcquireTarSubLoader)
 
+    # Test directly on $rootfs$
+    assert t.fs.get("$rootfs$/etc/test").open().read() == b"testdata1"
+    assert t.fs.get(f"$rootfs$/etc/{subfolder}/test").open().read() == b"testdata2"
+
+    # The OS plugin is not applied, so manually mount to also test this case
+    t.fs.mount("/", t.fs.mounts["$rootfs$"])
     assert t.fs.get("/etc/test").open().read() == b"testdata1"
-    assert t.fs.get("/etc/fs/test").open().read() == b"testdata2"
+    assert t.fs.get(f"/etc/{subfolder}/test").open().read() == b"testdata2"
 
 
 def test_anonymous_filesystems() -> None:
