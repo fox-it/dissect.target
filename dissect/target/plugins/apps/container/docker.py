@@ -8,7 +8,7 @@ from dissect.cstruct import cstruct
 from dissect.util import ts
 
 from dissect.target import container, filesystem, volume
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import ContainerError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.protobuf import ProtobufVarint
@@ -103,22 +103,6 @@ class DockerPlugin(ContainerPlugin):
         super().__init__(target)
         self.installs = set(find_installs(target))
 
-        for install in self.installs:
-            # macOS installs are within Docker.raw
-            if (docker_path := install.joinpath("Docker.raw")).exists():
-                vs = volume.open(container.open(docker_path))
-                if len(vs.volumes) > 1:
-                    self.target.log.warning(
-                        "Docker container %s has multiple volumes, only using first volume", install.name
-                    )
-
-                fs = filesystem.open(vs.volumes[0])
-
-                if not fs.get("/docker"):
-                    self.target.log.warning("Docker.raw misses docker directory")
-                else:
-                    self.target.fs.mount(str(install), fs.get("/docker"))
-
     def check_compatible(self) -> None:
         if not self.installs:
             raise UnsupportedPluginError("No Docker install(s) found")
@@ -127,7 +111,8 @@ class DockerPlugin(ContainerPlugin):
     def images(self) -> Iterator[DockerImageRecord]:
         """Returns any pulled docker images on the target system."""
         for data_root in self.installs:
-            images_path = data_root.joinpath("image/overlay2/repositories.json")
+            data_relative_root = open_docker_raw(data_root)
+            images_path = data_relative_root.joinpath("image/overlay2/repositories.json")
 
             if not images_path.exists():
                 self.target.log.debug("No docker images found, file %s does not exist", images_path)
@@ -139,6 +124,10 @@ class DockerPlugin(ContainerPlugin):
                 self.target.log.warning("Unable to parse JSON in: %s", images_path)
                 self.target.log.debug("", exc_info=e)
                 continue
+
+            full_images_path = images_path
+            if data_relative_root != data_root:
+                full_images_path = str(data_root) + "/" + str(images_path)
 
             for name, tags in repositories.items():
                 for tag, hash in tags.items():
@@ -161,7 +150,7 @@ class DockerPlugin(ContainerPlugin):
                         image_id=hash_to_image_id(hash),
                         created=created,
                         hash=hash,
-                        source=images_path,
+                        source=full_images_path,
                         _target=self.target,
                     )
 
@@ -169,7 +158,8 @@ class DockerPlugin(ContainerPlugin):
     def containers(self) -> Iterator[DockerContainerRecord]:
         """Returns any docker containers present on the target system."""
         for data_root in self.installs:
-            for config_path in data_root.joinpath("containers").glob("**/config.v2.json"):
+            data_relative_root = open_docker_raw(data_root)
+            for config_path in data_relative_root.joinpath("containers").glob("**/config.v2.json"):
                 try:
                     config = json.loads(config_path.read_text())
                 except (json.JSONDecodeError, UnicodeDecodeError) as e:
@@ -205,6 +195,10 @@ class DockerPlugin(ContainerPlugin):
                 else:
                     self.target.log.warning("Encountered unsupported container filesystem: %s", config.get("Driver"))
 
+                full_config_path = config_path
+                if data_relative_root != data_root:
+                    full_config_path = str(data_root) + "/" + str(config_path)
+
                 yield DockerContainerRecord(
                     container_id=container_id,
                     image=config.get("Config", {}).get("Image"),
@@ -220,8 +214,8 @@ class DockerPlugin(ContainerPlugin):
                     volumes=volumes,
                     environment=config.get("Config", {}).get("Env", []),
                     mount_path=mount_path,
-                    config_path=config_path,
-                    source=config_path,
+                    config_path=full_config_path,
+                    source=full_config_path,
                     _target=self.target,
                 )
 
@@ -252,10 +246,15 @@ class DockerPlugin(ContainerPlugin):
             - https://docs.docker.com/config/containers/logging/local/
         """
         for data_root in self.installs:
-            containers_path = data_root.joinpath("containers")
+            data_relative_root = open_docker_raw(data_root)
+            containers_path = data_relative_root.joinpath("containers")
 
             for log_file in containers_path.glob("**/*.log*"):
                 container = log_file.parent
+
+                full_log_file_path = log_file
+                if data_relative_root != data_root:
+                    full_log_file_path = str(data_root) + "/" + str(log_file)
 
                 # json log driver
                 if "-json.log" in log_file.name:
@@ -269,7 +268,7 @@ class DockerPlugin(ContainerPlugin):
                                 if raw_messages
                                 else strip_log(log_entry.get("log"), remove_backspaces)
                             ),
-                            source=log_file,
+                            source=full_log_file_path,
                             _target=self.target,
                         )
 
@@ -283,7 +282,7 @@ class DockerPlugin(ContainerPlugin):
                             message=(
                                 log_entry.message if raw_messages else strip_log(log_entry.message, remove_backspaces)
                             ),
-                            source=log_file,
+                            source=full_log_file_path,
                             _target=self.target,
                         )
 
@@ -328,6 +327,24 @@ def get_data_path(path: Path) -> str | None:
     return config.get("data-root") or config.get("DataFolder")
 
 
+def open_docker_raw(path: Path) -> filesystem.FileSystem:
+    """Open a Docker.raw file and return the filesystem within."""
+    try:
+        vs = volume.open(container.open(path))
+    except ContainerError:
+        return path
+
+    fs = filesystem.open(vs.volumes[0])
+    return fs.path("/docker")
+
+
+def expand_datapath_macos(path: Path) -> Path:
+    """Check if the datapath is a macOS Docker Desktop install and return the path to the Docker.raw file."""
+    if (docker_path := path.joinpath("Docker.raw")).exists():
+        return docker_path
+    return path
+
+
 def find_installs(target: Target) -> Iterator[Path]:
     """Attempt to find additional configured and existing Docker daemon data-root folders.
 
@@ -369,7 +386,7 @@ def find_installs(target: Target) -> Iterator[Path]:
     for path in user_data_paths:
         for user_details in target.user_details.all_with_home():
             if (user_path := user_details.home_path.joinpath(path)).exists():
-                yield user_path
+                yield expand_datapath_macos(user_path)
 
     for path in default_config_paths:
         if (config_file := target.fs.path(path)).exists():
@@ -386,7 +403,10 @@ def find_installs(target: Target) -> Iterator[Path]:
                     target.log.info("Unable to get data-root from docker daemon file %s", config_file)
                     continue
                 if (data_root_path := target.fs.path(data_path)).exists():
-                    yield data_root_path
+                    try:
+                        yield expand_datapath_macos(data_root_path)
+                    except Exception as e:
+                        print(e)
 
 
 def convert_timestamp(timestamp: str | None) -> str | None:
