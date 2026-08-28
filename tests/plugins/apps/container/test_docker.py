@@ -53,18 +53,21 @@ def test_docker_plugin_data_roots_empty(target_unix_users: Target, fs_unix: Virt
     ]
 
 
-def test_docker_plugin_data_roots_empty_darwin(target_macos_users: Target, fs_unix: VirtualFilesystem) -> None:
-    target_macos_users.fs.makedirs("/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data")
-    fs_unix.map_file_fh("/User/dissect/.docker/daemon.json", BytesIO(b"{}"))
+def test_docker_plugin_data_roots_empty_darwin(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
+    fs_macos.map_file_fh("/User/dissect/.docker/daemon.json", BytesIO(b"{}"))
+    fs_macos.map_file(
+        "/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+        absolute_path("_data/plugins/apps/container/docker/Docker.raw"),
+    )
 
     assert [str(p) for p in find_installs(target_macos_users)] == [
-        "/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data",
+        "/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
     ]
 
 
-def test_docker_plugin_data_roots_darwin(target_macos_users: Target, fs_unix: VirtualFilesystem) -> None:
-    target_macos_users.fs.makedirs("/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data")
-    fs_unix.map_file_fh("/User/dissect/.docker/daemon.json", BytesIO(b'{"data-root": "/tmp/foo/bar"}'))
+def test_docker_plugin_data_roots_darwin(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
+    fs_macos.makedirs("tmp/foo/bar")
+    fs_macos.map_file_fh("/Users/dissect/.docker/daemon.json", BytesIO(b'{"data-root": "/tmp/foo/bar"}'))
 
     assert [str(p) for p in find_installs(target_macos_users)] == [
         "/tmp/foo/bar",
@@ -123,6 +126,29 @@ def test_docker_plugin_containers(target_unix_users: Target, fs_unix: VirtualFil
     assert result.volumes == ["/tmp/test:/test"]
     assert result.config_path == path.from_posix(f"/var/lib/docker/containers/{id}/config.v2.json")
     assert result.mount_path == path.from_posix(f"/var/lib/docker/image/overlay2/layerdb/mounts/{id}")
+
+
+def test_docker_plugin_containers_macos(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
+    fs_macos.map_file_fh("/User/dissect/.docker/daemon.json", BytesIO(b"{}"))
+    fs_macos.map_file(
+        "/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+        absolute_path("_data/plugins/apps/container/docker/Docker.raw"),
+    )
+
+    target_macos_users.add_plugin(DockerPlugin)
+    results = list(target_macos_users.docker.containers())
+
+    assert len(results) == 1
+
+
+def test_docker_plugin_containers_macos_invalid(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
+    fs_macos.map_file_fh("/User/dissect/.docker/daemon.json", BytesIO(b"{}"))
+    fs_macos.map_file(
+        "/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+        absolute_path("_data/plugins/apps/container/docker/DockerInvalid.raw"),
+    )
+
+    assert list(target_macos_users.docker.containers()) == []
 
 
 def test_docker_plugin_logs(target_linux_docker_logs: Target) -> None:
