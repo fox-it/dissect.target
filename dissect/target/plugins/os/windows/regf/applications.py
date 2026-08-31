@@ -55,7 +55,7 @@ class WindowsApplicationsPlugin(Plugin):
             version      (string):   version of the application
             author       (string):   author of the application
             type         (string):   type of the application, either user or system
-            path         (string):   path to the installed location or installer of the application
+            source       (path):     path to the installed location or installer of the application
         """
         for uninstall in self.keys:
             for app in uninstall.subkeys():
@@ -73,6 +73,6 @@ class WindowsApplicationsPlugin(Plugin):
                     version=values.get("DisplayVersion"),
                     author=values.get("Publisher"),
                     type="system" if values.get("SystemComponent") or not values else "user",
-                    path=values.get("DisplayIcon") or values.get("InstallLocation") or values.get("InstallSource"),
+                    source=values.get("DisplayIcon") or values.get("InstallLocation") or values.get("InstallSource"),
                     _target=self.target,
                 )
