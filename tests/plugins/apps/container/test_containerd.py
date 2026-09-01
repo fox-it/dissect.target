@@ -15,7 +15,22 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def target_unix_containerd_docker(target_unix: Target, fs_unix: VirtualFilesystem) -> Target:
-    fs_unix.map_dir("/var/lib/containerd", absolute_path("_data/plugins/apps/container/containerd/docker"))
+    fs_unix.map_file(
+        "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db",
+        absolute_path("_data/plugins/apps/container/containerd/docker/io.containerd.metadata.v1.bolt/meta.db"),
+    )
+    fs_unix.map_file(
+        "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/metadata.db",
+        absolute_path(
+            "_data/plugins/apps/container/containerd/docker/io.containerd.snapshotter.v1.overlayfs/metadata.db"
+        ),
+    )
+    fs_unix.map_dir_from_tar(
+        "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+        absolute_path(
+            "_data/plugins/apps/container/containerd/docker/io.containerd.snapshotter.v1.overlayfs/snapshots.tgz"
+        ),
+    )
     target_unix.add_plugin(ContainerdPlugin)
     return target_unix
 
@@ -42,7 +57,7 @@ def test_containerd_docker_images(target_unix_containerd_docker: Target) -> None
 
 def test_containerd_docker_containers(target_unix_containerd_docker: Target) -> None:
     """Test if we can parse (running) containerd docker containers."""
-    records = list(target_unix_containerd_docker.containerd.images())
+    records = list(target_unix_containerd_docker.containerd.containers())
     assert len(records) == 1
 
     assert records[0].container_id == "5fc9c48c9ee7a72c4e733a19c0388e6d7b26413fd0949f855067bfb8dd2d2181"

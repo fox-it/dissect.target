@@ -6,7 +6,8 @@ from dissect.target.filesystems.overlay import OverlayFsFilesystem
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
-    from dissect.target.helpers.compat.pathlib import TargetPath
+    from pathlib import Path
+
     from dissect.target.target import Target
 
 
@@ -14,7 +15,7 @@ class OverlayFsLoader(Loader):
     """Load containerd OCI overlay filesystems."""
 
     @staticmethod
-    def detect(path: TargetPath) -> bool:
+    def detect(path: Path) -> bool:
         """Detect an ``overlayfs`` bbolt ``meta.db`` path.
 
         Example::
