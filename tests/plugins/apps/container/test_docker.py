@@ -37,7 +37,7 @@ def test_docker_plugin_data_roots(target_unix_users: Target, fs_unix: VirtualFil
     fs_unix.map_file_fh("/etc/docker/daemon.json", BytesIO(b'{"data-root": "/tmp/foo/bar"}'))
     fs_unix.map_file_fh("/root/.docker/daemon.json", BytesIO(b'{"data-root": "/tmp/another/docker"}'))
 
-    assert [str(p) for p in find_installs(target_unix_users)] == [
+    assert [str(p) for (p, _) in find_installs(target_unix_users)] == [
         "/var/lib/docker",
         "/tmp/foo/bar",
         "/tmp/another/docker",
@@ -48,7 +48,7 @@ def test_docker_plugin_data_roots_empty(target_unix_users: Target, fs_unix: Virt
     fs_unix.makedirs("/var/lib/docker")
     fs_unix.map_file_fh("/etc/docker/daemon.json", BytesIO(b"{}"))
 
-    assert [str(p) for p in find_installs(target_unix_users)] == [
+    assert [str(p) for (p, _) in find_installs(target_unix_users)] == [
         "/var/lib/docker",
     ]
 
@@ -60,16 +60,20 @@ def test_docker_plugin_data_roots_empty_darwin(target_macos_users: Target, fs_ma
         absolute_path("_data/plugins/apps/container/docker/Docker.raw"),
     )
 
-    assert [str(p) for p in find_installs(target_macos_users)] == [
-        "/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
-    ]
+    installs = list(find_installs(target_macos_users))
+
+    assert len(installs) == 1
+    assert installs[0][0].resolve() == "/docker"
+    assert installs[0][1] == (
+        fs_macos.path("/Users/dissect/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw")
+    )
 
 
 def test_docker_plugin_data_roots_darwin(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
     fs_macos.makedirs("tmp/foo/bar")
     fs_macos.map_file_fh("/Users/dissect/.docker/daemon.json", BytesIO(b'{"data-root": "/tmp/foo/bar"}'))
 
-    assert [str(p) for p in find_installs(target_macos_users)] == [
+    assert [str(p) for (p, _) in find_installs(target_macos_users)] == [
         "/tmp/foo/bar",
     ]
 
