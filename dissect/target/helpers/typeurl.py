@@ -37,7 +37,7 @@ def unmarshal_any(raw: bytes) -> tuple[str, bytes]:
 def unmarshal_any_json(raw: bytes) -> tuple[str, dict]:
     """Attempt to unmarshal a typeurl any structure to a JSON dict.
 
-    Returns: dict
+    Returns: tuple of path (str) and JSON object (dict)
     """
     path, value = unmarshal_any(raw)
     try:
