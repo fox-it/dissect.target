@@ -1063,9 +1063,11 @@ class WuaHistoryPlugin(Plugin):
             format_data[mapped_column_name] = value
             format_data["classification_mapped"] = CLASSIFICATION_MAP.get(value, "Unknown")
         elif mapped_column_name == "title":
+            if isinstance(value, bytes):
+                value = value.decode(errors="ignore")
             format_data[mapped_column_name] = value
             if kb := re.search(r"(KB.[0-9]*)", value):
-                format_data["kb"] = kb.group()
+                format_data["kb"] = kb.group(1)        
         elif mapped_column_name == "status_id":
             format_data[mapped_column_name] = value
             format_data["status_mapped"] = STATUS_MAP.get(value, "Unknown")
@@ -1077,3 +1079,4 @@ class WuaHistoryPlugin(Plugin):
             format_data[mapped_column_name] = value
 
         return format_data
+
