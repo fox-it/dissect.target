@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 
 
 RE_TS = re.compile(r"(\w{3}\d{2}\s\d{2}:\d{2}:\d{2}\.\d{3})")
+RE_CLIENT_TS = re.compile(r"(\w{3}\s+\d{1,2}\s+\d{1,2}:\d{2}:\d{2}\.\d{3})")
+
+TS_FORMAT = "%b%d %H:%M:%S.%f"
+CLIENT_TS_FORMAT = "%b %d %H:%M:%S.%f"
 
 
 class SplashtopPlugin(RemoteAccessPlugin):
@@ -48,14 +52,20 @@ class SplashtopPlugin(RemoteAccessPlugin):
         # "sysvol/ProgramData/Splashtop/Temp/log/FTCLog.txt",
     )
 
+    CLIENT_LOG_GLOBS = ("sysvol/ProgramData/Splashtop/Splashtop Remote Client for ST*/*/log/win_client.txt*",)
+
     def __init__(self, target: Target):
         super().__init__(target)
 
-        self.log_files: set[TargetPath] = set()
+        self.log_files: dict[TargetPath, tuple[re.Pattern[str], str]] = {}
 
         for log_path in self.LOG_PATHS:
             if (log_file := self.target.fs.path(log_path)).exists():
-                self.log_files.add(log_file)
+                self.log_files[log_file] = (RE_TS, TS_FORMAT)
+
+        for log_glob in self.CLIENT_LOG_GLOBS:
+            for log_file in self.target.fs.glob(log_glob):
+                self.log_files[self.target.fs.path(log_file)] = (RE_CLIENT_TS, CLIENT_TS_FORMAT)
 
     def check_compatible(self) -> None:
         if not self.log_files:
@@ -73,17 +83,20 @@ class SplashtopPlugin(RemoteAccessPlugin):
         """
         target_tz = self.target.datetime.tzinfo
 
-        for log_file in self.log_files:
+        for log_file, (re_ts, ts_format) in self.log_files.items():
             try:
-                for ts, line in year_rollover_helper(log_file, RE_TS, "%b%d %H:%M:%S.%f", target_tz):
+                for ts, line in year_rollover_helper(log_file, re_ts, ts_format, target_tz):
                     try:
-                        # The line is of format "<#>%b%d %H:%M:%S.%f ..." check if the start matches an expected line
+                        # All supported Splashtop logs prefix records with a numeric level in angle brackets.
                         if (line[0], line[2]) != ("<", ">"):
                             self.target.log.error("LINE %s", line)
                             raise ValueError("Line does not match expected format")  # noqa: TRY301
 
-                        # The prefix contains two spaces splitting off the timestamp, grab only the message part
-                        message = line.split(" ", maxsplit=2)[-1]
+                        timestamp_match = re_ts.search(line)
+                        if not timestamp_match:
+                            raise ValueError("Line does not contain the expected timestamp")  # noqa: TRY301
+
+                        message = line[timestamp_match.end() :].lstrip()
 
                         yield self.RemoteAccessLogRecord(
                             ts=ts,
