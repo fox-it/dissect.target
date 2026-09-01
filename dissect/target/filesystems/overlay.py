@@ -196,7 +196,7 @@ class OverlayFsFilesystem(LayerFilesystem):
         # Finally we iterate over all layers by traversing the 'parent' key of each layer.
         while True:
             name = metadata_db.get(f"v1 snapshots {id} id", decode=False)
-            dir = str(int.from_bytes(name))
+            dir = str(int.from_bytes(name, "big"))
             layer = containerd_root.joinpath(f"io.containerd.snapshotter.v1.overlayfs/snapshots/{dir}/fs")
 
             if layer.is_dir():
