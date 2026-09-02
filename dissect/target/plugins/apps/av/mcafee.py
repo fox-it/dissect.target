@@ -24,6 +24,7 @@ McAfeeMscLogRecord = TargetRecordDescriptor(
         ("string", "message"),
         ("string", "keywords"),
         ("string", "fkey"),
+        ("path", "source"),
     ],
 )
 
@@ -37,6 +38,7 @@ McAfeeMscFirewallRecord = TargetRecordDescriptor(
         ("string", "message"),
         ("string", "keywords"),
         ("string", "fkey"),
+        ("path", "source"),
     ],
 )
 
@@ -95,6 +97,7 @@ class McAfeePlugin(Plugin):
         len_marker = len(self.MARKER_SUSPICIOUS_UDP_CONNECTION)
 
         for log_file in self.get_log_files():
+            source_log_file = log_file.resolve()
             with SQLite3(log_file) as database:
                 fields = defaultdict(dict)
                 fields_table = database.table(self.TABLE_FIELD)
@@ -136,6 +139,7 @@ class McAfeePlugin(Plugin):
                             message=self._clean_message(entry.details_info),
                             keywords=",".join(log_fields.values()),
                             fkey=entry.fkey,
+                            source=source_log_file,
                             _target=self.target,
                         )
                     else:
@@ -146,6 +150,7 @@ class McAfeePlugin(Plugin):
                             port=port,
                             message=self._clean_message(entry.details_info),
                             keywords=",".join(log_fields.values()),
-                            fkey=entry.fkey,
+                            fkey=entry.fkey,                          
+                            source=source_log_file,
                             _target=self.target,
                         )
