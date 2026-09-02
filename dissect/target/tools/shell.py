@@ -1139,7 +1139,7 @@ class TargetCli(TargetCmd):
 
         return False
 
-    @arg("path", nargs="+", type=TargetPathArgument)
+    @arg("path", nargs="+", metavar="PATH", type=TargetPathArgument)
     @arg(
         "-f",
         "--file",
@@ -1162,6 +1162,12 @@ class TargetCli(TargetCmd):
         "--dereference",
         action="store_true",
         help="follow symlinks and archive the files they point to instead of the symlinks themselves",
+    )
+    @arg(
+        "-P",
+        "--absolute-names",
+        action="store_true",
+        help="store the absolute path of a file",
     )
     @arg("-v", "--verbose", action="store_true")
     def cmd_tar(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1247,8 +1253,11 @@ class TargetCli(TargetCmd):
                 print(f"tar: {PurePosixPath(path)}: unsupported file type, skipping", file=sys.stderr)
                 return
             if info.isreg():
-                with path.open("rb") as f:
-                    tar.addfile(info, fileobj=f)
+                with path.open("rb") as fh:
+                    try:
+                        tar.addfile(info, fileobj=fh)
+                    except Exception as e:
+                        print(f"tar: {PurePosixPath(path)}: failed to read file: {e}", file=sys.stderr)
             elif info.isdir():
                 tar.addfile(info)
                 for child in path.iterdir():
@@ -1265,11 +1274,11 @@ class TargetCli(TargetCmd):
         fobj = stdout.buffer if args.file == "-" else Path(args.file).open("wb")  # noqa: SIM115
         mode = "w|"
         if args.gzip:
-            mode = "w|gz"
+            mode += "gz"
         elif args.bzip2:
-            mode = "w|bz2"
+            mode += "bz2"
         elif args.xz:
-            mode = "w|xz"
+            mode += "xz"
 
         try:
             inodes_cache = {}
@@ -1286,11 +1295,18 @@ class TargetCli(TargetCmd):
                         continue
 
                     for path in paths:
-                        arcname = str(PurePosixPath(path).relative_to("/"))
-                        if not Path(arg_path).is_absolute():
-                            pure_path = PurePosixPath(path).relative_to(PurePosixPath(self.cwd))
-                            arcname = "/".join(p for p in pure_path.parts if p not in (".", ".."))
-                            arcname = arcname or "."
+                        if args.absolute_names:
+                            arcname = str(PurePosixPath(path))
+                            if arcname.startswith("/"):
+                                arcname = arcname.lstrip("/")
+                        else:
+                            if Path(arg_path).is_absolute():
+                                arcname = str(PurePosixPath(path).relative_to(path.drive or "/"))
+                            else:
+                                pure_path = PurePosixPath(path).relative_to(PurePosixPath(self.cwd))
+                                arcname = "/".join(p for p in pure_path.parts if p not in (".", ".."))
+                                arcname = arcname or "."
+
                         add_to_tar(tar, path, arcname, dereference=args.dereference, inodes=inodes_cache)
         finally:
             if fobj is not stdout.buffer:
