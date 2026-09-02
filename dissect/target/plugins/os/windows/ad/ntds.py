@@ -49,6 +49,7 @@ GENERIC_FIELDS = [
     ("uint32", "primary_group_id"),
     ("string[]", "member_of"),
     ("string[]", "service_principal_name"),
+    ("path", "source"),
 ]
 
 # Record descriptor for NTDS user secrets
@@ -82,6 +83,7 @@ NtdsGPORecord = TargetRecordDescriptor(
         ("string", "display_name"),
         ("datetime", "creation_time"),
         ("datetime", "last_modified_time"),
+        ("path", "source"),
     ],
 )
 
@@ -142,6 +144,7 @@ class NtdsPlugin(Plugin):
                 comment=user.get("comment"),
                 telephone_number=user.get("telephoneNumber"),
                 home_directory=user.get("homeDirectory"),
+                source=self.path,
                 _target=self.target,
             )
 
@@ -154,6 +157,7 @@ class NtdsPlugin(Plugin):
                 dns_hostname=computer.get("dNSHostName"),
                 operating_system=computer.get("operatingSystem"),
                 operating_system_version=computer.get("operatingSystemVersion"),
+                source=self.path,
                 _target=self.target,
             )
 
@@ -169,6 +173,7 @@ class NtdsPlugin(Plugin):
                 display_name=gpo.display_name,
                 creation_time=gpo.when_created,
                 last_modified_time=gpo.when_changed,
+                source=self.path,
                 _target=self.target,
             )
 
