@@ -96,6 +96,7 @@ NtdsDnsNodeRecord = TargetRecordDescriptor(
         ("datetime", "last_modified_time"),
         ("string", "dns_name"),
         ("string[]", "records"),
+        ("path", "source"),
     ],
 )
 
@@ -105,6 +106,7 @@ GENERIC_FIELDS_DNS_RECORD = [
     ("datetime", "node_last_modified_time"),
     ("string", "dns_name"),
     ("string", "dns_type"),
+    ("path", "source"),
 ]
 
 DnsGenericRecord = TargetRecordDescriptor(
@@ -326,6 +328,7 @@ class NtdsPlugin(Plugin):
                 records=[str(r) for r in dns_node.dns_record],
                 creation_time=dns_node.when_created,
                 last_modified_time=dns_node.when_changed,
+                source=self.path,
                 _target=self.target,
             )
 
@@ -364,6 +367,7 @@ class NtdsPlugin(Plugin):
                     "node_creation_time": dns_node.when_created,
                     "node_last_modified_time": dns_node.when_changed,
                     "dns_type": record.type.name,
+                    "source": self.path,
                     "_target": self.target,
                 }
                 if flow_record := dns_as_flow_record(record.data, generic):
