@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pathlib
 import tempfile
+from collections import Counter
 from typing import TYPE_CHECKING
 
 import pytest
@@ -94,3 +95,14 @@ def test_intunemanagementextension_parsing_main_and_rotated(target_win: Target, 
     assert third.context == "ManagedSoftware"
     assert "Test message one." in third.message
     assert third.file_origin.endswith("IntuneManagementExtension-20230101-100000.log")
+
+    assert Counter(str(r.source) for r in records) == {
+        "sysvol\\ProgramData\\Microsoft\\IntuneManagementExtension"
+        "\\Logs\\IntuneManagementExtension-20230101-100000.log": 1,
+        "sysvol\\ProgramData\\Microsoft\\IntuneManagementExtension\\Logs\\IntuneManagementExtension.log": 2,
+    }
+
+    assert Counter(r.file_origin for r in records) == {
+        "IntuneManagementExtension.log": 2,
+        "IntuneManagementExtension-20230101-100000.log": 1,
+    }

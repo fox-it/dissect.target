@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING
 
 import pytest
@@ -67,6 +68,7 @@ def test_users(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.users())
 
     assert len(results) == 33
+    assert Counter(str(r.source) for r in results) == {"c:\\windows\\ntds\\ntds.dit": 33}
 
     for result in results:
         if result.cn not in cn_to_ntlm_hash_mapping or result.nt == DEFAULT_NT_HASH:
@@ -84,7 +86,7 @@ def test_computers(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.computers())
 
     assert len(results) == 3
-
+    assert Counter(str(r.source) for r in results) == {"c:\\windows\\ntds\\ntds.dit": 3}
     for result in results:
         if result.cn not in cn_to_ntlm_hash_mapping or result.nt == DEFAULT_NT_HASH:
             continue
@@ -96,6 +98,7 @@ def test_group_policies(target_win_ntds: Target) -> None:
     results = list(target_win_ntds.ad.group_policies())
 
     assert len(results) == 5
+    assert Counter(str(r.source) for r in results) == {"c:\\windows\\ntds\\ntds.dit": 5}
 
 
 def test_secretsdump(target_win_ntds: Target) -> None:
