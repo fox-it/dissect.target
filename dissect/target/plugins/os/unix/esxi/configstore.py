@@ -22,12 +22,15 @@ class ConfigstorePlugin(Plugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._configstore = {}
-
+        path = None
         # ESXi 7 introduced the configstore
         # It's made available at /etc/vmware/configstore/current-store-1 during boot, but stored at
-        # the path used below in local.tgz
-        if (path := target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")).exists():
-            self._configstore = parse_config_store(path)
+        # /var/lib/vmware/configstore/backup/current-store-1 in local.tgz
+        # On live collection (uac, vm-support), this file is located at the /etc path
+        for path in ("/etc/vmware/configstore/current-store-1", "/var/lib/vmware/configstore/backup/current-store-1"):
+            if (p := self.target.fs.path(path)).exists():
+                self.path = p
+                self._configstore = parse_config_store(p)
 
     def check_compatible(self) -> None:
         # NOTE: Unable to use OS specific functions here, as this method can be called in ESXiPlugin.create
@@ -35,12 +38,57 @@ class ConfigstorePlugin(Plugin):
             raise UnsupportedPluginError("ESXi configstore not found on target")
 
     @internal
-    def get(self, key: str, default: Any = None) -> dict[str, Any]:
-        """Get configstore value for the specified key."""
-        return self._configstore.get(key, default)
+    def get(
+        self,
+        component: str,
+        config_group: str | None = None,
+        value_group: str | None = None,
+        identifier: str | None = None,
+        default: Any = None,
+    ) -> dict[str, Any] | Any:
+        """Get configstore value for the specified key.
+        Subkey order is component -> config_group -> value_group -> identifier.
+
+        Sub subkey are used only previous subkey are defined. E.g. is value_group is None, identifier will be ignored.
+        """
+        step_value = self._configstore
+        for step_name in [component, config_group, value_group, identifier]:
+            if step_name is None:
+                return step_value
+            if step_name not in step_value:
+                return default
+            step_value = step_value.get(step_name)
+        return step_value
 
 
 def parse_config_store(path: Path) -> dict[str, Any]:
+    """Parse ESXi configstore and create a tree-like dictionary with values.
+
+
+    Note: Configstore is a SQlite3 Db with the following schema
+
+        .. code-block:: sql
+
+            CREATE TABLE Config(Component TEXT
+                ConfigGroup TEXT
+                Name TEXT
+                Identifier TEXT NOT NULL DEFAULT ''
+                ModifiedTime DATETIME DEFAULT (datetime(CURRENT_TIMESTAMP))
+                CreationTime DATETIME
+                Version TEXT DEFAULT ''
+                Success BOOLEAN DEFAULT 1
+                AutoConfValue TEXT
+                 UserValue TEXT
+                 VitalValue TEXT
+                 CachedValue TEXT
+                 DesiredValue TEXT
+                 Revision INTEGER DEFAULT 0
+                 PRIMARY KEY(Component
+                     ConfigGroup
+                     Name
+                     Identifier)
+            );
+    """
     with SQLite3(path) as db:
         store = {}
 
