@@ -27,7 +27,7 @@ def test_linux_zip(opener: Callable[[str | Path], Target]) -> None:
     t = opener(path)
     assert isinstance(t._loader, ZipLoader)
     assert len(t.filesystems) == 1
-    assert t.os == OperatingSystem.LINUX
+    assert t.os == OperatingSystem.UNIX
     assert t.fs.path("/etc/hostname").read_bytes() == b"test\n"
     assert not t.fs.path("/etC/hostname").exists()  # Linux is considered as case sensitive
     assert not t.fs.path("/etc/Hostname").exists()
