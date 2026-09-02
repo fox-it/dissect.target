@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.localeutil import normalize_language
+from dissect.target.helpers.locale.util import normalize_language
 from dissect.target.plugin import OperatingSystem, Plugin, export
 from dissect.target.plugins.os.unix.locale import timezone_from_path
 
