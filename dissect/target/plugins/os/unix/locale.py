@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.localeutil import normalize_language
+from dissect.target.helpers.locale.util import normalize_language
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.default.locale import LocalePlugin

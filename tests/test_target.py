@@ -500,7 +500,7 @@ def test_empty_vs(target_bare: Target) -> None:
         target_bare.disks.apply()
 
         assert len(target_bare.volumes) == 1
-        assert target_bare.volumes[0].disk is mock_disk
+        assert target_bare.volumes[0].disk == [mock_disk]
         assert target_bare.volumes[0].offset == 0
 
 
