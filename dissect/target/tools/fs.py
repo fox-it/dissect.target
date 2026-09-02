@@ -14,6 +14,7 @@ from dissect.target.target import Target
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    find_and_filter_plugins,
     process_generic_arguments,
 )
 from dissect.target.tools.utils.fs import print_ls, print_stat
@@ -73,6 +74,19 @@ def cp(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
             _extract_path(extract_path, out_path)
     else:
         print(f"[!] Failed, unsuported file type: {path}")
+
+
+def extract(t: Target, args: argparse.Namespace) -> None:
+    for func_def in find_and_filter_plugins(args.function, t, []):
+        try:
+            paths = func_def.cls(t).get_paths()
+            for path in paths:
+                cp(t, path, args)
+        except NotImplementedError:  # noqa: PERF203
+            log.warning(
+                "Cannot extract paths for %s, get_paths is not implemented",
+                func_def.name,
+            )
 
 
 def stat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
@@ -143,6 +157,15 @@ def main() -> int:
     )
     parser_cp.add_argument("-o", "--output", default=".", help="output directory")
     parser_cp.set_defaults(handler=cp)
+
+    parser_extract = subparsers.add_parser(
+        "extract",
+        help="copy files based on plugin specified by -f",
+    )
+    parser_extract.add_argument("-o", "--output", default=".", help="output directory")
+    parser_extract.add_argument("-f", "--function", help="Function to extract files from")
+    parser_extract.set_defaults(handler=extract, path="not-used")
+
     configure_generic_arguments(parser)
 
     args, _ = parser.parse_known_args()
@@ -157,6 +180,9 @@ def main() -> int:
         log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
         return 1
+
+    if args.handler == extract:
+        return args.handler(target, args)
 
     glob_path = str(args.path).lstrip("/")
 
