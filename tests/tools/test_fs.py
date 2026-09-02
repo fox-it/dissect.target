@@ -6,8 +6,10 @@ from unittest.mock import Mock
 
 import pytest
 
+from dissect.target import Target
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
-from dissect.target.tools.fs import _extract_path, cp
+from dissect.target.plugins.apps.webserver import iis
+from dissect.target.tools.fs import _extract_path, cp, extract
 from dissect.target.tools.fs import main as target_fs
 from tests._utils import absolute_path
 
@@ -135,3 +137,21 @@ def test_cp_subdirectories(vfs: VirtualFilesystem, files: list[str], tmp_path: P
 
     for directories in filesystem_files:
         assert output_path.joinpath(directories).exists()
+
+
+def test_target_fs_extract(target_win_tzinfo: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
+    config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
+    data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
+    fs_win.map_file("windows/system32/inetsrv/config/applicationHost.config", config_path)
+    fs_win.map_dir("Users/John/iis-logs", data_dir)
+    target_win_tzinfo.add_plugin(iis.IISLogsPlugin)
+
+    output_path = tmp_path / "out"
+
+    args = Mock()
+    args.output = str(output_path)
+    args.function = "iis"
+
+    extract(target_win_tzinfo, args)
+
+    assert output_path.joinpath("W3SVC1/u_in211001.log").exists()
