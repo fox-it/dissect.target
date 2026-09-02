@@ -69,7 +69,9 @@ def test_winnt(tmp_path: Path) -> None:
 def test_windows_drive_letters(tmp_path: Path) -> None:
     """Test the ``DirLoader`` with Windows drive letters."""
     root = tmp_path
-    mkdirs(root, ["C/windows/system32/config", "D/test", "E/test"])
+    (root / "E" / "test").mkdir(parents=True)
+    (root / "D" / "test").mkdir(parents=True)
+    (root / "C" / "windows" / "system32" / "config").mkdir(parents=True)
     (root / "C" / "windows" / "system32" / "config" / "software").write_bytes(b"test")
 
     os_type, dirs = find_dirs(root)
@@ -95,6 +97,9 @@ def test_linux(tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, ["etc", "var"])
     (root / "etc" / "hostname").write_bytes(b"test")
+    # Test with more  deep.
+    (root / "etc" / "apt" / "sources.list.d").mkdir(parents=True)
+    (root / "etc" / "apt" / "sources.list.d" / "test.list").write_bytes(b"test_2")
     os_type, dirs = find_dirs(root)
     assert os_type == OperatingSystem.LINUX
     assert len(dirs) == 1
@@ -108,6 +113,7 @@ def test_linux(tmp_path: Path) -> None:
     t.apply()
 
     assert t.fs.path("/etc/hostname").read_bytes() == b"test"
+    assert t.fs.path("/etc/apt/sources.list.d/test.list").read_bytes() == b"test_2"
     assert not t.fs.path("/etC/hostname").exists()  # Linux is considered as case sensitive
     assert not t.fs.path("/etc/Hostname").exists()
 
