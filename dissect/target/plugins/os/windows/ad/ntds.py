@@ -6,6 +6,7 @@ from itertools import zip_longest
 from typing import TYPE_CHECKING, Any
 
 from dissect.database.ese.ntds import NTDS
+from dissect.database.ese.ntds.objects import dnsnode
 from dissect.database.ese.ntds.util import UserAccountControl
 
 from dissect.target.exceptions import RegistryKeyNotFoundError
@@ -85,6 +86,96 @@ NtdsGPORecord = TargetRecordDescriptor(
         ("datetime", "last_modified_time"),
         ("path", "source"),
     ],
+)
+
+
+NtdsDnsNodeRecord = TargetRecordDescriptor(
+    "windows/ad/dns_node",
+    [
+        ("datetime", "creation_time"),
+        ("datetime", "last_modified_time"),
+        ("string", "dns_name"),
+        ("string[]", "records"),
+        ("path", "source"),
+    ],
+)
+
+GENERIC_FIELDS_DNS_RECORD = [
+    ("datetime", "ts"),
+    ("datetime", "node_creation_time"),
+    ("datetime", "node_last_modified_time"),
+    ("string", "dns_name"),
+    ("string", "dns_type"),
+    ("path", "source"),
+]
+
+DnsGenericRecord = TargetRecordDescriptor(
+    "windows/ad/dns/generic",
+    [
+        *GENERIC_FIELDS_DNS_RECORD,
+        ("bytes", "dns_record_data"),
+    ],
+)
+
+DnsARecord = TargetRecordDescriptor(
+    "windows/ad/dns/a",
+    [
+        *GENERIC_FIELDS_DNS_RECORD,
+        ("net.ipaddress", "ip_address"),
+    ],
+)
+
+DnsAAAARecord = TargetRecordDescriptor(
+    "windows/ad/dns/aaaa",
+    [
+        *GENERIC_FIELDS_DNS_RECORD,
+        ("net.ipaddress", "ip_address"),
+    ],
+)
+
+
+DnsSOARecord = TargetRecordDescriptor(
+    "windows/ad/dns/soa",
+    [
+        *GENERIC_FIELDS_DNS_RECORD,
+        ("string", "name_primary_server"),
+        ("varint", "refresh"),
+        ("varint", "retry"),
+        ("varint", "minimum_ttl"),
+        ("string", "zone_administrator_email"),
+    ],
+)
+
+DnsNodeNameRecord = TargetRecordDescriptor(
+    "windows/ad/dns/node_name",
+    [*GENERIC_FIELDS_DNS_RECORD, ("string", "name_node")],
+)
+
+DnsStringRecord = TargetRecordDescriptor(
+    "windows/ad/dns/string",
+    [*GENERIC_FIELDS_DNS_RECORD, ("string", "string_data")],
+)
+
+
+DnsNamePreferenceRecord = TargetRecordDescriptor(
+    "windows/ad/dns/name_preference",
+    [*GENERIC_FIELDS_DNS_RECORD, ("varint", "preference"), ("string", "name_exchange")],
+)
+
+DnsSRVRecord = TargetRecordDescriptor(
+    "windows/ad/dns/srv",
+    [
+        *GENERIC_FIELDS_DNS_RECORD,
+        ("varint", "port"),
+        ("varint", "weight"),
+        ("varint", "srv_priority"),
+        ("string", "name_target"),
+    ],
+)
+
+DnsTombStonedRecord = TargetRecordDescriptor(
+    "windows/ad/dns/tombstoned",
+    [*GENERIC_FIELDS_DNS_RECORD, ("datetime", "entombed_time")],
 )
 
 # NTDS Registry consts
@@ -228,6 +319,60 @@ class NtdsPlugin(Plugin):
                 if "Primary:CLEARTEXT" in supplemental:
                     yield f"{username}:CLEARTEXT:{supplemental['Primary:CLEARTEXT']}"
 
+    @export(record=NtdsDnsNodeRecord)
+    def dns_nodes(self) -> Iterator[NtdsDnsNodeRecord]:
+        """Extract all DNS nodes from NTDS.dit database."""
+        for dns_node in self.ntds.dns_nodes():
+            yield NtdsDnsNodeRecord(
+                dns_name=dns_node.dns_name,
+                records=[str(r) for r in dns_node.dns_record],
+                creation_time=dns_node.when_created,
+                last_modified_time=dns_node.when_changed,
+                source=self.path,
+                _target=self.target,
+            )
+
+    @export(
+        record=[
+            DnsARecord,
+            DnsAAAARecord,
+            DnsSOARecord,
+            DnsNodeNameRecord,
+            DnsStringRecord,
+            DnsSRVRecord,
+            DnsNamePreferenceRecord,
+            DnsTombStonedRecord,
+            DnsGenericRecord,
+        ]
+    )
+    def dns_records(
+        self,
+    ) -> Iterator[
+        DnsARecord
+        | DnsAAAARecord
+        | DnsSOARecord
+        | DnsNodeNameRecord
+        | DnsStringRecord
+        | DnsSRVRecord
+        | DnsNamePreferenceRecord
+        | DnsTombStonedRecord
+        | DnsGenericRecord
+    ]:
+        """Extract all DNS records from DnsNode NTDS objects."""
+        for dns_node in self.ntds.dns_nodes():
+            for record in dns_node.dns_record:
+                generic = {
+                    "ts": record.timestamp,
+                    "dns_name": dns_node.dns_name,
+                    "node_creation_time": dns_node.when_created,
+                    "node_last_modified_time": dns_node.when_changed,
+                    "dns_type": record.type.name,
+                    "source": self.path,
+                    "_target": self.target,
+                }
+                if flow_record := dns_as_flow_record(record.data, generic):
+                    yield flow_record
+
 
 def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
     """Extract generic information from a User or Computer account."""
@@ -275,3 +420,64 @@ def extract_user_info(user: User | Computer, target: Target) -> dict[str, Any]:
         "member_of": member_of,
         "service_principal_name": user.get("servicePrincipalName"),
     }
+
+
+def dns_as_flow_record(
+    record_data: bytes
+    | dnsnode.DnsARecord
+    | dnsnode.DnsAAAARecord
+    | dnsnode.NodeNameRecord
+    | dnsnode.NamePreferenceRecord
+    | dnsnode.StringRecord
+    | dnsnode.TombStonedRecord
+    | dnsnode.SRVRecord
+    | dnsnode.SOARecord
+    | None,
+    generic: dict,
+) -> (
+    DnsARecord
+    | DnsAAAARecord
+    | DnsSOARecord
+    | DnsNodeNameRecord
+    | DnsStringRecord
+    | DnsSRVRecord
+    | DnsNamePreferenceRecord
+    | DnsTombStonedRecord
+    | DnsGenericRecord
+):
+    """Transform a DNS records as a flow records."""
+    match record_data:
+        case dnsnode.DnsARecord():
+            return DnsARecord(**generic, ip_address=record_data.ipv4_address)
+        case dnsnode.DnsAAAARecord():
+            return DnsAAAARecord(**generic, ip_address=record_data.ipv6_address)
+        case dnsnode.SOARecord():
+            return DnsSOARecord(
+                **generic,
+                name_primary_server=record_data.name_primary_server,
+                refresh=record_data.refresh,
+                retry=record_data.retry,
+                minimum_ttl=record_data.minimum_ttl,
+                zone_administrator_email=record_data.zone_administrator_email,
+            )
+        case dnsnode.NodeNameRecord():
+            return DnsNodeNameRecord(**generic, name_node=record_data.name_node)
+        case dnsnode.StringRecord():
+            return DnsStringRecord(**generic, string_data=record_data.string_data)
+        case dnsnode.NamePreferenceRecord():
+            return DnsNamePreferenceRecord(
+                **generic, preference=record_data.preference, name_exchange=record_data.name_exchange
+            )
+        case dnsnode.SRVRecord():
+            return DnsSRVRecord(
+                **generic,
+                name_target=record_data.name_target,
+                port=record_data.port,
+                srv_priority=record_data.priority,
+                weight=record_data.weight,
+            )
+        case dnsnode.TombStonedRecord():
+            return DnsTombStonedRecord(**generic, entombed_time=record_data.entombed_time)
+        case bytes():
+            return DnsGenericRecord(**generic, dns_record_data=record_data)
+    return None
