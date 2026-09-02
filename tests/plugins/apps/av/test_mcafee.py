@@ -21,6 +21,7 @@ def test_mcafee_plugin_log(target_win: Target, fs_win: VirtualFilesystem) -> Non
 
     records = list(target_win.mcafee.msc())
     assert len(records) == 2
+    assert None not in {r._source for r in records}
     for record in records:
         if isinstance(record, type(McAfeeMscFirewallRecord())):
             assert record.ip == "127.0.0.1"
