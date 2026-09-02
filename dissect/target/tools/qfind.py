@@ -17,6 +17,7 @@ from dissect.target.tools.query import record_output
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
 )
@@ -40,7 +41,7 @@ COLOR_GREY = "\033[38;5;248m"
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="Find a needle in a haystack.",
+        description=f"target-qfind {get_dissect_target_version()} : Find a needle in a haystack.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )

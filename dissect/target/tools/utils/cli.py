@@ -67,6 +67,13 @@ class _OverrideRequiredAction(argparse.Action):
         setattr(namespace, self.dest, self.const)
 
 
+def get_dissect_target_version() -> str:
+    try:
+        return version("dissect.target")
+    except PackageNotFoundError:
+        return "unable to determine version"
+
+
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     parser.add_argument(
@@ -83,7 +90,7 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--recursive", action="store_true", help="make --(list-)children behave recursively")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
-    parser.add_argument("--version", action="store_true", help="print version")
+    parser.add_argument("--version", action="version", version=f"dissect.target version {get_dissect_target_version()}")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
     parser.add_argument(
         "--plugin-path",
@@ -96,13 +103,6 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
 
 def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     configure_logging(args.verbose, args.quiet, as_plain_text=True)
-
-    if args.version:
-        try:
-            print("dissect.target version " + version("dissect.target"))
-        except PackageNotFoundError:
-            print("unable to determine version")
-        parser.exit(0)
 
     targets = args.targets if hasattr(args, "targets") else [args.target] if hasattr(args, "target") else []
     if targets and args.loader:
