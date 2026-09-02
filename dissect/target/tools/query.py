@@ -18,6 +18,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import cache, record_modifier
 from dissect.target.helpers.logging import get_logger
+from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     PLUGINS,
 )
@@ -118,6 +119,16 @@ def main() -> int:
     # Show help for target-query (when --help is specified without a function)
     if not args.function and args.help:
         parser.print_help()
+
+        # Additionally show the loader's specific arguments if a loader is specified.
+        if args.loader:
+            if (loader_cls := LOADERS_BY_SCHEME.get(args.loader, None)) is None:
+                print(f"Error: Loader '{args.loader}' not found.")
+                return 1
+
+            print()
+            loader_cls.print_help()
+
         return 0
 
     # Dynamically add plugin arguments for the specified function(s)
@@ -158,6 +169,7 @@ def main() -> int:
             )
 
     # Process plugin arguments after host and child args are checked
+    # This is for plugins, not loaders. We pass `rest` to let it find plugin args.
     different_output_types = process_plugin_arguments(parser, args, rest)
 
     if not args.targets:
