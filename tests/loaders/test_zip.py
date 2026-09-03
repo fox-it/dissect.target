@@ -21,7 +21,7 @@ if TYPE_CHECKING:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_linux_zip(opener: Callable[[str | Path], Target]) -> None:
+def test_unix_zip(opener: Callable[[str | Path], Target]) -> None:
     """Test the ``ZipLoader`` for Linux directories."""
     path = absolute_path("_data/loaders/zip/linux.zip")
     t = opener(path)
@@ -29,7 +29,7 @@ def test_linux_zip(opener: Callable[[str | Path], Target]) -> None:
     assert len(t.filesystems) == 1
     assert t.os == OperatingSystem.UNIX
     assert t.fs.path("/etc/hostname").read_bytes() == b"test\n"
-    assert not t.fs.path("/etC/hostname").exists()  # Linux is considered as case sensitive
+    assert not t.fs.path("/etC/hostname").exists()  # Unix is considered as case sensitive
     assert not t.fs.path("/etc/Hostname").exists()
 
 
