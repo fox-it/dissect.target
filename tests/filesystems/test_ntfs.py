@@ -11,9 +11,11 @@ from dissect.ntfs.exceptions import FileNotFoundError as NtfsFileNotFoundError
 from dissect.ntfs.mft import MftRecord
 from dissect.ntfs.util import AttributeMap
 
+from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem, NtfsFilesystemEntry
+from tests._utils import absolute_path
 
 
 @pytest.mark.parametrize(
@@ -151,3 +153,28 @@ def test_ntfs_identifier_no_guid() -> None:
     fs.ntfs = Mock(serial=serial_number)
 
     assert fs.identifier == serial_number
+
+
+def test_ntfs_parent_directory_traversal() -> None:
+    """NTFS filesystem correctly resolves a lone parent directory traversal ('..')."""
+    target = Target.open(absolute_path("_data/filesystems/ntfs/ntfs.qcow2"), apply=True)
+
+    resolved = target.fs.get("c:/Windows/System32/..")
+    parent = target.fs.get("c:/Windows")
+
+    # Same underlying NTFS MFT record (segment number)
+    assert resolved.entries[0].entry.segment == parent.entries[0].entry.segment
+
+    # Test fs.path and we are sure that it references the Downloads directory.
+    path = target.fs.path("c:/Users/User/Downloads/../Downloads")
+    assert path.exists()
+    filenames = {p.name for p in target.fs.path(path).iterdir()}
+    assert filenames == {"logo-konami.svg"}
+
+
+def test_ntfs_lstat_ads_exception() -> None:
+    """NTFS filesystem raises FileNotFoundError when an ADS record is not found."""
+    target = Target.open(absolute_path("_data/filesystems/ntfs/ntfs.qcow2"), apply=True)
+
+    with pytest.raises(FileNotFoundError, match="ADS record not found"):
+        target.fs.path("c:/$Extend/$ObjId").lstat()

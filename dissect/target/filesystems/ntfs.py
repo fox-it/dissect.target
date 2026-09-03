@@ -150,10 +150,21 @@ class NtfsFilesystemEntry(FilesystemEntry):
             self.path, self.ads = path.rsplit(":", maxsplit=1)
 
     def get(self, path: str) -> NtfsFilesystemEntry:
+        if path == "..":
+            # NTFS directories don't carry an explicit ".." index entry, so a lone parent
+            # traversal has to be resolved via the parent segment reference in $FILE_NAME.
+            fn_attrs = self.entry.attributes.FILE_NAME
+            if not fn_attrs:
+                raise FileNotFoundError(fsutil.join(self.path, path, sep=self.fs.sep))
+            parent_seg = segment_reference(fn_attrs[0].attribute.attr.ParentDirectory)
+            entry = self.fs.ntfs.mft(parent_seg)
+        else:
+            entry = self.fs._get_record(path, self.entry)
+
         return NtfsFilesystemEntry(
             self.fs,
             fsutil.join(self.path, path, sep=self.fs.sep),
-            self.fs._get_record(path, self.entry),
+            entry,
         )
 
     def open(self, name: str = "") -> BinaryIO:
@@ -225,7 +236,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
                 real_size = record.size(self.ads, allocated=True)
             except NtfsFileNotFoundError as e:
                 # Occurs when it cannot find the the specific ads inside its attributes
-                raise FileNotFoundError from e
+                raise FileNotFoundError(f"ADS record not found: {self.path}") from e
         else:
             mode = stat.S_IFDIR
 
