@@ -46,7 +46,7 @@ class DirectoryFilesystem(Filesystem):
 
             entry = searchpath
         else:
-            entry = self.base_path.joinpath(path)
+            entry = self.base_path.joinpath(path.strip("/"))
 
         return entry
 
