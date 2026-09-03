@@ -66,6 +66,24 @@ def test_winnt(tmp_path: Path) -> None:
     assert len(t.filesystems) == 1
 
 
+def test_windows_drive_letters(tmp_path: Path) -> None:
+    """Test the ``DirLoader`` with Windows drive letters."""
+    root = tmp_path
+    mkdirs(root, ["C/windows/system32", "D/test", "E/test"])
+
+    os_type, dirs = find_dirs(root)
+    assert os_type == OperatingSystem.WINDOWS
+    assert len(dirs) == 3
+
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
+
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 3
+    assert len(t.fs.mounts) == 3
+
+
 @pytest.mark.parametrize(
     ("opener"),
     [
@@ -73,8 +91,8 @@ def test_winnt(tmp_path: Path) -> None:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_windows_drive_letters(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
-    """Test the ``DirLoader`` with Windows drive letters."""
+def test_windows_drive_letters_with_openers(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
+    """Test the ``DirLoader`` with Windows drive letters. Also test for case sensitivity and with more folder depth."""
     root = tmp_path
     (root / "E" / "test").mkdir(parents=True)
     (root / "D" / "test").mkdir(parents=True)
@@ -92,6 +110,23 @@ def test_windows_drive_letters(opener: Callable[[str | Path], Target], tmp_path:
     assert t.fs.path("sysvol/Windows/System32/config/SOFTWARE").read_bytes() == b"test"
 
 
+def test_linux(tmp_path: Path) -> None:
+    """Test the ``DirLoader`` for Linux directories."""
+    root = tmp_path
+    mkdirs(root, ["etc", "var"])
+
+    os_type, dirs = find_dirs(root)
+    assert os_type == OperatingSystem.LINUX
+    assert len(dirs) == 1
+
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
+
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 1
+
+
 @pytest.mark.parametrize(
     ("opener"),
     [
@@ -99,8 +134,8 @@ def test_windows_drive_letters(opener: Callable[[str | Path], Target], tmp_path:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_linux(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
-    """Test the ``DirLoader`` for Linux directories."""
+def test_linux_with_openers(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
+    """Test the ``DirLoader`` for Linux directories. Also test for case sensitivity and with more folder depth."""
     root = tmp_path
     mkdirs(root, ["etc", "var"])
     (root / "etc" / "hostname").write_bytes(b"test")
@@ -137,6 +172,7 @@ def test_macos(tmp_path: Path) -> None:
     t = Target()
     loader.map(t)
     assert len(t.filesystems) == 1
+
 
 @pytest.mark.parametrize(
     ("opener"),
