@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -17,6 +16,7 @@ from dissect.target.plugins.apps.container.container import (
     COMMON_LOG_FIELDS,
     ContainerPlugin,
 )
+from dissect.target.plugins.apps.container.containerd import RE_CTR_LOG
 from dissect.target.plugins.apps.container.docker import hash_to_image_id
 
 if TYPE_CHECKING:
@@ -59,22 +59,6 @@ class ContainerState(Enum):
     EXITED = 6
     REMOVING = 7
     STOPPING = 8
-
-
-RE_CTR_LOG = re.compile(
-    r"""
-        ^
-        (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}\:\d{2}\:\d{2}\.\d{9}\+\d{2}\:\d{2})
-        \s
-        (?P<stream>(stderr|stdout))
-        \s
-        (?P<type>\S)
-        \s
-        (?P<message>.*)
-        $
-    """,
-    re.VERBOSE,
-)
 
 
 class PodmanPlugin(ContainerPlugin):
