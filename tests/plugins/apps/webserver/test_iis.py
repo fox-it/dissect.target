@@ -124,6 +124,7 @@ def test_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesys
     assert record.bytes_sent == 143
     assert record.referer is None
     assert record.useragent is None
+    assert record.response_time_ms == 613
     assert record.source == "sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"
 
 
@@ -154,6 +155,7 @@ def test_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) ->
         w3c_record_1.useragent
         == "Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/93.0.4577.82+Safari/537.36+Edg/93.0.961.52"  # noqa: E501
     )
+    assert w3c_record_1.response_time_ms == 1
     assert w3c_record_1.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
 
     # W3C format type 2: contains HTTP version
