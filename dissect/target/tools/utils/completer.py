@@ -243,7 +243,7 @@ class QuotedPathCompleter(Completer):
             if not path:
                 return cwd
 
-            resolved = path if path.startswith("/") else posixpath.join(str(cwd), path)
+            resolved = path if self.target.fs.path(path).is_absolute() else posixpath.join(str(cwd), path)
             # TargetPath may keep literal '..' segments; normalize first so completion lists the intended directory.
             normalized = posixpath.normpath(resolved)
             return self._make_path(normalized)
