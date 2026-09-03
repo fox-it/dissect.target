@@ -385,6 +385,8 @@ class ExtendedCmd(cmd.Cmd):
                         return func(argparts, pipe_stdin)
             except OSError as e:
                 # in case of a failure in a subprocess
+                if self.debug:
+                    raise
                 print(e)
                 return False
         else:
@@ -1242,7 +1244,13 @@ class TargetCli(TargetCmd):
             """This function is heavily inspired by tarfile.TarFile.add, but adapted to work with TargetPath."""
             if args.verbose:
                 print(f"a {arcname}", file=sys.stderr)
-            info = get_tarinfo(path, arcname, dereference=dereference, inodes=inodes)
+
+            try:
+                info = get_tarinfo(path, arcname, dereference=dereference, inodes=inodes)
+            except FileNotFoundError:
+                print(f"tar: {PurePosixPath(path)}: file not found, skipping", file=sys.stderr)
+                return
+
             if not info:
                 print(f"tar: {PurePosixPath(path)}: unsupported file type, skipping", file=sys.stderr)
                 return
@@ -1275,7 +1283,8 @@ class TargetCli(TargetCmd):
             inodes_cache = {}
             with tarfile.open(fileobj=fobj, mode=mode, format=tarfile.PAX_FORMAT) as tar:
                 for arg_path in args.path:
-                    base_path = self.target.fs.path("/") if Path(arg_path).is_absolute() else self.cwd
+                    is_absolute = self.target.fs.path(arg_path).is_absolute()
+                    base_path = self.target.fs.path("/") if is_absolute else self.cwd
                     glob_path = arg_path.lstrip("/")
 
                     # This is a workaround for Python 3.12 and lower
@@ -1286,11 +1295,14 @@ class TargetCli(TargetCmd):
                         continue
 
                     for path in paths:
-                        arcname = str(PurePosixPath(path).relative_to("/"))
-                        if not Path(arg_path).is_absolute():
-                            pure_path = PurePosixPath(path).relative_to(PurePosixPath(self.cwd))
-                            arcname = "/".join(p for p in pure_path.parts if p not in (".", ".."))
-                            arcname = arcname or "."
+                        if is_absolute:
+                            # Use lstrip rather than `.relative_to("/")`, because
+                            # drive-letter paths ("c:/...") aren't rooted at "/".
+                            arcname = fsutil.normpath(path, sep="/").lstrip("/")
+                        else:
+                            rel = path.relative_to(self.cwd)
+                            arcname = "/".join(p for p in rel.parts if p not in (".", ".."))
+                        arcname = arcname or "."
                         add_to_tar(tar, path, arcname, dereference=args.dereference, inodes=inodes_cache)
         finally:
             if fobj is not stdout.buffer:

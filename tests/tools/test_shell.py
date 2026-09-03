@@ -1082,3 +1082,44 @@ def test_target_cli_tar_unknown_path(tmp_path: Path, capsys: pytest.CaptureFixtu
     captured = capsys.readouterr()
     assert captured.err == "tar: missing.txt: No such file or directory\n"
     assert outpath.is_file()
+
+
+def test_target_cli_tar_windows_ntfs(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test tar works correctly on an NTFS filesystem (mounted under c:/)."""
+    target = Target.open(absolute_path("_data/filesystems/ntfs/ntfs.qcow2"), apply=True)
+    cli = TargetCli(target)
+
+    # Test relative paths
+    outpath = tmp_path / "out.tar"
+    cli.onecmd("cd c:/Users/User/Downloads")
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} ../Downloads")
+    captured = capsys.readouterr()
+    assert "No such file or directory" not in captured.err
+    assert outpath.is_file()
+    assert outpath.stat().st_size > 0
+    with tarfile.open(outpath, "r:*") as tar:
+        members = sorted(tar.getnames())
+    assert members == ["Downloads", "Downloads/logo-konami.svg"]
+
+    # Test path traversal
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} c:/Users/User/Downloads/../Downloads")
+    captured = capsys.readouterr()
+    assert "No such file or directory" not in captured.err
+    assert outpath.is_file()
+    assert outpath.stat().st_size > 0
+
+    # Test . (cwd)
+    cli.onecmd("cd c:/Users/User/")
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} .")
+    captured = capsys.readouterr()
+    assert "No such file or directory" not in captured.err
+    assert outpath.is_file()
+    assert outpath.stat().st_size > 0
+
+    # Test absolute paths
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} c:/")
+    captured = capsys.readouterr()
+    assert "No such file or directory" not in captured.err
+    assert "tar: c:/$Secure: file not found, skipping" in captured.err
+    assert outpath.is_file()
+    assert outpath.stat().st_size > 0
