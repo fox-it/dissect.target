@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
+import pytest
+
+from dissect.target.plugins.os.unix.bsd.darwin.macos.at_jobs import AtJobsPlugin
+from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
+
+@pytest.mark.parametrize(
+    "test_file",
+    [
+        "a0000901c45260",
+    ],
+)
+def test_at_jobs(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    # Test data was created by running: echo 'say "hello"' | at 09:00 tomorrow
+    # Command was executed on: 2026-05-11 (PDT time).
+    tz = timezone.utc
+    data_file = absolute_path(f"_data/plugins/os/unix/bsd/darwin/macos/{test_file}")
+    fs_unix.map_file(f"/usr/lib/cron/jobs/{test_file}", data_file)
+
+    target_unix.add_plugin(AtJobsPlugin)
+
+    results = list(target_unix.at_jobs())
+    assert len(results) == 1
+
+    assert results[0].queue == "a"
+    assert results[0].seq == 9
+    assert results[0].execution_time == datetime(2026, 5, 12, 16, 0, 0, tzinfo=tz)
+    assert results[0].command == 'say "hello"'
+    assert results[0].source == "/usr/lib/cron/jobs/a0000901c45260"
