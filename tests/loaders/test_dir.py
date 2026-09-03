@@ -66,7 +66,14 @@ def test_winnt(tmp_path: Path) -> None:
     assert len(t.filesystems) == 1
 
 
-def test_windows_drive_letters(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_windows_drive_letters(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test the ``DirLoader`` with Windows drive letters."""
     root = tmp_path
     (root / "E" / "test").mkdir(parents=True)
@@ -74,25 +81,25 @@ def test_windows_drive_letters(tmp_path: Path) -> None:
     (root / "C" / "windows" / "system32" / "config").mkdir(parents=True)
     (root / "C" / "windows" / "system32" / "config" / "software").write_bytes(b"test")
 
-    os_type, dirs = find_dirs(root)
-    assert os_type == OperatingSystem.WINDOWS
-    assert len(dirs) == 3
-
-    loader = loader_open(root)
-    assert isinstance(loader, DirLoader)
-
-    t = Target()
-    loader.map(t)
+    t = opener(root)
+    assert isinstance(t._loader, DirLoader)
+    assert t.os == OperatingSystem.WINDOWS
     assert len(t.filesystems) == 3
-    assert len(t.fs.mounts) == 3
+    assert len(t.fs.mounts) == 4  # 3 drive + sysvol
 
-    t.apply()  # apply to create sysvol mapping
     assert t.fs.path("sysvol/windows/system32/config/software").exists()
     assert t.fs.path("sysvol/Windows/System32/config/SOFTWARE").exists()
     assert t.fs.path("sysvol/Windows/System32/config/SOFTWARE").read_bytes() == b"test"
 
 
-def test_linux(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_linux(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test the ``DirLoader`` for Linux directories."""
     root = tmp_path
     mkdirs(root, ["etc", "var"])
@@ -104,34 +111,32 @@ def test_linux(tmp_path: Path) -> None:
     assert os_type == OperatingSystem.LINUX
     assert len(dirs) == 1
 
-    loader = loader_open(root)
-    assert isinstance(loader, DirLoader)
-
-    t = Target()
-    loader.map(t)
+    t = opener(root)
+    assert isinstance(t._loader, DirLoader)
+    assert t.os == OperatingSystem.UNIX
     assert len(t.filesystems) == 1
-    t.apply()
 
     assert t.fs.path("/etc/hostname").read_bytes() == b"test"
     assert t.fs.path("/etc/apt/sources.list.d/test.list").read_bytes() == b"test_2"
     # if tmp fs is case-insensitive (e.g on Windows), we skip test related to case.
     if not (root / "etC" / "Hostname").exists():
-        assert not t.fs.path("/etC/hostname").exists()  # Linux is considered as case-sensitive
+        assert not t.fs.path("/etC/hostname").exists()  # Unix is considered as case-sensitive
         assert not t.fs.path("/etc/Hostname").exists()
 
 
-def test_macos(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_macos(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test the ``DirLoader`` for macOS directories."""
     root = tmp_path
-    mkdirs(root, ["Library"])
+    mkdirs(root, ["Library", "Applications"])
+    t = opener(root)
+    assert isinstance(t._loader, DirLoader)
+    assert t.os == OperatingSystem.MACOS
 
-    os_type, dirs = find_dirs(root)
-    assert os_type == OperatingSystem.OSX
-    assert len(dirs) == 1
-
-    loader = loader_open(root)
-    assert isinstance(loader, DirLoader)
-
-    t = Target()
-    loader.map(t)
     assert len(t.filesystems) == 1
