@@ -29,6 +29,7 @@ def test_unix_zip(opener: Callable[[str | Path], Target]) -> None:
     assert len(t.filesystems) == 1
     assert t.os == OperatingSystem.UNIX
     assert t.fs.path("/etc/hostname").read_bytes() == b"test\n"
+    assert t.fs.path("/etc/apt/sources.list.d/test.list").read_bytes() == b"test_2\n"
     assert not t.fs.path("/etC/hostname").exists()  # Unix is considered as case sensitive
     assert not t.fs.path("/etc/Hostname").exists()
 
