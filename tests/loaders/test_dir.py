@@ -124,6 +124,20 @@ def test_linux(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
         assert not t.fs.path("/etc/Hostname").exists()
 
 
+def test_macos(tmp_path: Path) -> None:
+    root = tmp_path
+    mkdirs(root, ["Library"])
+
+    os_type, dirs = find_dirs(root)
+    assert os_type == OperatingSystem.OSX
+    assert len(dirs) == 1
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
+
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 1
+
 @pytest.mark.parametrize(
     ("opener"),
     [
@@ -131,7 +145,7 @@ def test_linux(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
         pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
     ],
 )
-def test_macos(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
+def test_macos_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> None:
     """Test the ``DirLoader`` for macOS directories."""
     root = tmp_path
     mkdirs(root, ["Library", "Applications"])
