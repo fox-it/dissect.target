@@ -114,8 +114,10 @@ def test_linux(tmp_path: Path) -> None:
 
     assert t.fs.path("/etc/hostname").read_bytes() == b"test"
     assert t.fs.path("/etc/apt/sources.list.d/test.list").read_bytes() == b"test_2"
-    assert not t.fs.path("/etC/hostname").exists()  # Linux is considered as case sensitive
-    assert not t.fs.path("/etc/Hostname").exists()
+    # if tmp fs is case-insensitive (e.g on Windows), we skip test related to case.
+    if not (root / "etC" / "Hostname").exists():
+        assert not t.fs.path("/etC/hostname").exists()  # Linux is considered as case-sensitive
+        assert not t.fs.path("/etc/Hostname").exists()
 
 
 def test_macos(tmp_path: Path) -> None:
