@@ -40,7 +40,7 @@ from dissect.target.tools.utils.cli import (
     generate_argparse_for_method,
     process_generic_arguments,
 )
-from dissect.target.tools.utils.fs import print_extensive_file_stat_listing
+from dissect.target.tools.utils.fs import LsEntry, print_ls_entry
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -446,7 +446,7 @@ class DifferentialCli(ExtendedCmd):
         modified: bool = True,
         deleted: bool = True,
         absolute: bool = False,
-    ) -> list[tuple[fsutil.TargetPath | DifferentialEntry], str]:
+    ) -> list[tuple[fsutil.TargetPath | DifferentialEntry, str]]:
         """Given a DirectoryDifferential instance, construct a list of tuples where the first element is a Filesystem /
         DifferentialEntry and the second a color-formatted string.
         """
@@ -608,18 +608,23 @@ class DifferentialCli(ExtendedCmd):
         path = args.path if args.path is not None else self.cwd
         diff = self.comparison.scandir(path)
         results = self._annotate_differential(diff)
-        if not args.l:
-            print("\n".join([name for _, name in results]), file=stdout)
-        else:
-            for entry, name in results:
-                if not isinstance(entry, DifferentialEntry):
-                    print_extensive_file_stat_listing(stdout, name, entry, human_readable=args.human_readable)
-                else:
-                    # We have to choose for which version of this file we are going to print detailed info. The
-                    # destination target seems to make the most sense: it is likely newer
-                    print_extensive_file_stat_listing(
-                        stdout, name, entry.dst_target_entry, human_readable=args.human_readable
-                    )
+        for entry, name in results:
+            # We have to choose for which version of this file we are going to print detailed info. The
+            # destination target seems to make the most sense: it is likely newer
+            tpath = entry.dst_target_entry if isinstance(entry, DifferentialEntry) else entry
+
+            try:
+                lstat = tpath.lstat()
+            except FileNotFoundError:
+                lstat = None
+
+            lsentry = LsEntry(name, tpath, lstat)
+            print_ls_entry(
+                stdout=stdout,
+                lsentry=lsentry,
+                human_readable=args.human_readable,
+                long_listing=args.l,
+            )
         return False
 
     @arg("path", nargs="?")
