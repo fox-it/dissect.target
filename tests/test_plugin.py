@@ -1900,7 +1900,7 @@ def test_plugin_record_field_have_source_field() -> None:
             if "source" not in fields and "path" not in fields:
                 record_without_source.add(record.name)
 
-    if len(record_without_source) != 81:
+    if len(record_without_source) != 68:
         pytest.fail(
             f"Found {len(record_without_source)} inconsistencies in "
             f"RecordDescriptors:\n" + "\n".join(record_without_source)
