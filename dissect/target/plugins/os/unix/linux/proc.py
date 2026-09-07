@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Self
 
+    from dissect.target.helpers.compat.pathlib import TargetPath
     from dissect.target.target import Target
 
 
@@ -75,6 +76,8 @@ class NetSocket:
     name: str | None = None  # process name associated to the socket
     cmdline: str | None = None  # process cmdline associated to the socket
 
+    source: TargetPath | None = None  # File from which this structure was generate.
+
     @classmethod
     def from_line(cls, line: str, ip_vers: int = 4) -> Self:
         socket = cls(*line.split())
@@ -110,6 +113,8 @@ class UnixSocket:
     stream_type_string: str | None = None
     protocol_string: str = "unix"
 
+    source: TargetPath | None = None  # File from which this structure was generate.
+
     @classmethod
     def from_line(cls, line: str) -> Self:
         socket = cls(*line.split())
@@ -142,6 +147,8 @@ class PacketSocket:
     protocol_type: int | None = None  # value parsed from protocol field
     owner: str | None = None  # resolved owner from user (uid) field
     protocol_string: str = "packet"
+
+    source: TargetPath | None = None  # File from which this structure was generate.
 
     @classmethod
     def from_line(cls, line: str) -> Self:
@@ -345,6 +352,7 @@ class Sockets:
             user = self.target.user_details.find(uid=socket.uid)
             user_name = user.user.name if user else str(socket.uid)
             socket.owner = user_name
+            socket.source = entry
 
             # inode 0 could indicate a kernel process, which has no assiciated PID or FDs in /proc
             # or a inode of 0 could mean the socket is in a TIME_WAIT state.
@@ -375,6 +383,7 @@ class Sockets:
 
             socket.stream_type_string = self.SocketStreamType(socket.type).name
             socket.state_string = self.SocketStateType(socket.state).name
+            socket.source = entry
 
             yield socket
 
@@ -394,7 +403,7 @@ class Sockets:
             processes = self.target.proc.inode_to_pids(socket.inode)
 
             socket.protocol_type = self.PacketProtocolTypes(socket.protocol).name
-
+            socket.source = entry
             user = self.target.user_details.find(uid=socket.user)
             user_name = user.user.name if user else str(socket.user)
             socket.owner = user_name

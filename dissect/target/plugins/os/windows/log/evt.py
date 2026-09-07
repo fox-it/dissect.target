@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
     from flow.record import Record
 
+    from dissect.target.helpers.compat.pathlib import TargetPath
+
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#]")
 
@@ -43,6 +45,7 @@ EvtRecordDescriptor = TargetRecordDescriptor(
         ("string", "UserSid"),
         ("string[]", "Strings"),
         ("bytes", "Data"),
+        ("path", "source"),
     ],
 )
 
@@ -152,9 +155,9 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
                 continue
 
             for record in evt.Evt(entry_data):
-                yield self._build_record(record)
+                yield self._build_record(record, source=entry)
 
-    def _build_record(self, record: Any) -> Record:
+    def _build_record(self, record: Any, source: TargetPath | None) -> Record:
         return EvtRecordDescriptor(
             ts=record.TimeGenerated,
             TimeGenerated=record.TimeGenerated,
@@ -170,6 +173,7 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
             Computername=record.Computername,
             Strings=record.Strings,
             Data=record.Data,
+            source=source,
             _target=self.target,
         )
 
@@ -191,4 +195,6 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
 
     def _parse_chunk(self, needle: bytes, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
-            yield self._build_record(record)
+            # we may provide disk + offset, but this would require more change in scrap internal
+            # We keep
+            yield self._build_record(record, source=None)

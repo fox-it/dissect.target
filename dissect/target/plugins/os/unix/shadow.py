@@ -26,6 +26,7 @@ UnixShadowRecord = TargetRecordDescriptor(
         ("varint", "inactivity_period"),
         ("datetime", "expiration_date"),
         ("string", "unused_field"),
+        ("path", "source"),
     ],
 )
 
@@ -118,6 +119,7 @@ class ShadowPlugin(Plugin):
                         inactivity_period=shent.get(6) if shent.get(6) else None,
                         expiration_date=epoch_days_to_datetime(expiration_date) if expiration_date else None,
                         unused_field=shent.get(8),
+                        source=path,
                         _target=self.target,
                     )
 

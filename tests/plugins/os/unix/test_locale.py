@@ -38,6 +38,7 @@ def test_locale_plugin_unix(target_unix_users: Target, fs_unix: VirtualFilesyste
     assert keyboard[0].variant == ""
     assert keyboard[0].options == ""
     assert keyboard[0].backspace == "guess"
+    assert keyboard[0].source == "/etc/default/keyboard"
 
 
 def test_locale_plugin_unix_quotes(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:

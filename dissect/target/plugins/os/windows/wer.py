@@ -28,6 +28,7 @@ def _create_record_descriptor(record_name: str, record_fields: list[tuple[str, s
         [
             ("path", "wer_file_path"),
             ("path", "metadata_file_path"),
+            ("path", "source"),
         ]
     )
     return TargetRecordDescriptor(record_name, record_fields)
@@ -200,7 +201,14 @@ class WindowsErrorReportingPlugin(Plugin):
         """
         for files in self.wer_files:
             record_fields = []
-            record_values = {"_target": self.target}
+            files = list(files)
+            if not files:
+                continue
+            record_values = {
+                "_target": self.target,
+                # As record is made from multiple files in the same folder, we use the folder as the source.
+                "source": files[0].parent,
+            }
 
             for file in files:
                 if file.suffix == ".wer":

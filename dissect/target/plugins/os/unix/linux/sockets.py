@@ -33,6 +33,7 @@ NetSocketRecord = TargetRecordDescriptor(
         ("uint32", "pid"),
         ("string", "name"),
         ("string", "cmdline"),
+        ("string", "source"),
     ],
 )
 
@@ -46,6 +47,7 @@ UnixSocketRecord = TargetRecordDescriptor(
         ("string", "state"),
         ("uint32", "inode"),
         ("string", "path"),
+        ("string", "source"),
     ],
 )
 
@@ -66,6 +68,7 @@ PacketSocketRecord = TargetRecordDescriptor(
         ("uint32", "pid"),
         ("string", "name"),
         ("string", "cmdline"),
+        ("string", "source"),
     ],
 )
 
@@ -215,6 +218,7 @@ class NetSocketPlugin(Plugin):
             state=data.state_string,
             inode=data.inode,
             path=data.path,
+            source=data.source,
             _target=self.target,
         )
 
@@ -234,6 +238,7 @@ class NetSocketPlugin(Plugin):
             name=data.name,
             cmdline=data.cmdline,
             owner=data.owner,
+            source=data.source,
             _target=self.target,
         )
 
@@ -252,5 +257,6 @@ class NetSocketPlugin(Plugin):
             pid=data.pid,
             name=data.name,
             cmdline=data.cmdline,
+            source=data.source,
             _target=self.target,
         )

@@ -40,10 +40,9 @@ if TYPE_CHECKING:
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
     [
-        ("path", "task_path"),
         ("string", "uri"),
         ("string", "security_descriptor"),
-        ("string", "source"),
+        ("string", "registration_source"),
         ("datetime", "date"),
         ("datetime", "last_run_date"),
         ("string", "author"),
@@ -92,6 +91,7 @@ TaskRecord = TargetRecordDescriptor(
         ("boolean", "disallow_start_on_remote_app_session"),
         ("string", "data"),
         ("string", "raw_data"),
+        ("path", "source"),
     ],
 )
 
@@ -99,6 +99,7 @@ TriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger",
     {
         ("string", "uri"),
+        ("path", "source"),
         *BaseTriggerRecord.target_fields,
         *BootTriggerRecord.target_fields,
         *CalendarTriggerRecord.target_fields,
@@ -121,6 +122,7 @@ ActionRecord = TargetRecordDescriptor(
     "filesystem/windows/task/action",
     {
         ("string", "uri"),
+        ("path", "source"),
         *ComHandlerRecord.target_fields,
         *ExecRecord.target_fields,
         *SendEmailRecord.target_fields,
@@ -206,6 +208,9 @@ class TasksPlugin(Plugin):
                 for attr in TaskRecord.fields:
                     record_kwargs[attr] = getattr(task_object, attr, None)
 
+                record_kwargs["source"] = task_object.source
+                if task_object.source is None:
+                    print(task_object)
                 task_record = TaskRecord(**record_kwargs, _target=self.target)
                 yield task_record
 
