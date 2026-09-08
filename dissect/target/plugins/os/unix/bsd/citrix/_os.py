@@ -47,8 +47,10 @@ class CitrixPlugin(BsdPlugin):
 
     def _parse_netscaler_configs(self) -> None:
         ips = set()
-
-        for path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
+        # sort file to ensure the most recent backup/config file is used as source for an user
+        for path in sorted(
+            self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"), key=lambda x: x.name, reverse=True
+        ):
             config = path.read_text()
 
             for match in RE_CONFIG_IP.finditer(config):
