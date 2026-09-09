@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TextIO
 
 from dissect.database.bbolt import Bbolt
 from dissect.util.ts import golangtimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.typeurl import unmarshal_any_json
 from dissect.target.plugin import export
@@ -23,6 +24,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.target import Target
+
+
+log = get_logger(__name__)
 
 
 ContainerdImageRecord = TargetRecordDescriptor(
@@ -96,23 +100,26 @@ class ContainerdPlugin(ContainerPlugin):
             - the bbolt namespace string (e.g. ``moby`` or ``k8s.io``)
         """
         for path in self.SYSTEM_PATHS:
-            if (dir := self.target.fs.path(path)).is_dir():
-                if not (meta_path := dir.joinpath("io.containerd.metadata.v1.bolt/meta.db")).is_file():
-                    self.target.log.warning("Containerd install %s does not contain meta.db", dir)
-                    continue
-                try:
-                    meta_db = Bbolt(meta_path)
-                except Exception as e:
-                    self.target.log.warning("Unable to parse containerd meta.db file %s: %s", meta_path, e)
-                    continue
+            if not (dir := self.target.fs.path(path)).is_dir():
+                continue
 
-                try:
-                    ns = infer_bbolt_namespace(meta_db)
-                except ValueError as e:
-                    self.target.log.warning("Unable to determine containerd meta.db namespace %s: %s", meta_path, e)
-                    continue
+            if not (meta_path := dir.joinpath("io.containerd.metadata.v1.bolt/meta.db")).is_file():
+                self.target.log.warning("Containerd install %s does not contain meta.db", dir)
+                continue
 
-                yield dir, meta_db, ns
+            try:
+                meta_db = Bbolt(meta_path)
+            except Exception as e:
+                self.target.log.warning("Unable to parse containerd meta.db file %s: %s", meta_path, e)
+                continue
+
+            try:
+                ns = infer_bbolt_namespace(meta_db)
+            except ValueError as e:
+                self.target.log.warning("Unable to determine containerd meta.db namespace %s: %s", meta_path, e)
+                continue
+
+            yield dir, meta_db, ns
 
     def check_compatible(self) -> None:
         if not self.installs:
@@ -134,14 +141,14 @@ class ContainerdPlugin(ContainerPlugin):
                     name = image_name
                     tag = None
 
-                digest = meta_db.get(f"v1 {ns} images {image_name} target digest")
-                created_at = meta_db.get(f"v1 {ns} images {image_name} createdat", decode=False)
+                digest: str = meta_db.get(f"v1 {ns} images {image_name} target digest")  # type: ignore
+                created_at: bytes = meta_db.get(f"v1 {ns} images {image_name} createdat", decode=False)  # type: ignore
 
                 yield ContainerdImageRecord(
                     name=name,
                     tag=tag,
-                    image_id=hash_to_image_id(digest),
-                    created=golangtimestamp(created_at),
+                    image_id=hash_to_image_id(digest) if digest else None,
+                    created=golangtimestamp(created_at) if created_at else None,
                     hash=digest,
                     source=meta_db.path,
                     _target=self.target,
@@ -158,25 +165,27 @@ class ContainerdPlugin(ContainerPlugin):
                 continue
 
             for container_id in containers:
+                spec_path = None
                 spec = {}
+                meta_path = None
                 meta = {}
 
                 if raw_spec := meta_db.get(f"v1 {ns} containers {container_id} spec", decode=False):
                     try:
-                        path, spec = unmarshal_any_json(raw_spec)
+                        spec_path, spec = unmarshal_any_json(raw_spec)
                     except ValueError as e:
                         self.target.log.warning(
-                            "Failed to decode typeurl structure %s for container %s: %s", path, container_id, e
+                            "Failed to decode typeurl structure %s for container %s: %s", spec_path, container_id, e
                         )
 
                 if raw_meta := meta_db.get(
                     f"v1 {ns} containers {container_id} extensions io.cri-containerd.sandbox.metadata", decode=False
                 ):
                     try:
-                        path, meta = unmarshal_any_json(raw_meta)
+                        meta_path, meta = unmarshal_any_json(raw_meta)
                     except ValueError as e:
                         self.target.log.warning(
-                            "Failed to decode typeurl structure %s for container %s: %s", path, container_id, e
+                            "Failed to decode typeurl structure %s for container %s: %s", meta_path, container_id, e
                         )
 
                 volumes = [
@@ -185,14 +194,14 @@ class ContainerdPlugin(ContainerPlugin):
                     if mount_point.get("type") == "bind"
                 ]
 
-                created_at = meta_db.get(f"v1 {ns} containers {container_id} createdat", decode=False)
+                created_at: bytes = meta_db.get(f"v1 {ns} containers {container_id} createdat", decode=False)  # type: ignore
 
                 # NOTE: The following fields cannot be populated with the information we have here:
                 # image_id, command, running, pid, started, finished, config_path, image_path
                 yield ContainerdContainerRecord(
                     container_id=container_id,
                     image=meta_db.get(f"v1 {ns} containers {container_id} image"),
-                    created=golangtimestamp(created_at),
+                    created=golangtimestamp(created_at) if created_at else None,
                     ports=[
                         f"0.0.0.0:{port.get('container_port')}->{port.get('container_port')}/tcp"
                         for port in meta.get("Metadata", {}).get("Config", {}).get("port_mappings", [])
@@ -215,21 +224,8 @@ class ContainerdPlugin(ContainerPlugin):
             return
 
         for log_path in dir.iterdir():
-            buf = ""
             with log_path.open("rt", errors="backslashreplace") as fh:
-                for line in fh:
-                    if not (match := RE_CTR_LOG.match(line)):
-                        continue
-                    entry = match.groupdict()
-                    type = entry.pop("type")
-
-                    if type == "P":
-                        buf += entry["message"]
-                        continue
-                    elif type == "F" and entry["message"] == "":
-                        entry["message"] = buf
-                        buf = ""
-
+                for entry in parse_ctr_log(fh):
                     yield ContainerdLogRecord(
                         container=log_path.stem,
                         **entry,
@@ -256,3 +252,26 @@ def infer_bbolt_namespace(db: Bbolt) -> str:
         return "k8s.io"
 
     raise ValueError(f"Unable to determine namespace ({root_keys})")
+
+
+def parse_ctr_log(fh: TextIO) -> Iterator[dict]:
+    """Yield CTR log entries (e.g. containerd or podman) from the provided file handle."""
+    buf = ""
+    for line in fh:
+        if not (match := RE_CTR_LOG.match(line)):
+            log.warning("Unable to match ctr log line %r in file handle %s", line, fh)
+            continue
+
+        entry = match.groupdict()
+        type = entry.pop("type")
+
+        # Each character has it's own log line and can be concatenated up until we encounter an empty 'F'.
+        if type == "P":
+            buf += entry["message"]
+            continue
+
+        if type == "F" and entry["message"] == "":
+            entry["message"] = buf
+            buf = ""
+
+        yield entry

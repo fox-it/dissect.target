@@ -30,7 +30,11 @@ def unmarshal_any(raw: bytes) -> tuple[str, bytes]:
     References:
         - https://github.com/containerd/typeurl
     """
-    struct = c_typeurl.any(raw)
+    try:
+        struct = c_typeurl.any(raw)
+    except (EOFError, IndexError) as e:
+        raise ValueError(f"Invalid typeurl structure: {e}") from e
+
     return struct.path.decode(), struct.value
 
 
@@ -40,7 +44,8 @@ def unmarshal_any_json(raw: bytes) -> tuple[str, dict]:
     Returns: tuple of path (str) and JSON object (dict)
     """
     path, value = unmarshal_any(raw)
+
     try:
         return path, json.loads(value.decode())
     except UnicodeDecodeError as e:
-        raise ValueError("Failed to decode typeurl structure %s: %s", path, e) from e
+        raise ValueError(f"Failed to decode typeurl structure {path}: {e}") from e
