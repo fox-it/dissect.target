@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
@@ -13,7 +14,11 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_windows_usb(target_win_users: Target, hive_hklm: VirtualHive, hive_hku: VirtualHive) -> None:
+@pytest.mark.parametrize(
+    ("missing_ts"),
+    [False, True],
+)
+def test_windows_usb(target_win_users: Target, hive_hklm: VirtualHive, hive_hku: VirtualHive, missing_ts: bool) -> None:
     """Test discovery of windows usb connection history."""
     usbstor_name = "SYSTEM\\ControlSet001\\Enum\\USBSTOR\\Disk&Ven_SanDisk&Prod_Ultra&Rev_1.00"
     usbstor_key = VirtualKey(hive_hklm, usbstor_name)
@@ -39,12 +44,13 @@ def test_windows_usb(target_win_users: Target, hive_hklm: VirtualHive, hive_hku:
     key_0066.add_value("(Default)", VirtualValue(hive_hklm, "(Default)", b"\xea\x05+$T\xdf\xda\x01"))
 
     key_0067 = VirtualKey(hive_hklm, "0067")
-    key_0067.add_value("(Default)", VirtualValue(hive_hklm, "(Default)", b"\x8b\xe0\x10\x96T\xdf\xda\x01"))
+    if not missing_ts:
+        key_0067.add_value("(Default)", VirtualValue(hive_hklm, "(Default)", b"\x8b\xe0\x10\x96T\xdf\xda\x01"))
+    guid_key.add_subkey("0067", key_0067)
 
     guid_key.add_subkey("0064", key_0064)
     guid_key.add_subkey("0065", key_0065)
     guid_key.add_subkey("0066", key_0066)
-    guid_key.add_subkey("0067", key_0067)
     properties_key.add_subkey("{83da6326-97a6-4088-9453-a1923f573b29}", guid_key)
     serial_key.add_subkey("Properties", properties_key)
     usbstor_key.add_subkey(serial_name, serial_key)
@@ -88,7 +94,8 @@ def test_windows_usb(target_win_users: Target, hive_hklm: VirtualHive, hive_hku:
     assert results[0].first_insert == dt("2024-07-26 12:05:43.789719+00:00")
     assert results[0].first_install == dt("2024-07-26 12:05:43.789719+00:00")
     assert results[0].last_insert == dt("2024-07-26 12:05:43.789719+00:00")
-    assert results[0].last_removal == dt("2024-07-26 12:08:54.878632+00:00")
+    if not missing_ts:
+        assert results[0].last_removal == dt("2024-07-26 12:08:54.878632+00:00")
     assert results[0].volumes == ["Example USB"]
     assert results[0].mounts == ["E:", "\\??\\Volume{4be8862a-4b47-11ef-9a61-70d823df2914}"]
     assert results[0].users == ["John"]

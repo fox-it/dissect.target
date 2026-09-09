@@ -210,7 +210,7 @@ class WtmpDbFile:
                 ut_line=row.TTY,
                 ut_id=None,
                 ut_host=row.RemoteHost or None,
-                ut_addr=row.RemoteHost or None,
+                ut_addr=(row.RemoteHost or None) if row.TTY == "ssh" else None,
                 ut_service=row.Service,
             )
 

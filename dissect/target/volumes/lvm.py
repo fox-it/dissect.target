@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, BinaryIO
 from dissect.volume import lvm
 
 from dissect.target.helpers.logging import get_logger
+from dissect.target.helpers.utils import to_list
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
@@ -31,13 +32,20 @@ KNOWN_SKIP_TYPES = (
 class LvmVolumeSystem(LogicalVolumeSystem):
     __type__ = "lvm"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
-        self.lvm = lvm.LVM2(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO],
+        *args,
+        devices: list[lvm.LVM2Device] | None = None,
+        **kwargs,
+    ):
+        self.lvm = lvm.LVM2(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         devices: dict[str, list[lvm.LVM2Device]] = {}
+        source_disks: dict[str, dict[BinaryIO, None]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
@@ -48,9 +56,17 @@ class LvmVolumeSystem(LogicalVolumeSystem):
                 vg_name = next(key for key, value in metadata.items() if isinstance(value, dict))
                 devices.setdefault(vg_name, []).append(dev)
 
-        for pvs in devices.values():
+                disks = source_disks.setdefault(vg_name, {})
+                for disk in to_list(vol.disk if isinstance(vol, Volume) else vol):
+                    disks[disk] = None
+
+        for vg_name, pvs in devices.items():
             try:
-                yield cls(pvs, disk=[pv.fh for pv in pvs])
+                yield cls(
+                    [pv.fh for pv in pvs],
+                    devices=pvs,
+                    disk=list(source_disks[vg_name]),
+                )
             except Exception:  # noqa: PERF203
                 continue
 

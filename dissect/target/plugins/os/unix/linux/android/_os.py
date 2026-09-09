@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers import configutil
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from pathlib import Path
 
     from typing_extensions import Self
 
@@ -22,33 +20,12 @@ class AndroidPlugin(LinuxPlugin):
         super().__init__(target)
         self.target = target
 
-        self.build_prop_paths = set(find_build_props(self.target.fs))
-        self.props = {}
-
-        for build_prop in self.build_prop_paths:
-            try:
-                self.props.update(
-                    configutil.parse(
-                        build_prop,
-                        hint="meta_bare",
-                        separator=("=",),
-                        comment_prefixes=("#",),
-                    ).parsed_data
-                )
-            except Exception as e:  # noqa: PERF203
-                self.target.log.warning("Unable to parse Android build.prop file %s: %s", build_prop, e)
-
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
-        ANDROID_PATHS = (
-            "data",
-            "system",
-            "vendor",
-            "product",
-        )
-
+        """Detect an Android-like filesystem."""
+        ANDROID_PATHS = ("data", "system", "vendor", "product")
         for fs in target.filesystems:
-            if all(fs.exists(p) for p in ANDROID_PATHS) and any(find_build_props(fs)):
+            if all(fs.exists(p) for p in ANDROID_PATHS):
                 return fs
         return None
 
@@ -59,7 +36,7 @@ class AndroidPlugin(LinuxPlugin):
 
     @export(property=True)
     def hostname(self) -> str | None:
-        return self.props.get("ro.build.host")
+        return self.target.property.get("ro.build.host")
 
     @export(property=True)
     def ips(self) -> list[str]:
@@ -67,16 +44,42 @@ class AndroidPlugin(LinuxPlugin):
 
     @export(property=True)
     def version(self) -> str:
-        full_version = "Android"
+        """Return the version of this Android system."""
+        version = "Android"
 
-        release_version = self.props.get("ro.build.version.release")
-        if release_version := self.props.get("ro.build.version.release"):
-            full_version += f" {release_version}"
+        if release_version := self.target.property.get("ro.build.version.release"):
+            version += f" {release_version}"
 
-        if security_patch_version := self.props.get("ro.build.version.security_patch"):
-            full_version += f" ({security_patch_version})"
+        if build_id := self.target.property.get("ro.build.id"):
+            version += f" {build_id}"
 
-        return full_version
+        if security_patch_version := self.target.property.get("ro.build.version.security_patch"):
+            version += f" ({security_patch_version})"
+
+        return version
+
+    @export(property=True)
+    def architecture(self) -> str | None:
+        """Return the architecture triple of this Android system."""
+        for bin in (
+            "/system/bin/sh",
+            "/vendor/bin/sh",
+        ):
+            if arch := self._get_architecture(self.os, bin):
+                return arch
+        return None
+
+    @export(property=True)
+    def device(self) -> str | None:
+        """Return the device brand, model and name of this Android system."""
+        manufacturer = self.target.property.get("ro.product.vendor.manufacturer", "").capitalize()
+        device = self.target.property.get("ro.product.vendor.device", "").upper()
+        model = self.target.property.get("ro.product.vendor.model", "")
+        _device = f"{manufacturer} {device} {model}"
+        if name := self.target.property.get("ro.product.vendor.name"):
+            _device += f" ({name})"
+
+        return _device.strip() or None
 
     @export(property=True)
     def os(self) -> str:
@@ -85,13 +88,3 @@ class AndroidPlugin(LinuxPlugin):
     @export(record=EmptyRecord)
     def users(self) -> Iterator[EmptyRecord]:
         yield from ()
-
-
-def find_build_props(fs: Filesystem) -> Iterator[Path]:
-    """Search for Android ``build.prop`` files on the provided :class:`Filesystem`."""
-    if (root_prop := fs.path("/build.prop")).is_file():
-        yield root_prop
-
-    for prop in fs.path("/").glob("*/build.prop"):
-        if prop.is_file():
-            yield prop

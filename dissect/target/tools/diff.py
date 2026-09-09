@@ -381,7 +381,7 @@ class DifferentialCli(ExtendedCmd):
         self.comparison: TargetComparison = None
 
         self.cwd = "/"
-        self.alt_separator = "/"
+        self.sep = "/"
 
         doc_header_middle = self.doc_header_multiple_targets if len(targets) > 2 else ""
         self.doc_header = self.doc_header_prefix + doc_header_middle + self.doc_header_suffix
@@ -432,10 +432,10 @@ class DifferentialCli(ExtendedCmd):
         self.dst_index = dst_index
         if not self.src_target.fs.exists(self.cwd) and not self.dst_target.fs.exists(self.cwd):
             logging.warning("The current directory exists on neither of the selected targets")
-        if self.src_target.fs.alt_separator != self.dst_target.fs.alt_separator:
+        if self.src_target.fs.sep != self.dst_target.fs.sep:
             raise NotImplementedError("No support for handling targets with different path separators")
 
-        self.alt_separator = self.src_target.fs.alt_separator
+        self.sep = self.src_target.fs.sep
         self.comparison = TargetComparison(self.src_target, self.dst_target, self.deep, self.limit)
 
     def _annotate_differential(
@@ -514,7 +514,7 @@ class DifferentialCli(ExtendedCmd):
         path = line[:begidx].rsplit(" ")[-1]
         textlower = text.lower()
 
-        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.alt_separator)
+        path = fsutil.abspath(path, cwd=str(self.cwd), sep=self.sep)
 
         diff = self.comparison.scandir(path)
         items = [
@@ -594,7 +594,7 @@ class DifferentialCli(ExtendedCmd):
 
     def do_cd(self, path: str) -> bool:
         """Change directory to the given path."""
-        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.alt_separator)
+        path = fsutil.abspath(path, cwd=str(self.cwd), sep=self.sep)
         if self._targets_with_directory(path, warn_when_incomplete=True) != 0:
             self.cwd = path
         return False
@@ -758,7 +758,7 @@ class DifferentialCli(ExtendedCmd):
     @arg("-u", "--unchanged", action="store_true")
     def cmd_find(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Search for files in a directory hierarchy."""
-        path = fsutil.abspath(args.path, cwd=str(self.cwd), alt_separator=self.comparison.src_target.fs.alt_separator)
+        path = fsutil.abspath(args.path, cwd=str(self.cwd), sep=self.comparison.src_target.fs.sep)
         if not path:
             return False
 

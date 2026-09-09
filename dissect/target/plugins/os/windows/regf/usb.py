@@ -209,8 +209,11 @@ def unpack_timestamps(usb_reg_properties: VirtualKey) -> dict[str, int]:
                 if "00000000" in version_key.subkeys():
                     data_value = version_key.subkey("00000000").value("Data").value
                 else:
-                    data_value = version_key.value("(Default)").value
-                timestamps[device_property] = wintimestamp(struct.unpack("<Q", data_value)[0])
+                    try:
+                        data_value = version_key.value("(Default)").value
+                    except RegistryValueNotFoundError:
+                        data_value = None
+                timestamps[device_property] = wintimestamp(struct.unpack("<Q", data_value)[0]) if data_value else None
                 break
             timestamps[device_property] = None
     return timestamps

@@ -66,7 +66,7 @@ AuthorizedKeysRecord = OpenSSHUserRecordDescriptor(
         *COMMON_ELLEMENTS,
         ("bytes", "public_key_pem"),
         ("digest", "fingerprint"),
-        ("string", "options"),
+        ("string[]", "options"),
     ],
 )
 

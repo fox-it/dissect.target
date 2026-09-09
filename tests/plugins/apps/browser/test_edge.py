@@ -127,10 +127,12 @@ def test_unix_edge_passwords_basic_plugin(target_edge_unix: Target, fs_unix: Vir
     fs_unix.map_file(
         "/root/.config/microsoft-edge/Default/Login Data",
         absolute_path("_data/plugins/apps/browser/chromium/unix/basic/Login Data"),
+        clobber=True,
     )
     fs_unix.map_file(
         "/root/.config/microsoft-edge/Profile 1/Login Data",
         absolute_path("_data/plugins/apps/browser/chromium/unix/basic/Login Data"),
+        clobber=True,
     )
 
     records = list(target_edge_unix.edge.passwords())
@@ -150,10 +152,12 @@ def test_unix_edge_passwords_gnome_plugin(target_edge_unix: Target, fs_unix: Vir
     fs_unix.map_file(
         "/root/.config/microsoft-edge/Default/Login Data",
         absolute_path("_data/plugins/apps/browser/chromium/unix/gnome/Login Data"),
+        clobber=True,
     )
     fs_unix.map_file(
         "/root/.config/microsoft-edge/Profile 1/Login Data",
         absolute_path("_data/plugins/apps/browser/chromium/unix/gnome/Login Data"),
+        clobber=True,
     )
 
     records = list(target_edge_unix.edge.passwords())

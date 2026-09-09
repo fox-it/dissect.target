@@ -125,7 +125,7 @@ class NfsFilesystem(Filesystem):
             relentry: The relative entry to start from. If not provided, the root entry is used.
         """
         current_handle = relentry.entry if relentry else self._root_handle
-        path = fsutil.normalize(path, self.alt_separator).strip("/")
+        path = fsutil.normalize(path, sep=self.sep).strip("/")
 
         if not path:
             return NfsFilesystemEntry(self, "/", current_handle)
@@ -217,7 +217,7 @@ class NfsFilesystemEntry(FilesystemEntry):
         st_info = fsutil.stat_result(
             [
                 attributes.mode | self._mode_file_type(attributes.type),
-                fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),
+                fsutil.generate_addr(self.path, sep=self.fs.sep),
                 attributes.fsid,
                 attributes.nlink,
                 attributes.uid,

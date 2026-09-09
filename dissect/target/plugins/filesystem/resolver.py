@@ -11,15 +11,15 @@ REPLACEMENTS = [
     # Windows sometimes uses /systemroot/ instead of /%SystemRoot%/, so we
     # replace the former with the latter so expand_env() can replace it with
     # the correct value.
-    (r"/systemroot/", r"/%systemroot%/"),
+    (r"\\systemroot\\", r"\\%systemroot%\\"),
 ]
 
 FALLBACK_SEARCH_PATHS = [
-    "sysvol/windows/system32",
-    "sysvol/windows/syswow64",
-    "sysvol/windows",
-    "sysvol/winnt/system32",
-    "sysvol/winnt",
+    "sysvol\\windows\\system32",
+    "sysvol\\windows\\syswow64",
+    "sysvol\\windows",
+    "sysvol\\winnt\\system32",
+    "sysvol\\winnt",
 ]
 
 
@@ -46,14 +46,14 @@ class ResolverPlugin(Plugin):
 
     def resolve_windows(self, path: str, user_sid: str | None = None) -> str:
         # Normalize first so the replacements are easier
-        path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
+        path = fsutil.normpath(path, sep="\\")
 
         for entry, environment in REPLACEMENTS:
-            path = re.sub(entry, re.escape(environment), path, flags=re.IGNORECASE)
+            path = re.sub(entry, environment, path, flags=re.IGNORECASE)
 
         path = self.target.expand_env(path, user_sid)
-        # Normalize again because environment variable expansion may have introduced backslashes again
-        path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
+        # Normalize again because environment variable expansion may have introduced forward slashes again
+        path = fsutil.normpath(path, sep="\\")
 
         # The \??\ pseudo path is used to point to the directory containing
         # (the user's) devices, e.g. \??\C:\foo\bar.
@@ -63,7 +63,7 @@ class ResolverPlugin(Plugin):
         # - https://googleprojectzero.blogspot.com/2016/02/the-definitive-guide-on-win32-to-nt.html
         # - https://stackoverflow.com/questions/23041983/path-prefixes-and
         # - https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#win32-file-namespaces
-        path = path.replace("/??/", "").replace("/?/", "")
+        path = path.replace("\\??\\", "").replace("\\\\?\\", "")
 
         if self.target.fs.exists(path):
             return path
@@ -80,8 +80,8 @@ class ResolverPlugin(Plugin):
         user_path_env = user_env_vars.get("%path%")
         if user_path_env:
             for path_env in user_path_env.split(";"):
-                # Normalize because environment variable may contain backslashes
-                path_env = fsutil.normalize(path_env, alt_separator=self.target.fs.alt_separator).rstrip("/")
+                # Normalize because environment variable may contain forward slashes
+                path_env = fsutil.normpath(path_env, sep="\\").rstrip("\\")
                 search_paths.append(path_env)
         if not search_paths:
             search_paths = FALLBACK_SEARCH_PATHS
@@ -102,11 +102,11 @@ class ResolverPlugin(Plugin):
                     return lookup_ext
 
                 for search_path in search_paths:
-                    lookup_path = fsutil.join(search_path, lookup_ext, alt_separator=self.target.fs.alt_separator)
+                    lookup_path = fsutil.join(search_path, lookup_ext, sep="\\")
                     if self.target.fs.is_file(lookup_path):
                         return lookup_path
 
         return path
 
     def resolve_default(self, path: str, user_id: str | None = None) -> str:
-        return fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
+        return fsutil.normalize(path, sep=self.target.fs.sep)

@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import io
 import re
-from typing import TYPE_CHECKING, BinaryIO
+from pathlib import Path
+from typing import BinaryIO
 
 from dissect.evidence import EWF
-from dissect.evidence.ewf import find_files
 
 from dissect.target.container import Container
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from dissect.target.helpers import keychain
 
 
 class EwfContainer(Container):
@@ -19,11 +17,25 @@ class EwfContainer(Container):
     __type__ = "ewf"
 
     def __init__(self, fh: list | BinaryIO | Path, *args, **kwargs):
-        fhs = [fh] if not isinstance(fh, list) else fh
-        if hasattr(fhs[0], "read"):
-            self.ewf = EWF(fhs)
-        else:
-            self.ewf = EWF(find_files(fhs[0]))
+        self.ewf = EWF(fh)
+
+        if self.ewf.is_adcrypt():
+            keys = keychain.get_keys_for_provider(self.__type__) + keychain.get_keys_without_provider()
+
+            if not keys:
+                raise ValueError("Failed to unlock ADCRYPT: no key(s) provided")
+
+            for key in keys:
+                try:
+                    if key.key_type == keychain.KeyType.PASSPHRASE:
+                        self.ewf.unlock(passphrase=key.value)
+                    elif key.key_type == keychain.KeyType.FILE and (path := Path(key.value)).is_file():
+                        self.ewf.unlock(private_key=path)
+                except ValueError:  # noqa: PERF203
+                    pass
+
+            if self.ewf.is_locked():
+                raise ValueError("Failed to unlock ADCRYPT using provided key(s)")
 
         self._stream = self.ewf.open()
         super().__init__(fh, self.ewf.size, *args, **kwargs)
@@ -46,4 +58,8 @@ class EwfContainer(Container):
         return self._stream.tell()
 
     def close(self) -> None:
-        self._stream.close()
+        if hasattr(self, "_stream") and not self._stream.closed:
+            self._stream.close()
+
+        if hasattr(self, "ewf"):
+            self.ewf.close()

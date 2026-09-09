@@ -56,10 +56,10 @@ def map_dirs(
         dirfs: The filesystem class to use for directory filesystems.
         zipfs: The filesystem class to use for ZIP filesystems.
     """
-    alt_separator = ""
+    sep = "/"
     case_sensitive = True
     if os_type == OperatingSystem.WINDOWS:
-        alt_separator = "\\"
+        sep = "\\"
         case_sensitive = False
 
     drive_letter_map = defaultdict(list)
@@ -71,9 +71,9 @@ def map_dirs(
             drive_letter = path.name[0]
 
         if isinstance(path, zipfile.Path):
-            dfs = zipfs(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
+            dfs = zipfs(path.root.fp, path.at, sep=sep, case_sensitive=case_sensitive)
         else:
-            dfs = dirfs(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
+            dfs = dirfs(path, sep=sep, case_sensitive=case_sensitive)
 
         drive_letter_map[drive_letter].append(dfs)
 

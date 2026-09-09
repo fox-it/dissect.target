@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.target.helpers.certificate import COMMON_CERTIFICATE_FIELDS
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import NamespacePlugin, export
 
 if TYPE_CHECKING:
+    import re
     from collections.abc import Iterator
 
 WebserverAccessLogRecord = TargetRecordDescriptor(
@@ -73,6 +74,12 @@ WebserverCertificateRecord = TargetRecordDescriptor(
         ("path", "source"),
     ],
 )
+
+
+class LogFormat(NamedTuple):
+    name: str
+    pattern: re.Pattern
+    timestamp: str | list[str] | None = None
 
 
 class WebserverPlugin(NamespacePlugin):

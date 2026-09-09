@@ -11,6 +11,7 @@ from dissect.target.plugins.os.unix.bsd.darwin._os import (
     DarwinPlugin,
     macho_cpu_type,
 )
+from dissect.target.plugins.os.unix.bsd.darwin.util.model import MODELS
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -31,6 +32,7 @@ class IOSPlugin(DarwinPlugin):
     """
 
     SYSTEM = "/private/var/preferences/SystemConfiguration/preferences.plist"
+    NETWORK = "/private/var/preferences/SystemConfiguration/NetworkInterfaces.plist"
     GLOBAL = "/private/var/mobile/Library/Preferences/.GlobalPreferences.plist"
     VERSION = "/System/Library/CoreServices/SystemVersion.plist"
 
@@ -44,6 +46,7 @@ class IOSPlugin(DarwinPlugin):
             target.fs.path(self.SYSTEM),
             target.fs.path(self.GLOBAL),
             target.fs.path(self.VERSION),
+            target.fs.path(self.NETWORK),
         )
 
     @classmethod
@@ -72,7 +75,10 @@ class IOSPlugin(DarwinPlugin):
 
     @export(property=True)
     def version(self) -> str:
-        return f"{self._config.VERSION['ProductName']} {self._config.VERSION['ProductVersion']} ({self._config.VERSION['ProductBuildVersion']})"  # noqa: E501
+        name = self._config.VERSION["ProductName"]
+        version = self._config.VERSION["ProductVersion"]
+        build = self._config.VERSION["ProductBuildVersion"]
+        return f"{name} {version} ({build})"
 
     @export(record=IOSUserRecord)
     def users(self) -> Iterator[IOSUserRecord]:
@@ -89,15 +95,29 @@ class IOSPlugin(DarwinPlugin):
             return target_triple(self.os, machine)
         return None
 
+    @export(property=True)
+    def device(self) -> str | None:
+        """Return the device name of this Apple machine."""
+        # Our first bet is to translate the model identifier to a model name.
+        if model_id := self._config.SYSTEM.get("Model"):
+            model, _ = MODELS.get(model_id, (None, None))
+
+        # Fallback to the device type from ``ProductName`` (e.g. ``iPhone OS```).
+        if not model:
+            model = self._config.VERSION.get("ProductName", "Unknown").replace(" OS", "")
+
+        return f"Apple {model} ({model_id})"
+
 
 @dataclass
 class Config:
     SYSTEM: dict[str, Any]
     GLOBAL: dict[str, Any]
     VERSION: dict[str, Any]
+    NETWORK: dict[str, Any]
 
     @classmethod
-    def load(cls, *args: list[Path]) -> Self:
+    def load(cls, *args: Path) -> Self:
         plists = []
         for path in args:
             if path.is_file():

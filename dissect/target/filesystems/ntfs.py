@@ -41,7 +41,7 @@ class NtfsFilesystem(Filesystem):
         *args,
         **kwargs,
     ):
-        super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
+        super().__init__(fh, *args, sep="\\", case_sensitive=False, **kwargs)
         self.ntfs = NTFS(fh, boot=boot, mft=mft, usnjrnl=usnjrnl, sds=sds)
 
     @staticmethod
@@ -152,7 +152,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
     def get(self, path: str) -> NtfsFilesystemEntry:
         return NtfsFilesystemEntry(
             self.fs,
-            fsutil.join(self.path, path, alt_separator=self.fs.alt_separator),
+            fsutil.join(self.path, path, sep=self.fs.sep),
             self.fs._get_record(path, self.entry),
         )
 
@@ -206,7 +206,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
             # This is because absolute links include the drive letter, of which we have no knowledge here
             # These will only work in the RootFilesystem
             print_name = "\\" + print_name
-        return fsutil.normalize(print_name, self.fs.alt_separator)
+        return fsutil.normalize(print_name, sep=self.fs.sep)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).lstat()

@@ -84,7 +84,7 @@ class VbkFilesystemEntry(FilesystemEntry):
     def get(self, path: str) -> FilesystemEntry:
         return VbkFilesystemEntry(
             self.fs,
-            fsutil.join(self.path, path, alt_separator=self.fs.alt_separator),
+            fsutil.join(self.path, path, sep=self.fs.sep),
             self.fs._get_node(path, self.entry),
         )
 
@@ -122,7 +122,7 @@ class VbkFilesystemEntry(FilesystemEntry):
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         st_info = [
             mode | 0o755,
-            fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),
+            fsutil.generate_addr(self.path, sep=self.fs.sep),
             id(self.fs),
             1,
             0,

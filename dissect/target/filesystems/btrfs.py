@@ -62,7 +62,7 @@ class BtrfsSubvolumeFilesystem(Filesystem):
     __type__ = "btrfs"
 
     def __init__(self, fs: BtrfsFilesystem, subvol: str | None = None, subvolid: int | None = None):
-        super().__init__(fs.volume, alt_separator=fs.alt_separator, case_sensitive=fs.case_sensitive)
+        super().__init__(fs.volume, sep=fs.sep, altsep=fs.altsep, case_sensitive=fs.case_sensitive)
         if subvol is not None and subvolid is not None:
             raise ValueError("Only one of subvol or subvolid is allowed")
 
@@ -107,7 +107,7 @@ class BtrfsFilesystemEntry(FilesystemEntry):
     entry: btrfs.INode
 
     def get(self, path: str) -> FilesystemEntry:
-        path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        path = fsutil.join(self.path, path, sep=self.fs.sep)
         return BtrfsFilesystemEntry(self.fs, path, self.fs._get_node(path, self.entry))
 
     def open(self) -> BinaryIO:
