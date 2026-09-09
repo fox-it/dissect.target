@@ -200,7 +200,8 @@ class CredHistPlugin(WindowsCredentialPlugin):
                 credhist.decrypt(hashlib.sha1(password.encode("utf-16-le")).digest())
 
             if not credhist.entries:
-                self.target.log.warning("File has no credhist entries: %s", path)
+                self.target.log.debug("File has no credhist entries: %s", path)
+                continue
 
             for entry in credhist.entries:
                 yield CredHistRecord(
