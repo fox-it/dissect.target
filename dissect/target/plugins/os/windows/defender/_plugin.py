@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 
     from flow.record import Record
 
+    from dissect.target.helpers.compat.pathlib import TargetPath
     from dissect.target.target import Target
 
 
@@ -100,6 +101,7 @@ DEFENDER_EVTX_FIELDS = [
     ("string", "Type_ID"),
     ("string", "Type_Name"),
     ("string", "Version"),
+    ("path", "source"),
 ]
 
 DEFENDER_LOG_DIR = "%windir%/system32/winevt/logs"
@@ -256,7 +258,7 @@ class MicrosoftDefenderPlugin(Plugin):
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in
         quarantine.
         """
-        for entry in self.get_quarantine_entries():
+        for guid_path, entry in self.get_quarantine_entries():
             # These fields are present for all (currently known) quarantine entry types
             fields = {
                 "ts": entry.timestamp,
@@ -264,6 +266,7 @@ class MicrosoftDefenderPlugin(Plugin):
                 "scan_id": entry.scan_id.hex(),
                 "threat_id": entry.threat_id,
                 "detection_name": entry.detection_name,
+                "source": guid_path,
             }
             for resource in entry.resources:
                 fields.update({"detection_type": resource.detection_type})
@@ -417,7 +420,7 @@ class MicrosoftDefenderPlugin(Plugin):
 
         yield DefenderMPLogRTPRecord(
             _target=self.target,
-            source_log=data["source_log"],
+            source=data["source"],
             **times,
             plugin_states=re.findall(r"^\s+(.*)$", data["plugin_states"])[0],
             process_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["process_exclusions"]),
@@ -448,7 +451,7 @@ class MicrosoftDefenderPlugin(Plugin):
             if match := pattern.match(mplog_line):
                 data = match.groupdict()
                 data["_target"] = self.target
-                data["source_log"] = source
+                data["source"] = source
                 yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data, tzinfo=tzinfo)
 
     def _mplog_block(
@@ -469,7 +472,7 @@ class MicrosoftDefenderPlugin(Plugin):
 
                 data = match.groupdict()
                 data["_target"] = self.target
-                data["source_log"] = source
+                data["source"] = source
                 yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data, tzinfo=tzinfo)
 
     def _mplog(
@@ -576,7 +579,7 @@ class MicrosoftDefenderPlugin(Plugin):
         resourcedata_directory = quarantine_directory.joinpath("ResourceData")
         if resourcedata_directory.exists() and resourcedata_directory.is_dir():
             recovered_files = []
-            for entry in self.get_quarantine_entries():
+            for _, entry in self.get_quarantine_entries():
                 for resource in entry.resources:
                     if resource.detection_type != b"file":
                         # We can only recover file entries
@@ -606,7 +609,7 @@ class MicrosoftDefenderPlugin(Plugin):
                     # Make sure we do not recover the same file multiple times if it has multiple entries
                     recovered_files.append(resourcedata_location)
 
-    def get_quarantine_entries(self) -> Iterator[QuarantineEntry]:
+    def get_quarantine_entries(self) -> Iterator[TargetPath, QuarantineEntry]:
         """Yield Windows Defender quarantine entries."""
         quarantine_directory = self.target.fs.path(DEFENDER_QUARANTINE_DIR)
         entries_directory = quarantine_directory.joinpath("entries")
@@ -623,7 +626,7 @@ class MicrosoftDefenderPlugin(Plugin):
             for resource in entry.resources:
                 for unknown_field in resource.unknown_fields:
                     self.target.log.warning("Encountered an unknown field identifier: %s", unknown_field.Identifier)
-            yield entry
+            yield guid_path.resolve(), entry
 
     @export(record=[DefenderMpCmdRunLogRecord])
     def mpcmdrun(self) -> Iterator[DefenderMpCmdRunLogRecord]:

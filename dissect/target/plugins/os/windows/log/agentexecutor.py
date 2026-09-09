@@ -21,6 +21,7 @@ AgentExecutorLogRecord = TargetRecordDescriptor(
         ("string", "context"),
         ("string", "message"),
         ("string", "file_origin"),
+        ("path", "source"),
     ],
 )
 
@@ -118,6 +119,7 @@ class AgentExecutorLogPlugin(Plugin):
                 context=match.group("context"),
                 message=msg,
                 file_origin=match.group("file_origin") or "AgentExecutor.log",
+                source=log_path,
                 _target=self.target,
             )
 

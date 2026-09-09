@@ -27,6 +27,7 @@ NetworkDataRecord = TargetRecordDescriptor(
         ("varint", "l2_profile_flags"),
         ("varint", "bytes_sent"),
         ("varint", "bytes_recvd"),
+        ("path", "source"),
     ],
 )
 
@@ -41,6 +42,7 @@ NetworkConnectivityRecord = TargetRecordDescriptor(
         ("varint", "connected_time"),
         ("datetime", "connect_start_time"),
         ("varint", "l2_profile_flags"),
+        ("path", "source"),
     ],
 )
 
@@ -51,6 +53,7 @@ EnergyEstimatorRecord = TargetRecordDescriptor(
         ("path", "app"),
         ("string", "user"),
         ("bytes", "binary_data"),
+        ("path", "source"),
     ],
 )
 
@@ -69,6 +72,7 @@ EnergyUsageRecord = TargetRecordDescriptor(
         ("varint", "configuration_hash"),
         ("varint", "battery_count"),
         ("varint", "battery_charge_limited"),
+        ("path", "source"),
     ],
 )
 
@@ -90,6 +94,7 @@ EnergyUsageLTRecord = TargetRecordDescriptor(
         ("varint", "full_charged_capacity"),
         ("varint", "cycle_count"),
         ("varint", "configuration_hash"),
+        ("path", "source"),
     ],
 )
 
@@ -114,6 +119,7 @@ ApplicationRecord = TargetRecordDescriptor(
         ("varint", "background_num_read_operations"),
         ("varint", "background_num_write_operations"),
         ("varint", "background_number_of_flushes"),
+        ("path", "source"),
     ],
 )
 
@@ -126,6 +132,7 @@ PushNotificationRecord = TargetRecordDescriptor(
         ("varint", "notification_type"),
         ("varint", "payload_size"),
         ("varint", "network_type"),
+        ("path", "source"),
     ],
 )
 
@@ -175,6 +182,7 @@ ApplicationTimelineRecord = TargetRecordDescriptor(
         ("varint", "keyboard_input_timeline"),
         ("varint", "keyboard_input_s"),
         ("varint", "mouse_input_s"),
+        ("path", "source"),
     ],
 )
 
@@ -188,6 +196,7 @@ VfuRecord = TargetRecordDescriptor(
         ("datetime", "start_time"),
         ("datetime", "end_time"),
         ("bytes", "usage"),
+        ("path", "source"),
     ],
 )
 
@@ -199,6 +208,7 @@ SdpVolumeProviderRecord = TargetRecordDescriptor(
         ("string", "user"),
         ("varint", "total"),
         ("varint", "used"),
+        ("path", "source"),
     ],
 )
 
@@ -209,6 +219,7 @@ SdpPhysicalDiskProviderRecord = TargetRecordDescriptor(
         ("path", "app"),
         ("string", "user"),
         ("varint", "size_in_bytes"),
+        ("path", "source"),
     ],
 )
 
@@ -219,6 +230,7 @@ SdpCpuProviderRecord = TargetRecordDescriptor(
         ("path", "app"),
         ("string", "user"),
         ("varint", "processor_time"),
+        ("path", "source"),
     ],
 )
 
@@ -231,6 +243,7 @@ SdpNetworkProviderRecord = TargetRecordDescriptor(
         ("varint", "bytes_inbound"),
         ("varint", "bytes_outbound"),
         ("varint", "bytes_total"),
+        ("path", "source"),
     ],
 )
 
@@ -384,10 +397,10 @@ class SRUPlugin(Plugin):
         super().__init__(target)
         self._sru = None
 
-        srupath = target.resolve("%windir%/System32/sru/SRUDB.dat")
-        if srupath.exists():
+        self.srupath = target.resolve("%windir%/System32/sru/SRUDB.dat")
+        if self.srupath.exists():
             try:
-                self._sru = sru.SRU(srupath.open())
+                self._sru = sru.SRU(self.srupath.open())
             except Error as e:
                 self.target.log.warning("Error opening SRU database")
                 self.target.log.debug("", exc_info=e)
@@ -424,6 +437,7 @@ class SRUPlugin(Plugin):
 
             yield record_type(
                 _target=self.target,
+                source=self.srupath,
                 **record_values,
             )
 

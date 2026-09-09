@@ -28,6 +28,7 @@ def test_sophos_hitman_plugin_log(target_win: Target, fs_win: VirtualFilesystem)
     assert log.alert == "ILoveYou"
     assert log.description == "Love Letter Virus"
     assert log.details.find("LOVE-LETTER-FOR-YOU.TXT.vbs") > -1
+    assert str(log.source) == "sysvol\\ProgramData\\HitmanPro.Alert\\excalibur.db"
 
 
 def test_sophos_home_plugin_log_3_9_4_1(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -41,6 +42,7 @@ def test_sophos_home_plugin_log_3_9_4_1(target_win: Target, fs_win: VirtualFiles
     assert isinstance(log, type(SophosLogRecord()))
     assert log.description == "EICAR-AV-Test"
     assert str(log.path) == "C:\\eicar_com.zip"
+    assert str(log.source) == "sysvol\\ProgramData\\Sophos\\Clean\\Logs\\Clean.log"
 
 
 def test_sophos_home_plugin_log_3_10_3(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -54,3 +56,4 @@ def test_sophos_home_plugin_log_3_10_3(target_win: Target, fs_win: VirtualFilesy
     assert isinstance(log, type(SophosLogRecord()))
     assert log.description == "EICAR-AV-Test"
     assert str(log.path) == "C:\\eicar_com.zip"
+    assert str(log.source) == "sysvol\\ProgramData\\Sophos\\Clean\\Logs\\Clean.log"
