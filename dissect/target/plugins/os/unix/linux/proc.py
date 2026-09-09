@@ -76,7 +76,7 @@ class NetSocket:
     name: str | None = None  # process name associated to the socket
     cmdline: str | None = None  # process cmdline associated to the socket
 
-    source: TargetPath | None = None  # File from which this structure was generate.
+    source: TargetPath | None = None  # File from which this structure was generated.
 
     @classmethod
     def from_line(cls, line: str, ip_vers: int = 4) -> Self:
@@ -148,7 +148,7 @@ class PacketSocket:
     owner: str | None = None  # resolved owner from user (uid) field
     protocol_string: str = "packet"
 
-    source: TargetPath | None = None  # File from which this structure was generate.
+    source: TargetPath | None = None  # File from which this structure was generated.
 
     @classmethod
     def from_line(cls, line: str) -> Self:

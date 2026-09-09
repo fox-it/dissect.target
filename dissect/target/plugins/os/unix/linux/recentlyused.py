@@ -30,7 +30,7 @@ RecentlyUsedRecord = TargetRecordDescriptor(
         ("string", "mimetype"),
         ("string", "groups"),
         ("boolean", "private"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -40,7 +40,7 @@ RecentlyUsedIconRecord = TargetRecordDescriptor(
         ("string", "type"),
         ("string", "href"),
         ("string", "name"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -51,7 +51,7 @@ RecentlyUsedApplicationRecord = TargetRecordDescriptor(
         ("string", "name"),
         ("string", "exec"),
         ("varint", "count"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 ns = {
@@ -124,7 +124,10 @@ def parse_recently_used_xbel(
             # Icon is optional, spec says at most one.
             for icon in bookmark.findall("./info/metadata/bookmark:icon", ns):
                 iconrecord = RecentlyUsedIconRecord(
-                    type=icon.get("type"), href=icon.get("href"), name=icon.get("name"), source=xbel_file
+                    type=icon.get("type"),
+                    href=icon.get("href"),
+                    name=icon.get("name"),
+                    source=xbel_file,
                 )
                 yield GroupedRecord("unix/linux/recently_used/icon", [cur, iconrecord])
 

@@ -196,5 +196,4 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
     def _parse_chunk(self, needle: bytes, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
             # we may provide disk + offset, but this would require more change in scrap internal
-            # We keep
             yield self._build_record(record, source=None)

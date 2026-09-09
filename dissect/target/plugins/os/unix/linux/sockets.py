@@ -33,7 +33,7 @@ NetSocketRecord = TargetRecordDescriptor(
         ("uint32", "pid"),
         ("string", "name"),
         ("string", "cmdline"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -47,7 +47,7 @@ UnixSocketRecord = TargetRecordDescriptor(
         ("string", "state"),
         ("uint32", "inode"),
         ("string", "path"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -68,7 +68,7 @@ PacketSocketRecord = TargetRecordDescriptor(
         ("uint32", "pid"),
         ("string", "name"),
         ("string", "cmdline"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 

@@ -4,22 +4,35 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 
 BootTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/boot",
-    [("path", "source")],
+    [
+        ("path", "source"),
+    ],
 )
 
 CalendarTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/calendar",
-    [("path", "source")],
+    [
+        ("path", "source"),
+    ],
 )
 
 DailyTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/daily",
-    [("uint16", "days_between_triggers"), ("uint16[]", "unused"), ("path", "source")],
+    [
+        ("uint16", "days_between_triggers"),
+        ("uint16[]", "unused"),
+        ("path", "source"),
+    ],
 )
 
 ComHandlerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/action/comhandler",
-    [("string", "action_type"), ("string", "class_id"), ("string", "com_data"), ("path", "source")],
+    [
+        ("string", "action_type"),
+        ("string", "class_id"),
+        ("string", "com_data"),
+        ("path", "source"),
+    ],
 )
 
 EventTriggerRecord = TargetRecordDescriptor(
@@ -47,17 +60,24 @@ ExecRecord = TargetRecordDescriptor(
 
 IdleTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/idle",
-    [("path", "source")],
+    [
+        ("path", "source"),
+    ],
 )
 
 LogonTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/logon",
-    [("string", "user_id"), ("path", "source")],
+    [
+        ("string", "user_id"),
+        ("path", "source"),
+    ],
 )
 
 TimeTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/time",
-    [("path", "source")],
+    [
+        ("path", "source"),
+    ],
 )
 
 BaseTriggerRecord = TargetRecordDescriptor(
@@ -79,17 +99,31 @@ BaseTriggerRecord = TargetRecordDescriptor(
 
 MonthlyDateTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/monthly",
-    [("uint16[]", "day_of_month"), ("string[]", "months_of_year"), ("path", "source")],
+    [
+        ("uint16[]", "day_of_month"),
+        ("string[]", "months_of_year"),
+        ("path", "source"),
+    ],
 )
 
 MonthlyDowTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/monthly_dow",
-    [("uint16[]", "which_week"), ("string[]", "days_of_week"), ("string[]", "months_of_year"), ("path", "source")],
+    [
+        ("uint16[]", "which_week"),
+        ("string[]", "days_of_week"),
+        ("string[]", "months_of_year"),
+        ("path", "source"),
+    ],
 )
 
 PaddingTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/padding",
-    [("uint16", "padding"), ("uint16", "reserved2"), ("uint16", "reserved3"), ("path", "source")],
+    [
+        ("uint16", "padding"),
+        ("uint16", "reserved2"),
+        ("uint16", "reserved3"),
+        ("path", "source"),
+    ],
 )
 
 SendEmailRecord = TargetRecordDescriptor(
@@ -113,25 +147,44 @@ SendEmailRecord = TargetRecordDescriptor(
 
 SessionStateChangeTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/session_state_change",
-    [("string", "user_id"), ("string", "state_change"), ("path", "source")],
+    [
+        ("string", "user_id"),
+        ("string", "state_change"),
+        ("path", "source"),
+    ],
 )
 
 ShowMessageRecord = TargetRecordDescriptor(
     "filesystem/windows/task/action/show_message",
-    [("string", "tile"), ("string", "body"), ("path", "source")],
+    [
+        ("string", "tile"),
+        ("string", "body"),
+        ("path", "source"),
+    ],
 )
 
 WeeklyTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/weekly",
-    [("uint16", "weeks_between_triggers"), ("string[]", "days_of_week"), ("uint16[]", "unused"), ("path", "source")],
+    [
+        ("uint16", "weeks_between_triggers"),
+        ("string[]", "days_of_week"),
+        ("uint16[]", "unused"),
+        ("path", "source"),
+    ],
 )
 
 WnfTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/wnf",
-    [("string", "state_name"), ("path", "source")],
+    [
+        ("string", "state_name"),
+        ("path", "source"),
+    ],
 )
 
 RegistrationTrigger = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/registration",
-    [("datetime", "date"), ("path", "source")],
+    [
+        ("datetime", "date"),
+        ("path", "source"),
+    ],
 )

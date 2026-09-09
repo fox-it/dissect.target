@@ -209,8 +209,6 @@ class TasksPlugin(Plugin):
                     record_kwargs[attr] = getattr(task_object, attr, None)
 
                 record_kwargs["source"] = task_object.source
-                if task_object.source is None:
-                    print(task_object)
                 task_record = TaskRecord(**record_kwargs, _target=self.target)
                 yield task_record
 

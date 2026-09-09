@@ -218,7 +218,11 @@ class AtTask:
         wrkdir = self.at_data.working_dir.rstrip("\x00")
 
         yield ExecRecord(
-            action_type=action_type, command=command, arguments=args, working_directory=wrkdir, source=self.source
+            action_type=action_type,
+            command=command,
+            arguments=args,
+            working_directory=wrkdir,
+            source=self.source,
         )
 
     def get_triggers(self) -> Iterator[GroupedRecord]:
@@ -269,7 +273,10 @@ class AtTask:
                 source=self.source,
             )
             padding_record = PaddingTriggerRecord(
-                padding=trigger.padding, reserved2=trigger.reserved2, reserved3=trigger.reserved3, source=self.source
+                padding=trigger.padding,
+                reserved2=trigger.reserved2,
+                reserved3=trigger.reserved3,
+                source=self.source,
             )
 
             if trigger_type == "EVENT_AT_LOGON":
@@ -292,7 +299,11 @@ class AtTask:
                 interval = trigger.trigger_specific0
                 unused = [trigger.trigger_specific1, trigger.trigger_specific2]
 
-                record = DailyTriggerRecord(days_between_triggers=interval, unused=unused, source=self.source)
+                record = DailyTriggerRecord(
+                    days_between_triggers=interval,
+                    unused=unused,
+                    source=self.source,
+                )
 
                 yield GroupedRecord("filesystem/windows/task/daily", [base, record, padding_record])
 
@@ -304,7 +315,10 @@ class AtTask:
                 unused = [trigger.trigger_specific2]
 
                 record = WeeklyTriggerRecord(
-                    weeks_between_triggers=interval, days_of_week=days_of_week, unused=unused, source=self.source
+                    weeks_between_triggers=interval,
+                    days_of_week=days_of_week,
+                    unused=unused,
+                    source=self.source,
                 )
 
                 yield GroupedRecord("filesystem/windows/task/weekly", [base, record, padding_record])
@@ -322,7 +336,9 @@ class AtTask:
                 months_of_year = self.get_months_of_year(trigger.trigger_specific2)
 
                 record = MonthlyDateTriggerRecord(
-                    day_of_month=[day_of_month], months_of_year=months_of_year, source=self.source
+                    day_of_month=[day_of_month],
+                    months_of_year=months_of_year,
+                    source=self.source,
                 )
 
                 yield GroupedRecord("filesystem/windows/task/monthly_date", [base, record, padding_record])
@@ -332,7 +348,10 @@ class AtTask:
                 days = self.get_days_of_week(trigger.trigger_specific1)
                 months = self.get_months_of_year(trigger.trigger_specific2)
                 record = MonthlyDowTriggerRecord(
-                    which_week=[week], days_of_week=days, months_of_year=months, source=self.source
+                    which_week=[week],
+                    days_of_week=days,
+                    months_of_year=months,
+                    source=self.source,
                 )
 
                 yield GroupedRecord("filesystem/windows/task/monthly_dow", [base, record, padding_record])

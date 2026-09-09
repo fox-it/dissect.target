@@ -271,7 +271,10 @@ class XmlTask:
 
             if trigger_type == "LogonTrigger":
                 user_id = self.get_element("UserId", trigger)
-                record = LogonTriggerRecord(user_id=user_id, source=self.source)
+                record = LogonTriggerRecord(
+                    user_id=user_id,
+                    source=self.source,
+                )
                 yield GroupedRecord(LogonTriggerRecord.name, [base, record])
 
             elif trigger_type == "BootTrigger":
@@ -305,13 +308,20 @@ class XmlTask:
                 user_id = self.get_element("UserId", trigger)
                 state_change = self.get_element("StateChange", trigger)
 
-                record = SessionStateChangeTriggerRecord(user_id=user_id, state_change=state_change, source=self.source)
+                record = SessionStateChangeTriggerRecord(
+                    user_id=user_id,
+                    state_change=state_change,
+                    source=self.source,
+                )
 
                 yield GroupedRecord(SessionStateChangeTriggerRecord.name, [base, record])
 
             elif trigger_type == "CalendarTrigger":
                 if days_between_triggers := self.get_element("ScheduleByDay/DaysInterval", trigger):
-                    record = DailyTriggerRecord(days_between_triggers=int(days_between_triggers), source=self.source)
+                    record = DailyTriggerRecord(
+                        days_between_triggers=int(days_between_triggers),
+                        source=self.source,
+                    )
 
                 elif weeks_between_triggers := self.get_element("ScheduleByWeek/WeeksInterval", trigger):
                     days_of_week = [day.tag for day in trigger.find("ScheduleByWeek/DaysOfWeek/").iter("*")]
@@ -325,7 +335,9 @@ class XmlTask:
                     day_of_month = [int(day.text) for day in trigger.iter("Day")]
                     months_of_year = [month.tag for month in trigger.findall("*/Months/*")]
                     record = MonthlyDateTriggerRecord(
-                        day_of_month=day_of_month, months_of_year=months_of_year, source=self.source
+                        day_of_month=day_of_month,
+                        months_of_year=months_of_year,
+                        source=self.source,
                     )
 
                 elif trigger.find("ScheduleByMonthDayOfWeek/") is not None:
@@ -347,14 +359,20 @@ class XmlTask:
             elif trigger_type == "WnfStateChangeTrigger":
                 state_name = self.get_element("StateName", trigger)
 
-                record = WnfTriggerRecord(state_name=state_name, source=self.source)
+                record = WnfTriggerRecord(
+                    state_name=state_name,
+                    source=self.source,
+                )
 
                 yield GroupedRecord(WnfTriggerRecord.name, [base, record])
 
             elif trigger_type == "RegistrationTrigger":
                 date = self.get_element("Date", trigger)
 
-                record = RegistrationTrigger(date=date, source=self.source)
+                record = RegistrationTrigger(
+                    date=date,
+                    source=self.source,
+                )
 
                 yield GroupedRecord(RegistrationTrigger.name, [base, record])
 
@@ -385,7 +403,10 @@ class XmlTask:
                 com_class_id = self.get_element("Actions/ComHandler/ClassId")
                 com_data = self.get_raw("Actions/ComHandler/Data")
                 yield ComHandlerRecord(
-                    action_type=action_type, class_id=com_class_id, com_data=com_data, source=self.source
+                    action_type=action_type,
+                    class_id=com_class_id,
+                    com_data=com_data,
+                    source=self.source,
                 )
 
             if action_type == "SendEmail":
@@ -419,4 +440,9 @@ class XmlTask:
             if action_type == "ShowMessage":
                 title = self.get_element("Actions/ShowMessage/Title")
                 body = self.get_element("Actions/ShowMessage/Body")
-                yield ShowMessageRecord(action_type=action, title=title, body=body, source=self.source)
+                yield ShowMessageRecord(
+                    action_type=action,
+                    title=title,
+                    body=body,
+                    source=self.source,
+                )

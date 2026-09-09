@@ -201,8 +201,7 @@ class WindowsErrorReportingPlugin(Plugin):
         """
         for files in self.wer_files:
             record_fields = []
-            files = list(files)
-            if not files:
+            if not (files := list(files)):
                 continue
             record_values = {
                 "_target": self.target,
