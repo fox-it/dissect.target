@@ -56,6 +56,7 @@ def test_unix_shadow_backup_file(target_unix_users: Target, fs_unix: VirtualFile
     assert results[0].name == "test"
     assert results[0].source == "/etc/shadow"
     assert results[1].name == "other-user"
+    assert results[0].hash == results[1].hash
     assert results[1].source == "/etc/shadow-"
 
 
