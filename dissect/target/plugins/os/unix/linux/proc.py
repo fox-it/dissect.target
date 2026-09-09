@@ -113,7 +113,7 @@ class UnixSocket:
     stream_type_string: str | None = None
     protocol_string: str = "unix"
 
-    source: TargetPath | None = None  # File from which this structure was generate.
+    source: TargetPath | None = None  # File from which this structure was generated.
 
     @classmethod
     def from_line(cls, line: str) -> Self:
