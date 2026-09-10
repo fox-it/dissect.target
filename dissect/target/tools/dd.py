@@ -27,7 +27,9 @@ logging.raiseExceptions = False
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description=f"target-dd {get_dissect_target_version()} : export (a part of) a raw target disk to a file or stdout, similar to the `dd` command on Unix systems.",
+        description=f"target-dd {get_dissect_target_version()} : "
+        f"export (a part of) a raw target disk to a file or stdout, "
+        f"similar to the `dd` command on Unix systems.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
