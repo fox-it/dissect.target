@@ -1105,6 +1105,6 @@ def test_target_cli_unsupported_plugin_debug_pm(monkeypatch: pytest.MonkeyPatch,
     target_path = str(absolute_path("_data/tools/info/image.tar"))
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "debug pm\nmsn")
     # test if we drop into the debugger on unsupported plugin invocation
-    assert "-->" in out
+    assert "->" in out
     assert "raise UnsupportedPluginError" in out
-    assert "ipdb>" in out
+    assert ("ipdb>" in out) or ("(Pdb)" in out)  # ipdb or pdb depending on availability
