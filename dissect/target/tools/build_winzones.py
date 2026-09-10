@@ -52,8 +52,9 @@ def parse_winzones_xml(path: Path) -> str:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description=f"target-build-winzones {get_dissect_target_version()} : generate the windows_zones.py statically "
-        f"file with windows Timezone map from an XML to improve dissect initialization speed.",
+        description=f"target-build-winzones {get_dissect_target_version()} : Generate windows_zones.py statically "
+        f"from windowsZones.xml to improve dissect initialization time by "
+        f"using a precomputed mapping of Windows time zones..",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
