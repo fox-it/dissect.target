@@ -66,7 +66,7 @@ from dissect.target.exceptions import (
     TargetError,
     UnsupportedPluginError,
 )
-from dissect.target.helpers import cyber, fsutil, regutil
+from dissect.target.helpers import cyber, excutil, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import alias, arg, clone_alias
@@ -692,7 +692,12 @@ class TargetCmd(ExtendedCmd):
             try:
                 output, value = execute_function_on_target(self.target, func, argparts)
             except UnsupportedPluginError as e:
-                print(e)
+                if self.debug == DebugMode.ON:
+                    print("\n".join(excutil.summarize_exceptions(e)))
+                elif self.debug == DebugMode.POST_MORTEM:
+                    raise
+                else:
+                    print(e)
                 return
             except SystemExit:
                 return

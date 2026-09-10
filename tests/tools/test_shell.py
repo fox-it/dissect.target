@@ -477,8 +477,8 @@ def test_target_cli_save(
 
 
 def run_target_shell(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, argv: str | list, stdin: str
-) -> tuple[bytes, bytes]:
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], argv: str | list, stdin: str
+) -> tuple[str, str]:
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv]))
         m.setattr("sys.stdin", StringIO(stdin))
@@ -1089,3 +1089,22 @@ def test_target_cli_unsupported_plugin(monkeypatch: pytest.MonkeyPatch, capsys: 
     target_path = str(absolute_path("_data/tools/info/image.tar"))
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "msn")
     assert out == "ubuntu:/$ Unsupported function `msn` for this target with OS linux\nubuntu:/$ \n"
+
+
+def test_target_cli_unsupported_plugin_debug_on(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """Test if the output of an unsupported plugin invocation in target-shell is not too verbose (debug on)."""
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "debug on\nmsn")
+    # test if we get a summary of exceptions on unsupported plugin invocation
+    assert "UnsupportedPluginError: No Microsoft MSN installs found on target" in out
+    assert "UnsupportedPluginError: Unsupported function `msn` for this target with OS linux" in out
+
+
+def test_target_cli_unsupported_plugin_debug_pm(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """Test if the output of an unsupported plugin invocation in target-shell is not too verbose (debug pm)."""
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "debug pm\nmsn")
+    # test if we drop into the debugger on unsupported plugin invocation
+    assert "-->" in out
+    assert "raise UnsupportedPluginError" in out
+    assert "ipdb>" in out
