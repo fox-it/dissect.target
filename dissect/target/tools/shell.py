@@ -1084,11 +1084,13 @@ class TargetCli(TargetCmd):
     @arg("-L", "--dereference", action="store_true")
     def cmd_stat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Display file status."""
-        path = self.resolve_path(args.path)
-        if not path or not self.check_path(path):
+        if not (paths := list(self.resolve_glob_path(args.path))):
+            print(f"{args.path}: no such file or directory")
             return False
 
-        print_stat(path, stdout, args.dereference)
+        for path in paths:
+            print_stat(path, stdout, args.dereference)
+            print()
         return False
 
     @arg("path", type=TargetPathArgument)
@@ -1121,21 +1123,28 @@ class TargetCli(TargetCmd):
     @arg("path", type=TargetPathArgument)
     def cmd_file(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Determine file type."""
-        if not (path := self.check_file(args.path)):
+        paths = list(self.resolve_glob_path(args.path))
+
+        if not paths:
+            print(f"{args.path}: No such file or directory")
             return False
 
-        p = subprocess.Popen(["file", "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        longest_path = max(len(path.as_posix()) for path in paths) + 1
 
-        with path.open() as fh:
-            # We could just alias this to cat <path> | file -, but this is slow for large files
-            # This way we can explicitly limit to just 512 bytes
-            p.stdin.write(fh.read(512))
+        for path in paths:
+            if path.is_dir():
+                print(f"{path}: is a directory")
+                continue
 
-        p.stdin.close()
-        p.wait()
-
-        filetype = p.stdout.read().decode().split(":", 1)[1].strip()
-        print(f"{path}: {filetype}", file=stdout)
+            with path.open() as fh:
+                # We could just alias this to cat <path> | file -, but this is slow for large files
+                # This way we can explicitly limit to just 512 bytes
+                p = subprocess.Popen(["file", "-"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                p.stdin.write(fh.read(512))
+                p.stdin.close()
+                p.wait()
+                filetype = p.stdout.read().decode().split(":", 1)[1].strip()
+                print(f"{path}:{' ' * (longest_path - len(path.as_posix()))}{filetype}", file=stdout)
 
         return False
 
@@ -1440,9 +1449,7 @@ class TargetCli(TargetCmd):
     @alias("type")
     def cmd_cat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print file content."""
-        paths = list(self.resolve_glob_path(args.path))
-
-        if not paths:
+        if not (paths := list(self.resolve_glob_path(args.path))):
             print(f"{args.path}: No such file or directory")
             return False
 
@@ -1460,9 +1467,7 @@ class TargetCli(TargetCmd):
     @arg("path", type=TargetPathArgument)
     def cmd_zcat(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print file content from compressed files."""
-        paths = list(self.resolve_glob_path(args.path))
-
-        if not paths:
+        if not (paths := list(self.resolve_glob_path(args.path))):
             print(f"{args.path}: No such file or directory")
             return False
 
@@ -1485,8 +1490,7 @@ class TargetCli(TargetCmd):
     @alias("xxd")
     def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print a hexdump of file(s)."""
-        paths = list(self.resolve_glob_path(args.path))
-        if not paths:
+        if not (paths := list(self.resolve_glob_path(args.path))):
             print(f"{args.path}: No such file or directory")
             return False
 
@@ -1509,42 +1513,71 @@ class TargetCli(TargetCmd):
     @alias("shasum")
     def cmd_hash(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print the MD5, SHA1 and SHA256 hashes of a file."""
-        if not (path := self.check_file(args.path)):
+        if not (paths := list(self.resolve_glob_path(args.path))):
+            print(f"{args.path}: No such file or directory")
             return False
 
-        md5, sha1, sha256 = path.get().hash()
-        print(f"MD5:\t{md5}\nSHA1:\t{sha1}\nSHA256:\t{sha256}", file=stdout)
+        for path in paths:
+            if path.is_dir():
+                print(f"{path}: Is a directory")
+                continue
+
+            md5, sha1, sha256 = path.get().hash()
+            if len(paths) > 1:
+                print(f"File:\t{path}")
+            print(f"MD5:\t{md5}\nSHA1:\t{sha1}\nSHA256:\t{sha256}\n", file=stdout)
 
         return False
 
     @arg("path", type=TargetPathArgument)
     def cmd_md5sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print the MD5 checksum of a file provided by a path."""
-        if not (path := self.check_file(args.path)):
+        if not (paths := list(self.resolve_glob_path(args.path))):
+            print(f"{args.path}: No such file or directory")
             return False
 
-        (md5,) = path.get().hash(["md5"])
-        print(f"{md5}  {path!s}", file=stdout)
+        for path in paths:
+            if path.is_dir():
+                print(f"{path}: Is a directory")
+                continue
+
+            (md5,) = path.get().hash(["md5"])
+            print(f"{md5}  {path!s}", file=stdout)
+
         return False
 
     @arg("path", type=TargetPathArgument)
     def cmd_sha1sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print the SHA1 checksum of a file provided by a path."""
-        if not (path := self.check_file(args.path)):
+        if not (paths := list(self.resolve_glob_path(args.path))):
+            print(f"{args.path}: No such file or directory")
             return False
 
-        (sha1,) = path.get().hash(["sha1"])
-        print(f"{sha1}  {path!s}", file=stdout)
+        for path in paths:
+            if path.is_dir():
+                print(f"{path}: Is a directory")
+                continue
+
+            (sha1,) = path.get().hash(["sha1"])
+            print(f"{sha1}  {path!s}", file=stdout)
+
         return False
 
     @arg("path", type=TargetPathArgument)
     def cmd_sha256sum(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """Print the SHA256 checksum of a file provided by a path."""
-        if not (path := self.check_file(args.path)):
+        if not (paths := list(self.resolve_glob_path(args.path))):
+            print(f"{args.path}: No such file or directory")
             return False
 
-        (sha256,) = path.get().hash(["sha256"])
-        print(f"{sha256}  {path!s}", file=stdout)
+        for path in paths:
+            if path.is_dir():
+                print(f"{path}: Is a directory")
+                continue
+
+            (sha256,) = path.get().hash(["sha256"])
+            print(f"{sha256}  {path!s}", file=stdout)
+
         return False
 
     @arg("path", type=TargetPathArgument)
