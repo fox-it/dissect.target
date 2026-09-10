@@ -71,7 +71,7 @@ def get_dissect_target_version() -> str:
     try:
         return version("dissect.target")
     except PackageNotFoundError:
-        return "unable to determine version"
+        return "0+unknown"
 
 
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
