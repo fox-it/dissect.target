@@ -69,9 +69,35 @@ def test_args_to_uri(targets: list[str], loader_name: str, args: list[str], uris
         assert args_to_uri(targets, loader_name, args) == uris
 
 
-def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_version(monkeypatch: pytest.MonkeyPatch) -> None:
     parser = argparse.ArgumentParser()
     configure_generic_arguments(parser)
+
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-mock",
+                "--version",
+                "--loader",
+                "loader_name",
+                "--plugin-path",
+                "/path/to/plugins",
+                "--some-other-arg",
+                "value",
+            ],
+        )
+        with patch.object(parser, "exit", side_effect=SystemExit) as mocked_exit:
+            with pytest.raises(SystemExit):
+                _ = parser.parse_known_args()
+            assert mocked_exit.call_count == 1
+
+
+def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
+    parser = argparse.ArgumentParser()
+    with patch("dissect.target.tools.utils.cli.version", return_value="1.0.0") as mocked_version:
+        configure_generic_arguments(parser)
+        mocked_version.assert_called_once_with("dissect.target")
 
     with monkeypatch.context() as m:
         m.setattr(
@@ -84,7 +110,6 @@ def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
                 "some_value",
                 "--loader",
                 "loader_name",
-                "--version",
                 "--plugin-path",
                 "/path/to/plugins",
                 "--some-other-arg",
@@ -97,8 +122,6 @@ def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
 
         with (
             patch("dissect.target.tools.utils.cli.configure_logging") as mocked_configure_logging,
-            patch("dissect.target.tools.utils.cli.version", return_value="1.0.0") as mocked_version,
-            patch("dissect.target.tools.utils.cli.sys.exit") as mocked_exit,
             patch(
                 "dissect.target.tools.utils.cli.args_to_uri",
                 return_value=["loader_name://target1", "loader_name://target2"],
@@ -113,8 +136,6 @@ def test_process_generic_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
             process_generic_arguments(parser, args)
 
             mocked_configure_logging.assert_called_once_with(0, False, as_plain_text=True)
-            mocked_version.assert_called_once_with("dissect.target")
-            mocked_exit.assert_called_once_with(0)
             mocked_args_to_uri.assert_called_once_with(["target1", "target2"], "loader_name")
             mocked_register_keychain_file.assert_called_once_with(Path("/path/to/keychain.csv"))
             mocked_register_wildcard_value.assert_called_once_with("some_value")

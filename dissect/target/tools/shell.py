@@ -78,6 +78,7 @@ from dissect.target.tools.utils.cli import (
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_method,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
 )
@@ -2091,7 +2092,7 @@ def run_cli(cli: ExtendedCmd) -> None:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-shell {get_dissect_target_version()} : access a target using a virtual shell environment.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
