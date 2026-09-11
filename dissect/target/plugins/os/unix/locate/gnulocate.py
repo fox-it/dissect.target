@@ -18,7 +18,7 @@ gnulocate_def = """
 struct entry {
     int8 offset;
     char path[];
-}
+};
 """
 
 GNULocateRecord = TargetRecordDescriptor(

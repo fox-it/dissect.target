@@ -45,21 +45,21 @@ struct header {
     int unknown1;
     int unknown2;
     int value_type;
-}
+};
 
 struct header_end {
     int number_of_entries;
-}
+};
 
 struct header_end_0 {
     uint16  name_length;
     wchar   name[name_length];
     int     number_of_entries;
-}
+};
 
 struct footer {
     char magic[4];
-}
+};
 """
 
 c_custom_destination = cstruct()

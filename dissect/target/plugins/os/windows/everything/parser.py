@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from datetime import datetime
 
+    from dissect.cstruct import Endianess
+
 BZIP_HEADER = b"BZh9"
 FILE_MAGIC = b"ESDb"
 COMPAT_1 = (1, 7, 9)
@@ -27,11 +29,11 @@ log = get_logger(__name__)
 
 class EverythingVarInt(int, BaseType):
     @classmethod
-    def _read(cls, stream: BinaryIO, context: dict[str, Any] | None = None) -> int:
+    def _read(cls, stream: BinaryIO, *, context: dict[str, Any] | None = None, endian: Endianess) -> int:
         return read_varint(stream)
 
     @classmethod
-    def _write(cls, stream: BinaryIO, data: int) -> int:
+    def _write(cls, stream: BinaryIO, data: int, *, endian: Endianess) -> int:
         return stream.write(write_varint(data))
 
 

@@ -33,7 +33,7 @@ struct file_header {
     uleb128     updateNumber;                   // increases on every settings update when fileType=9,
                                                 // doesn't seem to change on fileType 0 or 1
     uleb128     fileType;                       // 0 if unsaved, 1 if saved, 9 if contains settings?
-}
+};
 
 struct tab_header_saved {
     uleb128     filePathLength;

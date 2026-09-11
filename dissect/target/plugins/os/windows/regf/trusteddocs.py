@@ -37,8 +37,8 @@ trustrecord_def = """
 typedef QWORD FILETIME;
 
 enum TRFLAG {
-    EDITING_ENABLED     = 0x00000001
-    MACROS_ENABLED      = 0x7fffffff
+    EDITING_ENABLED     = 0x00000001,
+    MACROS_ENABLED      = 0x7fffffff,
 };
 
 struct TrustRecordEntry {

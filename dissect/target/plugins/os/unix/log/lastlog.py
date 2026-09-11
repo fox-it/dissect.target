@@ -37,9 +37,9 @@ lastlog_def = """
 #define size        292
 
 
-struct {
+struct time_t {
     uint32 tv_sec;
-} time_t;
+};
 
 
 struct entry {
