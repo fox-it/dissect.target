@@ -1,18 +1,14 @@
-"""dissect.target loader for Acronis TIBX backup archives.
-
-This is the only module in the package that imports ``dissect.target`` -- the parser
-itself has no dependency on it, so it can later move into ``dissect.archive`` unchanged.
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.archive.tibx.exceptions import (
+from dissect.archive.tibx.c_tibx import PAGE_MARKER, c_tibx
+from dissect.archive.tibx.exception import (
     Error,
     InvalidPasswordError,
     UnsupportedFormatError,
 )
+from dissect.archive.tibx.page import ARCH_MAGIC
 from dissect.archive.tibx.tibx import TIBX
 
 from dissect.target.exceptions import LoaderError
@@ -29,17 +25,27 @@ KEYCHAIN_PROVIDER = "tibx"
 
 
 class TibxLoader(Loader):
-    """Load Acronis TIBX (Cyber Protect / CyberBackup "archive3") backup archives.
+    """Load Acronis TIBX (Cyber Protect / True Image "archive3") backup archives.
 
     TIBX archives hold disk/partition image backups: each backed-up partition is a
     deduplicated, compressed data stream that is reconstructed lazily and mapped as a
-    volume, letting filesystem and OS detection take over. Split archives
-    (``Name-0001.tibx`` parts) are stitched automatically when the first part is opened.
+    volume, letting filesystem and OS detection take over. The metadata streams Acronis
+    stores alongside the partitions are not mapped. Split archives and backup chains
+    (``Name-0001.tibx``, ...) are stitched automatically when the first file is opened.
+
+    An archive can hold several backups, e.g. a full backup followed by incrementals. The
+    latest is loaded by default. Select another with the ``recovery-point`` query parameter:
+    its index counting from 0, in the order ``acrocmd list backups`` prints them (oldest
+    first), or ``oldest`` / ``latest``::
+
+        target-query -f hostname "tibx://path/to/backup.tibx?recovery-point=0"
 
     Encrypted archives take their password from the keychain (``-K`` / ``-Kv``).
 
     References:
-        - https://github.com/mniedermaier/acronis-tibx (format documentation)
+        - https://github.com/TreadingTheTiber/acronis-tib-reader
+        - acronis-tibx by mniedermaier (MIT, no longer publicly available), see
+          ``THIRD_PARTY_NOTICES.md`` in ``dissect.archive``
     """
 
     def __init__(self, path: Path, **kwargs):
@@ -49,8 +55,6 @@ class TibxLoader(Loader):
         except Error as e:
             raise LoaderError(f"Failed to open TIBX archive: {path}") from e
 
-        # Recovery-point selection is available via the scheme form, e.g.
-        # `target-query "tibx://path/backup.tibx?recovery-point=0"`
         recovery_point = self.parsed_query.get("recovery-point", "latest")
         try:
             self.tibx.use_recovery_point(recovery_point)
@@ -75,10 +79,14 @@ class TibxLoader(Loader):
             return False
         try:
             with path.open("rb") as fh:
-                header = fh.read(12)
-        except OSError:
+                superblock = c_tibx.arch_superblock(fh)
+        except (OSError, EOFError):
             return False
-        return len(header) == 12 and header[0] == 0x41 and header[1] == 0x01 and header[8:12] == b"ARCH"
+        return (
+            superblock.header.marker == PAGE_MARKER
+            and superblock.header.type == c_tibx.PageType.ARCH
+            and superblock.body.magic == ARCH_MAGIC
+        )
 
     def map(self, target: Target) -> None:
         try:

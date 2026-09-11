@@ -2,10 +2,25 @@ from __future__ import annotations
 
 import struct
 import sys
+import urllib.parse
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
+from dissect.archive.tibx.c_tibx import (
+    ENVELOPE_SIZE,
+    LSB_FIXED_SIZE,
+    LSB_MEMTREE_OFFSET,
+    PAGE_MARKER,
+    PAGE_SIZE,
+    SEGMENT_HEADER_OFFSET,
+    SEGMENT_PAYLOAD_OFFSET,
+    TLV_DIRECTORY_OFFSET,
+    TLV_SLOT_COUNT,
+    c_tibx,
+)
+from dissect.archive.tibx.exception import InvalidPasswordError
+from dissect.archive.tibx.page import page_crc32c
 
 from dissect.target.exceptions import LoaderError
 from dissect.target.helpers import keychain
@@ -15,19 +30,6 @@ from dissect.target.target import Target
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
-
-PAGE = 0x1000
-
-
-def _crc32c(data: bytes) -> int:
-    from dissect.archive.tibx.crc32c import page_crc32c
-
-    return page_crc32c(data)
-
-
-def _finalize(pg: bytearray) -> bytes:
-    pg[4:8] = struct.pack(">I", _crc32c(bytes(pg)))
-    return bytes(pg)
 
 
 def _build_fat12_image(content: bytes) -> bytes:
@@ -60,81 +62,101 @@ def _build_fat12_image(content: bytes) -> bytes:
     return bytes(img)
 
 
-def _build_tibx_archive(volume_data: bytes) -> bytes:
-    """Build a minimal synthetic TIBX archive wrapping ``volume_data`` as one volume.
+def _page(page_type: int, content: dict[int, bytes]) -> bytes:
+    """A CRC-correct page of ``page_type`` with ``content`` placed at the given offsets."""
+    page = bytearray(PAGE_SIZE)
+    for offset, data in content.items():
+        page[offset : offset + len(data)] = data
+    header = c_tibx.page_header(marker=PAGE_MARKER, type=page_type)
+    page[:ENVELOPE_SIZE] = header.dumps()
+    header.crc32c = page_crc32c(bytes(page))
+    page[:ENVELOPE_SIZE] = header.dumps()
+    return bytes(page)
 
-    Constructs a two-page archive: one ARCH header with inline data_map/segment_map
-    LSM mem-trees, and one zstd-compressed SG data segment.
+
+def _lsb(key_length: int, value_length: int, cells: list[tuple[bytes, bytes]]) -> bytes:
+    """An L-SB whose mem-tree holds ``cells``: one compact group of live records."""
+    stream = c_tibx.lsm_cell_group_header(count=len(cells), alive=(1 << len(cells)) - 1).dumps()
+    stream += b"".join(key + value for key, value in cells)
+
+    record = bytearray(LSB_FIXED_SIZE)
+    superblock = c_tibx.lsm_superblock(
+        magic=b"L-SB", format_version=1, ctree_max_minus_2=8, seq=1, key_length=key_length, value_length=value_length
+    )
+    record[: len(c_tibx.lsm_superblock)] = superblock.dumps()
+    memtree = c_tibx.lsm_memtree_header(node_count=len(cells), extra_len=len(stream))
+    record[LSB_MEMTREE_OFFSET : LSB_MEMTREE_OFFSET + len(c_tibx.lsm_memtree_header)] = memtree.dumps()
+    return bytes(record) + stream
+
+
+def _build_tibx_archive(streams: list[tuple[int, int, bytes]], slices: list[int] | None = None) -> bytes:
+    """Build a synthetic TIBX archive holding ``streams`` of ``(volume_id, slice_id, data)``.
+
+    Page 0 is the ARCH header, with the data_map and segment_map (and, given ``slices``,
+    the slices tree) as LSM mem-trees; each stream follows as one zstd segment page.
     """
     if sys.version_info >= (3, 14):
         from compression import zstd  # novermin
     else:
         from backports import zstd
 
-    blob = zstd.compress(volume_data)
+    dm_cells, sm_cells, segments = [], [], []
+    for index, (volume_id, slice_id, data) in enumerate(streams):
+        segment_id = 100 + index
+        dm_key = c_tibx.data_map_key(
+            volume_id=volume_id, source_offset=0, extent_length=len(data), slice_id=slice_id, extent_id=index + 1
+        )
+        dm_cells.append((dm_key.dumps(), c_tibx.data_map_value(segment_id=segment_id, extent_index=0xFFFF).dumps()))
+        sm_value = c_tibx.segment_map_value(page_count=(1).to_bytes(4, "little"), page_offset=1 + index)
+        sm_cells.append((c_tibx.segment_map_key(segment_id=segment_id).dumps(), sm_value.dumps()))
 
-    # SG data segment page
-    sg = bytearray(PAGE)
-    sg[0], sg[1] = 0x41, 0xFF
-    sg[8:12] = b"SG\x00\x01"
-    struct.pack_into(">III", sg, 0x0C, len(volume_data), len(blob), 0)
-    struct.pack_into(">HH", sg, 0x18, 0x0300, 0)  # zstd compression
-    sg[0x2C : 0x2C + len(blob)] = blob
+        blob = zstd.compress(data)
+        header = c_tibx.segment_header(magic=b"SG", version=1, length=len(data), zlength=len(blob), compression=0x0300)
+        segments.append(
+            _page(c_tibx.PageType.DATA, {SEGMENT_HEADER_OFFSET: header.dumps(), SEGMENT_PAYLOAD_OFFSET: blob})
+        )
 
-    # data_map key: volume_id(8) + source_offset(8) + length(3) + slice_id(4) + extent_id(8) = 31 bytes
-    dm_key = struct.pack(">QQ", 10, 0) + len(volume_data).to_bytes(3, "big") + struct.pack(">IQ", 2, 1)
-    dm_val = struct.pack(">QH", 100, 0xFFFF)  # segment_id=100, whole-segment sentinel
+    slots = {1: _lsb(31, 10, sorted(dm_cells)), 2: _lsb(8, 32, sm_cells)}
+    if slices:
+        records = [
+            (
+                c_tibx.slice_key(slice_id=slice_id).dumps(),
+                c_tibx.slice_record(guid=bytes([slice_id]) * 16, created_ms=slice_id, modified_ms=slice_id).dumps(),
+            )
+            for slice_id in slices
+        ]
+        slots[5] = _lsb(len(c_tibx.slice_key), len(c_tibx.slice_record), records)
 
-    # segment_map key: segment_id(8); value: page_count(4 LE) + page_offset(4 BE) + slice_id(4 BE) + hash(20)
-    sm_key = struct.pack(">Q", 100)
-    sm_val = struct.pack("<I", 1) + struct.pack(">II", 1, 2) + b"\x00" * 20
+    directory = bytearray()
+    for index in range(TLV_SLOT_COUNT):
+        payload = slots.get(index, b"")
+        directory += c_tibx.tlv_header(length=len(payload)).dumps() + payload
+        directory += b"\x00" * (-len(directory) % 4)
 
-    # Compact cell stream for one cell (group of 1, alive bitmap = 0x01)
-    def compact_one(key: bytes, val: bytes) -> bytes:
-        return struct.pack("<I", 1 | (0x01 << 24)) + key + val
+    body = c_tibx.arch_header(
+        magic=b"ARCH",
+        header_size=TLV_DIRECTORY_OFFSET + len(directory),
+        header_version=8,
+        created_ms=1000,
+        modified_ms=2000,
+        archive_uuid=b"\xab" * 16,
+    )
+    arch = _page(
+        c_tibx.PageType.ARCH,
+        {ENVELOPE_SIZE: body.dumps(), ENVELOPE_SIZE + TLV_DIRECTORY_OFFSET: bytes(directory)},
+    )
+    return arch + b"".join(segments)
 
-    dm_stream = compact_one(dm_key, dm_val)
-    sm_stream = compact_one(sm_key, sm_val)
 
-    # L-SB records (mem-tree with one cell each)
-    def lsb_record(key_len: int, val_len: int, stream: bytes) -> bytes:
-        record = bytearray(0x178)
-        record[0:4] = b"L-SB"
-        record[4] = 1  # format version
-        record[5] = 0  # ctree_count - 2
-        record[6] = 8  # ctree_max - 2
-        struct.pack_into(">IIII", record, 8, 1, 0, key_len, val_len)
-        record[0x158] = 0  # encoding: raw
-        struct.pack_into(">H", record, 0x15A, 1)  # node_count
-        struct.pack_into(">II", record, 0x15C, len(stream), 0)
-        return bytes(record) + stream
+def _loader(path: Path, query: str = "") -> TibxLoader:
+    return TibxLoader(path, parsed_path=urllib.parse.urlparse(f"tibx://{path.name}?{query}"))
 
-    dm_sb = lsb_record(31, 10, dm_stream)
-    sm_sb = lsb_record(8, 32, sm_stream)
 
-    # TLV directory: 19 slots; slots 1 (data_map) and 2 (segment_map) carry the L-SBs
-    tlv = bytearray()
-    for index in range(19):
-        payload = {1: dm_sb, 2: sm_sb}.get(index, b"")
-        tlv += struct.pack(">I", len(payload))
-        tlv += payload
-        stride = (len(payload) + 7) & ~3
-        tlv += b"\x00" * (stride - 4 - len(payload))
-
-    # ARCH header page
-    header_size = 0x400 + len(tlv)
-    pg = bytearray(PAGE)
-    pg[0], pg[1] = 0x41, 0x01
-    pg[8:12] = b"ARCH"
-    struct.pack_into(">I", pg, 0x0C, header_size)
-    struct.pack_into(">H", pg, 0x10, 8)
-    pg[0x18:0x20] = (1000).to_bytes(8, "big")
-    pg[0x20:0x28] = (2000).to_bytes(8, "big")
-    pg[0x28:0x38] = b"\xab" * 16
-    struct.pack_into(">Q", pg, 8 + 0x188, 1)  # commit sequence
-    pg[8 + 0x400 : 8 + 0x400 + len(tlv)] = tlv
-
-    return _finalize(pg) + _finalize(sg)
+def _read_hello(loader: TibxLoader) -> bytes:
+    target = Target()
+    loader.map(target)
+    target.apply()
+    return target.filesystems[0].path("/HELLO.TXT").read_bytes()
 
 
 FILE_CONTENT = b"hello from inside a tibx backup"
@@ -142,9 +164,17 @@ FILE_CONTENT = b"hello from inside a tibx backup"
 
 @pytest.fixture
 def fat_archive(tmp_path: Path) -> Path:
-    image = _build_fat12_image(FILE_CONTENT)
     path = tmp_path / "backup.tibx"
-    path.write_bytes(_build_tibx_archive(image))
+    path.write_bytes(_build_tibx_archive([(10, 2, _build_fat12_image(FILE_CONTENT))]))
+    return path
+
+
+@pytest.fixture
+def chain_archive(tmp_path: Path) -> Path:
+    """A full backup (slice 2) and an incremental (slice 3) that rewrote the volume."""
+    path = tmp_path / "chain.tibx"
+    streams = [(10, 2, _build_fat12_image(b"full backup")), (10, 3, _build_fat12_image(b"incremental"))]
+    path.write_bytes(_build_tibx_archive(streams, slices=[2, 3]))
     return path
 
 
@@ -170,6 +200,10 @@ def test_detect(fat_archive: Path, tmp_path: Path) -> None:
     wrong_magic.write_bytes(b"\x00" * 0x1000)
     assert not TibxLoader.detect(wrong_magic)
 
+    truncated = tmp_path / "truncated.tibx"
+    truncated.write_bytes(fat_archive.read_bytes()[:16])
+    assert not TibxLoader.detect(truncated)
+
     assert not TibxLoader.detect(tmp_path / "missing.tibx")
 
 
@@ -188,11 +222,51 @@ def test_map_volume_and_filesystem(fat_archive: Path) -> None:
     assert filesystem.path("/HELLO.TXT").read_bytes() == FILE_CONTENT
 
 
+def test_metadata_streams_are_not_mapped(tmp_path: Path) -> None:
+    # Acronis keys its own metadata by volume id just like a partition; only the
+    # partition may become a volume
+    path = tmp_path / "backup.tibx"
+    streams = [(10, 2, _build_fat12_image(FILE_CONTENT)), (3, 2, b'<?xml version="1.0"?><metainfo/>')]
+    path.write_bytes(_build_tibx_archive(streams))
+
+    target = Target()
+    TibxLoader(path).map(target)
+    assert [volume.name for volume in target.volumes] == ["tibx_a"]
+
+
 @pytest.mark.usefixtures("_registered_loader")
 def test_target_open_selects_loader(fat_archive: Path) -> None:
     target = Target.open(fat_archive)
     assert isinstance(target._loader, TibxLoader)
     assert len(target.filesystems) == 1
+
+
+def test_latest_recovery_point_is_default(chain_archive: Path) -> None:
+    assert _read_hello(TibxLoader(chain_archive)) == b"incremental"
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("recovery-point=0", b"full backup"),
+        ("recovery-point=1", b"incremental"),
+        ("recovery-point=oldest", b"full backup"),
+        ("recovery-point=latest", b"incremental"),
+    ],
+)
+def test_select_recovery_point(chain_archive: Path, query: str, expected: bytes) -> None:
+    assert _read_hello(_loader(chain_archive, query)) == expected
+
+
+@pytest.mark.parametrize("value", ["2", "-1", "bogus"])
+def test_invalid_recovery_point(chain_archive: Path, value: str) -> None:
+    with pytest.raises(LoaderError, match="Invalid recovery point"):
+        _loader(chain_archive, f"recovery-point={value}")
+
+
+def test_recovery_point_without_recorded_backups(fat_archive: Path) -> None:
+    with pytest.raises(LoaderError, match="records no backups"):
+        _loader(fat_archive, "recovery-point=0")
 
 
 def test_encrypted_without_password(fat_archive: Path) -> None:
@@ -203,8 +277,6 @@ def test_encrypted_without_password(fat_archive: Path) -> None:
 
 
 def test_encrypted_with_keychain_password(fat_archive: Path) -> None:
-    from dissect.archive.tibx.exceptions import InvalidPasswordError
-
     keychain.register_key(keychain.KeyType.PASSPHRASE, "wrong", provider="tibx")
     keychain.register_key(keychain.KeyType.PASSPHRASE, "letmein")
     try:
