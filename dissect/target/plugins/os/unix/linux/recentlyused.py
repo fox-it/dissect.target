@@ -125,6 +125,7 @@ def parse_recently_used_xbel(
                     type=icon.get("type"),
                     href=icon.get("href"),
                     name=icon.get("name"),
+                    _target=target,
                 )
                 yield GroupedRecord("unix/linux/recently_used/icon", [cur, iconrecord])
 
@@ -135,6 +136,7 @@ def parse_recently_used_xbel(
                     name=app.get("name"),
                     exec=app.get("exec"),
                     count=app.get("count"),
+                    _target=target,
                 )
                 yield GroupedRecord("unix/linux/recently_used/application", [cur, apprecord])
 

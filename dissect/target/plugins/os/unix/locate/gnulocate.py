@@ -93,4 +93,4 @@ class GNULocatePlugin(BaseLocatePlugin):
         locate_file = GNULocateFile(locate_fh)
 
         for path in locate_file:
-            yield GNULocateRecord(path=self.target.fs.path(path), source=self.path)
+            yield GNULocateRecord(path=self.target.fs.path(path), source=self.path, _target=self.target)

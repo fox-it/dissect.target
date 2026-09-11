@@ -11,6 +11,7 @@ from dissect.target.helpers.record import (
     WindowsInterfaceRecord,
 )
 from dissect.target.plugins.os.default.network import NetworkPlugin
+from tests.helpers.test_record import MockTarget
 
 if TYPE_CHECKING:
     from dissect.target.plugins.os.default.network import InterfaceRecord
@@ -28,6 +29,7 @@ def network_record(request: pytest.FixtureRequest) -> InterfaceRecord:
         dns=["8.8.8.8", "1.1.1.1"],
         mac=["DE:AD:BE:EF:00:00"],
         source="some_file",
+        _target=MockTarget(),
     )
 
 

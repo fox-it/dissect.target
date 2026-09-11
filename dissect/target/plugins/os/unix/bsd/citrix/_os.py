@@ -227,14 +227,14 @@ class CitrixPlugin(BsdPlugin):
                 user_home = self.target.fs.path("/root")
 
             seen.add((username, user_home.as_posix() if user_home else None, None))
-            yield UnixUserRecord(name=username, home=user_home)
+            yield UnixUserRecord(name=username, home=user_home, _target=self.target)
 
         # Yield all users in nstmp that were not observed in the config
         for username in nstmp_users:
             # The nsmonitor user has a home directory of /var/nstmp/monitors rather than /var/nstmp/nsmonitor
             home = nstmp_path.joinpath(username) if username != "nsmonitor" else nstmp_path.joinpath("monitors")
             seen.add((username, home.as_posix(), None))
-            yield UnixUserRecord(name=username, home=home)
+            yield UnixUserRecord(name=username, home=home, _target=self.target)
 
         # Yield users from /etc/passwd if we have not seem them in previous loops
         for user in super().users():
