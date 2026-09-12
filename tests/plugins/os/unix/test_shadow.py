@@ -38,6 +38,7 @@ def test_unix_shadow(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
     assert results[0].inactivity_period is None
     assert results[0].expiration_date is None
     assert results[0].unused_field == ""
+    assert results[0].source == "/etc/shadow"
 
 
 def test_unix_shadow_backup_file(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -53,8 +54,10 @@ def test_unix_shadow_backup_file(target_unix_users: Target, fs_unix: VirtualFile
     results = list(target_unix_users.passwords())
     assert len(results) == 2
     assert results[0].name == "test"
+    assert results[0].source == "/etc/shadow"
     assert results[1].name == "other-user"
     assert results[0].hash == results[1].hash
+    assert results[1].source == "/etc/shadow-"
 
 
 def test_unix_shadow_invalid_shent(

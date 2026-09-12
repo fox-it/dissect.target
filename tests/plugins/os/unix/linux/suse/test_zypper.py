@@ -38,9 +38,11 @@ def test_zypper_logs(target_unix: Target, fs_unix: VirtualFilesystem, test_file:
     assert results[0].package_name is None
     assert results[0].command == "zypper install unzip"
     assert results[0].requested_by_user == "root"
+    assert results[0].source == f"/var/log/zypp/{test_file}"
 
     assert results[-1].ts == datetime(2022, 12, 16, 13, 2, 44, tzinfo=tz)
     assert results[-1].operation == "install"
     assert results[-1].package_name == "yast2-4.5.20-1.1:x86_64"
     assert results[-1].command is None
     assert results[-1].requested_by_user is None
+    assert results[-1].source == f"/var/log/zypp/{test_file}"

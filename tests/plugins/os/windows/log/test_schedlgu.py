@@ -27,6 +27,7 @@ def test_shedlgu(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert task_scheduler_started_event.ts == datetime("2006-11-02 07:35:17+00:00")
     assert task_scheduler_started_event.job == "Task Scheduler Service"
     assert task_scheduler_started_event.status == "Started"
+    assert task_scheduler_started_event.source == "c:\\Windows\\SchedLgU.txt"
 
     assert task_scheduler_version_event.job == "Task Scheduler Service"
     assert task_scheduler_version_event.version == "6.0.6000.16386 (vista_rtm.061101-2205)"
@@ -40,3 +41,4 @@ def test_shedlgu(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert job_task_event.command == "NDETECT.EXE"
     assert job_task_event.status == "Finished"
     assert job_task_event.exit_code == 65
+    assert job_task_event.source == "c:\\Windows\\SchedLgU.txt"

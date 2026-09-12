@@ -41,7 +41,7 @@ class ScheduledTasks:
         except Exception as e:
             raise InvalidTaskError(e)
 
-        self.task_path = xml_file
+        self.source = xml_file
         self.tasks = self.get_tasks()
 
     def strip_namespace(self, data: Element) -> Element:
@@ -65,9 +65,9 @@ class ScheduledTasks:
     def get_tasks(self) -> list[XmlTask]:
         tasks = []
         if self.xml_data.tag == "Task":
-            tasks.append(XmlTask(self.xml_data, self.task_path))
+            tasks.append(XmlTask(self.xml_data, self.source))
         else:
-            tasks.extend(XmlTask(task_element, self.task_path) for task_element in self.xml_data.findall(".//{*}Task"))
+            tasks.extend(XmlTask(task_element, self.source) for task_element in self.xml_data.findall(".//{*}Task"))
 
         return tasks
 
@@ -109,7 +109,7 @@ class XmlTask:
     """
 
     def __init__(self, task_element: Element, task_path: TargetPath):
-        self.task_path = task_path
+        self.source = task_path
         self.task_element = task_element
 
         # Properties
@@ -124,7 +124,7 @@ class XmlTask:
 
         self.uri = self.get_element("RegistrationInfo/URI")
         self.security_descriptor = self.get_element("RegistrationInfo/SecurityDescriptor")
-        self.source = self.get_element("RegistrationInfo/Source")
+        self.registration_source = self.get_element("RegistrationInfo/Source")
         self.date = self.get_element("RegistrationInfo/Date")
         self.author = self.get_element("RegistrationInfo/Author")
         self.version = self.get_element("RegistrationInfo/Version")
@@ -266,12 +266,14 @@ class XmlTask:
                 delay=delay,
                 random_delay=random_delay,
                 trigger_data=trigger_data,
+                source=self.source,
             )
 
             if trigger_type == "LogonTrigger":
                 user_id = self.get_element("UserId", trigger)
                 record = LogonTriggerRecord(
                     user_id=user_id,
+                    source=self.source,
                 )
                 yield GroupedRecord(LogonTriggerRecord.name, [base, record])
 
@@ -297,6 +299,7 @@ class XmlTask:
                     number_of_occurences=number_of_occurences,
                     matching_elements=matching_elements,
                     value_queries=value_queries,
+                    source=self.source,
                 )
 
                 yield GroupedRecord(EventTriggerRecord.name, [base, record])
@@ -308,6 +311,7 @@ class XmlTask:
                 record = SessionStateChangeTriggerRecord(
                     user_id=user_id,
                     state_change=state_change,
+                    source=self.source,
                 )
 
                 yield GroupedRecord(SessionStateChangeTriggerRecord.name, [base, record])
@@ -316,6 +320,7 @@ class XmlTask:
                 if days_between_triggers := self.get_element("ScheduleByDay/DaysInterval", trigger):
                     record = DailyTriggerRecord(
                         days_between_triggers=int(days_between_triggers),
+                        source=self.source,
                     )
 
                 elif weeks_between_triggers := self.get_element("ScheduleByWeek/WeeksInterval", trigger):
@@ -323,6 +328,7 @@ class XmlTask:
                     record = WeeklyTriggerRecord(
                         weeks_between_triggers=int(weeks_between_triggers),
                         days_of_week=days_of_week,
+                        source=self.source,
                     )
 
                 elif trigger.find("ScheduleByMonth/") is not None:
@@ -331,6 +337,7 @@ class XmlTask:
                     record = MonthlyDateTriggerRecord(
                         day_of_month=day_of_month,
                         months_of_year=months_of_year,
+                        source=self.source,
                     )
 
                 elif trigger.find("ScheduleByMonthDayOfWeek/") is not None:
@@ -341,6 +348,7 @@ class XmlTask:
                         which_week=which_week,
                         days_of_week=days_of_week,
                         months_of_year=months_of_year,
+                        source=self.source,
                     )
 
                 else:
@@ -353,6 +361,7 @@ class XmlTask:
 
                 record = WnfTriggerRecord(
                     state_name=state_name,
+                    source=self.source,
                 )
 
                 yield GroupedRecord(WnfTriggerRecord.name, [base, record])
@@ -362,6 +371,7 @@ class XmlTask:
 
                 record = RegistrationTrigger(
                     date=date,
+                    source=self.source,
                 )
 
                 yield GroupedRecord(RegistrationTrigger.name, [base, record])
@@ -386,6 +396,7 @@ class XmlTask:
                     command=command,
                     arguments=args,
                     working_directory=wrkdir,
+                    source=self.source,
                 )
 
             if action_type == "ComHandler":
@@ -395,6 +406,7 @@ class XmlTask:
                     action_type=action_type,
                     class_id=com_class_id,
                     com_data=com_data,
+                    source=self.source,
                 )
 
             if action_type == "SendEmail":
@@ -422,6 +434,7 @@ class XmlTask:
                     header_value=email_headers_value,
                     body=email_body,
                     attachment=email_attachments,
+                    source=self.source,
                 )
 
             if action_type == "ShowMessage":
@@ -431,4 +444,5 @@ class XmlTask:
                     action_type=action,
                     title=title,
                     body=body,
+                    source=self.source,
                 )
