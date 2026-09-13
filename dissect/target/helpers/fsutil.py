@@ -9,6 +9,7 @@ import io
 import os
 import re
 import sys
+from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
@@ -57,6 +58,7 @@ from dissect.target.helpers.polypath import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Sequence
+    from contextvars import Token
 
     from typing_extensions import Self
 
@@ -447,6 +449,11 @@ def has_glob_magic(s: str) -> bool:
     return re_glob_magic.search(s) is not None
 
 
+# Symlinks are also resolved from within ``Filesystem.get()``, which has no way of passing the chain of already
+# resolved links along. Track it here so loops spanning those calls are detected as well.
+_resolving_symlinks: ContextVar[set[int] | None] = ContextVar("_resolving_symlinks", default=None)
+
+
 def resolve_link(
     fs: filesystem.Filesystem,
     link: str,
@@ -466,32 +473,42 @@ def resolve_link(
     link_id = f"{path}{link}"
     hash_entry = hash(link_id)
 
-    if not previous_links:
+    if previous_links is None:
+        previous_links = _resolving_symlinks.get()
+
+    # Only the outermost call owns the context variable and is responsible for resetting it
+    token: Token | None = None
+    if previous_links is None:
         previous_links = set()
+        token = _resolving_symlinks.set(previous_links)
 
-    # Check whether the current entry was already resolved once.
-    if hash_entry in previous_links:
-        raise SymlinkRecursionError(f"Symlink loop detected for {link_id}")
+    try:
+        # Check whether the current entry was already resolved once.
+        if hash_entry in previous_links:
+            raise SymlinkRecursionError(f"Symlink loop detected for {link_id}")
 
-    previous_links.add(hash_entry)
+        previous_links.add(hash_entry)
 
-    if not isabs(link):
-        cur_dirname = dirname(normpath(path))
-        link = normpath(join(cur_dirname, link))
+        if not isabs(link):
+            cur_dirname = dirname(normpath(path))
+            link = normpath(join(cur_dirname, link))
 
-    # retrieve file from root
-    entry = fs.get(link)
+        # retrieve file from root
+        entry = fs.get(link)
 
-    if entry.is_symlink():
-        entry = resolve_link(
-            fs,
-            entry.readlink(),
-            link,
-            sep=entry.fs.sep,
-            previous_links=previous_links,
-        )
+        if entry.is_symlink():
+            entry = resolve_link(
+                fs,
+                entry.readlink(),
+                link,
+                sep=entry.fs.sep,
+                previous_links=previous_links,
+            )
 
-    return entry
+        return entry
+    finally:
+        if token is not None:
+            _resolving_symlinks.reset(token)
 
 
 def open_decompress(
