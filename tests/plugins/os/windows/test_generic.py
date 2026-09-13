@@ -50,3 +50,30 @@ def test_windows_generic_sid(target_win: Target, hive_hklm: VirtualHive) -> None
 
     assert records[1].sid == "S-1-5-21-2056590280-2211311772-3114195273-1605"
     assert records[1].sidtype == "Domain"
+
+
+def test_windows_generic_domain_dcname(target_win: Target, hive_hklm: VirtualHive) -> None:
+    gph_key_name = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\History"
+    gph_key = VirtualKey(hive_hklm, gph_key_name)
+    gph_key.add_value("DCName", VirtualValue(hive_hklm, "DCName", "\\\\MYHOSTNAME.MYDOMAIN.local"))
+    hive_hklm.map_key(gph_key_name, gph_key)
+
+    target_win.add_plugin(GenericPlugin)
+
+    assert target_win.domain == "MYDOMAIN.local"
+
+
+def test_windows_generic_domain_skips_ip_address(target_win: Target, hive_hklm: VirtualHive) -> None:
+    gph_key_name = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\History"
+    gph_key = VirtualKey(hive_hklm, gph_key_name)
+    gph_key.add_value("NetworkName", VirtualValue(hive_hklm, "NetworkName", "10.0.0.1"))
+    hive_hklm.map_key(gph_key_name, gph_key)
+
+    telephony_key_name = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Telephony"
+    telephony_key = VirtualKey(hive_hklm, telephony_key_name)
+    telephony_key.add_value("DomainName", VirtualValue(hive_hklm, "DomainName", "MYDOMAIN.local"))
+    hive_hklm.map_key(telephony_key_name, telephony_key)
+
+    target_win.add_plugin(GenericPlugin)
+
+    assert target_win.domain == "MYDOMAIN.local"
