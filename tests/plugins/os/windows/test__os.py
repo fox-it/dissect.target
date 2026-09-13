@@ -290,7 +290,10 @@ def test_windows_user_from_sam(target_win_users: Target) -> None:
     target_win_users.machine_sid = Mock(
         return_value=iter([ComputerSidRecord(sid="S-1-5-21-3263113198-3007035898-945866154")])
     )
-    target_win_users.sam = Mock(return_value=[fake_sam_user])
+
+    # Need to define sam, then sam.users
+    target_win_users.sam = Mock()
+    target_win_users.sam.users = Mock(return_value=[fake_sam_user])
 
     users = list(target_win_users.users())
 
