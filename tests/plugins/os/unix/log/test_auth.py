@@ -39,6 +39,19 @@ def test_auth(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
         assert results[-1].message == "pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
+def test_auth_esxi(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
+
+    data_path = "_data/plugins/os/unix/log/auth/esxi_auth.log"
+    data_file = absolute_path(data_path)
+    fs_unix.map_file("var/run/log/auth.log", data_file)
+
+    target_unix.add_plugin(AuthPlugin)
+    results = list(target_unix.authlog())
+
+    assert len(results) == 1
+
+
 def test_auth_with_gz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Pacific/Honolulu"))
 

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 RE_TS = re.compile(r"^[A-Za-z]{3}\s*\d{1,2}\s\d{1,2}:\d{2}:\d{2}")
-RE_TS_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2}")
+RE_TS_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{2,6})?((?:\+\d{2}:\d{2})|Z)")
 RE_LINE = re.compile(
     r"""
     \d{2}:\d{2}\s                           # First match on the similar ending of the different timestamps
@@ -41,11 +41,16 @@ def iso_readlines(file: Path, max_lines: int | None = None) -> Iterator[tuple[da
                 log.debug("Skipping line: %s", line)
                 continue
 
-            try:
-                ts = datetime.strptime(match[0], "%Y-%m-%dT%H:%M:%S.%f%z")
-            except ValueError as e:
-                log.warning("Unable to parse ISO timestamp in line: %s", line)
-                log.debug("", exc_info=e)
+            ts = None
+            for format in ["%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z"]:
+                try:
+                    ts = datetime.strptime(match[0], format)
+                    break
+                except ValueError:
+                    continue
+
+            if not ts:
+                log.warning("Unable to parse ISO timestamp in line: %s TS:%s", line, match[0])
                 continue
 
             yield ts, line

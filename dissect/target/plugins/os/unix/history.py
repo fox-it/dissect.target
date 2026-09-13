@@ -37,6 +37,8 @@ RE_FISH = re.compile(r"- cmd: (?P<command>.+?)\s+when: (?P<ts>\d+)")
 class CommandHistoryPlugin(Plugin):
     """UNIX command history plugin."""
 
+    COMMAND_HISTORY_ABSOLUTE_PATHS = ()
+
     COMMAND_HISTORY_RELATIVE_PATHS = (
         ("bash", ".bash_history"),
         ("fish", ".local/share/fish/fish_history"),
@@ -62,6 +64,11 @@ class CommandHistoryPlugin(Plugin):
     def _find_history_files(self) -> list[tuple[str, TargetPath, UnixUserRecord]]:
         """Find existing history files."""
         history_files = []
+        for shell, history_absolute_path_glob in self.COMMAND_HISTORY_ABSOLUTE_PATHS:
+            history_files.extend(
+                (shell, path, None) for path in self.target.fs.path("/").glob(history_absolute_path_glob.lstrip("/"))
+            )
+
         for user_details in self.target.user_details.all_with_home():
             for shell, history_relative_path in self.COMMAND_HISTORY_RELATIVE_PATHS:
                 if "*" in history_relative_path:
