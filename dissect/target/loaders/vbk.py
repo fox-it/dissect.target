@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.vbk import VbkFilesystem
-from dissect.target.loader import Loader, find_loader
-from dissect.target.loaders.raw import RawLoader
+from dissect.target.loader import MiddlewareLoader
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
 RE_RAW_DISK = re.compile(r"(?:[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})|(?:DEV__.+)")
 
 
-class VbkLoader(Loader):
+class VbkLoader(MiddlewareLoader):
     """Load Veaam Backup (VBK) files.
 
     References:
@@ -35,7 +34,7 @@ class VbkLoader(Loader):
     def detect(path: Path) -> bool:
         return path.suffix.lower() == ".vbk"
 
-    def map(self, target: Target) -> None:
+    def prepare(self, target: Target) -> Path:
         # We haven't really researched any of the VBK metadata yet, so just try some common formats
         root = self.vbkfs.path("/")
         if (base := next(root.glob("*"), None)) is None:
@@ -51,24 +50,19 @@ class VbkLoader(Loader):
 
             candidates.append(root.joinpath("+".join(map(str, disks))))
 
-        # Try to find a loader
-        for candidate in candidates:
-            if candidate.suffix.lower() == ".vmcx":
-                # For VMCX files we need to massage the file layout a bit
-                vfs = VirtualFilesystem()
-                vfs.map_file_entry(candidate.name, candidate)
-
-                for entry in chain(base.glob("Ide*/*"), base.glob("Scsi*/*")):
-                    vfs.map_file_entry(entry.name, entry)
-
-                candidate = vfs.path(candidate.name)
-
-            if (loader := find_loader(candidate, fallbacks=[RawLoader])) is not None:
-                ldr = loader(candidate)
-                ldr.map(target)
-
-                # Store a reference to the loader if we successfully mapped
-                self.loader = ldr
-                break
-        else:
+        # We should only have one candidate at this point
+        if len(candidates) > 1:
             raise LoaderError("Unsupported VBK structure, use `-L raw` to manually inspect the VBK")
+
+        candidate = candidates[0]
+        if candidate.suffix.lower() == ".vmcx":
+            # For VMCX files we need to massage the file layout a bit
+            vfs = VirtualFilesystem()
+            vfs.map_file_entry(candidate.name, candidate)
+
+            for entry in chain(base.glob("Ide*/*"), base.glob("Scsi*/*")):
+                vfs.map_file_entry(entry.name, entry)
+
+            candidate = vfs.path(candidate.name)
+
+        return candidate
