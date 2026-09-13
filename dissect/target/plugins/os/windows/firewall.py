@@ -63,9 +63,9 @@ class WindowsFirewallPlugin(Plugin):
 
     LOGGING_KEYS = (
         # Defaults
-        "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Defaults\\FirewallPolicy\\PublicProfile\\Logging"
-        "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Defaults\\FirewallPolicy\\StandardProfile\\Logging"
-        "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Defaults\\FirewallPolicy\\DomainProfile\\Logging"
+        "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Defaults\\FirewallPolicy\\PublicProfile\\Logging",
+        "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Defaults\\FirewallPolicy\\StandardProfile\\Logging",
+        "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Defaults\\FirewallPolicy\\DomainProfile\\Logging",
         # Parameters
         "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\PublicProfile\\Logging",
         "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\StandardProfile\\Logging",
