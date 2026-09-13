@@ -26,6 +26,7 @@ from dissect.target.plugins.os.windows.defender.mplog import (
     DefenderMPLogRTPRecord,
     DefenderMPLogThreatActionRecord,
     DefenderMPLogThreatRecord,
+    strip_bidi_marks,
 )
 from dissect.target.plugins.os.windows.defender.quarantine import (
     DefenderFileQuarantineRecord,
@@ -463,6 +464,7 @@ class MicrosoftDefenderPlugin(Plugin):
                 block += mplog_line
 
                 while mplog_line := mplog.readline():
+                    mplog_line = strip_bidi_marks(mplog_line)
                     block += mplog_line
                     if suffix.search(mplog_line):
                         break
@@ -494,6 +496,7 @@ class MicrosoftDefenderPlugin(Plugin):
         | DefenderMPLogRTPRecord
     ]:
         while mplog_line := mplog.readline():
+            mplog_line = strip_bidi_marks(mplog_line)
             yield from self._mplog_line(mplog_line, source, tzinfo=tzinfo)
             yield from self._mplog_block(mplog_line, mplog, source, tzinfo=tzinfo)
 
