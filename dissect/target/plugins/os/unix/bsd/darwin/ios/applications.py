@@ -64,6 +64,6 @@ class IOSApplicationsPlugin(Plugin):
                 version=metadata.get("bundleShortVersionString") or info.get("CFBundleShortVersionString"),
                 author=metadata.get("artistName") or info.get("author"),
                 type=metadata.get("kind") or info.get("type"),
-                path=app_dir,
+                source=app_dir,
                 _target=self.target,
             )
