@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import ipaddress
 import struct
 from itertools import chain
 from typing import TYPE_CHECKING
@@ -156,18 +158,24 @@ class GenericPlugin(Plugin):
         """
         keys = [
             ("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\History", "MachineDomain"),
-            ("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\History", "NetworkName"),
             ("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\History", "DCName"),
+            ("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Group Policy\\History", "NetworkName"),
             ("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Telephony", "DomainName"),
         ]
 
         for key, value in keys:
             try:
                 val = self.target.registry.key(key).value(value).value
-                if val:
-                    return val.strip("\\")
-            except RegistryError:  # noqa: PERF203
+            except RegistryError:
                 continue
+
+            if value == "DCName":
+                # DCName holds the FQDN of the domain controller, e.g. \\DC01.example.com
+                _, _, val = val.strip("\\").partition(".")
+
+            if domain := _parse_domain(val):
+                return domain
+
         return None
 
     @export(property=True)
@@ -544,3 +552,19 @@ class GenericPlugin(Plugin):
     def sid(self) -> Iterator[ComputerSidRecord]:
         """Return the machine- and optional domain SID of the system."""
         yield from chain(self.machine_sid(), self.domain_sid())
+
+
+def _parse_domain(value: str) -> str | None:
+    """Return ``value`` as a domain name, or ``None`` if it does not hold one.
+
+    Systems that were never joined to a domain can leave an IP address behind in ``NetworkName``, which is not a
+    domain name.
+    """
+    if not (value := value.strip().strip("\\")):
+        return None
+
+    with contextlib.suppress(ValueError):
+        ipaddress.ip_address(value)
+        return None
+
+    return value
