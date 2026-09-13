@@ -239,6 +239,12 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
             "",
         ),
     )
+    fdinfo_files_data = (
+        "pos\t0\nflags\t00000002\nsocket\t1337\n",
+        "pos\t0\nflags\t00000002\nsocket\t1338\n",
+        "pos\t0\nflags\t00000002\nsocket\t1339\n",
+        "pos\t0\nflags\t00000002\nsocket\t1337\n"
+    )
     stat_files_data = (
         "1 (systemd) S 0 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
         "2 (kthread) K 1 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
@@ -251,6 +257,7 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
         fs.makedirs(dir)
         fs.map_file_entry(fd.path, fd)
 
+        fs.map_file_fh(dir + "/fdinfo/" + fd.name, BytesIO(fdinfo_files_data[idx].encode()))
         fs.map_file_fh(dir + "/stat", BytesIO(stat_files_data[idx].encode()))
         fs.map_file_fh(dir + "/cmdline", BytesIO(cmdline.encode()))
         if environ:
@@ -259,7 +266,7 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
     # symlink acquire process to self
     fs.link("/proc/1337", "/proc/self")
 
-    # boottime and uptime are needed for for time tests
+    # boottime and uptime are needed for time tests
     fs.map_file_fh("/proc/uptime", BytesIO(b"134368.27 132695.52\n"))
     fs.map_file_fh("/proc/stat", BytesIO(b"btime 1680559854"))
 
