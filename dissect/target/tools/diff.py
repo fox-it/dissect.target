@@ -38,6 +38,7 @@ from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
     generate_argparse_for_method,
+    get_dissect_target_version,
     process_generic_arguments,
 )
 from dissect.target.tools.utils.fs import print_extensive_file_stat_listing
@@ -899,7 +900,7 @@ def differentiate_target_plugin_outputs(
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="target-diff",
+        description=f"target-diff {get_dissect_target_version()} : compare targets against one another.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )

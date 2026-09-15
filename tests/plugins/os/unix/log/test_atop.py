@@ -45,4 +45,4 @@ def test_atop_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert results[0].vpid == 0
     assert bool(results[0].wasinactive) is False
     assert results[0].container == ""
-    assert str(results[0].filepath) == "/var/log/atop/atop_20221111"
+    assert str(results[0].source) == "/var/log/atop/atop_20221111"

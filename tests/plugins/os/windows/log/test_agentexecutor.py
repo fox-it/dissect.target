@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING
 
 import pytest
@@ -61,3 +62,7 @@ def test_agentexecutor_parsing_valid_entries(target_win: Target, fs_win: Virtual
     assert second.context == "CTX"
     assert "Another entry, testing DD-MM-YYYY format" in second.message
     assert second.file_origin == "ExplicitLogFile.log"
+
+    assert Counter(str(r.source) for r in records) == {
+        "sysvol\\ProgramData\\Microsoft\\IntuneManagementExtension\\Logs\\AgentExecutor.log": 2
+    }

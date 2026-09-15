@@ -51,14 +51,7 @@ class AcquireTarSubLoader(TarSubLoader):
             if member.name == ".":
                 continue
 
-            if member.name.startswith(("/fs/", "fs/")):
-                # Current acquire
-                parts = member.name.replace("fs/", "").split("/")
-                if parts[0] == "":
-                    parts.pop(0)
-            else:
-                # Legacy acquire
-                parts = member.name.lstrip("/").split("/")
+            parts = member.name.removeprefix("/").removeprefix("fs/").split("/")
             volume_name = parts[0].lower()
 
             # NOTE: older versions of acquire would write to "sysvol" instead of a driver letter
@@ -89,7 +82,11 @@ class AcquireTarSubLoader(TarSubLoader):
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             entry = entry_cls(volume, fsutil.normpath(mname), member)
-            volume.map_file_entry(entry.path, entry)
+
+            try:
+                volume.map_file_entry(entry.path, entry)
+            except KeyError as e:
+                log.debug("Skipping member %r in tar as %r is already mapped: %s", member, entry.path, e)
 
         for vol_name, vol in volumes.items():
             loaderutil.add_virtual_ntfs_filesystem(
