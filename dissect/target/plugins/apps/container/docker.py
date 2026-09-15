@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 from dissect.cstruct import cstruct
 from dissect.util import ts
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target import container, filesystem, volume
+from dissect.target.exceptions import ContainerError, UnsupportedPluginError, VolumeSystemError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.protobuf import ProtobufVarint
@@ -109,7 +110,7 @@ class DockerPlugin(ContainerPlugin):
     @export(record=DockerImageRecord)
     def images(self) -> Iterator[DockerImageRecord]:
         """Returns any pulled docker images on the target system."""
-        for data_root in self.installs:
+        for data_root, data_origin in self.installs:
             images_path = data_root.joinpath("image/overlay2/repositories.json")
 
             if not images_path.exists():
@@ -144,14 +145,14 @@ class DockerPlugin(ContainerPlugin):
                         image_id=hash_to_image_id(hash),
                         created=created,
                         hash=hash,
-                        source=images_path,
+                        source=f"{data_origin}/{images_path}" if data_origin else images_path,
                         _target=self.target,
                     )
 
     @export(record=DockerContainerRecord)
     def containers(self) -> Iterator[DockerContainerRecord]:
         """Returns any docker containers present on the target system."""
-        for data_root in self.installs:
+        for data_root, data_origin in self.installs:
             for config_path in data_root.joinpath("containers").glob("**/config.v2.json"):
                 try:
                     config = json.loads(config_path.read_text())
@@ -203,8 +204,8 @@ class DockerPlugin(ContainerPlugin):
                     volumes=volumes,
                     environment=config.get("Config", {}).get("Env", []),
                     mount_path=mount_path,
-                    config_path=config_path,
-                    source=config_path,
+                    config_path=f"{data_origin}/{config_path}" if data_origin else config_path,
+                    source=f"{data_origin}/{config_path}" if data_origin else config_path,
                     _target=self.target,
                 )
 
@@ -234,7 +235,7 @@ class DockerPlugin(ContainerPlugin):
             - https://docs.docker.com/config/containers/logging/json-file/
             - https://docs.docker.com/config/containers/logging/local/
         """
-        for data_root in self.installs:
+        for data_root, data_origin in self.installs:
             containers_path = data_root.joinpath("containers")
 
             for log_file in containers_path.glob("**/*.log*"):
@@ -252,7 +253,7 @@ class DockerPlugin(ContainerPlugin):
                                 if raw_messages
                                 else strip_log(log_entry.get("log"), remove_backspaces)
                             ),
-                            source=log_file,
+                            source=f"{data_origin}/{log_file}" if data_origin else log_file,
                             _target=self.target,
                         )
 
@@ -266,7 +267,7 @@ class DockerPlugin(ContainerPlugin):
                             message=(
                                 log_entry.message if raw_messages else strip_log(log_entry.message, remove_backspaces)
                             ),
-                            source=log_file,
+                            source=f"{data_origin}/{log_file}" if data_origin else log_file,
                             _target=self.target,
                         )
 
@@ -308,10 +309,24 @@ def get_data_path(path: Path) -> str | None:
         log.debug(exc_info=e)
         return None
 
-    return config.get("data-root")
+    return config.get("data-root") or config.get("DataFolder")
 
 
-def find_installs(target: Target) -> Iterator[Path]:
+def expand_datapath_macos(path: Path, target: Target) -> (Path, Path):
+    """Check if the datapath is a macOS Docker Desktop install and return the path to the Docker.raw file."""
+    if (docker_raw := path.joinpath("Docker.raw")).is_file():
+        try:
+            vs = volume.open(container.open(docker_raw))
+            fs = filesystem.open(vs.volumes[0])
+            return fs.path("/docker"), docker_raw
+        except (ContainerError, VolumeSystemError) as e:
+            target.log.warning("Could not open Docker.raw file: %s", docker_raw)
+            target.log.debug("", exc_info=e)
+    else:
+        return path, None
+
+
+def find_installs(target: Target) -> Iterator[(Path, Path)]:
     """Attempt to find additional configured and existing Docker daemon data-root folders.
 
     References:
@@ -325,6 +340,11 @@ def find_installs(target: Target) -> Iterator[Path]:
         "sysvol/ProgramData/docker",
     ]
 
+    user_data_paths = [
+        # MacOS
+        "Library/Containers/com.docker.docker/Data/vms/*/data",
+    ]
+
     default_config_paths = [
         # Linux
         "/etc/docker/daemon.json",
@@ -336,11 +356,19 @@ def find_installs(target: Target) -> Iterator[Path]:
     user_config_paths = [
         # Docker Desktop (macOS/Windows/Linux)
         ".docker/daemon.json",
+        # macOS Docker Desktop internal configuration
+        "Library/Group Containers/group.com.docker/settings-store.json",
     ]
 
     for path in default_data_paths:
         if (path := target.fs.path(path)).exists():
-            yield path
+            yield path, None
+
+    for path in user_data_paths:
+        for user_details in target.user_details.all_with_home():
+            for user_path in user_details.home_path.glob(path):
+                if expanded := expand_datapath_macos(user_path, target):
+                    yield expanded
 
     for path in default_config_paths:
         if (config_file := target.fs.path(path)).exists():
@@ -348,7 +376,7 @@ def find_installs(target: Target) -> Iterator[Path]:
                 target.log.info("Unable to get data-root from docker daemon file %s", config_file)
                 continue
             if (data_root_path := target.fs.path(data_path)).exists():
-                yield data_root_path
+                yield data_root_path, None
 
     for path in user_config_paths:
         for user_details in target.user_details.all_with_home():
@@ -357,7 +385,11 @@ def find_installs(target: Target) -> Iterator[Path]:
                     target.log.info("Unable to get data-root from docker daemon file %s", config_file)
                     continue
                 if (data_root_path := target.fs.path(data_path)).exists():
-                    yield data_root_path
+                    try:
+                        if expanded := expand_datapath_macos(data_root_path, target):
+                            yield expanded
+                    except Exception as e:
+                        print(e)
 
 
 def convert_timestamp(timestamp: str | None) -> str | None:
