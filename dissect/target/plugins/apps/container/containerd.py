@@ -203,7 +203,7 @@ class ContainerdPlugin(ContainerPlugin):
                     image=meta_db.get(f"v1 {ns} containers {container_id} image"),
                     created=golangtimestamp(created_at) if created_at else None,
                     ports=[
-                        f"0.0.0.0:{port.get('container_port')}->{port.get('container_port')}/tcp"
+                        f"0.0.0.0:{port.get('host_port')}->{port.get('container_port')}/tcp"
                         for port in meta.get("Metadata", {}).get("Config", {}).get("port_mappings", [])
                     ],
                     name=meta.get("Metadata", {}).get("Name"),  # or ``labels io.kubernetes.container.name``
