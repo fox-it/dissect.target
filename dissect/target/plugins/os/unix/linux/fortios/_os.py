@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
-import struct
+import time
 from base64 import b64decode
 from datetime import datetime, timezone
 from io import BytesIO
@@ -20,9 +20,19 @@ from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.fortios._keys import (
     KERNEL_KEY_MAP,
+)
+from dissect.target.plugins.os.unix.linux.fortios.fwkey import validate
+from dissect.target.plugins.os.unix.linux.fortios.fwkey.ciphers import (
+    aes_decrypt,
+    chacha20_crypt,
+    rc4_crypt,
+)
+from dissect.target.plugins.os.unix.linux.fortios.fwkey.kdf import kdf_7_4_x
+from dissect.target.plugins.os.unix.linux.fortios.fwkey.models import (
     AesKey,
     ChaCha20Key,
     ChaCha20Seed,
+    RC4Key,
 )
 
 if TYPE_CHECKING:
@@ -32,11 +42,11 @@ if TYPE_CHECKING:
 
     from dissect.target.filesystem import Filesystem
     from dissect.target.helpers.record import UnixUserRecord
+    from dissect.target.plugins.os.unix.linux.fortios.fwkey.models import FirmwareKey
     from dissect.target.target import Target
 
 try:
-    from Crypto.Cipher import AES, ChaCha20
-    from Crypto.Util import Counter
+    from Crypto.Cipher import AES
 
     HAS_CRYPTO = True
 except ImportError:
@@ -118,44 +128,61 @@ class FortiOSPlugin(LinuxPlugin):
             # The rootfs.gz file could be encrypted.
             try:
                 kernel_hash = get_kernel_hash(sysvol)
-                target.log.info("Kernel hash: %s", kernel_hash)
 
-                keys: list[ChaCha20Key | AesKey] = []
+                keys: list[FirmwareKey] = []
 
                 # Loads known key from built-in map
-                try:
-                    keys.append(key_iv_for_kernel_hash(kernel_hash))
-                except ValueError:
+                if known_key := KERNEL_KEY_MAP.get(kernel_hash) if kernel_hash else None:
+                    keys.append(known_key)
+                    target.log.info("Found known key for kernel hash (%s): %s", kernel_hash, known_key)
+                else:
                     target.log.warning("No known decryption key for kernel hash (%s)", kernel_hash)
 
-                # Load keys from keychain
-                keychain_keys = key_iv_from_keychain(target, kernel_hash=kernel_hash)
-                keys.extend(keychain_keys)
-                target.log.warning("Found %d key(s) in keychain", len(keychain_keys))
+                # Load keys from keychain (if no known keys are found)
+                if not keys:
+                    keychain_keys = key_iv_from_keychain(target, kernel_hash=kernel_hash) if kernel_hash else []
+                    keys.extend(keychain_keys)
+                    target.log.info("Found %d key(s) in keychain", len(keychain_keys))
+
+                if not keys:
+                    flatkc = sysvol.path("/flatkc")
+                    if not keys and flatkc.exists() and rootfs.exists():
+                        target.log.info("Trying to carve decryption keys from `flatkc` and `rootfs.gz`")
+                        target.log.info("This may take a while, please be patient...")
+                        try:
+                            carved_keys = set(validate.fwkeys_from_flatkc_and_rootfs(flatkc, rootfs))
+                            target.log.info("Found %d carved key(s) from `flatkc` and `rootfs.gz`", len(carved_keys))
+                            keys.extend(carved_keys)
+                        except Exception as _e:
+                            target.log.exception("Something went wrong while carving keys")
 
                 if not keys:
                     raise ValueError("No decryption keys available")  # noqa: TRY301
 
                 # Try to decrypt with all available keys
-                rfs_fh = None
+                start_time = 0
+                rootfs_data = rootfs.read_bytes()
                 for key in keys:
-                    target.log.warning("Trying to decrypt_rootfs using key: %r", key)
+                    target.log.warning("decrypt_rootfs() with %r", key)
                     try:
-                        rfs_fh = decrypt_rootfs(rootfs.open(), key)
+                        decrypt_rootfs(rootfs_data[:4], key)  # small decrypt for quick fail check
+                        target.log.info("  SUCCESS with key %r", key)
+                        target.log.info("Decrypting full rootfs.gz, this may take a while...")
+                        start_time = time.time()
+                        rootfs_data = decrypt_rootfs(rootfs_data, key)
+                        target.log.info("Decryption took %s seconds", time.time() - start_time)
                         break
                     except ValueError:
-                        target.log.info("Decryption with key %r failed", key)
+                        target.log.info("  FAILED with key %r", key)
                         continue
+                else:
+                    raise ValueError("All decryption attempts failed :(")  # noqa: TRY301
 
-                if not rfs_fh:
-                    raise ValueError("All decryption attempts failed")  # noqa: TRY301
-
-                target.log.info("Decrypted fh: %r", rfs_fh)
-                vfs = create_tar_filesystem(rfs_fh)
+                vfs = create_tar_filesystem(BytesIO(rootfs_data))
             except RuntimeError:
                 target.log.warning("Could not decrypt rootfs.gz, missing `pycryptodome` dependency")
             except ValueError as e:
-                target.log.warning("Could not decrypt rootfs.gz, unknown kernel hash (%s)", kernel_hash)
+                target.log.warning(e)
                 target.log.debug("", exc_info=e)
             except ReadError as e:
                 target.log.warning("Could not mount rootfs.gz, it could be corrupt")
@@ -526,35 +553,7 @@ def decrypt_password(input: str) -> str:
         return "ENC:" + input
 
 
-def key_iv_for_kernel_hash(kernel_hash: str) -> AesKey | ChaCha20Key:
-    """Return decryption key and IV for a specific sha256 kernel hash.
-
-    The decryption key and IV are used to decrypt the ``rootfs.gz`` file.
-
-    Args:
-        kernel_hash: SHA256 hash of the kernel file.
-
-    Returns:
-        Tuple with decryption key and IV.
-
-    Raises:
-        ValueError: When no decryption keys are available for the given kernel hash.
-    """
-    key = KERNEL_KEY_MAP.get(kernel_hash)
-    if isinstance(key, ChaCha20Seed):
-        # FortiOS 7.4.x uses a KDF to derive the key and IV
-        key, iv = _kdf_7_4_x(key.key)
-        return ChaCha20Key(key, iv)
-    if isinstance(key, ChaCha20Key):
-        # FortiOS 7.0.13 and 7.0.14 uses a static key and IV
-        return key
-    if isinstance(key, AesKey):
-        # FortiOS 7.0.16, 7.2.9, 7.4.4, 7.6.0 and higher uses AES-CTR with a custom CTR increment
-        return key
-    raise ValueError(f"No known decryption keys for kernel hash: {kernel_hash}")
-
-
-def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key | AesKey]:
+def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[FirmwareKey]:
     """Return list of ChaCha20Key and AesKey from keychain.
 
     When using the ``--keychain-file`` option, the CSV format is:
@@ -563,6 +562,7 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key |
         fortios-chacha20seed,recovery_key,<kernel_hash>,<chacha20_seed>
         fortios-chacha20key,recovery_key,<kernel_hash>,<chacha20_key>:<chacha20_iv>
         fortios-aeskey,recovery_key,<kernel_hash>,<aes_key>:<aes_iv>
+        fortios-rc4key,recovery_key,<kernel_hash>,<rc4_key>
 
     When using the ``--keychain-value`` option, multiple keys are returned due to missing provider.
 
@@ -573,7 +573,7 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key |
     Returns:
         List of ChaCha20Key or AesKey.
     """
-    keys: list[ChaCha20Key | AesKey] = []
+    keys: list[FirmwareKey] = []
     keychain_keys = keychain.get_all_keys()
 
     # We prioritize keys with matching identifier (kernel hash)
@@ -586,92 +586,32 @@ def key_iv_from_keychain(target: Target, kernel_hash: str) -> list[ChaCha20Key |
         if key.provider in ("fortios-chacha20seed", None) and len(key.value) == 64:
             # 32 bytes hex string
             key_data, key_iv = _kdf_7_4_x(key.value)
-            keys.append(ChaCha20Key(key_data, key_iv))
-        elif key.provider in ("fortios-aeskey", None) and len(key.value) == 97 and ":" in key.value:
+            thekey = ChaCha20Key(key_data, key_iv)
+            if thekey not in keys:
+                keys.append(thekey)
+        if key.provider in ("fortios-aeskey", None) and len(key.value) == 97 and ":" in key.value:
             # 48 bytes hex string with colon separator
             key_data, _, key_iv = key.value.partition(":")
-            keys.append(AesKey(key_data, key_iv))
-        elif key.provider in ("fortios-chacha20key", None) and len(key.value) == 97 and ":" in key.value:
+            thekey = AesKey(key_data, key_iv)
+            if thekey not in keys:
+                keys.append(thekey)
+        if key.provider in ("fortios-chacha20key", None) and len(key.value) == 97 and ":" in key.value:
             # 48 bytes hex string with colon separator
             key_data, _, key_iv = key.value.partition(":")
-            keys.append(ChaCha20Key(key_data, key_iv))
+            thekey = ChaCha20Key(key_data, key_iv)
+            if thekey not in keys:
+                keys.append(thekey)
+        if key.provider in ("fortios-rc4key", None) and len(key.value) == 64:
+            # 32 bytes hex string
+            for i_bits in (5, 3):
+                for reset_j in (True, False):
+                    rc4key = RC4Key(key.value, i_bits=i_bits, reset_j=reset_j)
+                    if rc4key not in keys:
+                        keys.append(rc4key)
     return keys
 
 
-def chacha20_decrypt(fh: BinaryIO, key: ChaCha20Key) -> bytes:
-    """Decrypt file using ChaCha20 with given ChaCha20Key.
-
-    Args:
-        fh: File-like object to the encrypted rootfs.gz file.
-        key: ChaCha20Key.
-
-    Returns:
-        Decrypted bytes.
-    """
-    # First 8 bytes = counter, last 8 bytes = nonce
-    # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple
-    # We're interested in updating the position in the ChaCha20 internal state, so to make
-    # PyCryptodome "OpenSSL-compatible" we have to multiply the counter by 64
-    cipher = ChaCha20.new(key=key.key, nonce=key.iv[8:])
-    cipher.seek(int.from_bytes(key.iv[:8], "little") * 64)
-    return cipher.decrypt(fh.read())
-
-
-def calculate_counter_increment(iv: bytes) -> int:
-    """Calculate the custom FortiGate CTR increment from IV.
-
-    Args:
-        iv: 16 bytes IV.
-
-    Returns:
-        Custom CTR increment.
-    """
-    increment = 0
-    for i in range(16):
-        increment ^= (iv[i] & 15) ^ ((iv[i] >> 4) & 0xFF)
-    return max(increment, 1)
-
-
-def aes_decrypt(fh: BinaryIO, key: AesKey) -> bytes:
-    """Decrypt file using a custom AES CTR increment with given AesKey.
-
-    Args:
-        fh: File-like object to the encrypted rootfs.gz file.
-        key: AesKey.
-
-    Returns:
-        Decrypted bytes.
-    """
-    data = bytearray(fh.read())
-
-    # Calculate custom CTR increment from IV
-    increment = calculate_counter_increment(key.iv)
-    advance_block = (b"\x69" * 16) * (increment - 1)
-
-    # AES counter is little-endian and has a prefix
-    prefix, counter = struct.unpack("<8sQ", key.iv)
-    ctr = Counter.new(
-        64,
-        prefix=prefix,
-        initial_value=counter,
-        little_endian=True,
-        allow_wraparound=True,
-    )
-    cipher = AES.new(key.key, mode=AES.MODE_CTR, counter=ctr)
-
-    nblocks, nleft = divmod(len(data), 16)
-    for i in range(nblocks):
-        offset = i * 16
-        data[offset : offset + 16] = cipher.decrypt(data[offset : offset + 16])
-        cipher.decrypt(advance_block)  # custom advance the counter
-
-    if nleft:
-        data[nblocks * 16 :] = cipher.decrypt(data[nblocks * 16 :])
-
-    return data
-
-
-def decrypt_rootfs(fh: BinaryIO, key: ChaCha20Key | AesKey) -> BinaryIO:
+def decrypt_rootfs(data: bytes, key: FirmwareKey) -> bytes:
     """Attempt to decrypt an encrypted ``rootfs.gz`` file with given key and IV.
 
     FortiOS releases as of 7.4.1 / 2023-08-31, have ChaCha20 encrypted ``rootfs.gz`` files.
@@ -686,7 +626,7 @@ def decrypt_rootfs(fh: BinaryIO, key: ChaCha20Key | AesKey) -> BinaryIO:
 
     Args:
         fh: File-like object to the encrypted rootfs.gz file.
-        key: ChaCha20Key or AesKey.
+        key: FirmwareKey used to decrypt the rootfs.gz file.
 
     Returns:
         File-like object to the decrypted rootfs.gz file.
@@ -698,18 +638,25 @@ def decrypt_rootfs(fh: BinaryIO, key: ChaCha20Key | AesKey) -> BinaryIO:
     if not HAS_CRYPTO:
         raise RuntimeError("Missing pycryptodome dependency")
 
-    result = b""
-    if isinstance(key, ChaCha20Key):
-        result = chacha20_decrypt(fh, key)
-    elif isinstance(key, AesKey):
-        result = aes_decrypt(fh, key)
-        if len(result) > 256:
-            result = result[:-256]  # strip off the 256 byte footer
+    match key:
+        case ChaCha20Seed(key=k, offset_key=ok, offset_iv=oi):
+            derived_key, iv = kdf_7_4_x(k, offset_key=ok, offset_iv=oi)
+            result = chacha20_crypt(data, derived_key, iv)
+        case ChaCha20Key(key=k, iv=iv):
+            result = chacha20_crypt(data, k, iv)
+        case AesKey(key=k, iv=iv):
+            result = aes_decrypt(data, k, iv)
+            if len(result) > 256:
+                result = result[:-256]
+        case RC4Key(key=k, i_bits=i_bits, reset_j=reset_j):
+            result = rc4_crypt(data, k, i_bits=i_bits, reset_j=reset_j)
+        case _:
+            raise NotImplementedError(f"Unsupported key type: {type(key)}")
 
     if result[0:2] != b"\x1f\x8b":
         raise ValueError("Failed to decrypt: No gzip magic header found.")
 
-    return BytesIO(result)
+    return result
 
 
 def _kdf_7_4_x(key_data: str | bytes, offset_key: int = 4, offset_iv: int = 5) -> tuple[bytes, bytes]:
