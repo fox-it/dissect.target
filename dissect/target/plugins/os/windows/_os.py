@@ -6,10 +6,12 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
+from dissect.target import filesystem
+from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.arch import target_triple
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export, internal
+from dissect.target.volumes.bde import BitlockerVolumeSystem
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -22,18 +24,13 @@ if TYPE_CHECKING:
 
 
 class WindowsPlugin(OSPlugin):
-    CURRENT_VERSION_KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion"
+    """Microsoft Windows OS plugin."""
 
     def __init__(self, target: Target):
         super().__init__(target)
 
         # Just run this here for now
         self.add_mounts()
-
-        target.props["sysvol_drive"] = next(
-            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts.get("sysvol") and mnt != "sysvol"),
-            None,
-        )
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
@@ -63,22 +60,30 @@ class WindowsPlugin(OSPlugin):
 
         return cls(target)
 
-    def add_mounts(self) -> None:
-        self.target.props["mounts_added"] = True
-        try:
-            for key in self.target.registry.keys("HKLM\\System\\MountedDevices"):
-                for entry in key.values():
-                    name, value = entry.name, entry.value
-                    if not name.lower().startswith("\\"):
-                        continue
+    def post(self) -> None:
+        self.bde_auto_unlock()
 
-                    p = name.lower()[1:].split("\\")
-                    if p[0] == "dosdevices":
+    def add_mounts(self) -> None:
+        """Mount all volumes defined in the registry to their drive letter."""
+        if self.target.has_function("registry"):
+            try:
+                for key in self.target.registry.keys("HKLM\\System\\MountedDevices"):
+                    for entry in key.values():
+                        name, value = entry.name, entry.value
+                        if not name.lower().startswith("\\"):
+                            continue
+
+                        p = name.lower()[1:].split("\\")
+                        if p[0] != "dosdevices":
+                            continue
                         drive = p[1]
+
+                        if drive in self.target.fs.mounts:
+                            self.target.log.debug("Skipping already mounted drive %s", drive)
+                            continue
 
                         if value.startswith(b"DMIO:ID:"):
                             guid = str(UUID(bytes_le=value[8:]))
-
                             for volume in self.target.volumes:
                                 if volume.guid == guid and volume.fs:
                                     self.target.fs.mount(drive, volume.fs)
@@ -86,18 +91,19 @@ class WindowsPlugin(OSPlugin):
                         elif len(value) == 12:
                             serial, offset = struct.unpack("<IQ", value)
                             for disk in self.target.disks:
-                                if disk.vs and disk.vs.serial == serial:
-                                    for volume in disk.vs.volumes:
-                                        if volume.offset == offset and volume.fs:
-                                            self.target.fs.mount(drive, volume.fs)
-                                            break
-        except Exception as e:
-            self.target.log.warning("Failed to map drive letters")
-            self.target.log.debug("", exc_info=e)
+                                if not disk.vs or disk.vs.serial != serial:
+                                    continue
+                                for volume in disk.vs.volumes:
+                                    if volume.offset == offset and volume.fs:
+                                        self.target.fs.mount(drive, volume.fs)
+                                        break
+            except Exception as e:
+                self.target.log.warning("Failed to map drive letters: %s", e)
+                self.target.log.debug("", exc_info=e)
 
-        sysvol_drive = self.target.fs.mounts.get("sysvol")
-        if not sysvol_drive:
+        if not (sysvol_drive := self.target.fs.mounts.get("sysvol")):
             self.target.log.warning("No sysvol drive found")
+
         elif operator.countOf(self.target.fs.mounts.values(), sysvol_drive) == 1:
             # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
             if "c:" not in self.target.fs.mounts:
@@ -105,6 +111,44 @@ class WindowsPlugin(OSPlugin):
                 self.target.fs.mount("c:", sysvol_drive)
             else:
                 self.target.log.warning("Unknown drive letter for sysvol")
+
+    def bde_auto_unlock(self) -> None:
+        """Attempt to unlock any remaining locked Bitlocker volumes configured to use registry auto unlock."""
+        try:
+            if not (keys := list(self.target.bitlocker.auto_unlock())):
+                return
+        except UnsupportedPluginError:
+            return
+
+        at_least_one = False
+        for volume in self.target.volumes:
+            # Skip volumes that already have a (decrypted) filesystem
+            if volume.fs:
+                continue
+
+            # Prevent iterating over an encrypted volume that has already been decrypted and mounted.
+            if any(vol.disk == volume for vol in self.target.volumes):
+                continue
+
+            if not BitlockerVolumeSystem.detect(volume.fh):
+                continue
+
+            volume.fh.seek(0)
+            bvs = BitlockerVolumeSystem(volume.fh)
+
+            # Search for matching identifiers.
+            matched_keys = [k.key for k in keys if k.guid in map(str, bvs.bde.identifiers)]
+            if len(matched_keys) < 1:
+                continue
+
+            bvs.unlock_with_external_key(bytes.fromhex(matched_keys[0]))
+            if bvs.bde.unlocked:
+                volume.fs = filesystem.open(bvs.bde.open())
+                at_least_one = True
+
+        # Re-run add_mounts to map mount drive letters for the newly added filesystem(s).
+        if at_least_one:
+            self.add_mounts()
 
     @export(property=True)
     def hostname(self) -> str | None:
@@ -120,7 +164,9 @@ class WindowsPlugin(OSPlugin):
 
     def _get_version_reg_value(self, value_name: str) -> Any:
         try:
-            value = self.target.registry.value(self.CURRENT_VERSION_KEY, value_name).value
+            value = self.target.registry.value(
+                "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion", value_name
+            ).value
         except RegistryError:
             value = None
 
