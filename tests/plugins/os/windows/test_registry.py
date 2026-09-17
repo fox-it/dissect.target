@@ -24,7 +24,7 @@ def test_missing_hives(fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixtu
     target.filesystems.add(fs_win)
 
     with caplog.at_level(TRACE_LEVEL, target.log.name):
-        target.apply()
+        target.apply(post=False)
 
         expected = []
 
@@ -64,7 +64,7 @@ def test_empty_hives(fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture
     target.filesystems.add(fs_win)
 
     with caplog.at_level(logging.WARNING, target.log.name):
-        target.apply()
+        target.apply(post=False)
 
         assert [record.message for record in caplog.records if record.filename == "registry.py"] == [
             f"{target}: Empty hive: sysvol/windows/system32/config/SYSTEM",
@@ -85,7 +85,7 @@ def test_empty_hives_skip_warning(fs_win: VirtualFilesystem, caplog: pytest.LogC
         caplog.at_level(logging.WARNING, target.log.name),
         patch("dissect.target.plugins.os.windows.registry.RegfHive"),
     ):
-        target.apply()
+        target.apply(post=False)
 
         assert [record.message for record in caplog.records if record.filename == "registry.py"] == []
 
