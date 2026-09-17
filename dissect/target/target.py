@@ -847,8 +847,9 @@ class Target:
                     if descriptor:
                         # In this case we made at least one iteration but it was skipped due incompatibility.
                         # Just take the last known cause for now
+                        os = self.os if self._os_plugin else None
                         raise UnsupportedPluginError(
-                            f"Unsupported function `{function}` for target with OS plugin {self._os_plugin}",
+                            f"Unsupported function `{function}` for this target with OS {os}",
                             extra=causes[1:] if len(causes) > 1 else None,
                         ) from (causes[0] if causes else None)
 
@@ -921,7 +922,7 @@ class DiskCollection(Collection[container.Container]):
             # To counter this, first check if the disk is part of any LVM configurations that we support
             if not volume.is_lvm_volume(disk):
                 try:
-                    if not hasattr(disk, "vs") or disk.vs is None:
+                    if disk.vs is None:
                         disk.vs = volume.open(disk)
                         self.target.log.debug("Opened volume system: %s on %s", disk.vs, disk)
 
@@ -952,12 +953,12 @@ class VolumeCollection(Collection[volume.Volume]):
         """
         # We don't want later additions to modify the todo, so make a copy
         todo = self.entries[:]
-        fs_volumes = []
-        lvm_volumes = []
-        encrypted_volumes = []
+        fs_volumes: list[volume.Volume] = []
+        lvm_volumes: list[volume.Volume] = []
+        encrypted_volumes: list[volume.Volume] = []
 
         while todo:
-            new_volumes = []
+            new_volumes: list[volume.Volume] = []
             lvm_volumes = []
             encrypted_volumes = []
 
@@ -987,7 +988,7 @@ class VolumeCollection(Collection[volume.Volume]):
                         continue
 
                     try:
-                        vs = volume.open(vol)
+                        vs = volume.open(vol, disk=vol.disk)
                     except Exception:
                         # If opening a volume system fails, there's likely none, so open as a filesystem instead
                         continue
@@ -1009,7 +1010,7 @@ class VolumeCollection(Collection[volume.Volume]):
                     new_volumes.append(lv)
 
             for enc_volume in encrypted_volumes:
-                for dec_volume in volume.open_encrypted(enc_volume):
+                for dec_volume in volume.open_encrypted(enc_volume, disk=enc_volume.disk):
                     self.target.log.debug("Encrypted volume opened: %s", enc_volume)
                     self.add(dec_volume)
                     new_volumes.append(dec_volume)

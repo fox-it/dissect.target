@@ -38,8 +38,8 @@ class ProfileLoader(Loader):
 
 class ProfileOSPlugin(OSPlugin):
     @classmethod
-    def detect(cls, target: Target) -> bool:
-        return True
+    def detect(cls, target: Target) -> Filesystem | None:
+        pass
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> Self:

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import io
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.logging import get_logger
-from dissect.target.helpers.utils import readinto
+from dissect.target.helpers.utils import readinto, to_list
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -63,7 +64,7 @@ class VolumeSystem:
 
     Args:
         fh: The source file-like object(s) on which to open the volume system.
-        disk: A reference to the source disk or container. Defaults to ``fh`` if not provided.
+        disk: A reference to the source disk(s) or container(s). Defaults to ``fh`` if not provided.
         serial: Serial number of the volume system, if any.
     """
 
@@ -78,7 +79,6 @@ class VolumeSystem:
         self.fh = fh
         self.disk = disk or fh
         self.serial = serial
-        self._volumes_list: list[Volume] = None
 
         if self.__type__ is None:
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
@@ -127,12 +127,19 @@ class VolumeSystem:
         raise NotImplementedError
 
     @property
+    def fhs(self) -> list[BinaryIO]:
+        """A list of all the file-like objects that make up this volume system."""
+        return to_list(self.fh)
+
+    @property
+    def disks(self) -> list[BinaryIO]:
+        """A list of all the disks or containers that make up this volume system."""
+        return to_list(self.disk)
+
+    @cached_property
     def volumes(self) -> list[Volume]:
         """A list of all the discovered volumes."""
-        if self._volumes_list is None:
-            self._volumes_list = list(self._volumes())
-
-        return self._volumes_list
+        return list(self._volumes())
 
 
 class EncryptedVolumeSystem(VolumeSystem):
@@ -253,7 +260,7 @@ class Volume(io.IOBase):
         name: The name of the volume.
         guid: The unique identifier of the volume.
         raw: A reference to the implementation specific object that the volume system uses for representing the volume.
-        disk: A reference to the associated :class:`~dissect.target.container.Container`.
+        disk: A reference to the associated backing disk(s) or :class:`~dissect.target.container.Container`.
         vs: A reference to the associated :class:`VolumeSystem`.
         fs: A reference to the :class:`~dissect.target.filesystem.Filesystem` that is on this ``Volume``.
         drive_letter: The letter associated to the ``Volume``, such as `c` or `d` in Windows.
@@ -284,7 +291,7 @@ class Volume(io.IOBase):
 
         # Shorthand access to raw volume, disk, vs and fs objects
         self.raw = raw
-        self.disk = disk
+        self.disk = to_list(disk)
         self.vs = vs
         self.fs = fs
         self.drive_letter = drive_letter
@@ -342,7 +349,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
     fh.seek(0)
 
     try:
-        return disk.DissectVolumeSystem(fh)
+        return disk.DissectVolumeSystem(fh, *args, **kwargs)
     except Exception as e:
         raise VolumeSystemError(f"Failed to load volume system for {fh}") from e
     finally:
@@ -386,7 +393,7 @@ def is_encrypted(volume: BinaryIO) -> bool:
     return False
 
 
-def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
+def open_encrypted(volume: BinaryIO, *args, **kwargs) -> Iterator[Volume]:
     """Open an encrypted ``volume``.
 
     An encrypted volume can only be opened if the encrypted volume system can successfully decrypt the volume,
@@ -403,7 +410,7 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
     for manager_cls in ENCRYPTED_VOLUME_MANAGERS:
         try:
             if manager_cls.detect(volume):
-                volume_manager = manager_cls(volume)
+                volume_manager = manager_cls(volume, *args, **kwargs)
                 yield from volume_manager.volumes
         except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", manager_cls)
@@ -416,7 +423,7 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
     return None
 
 
-def open_lvm(volumes: list[BinaryIO], *args, **kwargs) -> Iterator[VolumeSystem]:
+def open_lvm(volumes: list[BinaryIO]) -> Iterator[VolumeSystem]:
     """Open a single logical volume system on a list of file-like objects.
 
     Args:
