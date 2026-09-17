@@ -147,8 +147,8 @@ class FortiOSPlugin(LinuxPlugin):
                 if not keys:
                     flatkc = sysvol.path("/flatkc")
                     if not keys and flatkc.exists() and rootfs.exists():
-                        target.log.info("Trying to carve decryption keys from `flatkc` and `rootfs.gz`")
-                        target.log.info("This may take a while, please be patient...")
+                        target.log.warning("Trying to carve decryption keys from `flatkc` and `rootfs.gz`")
+                        target.log.warning("This may take a while, please be patient...")
                         try:
                             carved_keys = set(validate.fwkeys_from_flatkc_and_rootfs(flatkc, rootfs))
                             target.log.info("Found %d carved key(s) from `flatkc` and `rootfs.gz`", len(carved_keys))
@@ -160,14 +160,13 @@ class FortiOSPlugin(LinuxPlugin):
                     raise ValueError("No decryption keys available")  # noqa: TRY301
 
                 # Try to decrypt with all available keys
-                start_time = 0
                 rootfs_data = rootfs.read_bytes()
                 for key in keys:
-                    target.log.warning("decrypt_rootfs() with %r", key)
+                    target.log.warning("decrypt_rootfs() check with %r", key)
                     try:
                         decrypt_rootfs(rootfs_data[:4], key)  # small decrypt for quick fail check
                         target.log.info("  SUCCESS with key %r", key)
-                        target.log.info("Decrypting full rootfs.gz, this may take a while...")
+                        target.log.warning("Found the correct key. Decrypting full rootfs.gz; this may take a while...")
                         start_time = time.time()
                         rootfs_data = decrypt_rootfs(rootfs_data, key)
                         target.log.info("Decryption took %s seconds", time.time() - start_time)
