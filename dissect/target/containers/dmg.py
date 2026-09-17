@@ -70,6 +70,3 @@ class DmgContainer(Container):
     def close(self) -> None:
         if hasattr(self, "_stream") and not self._stream.closed:
             self._stream.close()
-
-        if hasattr(self, "dmg"):
-            self.dmg.close()
