@@ -127,7 +127,7 @@ class WindowsPlugin(OSPlugin):
                 continue
 
             # Prevent iterating over an encrypted volume that has already been decrypted and mounted.
-            if any(vol.disk == volume for vol in self.target.volumes):
+            if any(fs.volume.guid == volume.guid for fs in self.target.filesystems if fs.volume):
                 continue
 
             if not BitlockerVolumeSystem.detect(volume.fh):
@@ -146,6 +146,9 @@ class WindowsPlugin(OSPlugin):
 
             bvs.unlock_with_external_key(bytes.fromhex(matched_keys[0]))
             if bvs.bde.unlocked:
+                self.target.log.info(
+                    "Volume %s with identifiers %s unlocked with auto unlock key", volume, bvs.bde.identifiers
+                )
                 volume.fs = filesystem.open(bvs.bde.open())
                 at_least_one = True
 

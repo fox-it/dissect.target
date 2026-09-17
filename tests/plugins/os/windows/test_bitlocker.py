@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from io import BytesIO
+from itertools import repeat
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, patch
+
+import pytest
+from dissect.fve.bde.information import Datum
 
 from dissect.target.helpers import keychain
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
@@ -15,15 +20,20 @@ from tests.conftest import add_win_user
 from tests.plugins.os.windows.test__os import map_version_value
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
-def test_bitlocker_auto_unlock_to_go_compat_mode(
+@pytest.fixture
+def target_win_bitlocker_auto_unlock(
     target_win: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive, hive_hku: VirtualHive
-) -> None:
-    """Test if Bitlocker auto unlock works. Generated on Windows 11 24H2.
+) -> Iterator[Target]:
+    """Yields the :class:`Target` used for BDE auto unlock tests.
+
+    Created on a Windows 11 24H2 machine with the following drive protectors:
 
     PS C:\\WINDOWS\\system32> manage-bde -protectors -get E:
     BitLocker Drive Encryption: Configuration Tool version 10.0.26100
@@ -46,8 +56,54 @@ def test_bitlocker_auto_unlock_to_go_compat_mode(
 
         Password:
             ID: {A0EF7ECE-406D-4D59-9EDE-B9BF32A3268B}
+
+    C:\\Windows\\System32> manage-bde -protectors -get F:
+    BitLocker Drive Encryption: Configuration Tool version 10.0.26100
+    Copyright (C) 2013 Microsoft Corporation. All rights reserved.
+
+    Volume F: [New Volume]
+    All Key Protectors
+
+        Password:
+            ID: {85F5432F-ADD6-4AC7-A968-8DB97E65F8C8}
+
+        External Key:
+            ID: {27FB73B7-D86E-4788-9781-33ADEE564DB1}
+            External Key File Name:
+                27FB73B7-D86E-4788-9781-33ADEE564DB1.BEK
+
+        Numerical Password:
+            ID: {A819EE87-9FD8-4E61-9484-53DA5C3B4D7E}
+            Password:
+                496463-052888-466785-410619-687104-286165-239701-528308
+            Backup type:
+                Saved to file
+
+        External Key:
+            ID: {C6EE1294-DA90-44F7-9694-9E34983F93DE}
+            External Key File Name:
+                C6EE1294-DA90-44F7-9694-9E34983F93DE.BEK
+            Automatic unlock enabled.
     """
-    with open_file_gz("_data/plugins/os/windows/bitlocker/autounlock/volume.bin.gz") as vol_fh:
+    with (
+        open_file_gz("_data/plugins/os/windows/bitlocker/autounlock/to-go-volume.bin.gz") as vol_to_go_fh,
+        open_file_gz("_data/plugins/os/windows/bitlocker/autounlock/fixed-volume.bin.gz") as vol_fixed_fh,
+        patch("dissect.target.plugins.os.windows.bitlocker.autounlock.find_sysvol_bde") as find_sysvol_bde,
+    ):
+        # Mock the sysvol BDE object
+        find_sysvol_bde.return_value = find_sysvol_bde
+        find_sysvol_bde._used_key = bytes.fromhex("9cdaca10306f5cef4f7be4075c4094fb927d69f6102db85ea9126cabd53a919b")
+        find_datum = MagicMock()
+        datum = Datum.from_bytes(
+            bytes.fromhex(
+                "50000b0005000100c0f7600dec45dd0102000000f9341a029814b5a229b37aa4"
+                "44878ad7034e373fdb3ba228684da86c176002d4c5eefdd39ea2cd38504c70c8"
+                "552d117354b9ee5616b09ae7db35d4a0"
+            )
+        )
+        find_datum.return_value = iter(repeat(datum))
+        find_sysvol_bde.information.dataset.find_datum = find_datum
+
         # Prepare user DPAPI master key
         map_version_value(target_win, "CurrentVersion", 10.0)
         add_win_user(
@@ -86,10 +142,10 @@ def test_bitlocker_auto_unlock_to_go_compat_mode(
             provider="user",
         )
 
-        # Add an encrypted volume
+        # Add the encrypted volumes
         target_win.volumes.add(
             Volume(
-                fh=vol_fh,
+                fh=vol_to_go_fh,
                 number=1,
                 offset=0x10000,
                 size=104857088,
@@ -98,17 +154,34 @@ def test_bitlocker_auto_unlock_to_go_compat_mode(
                 guid="e6fde785-f737-47be-b9ad-28137359d733",
             )
         )
+        target_win.volumes.add(
+            Volume(
+                fh=vol_fixed_fh,
+                number=2,
+                offset=0xFFFE00000,
+                size=104857088,
+                name="Basic data partition",
+                vtype=313451834834061278758346828331453159879,
+                guid="e7a732af-cf6c-4eb5-96de-7ffef511d2c9",
+            )
+        )
 
-        # Add E: mount info to the registry
+        # Add E: and F: mount info to the registry
         name = "System\\MountedDevices"
         key = VirtualKey(hive_hklm, name)
         key.add_value(
             "\\DosDevices\\E:",
             VirtualValue(hive_hklm, "\\DosDevices\\E:", b"DMIO:ID:\x85\xe7\xfd\xe67\xf7\xbeG\xb9\xad(\x13sY\xd73"),
         )
+        key.add_value(
+            "\\DosDevices\\F:",
+            VirtualValue(
+                hive_hklm, "\\DosDevices\\F:", b"DMIO:ID:\xaf2\xa7\xe7l\xcf\xb5N\x96\xde\x7f\xfe\xf5\x11\xd2\xc9"
+            ),
+        )
         hive_hklm.map_key(name, key)
 
-        # Add FveAutoUnlock entry to the HKCU
+        # Add to-go FveAutoUnlock entry to the HKCU
         name = "Software\\Microsoft\\Windows\\CurrentVersion\\FveAutoUnlock\\{84d0ad0a-a440-4606-8d6f-6b20963b3416}"
         key = VirtualKey(hive_hku, name)
         key.add_value(
@@ -152,19 +225,55 @@ def test_bitlocker_auto_unlock_to_go_compat_mode(
         )
         hive_hku.map_key(name, key)
 
+        # Add fixed FVEAutoUnlock entry to HKLM
+        name = "SYSTEM\\ControlSet001\\Control\\FVEAutoUnlock\\{b3fd7c8c-020a-490b-88af-5733b3dab7f2}"
+        key = VirtualKey(hive_hklm, name)
+        key.add_value(
+            "Data",
+            VirtualValue(
+                hive_hklm,
+                "Data",
+                bytes.fromhex(
+                    "88000000090000009412eec690daf74496949e34983f93dee03f029aec45dd01"
+                    "18001900170001008c7cfdb30a020b4988af5733b3dab7f25000000005000100"
+                    "9e88029aec45dd010000001065b1d9a3d9d900f379ff58b975c31048ad269c02"
+                    "1419d1207477af7e59aed28cda6215353d631384cf18c1cbc23f2033288b6859"
+                    "94d172f46e068d7e"
+                ),
+            ),
+        )
+        hive_hklm.map_key(name, key)
+
         target_win.add_plugin(LSAPlugin, check_compatible=False)
         target_win.add_plugin(DPAPIPlugin)
         target_win.add_plugin(BitlockerAutoUnlock)
         target_win.apply()
+        yield target_win
 
-        # Test if FveAutoUnlock registry discovery works
-        record = next(target_win.bitlocker.auto_unlock())
-        assert record.ts == datetime(2026, 9, 16, 10, 4, 2, 673000, tzinfo=timezone.utc)
-        assert record.guid == "84d0ad0a-a440-4606-8d6f-6b20963b3416"
-        assert record.key == "91ce76fd339e0243e73a117d9868011e47e636f9cc8925feee80d6c9b7757d5e"
-        assert str(record.source).endswith(
-            "\\HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\FveAutoUnlock\\{84d0ad0a-a440-4606-8d6f-6b20963b3416}"
-        )
 
-        # Test if apply() correctly mounted and unlocked the BDE drive
-        assert target_win.fs.path("e:\\hello.txt").read_text() == "Hello world!\n"
+def test_bitlocker_auto_unlock(target_win_bitlocker_auto_unlock: Target) -> None:
+    """Test if Bitlocker auto unlock works. Generated on Windows 11 24H2."""
+    target = target_win_bitlocker_auto_unlock
+    records = list(target.bitlocker.auto_unlock())
+
+    # Test if registry discovery for FveAutoUnlock to-go drives works
+    assert records[0].ts == datetime(2026, 9, 16, 10, 4, 2, 673000, tzinfo=timezone.utc)
+    assert records[0].volume_type == "removable"
+    assert records[0].guid == "84d0ad0a-a440-4606-8d6f-6b20963b3416"
+    assert records[0].key == "91ce76fd339e0243e73a117d9868011e47e636f9cc8925feee80d6c9b7757d5e"
+    assert str(records[0].source).endswith(
+        "\\HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\FveAutoUnlock\\{84d0ad0a-a440-4606-8d6f-6b20963b3416}"
+    )
+
+    # Test if registry discovery for FVEAutoUnlock fixed drives works
+    assert records[1].ts == datetime(2026, 9, 16, 15, 3, 58, 941999, tzinfo=timezone.utc)
+    assert records[1].volume_type == "fixed"
+    assert records[1].guid == "c6ee1294-da90-44f7-9694-9e34983f93de"
+    assert records[1].key == "c1e376bf30aa838694a3c7ba1db7b9d1bfcf4702b87b6b118fe910b9fd23e5aa"
+    assert str(records[1].source).endswith(
+        "\\HKLM\\SYSTEM\\CurrentControlSet\\Control\\FVEAutoUnlock\\{b3fd7c8c-020a-490b-88af-5733b3dab7f2}"
+    )
+
+    # Test if apply() correctly mounted and unlocked the BDE drives
+    assert target.fs.path("e:\\hello.txt").read_text() == "Hello world!\n"
+    assert target.fs.path("f:\\hello.txt").read_text() == "Hello from a fixed drive!\n"

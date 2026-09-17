@@ -138,12 +138,16 @@ class BitlockerAutoUnlock(Plugin):
                     self.target.log.debug("", exc_info=e)
                     continue
 
-                encrypted_auto_unlock_datum = next(
-                    bde.information.dataset.find_datum(
-                        role=FVE_DATUM_ROLE.AUTO_UNLOCK,
-                        type_=FVE_DATUM_TYPE.AES_CCM_ENCRYPTED_KEY,
+                try:
+                    encrypted_auto_unlock_datum = next(
+                        bde.information.dataset.find_datum(
+                            role=FVE_DATUM_ROLE.AUTO_UNLOCK,
+                            type_=FVE_DATUM_TYPE.AES_CCM_ENCRYPTED_KEY,
+                        )
                     )
-                )
+                except StopIteration:
+                    self.target.log.warning("No AUTO_UNLOCK Datum found in sysvol BitLocker dataset")
+                    continue
 
                 try:
                     extern_key_datum = encrypted_auto_unlock_datum.unbox(bde._used_key)
