@@ -139,6 +139,9 @@ class WindowsPlugin(OSPlugin):
             # Search for matching identifiers.
             matched_keys = [k.key for k in keys if k.guid in map(str, bvs.bde.identifiers)]
             if len(matched_keys) < 1:
+                self.target.log.warning(
+                    "No BitLocker auto unlock key found for volume %s (%s)", volume, bvs.bde.identifiers
+                )
                 continue
 
             bvs.unlock_with_external_key(bytes.fromhex(matched_keys[0]))
