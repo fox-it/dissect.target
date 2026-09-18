@@ -36,7 +36,7 @@ def calculate_counter_increment(iv: bytes) -> int:
 
 
 def aes_decrypt(buffer: bytes, key: bytes, iv: bytes) -> bytes:
-    """Decrypt buffer using a custom AES CTR increment with given AesKey.
+    """Decrypt buffer using a custom AES CTR increment with given key.
 
     Args:
         buffer: data to decrypt.
