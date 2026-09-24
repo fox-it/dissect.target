@@ -203,7 +203,9 @@ def find_loader(
         except ImportError as e:  # noqa: PERF203
             log.info("Failed to import %s", loader)
             log.debug("", exc_info=e)
-
+        except OSError as e:
+            log.info("Loader %s fail with exception %s", loader, e)
+            log.debug("", exc_info=e)
     return None
 
 
