@@ -4,12 +4,7 @@ import tarfile as tf
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target import filesystem
-from dissect.target.filesystems.tar import (
-    TarFilesystemDirectoryEntry,
-    TarFilesystemEntry,
-)
-from dissect.target.helpers import fsutil, loaderutil
+from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader, SubLoader
@@ -92,47 +87,11 @@ class GenericTarSubLoader(TarSubLoader):
         return True
 
     def map(self, target: target.Target) -> None:
-        volumes = {}
-        windows_found = False
+        """Map the given :class`TarFile` to the :class:`Target` as a :class:`TarFilesystem`."""
+        windows_found = any(name for name in self.tar.getnames() if name.lower().startswith(WINDOWS_MEMBERS))
 
-        for member in self.tar.getmembers():
-            if member.name == ".":
-                continue
-
-            if member.name.lower().startswith(WINDOWS_MEMBERS):
-                windows_found = True
-                if "/" in volumes:
-                    # Root filesystem was already added
-                    volumes["/"].case_sensitive = False
-
-            if "/" not in volumes:
-                vol = filesystem.VirtualFilesystem(case_sensitive=not windows_found)
-                vol.tar = self.tar
-                volumes["/"] = vol
-                target.filesystems.add(vol)
-
-            volume = volumes["/"]
-            mname = member.name
-
-            entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
-            entry = entry_cls(volume, fsutil.normpath(mname), member)
-
-            try:
-                volume.map_file_entry(entry.path, entry)
-            except KeyError as e:
-                log.debug("Skipping directory member %r in tar as %r is already mapped: %s", member, entry.path, e)
-
-        for vol_name, vol in volumes.items():
-            loaderutil.add_virtual_ntfs_filesystem(
-                target,
-                vol,
-                usnjrnl_path=[
-                    "$Extend/$Usnjrnl:$J",
-                    "$Extend/$Usnjrnl:J",  # Old versions of acquire used $Usnjrnl:J
-                ],
-            )
-
-            target.fs.mount(vol_name, vol)
+        fs = TarFilesystem(fh=None, tarfile=self.tar, case_sensitive=not windows_found)
+        target.filesystems.add(fs)
 
 
 class TarLoader(Loader):

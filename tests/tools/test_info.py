@@ -27,7 +27,7 @@ def test_target_info(
             assert json.loads(stdout) == {
                 "disks": [],
                 "volumes": [],
-                "mounts": [{"fs": "virtual", "path": "/"}],
+                "mounts": [{"fs": "tar", "path": "/"}],
                 "children": [],
                 "hostname": "ubuntu",
                 "domain": None,
@@ -47,7 +47,7 @@ def test_target_info(
                 "<target/info hostname='ubuntu' domain=None last_activity=None install_date=2024-07-02 12:00:56+00:00 "
                 "ips=[net.ipaddress('1.2.3.4')] os_family='linux' os_version='Ubuntu 22.04.4 LTS (Jammy Jellyfish)' "
                 "architecture=None device=None language=[] timezone='Europe/Amsterdam' disks=[] volumes=[] "
-                "mounts=[\"{'fs': 'virtual', 'path': '/'}\"] children=[]>\n"
+                "mounts=[\"{'fs': 'tar', 'path': '/'}\"] children=[]>\n"
             )
 
         else:
