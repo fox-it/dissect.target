@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from dissect.target.plugins.os.unix.log.lastlog import LastLogPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
 def test_lastlog_sparse(target_linux_users: Target, fs_linux: VirtualFilesystem) -> None:
@@ -43,6 +43,15 @@ def test_lastlog_sparse(target_linux_users: Target, fs_linux: VirtualFilesystem)
     assert results[2].source == "/var/log/lastlog"
 
 
+def test_lastlog_sparse_direct() -> None:
+    """Test if we can correctly parse a sparse lastlog file in direct mode."""
+    target = Target.open_direct([absolute_path("_data/plugins/os/unix/log/lastlog/lastlog")])
+
+    records = sorted(target.lastlog(), key=lambda r: r.ts)
+
+    assert len(records) == 3
+
+
 def test_lastlog_sqlite(target_linux_users: Target, fs_linux: VirtualFilesystem) -> None:
     """Test if we can parse a lastlog2 SQLite3 database."""
     fs_linux.map_file("/var/lib/lastlog/lastlog2.db", absolute_path("_data/plugins/os/unix/log/lastlog/lastlog2.db"))
@@ -68,3 +77,12 @@ def test_lastlog_sqlite(target_linux_users: Target, fs_linux: VirtualFilesystem)
     assert records[1].ut_tty == "ssh"
     assert records[1].ut_service == "sshd"
     assert records[1].source == "/var/lib/lastlog/lastlog2.db"
+
+
+def test_lastlog_sqlite_direct() -> None:
+    """Test if we can parse a lastlog2 SQLite3 database in direct mode."""
+    target = Target.open_direct([absolute_path("_data/plugins/os/unix/log/lastlog/lastlog2.db")])
+
+    records = sorted(target.lastlog(), key=lambda r: r.ts)
+
+    assert len(records) == 2

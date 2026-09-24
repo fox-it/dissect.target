@@ -16,6 +16,7 @@ from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from pathlib import Path
 
     from dissect.target.target import Target
 
@@ -430,14 +431,15 @@ class JournalPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.journal_files = []
-
-        for journal_path in self.JOURNAL_PATHS:
-            self.journal_files.extend(self.target.fs.path(journal_path).glob(self.JOURNAL_GLOB))
+        self.journal_files = list(self.get_paths())
 
     def check_compatible(self) -> None:
         if not self.journal_files:
             raise UnsupportedPluginError("No journald files found")
+
+    def _get_paths(self) -> Iterator[Path]:
+        for journal_path in self.JOURNAL_PATHS:
+            yield from self.target.fs.path(journal_path).glob(self.JOURNAL_GLOB)
 
     @export(record=JournalRecord)
     def journal(self) -> Iterator[JournalRecord]:

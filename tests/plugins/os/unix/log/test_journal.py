@@ -8,13 +8,13 @@ import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.plugins.os.unix.log.journal import JournalMessagePriority, JournalPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from pytest_benchmark.fixture import BenchmarkFixture
 
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
 def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -40,6 +40,28 @@ def test_journal_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None
     assert record.kernel_boot_id == "5ffb8dae595f4679988508fd45d9c8c4"
     assert record.priority == "info"
     assert record.source == "/var/log/journal/1337/user-1000.journal"
+
+
+def test_journal_plugin_direct() -> None:
+    """Test linux systemd journal file parsing."""
+    target = Target.open_direct([absolute_path("_data/plugins/os/unix/log/journal/journal")])
+
+    results = list(target.journal())
+    assert len(results) == 2
+
+    record = results[0]
+    assert record.ts == dt("2023-05-19T16:22:38.841870+00:00")
+    assert record.message == (
+        "Window manager warning: last_user_time (928062) is greater than comparison timestamp (928031).  "
+        "This most likely represents a buggy client sending inaccurate timestamps in messages such as "
+        "_NET_ACTIVE_WINDOW.  Trying to work around..."
+    )
+    assert record.syslog_facility == "3"
+    assert record.syslog_identifier == "gnome-shell"
+    assert record.pid == 2096
+    assert record.transport == "stdout"
+    assert record.kernel_boot_id == "5ffb8dae595f4679988508fd45d9c8c4"
+    assert record.priority == "info"
 
 
 @pytest.mark.benchmark
