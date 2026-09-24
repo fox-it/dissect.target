@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from io import BytesIO
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 
 
 SPLASHTOP_LOG_PATH = "Program Files (x86)/Splashtop/Splashtop Remote/Server/log/SPLog.txt"
+SPLASHTOP_CLIENT_LOG_PATH = "ProgramData/Splashtop/Splashtop Remote Client for STB/analyst/log/win_client.txt.099"
 
 
 @pytest.fixture
@@ -30,6 +32,24 @@ def target_splashtop(target_win_users: Target, fs_win: VirtualFilesystem) -> Ite
     # the starting year
     # A new source checkout would result in different modification timestamps, so mock it to be in 2025
     entry = fs_win.get(SPLASHTOP_LOG_PATH)
+    stat_result = entry.stat()
+    stat_result.st_mtime = 1735732800
+
+    with patch.object(entry, "stat") as mock_stat:
+        mock_stat.return_value = stat_result
+        target_win_users.add_plugin(SplashtopPlugin)
+        yield target_win_users
+
+
+@pytest.fixture
+def target_splashtop_client(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+    log_data = (
+        b"<1>Feb  1 17:48:17.564 [wm_39215]:(Session     ) peer public addr {203.0.113.42:61761-2}, 816\n"
+        b"<0>May  4  9:36:03.163 [wm_29446]:(VideoUI     ) Fail to notify Wacom rectangle 3\n"
+    )
+    fs_win.map_file_fh(SPLASHTOP_CLIENT_LOG_PATH, BytesIO(log_data))
+
+    entry = fs_win.get(SPLASHTOP_CLIENT_LOG_PATH)
     stat_result = entry.stat()
     stat_result.st_mtime = 1735732800
 
@@ -59,3 +79,16 @@ def test_splashtop_plugin_filetransfer(target_splashtop: Target) -> None:
     )
     assert records[0].source == f"sysvol/{SPLASHTOP_LOG_PATH}"
     assert records[0].filename == "NOTE.txt"
+
+
+def test_splashtop_plugin_client_log(target_splashtop_client: Target) -> None:
+    records = list(target_splashtop_client.splashtop.logs())
+    assert len(records) == 2
+
+    assert records[0].ts == datetime(2025, 5, 4, 9, 36, 3, 163000, tzinfo=timezone.utc)
+    assert records[0].message == "[wm_29446]:(VideoUI     ) Fail to notify Wacom rectangle 3"
+    assert records[0].source == f"sysvol/{SPLASHTOP_CLIENT_LOG_PATH}"
+
+    assert records[1].ts == datetime(2025, 2, 1, 17, 48, 17, 564000, tzinfo=timezone.utc)
+    assert records[1].message == "[wm_39215]:(Session     ) peer public addr {203.0.113.42:61761-2}, 816"
+    assert records[1].source == f"sysvol/{SPLASHTOP_CLIENT_LOG_PATH}"
