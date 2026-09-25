@@ -17,7 +17,7 @@ try:
 except ImportError:
     HAS_YARA = False
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -68,6 +68,8 @@ class YaraPlugin(Plugin):
     ) -> Iterator[YaraMatchRecord]:
         """Scan files inside the target up to a given maximum size with YARA rule file(s).
 
+        String match values in the record output are limited to 1024 characters per match.
+
         Args:
             rules: ``list`` of strings or ``Path`` objects pointing to rule files to use.
             path: ``string`` of absolute target path to scan.
@@ -90,6 +92,9 @@ class YaraPlugin(Plugin):
                 self.target.log.info(warning)
 
         self.target.log.warning("Will not scan files larger than %s MB", max_size // 1024 // 1024)
+
+        # Cache record descriptors with metadata fields.
+        metadata_descriptors: dict[int, tuple[TargetRecordDescriptor, dict]] = {}
 
         if no_decompress:
             self.target.log.info("Will not automatically check in compressed files")
@@ -127,11 +132,19 @@ class YaraPlugin(Plugin):
                         fh_original.seek(0)
 
                         for match in compiled_rules.match(data=buf):
-                            string_matches: list[str] = []
-                            for string in match.strings:
-                                string_matches.extend(f"{string}={instance}" for instance in string.instances)
+                            # Aggregate string matches. We limit the size of each value to 1024 characters.
+                            string_matches = [
+                                f"{string}={str(instance)[:1024]}"
+                                for string in match.strings
+                                for instance in string.instances
+                            ]
 
-                            yield YaraMatchRecord(
+                            if (desc_hash := hash(tuple(sorted(match.meta.keys())))) not in metadata_descriptors:
+                                metadata_descriptors[desc_hash] = metadata_to_record_descriptor(match.meta)
+
+                            descriptor, metadata_key_values = metadata_descriptors[desc_hash]
+
+                            yield descriptor(
                                 ts_mtime=file.stat().st_mtime,
                                 path=self.target.fs.path(file.path),
                                 rule=match.rule,
@@ -139,6 +152,7 @@ class YaraPlugin(Plugin):
                                 tags=match.tags,
                                 digest=hashutil.common(BytesIO(buf)),
                                 namespace=match.namespace,
+                                **metadata_key_values,
                                 _target=self.target,
                             )
 
@@ -228,3 +242,41 @@ def is_valid_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> b
         return False
     else:
         return True
+
+
+def metadata_to_record_descriptor(metadata: dict[str, Any] | None) -> tuple[TargetRecordDescriptor, dict]:
+    """Generate a record descriptor based on the ``YaraMatchRecord`` with fields for metadata associated
+    with the YARA rule. The descriptor is returned as well as a sanitized version of the metadata dict.
+    """
+    if not metadata:
+        return YaraMatchRecord, {}
+
+    metadata_fields = []
+    sanitized_metadata = {}
+
+    for key, value in metadata.items():
+        if isinstance(value, bool):
+            fieldtype = "boolean"
+
+        elif isinstance(value, int):
+            fieldtype = "varint"
+
+        else:
+            fieldtype = "string"
+            if not isinstance(value, str):
+                value = str(value)
+
+        key = f"metadata_{key}"
+        sanitized_metadata[key] = value
+        metadata_fields.append((fieldtype, key))
+
+    return (
+        TargetRecordDescriptor(
+            YaraMatchRecord.name,
+            [
+                *YaraMatchRecord.target_fields,
+                *metadata_fields,
+            ],
+        ),
+        sanitized_metadata,
+    )
