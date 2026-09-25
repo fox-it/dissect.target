@@ -80,14 +80,22 @@ class SshdService(BaseService):
             additional_fields["port"] = int(port.group(1))
         if user := cls.RE_USER.search(message):
             additional_fields["user"] = user.group(1)
-        # Accepted publickey for test_user from 8.8.8.8 IP port 12345 ssh2: RSA SHA256:123456789asdfghjklertzuio
+
         if "Accepted publickey" in message:
-            ssh_protocol, encryption_algo, key_info = message.split()[-3:]
-            hash_algo, key_hash = key_info.split(":")
-            additional_fields["ssh_protocol"] = ssh_protocol.strip(":")
-            additional_fields["encryption_algorithm"] = encryption_algo
-            additional_fields["hash_algorithm"] = hash_algo
-            additional_fields["key_hash"] = key_hash
+            try:
+                # Accepted publickey for test_user from 8.8.8.8 IP port 12345 ssh2: RSA SHA256:123456789asdfghjklertzuio
+                if message.split()[-3].endswith(":"):
+                    ssh_protocol, encryption_algo, key_info = message.split()[-3:]
+                    hash_algo, key_hash = key_info.split(":")
+                    additional_fields["ssh_protocol"] = ssh_protocol.strip(":")
+                    additional_fields["encryption_algorithm"] = encryption_algo
+                    additional_fields["hash_algorithm"] = hash_algo
+                    additional_fields["key_hash"] = key_hash
+                # Accepted publickey for test_user from 8.8.8.8 IP port 12345 ssh2
+                else:
+                    additional_fields["ssh_protocol"] = message.split()[-1]
+            except ValueError:
+                pass
         if (failed := "Failed" in message) or "Accepted" in message:
             action_type = "failed" if failed else "accepted"
             additional_fields["action"] = f"{action_type} authentication"
