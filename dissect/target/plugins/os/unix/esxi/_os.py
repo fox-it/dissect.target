@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import struct
 import subprocess
 from configparser import ConfigParser
@@ -128,17 +129,22 @@ class ESXiPlugin(UnixPlugin):
     @export(property=True)
     def version(self) -> str | None:
         boot_cfg = self.target.fs.path("/bootbank/boot.cfg")
-        if not boot_cfg.exists():
-            # Default to retrieve version, but without build number
-            return self.target.esxconf.get("/resourceGroups/version")
+        if boot_cfg.exists():
+            for line in boot_cfg.read_text().splitlines():
+                if not line.startswith("build="):
+                    continue
 
-        for line in boot_cfg.read_text().splitlines():
-            if not line.startswith("build="):
-                continue
+                _, _, version = line.partition("=")
+                return f"VMware ESXi {version.strip()}"
 
-            _, _, version = line.partition("=")
-            return f"VMware ESXi {version.strip()}"
-        return None
+        build_info = self.target.fs.path("/etc/vmware/.buildInfo")
+        if build_info.exists():
+            with build_info.open("rt") as fh:
+                if version := format_version_from_build_info(parse_build_info(fh)):
+                    return version
+
+        # Default to retrieve version, but without build number
+        return self.target.esxconf.get("/resourceGroups/version")
 
     @export(property=True)
     def os(self) -> str:
@@ -427,6 +433,36 @@ def parse_boot_cfg(fh: TextIO) -> dict[str, str]:
         cfg[key.strip()] = value.strip()
 
     return cfg
+
+
+def parse_build_info(fh: TextIO) -> dict[str, str]:
+    info = {}
+    for line in fh:
+        line = line.strip()
+        if not line or ":" not in line:
+            continue
+
+        key, _, value = line.partition(":")
+        info[key.strip()] = value.strip()
+
+    return info
+
+
+def format_version_from_build_info(info: dict[str, str]) -> str | None:
+    buildnumber = info.get("BUILDNUMBER")
+    branch = info.get("BRANCH", "")
+    if not buildnumber or not branch:
+        return None
+
+    if branch.startswith("esx-"):
+        version = branch.removeprefix("esx-").split("-", 1)[0]
+    elif match := re.fullmatch(r"vsphere(\d)(\d+)u\d+", branch):
+        # Update releases do not carry their own version, e.g. vsphere67u3 is ESXi 6.7.0
+        version = f"{match.group(1)}.{match.group(2)}.0"
+    else:
+        return None
+
+    return f"VMware ESXi {version}-0.0.{buildnumber}"
 
 
 def nfs_volume_uuid(host: str, path: str) -> str:
