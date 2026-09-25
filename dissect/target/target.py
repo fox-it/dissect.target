@@ -341,10 +341,13 @@ class Target:
         Raises:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
+        last_error: tuple[str | Path, Exception] | None = None
 
         def _open_all(
             spec: str | Path, include_children: bool = False, recursive: bool = False, *, apply: bool = True
         ) -> Iterator[Target]:
+            nonlocal last_error
+
             # If the path is a URI-like string, separate the path component
             adjusted_path, parsed_path = parse_path_uri(spec)
             # We always need a path to work with, so convert the spec into one if it's not one already
@@ -388,6 +391,7 @@ class Target:
                     # For URI-like specs, load_path is the path component of the URI, and parsed_path is the parsed URI
                     ldr = loader_cls(load_path, parsed_path=load_parsed_path)
                 except Exception as e:
+                    last_error = (load_spec, e)
                     message = "%s" if isinstance(e, TargetPathNotFoundError) else "Failed to initiate loader: %s"
                     get_target_logger(load_spec).error(message, e)
                     get_target_logger(load_spec).debug("", exc_info=e)
@@ -402,6 +406,7 @@ class Target:
                     # The apply parameter will then be used on the children
                     target = cls._load(load_spec, ldr, apply=include_children or apply)
                 except Exception as e:
+                    last_error = (load_spec, e)
                     get_target_logger(load_spec).error("Failed to load target with loader %s", ldr)
                     get_target_logger(load_spec).debug("", exc_info=e)
                     continue
@@ -451,6 +456,13 @@ class Target:
                             yield target
 
         if not at_least_one_loaded:
+            if last_error is not None:
+                load_spec, error = last_error
+                # Unwrap the loader error, as it only adds a layer without additional information
+                cause = error.__cause__ if isinstance(error, TargetError) and error.__cause__ else error
+                # Only useful if the cause actually tells us something, otherwise fall through to the generic message
+                if str(cause):
+                    raise TargetError(f"Failed to load target {load_spec}: {cause}") from cause
             raise TargetError(f"Failed to find any loader for targets: {paths}")
 
     @classmethod
