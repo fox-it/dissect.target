@@ -71,10 +71,10 @@ struct exit_status {
     uint16 e_exit;
 };
 
-struct {
+struct timeval {
     uint32 tv_sec;
     uint32 tv_usec;
-} timeval;
+};
 
 struct entry {
     uint32  ut_type;

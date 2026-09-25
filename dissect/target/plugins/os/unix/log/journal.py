@@ -220,7 +220,7 @@ struct EntryItem {
 
 struct EntryItem_Compact {
     le32_t object_offset;
-}
+};
 
 // The first four members are copied from ObjectHeader, so that the size can be used as the length of items
 struct EntryObject {
