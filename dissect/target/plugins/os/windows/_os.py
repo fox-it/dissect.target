@@ -339,7 +339,7 @@ class WindowsPlugin(OSPlugin):
                 yield WindowsUserRecord(
                     sid=subkey.name,
                     name=name,
-                    home=self.target.resolve(home),
+                    home=self.target.resolve(home) if home else None,
                     _target=self.target,
                 )
 

@@ -273,6 +273,24 @@ def test_windows_user(target_win_users: Target) -> None:
     assert users[1].home == windows_path("C:\\Users\\John")
 
 
+def test_windows_user_missing_profile_path(target_win: Target, hive_hklm: VirtualHive) -> None:
+    """Users without ProfileImagePath should not crash users()."""
+    profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+    sid = "S-1-5-21-3263113198-3007035898-945866154-1002"
+
+    profile_list_key = VirtualKey(hive_hklm, profile_list_key_name)
+    profile_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid}")
+    profile_list_key.add_subkey(sid, profile_key)
+    hive_hklm.map_key(profile_list_key_name, profile_list_key)
+
+    users = list(WindowsPlugin(target_win).users())
+
+    assert len(users) == 1
+    assert users[0].sid == sid
+    assert users[0].name is None
+    assert users[0].home is None
+
+
 def test_windows_user_from_sam(target_win_users: Target) -> None:
     """Verify the home folder name is independent of the SAM username.
 
