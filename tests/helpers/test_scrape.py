@@ -271,6 +271,7 @@ def test_find_needle() -> None:
         (b"f\x00o\x00o\x00\xee\xee", "utf-16-le", False, True, "foo"),
         (b"f\x00o\x00o\x00\xee\xee", "utf-16-le", False, False, "foo\ueeee"),
         (b"\xee\xee\x00f\x00o\x00o\x00", "utf-16-le", True, True, "foo"),
+        (b"\x00asdf and some more text here", "utf-8", False, True, "asdf and some more text here"),
     ],
 )
 def test_recover_string(buf: bytes, encoding: str, reverse: bool, ascii: bool, expected: str) -> None:
