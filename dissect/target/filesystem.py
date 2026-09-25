@@ -1454,7 +1454,7 @@ class LayerFilesystem(Filesystem):
 
     def __init__(self, **kwargs):
         self.layers: list[Filesystem] = []
-        self.mounts = {}
+        self.mounts: dict[str, Filesystem] = {}
         self._sep = "/"
         self._case_sensitive = True
         self._root_entry = LayerFilesystemEntry(self, "/", [])

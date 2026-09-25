@@ -70,7 +70,7 @@ from dissect.target.helpers import cyber, excutil, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import alias, arg, clone_alias
-from dissect.target.target import Target
+from dissect.target.target import Target, unused_filesystems
 from dissect.target.tools.info import get_target_info, print_target_info
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
@@ -1621,7 +1621,7 @@ class TargetCli(TargetCmd):
         print()
         return False
 
-    @arg("targets", metavar="TARGETS", nargs="*", help="targets to load")
+    @arg("targets", metavar="TARGETS", nargs="*", help="target(s) to load")
     @arg("-p", "--python", action="store_true", help="(I)Python shell")
     @arg("-r", "--registry", action="store_true", help="registry shell")
     def cmd_enter(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1631,6 +1631,20 @@ class TargetCli(TargetCmd):
         if args.python:
             # Quick path that doesn't require CLI caching
             open_shell(list(open_targets(args)), args.python, args.registry)
+            return False
+
+        # Directly use a Filesystem instead of DirLoader for unused mounted filesystems.
+        if len(paths) == 1 and paths[0].as_posix().startswith("/$fs$"):
+            # We pass all unused filesystems to the new Target since those filesystems could be used by the Target
+            # as well. We pass the preferred filesystem to the first argument to make sure that filesystem is used
+            # for initial OS detection.
+            filesystems = list(unused_filesystems(self.target, first=paths[0]))
+            targets = [Target.open_filesystem(filesystems)]
+            if not (cli := create_cli(targets, RegistryCli if args.registry else TargetCli)):
+                return False
+
+            run_cli(cli)
+            print()
             return False
 
         clikey = tuple(str(path) for path in paths)

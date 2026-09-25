@@ -21,7 +21,7 @@ from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
-from dissect.target.target import Event, Target, TargetLogAdapter, log
+from dissect.target.target import Event, Target, TargetLogAdapter, log, unused_filesystems
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -866,3 +866,38 @@ def test_list_children_recursive() -> None:
         "1.0.1.1",
         "1.1",
     ]
+
+
+def test_target_open_filesystem(fs_unix: VirtualFilesystem, fs_win: VirtualFilesystem) -> None:
+    """Test that ``Target.open_filesystem()`` works and applies the first ``Filesystem`` first."""
+    target = Target.open_filesystem([fs_unix, fs_win])
+    assert target.os == "unix"
+
+    target = Target.open_filesystem([fs_win, fs_unix])
+    assert target.os == "windows"
+
+    target = Target.open_filesystem([VirtualFilesystem(), fs_win, fs_unix])
+    assert target.os == "default"
+
+
+def test_unused_filesystems(
+    target_unix: Target, fs_unix: VirtualFilesystem, fs_debian: VirtualFilesystem, fs_win: VirtualFilesystem
+) -> None:
+    """Test that ``unused_filesystems`` handles the kwarg ``first`` correctly."""
+    target_unix.filesystems.add(fs_win)
+    target_unix.filesystems.add(fs_debian)
+    target_unix.apply()
+
+    assert target_unix.fs.mounts == {
+        "/": fs_unix,
+        "/$fs$/fs0": fs_win,
+        "/$fs$/fs1": fs_debian,
+    }
+
+    filesystems = list(unused_filesystems(target_unix))
+    assert filesystems[0] == fs_win
+    assert filesystems[1] == fs_debian
+
+    filesystems = list(unused_filesystems(target_unix, first="/$fs$/fs1"))
+    assert filesystems[0] == fs_debian
+    assert filesystems[1] == fs_win
