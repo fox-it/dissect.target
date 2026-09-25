@@ -12,6 +12,21 @@ if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
+FAT_MAGIC = 0xCAFEBABE
+FAT_MAGIC_64 = 0xCAFEBABF
+MH_MAGIC = 0xFEEDFACE
+MH_MAGIC_64 = 0xFEEDFACF
+MH_CIGAM = 0xCEFAEDFE
+MH_CIGAM_64 = 0xCFFAEDFE
+
+FAT_ARCH_SIZE = 20
+FAT_ARCH_64_SIZE = 32
+
+CPU_TYPE_ARM64 = 0x0100000C
+
+# A fat header entry is 32 bytes, so this covers a reasonable number of slices
+MACHO_HEADER_SIZE = 1024
+
 
 class DarwinPlugin(BsdPlugin):
     """Darwin plugin."""
@@ -32,6 +47,54 @@ class DarwinPlugin(BsdPlugin):
 
         if (user_path := self.target.fs.path("/Users")).exists():
             yield from ((entry, None) for entry in user_path.iterdir() if entry.is_dir())
+
+
+def cpu_types_from_macho(data: bytes) -> list[int]:
+    """Extract all Mach-O CPU types from a Mach-O or fat binary header.
+
+    A fat binary holds one architecture entry per contained slice, a thin binary only has its own CPU type.
+
+    Args:
+        data: The start of the binary, at least the size of a fat header entry.
+
+    Returns:
+        The CPU types found in the header, in the order they appear.
+    """
+    if len(data) < 8:
+        return []
+
+    # Fat headers are always big endian, thin headers are in the endianness of their target
+    magic = int.from_bytes(data[:4], "big")
+
+    if magic in (FAT_MAGIC, FAT_MAGIC_64):
+        arch_size = FAT_ARCH_64_SIZE if magic == FAT_MAGIC_64 else FAT_ARCH_SIZE
+        cpu_types = []
+
+        for offset in range(8, 8 + int.from_bytes(data[4:8], "big") * arch_size, arch_size):
+            if len(data) < offset + 4:
+                break
+            cpu_types.append(int.from_bytes(data[offset : offset + 4], "big"))
+
+        return cpu_types
+
+    if magic in (MH_MAGIC, MH_MAGIC_64):
+        return [int.from_bytes(data[4:8], "big")]
+
+    if magic in (MH_CIGAM, MH_CIGAM_64):
+        return [int.from_bytes(data[4:8], "little")]
+
+    return []
+
+
+def select_cpu_type(cpu_types: list[int]) -> int | None:
+    """Select the CPU type that best describes the target from the slices of a fat binary.
+
+    Prefer ``arm64`` so that Apple silicon targets are not reported as Intel based on the first slice.
+    """
+    if CPU_TYPE_ARM64 in cpu_types:
+        return CPU_TYPE_ARM64
+
+    return cpu_types[0] if cpu_types else None
 
 
 def macho_cpu_type(paths: list[str | Path], fs: Filesystem | None = None) -> int | None:
@@ -61,8 +124,8 @@ def macho_cpu_type(paths: list[str | Path], fs: Filesystem | None = None) -> int
 
         try:
             with path.open("rb") as fh:
-                fh.seek(4)
-                return int.from_bytes(fh.read(4), "big")  # Mach-O CPU type. Header is big endian
+                if cpu_type := select_cpu_type(cpu_types_from_macho(fh.read(MACHO_HEADER_SIZE))):
+                    return cpu_type
         except Exception:
             pass
 
