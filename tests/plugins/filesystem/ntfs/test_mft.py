@@ -21,6 +21,7 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
     get_drive_letter,
     get_owner_and_group,
     get_volume_identifier,
+    join_ntfs_path,
 )
 from tests._utils import absolute_path
 
@@ -41,6 +42,21 @@ def target_win_mft(target_win: Target) -> Target:
     target_win.filesystems = [filesystem]
     target_win.add_plugin(MftPlugin)
     return target_win
+
+
+@pytest.mark.parametrize(
+    ("drive_letter", "path", "expected"),
+    [
+        ("c:\\", "Windows\\System32", "c:\\Windows\\System32"),
+        ("sysvol\\", "Users\\admin", "sysvol\\Users\\admin"),
+        # Virtual NTFS filesystems are mounted under a path with forward slashes
+        ("/$fs$/fs0\\", "$MFT", "\\$fs$\\fs0\\$MFT"),
+        ("/$fs$/fs0\\", "Windows\\System32 ($FILE_NAME)", "\\$fs$\\fs0\\Windows\\System32 ($FILE_NAME)"),
+        ("", "$MFT", "$MFT"),
+    ],
+)
+def test_join_ntfs_path(drive_letter: str, path: str, expected: str) -> None:
+    assert join_ntfs_path(drive_letter, path) == expected
 
 
 @pytest.mark.parametrize(
