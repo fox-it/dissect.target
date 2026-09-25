@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import datetime as dt
@@ -30,6 +31,12 @@ def test_trendmicro_plugin_worryfree_firewall(target_win: Target, fs_win: Virtua
     assert records[0].port == 444
     assert str(records[0].path) == "C:\\WINDOWS\\SYSTEM32\\SVCHOST.EXE"
     assert records[0].description == "SecurityLevelDrop"
+
+
+def test_trendmicro_plugin_worryfree_log_missing(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    fs_win.map_file_fh("Program Files (x86)/Trend Micro/Security Agent/Misc/placeholder", BytesIO(b""))
+    target_win.add_plugin(TrendMicroPlugin)
+    assert list(target_win.trendmicro.wflogs()) == []
 
 
 def test_trendmicro_plugin_worryfree_log(target_win: Target, fs_win: VirtualFilesystem) -> None:
