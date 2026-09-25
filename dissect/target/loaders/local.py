@@ -33,6 +33,10 @@ VOLATILE_LINUX_PATHS = [
     Path("/sys"),
 ]
 
+# https://www.cyberciti.biz/faq/freebsd-hard-disk-information/#:~:text=boot%20file.,var/run/dmesg.boot
+FREEBSD_DRIVE_REGEX = re.compile(r"(da\d+$)|(ada\d+$)|(nvd\d+$)")
+VOLATILE_FREEBSD_PATH = Path("/proc")
+
 ESXI_DEV_DIR = Path("/vmfs/devices/disks")
 
 WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
@@ -74,6 +78,8 @@ class LocalLoader(Loader):
                 target.filesystems.add(DirectoryFilesystem(Path("/")))
             elif os_name == "linux":
                 map_linux_drives(target)
+            elif os_name == "freebsd":
+                map_freebsd_drives(target)
             elif os_name == "sunos":
                 map_solaris_drives(target)
             elif os_name == "vmkernel":
@@ -108,6 +114,23 @@ def map_linux_drives(target: Target) -> None:
             volatile_fs = DirectoryFilesystem(volatile_path)
             target.filesystems.add(volatile_fs)
             target.fs.mount(str(volatile_path), volatile_fs)
+
+
+def map_freebsd_drives(target: Target) -> None:
+    """Map FreeBSD raw disks and /proc.
+
+    Iterate through /dev and match raw device names (not partitions).
+
+    /proc could be mounted for linux emulation.
+    """
+    for drive in LINUX_DEV_DIR.iterdir():
+        if FREEBSD_DRIVE_REGEX.match(drive.name):
+            _add_disk_as_raw_container_to_target(drive, target)
+
+    if VOLATILE_FREEBSD_PATH.exists():
+        volatile_fs = DirectoryFilesystem(VOLATILE_FREEBSD_PATH)
+        target.filesystems.add(volatile_fs)
+        target.fs.mount(str(VOLATILE_FREEBSD_PATH), volatile_fs)
 
 
 def map_solaris_drives(target: Target) -> None:
