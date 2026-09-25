@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -17,6 +16,7 @@ from dissect.target.plugins.apps.container.container import (
     COMMON_LOG_FIELDS,
     ContainerPlugin,
 )
+from dissect.target.plugins.apps.container.containerd import parse_ctr_log
 from dissect.target.plugins.apps.container.docker import hash_to_image_id
 
 if TYPE_CHECKING:
@@ -59,22 +59,6 @@ class ContainerState(Enum):
     EXITED = 6
     REMOVING = 7
     STOPPING = 8
-
-
-RE_CTR_LOG = re.compile(
-    r"""
-        ^
-        (?P<ts>\d{4}-\d{2}-\d{2}T\d{2}\:\d{2}\:\d{2}\.\d{9}\+\d{2}\:\d{2})
-        \s
-        (?P<stream>(stderr|stdout))
-        \s
-        (?P<type>\S)
-        \s
-        (?P<message>.*)
-        $
-    """,
-    re.VERBOSE,
-)
 
 
 class PodmanPlugin(ContainerPlugin):
@@ -294,30 +278,14 @@ class PodmanPlugin(ContainerPlugin):
         """
         for install, _ in self.installs:
             for log_file in install.glob("storage/overlay-containers/*/userdata/ctr.log*"):
-                buf = ""
-
-                for line in log_file.open("rt"):
-                    if not (match := RE_CTR_LOG.match(line)):
-                        self.target.log.warning("Unable to match Podman log line %r in file %r", line, log_file)
-                        continue
-
-                    fields = match.groupdict()
-                    type = fields.pop("type")
-
-                    # Each character has it's own log line and can be concatenated up until we encounter an empty 'F'.
-                    if type == "P":
-                        buf += fields["message"]
-                        continue
-                    elif type == "F" and fields["message"] == "":
-                        fields["message"] = buf
-                        buf = ""
-
-                    yield PodmanLogRecord(
-                        container=log_file.parent.parent.name,
-                        **fields,
-                        source=log_file,
-                        _target=self.target,
-                    )
+                with log_file.open("rt", errors="backslashreplace") as fh:
+                    for entry in parse_ctr_log(fh):
+                        yield PodmanLogRecord(
+                            container=log_file.parent.parent.name,
+                            **entry,
+                            source=log_file,
+                            _target=self.target,
+                        )
 
 
 def convert_ports(ports: dict[str, list | dict]) -> Iterator[str]:
