@@ -41,7 +41,14 @@ class UserRecordDescriptorExtension(RecordDescriptorExtensionBase):
             user_home = user.home
 
         record_kwargs.update(
-            {"username": username, "user_id": user_id, "user_group": user_group, "user_home": user_home}
+            (k, v)
+            for (k, v) in {
+                "username": username,
+                "user_id": user_id,
+                "user_group": user_group,
+                "user_home": user_home,
+            }.items()
+            if v is not None
         )
         return record_kwargs
 
