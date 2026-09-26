@@ -288,7 +288,7 @@ def test_windows_user_from_sam(target_win_users: Target) -> None:
     fake_sam_user.username = "Jane"  # Should override "John" from home folder
 
     target_win_users.machine_sid = Mock(
-        return_value=iter([ComputerSidRecord(sid="S-1-5-21-3263113198-3007035898-945866154")])
+        return_value=iter([ComputerSidRecord(sid="S-1-5-21-3263113198-3007035898-945866154", _target=target_win_users)])
     )
     target_win_users.sam = Mock(return_value=[fake_sam_user])
 

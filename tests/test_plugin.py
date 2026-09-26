@@ -311,7 +311,7 @@ class _TestSubPlugin1(_TestNSPlugin):
 
     @export(record=TestRecord)
     def test(self) -> Iterator[TestRecord]:
-        yield TestRecord(value="test1")
+        yield TestRecord(value="test1", _target=self.target)
 
 
 class _TestSubPlugin2(_TestNSPlugin):
@@ -320,7 +320,7 @@ class _TestSubPlugin2(_TestNSPlugin):
 
     @export(record=TestRecord)
     def test(self) -> Iterator[TestRecord]:
-        yield TestRecord(value="test2")
+        yield TestRecord(value="test2", _target=self.target)
 
 
 class _TestSubPlugin3(_TestSubPlugin2):
@@ -330,7 +330,7 @@ class _TestSubPlugin3(_TestSubPlugin2):
     # Override the test() function of t2
     @export(record=TestRecord)
     def test(self) -> Iterator[TestRecord]:
-        yield TestRecord(value=self._value())
+        yield TestRecord(value=self._value(), _target=self.target)
 
     def _value(self) -> str:
         return "test3"
@@ -346,11 +346,11 @@ class _TestSubPlugin4(_TestSubPlugin3):
 
     @export(record=TestRecord)
     def test_other(self) -> Iterator[TestRecord]:
-        yield TestRecord(value="test4-other")
+        yield TestRecord(value="test4-other", _target=self.target)
 
     @export(record=TestRecord)
     def test_all(self) -> Iterator[TestRecord]:
-        yield TestRecord(value="overridden")
+        yield TestRecord(value="overridden", _target=self.target)
 
 
 class _TestSubPlugin5(_TestNSPlugin):
@@ -359,7 +359,7 @@ class _TestSubPlugin5(_TestNSPlugin):
 
     @export(record=TestRecord2)
     def test_other(self) -> Iterator[TestRecord2]:
-        yield TestRecord2(value=69)
+        yield TestRecord2(value=69, _target=self.target)
 
 
 def test_namespace_plugin(target_win: Target) -> None:

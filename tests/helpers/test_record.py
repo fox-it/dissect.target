@@ -5,7 +5,7 @@ from typing import NoReturn
 
 import pytest
 
-from dissect.target.exceptions import PluginError
+from dissect.target.exceptions import MissingTargetInRecordWarning, PluginError
 from dissect.target.helpers.descriptor_extensions import (
     TargetRecordDescriptorExtension,
     UserRecordDescriptorExtension,
@@ -116,10 +116,11 @@ def test_trd_call_with_default_fields() -> None:
 
 
 def test_trd_call_no_target() -> None:
-    record = TestRecord(
-        foo="foo",
-        bar="bar",
-    )
+    with pytest.warns(MissingTargetInRecordWarning):
+        record = TestRecord(
+            foo="foo",
+            bar="bar",
+        )
 
     assert record.foo == "foo"
     assert record.bar == "bar"
@@ -175,12 +176,12 @@ def mock_unix_user() -> UnixUserRecord:
 def test_user_record_descriptor_extension(mock_windows_user: WindowsUserRecord, mock_unix_user: UnixUserRecord) -> None:
     TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])("test/record", [])
 
-    test_record = TestRecord(_user=mock_windows_user)
+    test_record = TestRecord(_user=mock_windows_user, _target=MockTarget())
     assert test_record.username == "some-name"
     assert test_record.user_id == "some-sid"
     assert test_record.user_home == "some-home"
 
-    test_record = TestRecord(_user=mock_unix_user)
+    test_record = TestRecord(_user=mock_unix_user, _target=MockTarget())
     assert test_record.username == "some-name"
     assert test_record.user_id == "1337"
     assert test_record.user_home == "some-home"

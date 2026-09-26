@@ -140,6 +140,7 @@ class McAfeePlugin(Plugin):
                             keywords=",".join(log_fields.values()),
                             fkey=entry.fkey,
                             source=source_log_file,
+                            _target=self.target,
                         )
                     else:
                         yield McAfeeMscFirewallRecord(
@@ -151,4 +152,5 @@ class McAfeePlugin(Plugin):
                             keywords=",".join(log_fields.values()),
                             fkey=entry.fkey,
                             source=source_log_file,
+                            _target=self.target,
                         )

@@ -21,6 +21,7 @@ from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
+from dissect.target.plugin import Plugin
 from dissect.target.target import Event, Target, TargetLogAdapter, log
 from tests._utils import absolute_path
 
@@ -795,13 +796,13 @@ def test_exception_invalid_path() -> None:
 def test_list_children() -> None:
     """Test that ``list_children`` returns child records."""
 
-    class MockChildTargetPlugin:
+    class MockChildTargetPlugin(Plugin):
         def list_children(self) -> Iterator[ChildTargetRecord]:
-            yield ChildTargetRecord(type="mock", name="child0", path="/mock/child0")
-            yield ChildTargetRecord(type="mock", name="child1", path="/mock/child1")
+            yield ChildTargetRecord(type="mock", name="child0", path="/mock/child0", _target=target)
+            yield ChildTargetRecord(type="mock", name="child1", path="/mock/child1", _target=target)
 
     target = Target()
-    target._child_plugins = {"mock": MockChildTargetPlugin()}
+    target._child_plugins = {"mock": MockChildTargetPlugin(target)}
 
     children = list(target.list_children())
     assert len(children) == 2
@@ -822,32 +823,32 @@ def test_list_children() -> None:
 def test_list_children_recursive() -> None:
     """Test that ``list_children(recursive=True)`` returns child records recursively."""
 
-    class MockChildTargetPlugin:
+    class MockChildTargetPlugin(Plugin):
         def list_children(self) -> Iterator[ChildTargetRecord]:
-            yield ChildTargetRecord(type="mock", name="child0", path="/mock/child0")
-            yield ChildTargetRecord(type="mock", name="child1", path="/mock/child1")
+            yield ChildTargetRecord(type="mock", name="child0", path="/mock/child0", _target=target)
+            yield ChildTargetRecord(type="mock", name="child1", path="/mock/child1", _target=target)
 
-    class EmptyChildTargetPlugin:
+    class EmptyChildTargetPlugin(Plugin):
         def list_children(self) -> Iterator[ChildTargetRecord]:
             return iter([])
 
     target = Target()
-    target._child_plugins = {"mock": MockChildTargetPlugin()}
+    target._child_plugins = {"mock": MockChildTargetPlugin(target)}
 
     child_0_target = Target()
-    child_0_target._child_plugins = {"mock": EmptyChildTargetPlugin()}
+    child_0_target._child_plugins = {"mock": EmptyChildTargetPlugin(target)}
     child_1_target = Target()
-    child_1_target._child_plugins = {"mock": MockChildTargetPlugin()}
+    child_1_target._child_plugins = {"mock": MockChildTargetPlugin(target)}
 
     child_1_0_target = Target()
-    child_1_0_target._child_plugins = {"mock": MockChildTargetPlugin()}
+    child_1_0_target._child_plugins = {"mock": MockChildTargetPlugin(target)}
     child_1_1_target = Target()
-    child_1_1_target._child_plugins = {"mock": EmptyChildTargetPlugin()}
+    child_1_1_target._child_plugins = {"mock": EmptyChildTargetPlugin(target)}
 
     child_target_1_0_0 = Target()
-    child_target_1_0_0._child_plugins = {"mock": EmptyChildTargetPlugin()}
+    child_target_1_0_0._child_plugins = {"mock": EmptyChildTargetPlugin(target)}
     child_target_1_0_1 = Target()
-    child_target_1_0_1._child_plugins = {"mock": MockChildTargetPlugin()}
+    child_target_1_0_1._child_plugins = {"mock": MockChildTargetPlugin(target)}
 
     target.open_child = lambda path: child_0_target if path == "/mock/child0" else child_1_target
     child_1_target.open_child = lambda path: child_1_0_target if path == "/mock/child0" else child_1_1_target
