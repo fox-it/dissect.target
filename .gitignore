@@ -6,6 +6,7 @@ dist/
 *.pyc
 __pycache__/
 .pytest_cache/
+.ruff_cache/
 tests/_docs/api
 tests/_docs/build
 .tox/
