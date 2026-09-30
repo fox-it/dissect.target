@@ -183,6 +183,7 @@ class IISLogsPlugin(WebserverPlugin):
                 bytes_sent=iis_record.response_size_bytes,
                 referer=getattr(iis_record, "cs_referer", None),
                 useragent=getattr(iis_record, "cs_user_agent", None),
+                response_time_ms=parse_time_taken(getattr(iis_record, "process_time_ms", None)),
                 source=iis_record.source,
                 _target=self.target,
             )
@@ -365,6 +366,25 @@ def parse_iis_datetime(date_str: str, time_str: str, tzinfo: timezone) -> dateti
 def replace_dash_with_none(data: dict) -> dict:
     """Replace ``-`` placeholder in dictionary values with ``None``."""
     return {k: (None if v == "-" else v) for k, v in data.items()}
+
+
+def parse_time_taken(value: str | None) -> int | None:
+    """Convert the IIS ``time-taken`` value (in milliseconds) to an ``int``.
+
+    Returns ``None`` if the value is missing. IIS records ``time-taken`` as a whole number of
+    milliseconds, but the W3C spec allows a fractional value, so we round to the nearest
+    millisecond as a fallback.
+    """
+    if not value:
+        return None
+
+    try:
+        return int(value)
+    except ValueError:
+        try:
+            return round(float(value))
+        except ValueError:
+            return None
 
 
 def normalise_field_name(field: str) -> str:
