@@ -52,7 +52,9 @@ def assert_xml_task_properties(xml_task: TaskRecord) -> None:
         xml_task.security_descriptor
         == "D:(A;;0x111FFFFF;;;SY)(A;;0x111FFFFF;;;BA)(A;;0x111FFFFF;;;S-1-5-80-3028837079-3186095147-955107200-3701964851-1150726376)(A;;FRFX;;;AU)"  # noqa: E501
     )
-    assert xml_task.source is None
+    assert xml_task.source == (
+        "c:\\Windows\\system32\\GroupPolicy\\DataStore\\ANY_SID\\Machine\\Preferences\\ScheduledTasks\\test_xml.xml"
+    )
     assert xml_task.date == datetime(2014, 11, 5, 0, 0, 0, tzinfo=timezone.utc)
     assert xml_task.last_run_date is None
     assert xml_task.author == "$(@%SystemRoot%\\system32\\mapstoasttask.dll,-600)"
@@ -96,8 +98,8 @@ def assert_xml_task_properties(xml_task: TaskRecord) -> None:
 
 def assert_at_task_properties(at_task: TaskRecord) -> None:
     assert at_task.uri is None
+    assert at_task.source == "c:\\Windows\\tasks\\AtTask.job"
     assert at_task.security_descriptor is None
-    assert str(at_task.task_path) == "c:\\Windows\\tasks\\AtTask.job"
     assert at_task.date is None
     assert at_task.last_run_date == datetime(2023, 5, 21, 10, 44, 25, 794000, tzinfo=timezone.utc)
     assert at_task.author == "user1"
@@ -161,6 +163,7 @@ def assert_at_task_grouped_daily(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.repetition_interval == "PT12M"
     assert at_task_grouped.repetition_stop_duration_end
     assert at_task_grouped.start_boundary == datetime.fromisoformat("2023-05-11 00:00:00+00:00")
+    assert at_task_grouped.source == "c:\\Windows\\tasks\\AtTask.job"
     assert_at_task_grouped_padding(at_task_grouped)
 
 

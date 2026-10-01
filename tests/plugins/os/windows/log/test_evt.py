@@ -109,3 +109,4 @@ def test_evt_direct_mode() -> None:
     records = list(target.evt())
 
     assert len(records) == 5
+    assert {str(record.source) for record in records} == {str(data_path)}

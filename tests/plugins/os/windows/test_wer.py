@@ -46,3 +46,4 @@ def test_wer_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert record.ts == datetime.datetime(2021, 11, 22, 15, 39, 49, 20733, tzinfo=datetime.timezone.utc)
     assert record.os_version == "6.1.7601.2.1.0.256.48"
     assert record.app_name == "Microsoft Malware Protection Command Line Utility"
+    assert record.source == "sysvol\\ProgramData\\Microsoft\\Windows\\WER\\ReportQueue\\test\\windows7"

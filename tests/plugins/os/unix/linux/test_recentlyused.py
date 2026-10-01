@@ -30,6 +30,7 @@ def test_recently_used(target_unix_users: Target, fs_unix: VirtualFilesystem) ->
     assert results[0].modified == dt("2023-10-18 13:14:09.483576Z")
     assert results[0].visited == dt("2023-10-18 13:12:41.905277Z")
     assert results[0].mimetype == "text/plain"
+    assert results[0].source == "/home/user/.local/share/recently-used.xbel"
 
 
 def test_recently_used_invalid_data(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:

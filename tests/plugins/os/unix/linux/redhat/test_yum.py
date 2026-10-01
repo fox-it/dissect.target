@@ -50,9 +50,11 @@ def test_yum_logs(test_file: str, target_unix: Target, fs_unix: VirtualFilesyste
         assert results[0].package_name == "unzip-6.0-24.el7_9.x86_64"
         assert results[0].command is None
         assert results[0].requested_by_user is None
+        assert results[0].source == f"/var/log/{test_file}"
 
         assert results[-1].ts == datetime(2023, 12, 16, 4, 41, 22, tzinfo=tz)
         assert results[-1].operation == "install"
         assert results[-1].package_name == "unzip-6.0-24.el7_9.x86_64"
         assert results[-1].command is None
         assert results[-1].requested_by_user is None
+        assert results[-1].source == f"/var/log/{test_file}"

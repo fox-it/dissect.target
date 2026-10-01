@@ -19,6 +19,7 @@ UnixKeyboardRecord = TargetRecordDescriptor(
         ("string", "variant"),
         ("string", "options"),
         ("string", "backspace"),
+        ("path", "source"),
     ],
 )
 
@@ -125,6 +126,7 @@ class UnixLocalePlugin(LocalePlugin):
                     variant=k.get("VARIANT"),
                     options=k.get("OPTIONS"),
                     backspace=k.get("BACKSPACE"),
+                    source=path,
                     _target=self.target,
                 )
 

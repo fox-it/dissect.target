@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.compat.pathlib import TargetPath
     from dissect.target.target import Target
 
 RE_CONFIG_IP = re.compile(r"-IPAddress (?P<ip>[^ ]+) ")
@@ -41,27 +42,27 @@ class CitrixPlugin(BsdPlugin):
         super().__init__(target)
         self._ips = []
         self._hostname = None
-        self._config_usernames = []
+        self._config_usernames: dict[str, TargetPath] = {}
         self._parse_netscaler_configs()
 
     def _parse_netscaler_configs(self) -> None:
         ips = set()
-        usernames = set()
-
-        for path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
+        # sort file to ensure the most recent backup/config file is used as source for an user
+        for path in sorted(
+            self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"), key=lambda x: x.name, reverse=True
+        ):
             config = path.read_text()
 
             for match in RE_CONFIG_IP.finditer(config):
                 ips.add(match.groupdict()["ip"])
 
             for match in RE_CONFIG_USER.finditer(config):
-                usernames.add(match.groupdict()["user"])
+                self._config_usernames[match.groupdict()["user"]] = path
 
             if path.name == "ns.conf" and (match := RE_CONFIG_HOSTNAME.search(config)):
                 # Current configuration of the netscaler
                 self._hostname = match.groupdict()["hostname"]
 
-        self._config_usernames = list(usernames)
         self._ips = list(ips)
 
     @classmethod
@@ -211,7 +212,7 @@ class CitrixPlugin(BsdPlugin):
                     nstmp_users.add(username)
 
         # Yield users from the config, matching them to their 'home' in /var/nstmp if it exists.
-        for username in self._config_usernames:
+        for username, config_source in self._config_usernames.items():
             nstmp_home = nstmp_path.joinpath(username)
             user_home = nstmp_home if nstmp_home.exists() else None
 
@@ -227,14 +228,14 @@ class CitrixPlugin(BsdPlugin):
                 user_home = self.target.fs.path("/root")
 
             seen.add((username, user_home.as_posix() if user_home else None, None))
-            yield UnixUserRecord(name=username, home=user_home)
+            yield UnixUserRecord(name=username, home=user_home, source=config_source)
 
         # Yield all users in nstmp that were not observed in the config
         for username in nstmp_users:
             # The nsmonitor user has a home directory of /var/nstmp/monitors rather than /var/nstmp/nsmonitor
             home = nstmp_path.joinpath(username) if username != "nsmonitor" else nstmp_path.joinpath("monitors")
             seen.add((username, home.as_posix(), None))
-            yield UnixUserRecord(name=username, home=home)
+            yield UnixUserRecord(name=username, home=home, source=home)
 
         # Yield users from /etc/passwd if we have not seem them in previous loops
         for user in super().users():

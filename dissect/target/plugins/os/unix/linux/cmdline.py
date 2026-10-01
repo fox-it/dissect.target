@@ -17,6 +17,7 @@ CmdlineRecord = TargetRecordDescriptor(
         ("varint", "pid"),
         ("string", "state"),
         ("string", "cmdline"),
+        ("path", "source"),
     ],
 )
 
@@ -55,5 +56,6 @@ class CmdlinePlugin(Plugin):
                 pid=process.pid,
                 state=process.state,
                 cmdline=process.cmdline,
+                source=process.get("cmdline"),
                 _target=self.target,
             )

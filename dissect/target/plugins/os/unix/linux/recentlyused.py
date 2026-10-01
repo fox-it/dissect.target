@@ -23,7 +23,6 @@ RecentlyUsedRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("string", "user"),
-        ("string", "source"),
         ("string", "href"),
         ("datetime", "added"),
         ("datetime", "modified"),
@@ -31,6 +30,7 @@ RecentlyUsedRecord = TargetRecordDescriptor(
         ("string", "mimetype"),
         ("string", "groups"),
         ("boolean", "private"),
+        ("path", "source"),
     ],
 )
 
@@ -40,6 +40,7 @@ RecentlyUsedIconRecord = TargetRecordDescriptor(
         ("string", "type"),
         ("string", "href"),
         ("string", "name"),
+        ("path", "source"),
     ],
 )
 
@@ -50,6 +51,7 @@ RecentlyUsedApplicationRecord = TargetRecordDescriptor(
         ("string", "name"),
         ("string", "exec"),
         ("varint", "count"),
+        ("path", "source"),
     ],
 )
 ns = {
@@ -107,7 +109,6 @@ def parse_recently_used_xbel(
             cur = RecentlyUsedRecord(
                 ts=parse_ts(target, bookmark.get("visited")),
                 user=username,
-                source=xbel_file,
                 href=bookmark.get("href"),
                 added=parse_ts(target, bookmark.get("added")),
                 modified=parse_ts(target, bookmark.get("modified")),
@@ -115,6 +116,7 @@ def parse_recently_used_xbel(
                 mimetype=mimetype,
                 groups=group_list,
                 private=private,
+                source=xbel_file,
                 _target=target,
             )
             yield cur
@@ -125,6 +127,7 @@ def parse_recently_used_xbel(
                     type=icon.get("type"),
                     href=icon.get("href"),
                     name=icon.get("name"),
+                    source=xbel_file,
                 )
                 yield GroupedRecord("unix/linux/recently_used/icon", [cur, iconrecord])
 
@@ -135,6 +138,7 @@ def parse_recently_used_xbel(
                     name=app.get("name"),
                     exec=app.get("exec"),
                     count=app.get("count"),
+                    source=xbel_file,
                 )
                 yield GroupedRecord("unix/linux/recently_used/application", [cur, apprecord])
 

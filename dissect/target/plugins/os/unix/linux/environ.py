@@ -17,6 +17,7 @@ EnvironmentVariableRecord = TargetRecordDescriptor(
         ("varint", "pid"),
         ("string", "variable"),
         ("string", "content"),
+        ("path", "source"),
     ],
 )
 
@@ -55,5 +56,6 @@ class EnvironPlugin(Plugin):
                     pid=process.pid,
                     variable=environ.variable,
                     content=environ.contents,
+                    source=process.get("environ"),
                     _target=self.target,
                 )
