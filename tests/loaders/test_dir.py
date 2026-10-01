@@ -139,7 +139,7 @@ def test_linux_with_openers(opener: Callable[[str | Path], Target], tmp_path: Pa
     root = tmp_path
     mkdirs(root, ["etc", "var"])
     (root / "etc" / "hostname").write_bytes(b"test")
-    # Test with more  deep.
+    # Test with a deeper path.
     (root / "etc" / "apt" / "sources.list.d").mkdir(parents=True)
     (root / "etc" / "apt" / "sources.list.d" / "test.list").write_bytes(b"test_2")
     os_type, dirs = find_dirs(root)
