@@ -119,6 +119,7 @@ def test_case_sensitivity(tmp_path: pathlib.Path) -> None:
     dirents_sensitive = {entry.name: entry for entry in fs_sensitive.get("/").scandir()}
     assert len(dirents_sensitive) == 1
     assert dirents_sensitive["LeVel1"].is_dir()
+
     assert fs_insensitive.get("level1").entry == fs_insensitive.get("LeVel1").entry
     fh = fs_insensitive.get("level1/test_file").open()
     assert fh.read() == b"test_content"
