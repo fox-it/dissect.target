@@ -40,6 +40,7 @@ def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> 
 
 
 def test_loader(tmp_path: Path) -> None:
+    """Test that ``VBoxLoader`` correctly loads a Virtual Box configuration file and its disks."""
     path = tmp_path / "test.vbox"
     path.touch()
 
