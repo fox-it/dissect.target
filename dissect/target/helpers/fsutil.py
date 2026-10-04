@@ -261,10 +261,11 @@ def walk(
     topdown: bool = True,
     onerror: Callable[[Exception], None] | None = None,
     followlinks: bool = False,
+    exclude: list[str] | None = None,
 ) -> Iterator[
     tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
 ]:
-    for path_list, dirs, files in walk_ext(path_entry, topdown, onerror, followlinks):
+    for path_list, dirs, files in walk_ext(path_entry, topdown, onerror, followlinks, exclude):
         dir_names = [d.name for d in dirs]
         file_names = [f.name for f in files]
 
@@ -280,14 +281,28 @@ def walk_ext(
     topdown: bool = True,
     onerror: Callable[[Exception], None] | None = None,
     followlinks: bool = False,
+    exclude: list[str] | None = None,
 ) -> Iterator[
     tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
 ]:
+    # Ignore if self excluded
+    if exclude:
+        path = PureTargetPath(path_entry.path)
+        if any(path.full_match(pattern) for pattern in exclude):
+            return
+
     dirs: list[filesystem.FilesystemEntry] = []
     files: list[filesystem.FilesystemEntry] = []
 
     try:
         for entry in path_entry.scandir():
+            # Ignore excluded entries
+            if exclude:
+                path = PureTargetPath(entry.path)
+                if any(path.full_match(pattern) for pattern in exclude):
+                    continue
+
+            # If matches continue
             if entry.is_dir():
                 dirs.append(entry.get())
             else:
@@ -303,7 +318,7 @@ def walk_ext(
 
     for direntry in dirs:
         if followlinks or not direntry.is_symlink():
-            for xpath, xdirs, xfiles in walk_ext(direntry, topdown, onerror, followlinks):
+            for xpath, xdirs, xfiles in walk_ext(direntry, topdown, onerror, followlinks, exclude):
                 yield [path_entry, *xpath], xdirs, xfiles
 
     if not topdown:
