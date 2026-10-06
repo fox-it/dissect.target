@@ -57,6 +57,7 @@ class YaraPlugin(Plugin):
     @arg("-m", "--max-size", type=int, default=DEFAULT_MAX_SCAN_SIZE, help="maximum file size in bytes to scan")
     @arg("-c", "--check", action="store_true", help="check if every YARA rule is valid")
     @arg("--no-decompress", action="store_true", help="do not automatically decompress files for extra scanning")
+    @arg("-e", "--exclude", nargs="*", help="glob-style patterns to exclude paths on target(s) from scan")
     @export(record=YaraMatchRecord)
     def yara(
         self,
@@ -65,6 +66,7 @@ class YaraPlugin(Plugin):
         max_size: int = DEFAULT_MAX_SCAN_SIZE,
         check: bool = False,
         no_decompress: bool = False,
+        exclude: list[str] | None = None,
     ) -> Iterator[YaraMatchRecord]:
         """Scan files inside the target up to a given maximum size with YARA rule file(s).
 
@@ -74,6 +76,7 @@ class YaraPlugin(Plugin):
             max_size: Files larger than this size will not be scanned.
             check: Check if provided rules are valid, only compiles valid rules.
             no_decompress: Do not automatically decompress compressed files before scanning.
+            exclude: ``list`` of glob-style string patterns to exclude from scanning.
 
         Returns:
             Iterator yields ``YaraMatchRecord``.
@@ -99,7 +102,7 @@ class YaraPlugin(Plugin):
                 max_size // 1024 // 1024,
             )
 
-        for _, _, files in self.target.fs.walk_ext(path):
+        for _, _, files in self.target.fs.walk_ext(path, exclude=exclude):
             for file in files:
                 fhandles = []
                 try:

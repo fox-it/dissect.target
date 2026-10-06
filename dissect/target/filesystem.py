@@ -255,6 +255,7 @@ class Filesystem:
         topdown: bool = True,
         onerror: Callable[[Exception], None] | None = None,
         followlinks: bool = False,
+        exclude: list[str] | None = None,
     ) -> Iterator[tuple[str, list[str], list[str]]]:
         """Recursively walk a directory pointed to by ``path``, returning the string representation of both files
         and directories.
@@ -264,11 +265,12 @@ class Filesystem:
             topdown: ``True`` puts the ``path`` at the top, ``False`` puts the ``path`` at the bottom.
             onerror: A method to execute when an error occurs.
             followlinks: ``True`` if we want to follow any symbolic link.
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
 
         Returns:
             An iterator of directory entries as path strings.
         """
-        return self.get(path).walk(topdown, onerror, followlinks)
+        return self.get(path).walk(topdown, onerror, followlinks, exclude)
 
     def walk_ext(
         self,
@@ -276,6 +278,7 @@ class Filesystem:
         topdown: bool = True,
         onerror: Callable[[Exception], None] | None = None,
         followlinks: bool = False,
+        exclude: list[str] | None = None,
     ) -> Iterator[tuple[list[FilesystemEntry], list[DirEntry], list[DirEntry]]]:
         """Recursively walk a directory pointed to by ``path``, returning :class:`FilesystemEntry` of files
         and directories.
@@ -285,11 +288,12 @@ class Filesystem:
             topdown: ``True`` puts the ``path`` at the top, ``False`` puts the ``path`` at the bottom.
             onerror: A method to execute when an error occurs.
             followlinks: ``True`` if we want to follow any symbolic link.
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
 
         Returns:
             An iterator of directory entries as FilesystemEntry's.
         """
-        return self.get(path).walk_ext(topdown, onerror, followlinks)
+        return self.get(path).walk_ext(topdown, onerror, followlinks, exclude)
 
     def recurse(self, path: str) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield contents as :class:`FilesystemEntry`.
@@ -643,6 +647,7 @@ class FilesystemEntry:
         topdown: bool = True,
         onerror: Callable[[Exception], None] | None = None,
         followlinks: bool = False,
+        exclude: list[str] | None = None,
     ) -> Iterator[tuple[str, list[str], list[str]]]:
         """Recursively walk a directory and yield its contents as strings split in a tuple
         of lists of files, directories and symlinks.
@@ -656,17 +661,19 @@ class FilesystemEntry:
             topdown: ``True`` puts this entry at the top of the list, ``False`` puts this entry at the bottom.
             onerror: A method to execute when an error occurs.
             followlinks: ``True`` if we want to follow any symbolic link.
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
 
         Returns:
             An iterator of directory entries as path strings.
         """
-        yield from fsutil.walk(self, topdown, onerror, followlinks)
+        yield from fsutil.walk(self, topdown, onerror, followlinks, exclude)
 
     def walk_ext(
         self,
         topdown: bool = True,
         onerror: Callable[[Exception], None] | None = None,
         followlinks: bool = False,
+        exclude: list[str] | None = None,
     ) -> Iterator[tuple[list[Self], list[Self], list[Self]]]:
         """Recursively walk a directory and yield its contents as :class:`FilesystemEntry` split in a tuple of
         lists of files, directories and symlinks.
@@ -675,11 +682,12 @@ class FilesystemEntry:
             topdown: ``True`` puts this entry at the top of the list, ``False`` puts this entry at the bottom.
             onerror: A method to execute when an error occurs.
             followlinks: ``True`` if we want to follow any symbolic link
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
 
         Returns:
             An iterator of tuples :class:`FilesystemEntry`.
         """
-        yield from fsutil.walk_ext(self, topdown, onerror, followlinks)
+        yield from fsutil.walk_ext(self, topdown, onerror, followlinks, exclude)
 
     def recurse(self) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield its contents as :class:`DirEntry`.
@@ -692,7 +700,7 @@ class FilesystemEntry:
         yield from fsutil.recurse(self)
 
     def glob(self, pattern: str) -> Iterator[str]:
-        """Iterate over this directory part of ``patern``, returning entries matching ``pattern`` as strings.
+        """Iterate over this directory part of ``pattern``, returning entries matching ``pattern`` as strings.
 
         Args:
             pattern: The pattern to match.
