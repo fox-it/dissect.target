@@ -201,8 +201,8 @@ class SmbRegistry(RegistryPlugin):
         self._winreg = None
         super().__init__(target)
 
-    def check_compatible(self) -> bool:
-        return False
+    def check_compatible(self) -> None:
+        pass
 
     def _init_registry(self) -> None:
         try:

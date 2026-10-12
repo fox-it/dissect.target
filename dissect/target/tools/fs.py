@@ -14,6 +14,7 @@ from dissect.target.target import Target
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     process_generic_arguments,
 )
 from dissect.target.tools.utils.fs import print_ls, print_stat
@@ -103,7 +104,8 @@ def _extract_path(path: TargetPath, output_path: pathlib.Path) -> None:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-fs {get_dissect_target_version()} : interact with the filesystem of a "
+        f"target using a set of familiar Unix commands.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )

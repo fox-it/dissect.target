@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
@@ -67,6 +68,9 @@ def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_p
     assert {r.Channel for r in records} == {"Microsoft-Windows-Windows Defender/Operational"}
     # Both informational records (no threat name) and detections are present
     assert {r.Threat_Name for r in records} == {None, "TrojanDropper:PowerShell/PowerSploit.S!MSR"}
+    assert Counter(str(r.source) for r in records) == {
+        "c:\\Windows\\system32\\winevt\\logs\\Microsoft-Windows-Windows Defender%4Operational.evtx": 9
+    }
 
 
 def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -97,7 +101,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert mimikatz_record.quarantine_id == "a762038000000000fb1112639186e0d6"
     assert mimikatz_record.scan_id == "cdbe4600e43a964b8dc2416b0ef7a207"
     assert mimikatz_record.threat_id == 2147705511
-
+    assert mimikatz_record.source == (
+        r"sysvol\\programdata\\microsoft\\"
+        r"windows defender\\quarantine\\entries\\{800362A7-0000-0000-FB11-12639186E0D6}"
+    )
     ie_records = sorted(
         [r for r in records if r.quarantine_id == "229c0170000000004d02ef183c202f42"], key=lambda r: r.ts
     )
@@ -115,6 +122,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert ie_startup_record.detection_path == (
         "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Internet Explorer.lnk"
     )
+    assert ie_startup_record.source == (
+        r"sysvol\\programdata\\microsoft\\"
+        r"windows defender\\quarantine\\entries\\{8006A512-0000-0000-2E01-A7D5DA185F14}"
+    )
 
     tasksched_records = sorted(
         [r for r in records if r.quarantine_id == "3c1f228000000000270c270b71d096cd"], key=lambda r: r.ts
@@ -130,6 +141,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert regkey_records[1].detection_path == (
         "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Schedule\\TaskCache\\"
         "Tasks\\{EBCB386F-05C8-4545-9455-922990114435}"
+    )
+    assert regkey_records[1].source == (
+        r"sysvol\\programdata\\microsoft\\"
+        r"windows defender\\quarantine\\entries\\{8006A512-0000-0000-2E11-A7D5DA185F24}"
     )
 
     file_records = sorted([r for r in tasksched_records if r.detection_type == "file"], key=lambda r: r.ts)
@@ -147,6 +162,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert ts_record.detection_name == "HackTool:Win32/AutoKMS"
     assert ts_record.detection_path == "C:\\WINDOWS\\System32\\Tasks\\KMSAuto"
     assert ts_record.file_size is None
+    assert ts_record.source == (
+        r"sysvol\\programdata\\microsoft\\"
+        r"windows defender\\quarantine\\entries\\{8006A512-0000-0000-2E11-A7D5DA185F24}"
+    )
 
 
 def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
@@ -255,7 +274,7 @@ def _mplog_records(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path
 
 def test_defender_mplogs_rtp(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "rtp").pop()
-    assert record.source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert record.source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert record.ts == dt("2021-05-04 09:54:06+00:00")
     assert record.last_perf == dt("2021-05-04 09:54:06+00:00")
     assert record.first_rtp_scan == dt("2021-05-04 09:54:06+00:00")
@@ -269,7 +288,7 @@ def test_defender_mplogs_rtp(target_win: Target, fs_win: VirtualFilesystem, tmp_
 
 def test_defender_mplogs_resource_scan(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "resourcescan").pop()
-    assert record.source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert record.source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert record.ts == dt("2023-01-01 00:00:00+00:00")
     assert record.scan_id == "{1A2B3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D}"
     assert record.scan_source == 4
@@ -296,7 +315,7 @@ def test_defender_mplogs_resource_scan(target_win: Target, fs_win: VirtualFilesy
 
 def test_defender_mplogs_threat_actions(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "threatactions").pop()
-    assert record.source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert record.source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert record.ts == dt("2017-12-25 16:30:45+00:00")
     assert record.threats == ["Worm:Win32/RandomName.X"]
     for item in [
@@ -317,7 +336,7 @@ def test_defender_mplogs_threat_actions(target_win: Target, fs_win: VirtualFiles
 
 def test_defender_mplogs_bmtelemetry(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "bmtelemetry").pop()
-    assert record.source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert record.source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert record.ts == dt("2024-07-15 11:45:22+00:00")
     assert record.guid == "{1D3E4F07-89AB-45C2-923D-E5F6789A1B2C}"
     assert record.signature_id == 123456789012345
@@ -335,7 +354,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert len(records) == 10
 
     # Process Image
-    assert records[0].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[0].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[0].ts == dt("2024-07-13 14:42:19.659000+00:00")
     assert records[0].process_image_name == "randomapp.exe"
     assert records[0].pid == 5832
@@ -346,14 +365,14 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[0].estimated_impact == 4
 
     # Lowfi
-    assert records[1].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[1].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[1].ts == dt("2023-01-20 08:45:40.321000+00:00")
     assert records[1].lowfi == command(
         "C:\\OS\\System32\\cfg.exe(reg add HKLM\\SYSTEM\\OtherControlSet\\Control\\SecurityOptions\\SecurityModule /v RandomFlag /t REG_DWORD /d 0 /f)",  # noqa: E501
     )
 
     # Detection Add
-    assert records[2].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[2].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[2].ts == dt("2023-01-27 15:33:07.698000+00:00")
     assert (
         records[2].detection
@@ -361,24 +380,24 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     )
 
     # Threat
-    assert records[3].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[3].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[3].ts == dt("2023-01-27 15:33:07.698000+00:00")
     assert records[3].threat == command("C:\\Users\\user987\\Documents\\executable.exe")
 
     # Detection event
-    assert records[4].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[4].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[4].ts == dt("2023-01-27 15:33:07.698000+00:00")
     assert records[4].threat_type == "MSIL/RndGen!MD5"
     assert records[4].command == command("C:\\Users\\user987\\Documents\\executable.exe")
 
     # Exclusion
-    assert records[5].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[5].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[5].ts == dt("2024-08-17 17:35:22.614000+00:00")
     assert records[5].full_path_with_drive_letter == "C:\\example.txt"
     assert records[5].full_path_with_device_path == "example.txt"
 
     # Mini-filter unsuccesful scan
-    assert records[6].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[6].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert (
         records[6].path
         == "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs."  # noqa: E501
@@ -398,7 +417,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[6].backing_file_info == "0x0, 0x0, 0x0:0\\0x0:0"
 
     # Mini-filter blocked file
-    assert records[7].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[7].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[7].ts == dt("2024-07-13 14:38:15.272000+00:00")
     assert (
         records[7].blocked_file
@@ -418,7 +437,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[7].backing_file_info == "0x0, 0x0, 0x0:0\\0x0:0"
 
     # EMS
-    assert records[8].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[8].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[8].ts == dt("2024-09-05 10:21:39.417000+00:00")
     assert records[8].process == "sysproc"
     assert records[8].pid == 2820
@@ -427,7 +446,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[8].source_id == 4
 
     # Original Filename
-    assert records[9].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
+    assert records[9].source == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[9].ts == dt("2024-09-03 18:12:05.364000+00:00")
     assert records[9].original_file_name == "RandomData0123_static.dll"
     assert (

@@ -62,7 +62,6 @@ def test_caddy_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config_file = absolute_path("_data/plugins/apps/webserver/caddy/Caddyfile")
     fs_unix.map_file("etc/caddy/Caddyfile", config_file)
 
-    fs_unix.map_file("etc/caddy/Caddyfile", config_file)
     fs_unix.map_file_fh("var/www/log/access.log", BytesIO(b"Foo"))
     fs_unix.map_file_fh("var/log/caddy/access.log", BytesIO(b"Foo"))
 

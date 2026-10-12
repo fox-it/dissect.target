@@ -4,7 +4,7 @@ import json
 import re
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.localeutil import normalize_language
+from dissect.target.helpers.locale.util import normalize_language
 from dissect.target.plugin import export
 from dissect.target.plugins.os.default.locale import LocalePlugin
 

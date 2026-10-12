@@ -32,18 +32,24 @@ def find_pvms(target: Target) -> Iterator[TargetPath]:
     References:
         - https://kb.parallels.com/117333
     """
+    seen = set()
+
     for user_details in target.user_details.all_with_home():
         for parallels_path in PARALLELS_SYSTEM_PATHS:
-            if (path := target.fs.path(parallels_path)).exists():
+            if (path := target.fs.path(parallels_path)).exists() and path not in seen:
+                seen.add(path)
                 yield from iter_vms(path)
 
         for parallels_path in PARALLELS_USER_PATHS:
             if "*" in parallels_path:
                 start_path, pattern = parallels_path.split("*", 1)
                 for path in user_details.home_path.joinpath(start_path).rglob("*" + pattern):
-                    yield from iter_vms(path)
+                    if path not in seen:
+                        seen.add(path)
+                        yield from iter_vms(path)
             else:
-                if (path := user_details.home_path.joinpath(parallels_path)).exists():
+                if (path := user_details.home_path.joinpath(parallels_path)).exists() and path not in seen:
+                    seen.add(path)
                     yield from iter_vms(path)
 
 

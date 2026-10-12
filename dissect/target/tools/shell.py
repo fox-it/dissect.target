@@ -64,8 +64,9 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
     TargetError,
+    UnsupportedPluginError,
 )
-from dissect.target.helpers import cyber, fsutil, regutil
+from dissect.target.helpers import cyber, excutil, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import alias, arg, clone_alias
@@ -78,6 +79,7 @@ from dissect.target.tools.utils.cli import (
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_method,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
 )
@@ -689,6 +691,14 @@ class TargetCmd(ExtendedCmd):
         def _exec_(argparts: list[str], stdout: TextIO) -> None:
             try:
                 output, value = execute_function_on_target(self.target, func, argparts)
+            except UnsupportedPluginError as e:
+                if self.debug == DebugMode.ON:
+                    print("\n".join(excutil.summarize_exceptions(e)))
+                elif self.debug == DebugMode.POST_MORTEM:
+                    raise
+                else:
+                    print(e)
+                return
             except SystemExit:
                 return
 
@@ -1941,7 +1951,14 @@ if HAS_PROMPT_TOOLKIT:
 
         def load_history_strings(self) -> Iterable[str]:
             """Yield most recent history strings from the readline history file."""
-            readline.read_history_file(self.histfile)
+            if not self.histfile.is_file():
+                return
+
+            try:
+                readline.read_history_file(self.histfile)
+            except OSError as e:
+                log.error("Unable to read %s: %s", self.histfile, e)  # noqa: TRY400
+
             for i in range(readline.get_current_history_length(), 0, -1):
                 yield readline.get_history_item(i)
 
@@ -2084,7 +2101,7 @@ def run_cli(cli: ExtendedCmd) -> None:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-shell {get_dissect_target_version()} : access a target using a virtual shell environment.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )

@@ -67,9 +67,18 @@ class _OverrideRequiredAction(argparse.Action):
         setattr(namespace, self.dest, self.const)
 
 
+def get_dissect_target_version() -> str:
+    try:
+        return version("dissect.target")
+    except PackageNotFoundError:
+        return "0+unknown"
+
+
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
-    parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
+    parser.add_argument(
+        "-Kv", "--keychain-value", action="append", help="passphrase, recovery key or key file path value"
+    )
     parser.add_argument("-L", "--loader", help="select a specific loader (i.e. vmx, raw)")
     parser.add_argument("--child", help="load child of target by path of index (see --list-children)")
     parser.add_argument("--children", action="store_true", help="include children (depth=1 or use --recursive)")
@@ -81,7 +90,7 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--recursive", action="store_true", help="make --(list-)children behave recursively")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
-    parser.add_argument("--version", action="store_true", help="print version")
+    parser.add_argument("--version", action="version", version=f"dissect.target version {get_dissect_target_version()}")
     parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
     parser.add_argument(
         "--plugin-path",
@@ -94,13 +103,6 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
 
 def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     configure_logging(args.verbose, args.quiet, as_plain_text=True)
-
-    if args.version:
-        try:
-            print("dissect.target version " + version("dissect.target"))
-        except PackageNotFoundError:
-            print("unable to determine version")
-        parser.exit(0)
 
     targets = args.targets if hasattr(args, "targets") else [args.target] if hasattr(args, "target") else []
     if targets and args.loader:
@@ -123,7 +125,8 @@ def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Na
         keychain.register_keychain_file(args.keychain_file)
 
     if args.keychain_value:
-        keychain.register_wildcard_value(args.keychain_value)
+        for value in args.keychain_value:
+            keychain.register_wildcard_value(value)
 
     paths = get_external_module_paths(args.plugin_path or [])
     load_modules_from_paths(paths)
@@ -341,7 +344,8 @@ def generate_argparse_for_method(
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
-    _add_args_to_parser(parser, getattr(method, "__args__", []))
+    for args, kwargs in getattr(method, "__args__", []):
+        parser.add_argument(*args, **kwargs)
 
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
@@ -366,7 +370,8 @@ def generate_argparse_for_plugin_class(
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
-    _add_args_to_parser(parser, getattr(plugin_cls.__call__, "__args__", []))
+    for args, kwargs in getattr(plugin_cls.__call__, "__args__", []):
+        parser.add_argument(*args, **kwargs)
 
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
@@ -389,27 +394,6 @@ def generate_argparse_for_plugin(
         raise ValueError(f"Plugin `{plugin_instance}` is not a namespace plugin and is not callable")
 
     return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
-
-
-def _add_args_to_parser(
-    parser: argparse.ArgumentParser,
-    fargs: list[tuple[list[str], dict[str, Any]]],
-) -> None:
-    groups = {}
-    default_group_options = {"required": False}
-    for args, kwargs in fargs:
-        if "group" in kwargs:
-            group_name = kwargs.pop("group")
-            options = kwargs.pop("group_options") if "group_options" in kwargs else default_group_options
-            if group_name not in groups:
-                group = parser.add_mutually_exclusive_group(**options)
-                groups[group_name] = group
-            else:
-                group = groups[group_name]
-
-            group.add_argument(*args, **kwargs)
-        else:
-            parser.add_argument(*args, **kwargs)
 
 
 def execute_function_on_target(
@@ -510,8 +494,20 @@ def args_to_uri(targets: list[str], loader_name: str, args: list[str] | None = N
 
 
 def find_and_filter_plugins(
-    functions: str, target: Target, excluded_func_paths: set[str] | None = None
+    functions: str,
+    target: Target,
+    excluded_func_paths: set[str] | None = None,
+    plugin_paths: list[Path] | None = None,
 ) -> Iterator[FunctionDescriptor]:
+    """Find and filter plugins for the given functions and target.
+
+    If ``plugin_paths`` are provided, they are loaded before plugin discovery
+    to ensure external plugins are included in the results.
+    """
+    if plugin_paths:
+        paths = get_external_module_paths(plugin_paths)
+        load_modules_from_paths(paths)
+
     # Keep a set of plugins that were already executed on the target.
     executed_plugins = set()
     excluded_func_paths = excluded_func_paths or set()

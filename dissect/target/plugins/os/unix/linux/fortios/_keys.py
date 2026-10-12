@@ -1,45 +1,11 @@
 # SHA256 hashes of kernel files
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-
-@dataclass
-class AesKey:
-    key: bytes
-    iv: bytes
-
-    def __init__(self, key: bytes | str, iv: bytes | str):
-        self.key = bytes.fromhex(key) if isinstance(key, str) else key
-        self.iv = bytes.fromhex(iv) if isinstance(iv, str) else iv
-
-    def __repr__(self) -> str:
-        return f"AesKey(key={self.key.hex()!r}, iv={self.iv.hex()!r})"
-
-
-@dataclass
-class ChaCha20Key:
-    key: bytes
-    iv: bytes
-
-    def __init__(self, key: bytes | str, iv: bytes | str):
-        self.key = bytes.fromhex(key) if isinstance(key, str) else key
-        self.iv = bytes.fromhex(iv) if isinstance(iv, str) else iv
-
-    def __repr__(self) -> str:
-        return f"ChaCha20Key(key={self.key.hex()!r}, iv={self.iv.hex()!r})"
-
-
-@dataclass
-class ChaCha20Seed:
-    key: bytes
-
-    def __init__(self, key: bytes | str):
-        self.key = bytes.fromhex(key) if isinstance(key, str) else key
-
-    def __repr__(self) -> str:
-        return f"ChaCha20Seed(key={self.key.hex()!r})"
-
+from dissect.target.plugins.os.unix.linux.fortios.fwkey.models import (
+    AesKey,
+    ChaCha20Key,
+    ChaCha20Seed,
+)
 
 KERNEL_KEY_MAP = {
     # FGR_60F-v7.0.12FIPS-CC-70-16-build9223-FORTINET

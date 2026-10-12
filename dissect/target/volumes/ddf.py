@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume.ddf.ddf import DDF, DEFAULT_SECTOR_SIZE, DDFPhysicalDisk
 
+from dissect.target.helpers.utils import to_list
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
@@ -16,24 +17,40 @@ if TYPE_CHECKING:
 class DdfVolumeSystem(LogicalVolumeSystem):
     __type__ = "ddf"
 
-    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
-        self.ddf = DDF(fh)
+    def __init__(
+        self,
+        fh: BinaryIO | list[BinaryIO],
+        *args,
+        devices: list[DDFPhysicalDisk] | None = None,
+        **kwargs,
+    ):
+        self.ddf = DDF(devices if devices is not None else fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
     def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         sets: dict[bytes, list[DDFPhysicalDisk]] = {}
+        source_disks: dict[bytes, dict[BinaryIO, None]] = {}
 
         for vol in volumes:
             if not cls.detect_volume(vol):
                 continue
 
-            disk = DDFPhysicalDisk(vol)
-            sets.setdefault(disk.anchor.DDF_Header_GUID, []).append(disk)
+            ddf_disk = DDFPhysicalDisk(vol)
+            guid = ddf_disk.anchor.DDF_Header_GUID
+            sets.setdefault(guid, []).append(ddf_disk)
 
-        for devs in sets.values():
+            disks = source_disks.setdefault(guid, {})
+            for disk in to_list(vol.disk if isinstance(vol, Volume) else vol):
+                disks[disk] = None
+
+        for guid, devs in sets.items():
             try:
-                yield cls(devs)
+                yield cls(
+                    [dev.fh for dev in devs],
+                    devices=devs,
+                    disk=list(source_disks[guid]),
+                )
             except Exception:  # noqa: PERF203
                 continue
 

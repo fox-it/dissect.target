@@ -156,7 +156,6 @@ class MftPlugin(Plugin):
     )
     @arg(
         "--compact",
-        group="fmt",
         action="store_true",
         help="compacts the MFT entry timestamps into a single record",
     )
@@ -165,7 +164,6 @@ class MftPlugin(Plugin):
     @arg("--end", type=int, default=-1, help="the last MFT segment number")
     @arg(
         "--macb",
-        group="fmt",
         action="store_true",
         help="compacts MFT timestamps into MACB bitfield (format: MACB[standard|ads]/MACB[filename])",
     )

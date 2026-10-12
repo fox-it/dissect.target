@@ -25,6 +25,7 @@ PrefetchRecord = TargetRecordDescriptor(
         ("path", "prefetch"),
         ("path", "linkedfile"),
         ("uint32", "runcount"),
+        ("path", "source"),
     ],
 )
 
@@ -38,6 +39,7 @@ CompactPrefetchRecord = TargetRecordDescriptor(
         ("path[]", "linkedfiles"),
         ("uint32", "runcount"),
         ("datetime[]", "previousruns"),
+        ("path", "source"),
     ],
 )
 
@@ -320,6 +322,7 @@ class PrefetchPlugin(Plugin):
                     linkedfiles=list(map(self.target.fs.path, scca.metrics)),
                     runcount=scca.fn.run_count,
                     previousruns=scca.previous_timestamps,
+                    source=entry.resolve(),
                     _target=self.target,
                 )
             else:
@@ -332,5 +335,6 @@ class PrefetchPlugin(Plugin):
                             prefetch=entry_name,
                             linkedfile=self.target.fs.path(linked_file),
                             runcount=scca.fn.run_count,
+                            source=entry.resolve(),
                             _target=self.target,
                         )

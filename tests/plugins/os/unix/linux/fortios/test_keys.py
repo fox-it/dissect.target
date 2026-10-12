@@ -1,23 +1,23 @@
 from __future__ import annotations
 
 import re
-from io import BytesIO
 from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.helpers import keychain
-from dissect.target.plugins.os.unix.linux.fortios._keys import (
-    KERNEL_KEY_MAP,
+from dissect.target.plugins.os.unix.linux.fortios._keys import KERNEL_KEY_MAP
+from dissect.target.plugins.os.unix.linux.fortios._os import (
+    decrypt_rootfs,
+    key_iv_from_keychain,
+)
+from dissect.target.plugins.os.unix.linux.fortios.fwkey.ciphers import aes_decrypt, rc4_crypt
+from dissect.target.plugins.os.unix.linux.fortios.fwkey.kdf import kdf_7_4_x
+from dissect.target.plugins.os.unix.linux.fortios.fwkey.models import (
     AesKey,
     ChaCha20Key,
     ChaCha20Seed,
-)
-from dissect.target.plugins.os.unix.linux.fortios._os import (
-    aes_decrypt,
-    decrypt_rootfs,
-    key_iv_for_kernel_hash,
-    key_iv_from_keychain,
+    RC4Key,
 )
 
 if TYPE_CHECKING:
@@ -46,18 +46,21 @@ def test_kernel_key_map() -> None:
 
 def test_key_iv_for_kernel_hash() -> None:
     # test FFW_1801F-v7.4.2.F-build2571-FORTINET (KDF)
-    key = key_iv_for_kernel_hash("d719f7fd533d05efb872907cf3711d0d895750d288b856ce70fefecbd7ace482")
-    assert key.key == bytes.fromhex("39ef9ceb4262b49252164a4558b14a9b006d91a5247f5c797af281fade2198a8")
-    assert key.iv == bytes.fromhex("f30a9e100417e2c390b763d2be2f2d03")
+    key = KERNEL_KEY_MAP["d719f7fd533d05efb872907cf3711d0d895750d288b856ce70fefecbd7ace482"]
+    assert isinstance(key, ChaCha20Seed)
+    derived_key, derived_iv = kdf_7_4_x(key.key)
+    assert derived_key == bytes.fromhex("39ef9ceb4262b49252164a4558b14a9b006d91a5247f5c797af281fade2198a8")
+    assert derived_iv == bytes.fromhex("f30a9e100417e2c390b763d2be2f2d03")
 
     # test FFW_3980E-v7.0.14.M-build0601-FORTINET (static key + IV)
-    key = key_iv_for_kernel_hash("a494ec1713ab75a5ab58a847f096951e2de7ba899bef1a9a88a9c94d8efc4749")
+    key = KERNEL_KEY_MAP["a494ec1713ab75a5ab58a847f096951e2de7ba899bef1a9a88a9c94d8efc4749"]
+    assert isinstance(key, ChaCha20Key)
     assert key.key == bytes.fromhex("bb48ece8482e277f307479b8923796aed3b536e83f5fadc0d758b36192626762")
     assert key.iv == bytes.fromhex("5394687ae6c679a74c7901267dfb9bb3")
 
     # test unknown hash
-    with pytest.raises(ValueError, match=r"No known decryption keys for kernel hash: .*"):
-        key_iv_for_kernel_hash("12345")
+    with pytest.raises(KeyError):
+        KERNEL_KEY_MAP["12345"]
 
 
 def test_decrypt_rootfs() -> None:
@@ -65,13 +68,13 @@ def test_decrypt_rootfs() -> None:
     encrypted_rootfs_header = bytes.fromhex("3ccb 7d85 b9b0 4c8e 8c92 36d4 1d9c c48c")
     key = bytes.fromhex("b9c77cfca5c3f4fe543b5b861b5eeab61b0bfd23fa93f52f5cd428bb5567ec37")
     iv = bytes.fromhex("25c9578ca8d04f8c55009ae41657d7dd")
-    fh = decrypt_rootfs(BytesIO(encrypted_rootfs_header), ChaCha20Key(key, iv))
-    assert fh.read(16) == b"\x1f\x8b\x08\x00J\xd6\xbbe\x00\x03\xa4\xb6S\x900\x00"
+    data = decrypt_rootfs(encrypted_rootfs_header, ChaCha20Key(key, iv))
+    assert data[:16] == b"\x1f\x8b\x08\x00J\xd6\xbbe\x00\x03\xa4\xb6S\x900\x00"
 
     # test bad decrypt
     bad_key = ChaCha20Key(key[::-1], iv[::-1])
     with pytest.raises(ValueError, match=re.escape("Failed to decrypt: No gzip magic header found.")):
-        decrypt_rootfs(BytesIO(encrypted_rootfs_header), bad_key)
+        decrypt_rootfs(encrypted_rootfs_header, bad_key)
 
 
 def test_aes_decrypt() -> None:
@@ -90,7 +93,27 @@ def test_aes_decrypt() -> None:
     )
     key = KERNEL_KEY_MAP.get("5a4c18b9118124049955caa29824188d92fc51741f9576f90ea7a9df082b7657")
     assert isinstance(key, AesKey)
-    data = aes_decrypt(BytesIO(encrypted_rootfs_header), key)
+    data = aes_decrypt(encrypted_rootfs_header, key.key, key.iv)
+    assert data == decrypted_rootfs_header
+
+
+def test_rc4_decrypt() -> None:
+    # encrypted fortinet-fgtondemand-arm64-800-20260423 (FGT_ARM64_GCP)
+    encrypted_rootfs_header = bytes.fromhex(
+        """
+        f754 8e2d 8ef2 0f2c fd3e 93f8 39bd b253
+        dc8f 7be6 8a23 0102 e06a 2c35 e96c a70a
+        """
+    )
+    decrypted_rootfs_header = bytes.fromhex(
+        """
+        1f8b 0800 e467 e669 0003 9cb7 53ac 3000
+        afa6 bb6c dbb6 6ddb b66d dbb6 6ddb f896
+        """
+    )
+    key = RC4Key(key="8b82eca163d676c922ce4f21820aa1934d8b065c810f77e44a5aa59517189f45", i_bits=3, reset_j=True)
+    assert isinstance(key, RC4Key)
+    data = rc4_crypt(encrypted_rootfs_header, key.key, i_bits=key.i_bits, reset_j=key.reset_j)
     assert data == decrypted_rootfs_header
 
 
@@ -129,8 +152,8 @@ def test_decrypt_rootfs_from_keychain_file(target_unix: Target, tmp_path: Path) 
         assert key.key == bytes.fromhex("5adbbe614bcde31c3e05ba2e261c1a2410f0900ed340689835520a0612fc612b")
         assert key.iv == bytes.fromhex("e4973d6eff0412b4dbf4fe43c4d3136d")
 
-        fh = decrypt_rootfs(BytesIO(encrypted_rootfs_header), key)
-        assert fh.read() == decrypted_rootfs_header
+        data = decrypt_rootfs(encrypted_rootfs_header, key)
+        assert data == decrypted_rootfs_header
 
 
 def test_decrypt_rootfs_from_keychain_value(target_unix: Target) -> None:
@@ -160,9 +183,17 @@ def test_decrypt_rootfs_from_keychain_value(target_unix: Target) -> None:
     assert keys, "No keys found in keychain for testing"
 
     for key in keys:
-        assert isinstance(key, AesKey)
+        # the keychain code expands the given key to both AesKey and ChaCha20Key
+        assert isinstance(key, (AesKey, ChaCha20Key))
         assert key.key == bytes.fromhex("5adbbe614bcde31c3e05ba2e261c1a2410f0900ed340689835520a0612fc612b")
         assert key.iv == bytes.fromhex("e4973d6eff0412b4dbf4fe43c4d3136d")
 
-        fh = decrypt_rootfs(BytesIO(encrypted_rootfs_header), key)
-        assert fh.read() == decrypted_rootfs_header
+        # The ChaCha20Key is not the correct one, so it should fail to decrypt
+        if isinstance(key, ChaCha20Key):
+            with pytest.raises(ValueError, match="Failed to decrypt: No gzip magic header found"):
+                data = decrypt_rootfs(encrypted_rootfs_header, key)
+
+        # the AesKey is the correct one
+        if isinstance(key, AesKey):
+            data = decrypt_rootfs(encrypted_rootfs_header, key)
+            assert data == decrypted_rootfs_header

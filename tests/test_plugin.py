@@ -1496,6 +1496,10 @@ class MockOS1(OSPlugin):
     def architecture(self) -> str | None:
         pass
 
+    @export(property=True)
+    def device(self) -> str | None:
+        pass
+
 
 class MockOS2(OSPlugin):
     __register__ = False
@@ -1523,6 +1527,10 @@ class MockOS2(OSPlugin):
     @export(property=True)
     def architecture(self) -> str | None:
         """Test docstring architecture."""
+
+    @export(property=True)
+    def device(self) -> str | None:
+        pass
 
 
 @pytest.mark.parametrize(
@@ -1866,6 +1874,36 @@ def test_plugin_record_field_and_name_consistency() -> None:
     if inconsistencies:
         pytest.fail(
             f"Found {len(inconsistencies)} inconsistencies in RecordDescriptors:\n" + "\n".join(inconsistencies)
+        )
+
+
+def test_plugin_record_field_have_source_field() -> None:
+    """Test that ensures that every plugin have the "source" or "path" field,
+    containing path of the file used to generate the record..
+
+    As there is some backlogs, this test fail if the number of invalid plugin change.
+    First step is to ensure presence of source or path, second step will be to normalize source and path.
+    See https://github.com/fox-it/dissect.target/issues/1892
+    """
+    record_without_source: set[str] = set()
+
+    for descriptor in find_functions("*", Target(), compatibility=False, show_hidden=True)[0]:
+        # Test if plugin function record fields make sense and do not conflict with other records.
+        if descriptor.output != "record" or not hasattr(descriptor, "record"):
+            continue
+
+        # Functions can yield a single record or a list of records.
+        records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+
+        for record in records:
+            fields = [name for name, field in record.fields.items()]
+            if "source" not in fields and "path" not in fields:
+                record_without_source.add(record.name)
+
+    if len(record_without_source) != 81:
+        pytest.fail(
+            f"Found {len(record_without_source)} inconsistencies in "
+            f"RecordDescriptors:\n" + "\n".join(record_without_source)
         )
 
 

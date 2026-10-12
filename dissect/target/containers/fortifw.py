@@ -5,17 +5,14 @@ import io
 import logging
 import zlib
 from itertools import cycle, islice
-from typing import TYPE_CHECKING, BinaryIO
+from pathlib import Path
+from typing import BinaryIO
 
 from dissect.util.stream import AlignedStream, RangeStream, RelativeStream
 
 from dissect.target.container import Container
 from dissect.target.helpers.logging import get_logger
 from dissect.target.tools.utils.cli import catch_sigpipe
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
 
 log = get_logger(__name__)
 
@@ -179,15 +176,16 @@ def main(argv: list[str] | None = None) -> None:
     import sys
 
     parser = argparse.ArgumentParser(description="Decompress and deobfuscate Fortinet firmware file to stdout.")
-    parser.add_argument("file", type=argparse.FileType("rb"), help="Fortinet firmware file")
+    parser.add_argument("path", type=Path, help="path to Fortinet firmware file")
     parser.add_argument("--verbose", "-v", action="store_true", help="verbose output")
     args = parser.parse_args(argv)
 
     if args.verbose:
         logging.basicConfig(level=logging.INFO)
 
-    ff = FortiFirmwareFile(args.file)
-    shutil.copyfileobj(ff, sys.stdout.buffer)
+    with args.path.open("rb") as fh:
+        ff = FortiFirmwareFile(fh)
+        shutil.copyfileobj(ff, sys.stdout.buffer)
 
 
 if __name__ == "__main__":

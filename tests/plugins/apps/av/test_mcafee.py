@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import datetime as dt
@@ -42,3 +43,8 @@ def test_mcafee_plugin_log(target_win: Target, fs_win: VirtualFilesystem) -> Non
                 == "Status Quarantined Scan type Custom  We found one or several threats on your PC. Threat name EICAR test file File C:\\Users\\admin\\Desktop\\eicar.com"  # noqa: E501
             )
             assert record.keywords == "Custom,EICAR test file,Quarantined"
+
+        assert Counter(str(r.source) for r in records) == {
+            "sysvol\\ProgramData\\McAfee\\MSC\\Logs\\firewall.log": 1,
+            "sysvol\\ProgramData\\McAfee\\MSC\\Logs\\infect.log": 1,
+        }

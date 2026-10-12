@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 def test_unix_passwd_file(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     passwd_file = absolute_path("_data/plugins/os/unix/_os/passwd")
-    fs_unix.map_file("/etc/passwd", passwd_file)
+    fs_unix.map_file("/etc/passwd", passwd_file, clobber=True)
     target_unix_users.add_plugin(UnixPlugin)
 
     results = list(target_unix_users.users())
@@ -30,7 +30,7 @@ def test_unix_passwd_file(target_unix_users: Target, fs_unix: VirtualFilesystem)
 def test_unix_passwd_syslog(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     syslog_file = absolute_path("_data/plugins/os/unix/_os/passwd-syslog")
     fs_unix.map_file("/var/log/syslog", syslog_file)
-    fs_unix.map_file_fh("/etc/passwd", BytesIO())
+    fs_unix.map_file_fh("/etc/passwd", BytesIO(), clobber=True)
     target_unix_users.add_plugin(UnixPlugin)
 
     results = list(target_unix_users.users(sessions=True))

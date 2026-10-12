@@ -344,7 +344,21 @@ def normpath(path: str, *, sep: str = "/") -> str:
 def abspath(path: str, *, cwd: str = "", sep: str = "/") -> str:
     """Return an absolute path."""
     cwd = cwd or sep
-    if not isabs(path, sep=sep):
+
+    # A small exception to the rule of absolute paths:
+    # Don't fold path components from ALLOWED_DRIVE_NAMES if there is a cwd present
+    # This allows us to construct paths like "efi/EFI" without folding it to "EFI"
+    # It's easier to inline isabs here for that reason
+    if sep == "\\":
+        if not (absolute := path[:1] in ("\\", "/")):
+            drive, _, _ = splitroot(path, sep=sep)
+            if drive:
+                # A drive makes the path absolute, unless it's an allowed drive name and a cwd is given
+                absolute = not (cwd != sep and drive.lower() in ALLOWED_DRIVE_NAMES)
+    else:
+        absolute = path[:1] == "/"
+
+    if not absolute:
         path = join(cwd, path, sep=sep)
     return normpath(path, sep=sep)
 
