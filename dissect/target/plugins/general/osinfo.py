@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING
-
-from flow.record import GroupedRecord
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -15,8 +14,7 @@ if TYPE_CHECKING:
 OSInfoRecord = TargetRecordDescriptor(
     "generic/osinfo",
     [
-        ("string", "name"),
-        ("string", "value"),
+        ("string", "values"),
     ],
 )
 
@@ -29,18 +27,36 @@ class OSInfoPlugin(Plugin):
             raise UnsupportedPluginError("No operating system detected on target")
 
     @export(record=OSInfoRecord)
-    def osinfo(self) -> Iterator[OSInfoRecord | GroupedRecord]:
-        """Yield grouped records with target OS info."""
+    def osinfo(self) -> Iterator[OSInfoRecord]:
+        """Yield one aggregated OS info record for the current target.
+
+        Returns:
+            Iterator yields ``OSInfoRecord`` containing a JSON-serialized string of all OS values.
+        """
+        values = {}
+
         for os_func in self.target._os.__exports__:
             value = getattr(self.target._os, os_func)
-            record = OSInfoRecord(name=os_func, value=None, _target=self.target)
-            if isinstance(value, Callable) and isinstance(subrecords := value(), Generator):
+
+            if isinstance(value, Callable):
                 try:
-                    yield GroupedRecord("generic/osinfo/grouped", [record, *list(subrecords)])
+                    value = value()
                 except Exception:
-                    # Ignore exceptions triggered by functions
-                    # that cannot be executed in this context
+                    # Ignore exceptions triggered by functions that cannot
+                    # be executed in this context.
                     continue
-            else:
-                record.value = value
-                yield record
+
+            if isinstance(value, Generator):
+                # Materialize generator-style exports so they can be represented
+                # in the aggregated payload.
+                try:
+                    values[os_func] = list(value)
+                except Exception:
+                    # Ignore exceptions triggered while consuming generators
+                    # that cannot be executed in this context.
+                    continue
+                continue
+
+            values[os_func] = value
+
+        yield OSInfoRecord(values=json.dumps(values, default=str, sort_keys=True), _target=self.target)
