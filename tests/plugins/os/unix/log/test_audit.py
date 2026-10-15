@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 from dissect.util.ts import from_unix
 
 from dissect.target.plugins.os.unix.log.audit import AuditPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
 def test_audit_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -48,7 +48,14 @@ def test_audit_plugin_config(target_unix: Target, fs_unix: VirtualFilesystem) ->
     fs_unix.map_file_fh("tmp/disabled/audit/audit.log", BytesIO(b"Foo"))
     fs_unix.map_file_fh("foo/bar/audit/audit.log", BytesIO(b"Foo"))
 
-    log_paths = AuditPlugin(target_unix).get_log_paths()
+    log_paths = list(AuditPlugin(target_unix).get_paths())
     assert len(log_paths) == 2
     assert str(log_paths[0]) == "/foo/bar/audit/audit.log"
     assert str(log_paths[1]) == "/tmp/disabled/audit/audit.log"
+
+
+def test_audit_direct() -> None:
+    target = Target.open_direct([absolute_path("_data/plugins/os/unix/log/audit/audit.log")])
+    results = list(target.audit())
+
+    assert len(results) == 4

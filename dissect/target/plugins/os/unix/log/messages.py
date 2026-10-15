@@ -44,9 +44,9 @@ class MessagesPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.log_files = set(self._find_log_files())
+        self.log_files = set(self.get_paths())
 
-    def _find_log_files(self) -> Iterator[Path]:
+    def _get_paths(self) -> Iterator[Path]:
         log_dirs = ["/var/log/", "/var/log/installer/"]
         file_globs = ["syslog*", "messages*", "cloud-init.log*"]
         for log_dir in log_dirs:
@@ -68,6 +68,8 @@ class MessagesPlugin(Plugin):
         The messages log file holds information about a variety of events such as the system error messages, system
         startups and shutdowns, change in the network configuration, etc. Aims to store valuable, non-debug and
         non-critical messages. This log should be considered the "general system activity" log.
+
+        When used with --direct access, files whose names contain `cloud-init` will be treated as cloud-init logs.
 
         References:
             - https://geek-university.com/linux/var-log-messages-file/
