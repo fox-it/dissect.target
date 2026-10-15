@@ -72,20 +72,17 @@ class CronjobPlugin(Plugin):
         "/usr/local/etc/cron.d",  # FreeBSD
     )
 
-    CRONTAB_FILES = (
-        "/etc/crontab",
-        "/etc/anacrontab",
-    )
+    CRONTAB_FILES = ("/etc/crontab",)
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.crontabs = list(self.find_crontabs())
+        self.crontabs = list(self.get_paths())
 
     def check_compatible(self) -> None:
         if not self.crontabs:
             raise UnsupportedPluginError("No crontab(s) found on target")
 
-    def find_crontabs(self) -> Iterator[Path]:
+    def _get_paths(self) -> Iterator[Path]:
         for crontab_dir in self.CRONTAB_DIRS:
             if not (dir := self.target.fs.path(crontab_dir)).exists():
                 continue
@@ -110,7 +107,6 @@ class CronjobPlugin(Plugin):
             - https://linux.die.net/man/1/crontab
             - https://linux.die.net/man/5/crontab
             - https://en.wikipedia.org/wiki/Cron
-            - https://linux.die.net/man/8/anacron
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/crontab.5.html
             - https://www.gnu.org/software/mcron/manual/mcron.html#Guile-Syntax
         """
