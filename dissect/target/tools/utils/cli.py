@@ -250,7 +250,9 @@ def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Ta
     targets: Iterable[Target] = (
         [Target.open_direct(args.targets, case_sensitive=getattr(args, "direct_sensitive", False))]
         if direct
-        else Target.open_all(args.targets, include_children=children, recursive=args.recursive, apply=apply)
+        else Target.open_all(
+            args.targets, include_children=children, recursive=getattr(args, "recursive", False), apply=apply
+        )
     )
 
     for target in targets:

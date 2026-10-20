@@ -276,6 +276,7 @@ class Target:
                   If the path is a ``os.PathLike`` object, it will be used as-is.
                   If the path is a string and looks like a URI, it will be parsed as such.
                   If the path is a string and does not like like a URI, it will be treated as a local path.
+            apply: Resolve all disks, volumes and filesystems and load an operating system on the :class:`Target`.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
@@ -337,13 +338,18 @@ class Target:
                    If the path is a string and does not look like a URI, it will be treated as a local path.
             include_children: Whether to open child targets.
             recursive: Whether to open child targets recursively.
+            apply: Resolve all disks, volumes and filesystems and load an operating system on the :class:`Target`.
 
         Raises:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
         def _open_all(
-            spec: str | Path, include_children: bool = False, recursive: bool = False, *, apply: bool = True
+            spec: str | Path,
+            *,
+            include_children: bool = False,
+            recursive: bool = False,
+            apply: bool = True,
         ) -> Iterator[Target]:
             # If the path is a URI-like string, separate the path component
             adjusted_path, parsed_path = parse_path_uri(spec)
@@ -461,6 +467,42 @@ class Target:
         """
         return cls._load("direct", DirectLoader(paths, case_sensitive))
 
+    @classmethod
+    def open_filesystem(cls, fs: filesystem.Filesystem | list[filesystem.Filesystem], *, apply: bool = True) -> Self:
+        """Create a :class:`Target` from a (list of) predefined :class:`Filesystem` objects.
+
+        Do not use directly unless you know what you are doing.
+        Instead use :meth:`Target.open` or :meth:`Target.open_all`.
+
+        When given multiple :class:`Filesystem` in a list, the first filesystem is used to determine the target OS.
+
+        Args:
+            fs: Filesystem(s) to make available to the :class:`Target`.
+            apply: Resolve all disks, volumes and filesystems and load an operating system on the :class:`Target`.
+
+        Raises:
+            TargetError: Raised when not a single :class:`Target` can be loaded.
+        """
+        target = cls(None)
+
+        if not isinstance(fs, list):
+            fs = [fs]
+
+        # Make sure we add the first filesystem and attempt OS detection before adding other filesystems.
+        # This way we make sure to load the likely intended filesystem as system volume first.
+        if len(fs) > 1 and apply:
+            target.filesystems.add(fs[0])
+            target.apply()
+
+        for i, f in enumerate(fs):
+            if len(fs) > 1 and i == 0 and apply:
+                continue
+            target.filesystems.add(f)
+
+        if apply:
+            target.apply()
+        return target
+
     @property
     def is_direct(self) -> bool:
         """Check if the target is a direct target."""
@@ -514,9 +556,10 @@ class Target:
 
         Args:
             child: The location of a target within the current ``Target``, or a child pattern.
+            apply: Resolve all disks, volumes and filesystems and load an operating system on the :class:`Target`.
 
         Returns:
-            An opened ``Target`` object of the child target.
+            A :class:`Target` object of the child target.
         """
         # Open child identified by its single digit index (from list_children), int or str
         # OR
@@ -537,18 +580,22 @@ class Target:
             return current_target
 
         # Open child by path
+        if str(child).startswith("/$fs$"):
+            return Target.open_filesystem(list(unused_filesystems(self, first=child)), apply=apply)
+
         return Target.open(self.fs.path(child), apply=apply)
 
     def open_children(self, recursive: bool = False, *, apply: bool = True) -> Iterator[Target]:
-        """Open all the child targets on a ``Target``.
+        """Open all the child targets on a :class:`Target`.
 
-        Will open all discovered child targets if the current ``Target`` has them, such as VMs on a hypervisor.
+        Will open all discovered child targets if the current :class`Target` has them, such as VMs on a hypervisor.
 
         Args:
-            recursive: Whether to check the child ``Target`` for more ``Targets``.
+            recursive: Whether to check the child :class:`Target` for more ``Targets``.
+            apply: Resolve all disks, volumes and filesystems and load an operating system on the :class:`Target`.
 
         Returns:
-            An iterator of ``Targets``.
+            An iterator of :class:`Target`.
         """
         for _, child in self.list_children():
             try:
@@ -1053,3 +1100,15 @@ class FilesystemCollection(Collection[filesystem.Filesystem]):
         for fs in self.entries:
             for subfs in fs.iter_subfs():
                 self.add(subfs)
+
+
+def unused_filesystems(target: Target, first: Path | str | None = None) -> Iterator[filesystem.Filesystem]:
+    """Yield :class:`Filesystem` for all unused mounted ``/$fs$/<fsN>`` entries."""
+    if first:
+        yield (first_fs := target.fs.mounts[first.as_posix() if isinstance(first, Path) else first])
+
+    for path, fs in target.fs.mounts.items():
+        if path.startswith("/$fs$"):
+            if first and fs == first_fs:
+                continue
+            yield fs
