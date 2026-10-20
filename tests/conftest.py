@@ -377,7 +377,7 @@ def target_win(tmp_path: pathlib.Path, hive_hklm: VirtualHive, fs_win: Filesyste
         hive_hklm,
         mock_target.fs.path(""),
     )
-    mock_target.apply()
+    mock_target.apply(post=False)
     assert mock_target.fs.sep == "\\"
     assert mock_target.fs.altsep == "/"
     mock_target.fs.mount("c:", fs_win)
