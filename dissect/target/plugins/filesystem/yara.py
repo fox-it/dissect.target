@@ -62,7 +62,7 @@ class YaraPlugin(Plugin):
         "--exclude",
         action="append",
         metavar="PATTERN",
-        help="glob-style patterns to exclude paths on target(s) from scan (can be repeated)",
+        help="exclude paths on target(s) matching this glob-style pattern from scan (can be repeated)",
     )
     @export(record=YaraMatchRecord)
     def yara(

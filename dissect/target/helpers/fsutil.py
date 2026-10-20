@@ -63,7 +63,8 @@ if TYPE_CHECKING:
     import dissect.target.filesystem as filesystem
 
 
-from dissect.target.helpers.compat.pathlib import PureTargetPath, TargetPath, _StringGlobber
+from dissect.target.helpers.compat.glob import _StringGlobber
+from dissect.target.helpers.compat.pathlib import PureTargetPath, TargetPath
 
 log = get_logger(__name__)
 
@@ -256,9 +257,10 @@ class stat_result:
         return st
 
 
-def compile_glob(fs: filesystem.Filesystem, pattern: str) -> Callable[[str, int | None], bool]:
-    pattern = normalize(pattern, sep=fs.altsep or fs.sep)
-    return _StringGlobber(fs.sep, fs.case_sensitive, recursive=True).compile(pattern)
+def _compile_glob(fs: filesystem.Filesystem, pattern: str) -> Callable[[str, int | None], bool]:
+    if "\\" in (fs.sep, fs.altsep):
+        pattern = normalize(pattern, sep="\\")
+    return _StringGlobber("/", fs.case_sensitive, recursive=True).compile(pattern)
 
 
 def walk(
@@ -291,7 +293,7 @@ def walk_ext(
     tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
 ]:
     # Compile exclusion patterns
-    exclude_matchers = [compile_glob(path_entry.fs, pattern) for pattern in (exclude or [])]
+    exclude_matchers = [_compile_glob(path_entry.fs, pattern) for pattern in (exclude or [])]
 
     # Ignore if self is excluded
     if exclude_matchers and any(matcher(path_entry.path) for matcher in exclude_matchers):
