@@ -84,6 +84,7 @@ __all__ = [
     "glob_split",
     "has_glob_magic",
     "isabs",
+    "iter_entries",
     "join",
     "normalize",
     "normpath",
@@ -327,6 +328,37 @@ def walk_ext(
 
     if not topdown:
         yield [path_entry], dirs, files
+
+
+def iter_entries(
+    path_entry: filesystem.FilesystemEntry,
+    onerror: Callable[[Exception], None] | None = None,
+    followlinks: bool = False,
+    exclude: list[str] | None = None,
+) -> Iterator[filesystem.FilesystemEntry]:
+    # Compile exclusion patterns
+    exclude_matchers = [_compile_glob(path_entry.fs, pattern) for pattern in (exclude or [])]
+
+    # Ignore if self is excluded
+    if exclude_matchers and any(matcher(path_entry.path) for matcher in exclude_matchers):
+        return
+
+    try:
+        for entry in path_entry.scandir():
+            # Ignore excluded entries
+            if exclude_matchers and any(matcher(entry.path) for matcher in exclude_matchers):
+                continue
+
+            # Handle non-excluded entries
+            yield entry.get()
+
+            if entry.is_dir() and (followlinks or not entry.is_symlink()):
+                yield from iter_entries(entry.get(), onerror, followlinks, exclude)
+    except Exception as e:
+        if onerror is not None and callable(onerror):
+            e.entry = path_entry
+            onerror(e)
+        return
 
 
 def recurse(entry: filesystem.FilesystemEntry) -> Iterator[filesystem.FilesystemEntry]:

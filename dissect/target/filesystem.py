@@ -295,6 +295,27 @@ class Filesystem:
         """
         return self.get(path).walk_ext(topdown, onerror, followlinks, exclude)
 
+    def iter_entries(
+        self,
+        path: str,
+        onerror: Callable[[Exception], None] | None = None,
+        followlinks: bool = False,
+        exclude: list[str] | None = None,
+    ) -> Iterator[FilesystemEntry]:
+        """Recursively walk a directory pointed to by ``path``, and yield its contents as :class:`FilesystemEntry`.
+        It is significantly more performant than ``walk_ext`` but does not provide control over the walking order.
+
+        Args:
+            path: The path to walk on the filesystem.
+            onerror: A method to execute when an error occurs.
+            followlinks: ``True`` if we want to follow any symbolic link
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
+
+        Returns:
+            An iterator of :class:`FilesystemEntry`.
+        """
+        yield from self.get(path).iter_entries(onerror, followlinks, exclude)
+
     def recurse(self, path: str) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield contents as :class:`FilesystemEntry`.
 
@@ -688,6 +709,25 @@ class FilesystemEntry:
             An iterator of tuples :class:`FilesystemEntry`.
         """
         yield from fsutil.walk_ext(self, topdown, onerror, followlinks, exclude)
+
+    def iter_entries(
+        self,
+        onerror: Callable[[Exception], None] | None = None,
+        followlinks: bool = False,
+        exclude: list[str] | None = None,
+    ) -> Iterator[Self]:
+        """Recursively walk a directory and yield its contents as :class:`FilesystemEntry`.
+        It is significantly more performant than ``walk_ext`` but does not provide control over the walking order.
+
+        Args:
+            onerror: A method to execute when an error occurs.
+            followlinks: ``True`` if we want to follow any symbolic link
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
+
+        Returns:
+            An iterator of :class:`FilesystemEntry`.
+        """
+        yield from fsutil.iter_entries(self, onerror, followlinks, exclude)
 
     def recurse(self) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield its contents as :class:`DirEntry`.

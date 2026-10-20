@@ -116,60 +116,62 @@ class YaraPlugin(Plugin):
                 max_size // 1024 // 1024,
             )
 
-        for _, _, files in self.target.fs.walk_ext(path, exclude=exclude):
-            for file in files:
-                fhandles = []
-                try:
-                    if (file_size := file.stat().st_size) > max_size:
-                        self.target.log.info("Not scanning file of %s MB: '%s'", (file_size // 1024 // 1024), file)
-                        continue
+        for file in self.target.fs.iter_entries(path, exclude=exclude):
+            if not file.is_file():
+                continue
 
-                    fh_original = file.open()
-                    fhandles.append(fh_original)
-                    if not no_decompress:
-                        fh_decompress = open_decompress(fileobj=fh_original, mode="rb")
-                        if fh_decompress is not fh_original:
-                            fhandles.append(fh_decompress)
-
-                    for fh in fhandles:
-                        buf = fh.read(max_size + 1)
-                        if len(buf) > max_size:
-                            self.target.log.warning(
-                                "Decompressed '%s' is larger than the maximum scan size, scanning up to %s bytes",
-                                file,
-                                max_size,
-                            )
-
-                        # ensure that the original file handle is reset for compressed reads
-                        fh_original.seek(0)
-
-                        for match in compiled_rules.match(data=buf):
-                            string_matches: list[str] = []
-                            for string in match.strings:
-                                string_matches.extend(f"{string}={instance}" for instance in string.instances)
-
-                            yield YaraMatchRecord(
-                                ts_mtime=file.stat().st_mtime,
-                                path=self.target.fs.path(file.path),
-                                rule=match.rule,
-                                matches=string_matches,
-                                tags=match.tags,
-                                digest=hashutil.common(BytesIO(buf)),
-                                namespace=match.namespace,
-                                _target=self.target,
-                            )
-
-                except FileNotFoundError:
+            fhandles = []
+            try:
+                if (file_size := file.stat().st_size) > max_size:
+                    self.target.log.info("Not scanning file of %s MB: '%s'", (file_size // 1024 // 1024), file)
                     continue
-                except RuntimeWarning as e:
-                    self.target.log.warning("Runtime warning while scanning file '%s': %s", file, e)
-                except Exception as e:
-                    self.target.log.error("Exception scanning file '%s'", file)  # noqa: TRY400
-                    self.target.log.debug("", exc_info=e)
-                finally:
-                    for fh in reversed(fhandles):
-                        with contextlib.suppress(Exception):
-                            fh.close()
+
+                fh_original = file.open()
+                fhandles.append(fh_original)
+                if not no_decompress:
+                    fh_decompress = open_decompress(fileobj=fh_original, mode="rb")
+                    if fh_decompress is not fh_original:
+                        fhandles.append(fh_decompress)
+
+                for fh in fhandles:
+                    buf = fh.read(max_size + 1)
+                    if len(buf) > max_size:
+                        self.target.log.warning(
+                            "Decompressed '%s' is larger than the maximum scan size, scanning up to %s bytes",
+                            file,
+                            max_size,
+                        )
+
+                    # ensure that the original file handle is reset for compressed reads
+                    fh_original.seek(0)
+
+                    for match in compiled_rules.match(data=buf):
+                        string_matches: list[str] = []
+                        for string in match.strings:
+                            string_matches.extend(f"{string}={instance}" for instance in string.instances)
+
+                        yield YaraMatchRecord(
+                            ts_mtime=file.stat().st_mtime,
+                            path=self.target.fs.path(file.path),
+                            rule=match.rule,
+                            matches=string_matches,
+                            tags=match.tags,
+                            digest=hashutil.common(BytesIO(buf)),
+                            namespace=match.namespace,
+                            _target=self.target,
+                        )
+
+            except FileNotFoundError:
+                continue
+            except RuntimeWarning as e:
+                self.target.log.warning("Runtime warning while scanning file '%s': %s", file, e)
+            except Exception as e:
+                self.target.log.error("Exception scanning file '%s'", file)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
+            finally:
+                for fh in reversed(fhandles):
+                    with contextlib.suppress(Exception):
+                        fh.close()
 
 
 def process_rules(paths: list[str | Path], check: bool = False) -> yara.Rules | None:
