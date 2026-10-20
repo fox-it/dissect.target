@@ -55,6 +55,41 @@ def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: p
 
 
 @pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
+def test_yara_exclude(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("test_file", BytesIO(b"hello there this is a test string!"))
+    vfs.map_file_fh("/test/dir/to/test_file", BytesIO(b"this is another test string for YARA testing."))
+    vfs.map_file_fh("should_not_hit", BytesIO(b"this is another file."))
+    target_default.fs.mount("/", vfs)
+
+    with patch("dissect.target.Target.open_all", return_value=[target_default]), monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-yara",
+                "example.img",
+                "--rules",
+                str(absolute_path("_data/plugins/filesystem/yara/rule-dir/rule.yar")),
+                "--path",
+                "/",
+                "--check",
+                "-s",
+                "--exclude",
+                "/*/**/test_file",
+            ],
+        )
+        target_yara()
+
+        out, _ = capsys.readouterr()
+
+        hit1 = "<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 path='/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=d690ba32b59d28614aebefe9b03c74d4, sha1=4b1ced217aabe37138e96fb93bf40026639b9d3b, sha256=7a644118588ff0dcf2fadbe198ae1f1629c29374bac491ba41d5cf957edf0dfc)"  # noqa E501
+
+        assert len(out.splitlines()) == 1
+
+        assert hit1 in out
+
+
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
 @pytest.mark.parametrize("no_decompress", [False, True], ids=["decompress", "no-decompress"])
 def test_yara_decompress(
     target_default: Target,
@@ -101,3 +136,84 @@ def test_yara_decompress(
         else:
             assert len(out.splitlines()) == 1
             assert hit in out
+
+
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
+def test_yara_exclude_repeated(
+    target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("test_file", BytesIO(b"hello there this is a test string!"))
+    vfs.map_file_fh("/test/dir/to/test_file", BytesIO(b"this is another test string for YARA testing."))
+    for i in range(10):
+        vfs.map_file_fh(f"/var/nssynclog/keys/{i}.key", BytesIO(b"a test string in a key"))
+    target_default.fs.mount("/", vfs)
+
+    with (
+        patch("dissect.target.Target.open_all", return_value=[target_default]) as open_all,
+        monkeypatch.context() as m,
+    ):
+        m.setattr(
+            "sys.argv",
+            [
+                "target-yara",
+                "--rules",
+                str(absolute_path("_data/plugins/filesystem/yara/rule-dir/rule.yar")),
+                "-s",
+                "-e",
+                "/test/dir",
+                "-e",
+                "/var/nssynclog/keys",
+                "example.img",
+            ],
+        )
+        target_yara()
+
+        out, _ = capsys.readouterr()
+
+    # The target after the last -e is still treated as a target, not as a pattern
+    assert open_all.call_args.args[0] == ["example.img"]
+
+    assert len(out.splitlines()) == 1
+    assert "path='/test_file'" in out
+
+
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
+def test_yara_exclude_any_depth(
+    target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("test_file", BytesIO(b"hello there this is a test string!"))
+    vfs.map_file_fh("/home/dissect/test_file", BytesIO(b"this is another test string for YARA testing."))
+    vfs.map_file_fh("/home/target/test_file", BytesIO(b"this is another test string for YARA testing."))
+    for i in range(10):
+        vfs.map_file_fh(f"/var/nssynclog/keys/{i}.key", BytesIO(b"a test string in a key"))
+    target_default.fs.mount("/", vfs)
+
+    with (
+        patch("dissect.target.Target.open_all", return_value=[target_default]) as open_all,
+        monkeypatch.context() as m,
+    ):
+        m.setattr(
+            "sys.argv",
+            [
+                "target-yara",
+                "--rules",
+                str(absolute_path("_data/plugins/filesystem/yara/rule-dir/rule.yar")),
+                "-s",
+                "-e",
+                "/home/*/test_file",
+                "-e",
+                "**/*.key",
+                "example.img",
+            ],
+        )
+        target_yara()
+
+        out, _ = capsys.readouterr()
+
+    # The target after the last -e is still treated as a target, not as a pattern
+    assert open_all.call_args.args[0] == ["example.img"]
+
+    assert len(out.splitlines()) == 1
+    assert "path='/test_file'" in out

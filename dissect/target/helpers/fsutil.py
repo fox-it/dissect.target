@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     import dissect.target.filesystem as filesystem
 
 
+from dissect.target.helpers.compat.glob import _StringGlobber
 from dissect.target.helpers.compat.pathlib import PureTargetPath, TargetPath
 
 log = get_logger(__name__)
@@ -256,15 +257,20 @@ class stat_result:
         return st
 
 
+def _compile_glob(fs: filesystem.Filesystem, pattern: str) -> Callable[[str, int | None], bool]:
+    if "\\" in (fs.sep, fs.altsep):
+        pattern = normalize(pattern, sep="\\")
+    return _StringGlobber("/", fs.case_sensitive, recursive=True).compile(pattern)
+
+
 def walk(
     path_entry: filesystem.FilesystemEntry,
     topdown: bool = True,
     onerror: Callable[[Exception], None] | None = None,
     followlinks: bool = False,
-) -> Iterator[
-    tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
-]:
-    for path_list, dirs, files in walk_ext(path_entry, topdown, onerror, followlinks):
+    exclude: list[str] | None = None,
+) -> Iterator[tuple[str, list[str], list[str]]]:
+    for path_list, dirs, files in walk_ext(path_entry, topdown, onerror, followlinks, exclude):
         dir_names = [d.name for d in dirs]
         file_names = [f.name for f in files]
 
@@ -280,14 +286,27 @@ def walk_ext(
     topdown: bool = True,
     onerror: Callable[[Exception], None] | None = None,
     followlinks: bool = False,
+    exclude: list[str] | None = None,
 ) -> Iterator[
     tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
 ]:
+    # Compile exclusion patterns
+    exclude_matchers = [_compile_glob(path_entry.fs, pattern) for pattern in (exclude or [])]
+
+    # Ignore if self is excluded
+    if exclude_matchers and any(matcher(path_entry.path) for matcher in exclude_matchers):
+        return
+
     dirs: list[filesystem.FilesystemEntry] = []
     files: list[filesystem.FilesystemEntry] = []
 
     try:
         for entry in path_entry.scandir():
+            # Ignore excluded entries
+            if exclude_matchers and any(matcher(entry.path) for matcher in exclude_matchers):
+                continue
+
+            # Handle non-excluded entries
             if entry.is_dir():
                 dirs.append(entry.get())
             else:
@@ -303,7 +322,7 @@ def walk_ext(
 
     for direntry in dirs:
         if followlinks or not direntry.is_symlink():
-            for xpath, xdirs, xfiles in walk_ext(direntry, topdown, onerror, followlinks):
+            for xpath, xdirs, xfiles in walk_ext(direntry, topdown, onerror, followlinks, exclude):
                 yield [path_entry, *xpath], xdirs, xfiles
 
     if not topdown:
