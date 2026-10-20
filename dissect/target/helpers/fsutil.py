@@ -269,9 +269,7 @@ def walk(
     onerror: Callable[[Exception], None] | None = None,
     followlinks: bool = False,
     exclude: list[str] | None = None,
-) -> Iterator[
-    tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
-]:
+) -> Iterator[tuple[str, list[str], list[str]]]:
     for path_list, dirs, files in walk_ext(path_entry, topdown, onerror, followlinks, exclude):
         dir_names = [d.name for d in dirs]
         file_names = [f.name for f in files]
