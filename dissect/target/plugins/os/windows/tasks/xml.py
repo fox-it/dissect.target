@@ -318,10 +318,19 @@ class XmlTask:
                         days_between_triggers=int(days_between_triggers),
                     )
 
-                elif weeks_between_triggers := self.get_element("ScheduleByWeek/WeeksInterval", trigger):
-                    days_of_week = [day.tag for day in trigger.find("ScheduleByWeek/DaysOfWeek/").iter("*")]
+                elif trigger.find("ScheduleByWeek/") is not None:
+                    weeks_between_triggers = self.get_element("ScheduleByWeek/WeeksInterval", trigger)
+                    # If WeeksInterval is not present, default to 1 (every week).
+                    weeks_between_triggers = int(weeks_between_triggers) if weeks_between_triggers else 1
+
+                    days_el = trigger.find("ScheduleByWeek/DaysOfWeek")
+                    if days_el is not None:
+                        days_of_week = [day.tag for day in list(days_el)]
+                    else:
+                        days_of_week = []
+
                     record = WeeklyTriggerRecord(
-                        weeks_between_triggers=int(weeks_between_triggers),
+                        weeks_between_triggers=weeks_between_triggers,
                         days_of_week=days_of_week,
                     )
 
