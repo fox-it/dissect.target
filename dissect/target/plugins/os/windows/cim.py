@@ -25,6 +25,7 @@ COMMON_ELEMENTS = [
     ("string", "filter_name"),
     ("string", "filter_query_language"),
     ("string", "filter_creator_sid"),
+    ("path", "source"),
 ]
 
 CommandLineEventConsumerRecord = TargetRecordDescriptor(
@@ -119,6 +120,7 @@ class CimPlugin(Plugin):
 
         self._filters: dict[str, EventFilter] = {}
         repodir = repodirs[0]
+        self.source = repodir
         index = repodir.joinpath("index.btr")
         objects = repodir.joinpath("objects.data")
         mappings = [repodir.joinpath(f"mapping{i}.map") for i in range(1, 4)]
@@ -186,6 +188,7 @@ class CimPlugin(Plugin):
                     machine_name=get_property_value_safe(consumer, "MachineName", ""),
                     name=get_property_value_safe(consumer, "Name", ""),
                     creator_sid=get_creator_sid(consumer),
+                    source=self.source,
                     _target=self.target,
                     **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
                 )
@@ -195,6 +198,7 @@ class CimPlugin(Plugin):
                     executable_path=get_property_value_safe(consumer, "ExecutablePath", ""),
                     working_directory=get_property_value_safe(consumer, "WorkingDirectory", ""),
                     creator_sid=get_creator_sid(consumer),
+                    source=self.source,
                     _target=self.target,
                     **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
                 )

@@ -153,7 +153,7 @@ class AtTask:
         except Exception as e:
             raise InvalidTaskError(e)
 
-        self.task_path = job_file
+        self.source = job_file
         self.tzinfo = tzinfo
 
         last_year = self.at_data.last_year
@@ -222,6 +222,7 @@ class AtTask:
             command=command,
             arguments=args,
             working_directory=wrkdir,
+            source=self.source,
         )
 
     def get_triggers(self) -> Iterator[GroupedRecord]:
@@ -269,11 +270,13 @@ class AtTask:
                 repetition_duration=repetition_duration,
                 repetition_stop_duration_end=repetition_stop_duration_end,
                 execution_time_limit=execution_time_limit,
+                source=self.source,
             )
             padding_record = PaddingTriggerRecord(
                 padding=trigger.padding,
                 reserved2=trigger.reserved2,
                 reserved3=trigger.reserved3,
+                source=self.source,
             )
 
             if trigger_type == "EVENT_AT_LOGON":
@@ -299,6 +302,7 @@ class AtTask:
                 record = DailyTriggerRecord(
                     days_between_triggers=interval,
                     unused=unused,
+                    source=self.source,
                 )
 
                 yield GroupedRecord("filesystem/windows/task/daily", [base, record, padding_record])
@@ -314,6 +318,7 @@ class AtTask:
                     weeks_between_triggers=interval,
                     days_of_week=days_of_week,
                     unused=unused,
+                    source=self.source,
                 )
 
                 yield GroupedRecord("filesystem/windows/task/weekly", [base, record, padding_record])
@@ -333,6 +338,7 @@ class AtTask:
                 record = MonthlyDateTriggerRecord(
                     day_of_month=[day_of_month],
                     months_of_year=months_of_year,
+                    source=self.source,
                 )
 
                 yield GroupedRecord("filesystem/windows/task/monthly_date", [base, record, padding_record])
@@ -345,6 +351,7 @@ class AtTask:
                     which_week=[week],
                     days_of_week=days,
                     months_of_year=months,
+                    source=self.source,
                 )
 
                 yield GroupedRecord("filesystem/windows/task/monthly_dow", [base, record, padding_record])

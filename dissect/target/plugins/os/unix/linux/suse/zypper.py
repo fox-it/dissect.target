@@ -68,6 +68,7 @@ class ZypperPlugin(PackageManagerPlugin):
                     ts=ts,
                     package_manager="zypper",
                     operation=operation.value,
+                    source=path,
                     _target=self.target,
                 )
 

@@ -13,3 +13,8 @@ def test_cmdline(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -
     target_linux_users.add_plugin(ProcPlugin)
     results = list(target_linux_users.cmdline())
     assert len(results) == 4
+    results.sort(key=lambda x: x.pid)
+    assert results[3].pid == 1337
+    assert results[3].source == "/proc/1337/cmdline"
+    assert results[3].name == "acquire"
+    assert results[3].cmdline == "acquire -p full --proc"

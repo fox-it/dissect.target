@@ -57,5 +57,6 @@ class YumPlugin(PackageManagerPlugin):
                     package_manager="yum",
                     operation=OperationTypes.infer(operation.strip()).value,
                     package_name=package_name,
+                    source=path,
                     _target=self.target,
                 )

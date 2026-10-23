@@ -19,6 +19,7 @@ ProcProcessRecord = TargetRecordDescriptor(
         ("datetime", "runtime"),
         ("varint", "ppid"),
         ("string", "parent"),
+        ("path", "source"),
     ],
 )
 
@@ -60,5 +61,6 @@ class ProcProcesses(Plugin):
                 ppid=process.ppid,
                 state=process.state,
                 parent=process.parent.name,
+                source=process.entry,
                 _target=self.target,
             )

@@ -17,6 +17,7 @@ from dissect.target.plugins.os.unix.packagemanager import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.helpers.compat.pathlib import TargetPath
     from dissect.target.target import Target
 
 
@@ -61,7 +62,7 @@ class AptPlugin(PackageManagerPlugin):
 
                 # Indicates the end of a log chunk
                 if line == "":
-                    yield from split_into_records(chunk, target_tz, self.target)
+                    yield from split_into_records(chunk, target_tz, self.target, source=path)
 
                     chunk = []
                     continue
@@ -70,7 +71,7 @@ class AptPlugin(PackageManagerPlugin):
 
 
 def split_into_records(
-    chunk: Iterator[str], tzinfo: datetime.tzinfo, target: Target
+    chunk: Iterator[str], tzinfo: datetime.tzinfo, target: Target, source: TargetPath
 ) -> Iterator[PackageManagerLogRecord]:
     """Parse the chunk line for line and try to extract as much information from each line as possible."""
     packages = []
@@ -103,6 +104,7 @@ def split_into_records(
             operation=OperationTypes.infer(operation).value,
             requested_by_user=user,
             command=command,
+            source=source,
             _target=target,
         )
 

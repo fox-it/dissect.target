@@ -38,9 +38,11 @@ def test_apt_logs(test_file: str, target_unix: Target, fs_unix: VirtualFilesyste
     assert results[0].package_name == "libcurl4:amd64 (7.68.0-1ubuntu2.12, 7.68.0-1ubuntu2.13)"
     assert results[0].command == "/usr/bin/unattended-upgrade"
     assert results[0].requested_by_user is None
+    assert results[0].source == f"/var/log/apt/{test_file}"
 
     assert results[-1].ts == datetime(2022, 9, 7, 7, 48, 28, tzinfo=tz)
     assert results[-1].operation == "update"
     assert results[-1].package_name == "linux-generic:amd64 (5.4.0.125.126, 5.4.0.126.127)"
     assert results[-1].command == "/usr/bin/unattended-upgrade"
     assert results[-1].requested_by_user == "user (1000)"
+    assert results[-1].source == f"/var/log/apt/{test_file}"
