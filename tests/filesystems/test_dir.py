@@ -79,3 +79,48 @@ def test_entry_lattr(dirfs_entry: DirectoryFilesystemEntry) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         dirfs_entry.lattr()
         fs_attrs.assert_called_with(dirfs_entry.entry, follow_symlinks=False)
+
+
+def test_multiple_nested_path_resolution(tmp_path: pathlib.Path) -> None:
+    """Test some basic I/O operations."""
+    nested_dir = tmp_path / "level1" / "level2" / "level3" / "level4"
+    nested_dir.mkdir(parents=True)
+    (nested_dir / "file5").write_text("file5 content")
+    (tmp_path / "level1" / "level2" / "level3" / "file4").write_text("file4_content")
+    fs = DirectoryFilesystem(path=tmp_path)
+    assert not fs.exists("/level1/level2/level3/level4/level5")
+    assert fs.exists("/level1/level2/level3/level4/file5")
+    assert fs.exists("/level1/level2/level3/file4")
+
+    dirents = {entry.name: entry for entry in fs.get("/level1/level2/level3").scandir()}
+    assert len(dirents) == 2
+    assert dirents["level4"].is_dir()
+
+    fh_4 = dirents["file4"].get().open()
+    assert fh_4.read() == b"file4_content"
+    fh_4.close()
+
+    fh_5 = fs.get("/level1/level2/level3/level4/file5").open()
+    assert fh_5.read() == b"file5 content"
+    fh_5.close()
+
+
+def test_case_sensitivity(tmp_path: pathlib.Path) -> None:
+    test_dir = tmp_path / "LeVel1"
+    test_dir.mkdir(parents=True)
+    if (tmp_path / "level1").exists():
+        pytest.skip("Skip test as filesystem is not case sensitive (e.g NTFS)")
+    (test_dir / "test_filE").write_text("test_content")
+    fs_sensitive = DirectoryFilesystem(path=tmp_path)  # default to case sensitive
+    fs_insensitive = DirectoryFilesystem(path=tmp_path, case_sensitive=False)
+    assert not fs_sensitive.exists("/level1")
+    assert fs_insensitive.exists("/level1")
+
+    dirents_sensitive = {entry.name: entry for entry in fs_sensitive.get("/").scandir()}
+    assert len(dirents_sensitive) == 1
+    assert dirents_sensitive["LeVel1"].is_dir()
+
+    assert fs_insensitive.get("level1").entry == fs_insensitive.get("LeVel1").entry
+    fh = fs_insensitive.get("level1/test_file").open()
+    assert fh.read() == b"test_content"
+    fh.close()
