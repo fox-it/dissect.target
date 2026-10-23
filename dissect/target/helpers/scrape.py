@@ -208,7 +208,7 @@ def recover_string(buf: bytes, encoding: str, *, reverse: bool = False, ascii: b
         except UnicodeDecodeError as e:
             decoded = buf[: e.start].decode(encoding)
 
-        decoded = decoded.split("\x00")[0]
+        decoded = decoded.lstrip("\x00").split("\x00")[0]
 
         if ascii:
             for i in range(len(decoded)):
