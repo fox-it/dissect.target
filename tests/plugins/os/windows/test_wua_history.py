@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 from dissect.target.plugins.os.windows.wua_history import WuaHistoryPlugin
 from tests._utils import absolute_path
@@ -55,3 +56,11 @@ def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> No
     assert record.classification == "e0789628-ce08-4437-be74-2495b842f43b"
     assert record.classification_mapped == "DefinitionUpdates"
     assert record.kb == "KB2267602"
+
+
+def test_wua_history_title_bytes() -> None:
+    plugin = WuaHistoryPlugin(Mock())
+    result = plugin._format_record_value("title", "Security Update (KB1234567)".encode("utf-16-le"))
+
+    assert result["title"] == "Security Update (KB1234567)"
+    assert result["kb"] == "KB1234567"
