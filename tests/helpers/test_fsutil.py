@@ -878,6 +878,14 @@ def test_target_path_no_fs_exception() -> None:
             "\\Device\\HarddiskVolume1\\Windows\\System32\\backgroundTaskHost.exe",
             id="windows-device",
         ),
+        pytest.param(
+            "\\",
+            ["C:", "$recycle.bin", "$Ihello_world"],
+            ("C:", "$recycle.bin", "$Ihello_world"),
+            "C:/$recycle.bin/$Ihello_world",
+            "C:\\$recycle.bin\\$Ihello_world",
+            id="windows-drive-relative",
+        ),
     ],
 )
 def test_target_path(sep: str, paths: list[str], parts: tuple[str, ...], string: str, flow_string: str) -> None:
