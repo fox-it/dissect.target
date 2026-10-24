@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import functools
 import os
 import stat
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, TextIO
+from typing import TYPE_CHECKING, Literal, NamedTuple, TextIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import LayerFilesystemEntry
@@ -12,8 +13,14 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dissect.target.filesystem import FilesystemEntry
     from dissect.target.helpers.fsutil import TargetPath
+
+
+class LsEntry(NamedTuple):
+    name: str
+    path: TargetPath
+    lstat: fsutil.stat_result | None = None
+
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
 STAT_TEMPLATE = """  File: {path} {symlink}
@@ -25,7 +32,22 @@ Modify: {mtime}
 Change: {ctime}
  Birth: {btime}"""
 
-FALLBACK_LS_COLORS = "rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32"  # noqa: E501
+# Output from `dircolors -b` on a Linux system
+FALLBACK_LS_COLORS = "rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.7z=01;31:*.ace=01;31:*.alz=01;31:*.apk=01;31:*.arc=01;31:*.arj=01;31:*.bz=01;31:*.bz2=01;31:*.cab=01;31:*.cpio=01;31:*.crate=01;31:*.deb=01;31:*.drpm=01;31:*.dwm=01;31:*.dz=01;31:*.ear=01;31:*.egg=01;31:*.esd=01;31:*.gz=01;31:*.jar=01;31:*.lha=01;31:*.lrz=01;31:*.lz=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.lzo=01;31:*.pyz=01;31:*.rar=01;31:*.rpm=01;31:*.rz=01;31:*.sar=01;31:*.swm=01;31:*.t7z=01;31:*.tar=01;31:*.taz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tgz=01;31:*.tlz=01;31:*.txz=01;31:*.tz=01;31:*.tzo=01;31:*.tzst=01;31:*.udeb=01;31:*.war=01;31:*.whl=01;31:*.wim=01;31:*.xz=01;31:*.z=01;31:*.zip=01;31:*.zoo=01;31:*.zst=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.jxl=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:"  # noqa: E501
+
+# For easier and faster access to stat module functions and constants
+S_ISREG = stat.S_ISREG
+S_ISDIR = stat.S_ISDIR
+S_ISLNK = stat.S_ISLNK
+S_ISFIFO = stat.S_ISFIFO
+S_ISSOCK = stat.S_ISSOCK
+S_ISBLK = stat.S_ISBLK
+S_ISCHR = stat.S_ISCHR
+S_ISUID = stat.S_ISUID
+S_ISGID = stat.S_ISGID
+S_ISVTX = stat.S_ISVTX
+S_IWOTH = stat.S_IWOTH
+S_IXUGO = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
 
 
 def prepare_ls_colors() -> dict[str, str]:
@@ -62,6 +84,42 @@ def fmt_ls_colors(ft: str, name: str) -> str:
     return name
 
 
+@functools.cache
+def file_type_from_mode(mode: int | None = None) -> str:
+    """Helper method to get a LS_COLORS file type string from a file stat."""
+    if mode is None:
+        return "or"
+    if S_ISREG(mode):
+        file_type = "fi"
+        if mode & S_ISUID:
+            file_type = "su"
+        elif mode & S_ISGID:
+            file_type = "sg"
+        elif mode & S_IXUGO:
+            file_type = "ex"
+    elif S_ISDIR(mode):
+        file_type = "di"
+        if (mode & S_ISVTX) and (mode & S_IWOTH):
+            file_type = "tw"
+        elif mode & S_IWOTH:
+            file_type = "ow"
+        elif mode & S_ISVTX:
+            file_type = "st"
+    elif S_ISLNK(mode):
+        file_type = "ln"
+    elif S_ISFIFO(mode):
+        file_type = "pi"
+    elif S_ISSOCK(mode):
+        file_type = "so"
+    elif S_ISBLK(mode):
+        file_type = "bd"
+    elif S_ISCHR(mode):
+        file_type = "cd"
+    else:
+        file_type = "or"
+    return file_type
+
+
 def human_size(bytes: int, units: Sequence[str] = ("", "K", "M", "G", "T", "P", "E")) -> str:
     """Helper function to return the human readable string representation of bytes."""
     return str(bytes) + units[0] if bytes < 1024 else human_size(bytes >> 10, units[1:])
@@ -72,75 +130,69 @@ def stat_modestr(st: fsutil.stat_result) -> str:
     return stat.filemode(st.st_mode)
 
 
-def print_extensive_file_stat_listing(
+def print_ls_entry(
+    *,
     stdout: TextIO,
-    name: str,
-    entry: FilesystemEntry | None = None,
-    timestamp: datetime | None = None,
+    lsentry: LsEntry,
+    time_attr: Literal["st_mtime", "st_atime", "st_ctime"] = "st_mtime",
     human_readable: bool = False,
+    long_listing: bool = False,
+    color: bool = False,
 ) -> None:
-    """Print the file status as a single line."""
-    if entry is not None:
-        try:
-            entry_stat = entry.lstat()
-        except FileNotFoundError:
-            pass
-        else:
-            if timestamp is None:
-                timestamp = entry_stat.st_mtime
-            symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-            utc_time = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec="microseconds")
-            size = f"{human_size(entry_stat.st_size):5s}" if human_readable else f"{entry_stat.st_size:10d}"
+    """Print the LsEntry output as a single line."""
+    if color:
+        ft = file_type_from_mode(lsentry.lstat.st_mode) if lsentry.lstat else None
+        name = fmt_ls_colors(ft, lsentry.name)
+    else:
+        name = lsentry.name
 
-            print(
-                (
-                    f"{stat_modestr(entry_stat)} {entry_stat.st_uid:4d} {entry_stat.st_gid:4d} {size} "
-                    f"{utc_time} {name}{symlink}"
-                ),
-                file=stdout,
-            )
-            return
+    if not long_listing:
+        print(name, file=stdout)
+        return
 
-    hr_spaces = f"{'':5s}" if human_readable else " "
-    regular_spaces = f"{'':10s}" if not human_readable else " "
+    if lsentry.lstat is None:
+        hr_spaces = f"{'':5s}" if human_readable else " "
+        regular_spaces = f"{'':10s}" if not human_readable else " "
+        print(f"??????????    ?    ?{regular_spaces}?{hr_spaces}????-??-??T??:??:??.??????+??:?? {name}", file=stdout)
+        return
 
-    print(f"??????????    ?    ?{regular_spaces}?{hr_spaces}????-??-??T??:??:??.??????+??:?? {name}", file=stdout)
+    timestamp = getattr(lsentry.lstat, time_attr)
+    symlink = f" -> {lsentry.path.readlink()}" if lsentry.path.is_symlink() else ""
+    utc_time = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec="microseconds")
+    size = f"{human_size(lsentry.lstat.st_size):5s}" if human_readable else f"{lsentry.lstat.st_size:10d}"
+
+    print(
+        (
+            f"{stat_modestr(lsentry.lstat)} {lsentry.lstat.st_uid:4d} {lsentry.lstat.st_gid:4d} {size} "
+            f"{utc_time} {name}{symlink}"
+        ),
+        file=stdout,
+    )
 
 
-def ls_scandir(path: fsutil.TargetPath, color: bool = False) -> list[tuple[fsutil.TargetPath, str]]:
-    """List a directory for the given path."""
-    result = []
-    if not path.exists() or not path.is_dir():
-        return []
-
-    for file_ in path.iterdir():
-        file_type = None
-        if color:
-            if file_.is_symlink():
-                file_type = "ln"
-            elif file_.is_dir():
-                file_type = "di"
-            elif file_.is_file():
-                file_type = "fi"
-
-        result.append((file_, fmt_ls_colors(file_type, file_.name) if color else file_.name))
-
-        # If we happen to scan an NTFS filesystem see if any of the
-        # entries has an alternative data stream and also list them.
-        entry = file_.get()
-        if isinstance(entry, LayerFilesystemEntry) and entry.entries.fs.__type__ == "ntfs":
-            attrs = entry.lattr()
-            for data_stream in attrs.DATA:
-                if data_stream.name != "":
-                    name = f"{file_.name}:{data_stream.name}"
-                    result.append((file_, fmt_ls_colors(file_type, name) if color else name))
-
-    result.sort(key=lambda e: e[0].name)
-
-    return result
+def get_ntfs_ads_ls_entries(path: TargetPath) -> list[LsEntry]:
+    """Helper method to get NTFS alternative data stream entries for a given path."""
+    entries = []
+    # If we happen to scan an NTFS filesystem see if any of the
+    # entries has an alternative data stream and also list them.
+    entry = path.get()
+    if isinstance(entry, LayerFilesystemEntry) and entry.entries.fs.__type__ == "ntfs":
+        attrs = entry.lattr()
+        for data_stream in attrs.DATA:
+            if not data_stream.name:
+                continue
+            ads_name = f"{entry.name}:{data_stream.name}"
+            ads_path = path.with_name(ads_name)
+            try:
+                lstat = ads_path.lstat()
+            except FileNotFoundError:
+                lstat = None
+            entries.append(LsEntry(ads_name, ads_path, lstat))
+    return entries
 
 
 def print_ls(
+    *,
     path: fsutil.TargetPath,
     depth: int,
     stdout: TextIO,
@@ -149,46 +201,66 @@ def print_ls(
     recursive: bool = False,
     use_ctime: bool = False,
     use_atime: bool = False,
+    sort_by_time: bool = False,
+    reverse_sort: bool = False,
     color: bool = True,
 ) -> None:
     """Print ls output."""
-    subdirs = []
+    contents: list[LsEntry] = []
+    for tpath in path.iterdir() if path.is_dir() else [path]:
+        try:
+            lstat = tpath.lstat()
+        except FileNotFoundError:
+            lstat = None
+        contents.append(LsEntry(tpath.name, tpath, lstat))
+        contents.extend(get_ntfs_ads_ls_entries(tpath))
 
-    if path.is_dir():
-        contents = ls_scandir(path, color)
-    elif path.is_file():
-        contents = [(path, path.name)]
+    attr = "st_mtime"
+    if sort_by_time:
+        if use_ctime:
+            attr = "st_ctime"
+        elif use_atime:
+            attr = "st_atime"
+        contents.sort(key=lambda e: (getattr(e.lstat, attr), e.name) if e.lstat else (0, ""), reverse=True)
+    else:
+        contents.sort(key=lambda e: e.name)
+
+    if reverse_sort:
+        contents.reverse()
 
     if depth > 0:
         print(f"\n{path!s}:", file=stdout)
 
-    if not long_listing:
-        for target_path, name in contents:
-            print(name, file=stdout)
-            if not target_path.is_symlink() and target_path.is_dir():
-                subdirs.append(target_path)
-    else:
-        if len(contents) > 1:
-            print(f"total {len(contents)}", file=stdout)
-        for target_path, name in contents:
-            try:
-                entry = target_path.get()
-                entry_stat = entry.lstat()
-                show_time = entry_stat.st_mtime
-                if use_ctime:
-                    show_time = entry_stat.st_ctime
-                elif use_atime:
-                    show_time = entry_stat.st_atime
-            except FileNotFoundError:
-                entry = None
-                show_time = None
-            print_extensive_file_stat_listing(stdout, name, entry, show_time, human_readable)
-            if target_path.is_dir():
-                subdirs.append(target_path)
+    if long_listing and len(contents) > 1:
+        print(f"total {len(contents)}", file=stdout)
 
-    if recursive and subdirs:
-        for subdir in subdirs:
-            print_ls(subdir, depth + 1, stdout, long_listing, human_readable, recursive, use_ctime, use_atime, color)
+    subdirs: list[TargetPath] = []
+    for lsentry in contents:
+        print_ls_entry(
+            stdout=stdout,
+            lsentry=lsentry,
+            time_attr=attr,
+            human_readable=human_readable,
+            long_listing=long_listing,
+            color=color,
+        )
+        if recursive and not lsentry.path.is_symlink() and lsentry.path.is_dir():
+            subdirs.append(lsentry.path)
+
+    for subdir in subdirs:
+        print_ls(
+            path=subdir,
+            depth=depth + 1,
+            stdout=stdout,
+            long_listing=long_listing,
+            human_readable=human_readable,
+            recursive=recursive,
+            use_ctime=use_ctime,
+            use_atime=use_atime,
+            reverse_sort=reverse_sort,
+            sort_by_time=sort_by_time,
+            color=color,
+        )
 
 
 def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = False) -> None:
