@@ -315,7 +315,8 @@ def walk_ext(
         if onerror is not None and callable(onerror):
             e.entry = path_entry
             onerror(e)
-        return
+        else:
+            raise
 
     if topdown:
         yield [path_entry], dirs, files
