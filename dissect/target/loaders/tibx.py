@@ -41,11 +41,6 @@ class TibxLoader(Loader):
         target-query -f hostname "tibx://path/to/backup.tibx?recovery-point=0"
 
     Encrypted archives take their password from the keychain (``-K`` / ``-Kv``).
-
-    References:
-        - https://github.com/TreadingTheTiber/acronis-tib-reader
-        - acronis-tibx by mniedermaier (MIT, no longer publicly available), see
-          ``THIRD_PARTY_NOTICES.md`` in ``dissect.archive``
     """
 
     def __init__(self, path: Path, **kwargs):

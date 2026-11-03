@@ -1,298 +1,146 @@
 from __future__ import annotations
 
-import struct
-import sys
-import urllib.parse
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from urllib.parse import urlparse
 
 import pytest
-from dissect.archive.tibx.c_tibx import (
-    ENVELOPE_SIZE,
-    LSB_FIXED_SIZE,
-    LSB_MEMTREE_OFFSET,
-    PAGE_MARKER,
-    PAGE_SIZE,
-    SEGMENT_HEADER_OFFSET,
-    SEGMENT_PAYLOAD_OFFSET,
-    TLV_DIRECTORY_OFFSET,
-    TLV_SLOT_COUNT,
-    c_tibx,
-)
-from dissect.archive.tibx.exception import InvalidPasswordError
-from dissect.archive.tibx.page import page_crc32c
 
 from dissect.target.exceptions import LoaderError
 from dissect.target.helpers import keychain
+from dissect.target.loader import open as loader_open
 from dissect.target.loaders.tibx import TibxLoader
 from dissect.target.target import Target
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable
     from pathlib import Path
 
+# Archives written by Acronis Cyber Protect 15, the same as in dissect.archive's tests. Each holds
+# one NTFS partition, and each backup added a line to its changelog.txt
+CHAIN_INC = "_data/loaders/tibx/t1_chain_inc.tibx"  # A full backup and two incrementals
+CHAIN_DIFF = "_data/loaders/tibx/t1_chain_diff.tibx"  # A full backup, and a differential in t1_chain_diff-0001.tibx
+ENCRYPTED = "_data/loaders/tibx/t1_enc_aes.tibx"  # A full backup, encrypted with AES-256
 
-def _build_fat12_image(content: bytes) -> bytes:
-    """A minimal 64-sector FAT12 image with one root file holding ``content``."""
-    bps, spc, reserved, nfats, root_entries, fat_sectors, total = 512, 1, 1, 1, 16, 1, 64
-    img = bytearray(total * bps)
-    img[0:3] = b"\xeb\x3c\x90"
-    img[3:11] = b"MSDOS5.0"
-    struct.pack_into("<H", img, 0x0B, bps)
-    img[0x0D] = spc
-    struct.pack_into("<H", img, 0x0E, reserved)
-    img[0x10] = nfats
-    struct.pack_into("<H", img, 0x11, root_entries)
-    struct.pack_into("<H", img, 0x13, total)
-    img[0x15] = 0xF8
-    struct.pack_into("<H", img, 0x16, fat_sectors)
-    img[0x36:0x3E] = b"FAT12   "
-    img[0x1FE:0x200] = b"\x55\xaa"
-    fat_offset = reserved * bps
-    img[fat_offset : fat_offset + 6] = bytes([0xF8, 0xFF, 0xFF, 0xFF, 0x0F, 0x00])
-    root_offset = (reserved + nfats * fat_sectors) * bps
-    entry = bytearray(32)
-    entry[0:11] = b"HELLO   TXT"
-    entry[0x0B] = 0x20
-    struct.pack_into("<H", entry, 0x1A, 2)
-    struct.pack_into("<I", entry, 0x1C, len(content))
-    img[root_offset : root_offset + 32] = entry
-    first_data = reserved + nfats * fat_sectors + (root_entries * 32 + bps - 1) // bps
-    img[first_data * bps : first_data * bps + len(content)] = content
-    return bytes(img)
-
-
-def _page(page_type: int, content: dict[int, bytes]) -> bytes:
-    """A CRC-correct page of ``page_type`` with ``content`` placed at the given offsets."""
-    page = bytearray(PAGE_SIZE)
-    for offset, data in content.items():
-        page[offset : offset + len(data)] = data
-    header = c_tibx.page_header(marker=PAGE_MARKER, type=page_type)
-    page[:ENVELOPE_SIZE] = header.dumps()
-    header.crc32c = page_crc32c(bytes(page))
-    page[:ENVELOPE_SIZE] = header.dumps()
-    return bytes(page)
-
-
-def _lsb(key_length: int, value_length: int, cells: list[tuple[bytes, bytes]]) -> bytes:
-    """An L-SB whose mem-tree holds ``cells``: one compact group of live records."""
-    stream = c_tibx.lsm_cell_group_header(count=len(cells), alive=(1 << len(cells)) - 1).dumps()
-    stream += b"".join(key + value for key, value in cells)
-
-    record = bytearray(LSB_FIXED_SIZE)
-    superblock = c_tibx.lsm_superblock(
-        magic=b"L-SB", format_version=1, ctree_max_minus_2=8, seq=1, key_length=key_length, value_length=value_length
-    )
-    record[: len(c_tibx.lsm_superblock)] = superblock.dumps()
-    memtree = c_tibx.lsm_memtree_header(node_count=len(cells), extra_len=len(stream))
-    record[LSB_MEMTREE_OFFSET : LSB_MEMTREE_OFFSET + len(c_tibx.lsm_memtree_header)] = memtree.dumps()
-    return bytes(record) + stream
-
-
-def _build_tibx_archive(streams: list[tuple[int, int, bytes]], slices: list[int] | None = None) -> bytes:
-    """Build a synthetic TIBX archive holding ``streams`` of ``(volume_id, slice_id, data)``.
-
-    Page 0 is the ARCH header, with the data_map and segment_map (and, given ``slices``,
-    the slices tree) as LSM mem-trees; each stream follows as one zstd segment page.
-    """
-    if sys.version_info >= (3, 14):
-        from compression import zstd  # novermin
-    else:
-        from backports import zstd
-
-    dm_cells, sm_cells, segments = [], [], []
-    for index, (volume_id, slice_id, data) in enumerate(streams):
-        segment_id = 100 + index
-        dm_key = c_tibx.data_map_key(
-            volume_id=volume_id, source_offset=0, extent_length=len(data), slice_id=slice_id, extent_id=index + 1
-        )
-        dm_cells.append((dm_key.dumps(), c_tibx.data_map_value(segment_id=segment_id, extent_index=0xFFFF).dumps()))
-        sm_value = c_tibx.segment_map_value(page_count=(1).to_bytes(4, "little"), page_offset=1 + index)
-        sm_cells.append((c_tibx.segment_map_key(segment_id=segment_id).dumps(), sm_value.dumps()))
-
-        blob = zstd.compress(data)
-        header = c_tibx.segment_header(magic=b"SG", version=1, length=len(data), zlength=len(blob), compression=0x0300)
-        segments.append(
-            _page(c_tibx.PageType.DATA, {SEGMENT_HEADER_OFFSET: header.dumps(), SEGMENT_PAYLOAD_OFFSET: blob})
-        )
-
-    slots = {1: _lsb(31, 10, sorted(dm_cells)), 2: _lsb(8, 32, sm_cells)}
-    if slices:
-        records = [
-            (
-                c_tibx.slice_key(slice_id=slice_id).dumps(),
-                c_tibx.slice_record(guid=bytes([slice_id]) * 16, created_ms=slice_id, modified_ms=slice_id).dumps(),
-            )
-            for slice_id in slices
-        ]
-        slots[5] = _lsb(len(c_tibx.slice_key), len(c_tibx.slice_record), records)
-
-    directory = bytearray()
-    for index in range(TLV_SLOT_COUNT):
-        payload = slots.get(index, b"")
-        directory += c_tibx.tlv_header(length=len(payload)).dumps() + payload
-        directory += b"\x00" * (-len(directory) % 4)
-
-    body = c_tibx.arch_header(
-        magic=b"ARCH",
-        header_size=TLV_DIRECTORY_OFFSET + len(directory),
-        header_version=8,
-        created_ms=1000,
-        modified_ms=2000,
-        archive_uuid=b"\xab" * 16,
-    )
-    arch = _page(
-        c_tibx.PageType.ARCH,
-        {ENVELOPE_SIZE: body.dumps(), ENVELOPE_SIZE + TLV_DIRECTORY_OFFSET: bytes(directory)},
-    )
-    return arch + b"".join(segments)
+PASSWORD = "dissect"
 
 
 def _loader(path: Path, query: str = "") -> TibxLoader:
-    return TibxLoader(path, parsed_path=urllib.parse.urlparse(f"tibx://{path.name}?{query}"))
+    return TibxLoader(path, parsed_path=urlparse(f"tibx://{path.name}?{query}"))
 
 
-def _read_hello(loader: TibxLoader) -> bytes:
+def _read_changelog(loader: TibxLoader) -> bytes:
     target = Target()
     loader.map(target)
     target.apply()
-    return target.filesystems[0].path("/HELLO.TXT").read_bytes()
+    return target.filesystems[0].path("/changelog.txt").read_bytes()
 
 
-FILE_CONTENT = b"hello from inside a tibx backup"
+@pytest.mark.parametrize(
+    ("opener"),
+    [
+        pytest.param(Target.open, id="target-open"),
+        pytest.param(lambda x: next(Target.open_all([x])), id="target-open-all"),
+    ],
+)
+def test_target_open(opener: Callable[[str | Path], Target]) -> None:
+    """Test that we correctly use ``TibxLoader`` when opening a ``Target``."""
+    path = absolute_path(CHAIN_INC)
+
+    target = opener(path)
+    assert isinstance(target._loader, TibxLoader)
+    assert target.path == path
 
 
-@pytest.fixture
-def fat_archive(tmp_path: Path) -> Path:
-    path = tmp_path / "backup.tibx"
-    path.write_bytes(_build_tibx_archive([(10, 2, _build_fat12_image(FILE_CONTENT))]))
-    return path
+def test_detect(tmp_path: Path) -> None:
+    """Test that ``TibxLoader`` detects the first file of an archive only."""
+    path = absolute_path(CHAIN_DIFF)
+    assert TibxLoader.detect(path)
+    # The parts after the first file are read along with it
+    assert not TibxLoader.detect(path.with_name("t1_chain_diff-0001.tibx"))
 
-
-@pytest.fixture
-def chain_archive(tmp_path: Path) -> Path:
-    """A full backup (slice 2) and an incremental (slice 3) that rewrote the volume."""
-    path = tmp_path / "chain.tibx"
-    streams = [(10, 2, _build_fat12_image(b"full backup")), (10, 3, _build_fat12_image(b"incremental"))]
-    path.write_bytes(_build_tibx_archive(streams, slices=[2, 3]))
-    return path
-
-
-@pytest.fixture
-def _registered_loader() -> Iterator[None]:
-    from dissect.target import loader as loader_registry
-
-    loader_registry.LOADERS.append(TibxLoader)
-    loader_registry.LOADERS_BY_SCHEME["tibx"] = TibxLoader
-    yield
-    loader_registry.LOADERS.remove(TibxLoader)
-    loader_registry.LOADERS_BY_SCHEME.pop("tibx")
-
-
-def test_detect(fat_archive: Path, tmp_path: Path) -> None:
-    assert TibxLoader.detect(fat_archive)
-
-    wrong_suffix = tmp_path / "backup.vbk"
-    wrong_suffix.write_bytes(fat_archive.read_bytes())
+    wrong_suffix = tmp_path / "t1_chain_diff.vbk"
+    wrong_suffix.write_bytes(path.read_bytes())
     assert not TibxLoader.detect(wrong_suffix)
 
-    wrong_magic = tmp_path / "other.tibx"
-    wrong_magic.write_bytes(b"\x00" * 0x1000)
-    assert not TibxLoader.detect(wrong_magic)
-
     truncated = tmp_path / "truncated.tibx"
-    truncated.write_bytes(fat_archive.read_bytes()[:16])
+    truncated.write_bytes(path.read_bytes()[:16])
     assert not TibxLoader.detect(truncated)
 
     assert not TibxLoader.detect(tmp_path / "missing.tibx")
 
 
-def test_map_volume_and_filesystem(fat_archive: Path) -> None:
-    target = Target()
-    TibxLoader(fat_archive).map(target)
+def test_loader() -> None:
+    """Test that ``TibxLoader`` maps the backed-up partition, and only that, as a volume."""
+    path = absolute_path(CHAIN_INC)
 
-    assert len(target.volumes) == 1
-    volume = next(iter(target.volumes))
-    assert volume.size == 64 * 512
+    loader = loader_open(path)
+    assert isinstance(loader, TibxLoader)
+    # Acronis keys its own metadata by volume id just like the partition
+    assert len(loader.tibx.streams()) > 1
+
+    target = Target()
+    loader.map(target)
+    assert [(volume.name, volume.size) for volume in target.volumes] == [("tibx_4", 50331648)]
 
     target.apply()
-    assert len(target.filesystems) == 1
-    filesystem = target.filesystems[0]
-    assert filesystem.__type__ == "fat"
-    assert filesystem.path("/HELLO.TXT").read_bytes() == FILE_CONTENT
-
-
-def test_metadata_streams_are_not_mapped(tmp_path: Path) -> None:
-    # Acronis keys its own metadata by volume id just like a partition; only the
-    # partition may become a volume
-    path = tmp_path / "backup.tibx"
-    streams = [(10, 2, _build_fat12_image(FILE_CONTENT)), (3, 2, b'<?xml version="1.0"?><metainfo/>')]
-    path.write_bytes(_build_tibx_archive(streams))
-
-    target = Target()
-    TibxLoader(path).map(target)
-    assert [volume.name for volume in target.volumes] == ["tibx_a"]
-
-
-@pytest.mark.usefixtures("_registered_loader")
-def test_target_open_selects_loader(fat_archive: Path) -> None:
-    target = Target.open(fat_archive)
-    assert isinstance(target._loader, TibxLoader)
-    assert len(target.filesystems) == 1
-
-
-def test_latest_recovery_point_is_default(chain_archive: Path) -> None:
-    assert _read_hello(TibxLoader(chain_archive)) == b"incremental"
+    assert [filesystem.__type__ for filesystem in target.filesystems] == ["ntfs"]
 
 
 @pytest.mark.parametrize(
     ("query", "expected"),
     [
-        ("recovery-point=0", b"full backup"),
-        ("recovery-point=1", b"incremental"),
-        ("recovery-point=oldest", b"full backup"),
-        ("recovery-point=latest", b"incremental"),
+        ("", b"base\ninc1\ninc2\n"),
+        ("recovery-point=0", b"base\n"),
+        ("recovery-point=1", b"base\ninc1\n"),
+        ("recovery-point=2", b"base\ninc1\ninc2\n"),
+        ("recovery-point=oldest", b"base\n"),
+        ("recovery-point=latest", b"base\ninc1\ninc2\n"),
     ],
 )
-def test_select_recovery_point(chain_archive: Path, query: str, expected: bytes) -> None:
-    assert _read_hello(_loader(chain_archive, query)) == expected
+def test_recovery_point(query: str, expected: bytes) -> None:
+    """Test that the latest backup is loaded by default, and ``recovery-point`` selects another."""
+    assert _read_changelog(_loader(absolute_path(CHAIN_INC), query)) == expected
 
 
-@pytest.mark.parametrize("value", ["2", "-1", "bogus"])
-def test_invalid_recovery_point(chain_archive: Path, value: str) -> None:
+@pytest.mark.parametrize("value", ["3", "-1", "bogus"])
+def test_invalid_recovery_point(value: str) -> None:
     with pytest.raises(LoaderError, match="Invalid recovery point"):
-        _loader(chain_archive, f"recovery-point={value}")
+        _loader(absolute_path(CHAIN_INC), f"recovery-point={value}")
 
 
-def test_recovery_point_without_recorded_backups(fat_archive: Path) -> None:
-    with pytest.raises(LoaderError, match="records no backups"):
-        _loader(fat_archive, "recovery-point=0")
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("", b"base\ndiff\n"),
+        ("recovery-point=0", b"base\n"),
+    ],
+)
+def test_split_archive(query: str, expected: bytes) -> None:
+    """Test that a backup stored in a later part of the archive is loaded."""
+    assert _read_changelog(_loader(absolute_path(CHAIN_DIFF), query)) == expected
 
 
-def test_encrypted_without_password(fat_archive: Path) -> None:
-    with patch("dissect.target.loaders.tibx.TIBX") as mock_tibx_cls:
-        mock_tibx_cls.open.return_value.encrypted = True
-        with pytest.raises(LoaderError, match="Missing password"):
-            TibxLoader(fat_archive)
+@pytest.mark.parametrize("keys", [[], [("wrong", "tibx")]])
+def test_encrypted_without_password(keys: list[tuple[str, str]]) -> None:
+    for value, provider in keys:
+        keychain.register_key(keychain.KeyType.PASSPHRASE, value, provider=provider)
+
+    with pytest.raises(LoaderError, match="Missing password"):
+        TibxLoader(absolute_path(ENCRYPTED))
 
 
-def test_encrypted_with_keychain_password(fat_archive: Path) -> None:
+def test_encrypted_with_keychain_password() -> None:
+    """Test that the passphrases in the keychain are tried until one unlocks the archive."""
     keychain.register_key(keychain.KeyType.PASSPHRASE, "wrong", provider="tibx")
-    keychain.register_key(keychain.KeyType.PASSPHRASE, "letmein")
-    try:
-        with patch("dissect.target.loaders.tibx.TIBX") as mock_tibx_cls:
-            mock_tibx = mock_tibx_cls.open.return_value
-            mock_tibx.encrypted = True
-            mock_tibx.unlock.side_effect = [InvalidPasswordError("wrong"), None]
-            TibxLoader(fat_archive)
-            assert mock_tibx.unlock.call_count == 2
-            assert mock_tibx.unlock.call_args_list[1].args == ("letmein",)
-    finally:
-        keychain.KEYCHAIN.clear()
+    keychain.register_key(keychain.KeyType.PASSPHRASE, PASSWORD)
+
+    assert _read_changelog(TibxLoader(absolute_path(ENCRYPTED))) == b"base\n"
 
 
-def test_not_a_tibx_raises_loader_error(tmp_path: Path) -> None:
-    bogus = tmp_path / "bogus.tibx"
-    bogus.write_bytes(b"\x41\x01" + b"\x00" * 0x2000)
+def test_open_error(tmp_path: Path) -> None:
+    path = tmp_path / "truncated.tibx"
+    path.write_bytes(absolute_path(CHAIN_INC).read_bytes()[:16])
+
     with pytest.raises(LoaderError, match="Failed to open TIBX archive"):
-        TibxLoader(bogus)
+        TibxLoader(path)
