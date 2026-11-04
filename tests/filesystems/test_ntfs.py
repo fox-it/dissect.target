@@ -55,7 +55,7 @@ def test_ntfs_fileentry_open(ads: str, name: str, output: str) -> None:
     mocked_entry.open.assert_called_once_with(output)
 
 
-def test_ntfs_unknown_file() -> None:
+def test_ntfs_file_without_default_data_stream() -> None:
     vfs = VirtualFilesystem()
     mocked_entry = Mock()
     mocked_entry.attributes = AttributeMap()
@@ -63,7 +63,34 @@ def test_ntfs_unknown_file() -> None:
     mocked_entry.is_symlink.return_value = False
     mocked_entry.is_mount_point.return_value = False
     mocked_entry.size.side_effect = [NtfsFileNotFoundError]
-    entry = NtfsFilesystemEntry(vfs, "some/random/path", entry=mocked_entry)
+    mocked_entry.header = Mock(ReferenceCount=1)
+    mocked_entry.segment = 42
+    mocked_entry.resident = True
+    mocked_entry.ntfs = Mock(cluster_size=0x1000)
+    mocked_entry.attributes.STANDARD_INFORMATION = Mock(
+        last_access_time_ns=0,
+        last_modification_time_ns=0,
+        creation_time_ns=0,
+        last_access_time=Mock(timestamp=lambda: 0),
+        last_modification_time=Mock(timestamp=lambda: 0),
+        creation_time=Mock(timestamp=lambda: 0),
+    )
+    entry = NtfsFilesystemEntry(vfs, "$Secure", entry=mocked_entry)
+
+    stat_info = entry.lstat()
+
+    assert stat_info.st_size == 0
+
+
+def test_ntfs_missing_ads() -> None:
+    vfs = VirtualFilesystem()
+    mocked_entry = Mock()
+    mocked_entry.attributes = AttributeMap()
+    mocked_entry.is_dir.return_value = False
+    mocked_entry.is_symlink.return_value = False
+    mocked_entry.is_mount_point.return_value = False
+    mocked_entry.size.side_effect = [NtfsFileNotFoundError]
+    entry = NtfsFilesystemEntry(vfs, "some/random/path:$SDS", entry=mocked_entry)
     with pytest.raises(FileNotFoundError):
         entry.stat()
 

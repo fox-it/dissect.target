@@ -224,8 +224,12 @@ class NtfsFilesystemEntry(FilesystemEntry):
                 size = record.size(self.ads)
                 real_size = record.size(self.ads, allocated=True)
             except NtfsFileNotFoundError as e:
-                # Occurs when it cannot find the the specific ads inside its attributes
-                raise FileNotFoundError from e
+                if self.ads:
+                    # Occurs when it cannot find the specific ADS inside its attributes
+                    raise FileNotFoundError from e
+                # Files like $Secure have no default data stream, only ADS (e.g. $SDS)
+                size = 0
+                real_size = 0
         else:
             mode = stat.S_IFDIR
 
