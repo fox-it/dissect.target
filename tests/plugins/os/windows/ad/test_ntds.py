@@ -4,9 +4,11 @@ from collections import Counter
 from typing import TYPE_CHECKING
 
 import pytest
+from dissect.database.ese.ntds.objects.dnsnode import NamePreferenceRecord, StringRecord, TombStonedRecord
+from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
-from dissect.target.plugins.os.windows.ad.ntds import DEFAULT_NT_HASH
+from dissect.target.plugins.os.windows.ad.ntds import DEFAULT_NT_HASH, dns_as_flow_record
 from tests._utils import absolute_path
 from tests.plugins.os.windows.credential.test_credhist import md4
 from tests.plugins.os.windows.test_lsa import map_lsa_system_keys
@@ -112,3 +114,79 @@ def test_secretsdump(target_win_ntds: Target) -> None:
     )
     assert results[10] == "krbtgt_history0:502:7bd05f9617e7f15e3a6ca037e55f713f:988160b622eb37838dbff2523015e44c:::"
     assert results[-1] == "ESSOS$:des-cbc-md5:f715e30273382546"
+
+
+def test_dns_nodes(target_win_ntds: Target) -> None:
+    results = list(target_win_ntds.ad.dns_nodes())
+    results.sort(key=lambda x: x.creation_time)
+    assert results[42].dns_name == "_ldap._tcp.Default-First-Site-Name._sites.dc._msdcs.sevenkingdoms.local"
+    assert results[42].records == [
+        "<DnsRecord type='SRV' ttl_seconds=600 timestamp=2025-12-18 17:00:00+00:00 "
+        "data=SRVRecord(name_target='kingslanding.sevenkingdoms.local', port=389, "
+        "weight=100, priority=0)>"
+    ]
+    assert results[48].dns_name == "sevenkingdoms.local"
+    assert len(results[48].records) == 3
+    assert (
+        "<DnsRecord type='A' ttl_seconds=600 timestamp=2025-12-19 18:00:00+00:00 "
+        "data=DnsARecord(ipv4_address='192.168.56.10')>"
+    ) in results[48].records
+    assert results[48].creation_time == dt("2025-12-18 17:33:36+00:00")
+    assert results[48].last_modified_time == dt("2025-12-19 18:50:44+00:00")
+    assert len(results) == 113
+
+
+def test_dns_records(target_win_ntds: Target) -> None:
+    results = list(target_win_ntds.ad.dns_records())
+    assert len(results) == 100
+    assert Counter([result.dns_type for result in results]) == {
+        "NS": 32,
+        "SRV": 28,
+        "AAAA": 19,
+        "A": 17,
+        "SOA": 2,
+        "CNAME": 2,
+    }
+
+    assert Counter([type(result)._desc.name for result in results]) == {
+        "windows/ad/dns/node_name": 34,
+        "windows/ad/dns/srv": 28,
+        "windows/ad/dns/aaaa": 19,
+        "windows/ad/dns/a": 17,
+        "windows/ad/dns/soa": 2,
+    }
+
+
+def test_dns_as_flow_record() -> None:
+    """Test dns records type no present in the GOAD ntds."""
+    generic = {
+        "ts": dt("2025-12-19 18:00:00+00:00"),
+        "dns_name": "sevenkingdoms.local",
+        "node_creation_time": dt("2025-12-18 17:33:36+00:00"),
+        "node_last_modified_time": "2025-12-19 18:50:44+00:00",
+    }
+    mx_record = dns_as_flow_record(
+        NamePreferenceRecord.from_bytes(b"\x00\x14\x0b\x01\tmailhost2\x00"), {**generic, "dns_type": "MX"}
+    )
+    assert mx_record.preference == 20
+    assert mx_record.name_exchange == "mailhost2"
+    assert mx_record._desc.name == "windows/ad/dns/name_preference"
+
+    txt_record = dns_as_flow_record(
+        StringRecord.from_bytes(b"\x01q\x02qw\x03qwe\x04qwer\x05qwert\x06qwerty\x08qwertyui"),
+        {**generic, "dns_type": "TXT"},
+    )
+    assert txt_record.string_data == "q\nqw\nqwe\nqwer\nqwert\nqwerty\nqwertyui"
+    assert txt_record._desc.name == "windows/ad/dns/string"
+    #
+
+    zero_record = dns_as_flow_record(
+        TombStonedRecord.from_bytes(b"\xf1\xba\x0c\xa5\xc8 \xdc\x01"), {**generic, "dns_type": "ZERO"}
+    )
+    assert zero_record.entombed_time == dt("2025-09-08 13:58:24.889522+00:00")
+    assert zero_record._desc.name == "windows/ad/dns/tombstoned"
+
+    # DNS record type not unpacked by dissect.database
+    atma_records = dns_as_flow_record(b"\xa3\xf1\xba\x0c\xa5\xc8 \xdc\x01", {**generic, "dns_type": "ATMA"})
+    assert atma_records.dns_record_data == b"\xa3\xf1\xba\x0c\xa5\xc8 \xdc\x01"
+    assert atma_records._desc.name == "windows/ad/dns/generic"
