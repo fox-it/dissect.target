@@ -15,6 +15,7 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
     get_owner_and_group,
     get_record_size,
     get_volume_identifier,
+    join_ntfs_path,
 )
 
 if TYPE_CHECKING:
@@ -216,7 +217,7 @@ class MftPlugin(Plugin):
                         info.update(record, filesystem)
 
                         for path in record.full_paths():
-                            path = f"{info.drive_letter}{path}"
+                            path = join_ntfs_path(info.drive_letter, path)
                             yield from aggregator(
                                 iter_records(
                                     record=record,
@@ -272,7 +273,7 @@ class MftPlugin(Plugin):
                     info.update(record, fs)
 
                     for path in record.full_paths(ignore_dos):
-                        path = f"{info.drive_letter}{path}"
+                        path = join_ntfs_path(info.drive_letter, path)
 
                         for attr in record.attributes.STANDARD_INFORMATION:
                             yield from format_timeline_info(
@@ -284,7 +285,7 @@ class MftPlugin(Plugin):
                             )
 
                         for idx, attr in enumerate(record.attributes.FILE_NAME):
-                            filepath = f"{info.drive_letter}{attr.full_path()}"
+                            filepath = join_ntfs_path(info.drive_letter, attr.full_path())
 
                             yield from format_timeline_info(
                                 segment,
@@ -352,7 +353,7 @@ class MftPlugin(Plugin):
 
                 try:
                     for path in record.full_paths(False):
-                        path = f"{info.drive_letter}{path}"
+                        path = join_ntfs_path(info.drive_letter, path)
 
                         for attribute in record.attributes.STANDARD_INFORMATION:
                             yield format_body_info(
@@ -374,7 +375,7 @@ class MftPlugin(Plugin):
 
                 try:
                     for attribute in record.attributes.FILE_NAME:
-                        path = f"{info.drive_letter}{attribute.full_path()} ($FILE_NAME)"  # fls like output
+                        path = join_ntfs_path(info.drive_letter, f"{attribute.full_path()} ($FILE_NAME)")
                         yield format_body_info(
                             name=path,
                             inode=record.segment,
@@ -421,7 +422,7 @@ def iter_records(
         )
 
     for idx, attr in enumerate(record.attributes.FILE_NAME):
-        filepath = f"{drive_letter}{attr.full_path()}"
+        filepath = join_ntfs_path(drive_letter, attr.full_path())
 
         yield from record_formatter(
             attr=attr,
