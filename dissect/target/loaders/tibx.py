@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.archive.tibx.c_tibx import PAGE_MARKER, c_tibx
 from dissect.archive.tibx.exception import (
     Error,
     InvalidPasswordError,
     UnsupportedFormatError,
 )
-from dissect.archive.tibx.page import ARCH_MAGIC
-from dissect.archive.tibx.tibx import TIBX
+from dissect.archive.tibx.tibx import SPLIT_PART_RE, TIBX, find_split_parts
 
 from dissect.target.exceptions import LoaderError
 from dissect.target.helpers import keychain
@@ -47,7 +45,7 @@ class TibxLoader(Loader):
         super().__init__(path, **kwargs)
         try:
             self.tibx = TIBX.open(path)
-        except Error as e:
+        except (Error, EOFError) as e:
             raise LoaderError(f"Failed to open TIBX archive: {path}") from e
 
         recovery_point = self.parsed_query.get("recovery-point", "latest")
@@ -72,16 +70,8 @@ class TibxLoader(Loader):
     def detect(path: Path) -> bool:
         if path.suffix.lower() != ".tibx":
             return False
-        try:
-            with path.open("rb") as fh:
-                superblock = c_tibx.arch_superblock(fh)
-        except (OSError, EOFError):
-            return False
-        return (
-            superblock.header.marker == PAGE_MARKER
-            and superblock.header.type == c_tibx.PageType.ARCH
-            and superblock.body.magic == ARCH_MAGIC
-        )
+        # The later parts of a split archive are read through its first file
+        return not SPLIT_PART_RE.match(path.name) or find_split_parts(path)[0] == path
 
     def map(self, target: Target) -> None:
         try:

@@ -53,21 +53,18 @@ def test_target_open(opener: Callable[[str | Path], Target]) -> None:
 
 
 def test_detect(tmp_path: Path) -> None:
-    """Test that ``TibxLoader`` detects the first file of an archive only."""
+    """Test that ``TibxLoader`` detects ``.tibx`` files, except the later parts of a split archive."""
     path = absolute_path(CHAIN_DIFF)
     assert TibxLoader.detect(path)
     # The parts after the first file are read along with it
     assert not TibxLoader.detect(path.with_name("t1_chain_diff-0001.tibx"))
 
-    wrong_suffix = tmp_path / "t1_chain_diff.vbk"
-    wrong_suffix.write_bytes(path.read_bytes())
-    assert not TibxLoader.detect(wrong_suffix)
+    # Named like a part, but there is no first file next to it
+    standalone = tmp_path / "Backup-2024.tibx"
+    standalone.write_bytes(absolute_path(CHAIN_INC).read_bytes())
+    assert TibxLoader.detect(standalone)
 
-    truncated = tmp_path / "truncated.tibx"
-    truncated.write_bytes(path.read_bytes()[:16])
-    assert not TibxLoader.detect(truncated)
-
-    assert not TibxLoader.detect(tmp_path / "missing.tibx")
+    assert not TibxLoader.detect(tmp_path / "t1_chain_diff.vbk")
 
 
 def test_loader() -> None:
@@ -121,6 +118,15 @@ def test_split_archive(query: str, expected: bytes) -> None:
     assert _read_changelog(_loader(absolute_path(CHAIN_DIFF), query)) == expected
 
 
+def test_split_archive_in_directory(tmp_path: Path) -> None:
+    """Test that a directory holding a split archive loads its backup once, not once per part."""
+    for name in ("t1_chain_diff.tibx", "t1_chain_diff-0001.tibx"):
+        (tmp_path / name).write_bytes(absolute_path(CHAIN_DIFF).with_name(name).read_bytes())
+
+    targets = [target for target in Target.open_all([tmp_path]) if isinstance(target._loader, TibxLoader)]
+    assert [target.path.name for target in targets] == ["t1_chain_diff.tibx"]
+
+
 @pytest.mark.parametrize("keys", [[], [("wrong", "tibx")]])
 def test_encrypted_without_password(keys: list[tuple[str, str]]) -> None:
     for value, provider in keys:
@@ -138,9 +144,18 @@ def test_encrypted_with_keychain_password() -> None:
     assert _read_changelog(TibxLoader(absolute_path(ENCRYPTED))) == b"base\n"
 
 
-def test_open_error(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "size",
+    [
+        pytest.param(16, id="header"),
+        pytest.param(4096, id="first-page"),
+    ],
+)
+def test_open_error(tmp_path: Path, size: int) -> None:
+    """Test that a damaged archive is still detected, and fails with a clear error."""
     path = tmp_path / "truncated.tibx"
-    path.write_bytes(absolute_path(CHAIN_INC).read_bytes()[:16])
+    path.write_bytes(absolute_path(CHAIN_INC).read_bytes()[:size])
 
+    assert TibxLoader.detect(path)
     with pytest.raises(LoaderError, match="Failed to open TIBX archive"):
         TibxLoader(path)
