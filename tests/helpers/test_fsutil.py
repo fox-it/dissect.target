@@ -7,6 +7,7 @@ import io
 import os
 import pathlib
 import re
+import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -30,6 +31,7 @@ from dissect.target.helpers import fsutil
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
+    from dissect.target.filesystem import DirEntry
     from dissect.target.target import Target
 
 
@@ -2023,3 +2025,141 @@ def test_iter_dir_entries_exclude_start_path() -> None:
     vfs.map_file_fh("var/keys/1.key", io.BytesIO(b""))
 
     assert list(fsutil.iter_dir_entries(vfs.get("var"), exclude=["var"])) == []
+
+
+@pytest.mark.parametrize(
+    "get_root",
+    [
+        pytest.param(lambda vfs: vfs.get("/var"), id="FilesystemEntry"),
+        pytest.param(lambda vfs: next(entry for entry in vfs.get("/").scandir() if entry.name == "var"), id="DirEntry"),
+        pytest.param(lambda vfs: vfs.path("/var"), id="TargetPath"),
+    ],
+)
+def test_iter_dir_entries_argument_types(get_root: Callable[[VirtualFilesystem], Any]) -> None:
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("var/log/syslog", io.BytesIO(b""))
+    vfs.map_file_fh("other.txt", io.BytesIO(b""))
+
+    assert [entry.name for entry in fsutil.iter_dir_entries(get_root(vfs))] == ["log", "syslog"]
+
+
+def test_iter_dir_entries_argument_type_error() -> None:
+    with pytest.raises(TypeError, match="Expected FilesystemEntry, DirEntry or TargetPath, got str"):
+        list(fsutil.iter_dir_entries("/var"))
+
+
+def test_iter_dir_entries_exclude_compiled_once() -> None:
+    vfs = VirtualFilesystem()
+    for i in range(10):
+        vfs.map_file_fh(f"dir{i}/sub/file.txt", io.BytesIO(b""))
+
+    with patch("dissect.target.helpers.fsutil._compile_glob", wraps=fsutil._compile_glob) as mock_compile:
+        list(fsutil.iter_dir_entries(vfs.get("/"), exclude=["**/*.key", "/nope"]))
+
+    assert mock_compile.call_count == 2
+
+
+def test_iter_dir_entries_deep_tree() -> None:
+    depth = sys.getrecursionlimit() + 100
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("/".join(f"d{i}" for i in range(depth)) + "/file.txt", io.BytesIO(b""))
+
+    entries = list(fsutil.iter_dir_entries(vfs.get("/")))
+    assert len(entries) == depth + 1
+    assert entries[-1].name == "file.txt"
+
+
+def test_iter_dir_entries_subdir_error() -> None:
+    vfs = VirtualFilesystem()
+    for path in ("a/1.txt", "b/2.txt", "c/3.txt"):
+        vfs.map_file_fh(path, io.BytesIO(b""))
+
+    error = OSError("corrupt directory")
+    scandir = vfs.root.scandir
+
+    def scandir_with_error() -> Iterator[DirEntry]:
+        for entry in scandir():
+            if entry.name == "b":
+                entry.get = Mock(side_effect=error)
+            yield entry
+
+    vfs.root.scandir = scandir_with_error
+    expected = ["1.txt", "3.txt", "a", "b", "c"]
+
+    # A failing subdirectory is skipped by default, like os.walk, but its siblings are still walked
+    assert sorted(entry.name for entry in fsutil.iter_dir_entries(vfs.get("/"))) == expected
+
+    # With onerror, the error is reported and the walk continues
+    onerror = Mock()
+    assert sorted(entry.name for entry in fsutil.iter_dir_entries(vfs.get("/"), onerror=onerror)) == expected
+    onerror.assert_called_once_with(error)
+    assert error.entry.name == "b"
+
+
+def test_iter_dir_entries_scandir_error() -> None:
+    vfs = VirtualFilesystem()
+    for path in ("a/1.txt", "b/2.txt"):
+        vfs.map_file_fh(path, io.BytesIO(b""))
+
+    error = OSError("corrupt directory")
+    vfs.get("a").scandir = Mock(side_effect=error)
+
+    # A directory that can't be listed is skipped by default
+    assert sorted(entry.name for entry in fsutil.iter_dir_entries(vfs.get("/"))) == ["2.txt", "a", "b"]
+
+    # With onerror, the error is reported and the walk continues
+    onerror = Mock()
+    assert sorted(entry.name for entry in fsutil.iter_dir_entries(vfs.get("/"), onerror=onerror)) == [
+        "2.txt",
+        "a",
+        "b",
+    ]
+    onerror.assert_called_once_with(error)
+    assert error.entry.name == "a"
+
+    # Raising from onerror aborts the walk
+    with pytest.raises(OSError, match="corrupt directory"):
+        list(fsutil.iter_dir_entries(vfs.get("/"), onerror=Mock(side_effect=error)))
+
+
+def test_iter_dir_entries_start_not_a_directory() -> None:
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("file.txt", io.BytesIO(b""))
+
+    assert list(fsutil.iter_dir_entries(vfs.get("file.txt"))) == []
+
+    onerror = Mock()
+    assert list(fsutil.iter_dir_entries(vfs.get("file.txt"), onerror=onerror)) == []
+    onerror.assert_called_once()
+    assert isinstance(onerror.call_args.args[0], NotADirectoryError)
+
+
+def test_iter_dir_entries_symlink_loop(tmp_path: Path) -> None:
+    (tmp_path / "a" / "b").mkdir(parents=True)
+    (tmp_path / "a" / "b" / "file.txt").touch()
+    (tmp_path / "other").mkdir()
+    (tmp_path / "other" / "x.txt").touch()
+    try:
+        # Points to one of its own parent directories
+        (tmp_path / "a" / "b" / "up").symlink_to("../..", target_is_directory=True)
+        # Points to a directory that is not one of its parents
+        (tmp_path / "a" / "side").symlink_to("../other", target_is_directory=True)
+    except OSError:
+        pytest.skip("creating symlinks is not supported")
+
+    fs = DirectoryFilesystem(tmp_path)
+
+    paths = sorted(entry.path for entry in fsutil.iter_dir_entries(fs.get("/"), followlinks=True))
+    assert paths == [
+        "/a",
+        "/a/b",
+        "/a/b/file.txt",
+        "/a/b/up",
+        "/a/side",
+        "/a/side/x.txt",
+        "/other",
+        "/other/x.txt",
+    ]
+
+    paths = sorted(entry.path for entry in fsutil.iter_dir_entries(fs.get("/")))
+    assert paths == ["/a", "/a/b", "/a/b/file.txt", "/a/b/up", "/a/side", "/other", "/other/x.txt"]
