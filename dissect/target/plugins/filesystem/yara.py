@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import re
 from io import BytesIO
 from pathlib import Path
 
@@ -44,6 +45,8 @@ YaraMatchRecord = TargetRecordDescriptor(
 
 DEFAULT_MAX_SCAN_SIZE = 10 * 1024 * 1024
 
+RE_DRIVE_PATH = re.compile(r"^([a-zA-Z]):[\\/]")
+
 
 class YaraPlugin(Plugin):
     """Plugin to scan files against a local YARA rules file."""
@@ -62,7 +65,10 @@ class YaraPlugin(Plugin):
         "--exclude",
         action="append",
         metavar="PATTERN",
-        help="exclude paths on target(s) matching this glob-style pattern from scan (can be repeated)",
+        help=(
+            "exclude paths on target(s) matching this glob-style pattern from scan (can be repeated), "
+            "matched against the full path on the target, e.g. '/c:/Windows/**' or '**/*.log'"
+        ),
     )
     @export(record=YaraMatchRecord)
     def yara(
@@ -115,6 +121,15 @@ class YaraPlugin(Plugin):
                 "Will check in compressed files automatically (at most %s MB after decompression)",
                 max_size // 1024 // 1024,
             )
+
+        for pattern in exclude or []:
+            if suggestion := _suggest_exclude(pattern):
+                self.target.log.warning(
+                    "Exclude pattern %r is matched against the full path and only matches top-level entries, "
+                    "did you mean %r?",
+                    pattern,
+                    suggestion,
+                )
 
         for file in fsutil.iter_dir_entries(self.target.fs.get(path), exclude=exclude):
             if not file.is_file():
@@ -172,6 +187,18 @@ class YaraPlugin(Plugin):
                 for fh in reversed(fhandles):
                     with contextlib.suppress(Exception):
                         fh.close()
+
+
+def _suggest_exclude(pattern: str) -> str | None:
+    """Return a suggested replacement for an exclude pattern that can only match top-level entries, or ``None``."""
+    if pattern.startswith(("/", "**")):
+        return None
+
+    # Windows style path, e.g. C:\Windows or c:/Windows
+    if match := RE_DRIVE_PATH.match(pattern):
+        return f"/{match.group(1).lower()}:/" + pattern[match.end() :].replace("\\", "/")
+
+    return "**/" + pattern.replace("\\", "/")
 
 
 def process_rules(paths: list[str | Path], check: bool = False) -> yara.Rules | None:
