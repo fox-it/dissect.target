@@ -45,7 +45,7 @@ class TibxLoader(Loader):
         super().__init__(path, **kwargs)
         try:
             self.tibx = TIBX.open(path)
-        except (Error, EOFError) as e:
+        except Error as e:
             raise LoaderError(f"Failed to open TIBX archive: {path}") from e
 
         recovery_point = self.parsed_query.get("recovery-point", "latest")

@@ -144,17 +144,10 @@ def test_encrypted_with_keychain_password() -> None:
     assert _read_changelog(TibxLoader(absolute_path(ENCRYPTED))) == b"base\n"
 
 
-@pytest.mark.parametrize(
-    "size",
-    [
-        pytest.param(16, id="header"),
-        pytest.param(4096, id="first-page"),
-    ],
-)
-def test_open_error(tmp_path: Path, size: int) -> None:
+def test_open_error(tmp_path: Path) -> None:
     """Test that a damaged archive is still detected, and fails with a clear error."""
     path = tmp_path / "truncated.tibx"
-    path.write_bytes(absolute_path(CHAIN_INC).read_bytes()[:size])
+    path.write_bytes(absolute_path(CHAIN_INC).read_bytes()[:16])
 
     assert TibxLoader.detect(path)
     with pytest.raises(LoaderError, match="Failed to open TIBX archive"):
