@@ -322,7 +322,7 @@ class UnixPlugin(OSPlugin):
                 self.target.log.debug(
                     "No users found, trying root for mounting NFS share %s:%s at %s", address, exported_dir, mount_point
                 )
-                users = [UnixUserRecord(uid=0, gid=0)]
+                users = [UnixUserRecord(uid=0, gid=0, _target=self.target)]
 
             for user in users:
                 if user.uid is None or user.gid is None:

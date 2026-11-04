@@ -107,6 +107,7 @@ class MacOSPlugin(DarwinPlugin):
                         home=posix_path(home_dir) if home_dir else None,
                         shell=user.get("shell", [None])[0],
                         source=path,
+                        _target=self.target,
                     )
         except FileNotFoundError:
             pass

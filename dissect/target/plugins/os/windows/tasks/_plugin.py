@@ -193,13 +193,13 @@ class TasksPlugin(Plugin):
         for task_file in self.task_files:
             if not task_file.suffix or task_file.suffix == ".xml":
                 try:
-                    task_objects = ScheduledTasks(task_file).tasks
+                    task_objects = ScheduledTasks(task_file, self.target).tasks
                 except InvalidTaskError as e:
                     self.target.log.warning("Invalid task file encountered: %s", task_file)
                     self.target.log.debug("", exc_info=e)
                     continue
             else:
-                task_objects = [AtTask(task_file, target_tz)]
+                task_objects = [AtTask(task_file, target_tz, self.target)]
 
             for task_object in task_objects:
                 record_kwargs = {}

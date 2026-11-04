@@ -253,6 +253,7 @@ class NotificationsPlugin(Plugin):
             timestamp=chunk_timestamp,
             chunk_version=chunk.Header.Version,
             next_notification_id=chunk.Header.NextNotificationId,
+            _target=self.target,
         )
 
     def _get_appdb_push_record(
