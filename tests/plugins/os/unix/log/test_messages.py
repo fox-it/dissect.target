@@ -202,3 +202,11 @@ def test_linux_messages_kernel_logs(target_unix: Target, fs_unix: VirtualFilesys
 
     assert results[3].service == "kernel"
     assert results[3].message is None
+
+
+def test_unix_log_messages_plugin_direct_mode() -> None:
+    """Test if we can parse messages log files in direct mode+."""
+    target = Target.open_direct([absolute_path("_data/plugins/os/unix/log/messages/messages")])
+
+    assert len(list(target.messages())) == 2
+    assert len(list(target.syslog())) == 2
