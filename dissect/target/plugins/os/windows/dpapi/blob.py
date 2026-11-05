@@ -11,6 +11,13 @@ from dissect.target.plugins.os.windows.dpapi.crypto import (
     crypt_session_key_type2,
 )
 
+DPAPI_BLOB_VERSION = bytes.fromhex("01000000")
+DPAPI_BLOB_PROVIDER = bytes.fromhex("d08c9ddf0115d1118c7a00c04fc297eb")
+DPAPI_BLOB_PROVIDER_GUID = UUID(bytes_le=DPAPI_BLOB_PROVIDER)
+
+DPAPI_BLOB_MAGIC = DPAPI_BLOB_VERSION + DPAPI_BLOB_PROVIDER
+
+
 blob_def = """
 struct DPAPIBlob {
     DWORD   dwVersion;
