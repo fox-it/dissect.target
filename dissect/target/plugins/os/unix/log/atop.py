@@ -215,7 +215,7 @@ AtopRecord = TargetRecordDescriptor(
         ("varint", "vpid"),
         ("boolean", "wasinactive"),
         ("string", "container"),
-        ("path", "filepath"),
+        ("path", "source"),
     ],
 )
 
@@ -305,7 +305,7 @@ class AtopPlugin(Plugin):
             vpid (varint): The OpenVZ virtual pid of the process.
             wasinactive (boolean): The activity of the process.
             container (string): The Docker Container ID of the process.
-            filepath (path): The file name.
+            source (path): The file name.
         """
         for file in self.target.fs.path(self.ATOP_PATH).glob(self.ATOP_GLOB):
             fh = file.open()
@@ -354,6 +354,6 @@ class AtopPlugin(Plugin):
                     vpid=entry.gen.vpid,
                     wasinactive=entry.gen.wasinactive,
                     container=entry.gen.container.decode().strip("\x00"),
-                    filepath=file,
+                    source=file.resolve(),
                     _target=self.target,
                 )

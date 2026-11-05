@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, call, mock_open, patch
 import pytest
 
 from dissect.target.containers.raw import RawContainer
-from dissect.target.helpers.fsutil import TargetPath, normalize
+from dissect.target.helpers.fsutil import normalize
 from dissect.target.target import Target
 from dissect.target.tools.shell import (
     DebugMode,
@@ -243,29 +243,20 @@ def test_run_cli_postmortem() -> None:
     mock_debugger.post_mortem.assert_called_once()
 
 
-def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:
-    target_cli = TargetCli(target_bare)
-
-    mock_subfolder = MagicMock(spec_set=TargetPath)
-    mock_subfolder.is_dir.return_value = True
-    mock_subfile = MagicMock(spec_set=TargetPath)
-    mock_subfile.is_dir.return_value = False
-
-    base_path = "/base-path"
+def test_targetcli_autocomplete(target_bare: Target, tmp_path: Path) -> None:
+    base_path = "base-path"
 
     subfolder_name = "subfolder"
     subfile_name = "subfile"
     subpath_mismatch = "mismatch"
 
-    def dummy_scandir(path: TargetPath) -> list[tuple[TargetPath | None, str]]:
-        assert str(path) == base_path
-        return [
-            (mock_subfolder, subfolder_name),
-            (mock_subfile, subfile_name),
-            (None, subpath_mismatch),
-        ]
+    tmp_path.joinpath(base_path).mkdir()
+    tmp_path.joinpath(base_path, subfolder_name).mkdir()
+    tmp_path.joinpath(base_path, subfile_name).touch()
+    tmp_path.joinpath(base_path, subpath_mismatch).touch()
+    target_bare.fs.map_dir("/", tmp_path)
+    target_cli = TargetCli(target_bare)
 
-    monkeypatch.setattr("dissect.target.tools.shell.ls_scandir", dummy_scandir)
     suggestions = target_cli.completedefault("sub", f"ls {base_path}/sub", 3 + len(base_path), 3 + len(base_path) + 3)
 
     # We expect folder suggestions to be trailed with a '/'
@@ -477,8 +468,8 @@ def test_target_cli_save(
 
 
 def run_target_shell(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, argv: str | list, stdin: str
-) -> tuple[bytes, bytes]:
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], argv: str | list, stdin: str
+) -> tuple[str, str]:
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv]))
         m.setattr("sys.stdin", StringIO(stdin))
@@ -1082,3 +1073,40 @@ def test_target_cli_tar_unknown_path(tmp_path: Path, capsys: pytest.CaptureFixtu
     captured = capsys.readouterr()
     assert captured.err == "tar: missing.txt: No such file or directory\n"
     assert outpath.is_file()
+
+
+def test_target_cli_unsupported_plugin(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """Test if the output of an unsupported plugin invocation in target-shell is not too verbose."""
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "msn")
+    assert out == "ubuntu:/$ Unsupported function `msn` for this target with OS linux\nubuntu:/$ \n"
+
+
+def test_target_cli_unsupported_plugin_debug_on(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """Test if the output of an unsupported plugin invocation in target-shell is not too verbose (debug on)."""
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "debug on\nmsn")
+    # test if we get a summary of exceptions on unsupported plugin invocation
+    assert "UnsupportedPluginError: No Microsoft MSN installs found on target" in out
+    assert "UnsupportedPluginError: Unsupported function `msn` for this target with OS linux" in out
+
+
+def test_target_cli_unsupported_plugin_debug_pm(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """Test if the output of an unsupported plugin invocation in target-shell is not too verbose (debug pm)."""
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "debug pm\nmsn")
+    # test if we drop into the debugger on unsupported plugin invocation
+    assert "->" in out
+    assert "raise UnsupportedPluginError" in out
+    assert ("ipdb>" in out) or ("(Pdb)" in out)  # ipdb or pdb depending on availability
+
+
+def test_target_cli_lscolors(capsys: pytest.CaptureFixture) -> None:
+    """Test that we correctly format ls colors for different file types."""
+    target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
+    cli = TargetCli(target)
+
+    cli.onecmd("ls -la --color /files/pipes")
+    captured = capsys.readouterr()
+    assert fs.fmt_ls_colors("so", "unix.sock") in captured.out
+    assert fs.fmt_ls_colors("pi", "fifo") in captured.out

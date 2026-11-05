@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
+from dissect.target.helpers.locale.util import normalize_language, normalize_timezone
 
 
-def test_helpers_localeutil_normalize_timezone() -> None:
+def test_helpers_locale_util_normalize_timezone() -> None:
     assert normalize_timezone("W. Europe Standard Time") == "Europe/Berlin"
     assert normalize_timezone("GMT Standard Time") == "Europe/London"
     assert normalize_timezone("UTC") == "UTC"
@@ -20,6 +20,6 @@ def test_helpers_localeutil_normalize_timezone() -> None:
         ("en-US", "en_US"),
     ],
 )
-def test_helpers_localeutil_normalize_language(language_input: str, expected_output: str) -> None:
+def test_helpers_locale_util_normalize_language(language_input: str, expected_output: str) -> None:
     """Test if we normalize languages to ISO-3166 correctly."""
     assert normalize_language(language_input) == expected_output

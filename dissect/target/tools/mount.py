@@ -10,6 +10,7 @@ from dissect.target.helpers.utils import parse_options_string
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     open_target,
     process_generic_arguments,
 )
@@ -36,7 +37,8 @@ logging.raiseExceptions = False
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-mount {get_dissect_target_version()} : mount the filesystem of a target to any arbitrary "
+        f"directory on your analysis machine, similar to the `mount` command on Unix systems.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )

@@ -64,8 +64,9 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
     TargetError,
+    UnsupportedPluginError,
 )
-from dissect.target.helpers import cyber, fsutil, regutil
+from dissect.target.helpers import cyber, excutil, fsutil, regutil
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import alias, arg, clone_alias
@@ -78,12 +79,12 @@ from dissect.target.tools.utils.cli import (
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_method,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
 )
 from dissect.target.tools.utils.fs import (
     fmt_ls_colors,
-    ls_scandir,
     print_ls,
     print_stat,
     print_xattr,
@@ -689,6 +690,14 @@ class TargetCmd(ExtendedCmd):
         def _exec_(argparts: list[str], stdout: TextIO) -> None:
             try:
                 output, value = execute_function_on_target(self.target, func, argparts)
+            except UnsupportedPluginError as e:
+                if self.debug == DebugMode.ON:
+                    print("\n".join(excutil.summarize_exceptions(e)))
+                elif self.debug == DebugMode.POST_MORTEM:
+                    raise
+                else:
+                    print(e)
+                return
             except SystemExit:
                 return
 
@@ -835,13 +844,13 @@ class TargetCli(TargetCmd):
         path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
         textlower = text.lower()
 
-        suggestions = []
-        for fpath, fname in ls_scandir(path):
-            if not fname.lower().startswith(textlower):
+        suggestions: list[str] = []
+        for entry in path.iterdir():
+            if not entry.name.lower().startswith(textlower):
                 continue
 
             # Add a trailing slash to directories, to allow for easier traversal of the filesystem
-            suggestion = f"{fname}/" if fpath.is_dir() else fname
+            suggestion = f"{entry.name}/" if entry.is_dir() else entry.name
             suggestions.append(suggestion)
         return suggestions
 
@@ -978,6 +987,9 @@ class TargetCli(TargetCmd):
     @arg("-R", "--recursive", action="store_true", help="recursively list subdirectories encountered")
     @arg("-c", action="store_true", dest="use_ctime", help="show time when file status was last changed")
     @arg("-u", action="store_true", dest="use_atime", help="show time of last access")
+    @arg("-t", action="store_true", dest="sort_by_time", help="sort by time, newest first")
+    @arg("-r", action="store_true", dest="reverse_sort", help="reverse sort order")
+    @arg("--color", action="store_true", help="force color output")
     @alias("l")
     @alias("dir")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1001,16 +1013,20 @@ class TargetCli(TargetCmd):
             use_color = True
         if os.getenv("NO_COLOR") in ["1", "True", "true"]:
             use_color = False
+        if args.color:
+            use_color = True
 
         print_ls(
-            path,
-            0,
-            stdout,
-            args.l,
-            args.human_readable,
-            args.recursive,
-            args.use_ctime,
-            args.use_atime,
+            path=path,
+            depth=0,
+            stdout=stdout,
+            long_listing=args.l,
+            human_readable=args.human_readable,
+            recursive=args.recursive,
+            use_ctime=args.use_ctime,
+            use_atime=args.use_atime,
+            sort_by_time=args.sort_by_time,
+            reverse_sort=args.reverse_sort,
             color=use_color,
         )
         return False
@@ -2091,7 +2107,7 @@ def run_cli(cli: ExtendedCmd) -> None:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-shell {get_dissect_target_version()} : access a target using a virtual shell environment.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )

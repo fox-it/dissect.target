@@ -151,8 +151,8 @@ class ResFile(filesystem.VirtualFile):
 
 class ResOSPlugin(OSPlugin):
     @classmethod
-    def detect(cls, target: Target) -> bool:
-        return True
+    def detect(cls, target: Target) -> filesystem.Filesystem | None:
+        pass
 
     @classmethod
     def create(cls, target: Target, sysvol: filesystem.Filesystem) -> Self:

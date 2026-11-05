@@ -21,6 +21,7 @@ IntuneManagementExtensionLogRecord = TargetRecordDescriptor(
         ("string", "context"),
         ("string", "message"),
         ("string", "file_origin"),
+        ("path", "source"),
     ],
 )
 
@@ -130,7 +131,8 @@ class IntuneManagementExtensionLogParserPlugin(Plugin):
                     type=match.group("type"),
                     context=match.group("context"),
                     message=msg,
-                    file_origin=f"{log_path.name}:{match.group('file_origin')}",
+                    file_origin=str(match.group("file_origin")),
+                    source=log_path,
                     _target=self.target,
                 )
 

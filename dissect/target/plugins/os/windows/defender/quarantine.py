@@ -20,6 +20,7 @@ DefenderQuarantineRecord = TargetRecordDescriptor(
         ("varint", "threat_id"),
         ("string", "detection_type"),
         ("string", "detection_name"),
+        ("path", "source"),
     ],
 )
 
@@ -38,6 +39,7 @@ DefenderFileQuarantineRecord = TargetRecordDescriptor(
         ("datetime", "last_accessed_time"),
         ("string", "resource_id"),
         ("varint", "file_size"),
+        ("path", "source"),
     ],
 )
 
@@ -52,6 +54,7 @@ DefenderTaskSchedulerQuarantineRecord = TargetRecordDescriptor(
         ("string", "detection_name"),
         ("string", "detection_path"),
         ("varint", "file_size"),
+        ("path", "source"),
     ],
 )
 
@@ -65,6 +68,7 @@ DefenderRegKeyQuarantineRecord = TargetRecordDescriptor(
         ("string", "detection_type"),
         ("string", "detection_name"),
         ("string", "detection_path"),
+        ("path", "source"),
     ],
 )
 
@@ -78,6 +82,7 @@ DefenderStartupQuarantineRecord = TargetRecordDescriptor(
         ("string", "detection_type"),
         ("string", "detection_name"),
         ("string", "detection_path"),
+        ("path", "source"),
     ],
 )
 

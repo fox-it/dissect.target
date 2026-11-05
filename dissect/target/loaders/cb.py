@@ -120,8 +120,8 @@ class CbRegistry(RegistryPlugin):
         self.session = session
         super().__init__(target)
 
-    def check_compatible(self) -> bool:
-        return False
+    def check_compatible(self) -> None:
+        pass
 
     def _init_registry(self) -> None:
         for hive_name, root_key in self.MAPPINGS.items():

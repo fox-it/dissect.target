@@ -90,7 +90,7 @@ def test_wtmpdb(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     plugin = target_linux.add_plugin(UtmpPlugin)
     results = list(target_linux.wtmp())
 
-    assert len(results) == 3
+    assert len(results) == 4
     assert list(map(str, plugin.wtmp_paths)) == [
         "/var/log/wtmp.db",
         "/var/lib/wtmpdb/wtmp.db",
@@ -118,3 +118,25 @@ def test_wtmpdb(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     assert results[1].ut_service == "sshd"
     assert results[1].source == "/var/log/wtmp.db"
     assert results[1].hostname == "localhost"
+
+    assert results[2].ts == datetime(2026, 1, 28, 13, 14, 2, 776830, tzinfo=timezone.utc)
+    assert results[2].ts_logout == datetime(2026, 1, 28, 13, 14, 5, 776830, tzinfo=timezone.utc)
+    assert results[2].ut_type == "USER_PROCESS"
+    assert results[2].ut_user == "root"
+    assert results[2].ut_line == "ssh"
+    assert results[2].ut_host == "127.0.0.1"
+    assert results[2].ut_addr == "127.0.0.1"
+    assert results[2].ut_service == "sshd"
+    assert results[2].source == "/var/log/wtmp.db"
+    assert results[2].hostname == "localhost"
+
+    assert results[3].ts == datetime(2026, 1, 28, 13, 14, 2, 776830, tzinfo=timezone.utc)
+    assert results[3].ts_logout == datetime(2026, 1, 28, 13, 14, 5, 776830, tzinfo=timezone.utc)
+    assert results[3].ut_type == "BOOT_TIME"
+    assert results[3].ut_user == "reboot"
+    assert results[3].ut_line == "~"
+    assert results[3].ut_host == "6.12.105+deb13-amd64"
+    assert results[3].ut_addr is None
+    assert results[3].ut_service is None
+    assert results[3].source == "/var/log/wtmp.db"
+    assert results[3].hostname == "localhost"
