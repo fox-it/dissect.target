@@ -84,11 +84,11 @@ def test_unix_log_messages_compressed_timezone_year_rollover() -> None:
     results = list(target.messages())
     results.reverse()
 
-    assert len(results) == 2
+    assert len(results) == 3
     assert isinstance(results[0], type(MessagesRecord()))
-    assert isinstance(results[1], type(MessagesRecord()))
+    assert isinstance(results[2], type(MessagesRecord()))
     assert results[0].ts == datetime(2020, 12, 31, 3, 14, 0, tzinfo=ZoneInfo("America/Chicago"))
-    assert results[1].ts == datetime(2021, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("America/Chicago"))
+    assert results[2].ts == datetime(2021, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("America/Chicago"))
 
 
 def test_unix_log_messages_malformed_log_year_rollover(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -109,7 +109,7 @@ def test_unix_log_messages_malformed_log_year_rollover(target_unix_users: Target
         target_unix_users.add_plugin(MessagesPlugin)
 
         results = list(target_unix_users.messages())
-        assert len(results) == 2
+        assert len(results) == 3
 
         assert results[0].ts
         assert results[0].service == "systemd"

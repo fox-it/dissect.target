@@ -110,7 +110,7 @@ STRIP_RE = re.compile(r"^[\s\x00]*|[\s\x00]*$")
 
 def year_rollover_helper(
     path: Path, re_ts: str | re.Pattern, ts_format: str, tzinfo: tzinfo = timezone.utc
-) -> Iterator[tuple[datetime, str]]:
+) -> Iterator[tuple[datetime | None, str]]:
     """Helper function for determining the correct timestamps for log files without year notation.
 
     Supports compressed files by using :func:`open_decompress`.
@@ -142,7 +142,7 @@ def year_rollover_helper(
                 if not warned:
                     log.warning("No timestamp found in one of the lines in %s!", path)
                     warned = True
-                log.debug("Skipping line: %s", line)
+                yield None, line
                 continue
 
             # We have to append the current_year to strptime instead of adding it using replace later.
