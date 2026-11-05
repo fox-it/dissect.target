@@ -619,10 +619,10 @@ class FilesystemEntry:
             yield entry.name
 
     def scandir(self) -> Iterator[DirEntry]:
-        """Iterate over the contents of a directory, yields :class:`FilesystemEntry`.
+        """Iterate over the contents of a directory, yields :class:`DirEntry`.
 
         Returns:
-            An iterator of :class:`FilesystemEntry`.
+            An iterator of :class:`DirEntry`.
         """
         raise NotImplementedError
 

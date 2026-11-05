@@ -84,6 +84,7 @@ __all__ = [
     "glob_split",
     "has_glob_magic",
     "isabs",
+    "iter_dir_entries",
     "join",
     "normalize",
     "normpath",
@@ -327,6 +328,124 @@ def walk_ext(
 
     if not topdown:
         yield [path_entry], dirs, files
+
+
+def iter_dir_entries(
+    path_entry: filesystem.FilesystemEntry | filesystem.DirEntry | TargetPath,
+    *,
+    onerror: Callable[[Exception], None] | None = None,
+    followlinks: bool = False,
+    exclude: list[str] | None = None,
+) -> Iterator[filesystem.DirEntry]:
+    """Recursively walk a directory pointed to by ``path_entry``, and yield its contents as :class:`DirEntry`.
+    It is significantly more performant than ``walk_ext`` but does not provide control over the walking order.
+
+    Entries are yielded as reported by the filesystem, ``DirEntry.path`` is not normalized. Walk from ``target.fs``
+    to get absolute paths. Exclusion patterns are matched against these same paths.
+
+    Args:
+        path_entry: The path to walk on the filesystem, as a :class:`FilesystemEntry`, :class:`DirEntry` or
+                    :class:`TargetPath`.
+        onerror: A method to execute when an error occurs, called with the exception. The entry that caused the error
+                 is available as its ``entry`` attribute. Like ``os.walk``, errors are ignored if not given, and the
+                 walk continues with the next entry. Raise from ``onerror`` to abort the walk instead.
+        followlinks: ``True`` if we want to follow any symbolic link. Symbolic links that point to one of their own
+                     parent directories are yielded, but not followed.
+        exclude: ``list`` of glob-style string patterns to exclude from walking.
+
+    Returns:
+        An iterator of :class:`DirEntry`.
+
+    Raises:
+        TypeError: If ``path_entry`` is not a :class:`FilesystemEntry`, :class:`DirEntry` or :class:`TargetPath`.
+    """
+    # Imported here, as dissect.target.filesystem imports this module
+    from dissect.target.filesystem import DirEntry, FilesystemEntry
+
+    if isinstance(path_entry, (DirEntry, TargetPath)):
+        path_entry = path_entry.get()
+    elif not isinstance(path_entry, FilesystemEntry):
+        raise TypeError(
+            f"Expected FilesystemEntry, DirEntry or TargetPath, got {type(path_entry).__name__}: {path_entry!r}"
+        )
+
+    # Compile exclusion patterns once for the whole walk
+    exclude_matchers = [_compile_glob(path_entry.fs, pattern) for pattern in (exclude or [])]
+
+    def _is_excluded(path: str) -> bool:
+        return any(matcher(path) for matcher in exclude_matchers)
+
+    def _handle_error(e: Exception, entry: filesystem.FilesystemEntry | filesystem.DirEntry) -> None:
+        # Like os.walk, errors are ignored unless an error handler is given
+        if onerror is not None and callable(onerror):
+            e.entry = entry
+            onerror(e)
+
+    def _dir_key(entry: filesystem.FilesystemEntry) -> tuple[int, int] | None:
+        # Identify a directory by device and inode to detect symbolic link loops.
+        # Filesystems without inode numbers report 0, for which we can't detect loops.
+        st = entry.stat()
+        return (st.st_dev, st.st_ino) if st.st_ino else None
+
+    # Ignore if self is excluded
+    if exclude_matchers and _is_excluded(path_entry.path):
+        return
+
+    root_key = None
+    if followlinks:
+        try:
+            root_key = _dir_key(path_entry)
+        except Exception as e:
+            _handle_error(e, path_entry)
+
+    # Walk depth-first with an explicit stack instead of recursion, so deep trees can't exceed the recursion limit.
+    # Every stack item is a directory that is being iterated: (entry, scandir iterator, loop detection key).
+    stack = []
+    try:
+        stack.append((path_entry, iter(path_entry.scandir()), root_key))
+    except Exception as e:
+        _handle_error(e, path_entry)
+
+    ancestors = {root_key} if root_key else set()
+
+    while stack:
+        entry, entries, _ = stack[-1]
+
+        try:
+            dir_entry = next(entries, None)
+        except Exception as e:
+            _, _, key = stack.pop()
+            ancestors.discard(key)
+            _handle_error(e, entry)
+            continue
+
+        if dir_entry is None:
+            _, _, key = stack.pop()
+            ancestors.discard(key)
+            continue
+
+        # Ignore excluded entries
+        if exclude_matchers and _is_excluded(dir_entry.path):
+            continue
+
+        # Handle non-excluded entries
+        yield dir_entry
+
+        try:
+            if not dir_entry.is_dir() or (not followlinks and dir_entry.is_symlink()):
+                continue
+
+            subdir = dir_entry.get()
+            key = _dir_key(subdir) if followlinks else None
+            if key and key in ancestors:
+                # Symbolic link to one of its parent directories, following it would loop forever
+                continue
+
+            stack.append((subdir, iter(subdir.scandir()), key))
+            if key:
+                ancestors.add(key)
+        except Exception as e:
+            _handle_error(e, dir_entry)
 
 
 def recurse(entry: filesystem.FilesystemEntry) -> Iterator[filesystem.FilesystemEntry]:
