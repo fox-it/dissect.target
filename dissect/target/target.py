@@ -69,11 +69,13 @@ class Target:
 
     Args:
         path: The path of a target.
+        unknown_args: Optional list of argument strings not consumed by the tool calling :class:`Target`.
     """
 
-    def __init__(self, path: str | Path | None = None):
+    def __init__(self, path: str | Path | None = None, unknown_args: list[str] | None = None):
         self.path_scheme = None
         self.path_query = {}
+        self.unknown_args = unknown_args
 
         self.path, self.parsed_path = parse_path_uri(path)
         if self.parsed_path:
@@ -276,6 +278,7 @@ class Target:
                   If the path is a ``os.PathLike`` object, it will be used as-is.
                   If the path is a string and looks like a URI, it will be parsed as such.
                   If the path is a string and does not like like a URI, it will be treated as a local path.
+            apply: Resolve all disks, volumes and filesystems and load an operating system on the :class:`Target`.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
@@ -325,6 +328,7 @@ class Target:
         include_children: bool = False,
         recursive: bool = False,
         apply: bool = True,
+        unknown_args: list[str] | None = None,
     ) -> Iterator[Self]:
         """Yield all targets from one or more paths or directories.
 
@@ -337,13 +341,20 @@ class Target:
                    If the path is a string and does not look like a URI, it will be treated as a local path.
             include_children: Whether to open child targets.
             recursive: Whether to open child targets recursively.
+            apply: Resolve all disks, volumes and filesystems and load an operating system on the :class:`Target`.
+            unknown_args: List of unknown arguments possibly beloning to plugins.
 
         Raises:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
         def _open_all(
-            spec: str | Path, include_children: bool = False, recursive: bool = False, *, apply: bool = True
+            spec: str | Path,
+            include_children: bool = False,
+            recursive: bool = False,
+            *,
+            apply: bool = True,
+            unknown_args: list[str] | None = None,
         ) -> Iterator[Target]:
             # If the path is a URI-like string, separate the path component
             adjusted_path, parsed_path = parse_path_uri(spec)
@@ -400,7 +411,7 @@ class Target:
                     # For file/dir-like paths it's a Path object
                     # If include_children is True, we override the apply parameter so we can find child targets
                     # The apply parameter will then be used on the children
-                    target = cls._load(load_spec, ldr, apply=include_children or apply)
+                    target = cls._load(load_spec, ldr, apply=include_children or apply, unknown_args=unknown_args)
                 except Exception as e:
                     get_target_logger(load_spec).error("Failed to load target with loader %s", ldr)
                     get_target_logger(load_spec).debug("", exc_info=e)
@@ -423,7 +434,9 @@ class Target:
         for spec in paths:
             loaded = False
 
-            for target in _open_all(spec, include_children=include_children, recursive=recursive, apply=apply):
+            for target in _open_all(
+                spec, include_children=include_children, recursive=recursive, apply=apply, unknown_args=unknown_args
+            ):
                 loaded = True
                 at_least_one_loaded = True
                 yield target
@@ -445,7 +458,11 @@ class Target:
                 if path.is_dir():
                     for entry in path.iterdir():
                         for target in _open_all(
-                            entry, include_children=include_children, recursive=recursive, apply=apply
+                            entry,
+                            include_children=include_children,
+                            recursive=recursive,
+                            apply=apply,
+                            unknown_args=unknown_args,
                         ):
                             at_least_one_loaded = True
                             yield target
@@ -600,12 +617,16 @@ class Target:
         raise TargetError("Target has no path and/or loader")
 
     @classmethod
-    def _load(cls, path: str | Path | None, ldr: loader.Loader, *, apply: bool = True) -> Self:
+    def _load(
+        cls, path: str | Path | None, ldr: loader.Loader, *, apply: bool = True, unknown_args: list[str] | None = None
+    ) -> Self:
         """Internal function that attemps to load a path using a given loader.
 
         Args:
             path: The path to the target.
             ldr: The loader to use for loading this target.
+            apply: Resolve all disks, volumes and filesystems and load an operating system on the :class:`Target`.
+            unknown_args: List of unknown arguments possibly beloning to plugins.
 
         Raises:
             TargetError: If it failed to load a target.
@@ -613,7 +634,7 @@ class Target:
         Returns:
             A ``Target`` object with disks, volumes and/or filesystems mapped by the ``ldr`` from the given ``path``.
         """
-        target = cls(path)
+        target = cls(path, unknown_args)
 
         try:
             ldr.map(target)

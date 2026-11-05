@@ -33,6 +33,7 @@ ExampleUserRegistryRecord = create_extended_descriptor(
 )
 
 
+@arg("--plugin-flag", action="store_true", help="Flag available to all plugin functions.")
 class ExamplePlugin(Plugin):
     """Example plugin.
 
