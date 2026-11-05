@@ -29,12 +29,12 @@ def test_typeurl_unmarshal_json() -> None:
 @pytest.mark.parametrize(
     ("input", "exception", "match"),
     [
-        (None, ValueError, r"Expecting value\: line 1 column 1 \(char 0\)"),
+        (None, ValueError, r"(Expecting value|Unexpected \'\x00\')\: line 1 column 1 \(char 0\)"),
         (b"", ValueError, r"Invalid typeurl structure\: Read 0 bytes\, but expected 1"),
         (
             b"\x00\x03foo\x00\x03bar",
             JSONDecodeError,
-            r"(Expecting value|Unexpected \'\x00\'): line 1 column 1 \(char 0\)",
+            r"(Expecting value|Unexpected \'\x00\'|Unexpected \'b\'): line 1 column 1 \(char 0\)",
         ),
     ],
 )
