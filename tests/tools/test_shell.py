@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 
     from pytest_benchmark.fixture import BenchmarkFixture
 
+    from dissect.target.filesystem import VirtualFilesystem
+
 
 try:
     import pexpect
@@ -1108,3 +1110,15 @@ def test_target_cli_unsupported_plugin_debug_pm(monkeypatch: pytest.MonkeyPatch,
     assert "->" in out
     assert "raise UnsupportedPluginError" in out
     assert ("ipdb>" in out) or ("(Pdb)" in out)  # ipdb or pdb depending on availability
+
+
+def test_target_enter_filesystem(
+    target_unix: Target, fs_win: VirtualFilesystem, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """Test if the ``enter`` command works as expected with ``/$fs$/fsN`` paths."""
+    target_unix.filesystems.add(fs_win)
+    target_unix.apply()
+
+    with patch("dissect.target.Target.open_all", return_value=iter([target_unix])):
+        out, _ = run_target_shell(monkeypatch, capsys, "/foo/bar", "enter /$fs$/fs0\nls c:/windows")
+        assert "Unknown-windows:/$ system32\n" in out
