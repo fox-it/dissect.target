@@ -27,6 +27,7 @@ NetworkDataRecord = TargetRecordDescriptor(
         ("varint", "l2_profile_flags"),
         ("varint", "bytes_sent"),
         ("varint", "bytes_recvd"),
+        ("varint", "wake_count"),
         ("path", "source"),
     ],
 )
@@ -94,6 +95,8 @@ EnergyUsageLTRecord = TargetRecordDescriptor(
         ("varint", "full_charged_capacity"),
         ("varint", "cycle_count"),
         ("varint", "configuration_hash"),
+        ("varint", "battery_count"),
+        ("varint", "battery_charge_limited"),
         ("path", "source"),
     ],
 )
@@ -132,6 +135,7 @@ PushNotificationRecord = TargetRecordDescriptor(
         ("varint", "notification_type"),
         ("varint", "payload_size"),
         ("varint", "network_type"),
+        ("varint", "connection_type"),
         ("path", "source"),
     ],
 )
@@ -297,6 +301,7 @@ FIELD_MAPPINGS = {
     "ConfigurationHash": "configuration_hash",
     "ConnectStartTime": "connect_start_time",
     "ConnectedTime": "connected_time",
+    "ConnectionType": "connection_type",
     "CpuTimeline": "cpu_timeline",
     "CsAcTime": "cs_ac_time",
     "CsDcTime": "cs_dc_time",
@@ -358,6 +363,7 @@ FIELD_MAPPINGS = {
     "UserId": "user",
     "UserInputS": "user_input_s",
     "UserInputTimeline": "user_input_timeline",
+    "WakeCount": "wake_count",
 }
 
 
