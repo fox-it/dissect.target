@@ -1895,3 +1895,61 @@ def test_glob_ext(glob_fs: VirtualFilesystem, start_path: str, pattern: str, res
 
     entries = sorted([entry.path for entry in entries])
     assert entries == sorted(results)
+
+
+@pytest.mark.parametrize(
+    ("sep", "exclude", "expected"),
+    [
+        # "*" stays within a single directory, regardless of the filesystem separator
+        ("/", ["var/*.key"], ["a.txt", "var/keys/1.key", "var/keys/sub/2.key"]),
+        ("\\", ["var/*.key"], ["a.txt", "var/keys/1.key", "var/keys/sub/2.key"]),
+        # "**" spans directories
+        ("/", ["**/*.key"], ["a.txt"]),
+        ("\\", ["**/*.key"], ["a.txt"]),
+        # A matching directory is skipped together with everything below it
+        ("/", ["var/keys"], ["a.txt", "var/3.key"]),
+        ("\\", ["var/keys"], ["a.txt", "var/3.key"]),
+        # Backslashes are separators only on filesystems that use them
+        ("/", ["var\\keys"], ["a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"]),
+        ("\\", ["var\\keys"], ["a.txt", "var/3.key"]),
+    ],
+)
+def test_walk_ext_exclude(sep: str, exclude: list[str], expected: list[str]) -> None:
+    vfs = VirtualFilesystem(sep=sep)
+    for path in ("a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"):
+        vfs.map_file_fh(path, io.BytesIO(b""))
+
+    files = [file.path for _, _, entries in vfs.walk_ext("/", exclude=exclude) for file in entries]
+    assert sorted(files) == expected
+
+
+@pytest.mark.parametrize(
+    ("case_sensitive", "expected"),
+    [
+        (True, ["a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"]),
+        (False, ["a.txt", "var/3.key"]),
+    ],
+)
+def test_walk_ext_exclude_case_sensitivity(case_sensitive: bool, expected: list[str]) -> None:
+    vfs = VirtualFilesystem(case_sensitive=case_sensitive)
+    for path in ("a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"):
+        vfs.map_file_fh(path, io.BytesIO(b""))
+
+    files = [file.path for _, _, entries in vfs.walk_ext("/", exclude=["VAR/KEYS"]) for file in entries]
+    assert sorted(files) == expected
+
+
+def test_walk_ext_exclude_multiple_patterns() -> None:
+    vfs = VirtualFilesystem()
+    for path in ("a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"):
+        vfs.map_file_fh(path, io.BytesIO(b""))
+
+    files = [file.path for _, _, entries in vfs.walk_ext("/", exclude=["var/keys", "var/*.key"]) for file in entries]
+    assert files == ["a.txt"]
+
+
+def test_walk_ext_exclude_start_path() -> None:
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("var/keys/1.key", io.BytesIO(b""))
+
+    assert list(vfs.walk_ext("var", exclude=["var"])) == []

@@ -49,7 +49,7 @@ repository = "https://github.com/fox-it/dissect.target"
 full = [
     "asn1crypto",
     "dissect.apfs>=1.1,<2",
-    "dissect.archive>=1,<2",
+    "dissect.archive>=1.9.dev3,<2",  # TODO: Update on release!
     "dissect.btrfs>=1,<2",
     "dissect.cim>=3,<4",
     "dissect.clfs>=1,<2",
@@ -78,7 +78,7 @@ full = [
 dev = [
     "dissect.target[full,yara]",
     "dissect.apfs[dev]>=1.1,<2.0.dev",
-    "dissect.archive[dev]>=1.0.dev,<2.0.dev",
+    "dissect.archive[dev]>=1.9.dev3,<2.0.dev",  # TODO: Update on release!
     "dissect.btrfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cim[dev]>=3.0.dev,<4.0.dev",
     "dissect.clfs[dev]>=1.0.dev,<2.0.dev",
