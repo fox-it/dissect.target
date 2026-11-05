@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import TargetPath
 
 
+# TODO: Consider DirEntry once LayerDirEntry.stat no longer re-resolves the path from the root.
+# NTFS DirEntry stats differ from a full lstat, and listing ADS still needs a FilesystemEntry per file.
 class LsEntry(NamedTuple):
     name: str
     path: TargetPath
