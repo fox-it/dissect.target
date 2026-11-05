@@ -79,3 +79,13 @@ def test_entry_lattr(dirfs_entry: DirectoryFilesystemEntry) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         dirfs_entry.lattr()
         fs_attrs.assert_called_with(dirfs_entry.entry, follow_symlinks=False)
+
+
+@pytest.mark.parametrize("case_sensitive", [True, False])
+def test_windows_separator(tmp_path: pathlib.Path, case_sensitive: bool) -> None:
+    tmp_path.joinpath("Windows/System32").mkdir(parents=True)
+    tmp_path.joinpath("Windows/System32/dummy").write_bytes(b"dummy")
+
+    fs = DirectoryFilesystem(path=tmp_path, case_sensitive=case_sensitive, sep="\\")
+
+    assert fs.get("Windows\\System32\\dummy").open().read() == b"dummy"
