@@ -83,7 +83,7 @@ def test_yara_exclude(target_default: Target, monkeypatch: pytest.MonkeyPatch, c
 
         out, _ = capsys.readouterr()
 
-        hit1 = "<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 path='/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=d690ba32b59d28614aebefe9b03c74d4, sha1=4b1ced217aabe37138e96fb93bf40026639b9d3b, sha256=7a644118588ff0dcf2fadbe198ae1f1629c29374bac491ba41d5cf957edf0dfc)"  # noqa E501
+        hit1 = "<filesystem/yara/match hostname=None domain=None ts_mtime=1970-01-01 00:00:00+00:00 ts_atime=1970-01-01 00:00:00+00:00 ts_ctime=1970-01-01 00:00:00+00:00 ts_btime=None path='/test_file' rule='test_rule_name' matches=['$=test string'] tags=['tag1', 'tag2', 'tag3'] digest=(md5=d690ba32b59d28614aebefe9b03c74d4, sha1=4b1ced217aabe37138e96fb93bf40026639b9d3b, sha256=7a644118588ff0dcf2fadbe198ae1f1629c29374bac491ba41d5cf957edf0dfc)"  # noqa E501
 
         assert len(out.splitlines()) == 1
 
