@@ -119,6 +119,19 @@ def test_evtx_scraping(target_win: Target) -> None:
     assert len(scraped_records) == 5
 
 
+def test_evtx_scrape_without_os(target_bare: Target) -> None:
+    """Test that evtx scraping works on a target without a detected OS."""
+    target_bare.add_plugin(scrape.ScrapePlugin)
+    evtx_log_file = absolute_path("_data/plugins/os/windows/log/evtx/TestLogX.evtx")
+
+    with evtx_log_file.open("rb") as fh:
+        target_bare.disks.add(fh)
+        target_bare.add_plugin(evtx.EvtxPlugin)
+        scraped_records = list(target_bare.scraped_evtx())
+
+    assert len(scraped_records) == 5
+
+
 def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we normalize certain evtx fields correctly."""
     # Example Security.evtx originates from Windows 10 22H2 Pro build 19045.2006,
