@@ -53,10 +53,10 @@ class SnapPlugin(Plugin):
 
         .. code-block:: text
 
-            ts_modified  (datetime): timestamp when the installation was modified
-            name         (string):   name of the application
-            version      (string):   version of the application
-            path         (string):   path to the application snap file
+            ts_modified (datetime): timestamp when the installation was modified
+            name        (string):   name of the application
+            version     (string):   version of the application
+            source      (path):     path to the application snap file
         """
         for install_path in self.installs:
             for snap in install_path.glob("*.snap"):
@@ -78,6 +78,6 @@ class SnapPlugin(Plugin):
                     ts_modified=meta.lstat().st_mtime,
                     name=meta_data.get("name"),
                     version=meta_data.get("version"),
-                    path=snap,
+                    source=snap,
                     _target=self.target,
                 )
