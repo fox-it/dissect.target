@@ -29,6 +29,7 @@ SchedLgURecord = TargetRecordDescriptor(
         ("string", "status"),
         ("uint32", "exit_code"),
         ("string", "version"),
+        ("path", "source"),
     ],
 )
 
@@ -159,5 +160,6 @@ class SchedLgUPlugin(Plugin):
                     status=event.status,
                     exit_code=event.exit_code,
                     version=event.version,
+                    source=path,
                     _target=self.target,
                 )

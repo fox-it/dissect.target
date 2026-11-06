@@ -13,3 +13,8 @@ def test_environ(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -
     target_linux_users.add_plugin(ProcPlugin)
     results = list(target_linux_users.environ())
     assert len(results) == 3
+    results.sort(key=lambda x: x.pid)
+    assert results[0].source == "/proc/1/environ"
+    assert results[0].name == "systemd"
+    assert results[0].variable == "VAR"
+    assert results[0].content == "1"
