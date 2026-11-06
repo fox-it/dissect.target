@@ -48,6 +48,27 @@ def test_parse_iso_datetime(value: str, expected: datetime) -> None:
     assert parse_iso_datetime(value) == expected
 
 
+def test_defender_mplog_bidi_marks(target_win: Target) -> None:
+    """Test that MPLog lines with Unicode directionality marks still parse."""
+    mplog = io.StringIO(
+        "\u200e2024-07-13T14:42:19.659Z ProcessImageName: randomapp.exe, Pid: 5832, "
+        "TotalTime: 1398, Count: 22, MaxTime: 398, "
+        "MaxTimeFile: \\Device\\HarddiskVolume2\\Users\\user\\AppData\\Local\\Temp\\TEMP001.tmp, "
+        "EstimatedImpact: 4\n"
+        # A mark on a line within a block should be stripped as well
+        "Beginning threat actions\n"
+        "\u200eStart time:07-13-2024 14:43:00\n"
+        "Threat Name:EICAR_Test_File\n"
+        "Finished threat actions\n"
+    )
+
+    records = list(MicrosoftDefenderPlugin(target_win)._mplog(mplog, "MPLog-test.log"))
+
+    assert records[0].ts == dt("2024-07-13 14:42:19.659000+00:00")
+    assert records[1].ts == dt("2024-07-13 14:43:00+00:00")
+    assert records[1].threats == ["EICAR_Test_File"]
+
+
 def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     # map default log location to pass EvtxPlugin's compatibility check
     fs_win.map_dir("windows/system32/winevt/logs", tmp_path)
