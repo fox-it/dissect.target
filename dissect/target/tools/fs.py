@@ -39,15 +39,15 @@ def ls(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     use_colors = sys.stdout.buffer.isatty()
 
     print_ls(
-        path,
-        0,
-        sys.stdout,
-        args.l,
-        args.human_readable,
-        args.recursive,
-        args.use_ctime,
-        args.use_atime,
-        use_colors,
+        path=path,
+        depth=0,
+        stdout=sys.stdout,
+        long_listing=args.l,
+        human_readable=args.human_readable,
+        recursive=args.recursive,
+        use_ctime=args.use_ctime,
+        use_atime=args.use_atime,
+        color=use_colors,
     )
 
 
@@ -160,10 +160,14 @@ def main() -> int:
         log.debug("", exc_info=e)
         return 1
 
+    root = target.fs.path("/")
     glob_path = str(args.path).lstrip("/")
 
+    # An empty pattern (the path "/") is not a valid glob pattern
+    paths = root.glob(glob_path) if glob_path else [root]
+
     found = False
-    for path in target.fs.path("/").glob(glob_path):
+    for path in paths:
         args.handler(target, path, args)
         found = True
 

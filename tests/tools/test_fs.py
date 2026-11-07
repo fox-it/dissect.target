@@ -52,6 +52,37 @@ def test_target_fs(
             assert stdout == "[!] Path doesn't exist\n"
 
 
+@pytest.mark.parametrize(
+    ("path", "expected_entries"),
+    [
+        ("/", ["etc", "home", "root"]),
+        ("/etc", ["hostname", "network", "passwd"]),
+    ],
+)
+def test_target_fs_ls(
+    path: str, expected_entries: list[str], capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-fs", str(absolute_path("_data/tools/info/image.tar")), "ls", path])
+
+        assert target_fs() == 0
+        stdout, _ = capsys.readouterr()
+
+        entries = stdout.split()
+        for entry in expected_entries:
+            assert entry in entries
+
+
+def test_target_fs_stat_root(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-fs", str(absolute_path("_data/tools/info/image.tar")), "stat", "/"])
+
+        assert target_fs() == 0
+        stdout, _ = capsys.readouterr()
+
+        assert "File: /" in stdout
+
+
 @pytest.mark.parametrize("files", [["file"]])
 def test_extract_file(vfs: VirtualFilesystem, tmp_path: Path) -> None:
     output_path = tmp_path / "file"
