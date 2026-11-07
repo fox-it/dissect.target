@@ -186,6 +186,30 @@ def test_auth_year_rollover(target_unix: Target, fs_unix: VirtualFilesystem) -> 
             id="sshd: listening",
         ),
         pytest.param(
+            # Logged by OpenSSH 10.0p2 (PerSourcePenalties, LogLevel VERBOSE) through rsyslog in a debian:13
+            # container, after connections to sshd that closed without authentication
+            "Nov  7 19:01:38 testhost sshd[1067]: srclimit_penalise: ipv4: new 127.0.0.1/32 deferred penalty of 1 "
+            "seconds for penalty: connections without attempting authentication",
+            {
+                "service": "sshd",
+                "pid": 1067,
+                "remote_ip": "127.0.0.1",
+            },
+            id="sshd: per source penalty deferred",
+        ),
+        pytest.param(
+            # Logged by OpenSSH 10.6p2 with its default configuration (LogLevel INFO) through rsyslog in a
+            # debian:sid container, after login attempts with a user that does not exist
+            "Nov 11 14:33:32 testhost sshd[4063]: srclimit_penalise: 127.0.0.1/32: activating ipv4 penalty of "
+            "19.561 seconds for penalty: attempted authentication by invalid user",
+            {
+                "service": "sshd",
+                "pid": 4063,
+                "remote_ip": "127.0.0.1",
+            },
+            id="sshd: per source penalty activating",
+        ),
+        pytest.param(
             "Mar 27 13:08:09 ubuntu-1 sshd[1361]: pam_unix(sshd:session): session opened for user test_user by (uid=0)",
             {
                 "service": "sshd",
