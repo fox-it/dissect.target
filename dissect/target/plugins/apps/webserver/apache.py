@@ -350,28 +350,29 @@ class ApachePlugin(WebserverPlugin):
 
                 location = match.groupdict().get("location")
 
-                if "*" in location:
-                    root, rest = location.split("*", 1)
-                    if root.startswith("/"):
-                        root = self.target.fs.path(root)
-                    elif not root.startswith("/") and self.server_root:
-                        root = self.server_root.joinpath(root)
-                    elif not self.server_root:
-                        self.target.log.warning("Unable to resolve relative Include in %s: %r", path, line)
-                        continue
+                is_wildcard = "*" in location
 
-                    for found_conf in root.glob(f"*{rest}"):
+                # Extract the base location to resolve
+                if is_wildcard:
+                    base_loc, rest = location.split("*", 1)
+                else:
+                    base_loc, rest = location, None
+
+                # Unified absolute/relative path resolution
+                if base_loc.startswith("/"):
+                    resolved_path = self.target.fs.path(base_loc)
+                elif self.server_root:
+                    resolved_path = self.server_root.joinpath(base_loc)
+                else:
+                    self.target.log.warning("Unable to resolve relative Include in %s: %r", path, line)
+                    continue
+
+                # Process the resolved path
+                if is_wildcard:
+                    for found_conf in resolved_path.glob(f"*{rest}"):
                         self._process_conf_file(found_conf, seen)
-
-                elif (
-                    # Relative from server root
-                    (self.server_root and (include_path := self.server_root.joinpath(location)).exists())
-                    or
-                    # Absolute path
-                    ((include_path := self.target.fs.path(location)).exists())
-                ):
-                    self._process_conf_file(include_path, seen)
-
+                elif resolved_path.exists():
+                    self._process_conf_file(resolved_path, seen)
                 else:
                     self.target.log.warning("Unable to resolve Apache Include in %s: %r", path, line)
 
