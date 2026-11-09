@@ -2,24 +2,24 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import Plugin, arg, find_functions
+from dissect.target.target import Target
 from dissect.target.tools.utils.cli import (
     args_to_uri,
     configure_generic_arguments,
     execute_function_on_target,
+    list_plugins,
     persist_execution_report,
     process_generic_arguments,
 )
-
-if TYPE_CHECKING:
-    from dissect.target.target import Target
 
 
 def test_persist_execution_report() -> None:
@@ -189,3 +189,29 @@ def test_namespace_plugin_args() -> None:
     _, result = execute_function_on_target(mock_target, Mock(), ["--a", "asdf", "--b", "123"])
 
     assert result == "asdf"
+
+
+def test_list_plugins_multiple_targets_regression(capsys: pytest.CaptureFixture) -> None:
+    """Test if the output of list_plugins contains output from multiple targets."""
+    target1 = Target()
+    fs1 = VirtualFilesystem()
+    fs1.makedirs("var")
+    fs1.makedirs("/etc/kernel")
+    fs1.map_file_fh("/etc/shadow", BytesIO(b"username:$6$salt$hash5:1337:0:99999:7::123456:\n"))
+    target1.filesystems.add(fs1)
+    target1.apply()
+
+    target2 = Target()
+    fs2 = VirtualFilesystem()
+    fs2.makedirs("var")
+    fs2.makedirs("/etc/kernel")
+    fs2.map_file_fh("/etc/passwd", BytesIO(b"root:x:0:0:root:/root:/bin/bash\n"))
+    fs2.map_file_fh("/root/.bash_history", BytesIO(b"echo 'hello world!'\n"))
+    target2.filesystems.add(fs2)
+    target2.apply()
+
+    with patch("dissect.target.target.Target.open_all", return_value=[target1, target2]):
+        list_plugins(["fake-target-path"], "*", include_children=True, json=True)
+        out, _ = capsys.readouterr()
+        assert "os.unix.shadow.passwords" in out
+        assert "os.unix.history.bashhistory" in out
