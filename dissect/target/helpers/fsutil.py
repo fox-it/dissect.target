@@ -264,6 +264,24 @@ def _compile_glob(fs: filesystem.Filesystem, pattern: str) -> Callable[[str, int
     return _StringGlobber("/", fs.case_sensitive, recursive=True).compile(pattern)
 
 
+def _compile_exclude(fs: filesystem.Filesystem, patterns: list[str] | None) -> Callable[[str], bool] | None:
+    """Compile exclusion patterns into a single matcher, or ``None`` if there are no patterns.
+
+    Paths are made absolute before matching, as filesystems don't report entry paths consistently
+    (e.g. ``/var`` for a top-level entry but ``var/log`` for the entry below it).
+    """
+    if not patterns:
+        return None
+
+    matchers = [_compile_glob(fs, pattern) for pattern in patterns]
+
+    def is_excluded(path: str) -> bool:
+        path = "/" + path.lstrip("/")
+        return any(matcher(path) for matcher in matchers)
+
+    return is_excluded
+
+
 def walk(
     path_entry: filesystem.FilesystemEntry,
     topdown: bool = True,
@@ -292,10 +310,10 @@ def walk_ext(
     tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
 ]:
     # Compile exclusion patterns
-    exclude_matchers = [_compile_glob(path_entry.fs, pattern) for pattern in (exclude or [])]
+    is_excluded = _compile_exclude(path_entry.fs, exclude)
 
     # Ignore if self is excluded
-    if exclude_matchers and any(matcher(path_entry.path) for matcher in exclude_matchers):
+    if is_excluded and is_excluded(path_entry.path):
         return
 
     dirs: list[filesystem.FilesystemEntry] = []
@@ -304,7 +322,7 @@ def walk_ext(
     try:
         for entry in path_entry.scandir():
             # Ignore excluded entries
-            if exclude_matchers and any(matcher(entry.path) for matcher in exclude_matchers):
+            if is_excluded and is_excluded(entry.path):
                 continue
 
             # Handle non-excluded entries
@@ -313,7 +331,7 @@ def walk_ext(
             else:
                 files.append(entry.get())
     except Exception as e:
-        if onerror is not None and callable(onerror):
+        if onerror is not None:
             e.entry = path_entry
             onerror(e)
         return
@@ -340,8 +358,12 @@ def iter_dir_entries(
     """Recursively walk a directory pointed to by ``path_entry``, and yield its contents as :class:`DirEntry`.
     It is significantly more performant than ``walk_ext`` but does not provide control over the walking order.
 
-    Entries are yielded as reported by the filesystem, ``DirEntry.path`` is not normalized. Walk from ``target.fs``
-    to get absolute paths. Exclusion patterns are matched against these same paths.
+    ``DirEntry.path`` is the path as reported by the filesystem being walked, which may be relative and is not
+    guaranteed to be consistent between depths. Walk from ``target.fs`` to get absolute paths such as ``/c:/Windows``.
+
+    Exclusion patterns are matched against the absolute path within the filesystem being walked, e.g.
+    ``/c:/Windows/**`` when walking from ``target.fs``, or ``/Windows/**`` when walking the volume directly.
+    Use ``**/`` to match at any depth, e.g. ``**/*.log``.
 
     Args:
         path_entry: The path to walk on the filesystem, as a :class:`FilesystemEntry`, :class:`DirEntry` or
@@ -350,7 +372,8 @@ def iter_dir_entries(
                  is available as its ``entry`` attribute. Like ``os.walk``, errors are ignored if not given, and the
                  walk continues with the next entry. Raise from ``onerror`` to abort the walk instead.
         followlinks: ``True`` if we want to follow any symbolic link. Symbolic links that point to one of their own
-                     parent directories are yielded, but not followed.
+                     parent directories are yielded, but not followed. Loops can't be detected on filesystems that
+                     don't report inode numbers.
         exclude: ``list`` of glob-style string patterns to exclude from walking.
 
     Returns:
@@ -370,14 +393,11 @@ def iter_dir_entries(
         )
 
     # Compile exclusion patterns once for the whole walk
-    exclude_matchers = [_compile_glob(path_entry.fs, pattern) for pattern in (exclude or [])]
-
-    def _is_excluded(path: str) -> bool:
-        return any(matcher(path) for matcher in exclude_matchers)
+    is_excluded = _compile_exclude(path_entry.fs, exclude)
 
     def _handle_error(e: Exception, entry: filesystem.FilesystemEntry | filesystem.DirEntry) -> None:
         # Like os.walk, errors are ignored unless an error handler is given
-        if onerror is not None and callable(onerror):
+        if onerror is not None:
             e.entry = entry
             onerror(e)
 
@@ -388,7 +408,7 @@ def iter_dir_entries(
         return (st.st_dev, st.st_ino) if st.st_ino else None
 
     # Ignore if self is excluded
-    if exclude_matchers and _is_excluded(path_entry.path):
+    if is_excluded and is_excluded(path_entry.path):
         return
 
     root_key = None
@@ -425,7 +445,7 @@ def iter_dir_entries(
             continue
 
         # Ignore excluded entries
-        if exclude_matchers and _is_excluded(dir_entry.path):
+        if is_excluded and is_excluded(dir_entry.path):
             continue
 
         # Handle non-excluded entries

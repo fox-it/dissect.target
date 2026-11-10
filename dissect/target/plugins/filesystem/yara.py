@@ -128,8 +128,7 @@ class YaraPlugin(Plugin):
         for pattern in exclude or []:
             if suggestion := _suggest_exclude(pattern):
                 self.target.log.warning(
-                    "Exclude pattern %r is matched against the full path and only matches top-level entries, "
-                    "did you mean %r?",
+                    "Exclude pattern %r is matched against the full path and will not match anything, did you mean %r?",
                     pattern,
                     suggestion,
                 )
@@ -197,9 +196,11 @@ class YaraPlugin(Plugin):
 
 
 def _suggest_exclude(pattern: str) -> str | None:
-    """Return a suggested replacement for an exclude pattern that can only match top-level entries, or ``None``."""
+    """Return a suggested replacement for an exclude pattern that will not match anything, or ``None``."""
     if pattern.startswith(("/", "**")):
         return None
+
+    pattern = pattern.removeprefix("./")
 
     # Windows style path, e.g. C:\Windows or c:/Windows
     if match := RE_DRIVE_PATH.match(pattern):

@@ -1903,17 +1903,17 @@ def test_glob_ext(glob_fs: VirtualFilesystem, start_path: str, pattern: str, res
     ("sep", "exclude", "expected"),
     [
         # "*" stays within a single directory, regardless of the filesystem separator
-        ("/", ["var/*.key"], ["a.txt", "var/keys/1.key", "var/keys/sub/2.key"]),
-        ("\\", ["var/*.key"], ["a.txt", "var/keys/1.key", "var/keys/sub/2.key"]),
+        ("/", ["/var/*.key"], ["a.txt", "var/keys/1.key", "var/keys/sub/2.key"]),
+        ("\\", ["/var/*.key"], ["a.txt", "var/keys/1.key", "var/keys/sub/2.key"]),
         # "**" spans directories
         ("/", ["**/*.key"], ["a.txt"]),
         ("\\", ["**/*.key"], ["a.txt"]),
         # A matching directory is skipped together with everything below it
-        ("/", ["var/keys"], ["a.txt", "var/3.key"]),
-        ("\\", ["var/keys"], ["a.txt", "var/3.key"]),
+        ("/", ["/var/keys"], ["a.txt", "var/3.key"]),
+        ("\\", ["/var/keys"], ["a.txt", "var/3.key"]),
         # Backslashes are separators only on filesystems that use them
-        ("/", ["var\\keys"], ["a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"]),
-        ("\\", ["var\\keys"], ["a.txt", "var/3.key"]),
+        ("/", ["\\var\\keys"], ["a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"]),
+        ("\\", ["\\var\\keys"], ["a.txt", "var/3.key"]),
     ],
 )
 def test_walk_ext_exclude(sep: str, exclude: list[str], expected: list[str]) -> None:
@@ -1937,7 +1937,7 @@ def test_walk_ext_exclude_case_sensitivity(case_sensitive: bool, expected: list[
     for path in ("a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"):
         vfs.map_file_fh(path, io.BytesIO(b""))
 
-    files = [file.path for _, _, entries in vfs.walk_ext("/", exclude=["VAR/KEYS"]) for file in entries]
+    files = [file.path for _, _, entries in vfs.walk_ext("/", exclude=["/VAR/KEYS"]) for file in entries]
     assert sorted(files) == expected
 
 
@@ -1946,7 +1946,7 @@ def test_walk_ext_exclude_multiple_patterns() -> None:
     for path in ("a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"):
         vfs.map_file_fh(path, io.BytesIO(b""))
 
-    files = [file.path for _, _, entries in vfs.walk_ext("/", exclude=["var/keys", "var/*.key"]) for file in entries]
+    files = [file.path for _, _, entries in vfs.walk_ext("/", exclude=["/var/keys", "/var/*.key"]) for file in entries]
     assert files == ["a.txt"]
 
 
@@ -1954,25 +1954,25 @@ def test_walk_ext_exclude_start_path() -> None:
     vfs = VirtualFilesystem()
     vfs.map_file_fh("var/keys/1.key", io.BytesIO(b""))
 
-    assert list(vfs.walk_ext("var", exclude=["var"])) == []
+    assert list(vfs.walk_ext("var", exclude=["/var"])) == []
 
 
 @pytest.mark.parametrize(
     ("sep", "exclude", "expected"),
     [
         # "*" stays within a single directory, regardless of the filesystem separator
-        ("/", ["var/*.key"], ["a.txt", "var", "var/keys", "var/keys/1.key", "var/keys/sub", "var/keys/sub/2.key"]),
-        ("\\", ["var/*.key"], ["a.txt", "var", "var/keys", "var/keys/1.key", "var/keys/sub", "var/keys/sub/2.key"]),
+        ("/", ["/var/*.key"], ["a.txt", "var", "var/keys", "var/keys/1.key", "var/keys/sub", "var/keys/sub/2.key"]),
+        ("\\", ["/var/*.key"], ["a.txt", "var", "var/keys", "var/keys/1.key", "var/keys/sub", "var/keys/sub/2.key"]),
         # "**" spans directories
         ("/", ["**/*.key"], ["a.txt", "var", "var/keys", "var/keys/sub"]),
         ("\\", ["**/*.key"], ["a.txt", "var", "var/keys", "var/keys/sub"]),
         # A matching directory is skipped together with everything below it
-        ("/", ["var/keys"], ["a.txt", "var", "var/3.key"]),
-        ("\\", ["var/keys"], ["a.txt", "var", "var/3.key"]),
+        ("/", ["/var/keys"], ["a.txt", "var", "var/3.key"]),
+        ("\\", ["/var/keys"], ["a.txt", "var", "var/3.key"]),
         # Backslashes are separators only on filesystems that use them
         (
             "/",
-            ["var\\keys"],
+            ["\\var\\keys"],
             [
                 "a.txt",
                 "var",
@@ -1983,7 +1983,7 @@ def test_walk_ext_exclude_start_path() -> None:
                 "var/keys/sub/2.key",
             ],
         ),
-        ("\\", ["var\\keys"], ["a.txt", "var", "var/3.key"]),
+        ("\\", ["\\var\\keys"], ["a.txt", "var", "var/3.key"]),
     ],
 )
 def test_iter_dir_entries_exclude(sep: str, exclude: list[str], expected: list[str]) -> None:
@@ -2007,7 +2007,7 @@ def test_iter_dir_entries_exclude_case_sensitivity(case_sensitive: bool, expecte
     for path in ("a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"):
         vfs.map_file_fh(path, io.BytesIO(b""))
 
-    files = [file.get().path for file in fsutil.iter_dir_entries(vfs.get("/"), exclude=["VAR/KEYS"])]
+    files = [file.get().path for file in fsutil.iter_dir_entries(vfs.get("/"), exclude=["/VAR/KEYS"])]
     assert sorted(files) == expected
 
 
@@ -2016,7 +2016,7 @@ def test_iter_dir_entries_exclude_multiple_patterns() -> None:
     for path in ("a.txt", "var/3.key", "var/keys/1.key", "var/keys/sub/2.key"):
         vfs.map_file_fh(path, io.BytesIO(b""))
 
-    files = [file.get().path for file in fsutil.iter_dir_entries(vfs.get("/"), exclude=["var/keys", "var/*.key"])]
+    files = [file.get().path for file in fsutil.iter_dir_entries(vfs.get("/"), exclude=["/var/keys", "/var/*.key"])]
     assert sorted(files) == ["a.txt", "var"]
 
 
@@ -2024,7 +2024,49 @@ def test_iter_dir_entries_exclude_start_path() -> None:
     vfs = VirtualFilesystem()
     vfs.map_file_fh("var/keys/1.key", io.BytesIO(b""))
 
-    assert list(fsutil.iter_dir_entries(vfs.get("var"), exclude=["var"])) == []
+    assert list(fsutil.iter_dir_entries(vfs.get("var"), exclude=["/var"])) == []
+
+
+@pytest.mark.parametrize(
+    ("exclude", "expected"),
+    [
+        # Absolute patterns match at any depth, even though the filesystem reports "/var" but "var/log"
+        (["/var"], ["/etc", "/etc/passwd"]),
+        (["/var/log"], ["/etc", "/etc/passwd", "/var"]),
+        # Relative patterns never match
+        (["var"], ["/etc", "/etc/passwd", "/var", "/var/log", "/var/log/syslog"]),
+        (["var/log"], ["/etc", "/etc/passwd", "/var", "/var/log", "/var/log/syslog"]),
+        # "**" matches at any depth
+        (["**/log"], ["/etc", "/etc/passwd", "/var"]),
+    ],
+)
+@pytest.mark.parametrize("from_target_fs", [True, False], ids=["target.fs", "vfs"])
+def test_iter_dir_entries_exclude_absolute(
+    target_bare: Target, from_target_fs: bool, exclude: list[str], expected: list[str]
+) -> None:
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("etc/passwd", io.BytesIO(b""))
+    vfs.map_file_fh("var/log/syslog", io.BytesIO(b""))
+    target_bare.fs.mount("/", vfs)
+
+    root = target_bare.fs.get("/") if from_target_fs else vfs.get("/")
+    paths = sorted("/" + entry.path.lstrip("/") for entry in fsutil.iter_dir_entries(root, exclude=exclude))
+    assert paths == expected
+
+
+def test_iter_dir_entries_exclude_target_fs_drive(target_bare: Target) -> None:
+    vfs = VirtualFilesystem(sep="\\", case_sensitive=False)
+    vfs.map_file_fh("Windows/System32/kernel32.dll", io.BytesIO(b""))
+    vfs.map_file_fh("Windows/WinSxS/x.dll", io.BytesIO(b""))
+    target_bare.fs.mount("c:", vfs)
+
+    entries = fsutil.iter_dir_entries(target_bare.fs.get("/"), exclude=["/c:/Windows/WinSxS"])
+    assert sorted(entry.path for entry in entries) == [
+        "/c:",
+        "/c:/Windows",
+        "/c:/Windows/System32",
+        "/c:/Windows/System32/kernel32.dll",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -2041,6 +2083,16 @@ def test_iter_dir_entries_argument_types(get_root: Callable[[VirtualFilesystem],
     vfs.map_file_fh("other.txt", io.BytesIO(b""))
 
     assert [entry.name for entry in fsutil.iter_dir_entries(get_root(vfs))] == ["log", "syslog"]
+
+
+def test_dir_entry_str() -> None:
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("var/log/syslog", io.BytesIO(b""))
+
+    entry = next(iter(vfs.get("var/log").scandir()))
+    assert str(entry) == entry.path == "var/log/syslog"
+    assert f"{entry}" == "var/log/syslog"
+    assert repr(entry) == "<DirEntry 'syslog'>"
 
 
 def test_iter_dir_entries_argument_type_error() -> None:

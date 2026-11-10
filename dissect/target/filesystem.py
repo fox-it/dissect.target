@@ -933,6 +933,9 @@ class DirEntry:
     def __repr__(self) -> str:
         return f"<DirEntry {self.name!r}>"
 
+    def __str__(self) -> str:
+        return str(self.path)
+
     def get(self) -> FilesystemEntry:
         """Retrieve the :class:`FilesystemEntry` this directory entry points to.
 

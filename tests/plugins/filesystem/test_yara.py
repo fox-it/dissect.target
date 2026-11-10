@@ -131,6 +131,7 @@ def test_yara_plugin_multiple_matches(target_default: Target) -> None:
         ("Windows/WinSxS", "**/Windows/WinSxS"),
         ("c:/Windows/WinSxS", "/c:/Windows/WinSxS"),
         ("C:\\Windows\\WinSxS", "/c:/Windows/WinSxS"),
+        ("./WinSxS", "**/WinSxS"),
     ],
 )
 def test_yara_suggest_exclude(pattern: str, expected: str | None) -> None:
@@ -141,6 +142,6 @@ def test_yara_suggest_exclude(pattern: str, expected: str | None) -> None:
 def test_yara_plugin_exclude_warning(target_yara: Target, caplog: pytest.LogCaptureFixture) -> None:
     list(target_yara.yara(rules=[rule_file], exclude=["*.dll", "**/*.key"]))
 
-    assert "Exclude pattern '*.dll' is matched against the full path" in caplog.text
+    assert "Exclude pattern '*.dll' is matched against the full path and will not match anything" in caplog.text
     assert "did you mean '**/*.dll'?" in caplog.text
     assert "'**/*.key'" not in caplog.text
