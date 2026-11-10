@@ -1141,7 +1141,7 @@ def test_target_cli_tar_windows_ntfs(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert outpath.is_file()
     assert outpath.stat().st_size > 0
 
-    
+
 def test_target_cli_lscolors(capsys: pytest.CaptureFixture) -> None:
     """Test that we correctly format ls colors for different file types."""
     target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
