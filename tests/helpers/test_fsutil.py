@@ -6,6 +6,7 @@ import inspect
 import io
 import os
 import pathlib
+import platform
 import re
 import sys
 import tempfile
@@ -2186,6 +2187,7 @@ def test_iter_dir_entries_start_not_a_directory() -> None:
     assert isinstance(onerror.call_args.args[0], NotADirectoryError)
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test")
 def test_iter_dir_entries_symlink_loop(tmp_path: Path) -> None:
     (tmp_path / "a" / "b").mkdir(parents=True)
     (tmp_path / "a" / "b" / "file.txt").touch()
