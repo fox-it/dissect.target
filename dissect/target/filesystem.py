@@ -619,10 +619,10 @@ class FilesystemEntry:
             yield entry.name
 
     def scandir(self) -> Iterator[DirEntry]:
-        """Iterate over the contents of a directory, yields :class:`FilesystemEntry`.
+        """Iterate over the contents of a directory, yields :class:`DirEntry`.
 
         Returns:
-            An iterator of :class:`FilesystemEntry`.
+            An iterator of :class:`DirEntry`.
         """
         raise NotImplementedError
 
@@ -932,6 +932,9 @@ class DirEntry:
 
     def __repr__(self) -> str:
         return f"<DirEntry {self.name!r}>"
+
+    def __str__(self) -> str:
+        return str(self.path)
 
     def get(self) -> FilesystemEntry:
         """Retrieve the :class:`FilesystemEntry` this directory entry points to.
