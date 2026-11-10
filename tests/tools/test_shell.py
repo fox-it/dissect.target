@@ -1101,6 +1101,62 @@ def test_target_cli_unsupported_plugin_debug_pm(monkeypatch: pytest.MonkeyPatch,
     assert ("ipdb>" in out) or ("(Pdb)" in out)  # ipdb or pdb depending on availability
 
 
+def test_target_cli_tar_windows_ntfs(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    """Test tar works correctly on an NTFS filesystem (mounted under c:/)."""
+    target = Target.open(absolute_path("_data/filesystems/ntfs/ntfs.qcow2"), apply=True)
+    cli = TargetCli(target)
+
+    # Test relative paths
+    outpath = tmp_path / "out.tar"
+    cli.onecmd("cd c:/Users/User/Downloads")
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} ../Downloads")
+    captured = capsys.readouterr()
+    assert "No such file or directory" not in captured.err
+    assert outpath.is_file()
+    assert outpath.stat().st_size > 0
+    with tarfile.open(outpath, "r:*") as tar:
+        members = sorted(tar.getnames())
+    assert members == ["Downloads", "Downloads/logo-konami.svg"]
+
+    # Test relative paths with traversals in the middle, which must be normalized in the member names
+    for pattern in ("../*/../Downloads", "../Downloads/../Downloads", "./../../User/Downloads"):
+        cli.onecmd(f"tar -cvf {outpath.as_posix()} {pattern}")
+        captured = capsys.readouterr()
+        assert "No such file or directory" not in captured.err
+        with tarfile.open(outpath, "r:*") as tar:
+            members = sorted(tar.getnames())
+        expected = ["Downloads", "Downloads/logo-konami.svg"]
+        if pattern.endswith("User/Downloads"):
+            expected = ["User/Downloads", "User/Downloads/logo-konami.svg"]
+        assert members == expected, pattern
+
+    # Test path traversal
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} c:/Users/User/Downloads/../Downloads")
+    captured = capsys.readouterr()
+    assert "No such file or directory" not in captured.err
+    assert outpath.is_file()
+    assert outpath.stat().st_size > 0
+    with tarfile.open(outpath, "r:*") as tar:
+        members = sorted(tar.getnames())
+    assert members == ["c:/Users/User/Downloads", "c:/Users/User/Downloads/logo-konami.svg"]
+
+    # Test . (cwd)
+    cli.onecmd("cd c:/Users/User/")
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} .")
+    captured = capsys.readouterr()
+    assert "No such file or directory" not in captured.err
+    assert outpath.is_file()
+    assert outpath.stat().st_size > 0
+
+    # Test absolute paths
+    cli.onecmd(f"tar -cvf {outpath.as_posix()} c:/")
+    captured = capsys.readouterr()
+    assert "No such file or directory" not in captured.err
+    assert "tar: c:/$Secure: file not found, skipping" in captured.err
+    assert outpath.is_file()
+    assert outpath.stat().st_size > 0
+
+
 def test_target_cli_lscolors(capsys: pytest.CaptureFixture) -> None:
     """Test that we correctly format ls colors for different file types."""
     target = Target.open(absolute_path("_data/filesystems/filesystem.ext4"), apply=True)
