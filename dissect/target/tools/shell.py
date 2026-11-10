@@ -1316,8 +1316,10 @@ class TargetCli(TargetCmd):
                             # drive-letter paths ("c:/...") aren't rooted at "/".
                             arcname = fsutil.normpath(path, sep="/").lstrip("/")
                         else:
-                            rel = path.relative_to(self.cwd)
-                            arcname = "/".join(p for p in rel.parts if p not in (".", ".."))
+                            # Normalize first, so "a/../b" becomes "b" instead of "a/b". Afterwards ".." can only
+                            # be leading, drop those so members can't escape the archive root (like GNU tar does).
+                            rel = fsutil.normpath(str(path.relative_to(self.cwd)), sep="/")
+                            arcname = "/".join(p for p in rel.split("/") if p not in ("", ".", ".."))
                         arcname = arcname or "."
                         add_to_tar(tar, path, arcname, dereference=args.dereference, inodes=inodes_cache)
         finally:
