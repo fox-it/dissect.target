@@ -344,7 +344,8 @@ class AuthPlugin(Plugin):
 
     def _get_paths(self) -> Iterator[Path]:
         var_log = self.target.fs.path("/var/log")
-        return chain(var_log.glob("auth.log*"), var_log.glob("secure*"))
+        var_run_log = self.target.fs.path("/var/run/log")
+        return chain(var_log.glob("auth.log*"), var_log.glob("secure*"), var_run_log.glob("auth.log*"))
 
     @alias("securelog")
     @export(record=DynamicDescriptor(["datetime", "path", "string"]))
