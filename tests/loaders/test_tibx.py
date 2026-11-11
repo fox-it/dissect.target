@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import uuid
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -160,8 +161,22 @@ def test_open_error(tmp_path: Path) -> None:
     path.write_bytes(absolute_path(CHAIN_INC).read_bytes()[:16])
 
     assert TibxLoader.detect(path)
-    with pytest.raises(LoaderError, match="Failed to open TIBX archive"):
+    with pytest.raises(LoaderError, match=r"Failed to open TIBX archive .*: Missing ARCH magic"):
         TibxLoader(path)
+
+
+def test_open_error_names_missing_files(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Test that an archive with files missing says so, also where only the log carries the reason."""
+    path = tmp_path / "Split-0001.tibx"
+    path.write_bytes(absolute_path(CHAIN_DIFF).with_name("t1_chain_diff-0001.tibx").read_bytes())
+
+    with pytest.raises(LoaderError, match=r"missing the first file of this archive, Split\.tibx$"):
+        TibxLoader(path)
+
+    # Opening every backup logs why the archive does not load, before it gives up
+    with caplog.at_level(logging.ERROR), pytest.raises(TargetError, match="Failed to find any loader"):
+        list(Target.open_all([_uri(path, "recovery-point=all")]))
+    assert "missing the first file of this archive, Split.tibx" in caplog.text
 
 
 # Synthetic archives, for the tests that need an archive's backups but none of its data.
