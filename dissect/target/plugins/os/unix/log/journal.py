@@ -342,7 +342,12 @@ class JournalFile:
         offset = self.header.entry_array_offset
         while offset != 0:
             self.fh.seek(offset)
-            object_type = self.fh.read(1)[0]
+            object_type_bytes = self.fh.read(1)
+            if not object_type_bytes:
+                self.target.log.warning("Truncated journal file at offset 0x%X", offset)
+                break
+
+            object_type = object_type_bytes[0]
 
             if object_type == c_journal.ObjectType.OBJECT_UNUSED:
                 self.target.log.warning(

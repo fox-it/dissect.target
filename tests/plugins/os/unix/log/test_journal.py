@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.plugins.os.unix.log.journal import JournalMessagePriority, JournalPlugin
+from dissect.target.plugins.os.unix.log.journal import JournalFile, JournalMessagePriority, JournalPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -55,6 +56,23 @@ def test_benchmark_journal(target_unix: Target, fs_unix: VirtualFilesystem, benc
 
     assert result.ts == datetime(2025, 1, 15, 14, 25, 1, 607354, tzinfo=timezone.utc)
     assert result.message == "pam_unix(cron:session): session opened for user root(uid=0) by root(uid=0)"
+
+
+def test_journal_file_truncated_at_entry_array(
+    caplog: pytest.LogCaptureFixture, target_unix: Target, fs_unix: VirtualFilesystem
+) -> None:
+    """Truncated journal files should not crash with IndexError."""
+    data_file = absolute_path("_data/plugins/os/unix/log/journal/journal")
+    with data_file.open("rb") as fh:
+        journal_file = JournalFile(fh, target_unix)
+        offset = journal_file.header.entry_array_offset
+        fh.seek(0)
+        truncated = fh.read(offset)
+
+    with caplog.at_level(logging.WARNING, target_unix.log.name):
+        assert list(JournalFile(BytesIO(truncated), target_unix)) == []
+
+    assert "Truncated journal file at offset" in caplog.text
 
 
 def test_journal_plugin_unused_object(
