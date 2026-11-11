@@ -4,12 +4,16 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 
 BootTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/boot",
-    [],
+    [
+        ("path", "source"),
+    ],
 )
 
 CalendarTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/calendar",
-    [],
+    [
+        ("path", "source"),
+    ],
 )
 
 DailyTriggerRecord = TargetRecordDescriptor(
@@ -17,6 +21,7 @@ DailyTriggerRecord = TargetRecordDescriptor(
     [
         ("uint16", "days_between_triggers"),
         ("uint16[]", "unused"),
+        ("path", "source"),
     ],
 )
 
@@ -26,6 +31,7 @@ ComHandlerRecord = TargetRecordDescriptor(
         ("string", "action_type"),
         ("string", "class_id"),
         ("string", "com_data"),
+        ("path", "source"),
     ],
 )
 
@@ -37,6 +43,7 @@ EventTriggerRecord = TargetRecordDescriptor(
         ("uint16", "number_of_occurences"),
         ("string", "matching_elements"),
         ("string", "value_queries"),
+        ("path", "source"),
     ],
 )
 
@@ -47,24 +54,30 @@ ExecRecord = TargetRecordDescriptor(
         ("string", "command"),
         ("string", "arguments"),
         ("string", "working_directory"),
+        ("path", "source"),
     ],
 )
 
 IdleTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/idle",
-    [],
+    [
+        ("path", "source"),
+    ],
 )
 
 LogonTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/logon",
     [
         ("string", "user_id"),
+        ("path", "source"),
     ],
 )
 
 TimeTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/time",
-    [],
+    [
+        ("path", "source"),
+    ],
 )
 
 BaseTriggerRecord = TargetRecordDescriptor(
@@ -80,6 +93,7 @@ BaseTriggerRecord = TargetRecordDescriptor(
         ("string", "delay"),
         ("string", "random_delay"),
         ("string", "trigger_data"),
+        ("path", "source"),
     ],
 )
 
@@ -88,6 +102,7 @@ MonthlyDateTriggerRecord = TargetRecordDescriptor(
     [
         ("uint16[]", "day_of_month"),
         ("string[]", "months_of_year"),
+        ("path", "source"),
     ],
 )
 
@@ -97,6 +112,7 @@ MonthlyDowTriggerRecord = TargetRecordDescriptor(
         ("uint16[]", "which_week"),
         ("string[]", "days_of_week"),
         ("string[]", "months_of_year"),
+        ("path", "source"),
     ],
 )
 
@@ -106,6 +122,7 @@ PaddingTriggerRecord = TargetRecordDescriptor(
         ("uint16", "padding"),
         ("uint16", "reserved2"),
         ("uint16", "reserved3"),
+        ("path", "source"),
     ],
 )
 
@@ -124,6 +141,7 @@ SendEmailRecord = TargetRecordDescriptor(
         ("string", "header_value"),
         ("string", "body"),
         ("string", "attachment"),
+        ("path", "source"),
     ],
 )
 
@@ -132,6 +150,7 @@ SessionStateChangeTriggerRecord = TargetRecordDescriptor(
     [
         ("string", "user_id"),
         ("string", "state_change"),
+        ("path", "source"),
     ],
 )
 
@@ -140,6 +159,7 @@ ShowMessageRecord = TargetRecordDescriptor(
     [
         ("string", "tile"),
         ("string", "body"),
+        ("path", "source"),
     ],
 )
 
@@ -149,6 +169,7 @@ WeeklyTriggerRecord = TargetRecordDescriptor(
         ("uint16", "weeks_between_triggers"),
         ("string[]", "days_of_week"),
         ("uint16[]", "unused"),
+        ("path", "source"),
     ],
 )
 
@@ -156,6 +177,7 @@ WnfTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/wnf",
     [
         ("string", "state_name"),
+        ("path", "source"),
     ],
 )
 
@@ -163,5 +185,6 @@ RegistrationTrigger = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/registration",
     [
         ("datetime", "date"),
+        ("path", "source"),
     ],
 )

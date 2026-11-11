@@ -26,6 +26,7 @@ def test_cim_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert len([r for r in consumer_records if type(r) == ActiveScriptEventConsumerRecord.recordType]) == 2  # noqa: E721
     # Ensure associated filter query was correctly found for all
     assert len([record for record in target_win.cim() if record.filter_query]) == 3
+    assert {str(r.source) for r in consumer_records} == {"c:\\Windows\\system32\\wbem\\repository"}
 
 
 def test_cim_direct_mode() -> None:
@@ -34,6 +35,7 @@ def test_cim_direct_mode() -> None:
     records = list(target.cim.consumerbindings())
 
     assert len(records) == 3
+    assert {str(r.source) for r in records} == {str(data_path)}
 
 
 r"""
@@ -283,3 +285,4 @@ def test_consumerbindings_all_namespaces(target_win: Target, fs_win: VirtualFile
     consumer_records = list(target_win.cim.consumerbindings())
     binding_names = [r.filter_name for r in consumer_records]
     assert "Pentestlab-WMI" in binding_names
+    assert {str(r.source) for r in consumer_records} == {"c:\\Windows\\system32\\wbem\\repository"}
