@@ -68,7 +68,8 @@ class SshdService(BaseService):
     def parse(cls, message: str) -> dict[str, str | int]:
         """Parse message from sshd."""
         additional_fields = {}
-        if ip_address := extract_ips(message):
+        # OpenSSH PerSourcePenalties messages add a prefix length to the address, e.g. ``192.0.2.10/32``
+        if ip_address := list(dict.fromkeys(ip.split("/")[0] for ip in extract_ips(message))):
             field_name = "host_ip" if "listening" in message else "remote_ip"
 
             if len(ip_address) > 1:
