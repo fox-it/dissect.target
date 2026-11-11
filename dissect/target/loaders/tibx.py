@@ -67,16 +67,20 @@ class TibxLoader(Loader):
     def __init__(self, path: Path, **kwargs):
         super().__init__(path, **kwargs)
         recovery_point = self.parsed_query.get(RECOVERY_POINT, "latest")
+        # Opened first, so that an archive that does not open says why, also with
+        # recovery-point=all: find_all hands such an archive here as it was given
+        try:
+            self.tibx = TIBX.open(path)
+        except Error as e:
+            # The cause in the message: a tool that opens several targets logs only this one
+            raise LoaderError(f"Failed to open TIBX archive {path}: {e}") from e
+
         if recovery_point == "all":
+            self.tibx.close()
             raise LoaderError(
                 f"{RECOVERY_POINT}=all opens one target per backup, which only tools that open several "
                 f"targets do, such as target-query: {path}"
             )
-
-        try:
-            self.tibx = TIBX.open(path)
-        except Error as e:
-            raise LoaderError(f"Failed to open TIBX archive: {path}") from e
 
         try:
             self.tibx.use_recovery_point(recovery_point)
