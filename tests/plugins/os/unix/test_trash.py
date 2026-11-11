@@ -85,13 +85,18 @@ def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
 
 def test_gnome_trash_mounts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if GNOME Trash plugin finds Trash files in mounted devices from ``/etc/fstab``, ``/mnt`` and ``/media``."""
-    fs_unix.map_file_fh("etc/hostname", BytesIO(b"hostname"))
-    fs_unix.map_dir("home/user/.local/share/Trash", absolute_path("_data/plugins/os/unix/trash"))
-    fs_unix.map_dir("mnt/example/.Trash-1234", absolute_path("_data/plugins/os/unix/trash"))
-    fs_unix.map_dir("tmp/example/.Trash-5678", absolute_path("_data/plugins/os/unix/trash"))
-    fs_unix.map_dir("media/user/example/.Trash-1000", absolute_path("_data/plugins/os/unix/trash"))
+    fs_unix.map_file_fh("/etc/hostname", BytesIO(b"hostname"))
 
-    with patch.object(target_unix_users.fs, "mounts", {"/tmp/example": None, "/mnt/example": None}):
+    trash = absolute_path("_data/plugins/os/unix/trash")
+    fs_unix.map_dir("/home/user/.local/share/Trash", trash)
+    fs_unix.map_dir("/mnt/example/.Trash-1234", trash)
+    fs_unix.map_dir("/tmp/example/.Trash-5678", trash)
+    fs_unix.map_dir("/media/user/example/.Trash-1000", trash)
+
+    # Simulates the result of a parsed /etc/fstab
+    with patch.object(
+        target_unix_users.fs, "mounts", {"/tmp/example": None, "/mnt/example": None, "/media/user/example": None}
+    ):
         target_unix_users.add_plugin(UnixPlugin)
         plugin = GnomeTrashPlugin(target_unix_users)
 
