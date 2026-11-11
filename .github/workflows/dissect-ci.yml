@@ -14,7 +14,7 @@ jobs:
     with:
       deb-packages: 'liblzo2-dev'
       run-benchmarks: true
-      benchmark-mode: walltime
+      benchmark-mode: simulation
     secrets: inherit
 
   publish:
