@@ -85,7 +85,6 @@ from dissect.target.tools.utils.cli import (
 )
 from dissect.target.tools.utils.fs import (
     fmt_ls_colors,
-    ls_scandir,
     print_ls,
     print_stat,
     print_xattr,
@@ -387,6 +386,8 @@ class ExtendedCmd(cmd.Cmd):
                         return func(argparts, pipe_stdin)
             except OSError as e:
                 # in case of a failure in a subprocess
+                if self.debug:
+                    raise
                 print(e)
                 return False
         else:
@@ -845,13 +846,13 @@ class TargetCli(TargetCmd):
         path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
         textlower = text.lower()
 
-        suggestions = []
-        for fpath, fname in ls_scandir(path):
-            if not fname.lower().startswith(textlower):
+        suggestions: list[str] = []
+        for entry in path.iterdir():
+            if not entry.name.lower().startswith(textlower):
                 continue
 
             # Add a trailing slash to directories, to allow for easier traversal of the filesystem
-            suggestion = f"{fname}/" if fpath.is_dir() else fname
+            suggestion = f"{entry.name}/" if entry.is_dir() else entry.name
             suggestions.append(suggestion)
         return suggestions
 
@@ -988,6 +989,9 @@ class TargetCli(TargetCmd):
     @arg("-R", "--recursive", action="store_true", help="recursively list subdirectories encountered")
     @arg("-c", action="store_true", dest="use_ctime", help="show time when file status was last changed")
     @arg("-u", action="store_true", dest="use_atime", help="show time of last access")
+    @arg("-t", action="store_true", dest="sort_by_time", help="sort by time, newest first")
+    @arg("-r", action="store_true", dest="reverse_sort", help="reverse sort order")
+    @arg("--color", action="store_true", help="force color output")
     @alias("l")
     @alias("dir")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> bool:
@@ -1011,16 +1015,20 @@ class TargetCli(TargetCmd):
             use_color = True
         if os.getenv("NO_COLOR") in ["1", "True", "true"]:
             use_color = False
+        if args.color:
+            use_color = True
 
         print_ls(
-            path,
-            0,
-            stdout,
-            args.l,
-            args.human_readable,
-            args.recursive,
-            args.use_ctime,
-            args.use_atime,
+            path=path,
+            depth=0,
+            stdout=stdout,
+            long_listing=args.l,
+            human_readable=args.human_readable,
+            recursive=args.recursive,
+            use_ctime=args.use_ctime,
+            use_atime=args.use_atime,
+            sort_by_time=args.sort_by_time,
+            reverse_sort=args.reverse_sort,
             color=use_color,
         )
         return False
@@ -1252,7 +1260,13 @@ class TargetCli(TargetCmd):
             """This function is heavily inspired by tarfile.TarFile.add, but adapted to work with TargetPath."""
             if args.verbose:
                 print(f"a {arcname}", file=sys.stderr)
-            info = get_tarinfo(path, arcname, dereference=dereference, inodes=inodes)
+
+            try:
+                info = get_tarinfo(path, arcname, dereference=dereference, inodes=inodes)
+            except FileNotFoundError:
+                print(f"tar: {PurePosixPath(path)}: file not found, skipping", file=sys.stderr)
+                return
+
             if not info:
                 print(f"tar: {PurePosixPath(path)}: unsupported file type, skipping", file=sys.stderr)
                 return
@@ -1285,7 +1299,8 @@ class TargetCli(TargetCmd):
             inodes_cache = {}
             with tarfile.open(fileobj=fobj, mode=mode, format=tarfile.PAX_FORMAT) as tar:
                 for arg_path in args.path:
-                    base_path = self.target.fs.path("/") if Path(arg_path).is_absolute() else self.cwd
+                    is_absolute = self.target.fs.path(arg_path).is_absolute()
+                    base_path = self.target.fs.path("/") if is_absolute else self.cwd
                     glob_path = arg_path.lstrip("/")
 
                     # This is a workaround for Python 3.12 and lower
@@ -1296,11 +1311,16 @@ class TargetCli(TargetCmd):
                         continue
 
                     for path in paths:
-                        arcname = str(PurePosixPath(path).relative_to("/"))
-                        if not Path(arg_path).is_absolute():
-                            pure_path = PurePosixPath(path).relative_to(PurePosixPath(self.cwd))
-                            arcname = "/".join(p for p in pure_path.parts if p not in (".", ".."))
-                            arcname = arcname or "."
+                        if is_absolute:
+                            # Use lstrip rather than `.relative_to("/")`, because
+                            # drive-letter paths ("c:/...") aren't rooted at "/".
+                            arcname = fsutil.normpath(path, sep="/").lstrip("/")
+                        else:
+                            # Normalize first, so "a/../b" becomes "b" instead of "a/b". Afterwards ".." can only
+                            # be leading, drop those so members can't escape the archive root (like GNU tar does).
+                            rel = fsutil.normpath(str(path.relative_to(self.cwd)), sep="/")
+                            arcname = "/".join(p for p in rel.split("/") if p not in ("", ".", ".."))
+                        arcname = arcname or "."
                         add_to_tar(tar, path, arcname, dereference=args.dereference, inodes=inodes_cache)
         finally:
             if fobj is not stdout.buffer:
