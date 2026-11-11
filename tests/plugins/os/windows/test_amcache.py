@@ -224,6 +224,45 @@ def test_parse_inventory_application_file_bad_link_date(target_win: Target) -> N
         assert call_kwargs["name"] == "3DViewer.exe"
 
 
+def mock_read_key_subkeys_missing_path(self: AmcachePlugin, key: str) -> Iterator[Mock]:
+    entries = [
+        {"LowerCaseLongPath": "c:\\program files\\one\\one.exe", "Name": "one.exe"},
+        # An entry that only has a ProgramId and a FileId
+        {
+            "ProgramId": "0000df892556c2f7a6b7fa69f7009b5c08cb00000904",
+            "FileId": "00008e01cdeb9a1c23cee421a647f29c45f67623be97",
+        },
+        {"LowerCaseLongPath": "c:\\program files\\three\\three.exe", "Name": "three.exe"},
+    ]
+
+    for values in entries:
+        mock_values = []
+        for name, value in values.items():
+            mock_value = Mock()
+            mock_value.name = name
+            mock_value.value = value
+            mock_values.append(mock_value)
+
+        mock_entry = Mock()
+        mock_entry.timestamp = datetime.datetime(2021, 12, 31, tzinfo=datetime.timezone.utc)
+        mock_entry.values = Mock(return_value=mock_values)
+
+        yield mock_entry
+
+
+@patch.object(AmcachePlugin, "read_key_subkeys", mock_read_key_subkeys_missing_path)
+def test_parse_inventory_application_file_missing_path(target_win: Target) -> None:
+    """An entry without ``LowerCaseLongPath`` gets no path and does not stop the entries after it."""
+    records = list(AmcachePlugin(target_win).parse_inventory_application_file())
+
+    assert [record.name for record in records] == ["one.exe", None, "three.exe"]
+    assert [str(record.path) if record.path else None for record in records] == [
+        "c:\\program files\\one\\one.exe",
+        None,
+        "c:\\program files\\three\\three.exe",
+    ]
+
+
 def test_amcache_install_entry(target_win: Target) -> None:
     amcache_install_plugin = AmcacheInstallPlugin(target_win)
 

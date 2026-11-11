@@ -496,7 +496,9 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 mtime_regf=entry.timestamp,
                 program_id=entry_data.get("ProgramId"),
                 digest=(None, sha1_digest, None),
-                path=self.target.fs.path(entry_data.get("LowerCaseLongPath")),
+                path=self.target.fs.path(entry_data["LowerCaseLongPath"])
+                if entry_data.get("LowerCaseLongPath")
+                else None,
                 link_date=parse_win_datetime(entry_data.get("LinkDate")),
                 hash_path=entry_data.get("LongPathHash"),
                 name=entry_data.get("Name"),
