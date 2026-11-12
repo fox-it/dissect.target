@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import threading
+from collections import OrderedDict
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import (
@@ -18,12 +20,21 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+# Number of directory listings kept per DirectoryFilesystem for case insensitive lookups.
+# Lookups are usually clustered in the directory that is being walked, so a small number is enough.
+CASE_INSENSITIVE_CACHE_SIZE = 128
+
+
 class DirectoryFilesystem(Filesystem):
     __type__ = "dir"
 
     def __init__(self, path: Path, *args, **kwargs):
         super().__init__(None, *args, **kwargs)
         self.base_path = path
+
+        # directory -> (directory mtime in ns, {lowercase name: [entries]})
+        self._lookup_cache: OrderedDict[Path, tuple[int, dict[str, list[Path]]]] = OrderedDict()
+        self._lookup_cache_lock = threading.Lock()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.base_path}>"
@@ -32,12 +43,46 @@ class DirectoryFilesystem(Filesystem):
     def _detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on DirectoryFilesystem class")
 
+    def _lookup_insensitive(self, directory: Path, name: str) -> list[Path]:
+        """Find the entries in ``directory`` whose name matches ``name``, ignoring case.
+
+        Listing a directory for every single lookup makes walking a directory with ``n`` entries cost ``O(n²)``,
+        which gets prohibitively slow for directories with tens of thousands of entries. Instead, index each
+        directory by lowercase name once and reuse that index for as long as the directory is unchanged.
+        """
+        try:
+            mtime = directory.stat().st_mtime_ns
+        except OSError:
+            # Let iterdir() below raise the appropriate error, and don't cache anything
+            mtime = None
+
+        index = None
+        if mtime is not None:
+            with self._lookup_cache_lock:
+                if (cached := self._lookup_cache.get(directory)) is not None and cached[0] == mtime:
+                    self._lookup_cache.move_to_end(directory)
+                    index = cached[1]
+
+        if index is None:
+            index = {}
+            for entry in directory.iterdir():
+                index.setdefault(entry.name.lower(), []).append(entry)
+
+            if mtime is not None:
+                with self._lookup_cache_lock:
+                    self._lookup_cache[directory] = (mtime, index)
+                    self._lookup_cache.move_to_end(directory)
+                    while len(self._lookup_cache) > CASE_INSENSITIVE_CACHE_SIZE:
+                        self._lookup_cache.popitem(last=False)
+
+        return index.get(name.lower(), [])
+
     def _resolve_path(self, path: str) -> Path:
         if not self.case_sensitive:
             searchpath = self.base_path
 
             for p in path.split("/"):
-                match = [d for d in searchpath.iterdir() if d.name.lower() == p.lower()]
+                match = self._lookup_insensitive(searchpath, p)
 
                 if not match or len(match) > 1:
                     raise FileNotFoundError(path)

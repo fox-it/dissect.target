@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import pathlib
 import tempfile
 from unittest.mock import Mock, patch
@@ -124,3 +125,47 @@ def test_case_sensitivity(tmp_path: pathlib.Path) -> None:
     fh = fs_insensitive.get("level1/test_file").open()
     assert fh.read() == b"test_content"
     fh.close()
+
+
+def test_case_insensitive_lookup_lists_directory_once(tmp_path: pathlib.Path) -> None:
+    """Looking up many entries of one directory should not list that directory for every lookup."""
+    big_dir = tmp_path / "Big"
+    big_dir.mkdir()
+    for i in range(50):
+        (big_dir / f"File{i}.txt").write_text(str(i))
+
+    fs = DirectoryFilesystem(path=tmp_path, case_sensitive=False)
+    original_iterdir = type(tmp_path).iterdir
+
+    with patch.object(type(tmp_path), "iterdir", autospec=True, side_effect=original_iterdir) as mock_iterdir:
+        for i in range(50):
+            assert fs.get(f"/big/FILE{i}.TXT").open().read() == str(i).encode()
+
+        # One listing for the root and one for the big directory, regardless of the number of lookups
+        assert mock_iterdir.call_count == 2
+
+
+def test_case_insensitive_lookup_sees_new_entries(tmp_path: pathlib.Path) -> None:
+    """A cached listing must not hide entries that are added to the directory afterwards."""
+    fs = DirectoryFilesystem(path=tmp_path, case_sensitive=False)
+    (tmp_path / "first").write_text("1")
+    assert fs.exists("/FIRST")
+    assert not fs.exists("/Second")
+
+    (tmp_path / "second").write_text("2")
+    # Make sure the change is visible even on filesystems with a coarse mtime granularity
+    stat = tmp_path.stat()
+    os.utime(tmp_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+
+    assert fs.exists("/Second")
+
+
+def test_case_insensitive_lookup_ambiguous(tmp_path: pathlib.Path) -> None:
+    """Names that only differ in case are ambiguous and must not resolve."""
+    (tmp_path / "Dup").write_text("a")
+    if (tmp_path / "dup").exists():
+        pytest.skip("Skip test as filesystem is not case sensitive (e.g NTFS)")
+    (tmp_path / "dup").write_text("b")
+
+    fs = DirectoryFilesystem(path=tmp_path, case_sensitive=False)
+    assert not fs.exists("/DUP")
