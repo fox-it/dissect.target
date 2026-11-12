@@ -130,13 +130,19 @@ def find_dirs(path: Path) -> tuple[str, list[Path]]:
     os_type = None
 
     if path.is_dir():
-        for p in path.iterdir():
-            # Look for directories like C or C:
-            if p.is_dir() and (is_drive_letter_path(p) or p.name in ("sysvol", "$rootfs$")):
-                dirs.append(p)
+        children = [p for p in path.iterdir() if p.is_dir()]
+        # An acquire layout has a directory per volume, so also take siblings such as efi along
+        is_acquire_layout = any(is_drive_letter_path(p) for p in children)
 
-                if not os_type:
-                    os_type = os_type_from_path(p)
+        for p in children:
+            # Look for directories like C or C:
+            if not (is_acquire_layout or is_drive_letter_path(p) or p.name in ("sysvol", "$rootfs$")):
+                continue
+
+            dirs.append(p)
+
+            if not os_type:
+                os_type = os_type_from_path(p)
 
         if not os_type:
             os_type = os_type_from_path(path)
