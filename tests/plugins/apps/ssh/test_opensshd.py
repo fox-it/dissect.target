@@ -4,7 +4,7 @@ import textwrap
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target.plugins.apps.ssh.opensshd import SSHServerPlugin
+from dissect.target.plugins.apps.ssh.opensshd import OpenSshdConfigRecord, SSHServerPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -56,3 +56,20 @@ def test_sshd_config_plugin_multiple_definitions(target_unix_users: Target, fs_u
     assert str(result.source) == str(plugin.sshd_config_path)
     assert result.Port == [22, 1234]
     assert result.ListenAddress == ["1.2.3.4", "9.8.7.6"]
+
+
+def test_sshd_config_plugin_called_twice(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """Parsing a config must not add its fields to ``OpenSshdConfigRecord``, or the next config gets them twice."""
+    plugin = SSHServerPlugin(target_unix_users)
+    fs_unix.map_file_fh(str(plugin.sshd_config_path), BytesIO(b"Port 22\nPort 1234\n"))
+    target_unix_users.add_plugin(SSHServerPlugin)
+
+    record_fields = list(OpenSshdConfigRecord.target_fields)
+    first = next(target_unix_users.opensshd.config())
+    second = next(target_unix_users.opensshd.config())
+
+    assert OpenSshdConfigRecord.target_fields == record_fields
+    for result in (first, second):
+        field_names = [name for _, name in result._desc.get_field_tuples()]
+        assert field_names.count("Port") == 1
+        assert result.Port == [22, 1234]

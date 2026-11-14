@@ -121,7 +121,8 @@ class SSHServerPlugin(SSHPlugin):
             - https://github.com/openssh/openssh-portable
             - https://www.man7.org/linux/man-pages/man5/sshd_config.5.html
         """
-        record_fields = OpenSshdConfigRecord.target_fields
+        # Copy the fields, so appending the fields of this config doesn't change the fields of the record itself
+        record_fields = list(OpenSshdConfigRecord.target_fields)
 
         # Parse sshd_config
         sshd_config = parse(

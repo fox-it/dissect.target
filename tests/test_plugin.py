@@ -1757,7 +1757,7 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
 def test_plugin_record_field_and_name_consistency() -> None:
     """Test that ensures that record fields with the same name across different plugins translate to the
-    same normalized type, and that no two records share the same name.
+    same normalized type, that no two records share the same name, and that no record declares a field twice.
 
     Consider the following TargetRecordDescriptors for plugins X, Y, Z, A and B::
 
@@ -1776,6 +1776,9 @@ def test_plugin_record_field_and_name_consistency() -> None:
 
     In the second example, ``RecordA`` and ``RecordB`` will fail the test because they both define the name
     ``record/a``. Duplicate record names may cause collisions in export formats or downstream processing.
+
+    A record such as ``TargetRecordDescriptor("record/c", [("varint", "pid"), ("varint", "pid")])`` fails the test
+    as well, because it declares the field ``pid`` twice.
 
     Field type normalization is based on ``FIELD_TYPES_MAP``, loosely aligned with flow.record and
     ElasticSearch type mappings.
@@ -1842,6 +1845,14 @@ def test_plugin_record_field_and_name_consistency() -> None:
                 inconsistencies.add(f"<{record.name}> has duplicates")
             else:
                 seen_record_names.add(record.name)
+
+            # Detect field names that are declared more than once. A TargetRecordDescriptor uses such a name as a single
+            # field, so check the fields as they were declared (target_fields) instead of the fields of the record.
+            declared_fields = getattr(record, "target_fields", None) or record.get_field_tuples()
+            field_names = [field_name for _, field_name in declared_fields]
+            duplicate_names = sorted({fname for fname in field_names if field_names.count(fname) > 1})
+            if duplicate_names:
+                inconsistencies.add(f"<{record.name}> declares field(s) more than once: {', '.join(duplicate_names)}")
 
             for name, field in record.fields.items():
                 # Make sure field names have the same type when translated. This check does not save multiple field

@@ -215,5 +215,11 @@ class WindowsErrorReportingPlugin(Plugin):
                     record_fields.extend(metadata_fields)
                     record_values = metadata_values | record_values
 
-            record = _create_record_descriptor("filesystem/windows/wer/report", record_fields)
+            # A key can be in both the report and its metadata. The fields of the report come first and its values
+            # take precedence, so keep the first field with every name.
+            unique_fields = {}
+            for field_type, field_name in record_fields:
+                unique_fields.setdefault(field_name, (field_type, field_name))
+
+            record = _create_record_descriptor("filesystem/windows/wer/report", list(unique_fields.values()))
             yield record(**record_values)

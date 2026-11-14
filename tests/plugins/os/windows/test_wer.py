@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 from dissect.target.plugins.os.windows.wer import WindowsErrorReportingPlugin
@@ -46,3 +47,32 @@ def test_wer_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     assert record.ts == datetime.datetime(2021, 11, 22, 15, 39, 49, 20733, tzinfo=datetime.timezone.utc)
     assert record.os_version == "6.1.7601.2.1.0.256.48"
     assert record.app_name == "Microsoft Malware Protection Command Line Utility"
+
+
+def test_wer_plugin_key_in_report_and_metadata(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    """A key that is in both the report and its metadata is a single field, with the value of the report."""
+    report_dir = "ProgramData/Microsoft/Windows/WER/ReportQueue/test"
+    fs_win.map_file_fh(
+        f"{report_dir}/report.wer",
+        BytesIO("EventType=test_event_type\r\nOSVersionInformationLCID=from_report\r\n".encode("utf-16")),
+    )
+    fs_win.map_file_fh(
+        f"{report_dir}/report.tmp.WERInternalMetadata.xml",
+        BytesIO(
+            (
+                '<?xml version="1.0" encoding="UTF-16"?>\n'
+                "<WERReportMetadata><OSVersionInformation><LCID>from_metadata</LCID></OSVersionInformation>"
+                "</WERReportMetadata>"
+            ).encode("utf-16")
+        ),
+    )
+    target_win.add_plugin(WindowsErrorReportingPlugin)
+
+    records = list(target_win.wer())
+    assert len(records) == 1
+
+    record = records[0]
+    field_names = [name for _, name in record._desc.get_field_tuples()]
+    assert field_names.count("os_version_information_lcid") == 1
+    assert record.os_version_information_lcid == "from_report"
+    assert record.event_type == "test_event_type"

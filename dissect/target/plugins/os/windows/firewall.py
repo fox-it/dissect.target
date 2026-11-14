@@ -125,31 +125,58 @@ class WindowsFirewallPlugin(Plugin):
             active (boolean): Whether the rule is active.
             dir (string): The direction of the rule.
             protocol (string): The specified IANA protocol (UDP, TCP, etc).
-            lport (string): The listening port or range of the rule.
-            rport (string): The receiving port or range the rule.
-            profile (string): The Profile field of the rule.
-            app (string): The App field of the rule.
+            lport (string[]): The listening ports or ranges of the rule.
+            rport (string[]): The receiving ports or ranges of the rule.
+            profile (string[]): The profiles of the rule, all profiles if absent.
+            la4 / la6 (string[]): The local IPv4 / IPv6 addresses of the rule.
+            ra4 / ra6 (string[]): The remote IPv4 / IPv6 addresses of the rule.
+            app (path): The App field of the rule.
             svc (string): The Svc of the rule.
             name (string): The Name of the rule.
             desc (string): The Desc of the rule.
-            embed_ctxt (string): The EmbedCtxt of the rule.
+            embedctxt (string): The EmbedCtxt of the rule.
+
+        Fields of tokens that can appear more than once in a rule are lists of the values of all appearances, the
+        other tokens appear at most once in a rule.
         """  # noqa: E501
         FIELD_MAP: Final[dict[str, str]] = {
             "app": "path",
             "active": "boolean",
             # protocol int is translated to a string at runtime
-            # lport and rport can be a string (e.g. port ranges or other text)
-            "lport": "string[]",
-            "rport": "string[]",
         }
         VALUE_MAP: Final[dict[str, Callable[[str], Any]]] = {"active": lambda val: val.upper() == "TRUE"}
 
+        # Tokens that can appear more than once in a rule, the values of all their appearances apply ([MS-GPFAS]
+        # section 2.2.2.19). Their fields are always a list, so their type doesn't depend on the rule.
+        LIST_TOKENS: Final[frozenset[str]] = frozenset(
+            {
+                "profile",
+                "lport",
+                "lport2_10",
+                "lport2_20",
+                "rport",
+                "rport2_10",
+                "la4",
+                "la6",
+                "ra4",
+                "ra6",
+                "ra42",
+                "ra62",
+                "icmp4",
+                "icmp6",
+                "platform",
+                "if",
+                "ttk",
+                "ttk2_22",
+                "ttk2_27",
+                "ttk2_28",
+            }
+        )
+        # Tokens of which one appearance can contain several values, separated by a comma (e.g. port ranges)
+        COMMA_SEPARATED_TOKENS: Final[frozenset[str]] = frozenset({"lport", "rport"})
+
         for reg in self.keys:
             for entry in reg.values():
-                r = [
-                    ("string", "key"),
-                    ("string", "version"),
-                ]
                 data = {}
 
                 pairs: list[str] = entry.value.split("|")
@@ -161,14 +188,18 @@ class WindowsFirewallPlugin(Plugin):
                     if not (key := key.lower()):
                         continue
 
-                    field_type = FIELD_MAP.get(key, "string")
-                    r.append((field_type, key))
+                    if key in LIST_TOKENS:
+                        values = value.split(",") if key in COMMA_SEPARATED_TOKENS else [value]
+                        data.setdefault(key, []).extend(values)
+                        continue
 
                     try:
                         value = VALUE_MAP[key](value)
                     except KeyError:
                         pass
-                    data[key] = value
+
+                    # The other tokens appear at most once in a rule, use the first appearance if one is repeated
+                    data.setdefault(key, value)
 
                 # Resolve file paths to TargetPaths
                 if "app" in data:
@@ -187,12 +218,12 @@ class WindowsFirewallPlugin(Plugin):
                 if "dir" in data:
                     data["dir"] = data["dir"].upper()
 
-                # Put port ranges in a list
-                if "lport" in data:
-                    data["lport"] = data["lport"].split(",")
-                if "rport" in data:
-                    data["rport"] = data["rport"].split(",")
-
+                r = [("string", "key")]
+                for key in data:
+                    if key in LIST_TOKENS:
+                        r.append(("string[]", key))
+                    else:
+                        r.append((FIELD_MAP.get(key, "string"), key))
                 r.append(("path", "source"))
 
                 yield TargetRecordDescriptor("windows/firewall/rule", r)(
