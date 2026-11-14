@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import logging
 from typing import NoReturn
 
 import pytest
@@ -184,3 +185,48 @@ def test_user_record_descriptor_extension(mock_windows_user: WindowsUserRecord, 
     assert test_record.username == "some-name"
     assert test_record.user_id == "1337"
     assert test_record.user_home == "some-home"
+
+
+def test_trd_duplicate_field_same_type(caplog: pytest.LogCaptureFixture) -> None:
+    """A field that occurs more than once with the same type is a single field, without a warning."""
+    with caplog.at_level(logging.WARNING, logger="dissect.target.helpers.record"):
+        DuplicateRecord = TargetRecordDescriptor(
+            "test/duplicate", [("varint", "pid"), ("varint", "tid"), ("varint", "pid")]
+        )
+
+    assert caplog.records == []
+    assert DuplicateRecord.target_fields == [("varint", "pid"), ("varint", "tid")]
+    assert [name for _, name in DuplicateRecord.get_field_tuples()].count("pid") == 1
+
+    record = DuplicateRecord(pid=1337, tid=314, _target=MockTarget())
+    assert record.pid == 1337
+    assert record.tid == 314
+
+
+def test_trd_duplicate_field_different_type(caplog: pytest.LogCaptureFixture) -> None:
+    """A field that occurs more than once with different types uses the first type and logs a warning."""
+    with caplog.at_level(logging.WARNING, logger="dissect.target.helpers.record"):
+        DuplicateRecord = TargetRecordDescriptor(
+            "test/duplicate", [("string", "name"), ("varint", "count"), ("string[]", "name")]
+        )
+
+    assert DuplicateRecord.target_fields == [("string", "name"), ("varint", "count")]
+    assert (
+        "Field 'name' of record 'test/duplicate' is declared as both 'string' and 'string[]', using 'string'"
+        in caplog.text
+    )
+
+    record = DuplicateRecord(name="foo", count=1, _target=MockTarget())
+    assert record.name == "foo"
+
+
+def test_trd_target_fields_is_a_copy() -> None:
+    """Changing the fields after creating a descriptor doesn't change its ``target_fields``, and vice versa."""
+    fields = [("string", "foo")]
+    FooRecord = TargetRecordDescriptor("test/foo", fields)
+
+    fields.append(("string", "bar"))
+    assert FooRecord.target_fields == [("string", "foo")]
+
+    FooRecord.target_fields.append(("string", "baz"))
+    assert fields == [("string", "foo"), ("string", "bar")]

@@ -63,7 +63,6 @@ class ServicesPlugin(Plugin):
                     continue
 
                 config = {}
-                types = []
 
                 try:
                     for segment, configuration in configutil.parse(service_file, hint="systemd").items():
@@ -84,11 +83,6 @@ class ServicesPlugin(Plugin):
                                         config[_key] = [config[_key]]
                                     config[_key].append(value or None)
 
-                                if isinstance(config[_key], list):
-                                    types.append(("string[]", _key))
-                                else:
-                                    types.append(("string", _key))
-
                 except FileNotFoundError:
                     # The service is registered but the symlink is broken.
                     yield LinuxServiceRecord(
@@ -100,6 +94,8 @@ class ServicesPlugin(Plugin):
                     )
                     continue
 
+                # One field per key, a list if the key occurs more than once (e.g. in a drop-in file)
+                types = [("string[]" if isinstance(value, list) else "string", key) for key, value in config.items()]
                 record = TargetRecordDescriptor(RECORD_NAME, DEFAULT_ELEMENTS + types)
                 yield record(
                     ts=service_file.stat().st_mtime,

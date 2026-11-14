@@ -22,7 +22,6 @@ AndroidTombstoneRecord = TargetRecordDescriptor(
         ("command", "command"),
         ("varint", "pid"),
         ("varint", "tid"),
-        ("varint", "pid"),
         ("varint", "signal_uid"),
         ("varint", "signal_pid"),
         ("varint", "process_uptime_seconds"),

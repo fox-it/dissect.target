@@ -9,6 +9,7 @@ from flow.record.base import parse_def
 from dissect.target.helpers.descriptor_extensions import (
     TargetRecordDescriptorExtension,
 )
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -19,11 +20,16 @@ if TYPE_CHECKING:
         RecordDescriptorExtensionBase,
     )
 
+log = get_logger(__name__)
+
 
 class ExtendableRecordDescriptor(RecordDescriptor):
     def __init__(self, name: str, fields: Sequence[tuple[str, str]] | None = None):
         """A RecordDescriptor with default fields for dissect targets
         automatically added.
+
+        A field name that occurs more than once is a single field. If the types differ, the first one is used and a
+        warning is logged.
         """
         fields = fields or []
         prepend_default_fields = []
@@ -31,7 +37,6 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         extended_fields = []
         self.field_fillers = set()
         self.input_fields = set()
-        self.target_fields = fields
 
         # all classes where we will look for `_default_fields` class
         # property and `_fill_default_fields` method
@@ -55,13 +60,28 @@ class ExtendableRecordDescriptor(RecordDescriptor):
             name, fields = parse_def(name)
 
         default_field_names = {field_name for _, field_name in prepend_default_fields + append_default_fields}
-        extended_fields.extend(prepend_default_fields)
 
+        # The field types by name, in the order of their first occurrence
+        field_types = {}
         for field_type, field_name in fields:
             if field_name in default_field_names:
                 raise TypeError(f"Default field '{field_name}' is not allowed to be explicitly declared")
-            extended_fields.append((field_type, field_name))
 
+            if (first_type := field_types.setdefault(field_name, field_type)) != field_type:
+                log.warning(
+                    "Field '%s' of record '%s' is declared as both '%s' and '%s', using '%s'",
+                    field_name,
+                    name,
+                    first_type,
+                    field_type,
+                    first_type,
+                )
+
+        # A copy of the fields, so changing them doesn't change the fields of the caller and vice versa
+        self.target_fields = [(field_type, field_name) for field_name, field_type in field_types.items()]
+
+        extended_fields.extend(prepend_default_fields)
+        extended_fields.extend(self.target_fields)
         extended_fields.extend(append_default_fields)
 
         super().__init__(name, fields=extended_fields)
