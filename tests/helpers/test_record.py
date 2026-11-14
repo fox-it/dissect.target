@@ -195,7 +195,9 @@ def test_trd_duplicate_field_same_type(caplog: pytest.LogCaptureFixture) -> None
         )
 
     assert caplog.records == []
-    assert DuplicateRecord.target_fields == [("varint", "pid"), ("varint", "tid")]
+    # target_fields keeps the fields as declared, so tests can find such duplicates
+    assert DuplicateRecord.target_fields == [("varint", "pid"), ("varint", "tid"), ("varint", "pid")]
+    assert DuplicateRecord.get_field_tuples()[-2:] == (("varint", "pid"), ("varint", "tid"))
     assert [name for _, name in DuplicateRecord.get_field_tuples()].count("pid") == 1
 
     record = DuplicateRecord(pid=1337, tid=314, _target=MockTarget())
@@ -210,7 +212,7 @@ def test_trd_duplicate_field_different_type(caplog: pytest.LogCaptureFixture) ->
             "test/duplicate", [("string", "name"), ("varint", "count"), ("string[]", "name")]
         )
 
-    assert DuplicateRecord.target_fields == [("string", "name"), ("varint", "count")]
+    assert DuplicateRecord.get_field_tuples()[-2:] == (("string", "name"), ("varint", "count"))
     assert (
         "Field 'name' of record 'test/duplicate' is declared as both 'string' and 'string[]', using 'string'"
         in caplog.text

@@ -29,7 +29,7 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         automatically added.
 
         A field name that occurs more than once is a single field. If the types differ, the first one is used and a
-        warning is logged.
+        warning is logged. ``target_fields`` contains the fields as they were declared, including such duplicates.
         """
         fields = fields or []
         prepend_default_fields = []
@@ -59,11 +59,14 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         elif fields is None:
             name, fields = parse_def(name)
 
+        # A copy of the declared fields, so changing them doesn't change the fields of the caller and vice versa
+        self.target_fields = list(fields)
+
         default_field_names = {field_name for _, field_name in prepend_default_fields + append_default_fields}
 
         # The field types by name, in the order of their first occurrence
         field_types = {}
-        for field_type, field_name in fields:
+        for field_type, field_name in self.target_fields:
             if field_name in default_field_names:
                 raise TypeError(f"Default field '{field_name}' is not allowed to be explicitly declared")
 
@@ -77,11 +80,8 @@ class ExtendableRecordDescriptor(RecordDescriptor):
                     first_type,
                 )
 
-        # A copy of the fields, so changing them doesn't change the fields of the caller and vice versa
-        self.target_fields = [(field_type, field_name) for field_name, field_type in field_types.items()]
-
         extended_fields.extend(prepend_default_fields)
-        extended_fields.extend(self.target_fields)
+        extended_fields.extend((field_type, field_name) for field_name, field_type in field_types.items())
         extended_fields.extend(append_default_fields)
 
         super().__init__(name, fields=extended_fields)
