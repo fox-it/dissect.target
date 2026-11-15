@@ -185,8 +185,12 @@ def test_open_error_names_missing_files(tmp_path: Path, caplog: pytest.LogCaptur
 
 ARCHIVE_UUID = uuid.UUID("0f8fad5b-d9cb-469f-a165-70867728950e")
 
+# The slice flags of a full and an incremental backup, as real archives record them
+FULL = 0x01
+INCREMENTAL = 0x06
 
-def synthetic_point(index: int, slice_id: int, slice_type: c_tibx.SliceType, *, finished: bool = True) -> RecoveryPoint:
+
+def synthetic_point(index: int, slice_id: int, flags: int, *, finished: bool = True) -> RecoveryPoint:
     """A backup as the slices tree records it, with fields derived from its slice id."""
     record = c_tibx.slice_record(
         guid=uuid.UUID(int=slice_id).bytes_le,
@@ -197,20 +201,20 @@ def synthetic_point(index: int, slice_id: int, slice_type: c_tibx.SliceType, *, 
         items_added=slice_id,
         items_changed=slice_id * 2,
         items_removed=slice_id * 3,
-        flags=slice_type,
+        flags=c_tibx.SliceFlags(flags),
     )
     return RecoveryPoint(index, slice_id, record)
 
 
 # A full backup and two incrementals; slice ids need not be contiguous
 CHAIN = [
-    synthetic_point(0, 2, c_tibx.SliceType.FULL),
-    synthetic_point(1, 3, c_tibx.SliceType.INCREMENTAL),
-    synthetic_point(2, 5, c_tibx.SliceType.INCREMENTAL),
+    synthetic_point(0, 2, FULL),
+    synthetic_point(1, 3, INCREMENTAL),
+    synthetic_point(2, 5, INCREMENTAL),
 ]
 
 # The same, while its last incremental has not finished
-UNFINISHED = [*CHAIN[:2], synthetic_point(2, 5, c_tibx.SliceType.INCREMENTAL, finished=False)]
+UNFINISHED = [*CHAIN[:2], synthetic_point(2, 5, INCREMENTAL, finished=False)]
 
 
 class SyntheticTibx:
