@@ -218,10 +218,14 @@ UNFINISHED = [*CHAIN[:2], synthetic_point(2, 5, INCREMENTAL, finished=False)]
 
 
 class SyntheticTibx:
-    """An archive holding the backups ``points``, and one volume of zeros that holds no filesystem."""
+    """An archive holding the backups ``points``, and one volume of zeros that holds no filesystem.
 
-    def __init__(self, points: list[RecoveryPoint]):
+    With ``has_volumes`` false, it holds no volume at all, as a file-level backup does.
+    """
+
+    def __init__(self, points: list[RecoveryPoint], *, has_volumes: bool = True):
         self.points = points
+        self.has_volumes = has_volumes
         self.encrypted = False
         self.uuid = ARCHIVE_UUID
         self.use_recovery_point("latest")
@@ -241,6 +245,8 @@ class SyntheticTibx:
         raise InvalidArchiveError(f"invalid recovery point {selector!r}")
 
     def volumes(self) -> list[SimpleNamespace]:
+        if not self.has_volumes:
+            return []
         return [SimpleNamespace(volume_id=4, size=0x10000, open=lambda: io.BytesIO(bytes(0x10000)))]
 
     def close(self) -> None:
@@ -253,9 +259,13 @@ class SyntheticTibx:
         self.close()
 
 
-def use_synthetic_tibx(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, points: list[RecoveryPoint]) -> Path:
+def use_synthetic_tibx(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, points: list[RecoveryPoint], *, has_volumes: bool = True
+) -> Path:
     """Make the loader open every archive as a synthetic one holding ``points``, and return a path to load."""
-    monkeypatch.setattr(tibx_loader, "TIBX", SimpleNamespace(open=lambda path: SyntheticTibx(points)))
+    monkeypatch.setattr(
+        tibx_loader, "TIBX", SimpleNamespace(open=lambda path: SyntheticTibx(points, has_volumes=has_volumes))
+    )
     path = tmp_path / "plc-eng01.tibx"
     path.touch()
     return path
@@ -340,6 +350,16 @@ def test_target_path_without_backups(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     path = use_synthetic_tibx(monkeypatch, tmp_path, [])
 
     assert Target.open(path).path == path
+
+
+def test_target_without_volumes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Test that an archive without volumes still loads, so the tibx plugin can show its backups."""
+    path = use_synthetic_tibx(monkeypatch, tmp_path, CHAIN, has_volumes=False)
+
+    target = Target.open(path)
+    assert len(target.volumes) == 0
+    assert target.os == "default"
+    assert [record.guid for record in target.tibx.recovery_points()] == [str(point.guid) for point in CHAIN]
 
 
 def test_open_recovery_point_by_guid(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -14,6 +14,7 @@ from dissect.archive.tibx.tibx import SPLIT_PART_RE, TIBX, find_split_parts
 from dissect.target.exceptions import LoaderError
 from dissect.target.helpers import keychain
 from dissect.target.loader import Loader
+from dissect.target.plugins.os.default._os import DefaultOSPlugin
 from dissect.target.volume import Volume
 
 if TYPE_CHECKING:
@@ -153,3 +154,10 @@ class TibxLoader(Loader):
                 )
         except UnsupportedFormatError as e:
             raise LoaderError(f"Unsupported TIBX feature in {self.path}") from e
+
+        if not len(target.volumes):
+            # A backup without partitions, e.g. a file-level backup, still has the metadata
+            # the tibx plugin shows. Without a volume to detect an OS on, the target would
+            # not load at all
+            target.log.warning("No volumes in TIBX archive, only the tibx plugin applies")
+            target._os_plugin = DefaultOSPlugin
