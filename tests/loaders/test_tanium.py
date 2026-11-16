@@ -50,6 +50,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_tanium_dir: Pa
 
 
 def test_loader(mock_tanium_dir: Path) -> None:
+    """Test if we correctly detect and map a Tanium export directory."""
     loader = loader_open(mock_tanium_dir)
     assert isinstance(loader, TaniumLoader)
 
