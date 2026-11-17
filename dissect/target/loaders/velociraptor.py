@@ -172,6 +172,12 @@ def _quote_zip(path: str) -> str:
 
 
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
+    def _entry_name(self, item: Path) -> str:
+        # Velociraptor escapes names on disk. Return the original name (as ``VelociraptorZipFilesystem`` does) so
+        # that a listed path can be looked up again. Keep the name as is if it cannot be decoded losslessly.
+        name = unquote(item.name)
+        return item.name if "\ufffd" in name else name
+
     def _resolve_path(self, path: str) -> Path:
         # Try the (more aggressive) URL encoding first, then fall back to the escaping Velociraptor uses in collection
         # zips, which leaves characters such as ``{``, ``}`` and non-ASCII characters untouched.

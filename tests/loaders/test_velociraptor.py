@@ -124,6 +124,34 @@ def test_windows_dir_unescaped_names(mock_velociraptor_dir: Path) -> None:
         assert t.fs.get(entry.path).is_dir()
 
 
+def test_windows_dir_listing_names(mock_velociraptor_dir: Path) -> None:
+    """Test that ``scandir`` returns the original names, and that these can be looked up again."""
+    for drive in mock_velociraptor_dir.glob("uploads/*/%5C%5C.%5CC%3A"):
+        (drive / "Users" / "%2ENET v4.5 Classic").mkdir(parents=True)
+        (drive / "Users" / "%2ENET v4.5 Classic" / "NTUSER.DAT{abc}.regtrans-ms").write_text("dot")
+        # Real name: print=%5C%5Csrv%5CQ1.lnk
+        (drive / "Users" / "print=%255C%255Csrv%255CQ1.lnk").write_text("percent")
+        (drive / "Users" / "a%3Ab").write_text("colon")  # real name: a:b
+        (drive / "Users" / "broken%FFname").write_text("raw")  # not valid UTF-8 once decoded
+
+    loader = loader_open(mock_velociraptor_dir)
+    t = Target()
+    loader.map(t)
+    t.apply()
+
+    entries = {entry.name: entry for entry in t.fs.scandir("sysvol/Users")}
+    assert {".NET v4.5 Classic", "print=%5C%5Csrv%5CQ1.lnk", "a:b"} <= entries.keys()
+    # Names that cannot be decoded losslessly are kept as is
+    assert "broken%FFname" in entries
+
+    for name in (".NET v4.5 Classic", "print=%5C%5Csrv%5CQ1.lnk", "a:b"):
+        entry = entries[name]
+        assert t.fs.get(entry.path).stat() == entry.stat()
+
+    assert t.fs.path("sysvol/Users/.NET v4.5 Classic/NTUSER.DAT{abc}.regtrans-ms").read_text() == "dot"
+    assert ".TEST" in {entry.name for entry in t.fs.scandir("sysvol")}
+
+
 def test_windows_ntfs_zip(mock_velociraptor_dir: Path) -> None:
     """Test that ``VelociraptorLoader`` correctly loads a Windows ZIP structure."""
     shutil.make_archive(mock_velociraptor_dir.joinpath("test_ntfs"), "zip", mock_velociraptor_dir)
