@@ -4,10 +4,10 @@ import zipfile
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
 
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
-from dissect.target.helpers.fsutil import basename, dirname, join
 from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 from dissect.target.loaders.dir import find_dirs, map_dirs
@@ -160,13 +160,35 @@ class VelociraptorLoader(Loader):
             target.fs.mount(VELOCIRAPTOR_RESULTS, vfs)
 
 
+# Velociraptor only escapes these characters in the path components of the zip files it creates (everything else, e.g.
+# curly braces or non-ASCII characters, is stored as is).
+# Reference: SanitizeStringForZip in https://github.com/Velocidex/velociraptor/blob/master/utils/sanitize.go
+ZIP_ESCAPE_CHARS = frozenset('?"*:|<>%\\')
+
+
+def _quote_zip(path: str) -> str:
+    """Escape a path the way Velociraptor does for the files in its collection zips."""
+    return "".join(f"%{ord(c):02X}" if c in ZIP_ESCAPE_CHARS else c for c in path)
+
+
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
     def _resolve_path(self, path: str) -> Path:
-        path = quote(path, safe="$/% ")
-        if (fname := basename(path)).startswith("."):
-            path = join(dirname(path), fname.replace(".", "%2E", 1))
+        # Try the (more aggressive) URL encoding first, then fall back to the escaping Velociraptor uses in collection
+        # zips, which leaves characters such as ``{``, ``}`` and non-ASCII characters untouched.
+        candidates = list(dict.fromkeys((quote(path, safe="$/% "), _quote_zip(path))))
 
-        return super()._resolve_path(path)
+        for candidate in candidates[:-1]:
+            try:
+                return super()._resolve_path(self._escape_leading_dot(candidate))
+            except FileNotFoundError:  # noqa: PERF203
+                continue
+
+        return super()._resolve_path(self._escape_leading_dot(candidates[-1]))
+
+    @staticmethod
+    def _escape_leading_dot(path: str) -> str:
+        # Velociraptor escapes a leading dot for every path component, not only the last one
+        return "/".join(f"%2E{c[1:]}" if c.startswith(".") else c for c in path.split("/"))
 
 
 class VelociraptorZipFilesystem(ZipFilesystem):
