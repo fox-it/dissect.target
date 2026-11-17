@@ -106,8 +106,20 @@ class WindowsEventlogsMixin:
         return file_paths
 
     def check_compatible(self) -> None:
-        if not self.target.resolve(self.LOGS_DIR_PATH).exists():
-            raise UnsupportedPluginError(f'Event log directory "{self.LOGS_DIR_PATH}" not found')
+        if self.LOGS_DIR_PATH:
+            try:
+                if self.target.resolve(self.LOGS_DIR_PATH).exists():
+                    return
+            except PluginError:
+                # Resolving the path needs an OS plugin, which is unavailable when only scraping disks
+                pass
+
+        if self.target.disks:
+            return
+
+        raise UnsupportedPluginError(
+            f'Event log directory "{self.LOGS_DIR_PATH}" not found and no disks available for scraping'
+        )
 
 
 class EvtPlugin(WindowsEventlogsMixin, Plugin):
