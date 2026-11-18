@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 try:
     from Crypto.Cipher import AES, ChaCha20_Poly1305
+    from Crypto.Hash import SHA1
     from Crypto.Protocol.KDF import PBKDF2
     from Crypto.Util.Padding import unpad
 
@@ -774,7 +775,7 @@ def decrypt_v10_linux(
     salt = b"saltysalt"
     iv = b" " * 16
 
-    key = PBKDF2(hardcoded_key, salt, 16, 1)
+    key = PBKDF2(hardcoded_key, salt, 16, 1, hmac_hash_module=SHA1)
     cipher = AES.new(key, AES.MODE_CBC, IV=iv)
 
     decrypted = cipher.decrypt(ciphertext)
