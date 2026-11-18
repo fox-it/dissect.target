@@ -227,7 +227,7 @@ def parse_w3c_format_log(target: Target, path: Path) -> Iterator[TargetRecordDes
     record_descriptor = None
     fields = []
     extra_fields = []
-    for line in path.open().readlines():
+    for line in path.open():
         line = line.decode("utf-8", errors="backslashreplace").strip()
 
         if line.startswith("#Fields"):
@@ -320,7 +320,7 @@ def parse_iis_format_log(target: Target, path: Path) -> Iterator[BasicRecordDesc
     """
     target_tz = target.datetime.tzinfo
 
-    for line in path.open().readlines():
+    for line in path.open():
         # even though the docs say that IIS log format is ASCII format,
         # it is possible to select UTF-8 in configuration
         line = line.decode("utf-8", errors="backslashreplace")
