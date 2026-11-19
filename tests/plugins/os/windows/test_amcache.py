@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
@@ -41,6 +42,32 @@ def test_amcache_new_format(target_win: Target, fs_win: VirtualFilesystem) -> No
     assert len(application_shortcuts) == 65
     assert len(containers) == 9
     assert len(drivers) == 361
+
+
+def test_amcache_application_files_without_path(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    """Test that an ``InventoryApplicationFile`` entry without ``LowerCaseLongPath`` does not break the plugin."""
+    amcache_file = absolute_path("_data/plugins/os/windows/amcache/amcache-new.hve")
+    fs_win.map_file("windows/appcompat/programs/amcache.hve", amcache_file)
+
+    target_win.add_plugin(AmcachePlugin)
+
+    def entry(**values: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            timestamp=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
+            values=lambda: [SimpleNamespace(name=name, value=value) for name, value in values.items()],
+        )
+
+    entries = [
+        entry(Name="without-path.exe"),
+        entry(Name="with-path.exe", LowerCaseLongPath="c:\\windows\\with-path.exe"),
+    ]
+
+    with patch.object(AmcachePlugin, "read_key_subkeys", return_value=iter(entries)):
+        records = list(target_win.amcache.application_files())
+
+    assert [record.name for record in records] == ["without-path.exe", "with-path.exe"]
+    assert records[0].path is None
+    assert str(records[1].path) == "c:\\windows\\with-path.exe"
 
 
 def test_amcache_old_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
