@@ -185,6 +185,12 @@ class DockerPlugin(ContainerPlugin):
                     if not mount_path.exists():
                         self.target.log.warning("Overlay2 mount path does not exist for container: %s", container_id)
 
+                elif container_id and config.get("Driver") == "overlayfs":
+                    # TODO: Check if /var/lib/containerd is actually used by docker.
+                    mount_path = self.target.fs.path(
+                        "/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db"
+                    ).joinpath(container_id)
+
                 else:
                     self.target.log.warning("Encountered unsupported container filesystem: %s", config.get("Driver"))
 
