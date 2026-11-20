@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.cstruct.types.base import BaseType
+
+if TYPE_CHECKING:
+    from dissect.cstruct.cstruct import Endianess
 
 
 class ProtobufVarint(BaseType):
@@ -16,11 +19,11 @@ class ProtobufVarint(BaseType):
     """
 
     @classmethod
-    def _read(cls, stream: BinaryIO, context: dict[str, Any] | None = None) -> int:
+    def _read(cls, stream: BinaryIO, *, context: dict[str, Any] | None = None, endian: Endianess) -> int:
         return decode_varint(stream)
 
     @classmethod
-    def _write(cls, stream: BinaryIO, data: int) -> int:
+    def _write(cls, stream: BinaryIO, data: int, *, endian: Endianess) -> int:
         return stream.write(encode_varint(data))
 
 
