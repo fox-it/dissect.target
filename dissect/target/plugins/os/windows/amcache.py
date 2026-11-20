@@ -446,7 +446,9 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 program_instance_id=entry_data.get("ProgramInstanceId"),
                 publisher=entry_data.get("Publisher"),
                 registry_key_path=entry_data.get("RegistryKeyPath"),
-                root_dir_path=self.target.fs.path(entry_data.get("RootDirPath")),
+                root_dir_path=self.target.fs.path(root_dir_path)
+                if (root_dir_path := entry_data.get("RootDirPath")) is not None
+                else None,
                 source=entry_data.get("Source"),
                 uninstall_string=entry_data.get("UninstallString"),
                 type=entry_data.get("Type"),
@@ -496,7 +498,9 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 mtime_regf=entry.timestamp,
                 program_id=entry_data.get("ProgramId"),
                 digest=(None, sha1_digest, None),
-                path=self.target.fs.path(entry_data.get("LowerCaseLongPath")),
+                path=self.target.fs.path(file_path)
+                if (file_path := entry_data.get("LowerCaseLongPath")) is not None
+                else None,
                 link_date=parse_win_datetime(entry_data.get("LinkDate")),
                 hash_path=entry_data.get("LongPathHash"),
                 name=entry_data.get("Name"),
@@ -521,8 +525,10 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
 
             yield BinaryAppcompatRecord(
                 mtime_regf=entry.timestamp,
-                driver_name=self.target.fs.path(entry_data.get("DriverName")),
-                inf=self.target.fs.path(entry_data.get("Inf")),
+                driver_name=self.target.fs.path(driver_name)
+                if (driver_name := entry_data.get("DriverName")) is not None
+                else None,
+                inf=self.target.fs.path(inf) if (inf := entry_data.get("Inf")) is not None else None,
                 driver_version=entry_data.get("DriverVersion"),
                 product=entry_data.get("Product"),
                 product_version=entry_data.get("ProductVersion"),
