@@ -11,7 +11,7 @@ from flow.record.base import RE_VALID_FIELD_NAME
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import arg, export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverPlugin,
@@ -132,18 +132,31 @@ class IISLogsPlugin(WebserverPlugin):
             self.target.log.debug("", exc_info=e)
 
     @export(record=BasicRecordDescriptor)
-    def logs(self) -> Iterator[TargetRecordDescriptor]:
+    @arg("--log-file", help="only parse this log file (as in the source field) instead of all discovered log files")
+    def logs(self, log_file: str | None = None) -> Iterator[TargetRecordDescriptor]:
         """Return contents of IIS (v7 and above) log files.
 
         Internet Information Services (IIS) for Windows Server is a manageable web server for hosting anything on the
         web. Logs files might, for example, contain traces that indicate that the web server has been exploited.
 
         Supported log formats: IIS, W3C.
+
+        Use ``--log-file`` to only parse a single log file, given as in the ``source`` field of the records. This allows
+        splitting up the work over multiple runs.
         """
+        selected = self.target.fs.path(log_file) if log_file else None
+        found = False
+
         # We handle direct files here because _get_paths cannot select (filter) on the type of logfile.
         if self.target.is_direct:
-            for log_file in self.get_paths():
-                yield from parse_autodetect_format_log(self.target, log_file)
+            for path in self.get_paths():
+                if selected is not None and path != selected:
+                    continue
+                found = True
+                yield from parse_autodetect_format_log(self.target, path)
+
+            if selected is not None and not found:
+                self.target.log.error("IIS log file %s not found", log_file)
             # If we use the direct loader, there are no other files available.
             return
 
@@ -155,21 +168,28 @@ class IISLogsPlugin(WebserverPlugin):
 
         for format, parser in parsers.items():
             for log_dir in self.log_dirs.get(format, ()):
-                for log_file in log_dir.rglob("*.log"):
-                    self.target.log.info("Processing IIS log file %s in %s format", log_file, format)
+                for path in log_dir.rglob("*.log"):
+                    if selected is not None and path != selected:
+                        continue
+                    found = True
+                    self.target.log.info("Processing IIS log file %s in %s format", path, format)
                     try:
-                        yield from parser(self.target, log_file)
+                        yield from parser(self.target, path)
                     except Exception as e:
-                        self.target.log.error("Issue processing log file %s in %s format", log_file, format)  # noqa TRY400
+                        self.target.log.error("Issue processing log file %s in %s format", path, format)  # noqa TRY400
                         self.target.log.debug("", exc_info=e)
 
+        if selected is not None and not found:
+            self.target.log.error("IIS log file %s not found in the discovered log directories", log_file)
+
     @export(record=WebserverAccessLogRecord)
-    def access(self) -> Iterator[WebserverAccessLogRecord]:
+    @arg("--log-file", help="only parse this log file (as in the source field) instead of all discovered log files")
+    def access(self, log_file: str | None = None) -> Iterator[WebserverAccessLogRecord]:
         """Return contents of IIS (v7 and above) log files in unified WebserverAccessLogRecord format.
 
         See function ``iis.logs`` for more information and more verbose IIS records.
         """
-        for iis_record in self.logs():
+        for iis_record in self.logs(log_file=log_file):
             yield WebserverAccessLogRecord(
                 ts=iis_record.ts,
                 webserver="iis",
