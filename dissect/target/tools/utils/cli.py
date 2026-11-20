@@ -274,26 +274,32 @@ def list_plugins(
     include_children: bool = False,
     json: bool = False,
 ) -> None:
-    functions = None
+    collected = set()
+
     if targets:
         for target in Target.open_all(targets, include_children=include_children):
             functions, _ = find_functions(patterns or "*", target, compatibility=True, show_hidden=True)
+            collected.update(functions)
+
     elif patterns:
         functions, _ = find_functions(patterns, Target(), show_hidden=True)
+        collected.update(functions)
+
     else:
         functions = _get_default_functions()
+        collected.update(functions)
 
     target = Target()
     fparser = generate_argparse_for_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
     fargs, _ = fparser.parse_known_args()
 
     # Display in a user friendly manner
-    if functions:
+    if collected:
         if json:
             print('{"plugins": ', end="")
-            print(generate_functions_json(functions), end="")
+            print(generate_functions_json(collected), end="")
         else:
-            print(generate_functions_overview(functions, include_docs=fargs.print_docs))
+            print(generate_functions_overview(collected, include_docs=fargs.print_docs))
     elif json:
         print("{", end="")
 

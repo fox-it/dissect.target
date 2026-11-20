@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import json as jsonlib
 import textwrap
+from typing import TYPE_CHECKING
 
 from dissect.target import plugin
 from dissect.target.helpers.docs import INDENT_STEP, get_plugin_overview
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.os.default._os import DefaultOSPlugin
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 
 def generate_functions_overview(
-    functions: list[plugin.FunctionDescriptor] | None = None, include_docs: bool = False
-) -> list[str]:
+    functions: Iterable[plugin.FunctionDescriptor] | None = None, include_docs: bool = False
+) -> str:
     """Generate a tree list of functions with optional documentation."""
     categorized_plugins = _categorize_functions(functions)
     plugin_descriptions = _generate_plugin_tree_overview(categorized_plugins, include_docs)
@@ -50,7 +54,7 @@ def generate_functions_overview(
     return "\n".join(lines)
 
 
-def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = None) -> str:
+def generate_functions_json(functions: Iterable[plugin.FunctionDescriptor] | None = None) -> str:
     """Generate a JSON representation of all available functions."""
     loaded = []
     failed = []
@@ -101,7 +105,7 @@ def _get_default_functions() -> list[plugin.FunctionDescriptor]:
     return [f for f in plugin.functions() if f.exported] + _get_os_functions()
 
 
-def _categorize_functions(functions: list[plugin.FunctionDescriptor] | None = None) -> dict:
+def _categorize_functions(functions: Iterable[plugin.FunctionDescriptor] | None = None) -> dict:
     """Categorize functions based on its module path."""
     functions = functions or _get_default_functions()
     result = {}
