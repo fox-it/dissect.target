@@ -12,7 +12,7 @@ from dissect.target.loaders.tar import GenericTarSubLoader, TarLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
-from tests.filesystems.test_tar import _mkdir
+from tests.filesystems.test_tar import _mkdir, _mkfile
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -47,11 +47,10 @@ def test_compressed_tar_file(caplog: pytest.LogCaptureFixture) -> None:
     t = Target()
     loader.map(t)
     assert isinstance(loader.subloader, GenericTarSubLoader)
-
     assert len(t.filesystems) == 1
 
+    t.fs.mount("/", t.filesystems[0])
     test_file = t.fs.path("test-data/test-file.txt")
-
     assert test_file.exists()
     assert test_file.open().read() == b"test-value\n"
 
@@ -65,6 +64,7 @@ def test_compressed_tar_file_with_empty_dir() -> None:
 
     t = Target()
     loader.map(t)
+    t.fs.mount("/", t.filesystems[0])
     assert isinstance(loader.subloader, GenericTarSubLoader)
 
     assert len(t.filesystems) == 1
@@ -176,6 +176,23 @@ def test_skip_folder_member_if_previously_mapped() -> None:
     loader = loader_open(path)
     target = Target()
     loader.map(target)
+    target.fs.mount("/", target.filesystems[0])
 
     assert list(target.fs.get("/").iterdir()) == ["folder"]
     assert list(target.fs.get("/folder").iterdir()) == ["file"]
+
+
+def test_windows_tar(tmp_path: Path) -> None:
+    """Test if we can parse a simple Windows tar image without explicit directory entries."""
+    path = tmp_path / "test.tar"
+    tf = tarfile.TarFile(path, mode="w")
+    _mkfile(tf, "Users/John/Documents/hello.txt", b"Hello world!")
+    _mkfile(tf, "Windows/System32/drivers/etc/hosts", b"127.0.0.1\tlocalhost\t#example")
+    tf.close()
+
+    target = Target.open(path)
+    assert target.os == "windows"
+    assert list(map(str, target.fs.path("/").iterdir())) == ["sysvol", "c:"]
+    assert target.fs.path("c:/Users").is_dir()
+    assert target.fs.path("c:/Windows").is_dir()
+    assert target.fs.path("c:/Users/John/Documents/hello.txt").read_text() == "Hello world!"
