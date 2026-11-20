@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def current_version_key() -> str:
-    hive_name, path = WindowsPlugin.CURRENT_VERSION_KEY.split("\\", maxsplit=1)
+    hive_name, path = ["HKLM", "Software\\Microsoft\\Windows NT\\CurrentVersion"]
     hive_name = RegistryPlugin.SHORTNAMES.get(hive_name, hive_name)
     return f"{hive_name}\\{path}"
 

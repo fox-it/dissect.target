@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import gzip
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator, Iterator
     from types import ModuleType
 
     import pytest
@@ -14,6 +15,15 @@ if TYPE_CHECKING:
 
 def absolute_path(filename: str) -> Path:
     return Path(__file__).parent.joinpath(filename).resolve()
+
+
+@contextmanager
+def open_file_gz(name: str) -> Generator[BinaryIO | gzip.GzipFile]:
+    with gzip.GzipFile(absolute_path(name), "rb") as fh:
+        try:
+            yield fh
+        finally:
+            fh.close()
 
 
 def mkdirs(root: Path, paths: list[str]) -> None:

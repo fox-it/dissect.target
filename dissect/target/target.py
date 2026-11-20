@@ -209,12 +209,19 @@ class Target:
             except Exception:  # noqa: PERF203
                 self.log.warning("Can't send event %s to %s", event_type, callback, exc_info=True)
 
-    def apply(self) -> None:
+    def apply(self, *, post: bool = True) -> None:
         """Resolve all disks, volumes and filesystems and load an operating system on the current ``Target``."""
         self.disks.apply()
         self.volumes.apply()
         self.filesystems.apply()
         self._init_os()
+
+        if post and self._os:
+            try:
+                self._os.post()
+            except NotImplementedError:
+                pass
+
         self._mount_others()
         self._applied = True
 

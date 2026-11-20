@@ -1216,6 +1216,14 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
+    def post(self) -> None:
+        """This method is called just after OS initialization.
+
+        Implementing this method can be useful if actions need to be performed using components that only exist after
+        the OS has been initialized, for example accessing Windows user registry hives.
+        """
+        raise NotImplementedError
+
     @export(property=True)
     def hostname(self) -> str | None:
         """Return the target's hostname.
