@@ -4,6 +4,7 @@ import logging
 from collections import Counter
 from typing import TYPE_CHECKING
 
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugins.os.windows import sru
 from tests._utils import absolute_path
 
@@ -33,3 +34,27 @@ def test_sru_plugin(target_win: Target, fs_win: VirtualFilesystem, caplog: pytes
     with caplog.at_level(logging.WARNING, target_win.log.name):
         assert list(target_win.sru.vfu()) == []
         assert "Table not found: vfu" in caplog.text
+
+
+def test_sru_unknown_columns(target_win: Target, fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:
+    """Test that columns of a table that are not in the record, like those of newer Windows versions, are skipped."""
+    srudb = absolute_path("_data/plugins/os/windows/sru/SRUDB.dat")
+    fs_win.map_file("Windows/System32/sru/SRUDB.dat", srudb)
+
+    target_win.add_plugin(sru.SRUPlugin)
+
+    record_type = TargetRecordDescriptor(
+        "filesystem/windows/sru/test",
+        [
+            ("datetime", "ts"),
+            ("path", "app"),
+            ("string", "user"),
+            ("path", "source"),
+        ],
+    )
+
+    with caplog.at_level(logging.DEBUG, target_win.log.name):
+        records = list(target_win.sru.read_records("network_connectivity", record_type))
+
+    assert len(records) == 3
+    assert "Skipping unknown columns of SRU table network_connectivity" in caplog.text

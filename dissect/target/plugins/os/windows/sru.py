@@ -27,6 +27,7 @@ NetworkDataRecord = TargetRecordDescriptor(
         ("varint", "l2_profile_flags"),
         ("varint", "bytes_sent"),
         ("varint", "bytes_recvd"),
+        ("varint", "wake_count"),
         ("path", "source"),
     ],
 )
@@ -94,6 +95,8 @@ EnergyUsageLTRecord = TargetRecordDescriptor(
         ("varint", "full_charged_capacity"),
         ("varint", "cycle_count"),
         ("varint", "configuration_hash"),
+        ("varint", "battery_count"),
+        ("varint", "battery_charge_limited"),
         ("path", "source"),
     ],
 )
@@ -132,6 +135,7 @@ PushNotificationRecord = TargetRecordDescriptor(
         ("varint", "notification_type"),
         ("varint", "payload_size"),
         ("varint", "network_type"),
+        ("varint", "notification_connection_type"),
         ("path", "source"),
     ],
 )
@@ -296,6 +300,7 @@ FIELD_MAPPINGS = {
     "CompRenderedTimeline": "comp_rendered_timeline",
     "ConfigurationHash": "configuration_hash",
     "ConnectStartTime": "connect_start_time",
+    "ConnectionType": "notification_connection_type",
     "ConnectedTime": "connected_time",
     "CpuTimeline": "cpu_timeline",
     "CsAcTime": "cs_ac_time",
@@ -358,6 +363,7 @@ FIELD_MAPPINGS = {
     "UserId": "user",
     "UserInputS": "user_input_s",
     "UserInputTimeline": "user_input_timeline",
+    "WakeCount": "wake_count",
 }
 
 
@@ -419,6 +425,11 @@ class SRUPlugin(Plugin):
         if columns[:4] != ["AutoIncId", "TimeStamp", "AppId", "UserId"]:
             raise ValueError(f"Unexpected table layout in SRU iteration: {table} ({columns[:4]})")
         columns = columns[1:]
+
+        # Newer Windows versions add columns, don't fail on the ones that are not in the record yet
+        if unknown := [c for c in columns if FIELD_MAPPINGS.get(c, c) not in record_type.fields]:
+            self.target.log.debug("Skipping unknown columns of SRU table %s: %s", table_name, unknown)
+            columns = [c for c in columns if c not in unknown]
 
         for entry in self._sru.get_table_entries(table=table):
             values = (entry[name] for name in columns)
