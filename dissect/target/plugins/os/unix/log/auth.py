@@ -279,12 +279,7 @@ class AuthLogRecordBuilder:
             self.target.log.debug("Service %s is not recognised, no additional fields could be parsed", service)
             return {}
 
-        try:
-            return self.SERVICES[service].parse(message)
-        except Exception as e:
-            self.target.log.warning("Parsing additional fields in message '%s' for service %s failed", message, service)
-            self.target.log.debug("", exc_info=e)
-            raise
+        return self.SERVICES[service].parse(message)
 
     def build_record(self, ts: datetime, source: Path, line: str) -> TargetRecordDescriptor:
         """Builds an ``AuthLog`` event record."""
@@ -308,6 +303,26 @@ class AuthLogRecordBuilder:
         match = RE_LINE.search(line)
         if match:
             record_values.update(match.groupdict())
+
+        try:
+            return self._build_record_with_additional_fields(record_fields, record_values, line)
+        except Exception as e:
+            # Parsing the additional fields is best effort, so fall back to a record with only the base fields
+            self.target.log.warning(
+                "Parsing additional fields in message '%s' for service %s failed", line, record_values["service"]
+            )
+            self.target.log.debug("", exc_info=e)
+
+        # tuple conversion here is needed for lru_cache
+        desc = self._create_event_descriptor(tuple(record_fields))
+        return desc(**record_values)
+
+    def _build_record_with_additional_fields(
+        self, record_fields: list[tuple[str, str]], record_values: dict[str, Any], line: str
+    ) -> TargetRecordDescriptor:
+        """Builds an ``AuthLog`` event record with the additional fields parsed from the message."""
+        record_fields = record_fields.copy()
+        record_values = record_values.copy()
 
         for key, value in self._parse_additional_fields(record_values["service"], line).items():
             record_type = "string"
