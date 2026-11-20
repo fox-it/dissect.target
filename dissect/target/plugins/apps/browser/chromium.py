@@ -774,7 +774,7 @@ def decrypt_v10_linux(
     salt = b"saltysalt"
     iv = b" " * 16
 
-    key = hashlib.pbkdf2_hmac("sha1", hardcoded_key.encode(), salt, 1, 16)
+    key = hashlib.pbkdf2_hmac("sha1", password=hardcoded_key.encode(), salt=salt, iterations=1, dklen=16)
     cipher = AES.new(key, AES.MODE_CBC, IV=iv)
 
     decrypted = cipher.decrypt(ciphertext)
