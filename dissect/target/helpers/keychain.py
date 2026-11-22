@@ -35,7 +35,11 @@ KEYCHAIN: list[Key] = []
 
 
 def register_key(
-    key_type: KeyType, value: str, identifier: str | None = None, provider: str | None = None, is_wildcard: bool = False
+    key_type: KeyType,
+    value: str | bytes,
+    identifier: str | None = None,
+    provider: str | None = None,
+    is_wildcard: bool = False,
 ) -> None:
     if key_type == KeyType.RAW:
         try:
