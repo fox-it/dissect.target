@@ -281,6 +281,17 @@ def test_recursive_symlink_dev() -> None:
         lfs.get("/path/to/symlink/target/").readlink_ext()
 
 
+def test_recursive_symlink_resolved_during_get() -> None:
+    """Symlink loops resolved via fs.get() must raise SymlinkRecursionError."""
+    vfs = VirtualFilesystem()
+    vfs.symlink("baz", "foo")
+    vfs.symlink("foo/bar", "baz")
+
+    for path in ("/baz", "/foo/bar"):
+        with pytest.raises(SymlinkRecursionError):
+            vfs.get(path).readlink_ext()
+
+
 @pytest.mark.parametrize(
     ("entry", "link_dict"),
     [
