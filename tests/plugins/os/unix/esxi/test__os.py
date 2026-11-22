@@ -5,14 +5,19 @@ from io import BytesIO
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+import pytest
+
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import OperatingSystem
-from dissect.target.plugins.os.unix.esxi._os import ESXiPlugin, _create_local_fs, _decrypt_crypto_util
+from dissect.target.plugins.os.unix.esxi._os import (
+    ESXiPlugin,
+    _create_local_fs,
+    _decrypt_crypto_util,
+    format_version_from_build_info,
+)
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    import pytest
-
     from dissect.target.target import Target
 
 
@@ -125,3 +130,34 @@ def test_esxi_os_creation_version_7(target_bare: Target) -> None:
 
     assert ESXiPlugin.detect(target_bare)
     assert ESXiPlugin.create(target_bare, fs1)
+
+
+@pytest.mark.parametrize(
+    ("branch", "expected"),
+    [
+        ("esx-7.0.3-ep10", "VMware ESXi 7.0.3-0.0.21930508"),
+        ("vsphere67u3", "VMware ESXi 6.7.0-0.0.21930508"),
+        ("unknown-branch", None),
+    ],
+)
+def test_format_version_from_build_info(branch: str, expected: str | None) -> None:
+    assert format_version_from_build_info({"BRANCH": branch, "BUILDNUMBER": "21930508"}) == expected
+
+
+def test_esxi_version_from_build_info(target_bare: Target, fs_esxi: VirtualFilesystem) -> None:
+    """Test that the version falls back to ``/etc/vmware/.buildInfo`` when ``boot.cfg`` is missing."""
+    fs_esxi.map_file_fh("/etc/vmware/.buildInfo", BytesIO(b"BRANCH:esx-7.0.2-ep2\nBUILDNUMBER:18538813\n"))
+    target_bare.filesystems.add(fs_esxi)
+    target_bare.apply()
+
+    assert target_bare.version == "VMware ESXi 7.0.2-0.0.18538813"
+
+
+def test_esxi_version_prefers_boot_cfg(target_bare: Target, fs_esxi: VirtualFilesystem) -> None:
+    """Test that ``boot.cfg`` takes precedence over ``/etc/vmware/.buildInfo``."""
+    fs_esxi.map_file_fh("/bootbank/boot.cfg", BytesIO(b"build=7.0.3-0.0.21930508\n"))
+    fs_esxi.map_file_fh("/etc/vmware/.buildInfo", BytesIO(b"BRANCH:esx-7.0.2-ep2\nBUILDNUMBER:18538813\n"))
+    target_bare.filesystems.add(fs_esxi)
+    target_bare.apply()
+
+    assert target_bare.version == "VMware ESXi 7.0.3-0.0.21930508"
