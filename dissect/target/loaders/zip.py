@@ -49,6 +49,7 @@ class ZipLoader(Loader):
 
     __subloaders__ = (
         import_lazy("dissect.target.loaders.acquire").AcquireZipSubLoader,
+        import_lazy("dissect.target.loaders.surge").SurgeZipSubLoader,
         import_lazy("dissect.target.loaders.uac").UacZipSubLoader,
         GenericZipSubLoader,  # should be last
     )
