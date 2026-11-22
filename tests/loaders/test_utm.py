@@ -66,6 +66,7 @@ def test_target_open(opener: Callable[[str | Path], Target], mock_utm_dir: Path)
 
 
 def test_loader(mock_utm_dir: Path) -> None:
+    """Test that ``UtmLoader`` correctly loads a UTM file and its disks."""
     loader = loader_open(mock_utm_dir)
     assert isinstance(loader, UtmLoader)
 
