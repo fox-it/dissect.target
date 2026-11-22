@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.filesystem.yara import HAS_YARA, YaraPlugin, is_valid_yara
+from dissect.target.plugins.filesystem.yara import HAS_YARA, YaraPlugin, _suggest_exclude, is_valid_yara
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -119,3 +119,29 @@ def test_yara_plugin_multiple_matches(target_default: Target) -> None:
 
     assert results[0].path == "/files/first.txt"
     assert results[0].matches == ["$a=t\x00e\x00s\x00t\x00", "$b=This", "$c=\\xaa\\xbb\\xcc\\xdd\\xee\\xff"]
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ("/c:/Windows/WinSxS", None),
+        ("**/*.dll", None),
+        ("*.dll", "**/*.dll"),
+        ("WinSxS", "**/WinSxS"),
+        ("Windows/WinSxS", "**/Windows/WinSxS"),
+        ("c:/Windows/WinSxS", "/c:/Windows/WinSxS"),
+        ("C:\\Windows\\WinSxS", "/c:/Windows/WinSxS"),
+        ("./WinSxS", "**/WinSxS"),
+    ],
+)
+def test_yara_suggest_exclude(pattern: str, expected: str | None) -> None:
+    assert _suggest_exclude(pattern) == expected
+
+
+@pytest.mark.skipif(not HAS_YARA, reason="requires yara-python")
+def test_yara_plugin_exclude_warning(target_yara: Target, caplog: pytest.LogCaptureFixture) -> None:
+    list(target_yara.yara(rules=[rule_file], exclude=["*.dll", "**/*.key"]))
+
+    assert "Exclude pattern '*.dll' is matched against the full path and will not match anything" in caplog.text
+    assert "did you mean '**/*.dll'?" in caplog.text
+    assert "'**/*.key'" not in caplog.text

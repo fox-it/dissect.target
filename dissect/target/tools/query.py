@@ -28,6 +28,7 @@ from dissect.target.tools.utils.cli import (
     configure_plugin_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
+    get_dissect_target_version,
     open_targets,
     persist_execution_report,
     process_generic_arguments,
@@ -67,7 +68,7 @@ def record_output(strings: bool = False, json: bool = False) -> AbstractWriter:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-query {get_dissect_target_version()} : query specific data inside one or more targets.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
         add_help=False,
