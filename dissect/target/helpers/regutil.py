@@ -30,6 +30,17 @@ RE_GLOB_INDEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
 RE_GLOB_MAGIC = re.compile(r"[*?[]")
 RE_REGFLEX_NAME_VALUE = re.compile(r'^"(?P<name>(?:[^"\\]|\\.)*?)"=(?P<value>.*)')
 
+REGFLEX_HEADER = "Windows Registry Editor Version 5.00"
+_REGFLEX_LINE_LIMIT = 80
+
+SHORTNAMES = {
+    "HKLM": "HKEY_LOCAL_MACHINE",
+    "HKCC": "HKEY_CURRENT_CONFIG",
+    "HKCU": "HKEY_CURRENT_USER",
+    "HKCR": "HKEY_CLASSES_ROOT",
+    "HKU": "HKEY_USERS",
+}
+
 
 KeyType = regf.IndexLeaf | regf.FastLeaf | regf.HashLeaf | regf.IndexRoot | regf.KeyNode
 """The possible key types that can be returned from the registry."""
@@ -805,7 +816,7 @@ class RegFlexKey(VirtualKey):
 
 
 class RegFlexValue(VirtualValue):
-    def __init__(self, hive: RegistryHive, name: str, value: ValueType):
+    def __init__(self, hive: RegistryHive, name: str, value: str):
         super().__init__(hive, name, value)
 
     @cached_property
@@ -875,6 +886,172 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
     raise ValueError(f"Unsupported registry flex value type: {value!r}")
 
 
+def _escape_flex_str(value: str) -> str:
+    """Escape special characters in a string for ``.reg`` file format.
+
+    Backslashes are doubled and double-quote characters are backslash-escaped,
+    matching the encoding used by the Windows Registry Editor.
+
+    Args:
+        value: The string to escape.
+
+    Returns:
+        The escaped string, safe for use inside a quoted ``.reg`` value.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _format_flex_hex(data: bytes, prefix: str) -> str:
+    """Format binary data as hex for .reg format, wrapping long lines with continuation.
+
+    Produces comma-separated lowercase hex byte pairs. Lines longer than
+    :data:`_REGFLEX_LINE_LIMIT` characters are split with a trailing backslash and
+    the continuation line is indented by two spaces, matching the layout
+    produced by the Windows Registry Editor.
+
+    Args:
+        data: The bytes to encode.
+        prefix: The line prefix (e.g. ``'"name"=hex:'``). Included verbatim at
+            the start of the first line and used when computing line length.
+
+    Returns:
+        The formatted string, potentially spanning multiple lines.
+    """
+    if not data:
+        return prefix
+
+    hex_pairs = [f"{b:02x}" for b in data]
+    lines = []
+    current = prefix
+
+    for i, pair in enumerate(hex_pairs):
+        is_last = i == len(hex_pairs) - 1
+        entry = pair if is_last else f"{pair},"
+        # Reserve one column for the backslash continuation character on non-final segments
+        fits = len(current) + len(entry) + (0 if is_last else 1) <= _REGFLEX_LINE_LIMIT
+
+        if not fits and i > 0:
+            lines.append(f"{current}\\")
+            current = f"  {entry}"
+        else:
+            current += entry
+
+    lines.append(current)
+    return "\n".join(lines)
+
+
+def format_flex_value(value: RegistryValue) -> str:
+    """Format a :class:`RegistryValue` as a ``.reg`` file value line.
+
+    This is the inverse of :func:`parse_flex_value`.
+
+    When the value type is :attr:`RegistryValueType.NONE` the Python type
+    of the value data is used to infer an appropriate registry type:
+
+    - :class:`str`   → :attr:`RegistryValueType.SZ`
+    - :class:`int`   → :attr:`RegistryValueType.DWORD`
+    - :class:`list`  → :attr:`RegistryValueType.MULTI_SZ`
+    - :class:`bytes` → :attr:`RegistryValueType.BINARY`
+    - ``None``       → :attr:`RegistryValueType.NONE` (written as ``hex(0):``)
+
+    Args:
+        value: The registry value to format.
+
+    Returns:
+        The formatted ``.reg`` value line (e.g. ``"valuename"=dword:000000ff``).
+    """
+    name = value.name
+    data = value.value
+    vtype = RegistryValueType(value.type)
+
+    name_str = "@" if name == "" else f'"{_escape_flex_str(name)}"'
+
+    # Infer a sensible registry type from the Python value when the type is NONE.
+    # This covers VirtualValues which always report NONE.
+    if vtype == RegistryValueType.NONE:
+        if isinstance(data, str):
+            vtype = RegistryValueType.SZ
+        elif isinstance(data, int):
+            vtype = RegistryValueType.DWORD
+        elif isinstance(data, list):
+            vtype = RegistryValueType.MULTI_SZ
+        elif isinstance(data, bytes):
+            vtype = RegistryValueType.BINARY
+
+    if vtype == RegistryValueType.SZ:
+        return f'{name_str}="{_escape_flex_str(str(data))}"'
+
+    if vtype == RegistryValueType.DWORD:
+        return f"{name_str}=dword:{int(data):08x}"
+
+    if vtype == RegistryValueType.BINARY:
+        return _format_flex_hex(data if isinstance(data, bytes) else b"", f"{name_str}=hex:")
+
+    if vtype == RegistryValueType.EXPAND_SZ:
+        raw = data.encode("utf-16-le") + b"\x00\x00" if isinstance(data, str) else (data or b"")
+        return _format_flex_hex(raw, f"{name_str}=hex(2):")
+
+    if vtype == RegistryValueType.MULTI_SZ:
+        if isinstance(data, list):
+            joined = "".join(f"{s}\x00" for s in data) + "\x00"
+            raw = joined.encode("utf-16-le")
+        else:
+            raw = data if isinstance(data, bytes) else b""
+        return _format_flex_hex(raw, f"{name_str}=hex(7):")
+
+    if vtype == RegistryValueType.DWORD_BIG_ENDIAN:
+        raw = int(data).to_bytes(4, "big") if isinstance(data, int) else (data or b"")
+        return _format_flex_hex(raw, f"{name_str}=hex(5):")
+
+    if vtype == RegistryValueType.QWORD:
+        raw = int(data).to_bytes(8, "little") if isinstance(data, int) else (data or b"")
+        return _format_flex_hex(raw, f"{name_str}=hex(b):")
+
+    if vtype == RegistryValueType.NONE:
+        raw = data if isinstance(data, bytes) else b""
+        return _format_flex_hex(raw, f"{name_str}=hex(0):")
+
+    # Fallback for LINK, RESOURCE_LIST, FULL_RESOURCE_DESCRIPTOR, RESOURCE_REQUIREMENTS_LIST, etc.
+    raw = data if isinstance(data, bytes) else b""
+    return _format_flex_hex(raw, f"{name_str}=hex({int(vtype):x}):")
+
+
+def format_flex_key(
+    key: RegistryKey,
+    path: str | None = None,
+) -> Iterator[str]:
+    """Recursively format a registry key and its subkeys in ``.reg`` format.
+
+    Args:
+        key: The registry key to format.
+        path: The full registry path for this key (e.g. ``HKEY_LOCAL_MACHINE\\SOFTWARE\\Test``).
+              If ``None``, ``key.path`` is used.
+    """
+    yield f"[{path or key.path}]"
+    for value in key.values():
+        yield f"{format_flex_value(value)}"
+    yield ""
+    for subkey in key.subkeys():
+        yield from format_flex_key(subkey, f"{path or key.path}\\{subkey.name}")
+
+
+def format_flex_header(keys: list[str] | None = None) -> Iterator[str]:
+    """Format the header for a ``.reg`` file.
+
+    Args:
+        keys: Optional list of registry paths that will be exported in the file.
+              If provided, each path is included as a comment line in the header.
+    """
+    yield f"{REGFLEX_HEADER}"
+    yield ""
+    yield "; Generated by dissect.target"
+    if keys:
+        yield "; Registry paths exported:"
+        for key in keys:
+            yield f";   {key}"
+    yield ""
+
+
 def has_glob_magic(pattern: str) -> bool:
     """Return whether ``pattern`` contains any glob patterns.
 
@@ -885,6 +1062,33 @@ def has_glob_magic(pattern: str) -> bool:
         Whether ``pattern`` contains any glob patterns.
     """
     return RE_GLOB_MAGIC.search(pattern) is not None
+
+
+def split_key_path(path: str) -> tuple[str, str]:
+    """Split a registry key path into the canonical ``HKEY_*`` hive name and the rest of the path.
+
+    Args:
+        path: A registry path starting with a shortname such as ``HKLM`` or ``HKCU``.
+
+    Returns:
+        A tuple containing the canonical ``HKEY_*`` hive name and the rest of the path.
+    """
+    hive, _, rest = path.partition("\\")
+    expanded = SHORTNAMES.get(hive.upper(), hive.upper())
+    return expanded, rest
+
+
+def expand_key_path(path: str) -> str:
+    """Expand a registry shortname prefix to the canonical ``HKEY_*`` name.
+
+    Args:
+        path: A registry path starting with a shortname such as ``HKLM`` or ``HKCU``.
+
+    Returns:
+        The path with the leading component expanded to its full name.
+    """
+    hive, rest = split_key_path(path)
+    return f"{hive}\\{rest}"
 
 
 def glob_split(pattern: str) -> tuple[str]:

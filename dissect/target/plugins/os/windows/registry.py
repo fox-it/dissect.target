@@ -13,12 +13,17 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers.regutil import (
+    SHORTNAMES,
     HiveCollection,
     KeyCollection,
     RegfHive,
     VirtualHive,
+    expand_key_path,
+    format_flex_header,
+    format_flex_key,
     glob_ext,
     glob_split,
+    split_key_path,
 )
 from dissect.target.plugin import Plugin, internal
 
@@ -49,14 +54,6 @@ class RegistryPlugin(Plugin):
     """
 
     __namespace__ = "registry"
-
-    SHORTNAMES: Final[dict[str, str]] = {
-        "HKLM": "HKEY_LOCAL_MACHINE",
-        "HKCC": "HKEY_CURRENT_CONFIG",
-        "HKCU": "HKEY_CURRENT_USER",
-        "HKCR": "HKEY_CLASSES_ROOT",
-        "HKU": "HKEY_USERS",
-    }
 
     MAPPINGS: Final[dict[str, str]] = {
         "SAM": "HKEY_LOCAL_MACHINE\\SAM",
@@ -261,12 +258,7 @@ class RegistryPlugin(Plugin):
 
             key = CONTROLSET_REGEX.sub(self._currentcontrolset, key, 1)
 
-        hive, _, path = key.partition("\\")
-        for short_name, name in self.SHORTNAMES.items():
-            if hive.upper() == short_name.upper():
-                hive = name
-                break
-
+        hive, path = split_key_path(key)
         key = f"{hive}\\{path}"
 
         if hive in ("HKEY_CURRENT_USER", "HKEY_USERS"):
@@ -381,3 +373,31 @@ class RegistryPlugin(Plugin):
             return
         else:
             yield from glob_ext(key_collection, pattern)
+
+    @internal
+    def export(self, paths: str | list[str]) -> Iterator[str]:
+        """Export the given paths to a .reg file.
+
+        If no file handle is provided, the output is written to stdout.
+        """
+        if isinstance(paths, str):
+            paths = [paths]
+
+        paths = [expand_key_path(path) for path in paths]
+        yield from format_flex_header(paths)
+
+        if not paths:
+            paths = list(SHORTNAMES.keys())
+
+        for path in paths:
+            try:
+                key = self.key(path)
+            except RegistryKeyNotFoundError:
+                self.target.log.error("Key %r does not exist", path)  # noqa: TRY400
+                continue
+            except Exception as e:
+                self.target.log.error("Failed to open key %r: %s", path, e)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
+                continue
+
+            yield from format_flex_key(key, path)
