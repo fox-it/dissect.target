@@ -111,6 +111,7 @@ class ConfigurationParser:
         collapse_inverse: bool = False,
         separator: tuple[str] = ("=",),
         comment_prefixes: tuple[str] = (";", "#"),
+        namespace: str | None = None,
     ) -> None:
         self.collapse_all = collapse is True
         self.collapse = set(collapse) if isinstance(collapse, Iterable) else set()
@@ -118,6 +119,7 @@ class ConfigurationParser:
 
         self.separator = separator
         self.comment_prefixes = comment_prefixes
+        self.namespace = namespace
         self.parsed_data = {}
 
     def __getitem__(self, item: Any) -> dict | str:
@@ -358,35 +360,43 @@ class Xml(ConfigurationParser):
     """Parses an XML file. Ignores any constructor parameters passed from ``ConfigurationParser``."""
 
     def _tree(self, tree: ElementTree, root: bool = False) -> dict:
-        """Very simple but robust xml -> dict implementation, see comments."""
+        """XML to dictionary parser."""
         nodes = {}
         result = {}
-        counter = {}
 
-        # each node is a folder (so the structure is always the same! [1])
         for node in tree.findall("*"):
-            # if a node contains multiple nodes with the same name, number them
-            if node.tag in counter:
-                counter[node.tag] += 1
-                nodes[f"{node.tag}-{counter[node.tag]}"] = self._tree(node)
+            # Remove the XML namespace prefix from the node tag name
+            if self.namespace and node.tag.startswith(self.namespace):
+                node.tag = node.tag.removeprefix(self.namespace)
+
+            # If a node contains multiple nodes with the same name, we turn that node into a list of trees
+            if node.tag in nodes:
+                if not isinstance(nodes[node.tag], list):
+                    nodes[node.tag] = [nodes[node.tag]]
+                nodes[node.tag].append(self._tree(node))
             else:
-                counter[node.tag] = 1
                 nodes[node.tag] = self._tree(node)
 
-        # all attribs go in the attribute folder
-        # (i.e. stable, does not change depending on xml structure! [2]
-        # Also, this way we "know" they have been attributes, i.e. we don't lose information! [3]
+        # All tree attributes go in the __attributes__ dunder dictionary of the result
         if tree.attrib:
-            result["attributes"] = tree.attrib
+            result["__attributes__"] = tree.attrib
 
-        # all subnodes go in the nodes folder
+        # All subnodes go directly in the dictionary with their node name
         if nodes:
-            result["nodes"] = nodes
+            result.update(nodes)
 
-        # content goes into the text folder
-        # we don't use special prefixes ($) because XML docs may use them anyway (even though they are forbidden)
+        # Any additional tree content goes into the __text__ dunder attribute
         if tree.text and (text := tree.text.strip(" \n\r")):
-            result["text"] = text
+            # If this node does not contain attributes or other nodes, set the value directly
+            # instead of setting the __text__ dunder value.
+            if not nodes and not tree.attrib:
+                result = text
+            else:
+                result["__text__"] = text
+
+        # Remove the XML namespace from the tree tag too
+        if self.namespace and tree.tag.startswith(self.namespace):
+            tree.tag = tree.tag.removeprefix(self.namespace)
 
         # if you need to store meta-data, you can extend add more entries here... CDATA, Comments, errors
         return {tree.tag: result} if root else result
@@ -420,7 +430,7 @@ class Xml(ConfigurationParser):
 
         if not tree:
             # Error limit reached. Thus we consider the document not parseable.
-            raise ConfigurationParsingError(f"Could not parse XML file: {fh.name} after {errors} attempts.")
+            raise ConfigurationParsingError(f"Could not parse XML file: {getattr(fh, 'name', fh)}")
 
         self.parsed_data = tree
 
@@ -915,6 +925,7 @@ class ParserOptions:
     collapse_inverse: bool | None = None
     separator: tuple[str] | None = None
     comment_prefixes: tuple[str] | None = None
+    namespace: str | None = None
 
 
 @dataclass(frozen=True)
@@ -924,12 +935,13 @@ class ParserConfig:
     collapse_inverse: bool | None = None
     separator: tuple[str] | None = None
     comment_prefixes: tuple[str] | None = None
+    namespace: str | None = None
     fields: tuple[str, ...] | None = None
 
     def create_parser(self, options: ParserOptions | None = None) -> ConfigurationParser:
         kwargs = {}
 
-        for field_name in ["collapse", "collapse_inverse", "separator", "comment_prefixes", "fields"]:
+        for field_name in ["collapse", "collapse_inverse", "separator", "comment_prefixes", "namespace", "fields"]:
             value = getattr(options, field_name, None) or getattr(self, field_name)
             if value:
                 kwargs.update({field_name: value})

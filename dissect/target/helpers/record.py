@@ -163,7 +163,7 @@ COMMON_UNIX_FIELDS = [
     ("string", "gecos"),
     ("path", "home"),
     ("string", "shell"),
-    ("string", "source"),
+    ("path", "source"),
 ]
 
 UnixUserRecord = TargetRecordDescriptor(
