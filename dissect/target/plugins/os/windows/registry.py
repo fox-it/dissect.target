@@ -372,6 +372,29 @@ class RegistryPlugin(Plugin):
         return None
 
     @internal
+    def get_hive_name(self, key: RegistryKey | RegistryValue | RegistryHive) -> str | None:
+        """Return the hive name for the given key or value."""
+
+        if isinstance(key, (RegistryKey, RegistryValue)):
+            wanted_hive = key.hive
+        elif isinstance(key, (RegistryHive)):
+            wanted_hive = key
+        else:
+            raise TypeError(f"Unexpected type for {key!r}")
+
+        for name, hive, _ in self._hive_paths:
+            if hive is wanted_hive:
+                return name
+        return None
+
+    @internal
+    def get_hive_shortname(self, key: RegistryKey | RegistryValue | RegistryHive) -> str | None:
+        """Return the hive shortname for the given key or hive."""
+
+        reversed_shortnames = {value: key for key, value in self.target.registry.SHORTNAMES.items()}
+        return reversed_shortnames.get(self.get_hive_name(key))
+
+    @internal
     def glob_ext(self, pattern: str) -> Iterator[KeyCollection]:
         key_path, pattern = glob_split(pattern)
 
