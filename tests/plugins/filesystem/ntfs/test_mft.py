@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 from random import randrange
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
@@ -9,6 +10,7 @@ import pytest
 from dissect.ntfs.c_ntfs import ATTRIBUTE_TYPE_CODE
 from dissect.ntfs.exceptions import Error
 
+from dissect.target.exceptions import MissingTargetInRecordWarning
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.plugins.filesystem.ntfs.mft import (
@@ -216,14 +218,16 @@ def test_mft_plugin_macb_nodup() -> None:
         tss.add(ts)
         return ts
 
-    for _ in range(100):
-        tss = set()
-        records = []
-        for ts_type in ["M", "A", "C", "B"]:
-            records.append(FilesystemStdRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type))
-            records.append(FilesystemFilenameRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type, ads=False))
-            records.append(FilesystemFilenameRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type, ads=True))
-        assert len(list(macb_aggregator(records))) == len(tss)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=MissingTargetInRecordWarning)
+        for _ in range(100):
+            tss = set()
+            records = []
+            for ts_type in ["M", "A", "C", "B"]:
+                records.append(FilesystemStdRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type))
+                records.append(FilesystemFilenameRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type, ads=False))
+                records.append(FilesystemFilenameRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type, ads=True))
+            assert len(list(macb_aggregator(records))) == len(tss)
 
 
 def test_mft_plugin_disk_label(target_win_mft: Target) -> None:
