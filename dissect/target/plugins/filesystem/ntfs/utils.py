@@ -23,6 +23,11 @@ class InformationType(Enum):
     ALTERNATE_DATA_STREAM = auto()
 
 
+def join_ntfs_path(drive_letter: str, path: str) -> str:
+    """Join an MFT path prefix and suffix with consistent Windows separators."""
+    return f"{drive_letter}{path}".replace("/", "\\")
+
+
 def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
     """Retrieve the drive letter from the loaded mounts.
 
