@@ -56,7 +56,12 @@ def find_needles(
         if lock_seek:
             fh.seek(offset)
         else:
+            expected_offset = offset
             offset = fh.tell()
+
+            # Reset the overlap length if the consumer seeked more than the overlap length away
+            if abs(offset - expected_offset) > overlap_len:
+                overlap_len = 0
 
         read_size = min(block_size, end - offset) if end is not None else block_size
         if not (next_block := fh.read(read_size)):
@@ -89,6 +94,11 @@ def find_needles(
 
             closest_needle_pos, closest_needle, match = min(needle_positions)
             yield closest_needle, current_block_offset + closest_needle_pos, match
+
+            if not lock_seek and fh.tell() != current_block_offset + closest_needle_pos:
+                # If the consumer seeked in the middle of processing the current block, assume that they want to skip
+                # the rest of the block and continue from the new position
+                break
 
             last_needle_pos = closest_needle_pos
             last_needle_end = last_needle_pos + 1
