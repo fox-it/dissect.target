@@ -13,9 +13,11 @@ if TYPE_CHECKING:
 
 
 def test_sshd_config_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+
     config_file = absolute_path("_data/plugins/apps/ssh/opensshd/sshd_config")
+    fs_unix.map_file("/etc/ssh/sshd_config", config_file)
     plugin = SSHServerPlugin(target_unix_users)
-    fs_unix.map_file(str(plugin.sshd_config_path), config_file)
+    
 
     target_unix_users.add_plugin(SSHServerPlugin)
     results = list(target_unix_users.opensshd.config())
@@ -41,11 +43,12 @@ def test_sshd_config_plugin_multiple_definitions(target_unix_users: Target, fs_u
     ListenAddress 9.8.7.6
     """
 
-    plugin = SSHServerPlugin(target_unix_users)
+    
     fs_unix.map_file_fh(
-        str(plugin.sshd_config_path),
+        "/etc/ssh/sshd_config",
         BytesIO(textwrap.dedent(config).encode()),
     )
+    plugin = SSHServerPlugin(target_unix_users)
 
     target_unix_users.add_plugin(SSHServerPlugin)
     results = list(target_unix_users.opensshd.config())
