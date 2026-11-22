@@ -199,6 +199,15 @@ DEFENDER_MPLOG_TS_PATTERN = (
     r"\.[0-9]{3}(?:Z|[+-][0-9]{2}:[0-9]{2})?)"
 )
 
+# Defender writes Unicode directionality marks in MPLog lines, usually around timestamps
+RE_BIDI_MARKS = re.compile(r"[\u200e\u200f\u202a-\u202e\ufeff]+")
+
+
+def strip_bidi_marks(value: str) -> str:
+    """Remove Unicode directionality marks from ``value``."""
+    return RE_BIDI_MARKS.sub("", value)
+
+
 # Loosely based on https://github.com/Intrinsec/mplog_parser but feel free to add patterns
 
 DEFENDER_MPLOG_PATTERNS = [
