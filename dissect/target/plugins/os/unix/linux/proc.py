@@ -16,14 +16,15 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystem import fsutil
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import Plugin, internal
+from dissect.target.plugins.os.unix._os import parse_fstab_entry
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from datetime import datetime
-    from pathlib import Path
 
     from typing_extensions import Self
 
+    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
 
 
@@ -153,6 +154,16 @@ class PacketSocket:
 class Environ:
     variable: str
     contents: str
+
+
+@dataclass
+class FstabEntry:
+    fs_spec: str
+    mount_path: str
+    fs_type: str
+    options: list[str]
+    is_dump: bool
+    pass_num: int
 
 
 class ProcessStateEnum(StrEnum):
@@ -501,7 +512,7 @@ class ProcProcess:
             return int(line.split()[1])
         return None
 
-    def get(self, path: str) -> Path:
+    def get(self, path: str) -> TargetPath:
         """Returns a TargetPath relative to this process."""
         return self.entry.joinpath(path)
 
@@ -608,6 +619,26 @@ class ProcProcess:
 
         return line
 
+    def mounts(self) -> Iterator[FstabEntry]:
+        """Yields the content of the mount file associated with the process."""
+        mount_path = self.get("mounts")
+
+        if not (mount_path.exists() and mount_path.is_file()):
+            return
+
+        with mount_path.open("rt") as mount_file:
+            for line in mount_file:
+                try:
+                    entry = parse_fstab_entry(line)
+                except ValueError as e:
+                    self.target.log.warning("Failed to parse fstab entry: %s", e)
+                    continue
+
+                fs_spec, mount_point, fs_type, options, is_dump, pass_num = entry
+                options = options.split(",")
+
+                yield FstabEntry(fs_spec, mount_point, fs_type, options, is_dump, pass_num)
+
     def stat(self) -> fsutil.stat_result:
         """Return a stat entry of the process."""
         return self.entry.stat()
@@ -646,7 +677,7 @@ class ProcPlugin(Plugin):
         return map
 
     @internal
-    def iter_proc(self) -> Iterator[Path]:
+    def iter_proc(self) -> Iterator[TargetPath]:
         """Yields ``/proc/[pid]`` filesystems entries for every process id (pid) found in procfs."""
         yield from self.target.fs.path("/proc").glob("[0-9]*")
 
