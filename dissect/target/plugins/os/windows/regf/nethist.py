@@ -58,6 +58,9 @@ class NethistPlugin(Plugin):
                 for sig in kind.subkeys():
                     guid = sig.value("ProfileGuid").value
                     profile = self.find_profile(guid)
+                    if profile is None:
+                        self.target.log.warning("Skipping network signature %s, profile %s not found", sig.name, guid)
+                        continue
 
                     created = parse_ts(profile.value("DateCreated").value, tzinfo=target_tz)
                     last_connected = parse_ts(profile.value("DateLastConnected").value, tzinfo=target_tz)
