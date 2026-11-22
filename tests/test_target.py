@@ -775,7 +775,7 @@ def test_exception_invalid_path() -> None:
 
     with pytest.raises(
         TargetError,
-        match=r"Failed to find any loader for targets: \['smb://invalid'\]",
+        match=r"Failed to load target smb://invalid: Required dependency 'impacket' is missing",
     ):
         next(Target.open_all("smb://invalid"))
 
@@ -866,3 +866,24 @@ def test_list_children_recursive() -> None:
         "1.0.1.1",
         "1.1",
     ]
+
+
+def test_open_all_reports_load_failure(tmp_path: Path) -> None:
+    disk = tmp_path / "disk.vmdk"
+    disk.write_bytes(b"\x00")
+
+    class LVM2Error(Exception):
+        pass
+
+    lvm_error = LVM2Error("Physical volume not found: pv2")
+
+    def fail_load(path: Path, ldr: object, *, apply: bool = True) -> Target:
+        raise TargetError(f"Failed to load target: {path}") from lvm_error
+
+    with (
+        patch.object(Target, "_load", side_effect=fail_load),
+        pytest.raises(TargetError, match="Physical volume not found: pv2") as exc_info,
+    ):
+        list(Target.open_all(disk))
+
+    assert exc_info.value.__cause__ is lvm_error
