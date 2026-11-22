@@ -335,6 +335,9 @@ class _TestSubPlugin3(_TestSubPlugin2):
     def _value(self) -> str:
         return "test3"
 
+    def _get_paths(self) -> Iterator[Path]:
+        yield Path("test3.txt")
+
 
 class _TestSubPlugin4(_TestSubPlugin3):
     __namespace__ = "t4"
@@ -504,6 +507,18 @@ def test_nested_namespace_getattr(mock_plugins: PluginRegistry, target_bare: Tar
     assert next(target_bare.foo.baz.bazz()) == "bazz2"
     assert next(target_bare.foo.baz.bar()) == "bar2"
     assert next(target_bare.foo.buzz()) == "buzz"
+
+
+def test_get_paths(target_default: Target) -> None:
+    target_default._register_plugin_functions(_TestSubPlugin1(target_default))
+    target_default._register_plugin_functions(_TestSubPlugin3(target_default))
+    target_default._register_plugin_functions(_TestNSPlugin(target_default))
+
+    plugin = _TestSubPlugin3(target_default)
+    assert list(plugin.get_paths()) == [Path("test3.txt")]
+
+    namespace_plugin = _TestNSPlugin(target_default)
+    assert list(namespace_plugin.get_paths()) == [Path("test3.txt")]
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
