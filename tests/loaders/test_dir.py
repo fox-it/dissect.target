@@ -66,6 +66,26 @@ def test_winnt(tmp_path: Path) -> None:
     assert len(t.filesystems) == 1
 
 
+def test_windows_acquire_volumes(tmp_path: Path) -> None:
+    """Test the ``DirLoader`` with additional acquire volumes like efi and sysvol."""
+    root = tmp_path
+    mkdirs(root, ["C/windows/system32", "efi/EFI/Microsoft/Boot", "sysvol/windows/system32"])
+
+    os_type, dirs = find_dirs(root)
+    assert os_type == OperatingSystem.WINDOWS
+    assert len(dirs) == 3
+    assert {p.name for p in dirs} == {"C", "efi", "sysvol"}
+
+    loader = loader_open(root)
+    assert isinstance(loader, DirLoader)
+
+    t = Target()
+    loader.map(t)
+    assert len(t.filesystems) == 3
+    assert len(t.fs.mounts) == 1
+    assert "c:" in t.fs.mounts
+
+
 def test_windows_drive_letters(tmp_path: Path) -> None:
     """Test the ``DirLoader`` with Windows drive letters."""
     root = tmp_path
