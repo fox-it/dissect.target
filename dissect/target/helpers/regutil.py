@@ -336,7 +336,7 @@ class VirtualKey(RegistryKey):
         if not path.strip("\\"):
             self._name = "VROOT"
         else:
-            self._name = path.split("\\")[-1]
+            self._name = path.rsplit("\\", maxsplit=1)[-1]
         self._class_name = class_name
         self._values: dict[str, RegistryValue] = {}
         self._subkeys: dict[str, RegistryKey] = {}
@@ -845,7 +845,7 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
         # These values match regf type values
         vtype = int(vtype[4:5], 16)
         if vtype == regf.REG_NONE:
-            decoded = value if value else None
+            decoded = value or None
         elif vtype == regf.REG_SZ or vtype == regf.REG_EXPAND_SZ:
             decoded = regf.try_decode_sz(value)
         elif vtype == regf.REG_BINARY:

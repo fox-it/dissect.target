@@ -116,8 +116,8 @@ def register_keychain_file(keychain_path: Path) -> None:
                 log.warning("No value provided in row %s", row)
                 continue
 
-            identifier = identifier if identifier else None
-            provider = provider if provider else None
+            identifier = identifier or None
+            provider = provider or None
 
             register_key(
                 key_type=key_type,
