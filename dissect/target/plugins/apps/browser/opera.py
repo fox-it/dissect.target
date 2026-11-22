@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import arg, export
 from dissect.target.plugins.apps.browser.browser import (
+    GENERIC_CACHE_FIELDS,
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
@@ -63,6 +65,11 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
         GENERIC_COOKIE_FIELDS,
     )
 
+    BrowserCacheRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "application/browser/opera/cache",
+        GENERIC_CACHE_FIELDS,
+    )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "application/browser/opera/download",
         GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS,
@@ -87,6 +94,12 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
     def cookies(self) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records for Opera (and Opera GX)."""
         yield from super().cookies("opera")
+
+    @export(record=BrowserCacheRecord)
+    @arg("--export", type=Path, help="export cache files to provided directory")
+    def cache(self, export: Path | None = None) -> Iterator[BrowserCacheRecord]:
+        """Return browser cache records for Opera (and Opera GX)."""
+        yield from super().cache("opera", export)
 
     @export(record=BrowserDownloadRecord)
     def downloads(self) -> Iterator[BrowserDownloadRecord]:

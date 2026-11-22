@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import arg, export
 from dissect.target.plugins.apps.browser.browser import (
+    GENERIC_CACHE_FIELDS,
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
@@ -55,6 +57,11 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
         "application/browser/brave/cookie", GENERIC_COOKIE_FIELDS
     )
 
+    BrowserCacheRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "application/browser/brave/cache",
+        GENERIC_CACHE_FIELDS,
+    )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "application/browser/brave/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
@@ -76,6 +83,12 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
     def cookies(self) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records for Brave."""
         yield from super().cookies("brave")
+
+    @export(record=BrowserCacheRecord)
+    @arg("--export", type=Path, help="export cache files to provided directory")
+    def cache(self, export: Path | None = None) -> Iterator[BrowserCacheRecord]:
+        """Return browser cache records for Brave."""
+        yield from super().cache("brave", export)
 
     @export(record=BrowserDownloadRecord)
     def downloads(self) -> Iterator[BrowserDownloadRecord]:
