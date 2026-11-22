@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import defusedxml.ElementTree as ET
 
-from dissect.target.tools.utils.cli import catch_sigpipe
+from dissect.target.tools.utils.cli import catch_sigpipe, get_dissect_target_version
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -261,7 +261,8 @@ def convert_value(type: str, value: str) -> bytes:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="target-build-magic",
+        description=f"target-build-magic {get_dissect_target_version()} : generate a"
+        f" static file used by the magic helper to identify file type.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
@@ -270,6 +271,7 @@ def main() -> int:
         "--output", "-o", type=Path, help="optional alternative output path for generated types document"
     )
     parser.add_argument("--format", action="store_true", default=False, help="format output using ruff")
+    parser.add_argument("--version", action="version", version=get_dissect_target_version())
     args = parser.parse_args()
 
     if not args.path.is_file():

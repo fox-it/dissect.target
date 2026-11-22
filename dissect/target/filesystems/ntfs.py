@@ -225,7 +225,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
                 real_size = record.size(self.ads, allocated=True)
             except NtfsFileNotFoundError as e:
                 # Occurs when it cannot find the the specific ads inside its attributes
-                raise FileNotFoundError from e
+                raise FileNotFoundError(f"ADS record not found: {self.path}") from e
         else:
             mode = stat.S_IFDIR
 

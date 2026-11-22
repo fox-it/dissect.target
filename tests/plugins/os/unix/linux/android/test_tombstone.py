@@ -20,6 +20,9 @@ def test_android_tombstone(target_android: Target, fs_android: VirtualFilesystem
     target_android.add_plugin(AndroidTombstonePlugin)
     records = list(target_android.tombstones())
 
+    field_names = [name for _, name in records[0]._desc.get_field_tuples()]
+    assert len(field_names) == len(set(field_names))
+
     assert records[0].ts == datetime.datetime.fromisoformat("2026-05-04 15:30:00.123456+00:00")
     assert records[0].app_id == "dev.serwin.AnarchRE_3"  # public domain DOOM ftw
     assert records[0].command.executable == "dev.serwin.AnarchRE_3"
