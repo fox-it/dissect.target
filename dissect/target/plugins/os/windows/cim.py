@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 from dissect.cim import cim
@@ -65,7 +66,16 @@ class EventFilter:
 
 
 def get_property_value_safe(consumer: cim.Instance, prop_name: str, default_value: str | None = None) -> str | None:
-    """Extract value of a consumer properties. Fallback to ``default_value`` if property is missing."""
+    """Extract value of a consumer properties. Fallback to ``default_value`` if property is missing.
+
+    Args:
+        consumer (cim.Instance): The CIM instance from which to extract the property.
+        prop_name (str): The name of the property to extract.
+        default_value (str | None): The default value to return if the property is missing.
+
+    Returns:
+        property_value (str | None): The value of the property or the default value if it is missing.
+    """
     if not (prop := consumer.properties.get(prop_name)):
         return default_value
     try:
@@ -75,7 +85,14 @@ def get_property_value_safe(consumer: cim.Instance, prop_name: str, default_valu
 
 
 def get_filter_name(binding: cim.Instance) -> str:
-    """Return unquoted filter name from a ``__filtertoconsumerbinding`` class instance."""
+    """Return unquoted filter name from a ``__filtertoconsumerbinding`` class instance.
+
+    Args:
+        binding (cim.Instance): The CIM instance from which to extract the filter name.
+
+    Returns:
+        filter_name (str): The unquoted filter name.
+    """
     filter_name = binding.properties["Filter"].value
     # filter name is not always consistent
     # e.g : __EventFilter.Name="Windows Update Event MOF" or
@@ -88,7 +105,14 @@ def get_filter_name(binding: cim.Instance) -> str:
 
 
 def get_creator_sid(class_instance: cim.Instance) -> str | None:
-    """Extract and parse ``CreatorSID`` member, if available."""
+    """Extract and parse ``CreatorSID`` member, if available.
+
+    Args:
+        class_instance (cim.Instance): The CIM instance from which to extract the CreatorSID.
+
+    Returns:
+        creator_sid (str | None): The extracted CreatorSID or None if not available.
+    """
     if (creator_sid := class_instance.properties.get("CreatorSID")) and (
         creator_sid_value := getattr(creator_sid, "value", None)
     ):
@@ -117,7 +141,6 @@ class CimPlugin(Plugin):
         if len(repodirs) == 0:
             raise UnsupportedPluginError("No CIM database found")
 
-        self._filters: dict[str, EventFilter] = {}
         repodir = repodirs[0]
         index = repodir.joinpath("index.btr")
         objects = repodir.joinpath("objects.data")
@@ -133,8 +156,6 @@ class CimPlugin(Plugin):
             missing_files = ",".join(str(f) for f in [index, objects, *mappings] if not f.exists())
             raise UnsupportedPluginError(f"missing expected files : {missing_files}")
 
-        self._filters = self._get_filters()
-
     def _get_paths(self) -> Iterator[Path]:
         repodir = self.target.resolve("%windir%/system32/wbem/repository")
         if repodir.exists:
@@ -148,10 +169,31 @@ class CimPlugin(Plugin):
     def repo(self) -> cim.CIM:
         return self._repo
 
+    def _iter_namespaces(self, parent_namespace: cim.Namespace | None = None) -> Iterator[cim.Namespace]:
+        """Yield all namespaces recursively from the CIM database.
+
+        Args:
+            parent_namespace (cim.Namespace | None): The namespace to start iterating from.
+                If None, start from the root namespace.
+
+        Yields:
+            namespace (cim.Namespace): The current namespace and all its descendants.
+        """
+        current_node = self._repo.root if parent_namespace is None else parent_namespace
+
+        yield current_node
+
+        for child_ns in current_node.namespaces:
+            yield from self._iter_namespaces(child_ns)
+
     def _iter_consumerbindings(self) -> Iterator[tuple[cim.Instance, str]]:
-        """Yield consumer bindings from ``__filtertoconsumerbinding`` of all namespaces."""
+        """Yield consumer bindings from ``__filtertoconsumerbinding`` of all namespaces.
+
+        Yields:
+            consumer_filter_mapping (tuple[cim.Instance, str]): Containing the instance and its associated filter name.
+        """
         try:
-            for ns in self._repo.root.namespaces:
+            for ns in self._iter_namespaces():
                 for binding in ns.class_("__filtertoconsumerbinding").instances:
                     yield (
                         ns.query(binding.properties["Consumer"].value),
@@ -199,10 +241,15 @@ class CimPlugin(Plugin):
                     **asdict(self._filters.get(filter_name, EventFilter(filter_name=filter_name))),
                 )
 
-    def _get_filters(self) -> dict[str, EventFilter]:
-        """Generate a dictionary of ``__EventFilter`` that can be mapped with ``__filtertoconsumerbinding``."""
+    @cached_property
+    def _filters(self) -> dict[str, EventFilter]:
+        """Generate a dictionary of ``__EventFilter`` that can be mapped with ``__filtertoconsumerbinding``.
+
+        Returns:
+            dict[str, EventFilter]: A dictionary mapping filter names to their corresponding EventFilter dataclass
+        """
         filters = {}
-        for ns in self._repo.root.namespaces:
+        for ns in self._iter_namespaces():
             for event in ns.class_("__EventFilter").instances:
                 filter_name = event.properties["Name"].value
                 filters[filter_name] = EventFilter(
