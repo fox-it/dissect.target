@@ -17,6 +17,7 @@ from dissect.target.tools.shell import python_shell
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     open_target,
     process_generic_arguments,
 )
@@ -186,10 +187,11 @@ def _add_cmds(parser: argparse.ArgumentParser, scope: str) -> None:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-inspect {get_dissect_target_version()} : debugging utility.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
+    parser.add_argument("--version", action="version", version=get_dissect_target_version())
     scope = parser.add_subparsers(dest="scope", required=True, help="scope to inspect")
 
     base = argparse.ArgumentParser(add_help=False)
