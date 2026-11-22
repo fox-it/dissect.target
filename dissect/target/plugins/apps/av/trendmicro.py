@@ -89,7 +89,11 @@ class TrendMicroPlugin(Plugin):
             filename (string): Name to file that is associated with the threat.
             lineno (uint16): Line number for reference for further investigation.
         """
-        with self.target.fs.path(self.LOG_FILE_INFECTIONS).open("rt", 0, self.codepage) as f:
+        log_path = self.target.fs.path(self.LOG_FILE_INFECTIONS)
+        if not log_path.is_file():
+            return
+
+        with log_path.open("rt", 0, self.codepage) as f:
             for lineno, line in enumerate(f.readlines()):
                 cells = line.split("<;>")
                 yield TrendMicroWFLogRecord(
