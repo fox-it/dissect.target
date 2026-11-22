@@ -6,6 +6,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.ntfs import NTFS, NTFS_SIGNATURE
+from dissect.ntfs.bitmap import Bitmap
 from dissect.ntfs.exceptions import Error as NtfsError
 from dissect.ntfs.exceptions import FileNotFoundError as NtfsFileNotFoundError
 from dissect.ntfs.exceptions import NotADirectoryError as NtfsNotADirectoryError
@@ -66,6 +67,18 @@ class NtfsFilesystem(Filesystem):
     @cached_property
     def serial(self) -> int | str | None:
         return self.ntfs.serial
+
+    def allocated_space_iter(self) -> Iterator[BinaryIO]:
+        """Iteratively yield streams of allocated data on the filesystem."""
+        yield from (allocated_stream for _, allocated_stream in Bitmap(self.ntfs).iter())
+
+    def unallocated_space_iter(self) -> Iterator[BinaryIO]:
+        """Iteratively yield streams of unallocated data on the filesystem."""
+        yield from (unallocated_stream for unallocated_stream, _ in Bitmap(self.ntfs).iter())
+
+    def space_allocation_iter(self) -> Iterator[tuple[BinaryIO, BinaryIO]]:
+        """Iteratively yield tuples of [unallocated, allocated] data streams on the filesystem."""
+        yield from Bitmap(self.ntfs).iter()
 
 
 class NtfsDirEntry(DirEntry):
