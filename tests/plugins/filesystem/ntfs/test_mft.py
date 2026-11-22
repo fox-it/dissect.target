@@ -35,6 +35,11 @@ def compact(request: pytest.FixtureRequest) -> bool:
     return request.param
 
 
+@pytest.fixture(params=[True, False])
+def ignore_dos(request: pytest.FixtureRequest) -> bool:
+    return request.param
+
+
 @pytest.fixture
 def target_win_mft(target_win: Target) -> Target:
     filesystem = NtfsFilesystem(mft=absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw").open("rb"))
@@ -143,10 +148,10 @@ def test_volume_identifier_none_guid() -> None:
 @pytest.mark.parametrize(
     ("regex_pattern", "expected_nr_of_records"),
     [
-        (r".*", 304),
+        (r".*", 320),
         (r".+Size:(No Data)", 120),
         (r".+Is_ADS$", 24),
-        (r".+Size:\d+", 184),
+        (r".+Size:\d+", 200),
         (
             r"2021-08-04 ([+.:]?\d+)+ [SF]0?[BCMA] 43 NamelessDirectory - "
             r"In[uU]se:True Resident:No Data Owner:No Data Size:No Data VolumeUUID:No Data",
@@ -165,11 +170,18 @@ def test_volume_identifier_none_guid() -> None:
     ],
 )
 def test_mft_timeline(target_win_mft: Target, regex_pattern: str, expected_nr_of_records: int) -> None:
-    """Test whether the MFT timeline functions as inteded, same with the output."""
-    outputs = [entry for entry in target_win_mft.mft.timeline() if re.match(regex_pattern, entry)]
+    """Test whether the MFT timeline functions as intended, same with the output."""
+    outputs = [entry for entry in target_win_mft.mft.timeline(ignore_dos=True) if re.match(regex_pattern, entry)]
 
     # Check the MFT entries
     assert len(outputs) == expected_nr_of_records
+
+
+def test_mft_body(target_win_mft: Target) -> None:
+    """Test whether the MFT body functions as intended"""
+    body_content = absolute_path("_data/plugins/filesystem/ntfs/mft/mft.body").read_text()
+    for entry in target_win_mft.mft.body():
+        assert entry in body_content
 
 
 def check_output_amount(number: int, compact_output: bool) -> int:
@@ -178,34 +190,41 @@ def check_output_amount(number: int, compact_output: bool) -> int:
 
 
 def test_mft_plugin_entries(target_win_mft: Target, compact: bool) -> None:
-    mft_data = list(target_win_mft.mft(compact))
-    assert len(mft_data) == check_output_amount(76, compact)
+    mft_data = list(target_win_mft.mft.records(compact=compact, ignore_dos=True))
+    assert len(mft_data) == check_output_amount(80, compact)
+
+
+def test_mft_plugin_ignore_dos_entries(target_win_mft: Target, ignore_dos: bool) -> None:
+    mft_data = list(target_win_mft.mft.records(compact=True, ignore_dos=ignore_dos))
+    assert len(mft_data) == 81 - int(ignore_dos)
 
 
 def test_mft_plugin_macb(target_win_mft: Target) -> None:
-    mft_data = list(target_win_mft.mft(macb=True))
+    mft_data = list(target_win_mft.mft.records(macb=True, ignore_dos=True))
     path = None
     ts = None
     macb = None
+    segment = None
     field = "MACB/MACB"
     for record in mft_data:
-        assert record.macb != macb or record.ts != ts or record.path != path
+        assert record.segment != segment or record.macb != macb or record.ts != ts or record.path != path
         for bit in [0, 1, 2, 3, 5, 6, 7]:
             assert record.macb[bit : bit + 1] in (field[bit : bit + 1], ".")
         path = record.path
         macb = record.macb
         ts = record.ts
+        segment = record.segment
 
 
 def test_mft_plugin_macb_ads(target_win_mft: Target) -> None:
-    mft_data = list(target_win_mft.mft(macb=True))
+    mft_data = list(target_win_mft.mft.records(macb=True, ignore_dos=True))
     ads_entries = 0
     for record in mft_data:
         if record.ads:
             ads_entries += 1
             assert record.macb.endswith("/....")
             assert not record.macb.startswith("..../")
-    assert ads_entries == 6
+    assert ads_entries == 8
 
 
 def test_mft_plugin_macb_nodup() -> None:
@@ -228,27 +247,35 @@ def test_mft_plugin_macb_nodup() -> None:
 
 def test_mft_plugin_disk_label(target_win_mft: Target) -> None:
     target_win_mft.fs.mounts = {"c:": target_win_mft.filesystems[0]}
-    for mft_entries in target_win_mft.mft():
+    for mft_entries in target_win_mft.mft.records(ignore_dos=True):
         assert str(mft_entries.path).startswith("c:\\")
 
 
 def test_mft_plugin_ads(target_win_mft: Target, compact: bool) -> None:
-    mft_data = [mft_entry for mft_entry in target_win_mft.mft(compact) if hasattr(mft_entry, "ads") and mft_entry.ads]
+    mft_data = [
+        mft_entry
+        for mft_entry in target_win_mft.mft.records(compact=compact, ignore_dos=True)
+        if hasattr(mft_entry, "ads") and mft_entry.ads
+    ]
     assert len(mft_data) == check_output_amount(6, compact)
 
 
 def test_mft_plugin_resident(target_win_mft: Target, compact: bool) -> None:
-    mft_data = [mft_entry for mft_entry in target_win_mft.mft(compact) if mft_entry.resident]
-    assert len(mft_data) == check_output_amount(19, compact)
+    mft_data = [
+        mft_entry for mft_entry in target_win_mft.mft.records(compact=compact, ignore_dos=True) if mft_entry.resident
+    ]
+    assert len(mft_data) == check_output_amount(23, compact)
 
 
 def test_mft_plugin_inuse(target_win_mft: Target, compact: bool) -> None:
-    mft_data = [mft_entry for mft_entry in target_win_mft.mft(compact) if mft_entry.inuse]
-    assert len(mft_data) == check_output_amount(76, compact)
+    mft_data = [
+        mft_entry for mft_entry in target_win_mft.mft.records(compact=compact, ignore_dos=True) if mft_entry.inuse
+    ]
+    assert len(mft_data) == check_output_amount(80, compact)
 
 
 def test_mft_plugin_last_entries(target_win_mft: Target) -> None:
-    mft_data = list(target_win_mft.mft())[-9:]
+    mft_data = list(target_win_mft.mft.records(ignore_dos=True))[-9:]
     test_data = [
         "NamelessDirectory",
         "Food For Thought",
@@ -261,5 +288,5 @@ def test_mft_plugin_last_entries(target_win_mft: Target) -> None:
 
 
 def test_mft_plugin_owner(target_win_mft: Target) -> None:
-    for mft_entry in target_win_mft.mft():
+    for mft_entry in target_win_mft.mft.records(ignore_dos=True):
         assert mft_entry.owner is None
