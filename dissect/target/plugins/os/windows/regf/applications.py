@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import (
@@ -12,7 +12,6 @@ from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from datetime import datetime
 
     from dissect.target.target import Target
 
@@ -31,23 +30,8 @@ KEYS = (
 class WindowsApplicationsPlugin(Plugin):
     """Windows Applications plugin."""
 
-    def __init__(
-        self,
-        target: Target,
-        datetime_parser: Callable[[str], datetime | None] = common_datetime_parser,
-    ):
-        """Initialise the plugin.
-
-        Args:
-            target: The target to run this plugin on.
-            datetime_parser: A function to parse date strings. Defaults to
-                `default_datetime_parser`. This allows for dependency injection
-                of custom parsers.
-        """
+    def __init__(self, target: Target):
         super().__init__(target)
-        self.datetime_parser = datetime_parser
-
-        # Use the registry.keys() method with automatic RegBack filtering based on target props
         self.keys = list(self.target.registry.keys(KEYS))
 
     def check_compatible(self) -> None:
@@ -79,14 +63,13 @@ class WindowsApplicationsPlugin(Plugin):
             type         (string):   type of the application, either user or system
             path         (string):   path to the installed location or installer of the application
         """
-
         for uninstall in self.keys:
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}
 
                 install_date = None
                 if install_date_string := values.get("InstallDate"):
-                    install_date = self.datetime_parser(str(install_date_string))
+                    install_date = common_datetime_parser(install_date_string)
 
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,

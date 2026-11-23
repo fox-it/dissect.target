@@ -177,18 +177,21 @@ def year_rollover_helper(
             yield relative_ts, line
 
 
-def common_datetime_parser(date_string: str) -> datetime | None:
+def common_datetime_parser(value: str, tzinfo: timezone = timezone.utc) -> datetime | None:
     """Parses a date string by trying a list of common formats.
 
-    This is the default implementation that can be swapped out.
+    The formats are tried in order and the first match wins. This means that ambiguous dates
+    such as ``03/04/2024`` are interpreted as month first (``%m/%d/%Y``), and ``%d/%m/%Y``
+    only matches when the first number cannot be a month.
 
     Args:
-        date_string: The string representation of the date.
+        value: The string representation of the date.
+        tzinfo: The timezone to set on the parsed datetime object.
 
     Returns:
-        A datetime object with UTC timezone, or None if parsing fails.
+        A datetime object with the given timezone, or None if parsing fails.
     """
-    if not isinstance(date_string, str):
+    if not isinstance(value, str):
         return None
 
     date_formats = [
@@ -199,7 +202,7 @@ def common_datetime_parser(date_string: str) -> datetime | None:
     ]
     for fmt in date_formats:
         try:
-            return datetime.strptime(date_string, fmt).replace(tzinfo=timezone.utc)
+            return datetime.strptime(value, fmt).replace(tzinfo=tzinfo)
         except ValueError:  # noqa: PERF203
             continue
 
