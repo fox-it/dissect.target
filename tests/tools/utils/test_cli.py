@@ -14,6 +14,8 @@ from dissect.target.tools.utils.cli import (
     args_to_uri,
     configure_generic_arguments,
     execute_function_on_target,
+    open_target,
+    open_targets,
     persist_execution_report,
     process_generic_arguments,
 )
@@ -189,3 +191,51 @@ def test_namespace_plugin_args() -> None:
     _, result = execute_function_on_target(mock_target, Mock(), ["--a", "asdf", "--b", "123"])
 
     assert result == "asdf"
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected_props"),
+    [
+        ([], {}),
+        (["--ignore-regback"], {"ignore_regback": True}),
+    ],
+)
+def test_ignore_regback_argument(argv: list[str], expected_props: dict[str, bool]) -> None:
+    """Test that ``--ignore-regback`` is set as a target property by ``open_target`` and ``open_targets``."""
+    parser = argparse.ArgumentParser()
+    configure_generic_arguments(parser)
+    args = parser.parse_args(argv)
+    args.target = "target1"
+    args.targets = ["target1", "target2"]
+
+    assert args.ignore_regback is bool(argv)
+
+    with patch("dissect.target.tools.utils.cli.Target") as mock_target:
+        mock_target.open.return_value = Mock(props={})
+        mock_target.open_all.return_value = [Mock(props={}), Mock(props={})]
+
+        assert open_target(args).props == expected_props
+        assert [target.props for target in open_targets(args)] == [expected_props, expected_props]
+
+
+def test_ignore_regback_argument_child() -> None:
+    """Test that ``--ignore-regback`` is set on the child target when ``--child`` is used."""
+    parser = argparse.ArgumentParser()
+    configure_generic_arguments(parser)
+    args = parser.parse_args(["--ignore-regback", "--child", "0"])
+    args.target = "target1"
+    args.targets = ["target1"]
+
+    parent = Mock(props={})
+    child = Mock(props={})
+    parent.open_child.return_value = child
+
+    with patch("dissect.target.tools.utils.cli.Target") as mock_target:
+        mock_target.open.return_value = parent
+        mock_target.open_all.return_value = [parent]
+
+        assert open_target(args) is child
+        assert list(open_targets(args)) == [child]
+
+    assert child.props == {"ignore_regback": True}
+    assert parent.props == {}

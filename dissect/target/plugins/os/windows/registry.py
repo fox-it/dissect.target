@@ -304,18 +304,34 @@ class RegistryPlugin(Plugin):
         return self.key(key).subkey(subkey)
 
     @internal
-    def keys(self, keys: str | Iterable[str]) -> Iterator[RegistryKey]:
+    def keys(self, keys: str | Iterable[str], ignore_regback: bool | None = None) -> Iterator[RegistryKey]:
         """Yields all keys that match the given queries.
 
         Automatically resolves CurrentVersion keys. Also flattens KeyCollections.
+
+        Args:
+            keys: The registry key paths to query.
+            ignore_regback: Whether to skip keys from registry backup (RegBack) hives. If ``None``, the
+                            ``ignore_regback`` target property is used, which defaults to ``False``.
         """
         keys = [keys] if isinstance(keys, str) else keys
 
+        if ignore_regback is None:
+            ignore_regback = self.target.props.get("ignore_regback", False)
+
         for key in self._iter_controlset_keypaths(keys):
             try:
-                yield from self.key(key)
-            except (RegistryKeyNotFoundError, HiveUnavailableError):  # noqa: PERF203
+                for subkey in self.key(key):
+                    if ignore_regback and self._is_regback_key(subkey):
+                        continue
+                    yield subkey
+            except (RegistryKeyNotFoundError, HiveUnavailableError):
                 pass
+
+    def _is_regback_key(self, key: RegistryKey) -> bool:
+        """Return whether the given registry key originates from a RegBack hive."""
+        filepath = getattr(key.hive, "filepath", None)
+        return any(part.lower() == "regback" for part in getattr(filepath, "parts", ()))
 
     @internal
     def values(self, keys: str | Iterable[str], value: str | Iterable[str]) -> Iterator[RegistryValue]:
