@@ -10,6 +10,7 @@ from dissect.target.tools.query import record_output
 from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
 )
@@ -21,7 +22,7 @@ log = get_logger(__name__)
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="target-yara",
+        description=f"target-yara {get_dissect_target_version()} : scan targets with yara rules.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
@@ -49,7 +50,14 @@ def main() -> int:
     try:
         for target in open_targets(args):
             rs = record_output(args.strings, False)
-            for record in target.yara(args.rules, args.path, args.max_size, args.check, args.no_decompress):
+            for record in target.yara(
+                args.rules,
+                args.path,
+                args.max_size,
+                args.check,
+                args.no_decompress,
+                args.exclude,
+            ):
                 rs.write(record)
 
     except TargetError as e:

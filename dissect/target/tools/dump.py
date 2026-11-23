@@ -47,6 +47,7 @@ from dissect.target.tools.utils.cli import (
     configure_plugin_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
     process_plugin_arguments,
@@ -752,7 +753,8 @@ def execute_pipeline(
 def parse_arguments() -> tuple[argparse.Namespace, list[str]]:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-dump {get_dissect_target_version()} : "
+        f"export records of a specific `function` used in target-query to a file.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
         add_help=False,

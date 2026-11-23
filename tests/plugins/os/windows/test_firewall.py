@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
@@ -9,6 +10,8 @@ from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.firewall import WindowsFirewallPlugin
 
 if TYPE_CHECKING:
+    import pytest
+
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
@@ -77,10 +80,10 @@ def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive
     assert not records[1].active
     assert records[1].dir == "IN"
     assert records[1].protocol == "UNASSIGNED_148"  # test IntEnum._missing_
-    assert records[1].profile == "Domain"
+    assert records[1].profile == ["Domain"]
     assert records[1].lport == ["5678"]
-    assert records[1].ra4 == "ExampleKeyword"
-    assert records[1].ra6 == "AnotherExampleKeyword"
+    assert records[1].ra4 == ["ExampleKeyword"]
+    assert records[1].ra6 == ["AnotherExampleKeyword"]
     assert records[1].app == "c:\\Windows\\system32\\svchost.exe"
     assert records[1].svc == "ExampleSvc"
     assert records[1].name == "@Example.dll,-12345"
@@ -132,6 +135,72 @@ def test_windows_firewall_rules(target_win_users: Target, hive_hklm: VirtualHive
         records[4].source
         == "HKLM\\SYSTEM\\ControlSet001\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules"
     )
+
+
+def test_windows_firewall_rules_repeated_tokens(
+    target_win_users: Target, hive_hklm: VirtualHive, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Test if tokens that appear more than once in a rule are parsed according to [MS-GPFAS] section 2.2.2.19.
+
+    Tokens such as ``Profile``, ``LPort``, ``RA4`` and ``ICMP4`` can appear more than once, and the values of all
+    their appearances apply. Their fields are lists, also when they appear only once, so the type of a field is the
+    same in every rule. Other tokens appear at most once, if one is repeated anyway the first appearance is used.
+    Every token results in a single field.
+    """
+    rules_name = "SYSTEM\\ControlSet001\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules"
+    rules_key = VirtualKey(hive_hklm, rules_name)
+
+    rules_key.add_value(
+        "repeated-tokens",
+        "v2.30|Action=Allow|Active=TRUE|Dir=In|Protocol=6|Profile=Domain|Profile=Private|LPort=80|LPort=8000-8080,8443"
+        "|RA4=10.0.0.0/8|RA4=192.168.1.1-192.168.1.10|RA4=LocalSubnet|LA6=fe80::/64|LA6=::1"
+        "|Name=First name|Name=Second name|",
+    )
+    rules_key.add_value(
+        "single-tokens",
+        "v2.30|Action=Block|Active=FALSE|Dir=Out|Protocol=1|Profile=Public|ICMP4=8:*|RA4=1.2.3.4|Name=Single|",
+    )
+    rules_key.add_value(
+        "repeated-icmp",
+        "v2.30|Action=Allow|Dir=In|Protocol=58|ICMP6=128:*|ICMP6=129:*|Name=ICMPv6 echo|",
+    )
+    hive_hklm.map_key(rules_name, rules_key)
+
+    target_win_users.add_plugin(WindowsFirewallPlugin)
+    with caplog.at_level(logging.WARNING):
+        records = {record.key: record for record in target_win_users.firewall.rules()}
+
+    # No duplicate fields, so no warning about them either
+    assert caplog.records == []
+    for record in records.values():
+        field_names = [name for _, name in record._desc.get_field_tuples()]
+        assert len(field_names) == len(set(field_names))
+
+    record = records["repeated-tokens"]
+    assert record.action == "ALLOW"
+    assert record.active
+    assert record.dir == "IN"
+    assert record.protocol == "TCP"
+    assert record.profile == ["Domain", "Private"]
+    assert record.lport == ["80", "8000-8080", "8443"]
+    assert record.ra4 == ["10.0.0.0/8", "192.168.1.1-192.168.1.10", "LocalSubnet"]
+    assert record.la6 == ["fe80::/64", "::1"]
+    assert record.name == "First name"
+
+    record = records["single-tokens"]
+    assert not record.active
+    assert record.protocol == "ICMP"
+    assert record.profile == ["Public"]
+    assert record.icmp4 == ["8:*"]
+    assert record.ra4 == ["1.2.3.4"]
+    assert record.name == "Single"
+
+    field_types = {name: field_type for field_type, name in record._desc.get_field_tuples()}
+    for name in ("profile", "icmp4", "ra4"):
+        assert field_types[name] == "string[]"
+    assert field_types["name"] == "string"
+
+    assert records["repeated-icmp"].icmp6 == ["128:*", "129:*"]
 
 
 def test_windows_firewall_logs(target_win: Target, fs_win: VirtualFilesystem) -> None:
