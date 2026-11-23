@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import zipfile
 from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote
@@ -9,6 +8,7 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers.fsutil import basename, dirname, join
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 from dissect.target.loaders.dir import find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
@@ -19,7 +19,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 FILESYSTEMS_ROOT = "uploads"
 UNIX_ACCESSORS = ["file", "auto"]

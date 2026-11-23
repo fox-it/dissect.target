@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.log.mssql import MssqlPlugin
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
@@ -40,3 +41,19 @@ def test_mssql_errorlog(target_win_users: Target, hive_hklm: VirtualHive, fs_win
     assert record.process == "Server"
     assert record.message.startswith("The SQL Server Network Interface library could not register")
     assert record.path == "C:\\Temp\\MSSQL\\Log\\ERRORLOG"
+
+    first_record = records[0]
+    assert str(first_record.ts) == "2024-04-08 12:16:38.560000+00:00"
+    assert first_record.instance == "MSSQL69.MyInstance"
+    assert first_record.process == "Server"
+    assert "\n" in first_record.message
+    assert "\t" in first_record.message
+    assert first_record.message.endswith("(Hypervisor)")
+
+    last_record = records[-1]
+    assert str(last_record.ts) == "2024-08-01 21:34:44.450000+00:00"
+    assert last_record.instance == "MSSQL69.MyInstance"
+    assert last_record.process == "spid6s"
+    assert "\n" in last_record.message
+    assert "\t" in last_record.message
+    assert last_record.message.endswith("no user action is required.")

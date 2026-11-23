@@ -61,7 +61,6 @@ def test_unix_shadow_invalid_shent(
     caplog: pytest.LogCaptureFixture, target_unix_users: Target, fs_unix: VirtualFilesystem
 ) -> None:
     """Test if we can parse invalid day values in shents."""
-
     shadow_invalid = """
     no_last_change:$6$salt$hash1::0:99999:7::123456:
     no_max_age:$6$salt$hash2:18963:0::7:::

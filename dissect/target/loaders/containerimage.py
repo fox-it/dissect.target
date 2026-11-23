@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import logging
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loaders.tar import TarSubLoader
 
 if TYPE_CHECKING:
@@ -14,7 +14,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DOCKER_ARCHIVE_IMAGE = {
     "manifest.json",
@@ -60,7 +61,7 @@ class ContainerImageTarSubLoader(TarSubLoader):
         if self.tarfs.path("/manifest.json").exists():
             try:
                 self.manifest = json.loads(self.tarfs.path("/manifest.json").read_text())[0]
-                self.name = self.manifest.get("RepoTags", [None])[0]
+                self.name = (self.manifest.get("RepoTags") or [None])[0]
                 self.layers = [self.tarfs.path(p) for p in self.manifest.get("Layers", [])]
             except Exception as e:
                 raise ValueError(f"Unable to read manifest.json inside docker image filesystem: {e}") from e
@@ -69,6 +70,14 @@ class ContainerImageTarSubLoader(TarSubLoader):
                 self.config = json.loads(self.tarfs.path(self.manifest.get("Config")).read_text())
             except Exception as e:
                 raise ValueError(f"Unable to read config inside docker image filesystem: {e}") from e
+
+            # When self.name not set from "RepoTags" in manifest.json, try creating one from the "Config" json.
+            if self.config and not self.name:
+                labels = self.config.get("config", {}).get("Labels", {})
+                title = labels.get("org.opencontainers.image.title")
+                version = labels.get("org.opencontainers.image.version")
+                if title and version:
+                    self.name = f"{title}:{version}"
 
         # OCI spec only has index.json
         elif self.tarfs.path("/index.json").exists():

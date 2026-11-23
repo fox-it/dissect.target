@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 import string
 import urllib.parse
@@ -9,21 +8,23 @@ from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 def add_virtual_ntfs_filesystem(
     target: Target,
     fs: Filesystem,
-    boot_path: str = "$Boot",
-    mft_path: str = "$MFT",
-    usnjrnl_path: str = "$Extend/$Usnjrnl:$J",
-    sds_path: str = "$Secure:$SDS",
+    boot_path: str | list[str] = "$Boot",
+    mft_path: str | list[str] = "$MFT",
+    usnjrnl_path: str | list[str] = "$Extend/$Usnjrnl:$J",
+    sds_path: str | list[str] = "$Secure:$SDS",
 ) -> None:
     """Utility for creating an NtfsFilesystem with separate system files from another Filesystem, usually
     a DirectoryFilesystem or VirtualFilesystem.
@@ -66,15 +67,15 @@ def add_virtual_ntfs_filesystem(
             log.warning("Opened NTFS filesystem from %s but could not find $MFT, skipping", fs)
 
 
-def _try_open(fs: Filesystem, path: str) -> BinaryIO | None:
+def _try_open(fs: Filesystem, path: str | list[str]) -> BinaryIO | None:
     paths = [path] if not isinstance(path, list) else path
 
     for path in paths:
         try:
-            path = fs.get(path)
-            if path.stat().st_size > 0:
-                return path.open()
-            log.warning("File is empty and will be skipped: %s", path)
+            entry = fs.get(path)
+            if entry.stat().st_size > 0:
+                return entry.open()
+            log.warning("File is empty and will be skipped: %s", entry)
         except FileNotFoundError:  # noqa: PERF203
             pass
     return None

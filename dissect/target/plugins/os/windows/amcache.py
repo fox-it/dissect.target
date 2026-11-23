@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 AMCACHE_FILE_KEYS = {
     "0": "product_name",
     "1": "company_name",
@@ -654,7 +655,6 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         References:
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
         """
-
         if (path := self.target.resolve("%windir%/appcompat/pca/PcaAppLaunchDic.txt")).exists():
             for line in path.open("rt"):
                 if not (line := line.strip()):
@@ -682,7 +682,6 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
             - https://www.sygnia.co/blog/new-windows-11-pca-artifact/
         """
-
         for path in self.target.resolve("%windir%/appcompat/pca").glob("PcaGeneralDb*.txt"):
             for line in path.open("rt", encoding="utf-16-le"):
                 if not (line := line.strip()):
@@ -711,7 +710,10 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
 
 def parse_win_datetime(value: str) -> datetime | None:
     if value:
-        return datetime.strptime(value, "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+        try:
+            return datetime.strptime(value, "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
     return None
 
 

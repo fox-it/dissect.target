@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
@@ -113,29 +114,6 @@ def test_filesystem_entry_get(exfat_fs: ExfatFilesystem, some_path: ExfatFilesys
     assert some_file.entry[0]._mock_name == "Mock_some_path_some_file"
 
 
-def test_filesystem_entry__iterdir(exfat_fs: ExfatFilesystem, some_path: ExfatFilesystemEntry) -> None:
-    file_names = []
-    file_entries = []
-
-    for entry_name, entry_file_tree in some_path._iterdir():
-        file_names.append(entry_name)
-        file_entries.append(entry_file_tree[0]._mock_name)
-
-    assert len(file_names) == 2
-    assert "some_file" in file_names
-    assert "other_file" in file_names
-    assert "Mock_some_path_some_file" in file_entries
-    assert "Mock_some_path_other_file" in file_entries
-
-
-def test_filesystem_entry__iterdir_raises(
-    exfat_fs: ExfatFilesystem,
-    other_file: ExfatFilesystemEntry,
-) -> None:
-    with pytest.raises(NotADirectoryError):
-        list(other_file._iterdir())
-
-
 def test_filesystem_entry_iterdir(
     exfat_fs: ExfatFilesystem,
     some_path: ExfatFilesystemEntry,
@@ -201,3 +179,15 @@ def test_filesystem_entry_is_file(
     assert other_file.is_file()
     assert other_file.is_file(follow_symlinks=False)
     assert not some_path.is_file()
+
+
+def test_exfat_identifier_no_guid() -> None:
+    """ExFAT.identifier fallback using exfat.vbr.volume_serial when volume.guid is None."""
+    dummy_fh = BytesIO(b"")  # empty in-memory file handle
+    with patch("dissect.target.filesystems.exfat.ExfatFilesystem.__init__", lambda self, fh: None):
+        fs = ExfatFilesystem(fh=dummy_fh)
+        fs.volume = Mock(guid=None)
+        fs.exfat = Mock(vbr=Mock(volume_serial=987654321))
+
+        expected_uuid = "987654321"
+        assert fs.identifier == expected_uuid

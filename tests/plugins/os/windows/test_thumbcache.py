@@ -20,7 +20,6 @@ def create_user_data_paths(target_win: Target, tmp_path: Path) -> Path:
 
     Returns: the path of created directory.
     """
-
     mocked_user_details = Mock()
     mocked_user = Mock()
     mocked_user.home_path = tmp_path

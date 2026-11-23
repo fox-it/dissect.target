@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.localeutil import normalize_language
+from dissect.target.helpers.locale.util import normalize_language
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.default.locale import LocalePlugin
@@ -47,15 +47,13 @@ class UnixLocalePlugin(LocalePlugin):
     @export(property=True)
     def timezone(self) -> str | None:
         """Get the timezone of the system."""
-
-        # /etc/timezone should contain a simple timezone string
-        # on most unix systems
+        # /etc/timezone should contain a simple timezone string on most unix systems
         if (path := self.target.fs.path("/etc/timezone")).exists():
             for line in path.open("rt"):
-                return timezone_from_path(Path(line.strip()))
+                if stripped_line := line.strip():
+                    return timezone_from_path(stripped_line)
 
-        # /etc/localtime can be a symlink, hardlink or a copy of:
-        # eg. /usr/share/zoneinfo/America/New_York
+        # /etc/localtime can be a symlink, hardlink or a copy of: eg. /usr/share/zoneinfo/America/New_York
         p_localtime = self.target.fs.path("/etc/localtime")
 
         # If it's a symlink, read the path of the symlink
@@ -85,7 +83,6 @@ class UnixLocalePlugin(LocalePlugin):
     @export(property=True)
     def language(self) -> list[str]:
         """Get the configured locale(s) of the system."""
-
         # Although this purports to be a generic function for Unix targets, these paths are Linux specific.
         locale_paths = [
             "/etc/default/locale",
@@ -100,7 +97,7 @@ class UnixLocalePlugin(LocalePlugin):
                 for line in path.open("rt"):
                     if "LANG=" in line:
                         lang_str = line.partition("=")[-1].strip().strip('"')
-                        if lang_str == "C.UTF-8":  # Skip if no locales are installed.
+                        if lang_str in ("C.UTF-8", "C.utf8"):  # Skip if no locales are installed.
                             continue
                         found_languages.add(normalize_language(lang_str))
 
@@ -109,7 +106,6 @@ class UnixLocalePlugin(LocalePlugin):
     @export(record=UnixKeyboardRecord)
     def keyboard(self) -> Iterator[UnixKeyboardRecord]:
         """Get the keyboard layout(s) of the system."""
-
         paths = [
             "/etc/default/keyboard",
             "/etc/vconsole.conf",

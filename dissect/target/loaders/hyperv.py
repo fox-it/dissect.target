@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import logging
 from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
@@ -9,6 +8,7 @@ from dissect.hypervisor import hyperv
 
 from dissect.target import container
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DRIVE_CONTROLLER_GUIDS = [
     # Microsoft Emulated IDE Controller
@@ -142,7 +143,7 @@ class HyperVLoader(Loader):
                         continue
 
                     filepath = drive["pathname"]
-                    filename = fsutil.basename(filepath, alt_separator="\\")
+                    filename = fsutil.basename(filepath, sep="\\")
 
                     # First attempt path relative to .vmcx/.xml file
                     disk_path = self.base_path.joinpath(filename)

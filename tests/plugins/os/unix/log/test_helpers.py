@@ -35,13 +35,11 @@ Jan  3 13:21:34 localhost systemd: Stopped target Swap.
 )
 def test_iso_readlines_max_lines(fs_unix: VirtualFilesystem, max_lines: int, expected_return_value: bool) -> None:
     """Assert that iso_readlines does not parse more than the provided max_lines."""
-
     fs_unix.map_file_fh("/var/log/syslog.2", BytesIO(gzip.compress(textwrap.dedent(syslog).encode())))
     assert any(iso_readlines(fs_unix.path("/var/log/syslog.2"), max_lines)) == expected_return_value
 
 
 def test_is_iso_fmt(fs_unix: VirtualFilesystem) -> None:
     """Assert that is_iso_fmt does not parse more than three max_lines."""
-
     fs_unix.map_file_fh("/var/log/syslog.3", BytesIO(gzip.compress(textwrap.dedent(syslog).encode())))
     assert not is_iso_fmt(fs_unix.path("/var/log/syslog.3"))

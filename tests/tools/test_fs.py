@@ -9,6 +9,7 @@ import pytest
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.tools.fs import _extract_path, cp
 from dissect.target.tools.fs import main as target_fs
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,7 +38,9 @@ def test_target_fs(
     path: str, expected_files: int, tmp_path: Path, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-fs", "tests/_data/tools/info/image.tar", "cp", path, "-o", str(tmp_path)])
+        m.setattr(
+            "sys.argv", ["target-fs", str(absolute_path("_data/tools/info/image.tar")), "cp", path, "-o", str(tmp_path)]
+        )
 
         target_fs()
         stdout, _ = capsys.readouterr()
@@ -47,6 +50,37 @@ def test_target_fs(
             assert len(lines) == expected_files
         else:
             assert stdout == "[!] Path doesn't exist\n"
+
+
+@pytest.mark.parametrize(
+    ("path", "expected_entries"),
+    [
+        ("/", ["etc", "home", "root"]),
+        ("/etc", ["hostname", "network", "passwd"]),
+    ],
+)
+def test_target_fs_ls(
+    path: str, expected_entries: list[str], capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-fs", str(absolute_path("_data/tools/info/image.tar")), "ls", path])
+
+        assert target_fs() == 0
+        stdout, _ = capsys.readouterr()
+
+        entries = stdout.split()
+        for entry in expected_entries:
+            assert entry in entries
+
+
+def test_target_fs_stat_root(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-fs", str(absolute_path("_data/tools/info/image.tar")), "stat", "/"])
+
+        assert target_fs() == 0
+        stdout, _ = capsys.readouterr()
+
+        assert "File: /" in stdout
 
 
 @pytest.mark.parametrize("files", [["file"]])

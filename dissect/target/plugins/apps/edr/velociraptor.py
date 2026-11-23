@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -22,9 +22,10 @@ ISO_8601_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{
 
 
 class VelociraptorRecordBuilder:
-    def __init__(self, artifact_name: str):
+    def __init__(self, artifact_name: str, extract_nested: bool):
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
         self.record_name = f"velociraptor/{artifact_name}"
+        self.extract_nested = extract_nested
 
     def build(self, object: dict, target: Target) -> TargetRecordDescriptor:
         """Builds a Velociraptor record."""
@@ -52,8 +53,12 @@ class VelociraptorRecordBuilder:
             elif isinstance(value, str):
                 record_type = "string"
             elif isinstance(value, dict):
-                record_type = "record"
-                value = self.build(value, target)
+                if self.extract_nested:
+                    record_type = "record"
+                    value = self.build(value, target)
+                else:
+                    # Skip nested objects that contain additional metadata
+                    continue
             else:
                 record_type = "dynamic"
 
@@ -82,8 +87,19 @@ class VelociraptorPlugin(Plugin):
             raise UnsupportedPluginError("No Velociraptor artifacts found")
 
     @export(record=DynamicDescriptor(["datetime"]))
-    def results(self) -> Iterator[Record]:
+    @arg(
+        "--extract-nested",
+        action="store_true",
+        help="extracts JSON objects from the artifacts",
+    )
+    def results(
+        self,
+        extract_nested: bool = False,
+    ) -> Iterator[Record]:
         """Return Rapid7 Velociraptor artifacts.
+
+        By default JSON objects are not extracted from the artifacts,
+        this can be done with the argument ``--extract-nested``.
 
         References:
             - https://docs.velociraptor.app/docs/vql/artifacts/
@@ -93,7 +109,7 @@ class VelociraptorPlugin(Plugin):
             artifact_name = (
                 urllib.parse.unquote(artifact.name.removesuffix(".json")).split("/")[0].lower().replace(".", "_")
             )
-            record_builder = VelociraptorRecordBuilder(artifact_name)
+            record_builder = VelociraptorRecordBuilder(artifact_name, extract_nested=extract_nested)
 
             for line in artifact.open("rt"):
                 if not (line := line.strip()):

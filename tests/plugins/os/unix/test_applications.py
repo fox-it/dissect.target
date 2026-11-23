@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 def test_unix_applications_desktop_files(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if .desktop files registering installed applications are detected correctly."""
-
     fs_unix.map_file_fh("/etc/hostname", BytesIO(b"hostname"))
 
     # system paths

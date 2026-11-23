@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
-import logging
+import re
 from io import BytesIO
 from pathlib import Path
 
-from dissect.target.helpers import hashutil
+from dissect.target.helpers import fsutil, hashutil
+from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.logging import get_logger
 
 try:
     import yara
@@ -24,12 +27,16 @@ from dissect.target.plugin import Plugin, arg, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",
     [
         ("datetime", "ts_mtime"),
+        ("datetime", "ts_atime"),
+        ("datetime", "ts_ctime"),
+        ("datetime", "ts_btime"),
         ("path", "path"),
         ("string", "rule"),
         ("string[]", "matches"),
@@ -40,6 +47,8 @@ YaraMatchRecord = TargetRecordDescriptor(
 )
 
 DEFAULT_MAX_SCAN_SIZE = 10 * 1024 * 1024
+
+RE_DRIVE_PATH = re.compile(r"^([a-zA-Z]):[\\/]")
 
 
 class YaraPlugin(Plugin):
@@ -53,6 +62,17 @@ class YaraPlugin(Plugin):
     @arg("-p", "--path", default="/", help="path on target(s) to recursively scan")
     @arg("-m", "--max-size", type=int, default=DEFAULT_MAX_SCAN_SIZE, help="maximum file size in bytes to scan")
     @arg("-c", "--check", action="store_true", help="check if every YARA rule is valid")
+    @arg("--no-decompress", action="store_true", help="do not automatically decompress files for extra scanning")
+    @arg(
+        "-e",
+        "--exclude",
+        action="append",
+        metavar="PATTERN",
+        help=(
+            "exclude paths on target(s) matching this glob-style pattern from scan (can be repeated), "
+            "matched against the full path on the target, e.g. '/c:/Windows/**' or '**/*.log'"
+        ),
+    )
     @export(record=YaraMatchRecord)
     def yara(
         self,
@@ -60,6 +80,8 @@ class YaraPlugin(Plugin):
         path: str = "/",
         max_size: int = DEFAULT_MAX_SCAN_SIZE,
         check: bool = False,
+        no_decompress: bool = False,
+        exclude: list[str] | None = None,
     ) -> Iterator[YaraMatchRecord]:
         """Scan files inside the target up to a given maximum size with YARA rule file(s).
 
@@ -68,11 +90,20 @@ class YaraPlugin(Plugin):
             path: ``string`` of absolute target path to scan.
             max_size: Files larger than this size will not be scanned.
             check: Check if provided rules are valid, only compiles valid rules.
+            no_decompress: Do not automatically decompress compressed files before scanning.
+            exclude: ``list`` of glob-style string patterns to exclude from scanning.
+
+        Examples:
+            Exclude specific files or directories using the ``-e`` option:
+
+                -e /var/nssynclog/keys     skip this directory entirely
+                -e '/var/log/*.gz'         skip .gz files directly in /var/log
+                -e '**/*.key'              skip .key files at any depth
+                -e '/home/*/.cache'        skip the .cache directory of every user
 
         Returns:
             Iterator yields ``YaraMatchRecord``.
         """
-
         compiled_rules = process_rules(rules, check)
 
         if not rules:
@@ -86,21 +117,62 @@ class YaraPlugin(Plugin):
 
         self.target.log.warning("Will not scan files larger than %s MB", max_size // 1024 // 1024)
 
-        for _, _, files in self.target.fs.walk_ext(path):
-            for file in files:
-                try:
-                    if (file_size := file.stat().st_size) > max_size:
-                        self.target.log.info("Not scanning file of %s MB: '%s'", (file_size // 1024 // 1024), file)
-                        continue
+        if no_decompress:
+            self.target.log.info("Will not automatically check in compressed files")
+        else:
+            self.target.log.info(
+                "Will check in compressed files automatically (at most %s MB after decompression)",
+                max_size // 1024 // 1024,
+            )
 
-                    buf = file.open().read()
+        for pattern in exclude or []:
+            if suggestion := _suggest_exclude(pattern):
+                self.target.log.warning(
+                    "Exclude pattern %r is matched against the full path and will not match anything, did you mean %r?",
+                    pattern,
+                    suggestion,
+                )
+
+        for file in fsutil.iter_dir_entries(self.target.fs.get(path), exclude=exclude):
+            if not file.is_file():
+                continue
+
+            fhandles = []
+            try:
+                fstat = file.stat()
+                if fstat.st_size > max_size:
+                    self.target.log.info("Not scanning file of %s MB: '%s'", (fstat.st_size // 1024 // 1024), file)
+                    continue
+
+                fh_original = file.get().open()
+                fhandles.append(fh_original)
+                if not no_decompress:
+                    fh_decompress = open_decompress(fileobj=fh_original, mode="rb")
+                    if fh_decompress is not fh_original:
+                        fhandles.append(fh_decompress)
+
+                for fh in fhandles:
+                    buf = fh.read(max_size + 1)
+                    if len(buf) > max_size:
+                        self.target.log.warning(
+                            "Decompressed '%s' is larger than the maximum scan size, scanning up to %s bytes",
+                            file,
+                            max_size,
+                        )
+
+                    # ensure that the original file handle is reset for compressed reads
+                    fh_original.seek(0)
+
                     for match in compiled_rules.match(data=buf):
                         string_matches: list[str] = []
                         for string in match.strings:
                             string_matches.extend(f"{string}={instance}" for instance in string.instances)
 
                         yield YaraMatchRecord(
-                            ts_mtime=file.stat().st_mtime,
+                            ts_mtime=fstat.st_mtime,
+                            ts_atime=fstat.st_atime,
+                            ts_ctime=fstat.st_ctime,
+                            ts_btime=fstat.st_birthtime if hasattr(fstat, "st_birthtime") else None,
                             path=self.target.fs.path(file.path),
                             rule=match.rule,
                             matches=string_matches,
@@ -110,13 +182,31 @@ class YaraPlugin(Plugin):
                             _target=self.target,
                         )
 
-                except FileNotFoundError:
-                    continue
-                except RuntimeWarning as e:
-                    self.target.log.warning("Runtime warning while scanning file '%s': %s", file, e)
-                except Exception as e:
-                    self.target.log.error("Exception scanning file '%s'", file)  # noqa: TRY400
-                    self.target.log.debug("", exc_info=e)
+            except FileNotFoundError:
+                continue
+            except RuntimeWarning as e:
+                self.target.log.warning("Runtime warning while scanning file '%s': %s", file, e)
+            except Exception as e:
+                self.target.log.error("Exception scanning file '%s'", file)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
+            finally:
+                for fh in reversed(fhandles):
+                    with contextlib.suppress(Exception):
+                        fh.close()
+
+
+def _suggest_exclude(pattern: str) -> str | None:
+    """Return a suggested replacement for an exclude pattern that will not match anything, or ``None``."""
+    if pattern.startswith(("/", "**")):
+        return None
+
+    pattern = pattern.removeprefix("./")
+
+    # Windows style path, e.g. C:\Windows or c:/Windows
+    if match := RE_DRIVE_PATH.match(pattern):
+        return f"/{match.group(1).lower()}:/" + pattern[match.end() :].replace("\\", "/")
+
+    return "**/" + pattern.replace("\\", "/")
 
 
 def process_rules(paths: list[str | Path], check: bool = False) -> yara.Rules | None:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import pathlib
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -8,6 +7,7 @@ from dissect.fve import luks
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers.keychain import KeyType
+from dissect.target.helpers.logging import get_logger
 from dissect.target.volume import EncryptedVolumeSystem, Volume
 
 if TYPE_CHECKING:
@@ -15,7 +15,8 @@ if TYPE_CHECKING:
 
     from dissect.util.stream import AlignedStream
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class LUKSVolumeSystemError(VolumeSystemError):

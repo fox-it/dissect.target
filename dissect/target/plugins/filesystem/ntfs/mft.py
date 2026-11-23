@@ -156,7 +156,6 @@ class MftPlugin(Plugin):
     )
     @arg(
         "--compact",
-        group="fmt",
         action="store_true",
         help="compacts the MFT entry timestamps into a single record",
     )
@@ -165,7 +164,6 @@ class MftPlugin(Plugin):
     @arg("--end", type=int, default=-1, help="the last MFT segment number")
     @arg(
         "--macb",
-        group="fmt",
         action="store_true",
         help="compacts MFT timestamps into MACB bitfield (format: MACB[standard|ads]/MACB[filename])",
     )
@@ -187,7 +185,6 @@ class MftPlugin(Plugin):
         References:
             - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
         """
-
         record_formatter = default_formatter
 
         def noop_aggregator(records: Iterator[Record]) -> Iterator[Record]:
@@ -614,5 +611,4 @@ def format_body_info(
 
 def format_none_value(value: Any) -> str | Any:
     """Format the value if it is ``None``."""
-
     return value if value is not None else "No Data"

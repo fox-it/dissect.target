@@ -9,18 +9,21 @@ import sys
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.target import Target
-from dissect.target.tools.fsutils import print_ls, print_stat
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     process_generic_arguments,
 )
+from dissect.target.tools.utils.fs import print_ls, print_stat
 
 if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import TargetPath
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -36,15 +39,15 @@ def ls(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     use_colors = sys.stdout.buffer.isatty()
 
     print_ls(
-        path,
-        0,
-        sys.stdout,
-        args.l,
-        args.human_readable,
-        args.recursive,
-        args.use_ctime,
-        args.use_atime,
-        use_colors,
+        path=path,
+        depth=0,
+        stdout=sys.stdout,
+        long_listing=args.l,
+        human_readable=args.human_readable,
+        recursive=args.recursive,
+        use_ctime=args.use_ctime,
+        use_atime=args.use_atime,
+        color=use_colors,
     )
 
 
@@ -101,7 +104,8 @@ def _extract_path(path: TargetPath, output_path: pathlib.Path) -> None:
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-fs {get_dissect_target_version()} : interact with the filesystem of a "
+        f"target using a set of familiar Unix commands.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
@@ -156,10 +160,14 @@ def main() -> int:
         log.debug("", exc_info=e)
         return 1
 
+    root = target.fs.path("/")
     glob_path = str(args.path).lstrip("/")
 
+    # An empty pattern (the path "/") is not a valid glob pattern
+    paths = root.glob(glob_path) if glob_path else [root]
+
     found = False
-    for path in target.fs.path("/").glob(glob_path):
+    for path in paths:
         args.handler(target, path, args)
         found = True
 

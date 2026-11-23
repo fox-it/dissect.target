@@ -18,7 +18,6 @@ from dissect.target.helpers.regutil import (
     RegistryHive,
     RegistryKey,
     RegistryValue,
-    ValueType,
 )
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
@@ -30,6 +29,9 @@ if TYPE_CHECKING:
 
     from cbc_sdk.live_response_api import LiveResponseSession
 
+    from dissect.target.helpers.regutil import (
+        ValueType,
+    )
     from dissect.target.target import Target
 
 try:
@@ -118,8 +120,8 @@ class CbRegistry(RegistryPlugin):
         self.session = session
         super().__init__(target)
 
-    def check_compatible(self) -> bool:
-        return False
+    def check_compatible(self) -> None:
+        pass
 
     def _init_registry(self) -> None:
         for hive_name, root_key in self.MAPPINGS.items():

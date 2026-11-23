@@ -52,7 +52,7 @@ ADPolicyRecord = TargetRecordDescriptor(
 
 
 class ADPolicyPlugin(Plugin):
-    """Plugin that parses AD policies present on Windows Server and Desktop systems
+    """Plugin that parses AD policies present on Windows Server and Desktop systems.
 
     References:
         - https://docs.microsoft.com/en-us/previous-versions/windows/desktop/policy/registry-policy-file-format

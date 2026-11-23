@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 SEPLogRecord = TargetRecordDescriptor(
     "application/av/symantec/sep/log",
     [
@@ -363,7 +364,6 @@ class SymantecPlugin(Plugin):
             user (string): User associated with the event.
             line_no (varint): Reference line number in log file.
         """
-
         for log_path in self.target.fs.glob(self.LOG_SEP_NET):
             log = self.target.fs.path(log_path).open("rb")
             line_no = 0

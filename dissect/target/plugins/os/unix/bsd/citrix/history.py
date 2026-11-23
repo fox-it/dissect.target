@@ -52,7 +52,10 @@ CITRIX_NETSCALER_BASH_HISTORY_RE = re.compile(
 class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
     """Citrix command history plugin."""
 
-    COMMAND_HISTORY_ABSOLUTE_PATHS = (("citrix-netscaler-bash", "/var/log/bash.log*"),)
+    COMMAND_HISTORY_ABSOLUTE_PATHS = (
+        ("citrix-netscaler-bash", "/var/log/bash.log*"),
+        ("citrix-netscaler-sh", "/var/log/sh.log*"),
+    )
     COMMAND_HISTORY_RELATIVE_PATHS = (
         *CommandHistoryPlugin.COMMAND_HISTORY_RELATIVE_PATHS,
         ("citrix-netscaler-cli", ".nscli_history"),
@@ -66,8 +69,9 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
                 (shell, path, None) for path in self.target.fs.path("/").glob(history_absolute_path_glob.lstrip("/"))
             )
 
-        # Also utilize the _find_history_files function of the parent class
+        # Also utilize the _find_history_files function of the parent class for relative paths.
         history_files.extend(super()._find_history_files())
+
         return history_files
 
     def _find_user_by_name(self, username: str) -> UnixUserRecord | None:
@@ -85,16 +89,16 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         Some entries are returned in reverse chronological order and can contain negative command order integers due
         to the way Citrix stores bash history commands.
         """
-
         for shell, history_path, user in self._history_files:
             if shell == "citrix-netscaler-cli":
                 yield from self.parse_netscaler_cli_history(history_path, user)
-            elif shell == "citrix-netscaler-bash":
+            elif shell in ("citrix-netscaler-bash", "citrix-netscaler-sh"):
                 yield from self.parse_netscaler_bash_history(history_path)
+            else:
+                yield from self.parse_generic_history(history_path, user, shell)
 
     def parse_netscaler_bash_history(self, path: TargetPath) -> Iterator[CommandHistoryRecord]:
         """Parse bash.log* contents."""
-
         i = 0
         for ts, line in year_rollover_helper(path, RE_CITRIX_NETSCALER_BASH_HISTORY_DATE, "%b %d %H:%M:%S "):
             line = line.strip()

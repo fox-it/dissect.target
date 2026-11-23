@@ -45,7 +45,7 @@ def test_windows_activitiescache_10_22H2(target_win_users: Target, fs_win: Virtu
     assert records[0].activity_type == 11
     assert records[0].activity_status == 1
     assert records[0].activity_priority == 3
-    assert not records[0].match_id
+    assert records[0].match_id == "default$windows.data.consent.consentitem$consents"
     assert records[0].etag == 1
     assert records[0].tag == "windows.data.bluelightreduction.settings"
     assert records[0].is_local_only

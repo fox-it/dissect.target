@@ -36,7 +36,7 @@ class PfroPlugin(Plugin):
 
     @export(record=PfroRecord)
     def pfro(self) -> Iterator[PfroRecord]:
-        """Return the content of %windir%/PFRO.log
+        """Return the content of %windir%/PFRO.log.
 
         A Pending File Rename Operation log file (PFRO.log) holds information about the process of deleting or renaming
         files that are locked or being used and that will be renamed on reboot. This is related to the filerenameop

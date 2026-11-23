@@ -164,11 +164,11 @@ class LnkPlugin(Plugin):
             target_atime (datetime): Access time of the target (linked) file.
             target_ctime (datetime): Creation time of the target (linked) file.
         """
-
         for entry in self.lnk_entries(path):
             try:
                 lnk_file = Lnk(entry.open())
-                yield parse_lnk_file(self.target, lnk_file, entry)
+                if (lnk_rec := parse_lnk_file(self.target, lnk_file, entry)) is not None:
+                    yield lnk_rec
             except Exception as e:  # noqa: PERF203
                 self.target.log.warning("Failed to parse link file %s", entry)
                 self.target.log.debug("", exc_info=e)

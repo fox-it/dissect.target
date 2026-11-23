@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from dissect.target.target import Target
+from tests._utils import cleanup_modules
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -15,12 +16,16 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def mock_impacket(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
-    with monkeypatch.context() as m:
-        if "dissect.target.loaders.smb" in sys.modules:
-            m.delitem(sys.modules, "dissect.target.loaders.smb")
-        if "dissect.target.filesystems.smb" in sys.modules:
-            m.delitem(sys.modules, "dissect.target.filesystems.smb")
-
+    with (
+        cleanup_modules(
+            [
+                "dissect.target.loaders.smb",
+                "dissect.target.filesystems.smb",
+            ],
+            monkeypatch,
+        ),
+        monkeypatch.context() as m,
+    ):
         mock_impacket = MagicMock()
         m.setitem(sys.modules, "impacket", mock_impacket)
         m.setitem(sys.modules, "impacket.dcerpc", mock_impacket.dcerpc)

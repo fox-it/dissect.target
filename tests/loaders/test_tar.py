@@ -158,7 +158,6 @@ def test_detect_extension(should_detect: bool, filename: str, buffer: str, tmp_p
 )
 def test_detect_buffer(file: str, tmp_path: Path) -> None:
     """Test if we detect the given files as a (compressed) tar file or not."""
-
     if file == "small.tar.lz" and (platform.python_implementation() == "PyPy" or platform.system() == "Windows"):
         pytest.skip(reason="LZMA is flaky on PyPy and/or Windows")
 
@@ -169,3 +168,14 @@ def test_detect_buffer(file: str, tmp_path: Path) -> None:
     tmp_tar.write_bytes(small_file.read_bytes())
 
     assert TarLoader.detect(tmp_tar)
+
+
+def test_skip_folder_member_if_previously_mapped() -> None:
+    """Test if we skip a directory tar member if the path of said directory is already mapped."""
+    path = absolute_path("_data/loaders/tar/test-dir.tar")
+    loader = loader_open(path)
+    target = Target()
+    loader.map(target)
+
+    assert list(target.fs.get("/").iterdir()) == ["folder"]
+    assert list(target.fs.get("/folder").iterdir()) == ["file"]

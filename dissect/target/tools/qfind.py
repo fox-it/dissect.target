@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import logging
 import os
 import random
 import sys
@@ -11,12 +10,14 @@ from typing import TYPE_CHECKING
 from dissect.cstruct import utils
 
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.scrape import recover_string
-from dissect.target.plugins.scrape.qfind import QFindMatchRecord, QFindPlugin
+from dissect.target.plugins.scrape.qfind import QFindPlugin
 from dissect.target.tools.query import record_output
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
 )
@@ -25,10 +26,12 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dissect.target.container import Container
+    from dissect.target.plugins.scrape.qfind import QFindMatchRecord
     from dissect.target.target import Target
     from dissect.target.volume import Volume
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 NO_COLOR = os.getenv("NO_COLOR")
 COLOR_GREY = "\033[38;5;248m"
@@ -38,7 +41,7 @@ COLOR_GREY = "\033[38;5;248m"
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="Find a needle in a haystack.",
+        description=f"target-qfind {get_dissect_target_version()} : Find a needle in a haystack.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
@@ -90,7 +93,7 @@ def main() -> int:
                 header = f"[{hit.offset:#08x} @ {hit.needle} ({hit.codec})]"
 
                 if not NO_COLOR:
-                    header = utils.COLOR_WHITE + header + utils.COLOR_NORMAL
+                    header = utils.COLOR_WHITE_BOLD + header + utils.COLOR_CLEAR
 
                 before_offset = max(0, hit.offset - args.window)
                 needle_len = len(hit.match)
@@ -99,11 +102,11 @@ def main() -> int:
 
                 if args.raw:
                     palette = (
-                        [(hit.offset - before_offset, utils.COLOR_NORMAL), (needle_len, utils.COLOR_BG_RED)]
+                        [(hit.offset - before_offset, utils.COLOR_CLEAR), (needle_len, utils.COLOR_BG_RED)]
                         if not NO_COLOR
                         else None
                     )
-                    utils.hexdump(hit.buffer, palette, offset=before_offset)
+                    utils.hexdump(hit.buffer, palette=palette, offset=before_offset)
 
                 else:
                     codec = "utf-8" if hit.codec == "hex" else hit.codec
@@ -117,7 +120,7 @@ def main() -> int:
                         before_part,
                         (utils.COLOR_BG_RED if not NO_COLOR else ""),
                         after_part[:needle_len],
-                        (utils.COLOR_NORMAL if not NO_COLOR else ""),
+                        (utils.COLOR_CLEAR if not NO_COLOR else ""),
                         after_part[needle_len:],
                     )
                     print("".join(hit))
@@ -314,13 +317,13 @@ def progress_handler(target: Target) -> Callable[[Container | Volume, int, int],
         nonlocal current_disk, char
 
         if current_disk is None:
-            sys.stderr.write(f"{utils.COLOR_WHITE}{target}{utils.COLOR_NORMAL}\n")
+            sys.stderr.write(f"{utils.COLOR_WHITE_BOLD}{target}{utils.COLOR_CLEAR}\n")
 
         if current_disk != disk:
-            sys.stderr.write(f"\n{utils.COLOR_WHITE}[Current disk: {disk}]{utils.COLOR_NORMAL}\n")
+            sys.stderr.write(f"\n{utils.COLOR_WHITE_BOLD}[Current disk: {disk}]{utils.COLOR_CLEAR}\n")
             current_disk = disk
 
-        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_NORMAL}")
+        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_CLEAR}")
         sys.stderr.flush()
 
         if offset % (1337 * 3) == 0:

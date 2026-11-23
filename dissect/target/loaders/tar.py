@@ -1,24 +1,27 @@
 from __future__ import annotations
 
-import logging
 import tarfile as tf
 from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target import filesystem, target
+from dissect.target import filesystem
 from dissect.target.filesystems.tar import (
     TarFilesystemDirectoryEntry,
     TarFilesystemEntry,
 )
 from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader, SubLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+    from dissect.target import target
+
+
+log = get_logger(__name__)
 
 TAR_EXT_COMP = (
     ".tar.gz",
@@ -113,7 +116,11 @@ class GenericTarSubLoader(TarSubLoader):
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             entry = entry_cls(volume, fsutil.normpath(mname), member)
-            volume.map_file_entry(entry.path, entry)
+
+            try:
+                volume.map_file_entry(entry.path, entry)
+            except KeyError as e:
+                log.debug("Skipping directory member %r in tar as %r is already mapped: %s", member, entry.path, e)
 
         for vol_name, vol in volumes.items():
             loaderutil.add_virtual_ntfs_filesystem(
@@ -135,6 +142,8 @@ class TarLoader(Loader):
         import_lazy("dissect.target.loaders.containerimage").ContainerImageTarSubLoader,
         import_lazy("dissect.target.loaders.acquire").AcquireTarSubLoader,
         import_lazy("dissect.target.loaders.uac").UacTarSubloader,
+        import_lazy("dissect.target.loaders.nscollector").NsCollectorTarSubLoader,
+        import_lazy("dissect.target.loaders.vmsupport").VmSupportTarSubloader,
         GenericTarSubLoader,  # should be last
     )
 

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import datetime
-import logging
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 SchedLgURecord = TargetRecordDescriptor(
     "windows/tasks/log/schedlgu",

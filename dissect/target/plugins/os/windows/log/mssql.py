@@ -73,29 +73,49 @@ class MssqlPlugin(Plugin):
         References:
             - https://learn.microsoft.com/en-us/sql/relational-databases/logs/view-offline-log-files
         """
-
         for instance, log_path in self.instances:
             for errorlog in log_path.glob(self.FILE_GLOB):
                 # The errorlog includes a BOM, so endianess gets determined automatically
                 fh = errorlog.open(mode="rt", encoding="utf-16", errors="surrogateescape")
-                buf = ""
+
+                current_ts: re.Match[str] | None = None
+                current_buf = ""
 
                 for line in fh:
-                    if ts := RE_TIMESTAMP_PATTERN.match(line):
-                        yield MssqlErrorlogRecord(
-                            ts=datetime.strptime(ts.group(), "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
-                            instance=instance,
-                            # The process name is a fixed-width field and is always 12 characters long.
-                            process=buf[23:35].strip(),
-                            message=buf[35:].strip(),
-                            path=errorlog,
-                            _target=self.target,
-                        )
-                        buf = ""
+                    # If we have a buffer with a timestamp and
+                    # our current line also has a timestamp,
+                    # we should have a complete record in our buffer.
+                    if ts_match := RE_TIMESTAMP_PATTERN.match(line):
+                        if current_ts:
+                            yield MssqlErrorlogRecord(
+                                ts=datetime.strptime(current_ts.group(), "%Y-%m-%d %H:%M:%S.%f").replace(
+                                    tzinfo=timezone.utc
+                                ),
+                                instance=instance,
+                                # The process name is a fixed-width field and is always 12 characters long.
+                                process=current_buf[23:35].strip(),
+                                message=current_buf[35:].strip(),
+                                path=errorlog,
+                                _target=self.target,
+                            )
 
-                    buf += line
+                        current_ts = ts_match
+                        current_buf = line
+                    elif current_buf:
+                        current_buf += line
+                # For the last line
+                if current_ts and current_buf:
+                    yield MssqlErrorlogRecord(
+                        ts=datetime.strptime(current_ts.group(), "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
+                        instance=instance,
+                        # The process name is a fixed-width field and is always 12 characters long.
+                        process=current_buf[23:35].strip(),
+                        message=current_buf[35:].strip(),
+                        path=errorlog,
+                        _target=self.target,
+                    )
 
-    def _find_instances(self) -> set[str, TargetPath]:
+    def _find_instances(self) -> set[tuple[str, TargetPath]]:
         return {
             (subkey.name, self.target.fs.path(subkey.subkey("SQLServerAgent").value("ErrorLogFile").value).parent)
             for subkey in self.target.registry.glob_ext(self.MSSQL_KEY_GLOB)

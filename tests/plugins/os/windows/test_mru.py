@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
-from dissect.target.target import Target
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
@@ -41,6 +40,9 @@ def target_win_mru(target_win_users: Target) -> Target:
         "64002e006c006e006b00000026000000"
     )
     recentdocs_key.add_value("0", VirtualValue(user_hive, "0", recentdocs_value))
+
+    # value name is not present in MRUListEx, but should be still found with index None
+    recentdocs_key.add_value("1", VirtualValue(user_hive, "42", recentdocs_value))
 
     # OpenSaveMRU
     opensave_key = VirtualKey(
@@ -110,6 +112,24 @@ def target_win_mru(target_win_users: Target) -> Target:
         ),
     )
 
+    opensave_pidl_contacts_subkey = VirtualKey(user_hive, opensave_pidl_key.path + "\\info/contacts")
+    opensave_pidl_contacts_subkey.add_value(
+        "MRUListEx",
+        VirtualValue(user_hive, "MRUListEx", b"\x00\x00\x00\x00\xff\xff\xff\xff"),
+    )
+    contacts_data = bytes.fromhex(
+        "14001F6880531C87A0426910A2EA08002B30309D"
+        "4A0061800000000068007400740070003A002F00"
+        "2F007700770077002E0074006500730074003000"
+        "31002E0069006E0066006F002F0063006F006E00"
+        "74006100630074007300000000000000"
+    )
+    opensave_pidl_contacts_subkey.add_value(
+        "0",
+        VirtualValue(user_hive, "0", contacts_data),
+    )
+    opensave_pidl_key.add_subkey("info/contacts", opensave_pidl_contacts_subkey)
+
     # ACMru
     acmru_key = VirtualKey(user_hive, "Software\\Microsoft\\Search Assistant\\ACMru\\5603")
     acmru_key.add_value("000", VirtualValue(user_hive, "000", "value"))
@@ -138,6 +158,8 @@ def target_win_mru(target_win_users: Target) -> Target:
     excel_15_file_key = VirtualKey(user_hive, "Software\\Microsoft\\Office\\15.0\\Excel\\File MRU")
     excel_15_file_key.add_value("Item 1", VirtualValue(user_hive, "Item 1", office_value))
     excel_15_file_key.add_value("Item 2", VirtualValue(user_hive, "Item 2", office_value))
+    metadata_value = "<Metadata><AppSpecific><OneNoteNotebookUrl>C:\\Path</OneNoteNotebookUrl></AppSpecific></Metadata>"
+    excel_15_file_key.add_value("Item Metadata 1", VirtualValue(user_hive, "Item Metadata 1", metadata_value))
     excel_16_place_key = VirtualKey(user_hive, "Software\\Microsoft\\Office\\16.0\\Excel\\Place MRU")
     excel_16_place_key.add_value("Item 1", VirtualValue(user_hive, "Item 1", office_value))
     excel_16_place_key.add_value("Item 2", VirtualValue(user_hive, "Item 2", office_value))
@@ -187,10 +209,12 @@ def test_mru_plugin(target_win_mru: Target) -> None:
     msoffice = list(target_win_mru.mru.msoffice())
 
     assert len(run) == 2
-    assert len(recentdocs) == 1
-    assert len(opensave) == 5
+    assert len(recentdocs) == 2
+    assert any(r.index is None for r in recentdocs)
+    assert len(opensave) == 6
     # test if opensave_pidl_key is correctly resolved
     assert opensave[4].value == "My Computer\\Z:\\Web Optimizer.zip"
+    assert any("http://www.test01.info/contacts" in r.value for r in opensave)
     assert len(lastvisited) == 3
     # test if lastvisited_pidl_key is correctly resolved
     assert lastvisited[2].filename == "KeePass.exe"
@@ -200,4 +224,10 @@ def test_mru_plugin(target_win_mru: Target) -> None:
     assert len(mstsc) == 3
     assert len(msoffice) == 6
 
-    assert len(list(target_win_mru.mru())) == 25
+    msoffice_with_metadata = [r for r in msoffice if r.metadata is not None]
+    assert len(msoffice_with_metadata) == 1
+    assert msoffice_with_metadata[0].metadata == (
+        "<Metadata><AppSpecific><OneNoteNotebookUrl>C:\\Path</OneNoteNotebookUrl></AppSpecific></Metadata>"
+    )
+
+    assert len(list(target_win_mru.mru())) == 27

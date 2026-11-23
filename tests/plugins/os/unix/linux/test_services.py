@@ -71,7 +71,6 @@ def test_services(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None
 
 def test_services_systemd_drop_folder(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we correctly parse systemd ``.service`` and drop folder ``.conf`` files. Data based on Ubuntu 22.04 LTS default files."""  # noqa: E501
-
     fs_unix.map_file(
         "/lib/systemd/system/systemd-localed.service",
         str(absolute_path("_data/plugins/os/unix/linux/services/systemd-localed.service")),
@@ -87,6 +86,12 @@ def test_services_systemd_drop_folder(target_unix: Target, fs_unix: VirtualFiles
 
     target_unix.add_plugin(ServicesPlugin)
     results = list(target_unix.services())
+
+    # A key in multiple files is a single list field, not a field for every occurrence
+    field_tuples = results[0]._desc.get_field_tuples()
+    field_names = [name for _, name in field_tuples]
+    assert len(field_names) == len(set(field_names))
+    assert ("string[]", "Unit_Description") in field_tuples
 
     # Make sure we convert duplicate values to a list
     assert results[0].Unit_Description == ["Locale Service", "Another Description"]

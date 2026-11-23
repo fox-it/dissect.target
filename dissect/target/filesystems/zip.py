@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import stat
 import zipfile
 from datetime import datetime, timezone
@@ -22,11 +21,17 @@ from dissect.target.filesystem import (
     VirtualFilesystem,
 )
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-log = logging.getLogger(__name__)
+    from dissect.target.filesystem import (
+        DirEntry,
+    )
+
+
+log = get_logger(__name__)
 
 
 class ZipFilesystem(Filesystem):
@@ -52,15 +57,17 @@ class ZipFilesystem(Filesystem):
         self.zip = zipfile.ZipFile(fh, mode="r")
         self.base = base or ""
 
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
+        self._fs = VirtualFilesystem(sep=self.sep, altsep=self.altsep, case_sensitive=self.case_sensitive)
 
         for member in self.zip.infolist():
-            mname = member.filename.strip("/")
-            if not mname.startswith(self.base) or mname == ".":
+            if not member.filename.startswith(self.base) or member.filename in (".", "./"):
                 continue
 
-            rel_name = self._resolve_path(mname)
-            self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
+            rel_name = self._resolve_path(member.filename).strip("/")
+            try:
+                self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
+            except KeyError as e:
+                log.debug("Skipping directory member %r in zip as %r is already mapped: %s", member, rel_name, e)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
@@ -68,7 +75,7 @@ class ZipFilesystem(Filesystem):
         return zipfile.is_zipfile(fh)
 
     def _resolve_path(self, path: str) -> str:
-        return fsutil.normpath(path[len(self.base) :], alt_separator=self.alt_separator)
+        return fsutil.normpath(path.removeprefix(self.base), sep=self.sep)
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""
@@ -97,25 +104,13 @@ class ZipFilesystemEntry(VirtualDirectory):
         except Exception:
             raise FileNotFoundError(self.path)
 
-    def iterdir(self) -> Iterator[str]:
+    def scandir(self) -> Iterator[DirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        entry = self._resolve()
-        if isinstance(entry, ZipFilesystemEntry):
-            yield from super(ZipFilesystemEntry, entry).iterdir()
-        else:
-            yield from entry.iterdir()
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        if not self.is_dir():
-            raise NotADirectoryError(self.path)
-
-        entry = self._resolve()
-        if isinstance(entry, ZipFilesystemEntry):
-            yield from super(ZipFilesystemEntry, entry).scandir()
-        else:
-            yield from entry.scandir()
+        if isinstance(entry := self._resolve(), ZipFilesystemEntry):
+            return super(ZipFilesystemEntry, entry).scandir()
+        return entry.scandir()
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

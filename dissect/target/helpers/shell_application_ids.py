@@ -1,5 +1,6 @@
 # Known application identifiers
 # https://github.com/EricZimmerman/JumpList/blob/master/JumpList/Resources/AppIDs.txt
+from __future__ import annotations
 
 APPLICATION_IDENTIFIERS = {
     "560d789a6a42ad5a": "DC++ 0.261 / 0.698 / 0.782 (r2402.1)",

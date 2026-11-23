@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.filesystem import Filesystem, VirtualFilesystem
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import (
     add_virtual_ntfs_filesystem,
@@ -15,6 +15,7 @@ from dissect.target.helpers.loaderutil import (
 )
 
 if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
 

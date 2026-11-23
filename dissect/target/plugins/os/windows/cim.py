@@ -12,8 +12,10 @@ from dissect.target.plugin import Plugin, export, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
     from dissect.target.target import Target
+
 
 # https://learn.microsoft.com/en-us/windows/win32/wmisdk/--eventconsumer
 COMMON_ELEMENTS = [
@@ -105,22 +107,38 @@ class CimPlugin(Plugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._repo = None
-        repodir = self.target.resolve("%windir%/system32/wbem/repository")
-        self._subscription_ns = None
-        self._filters: dict[str, EventFilter] = {}
-        if repodir.exists():
-            index = repodir.joinpath("index.btr")
-            objects = repodir.joinpath("objects.data")
-            mappings = [repodir.joinpath(f"mapping{i}.map") for i in range(1, 4)]
 
-            if all([index.exists(), objects.exists(), all(m.exists() for m in mappings)]):
-                try:
-                    self._repo = cim.CIM(index.open(), objects.open(), [m.open() for m in mappings])
-                except cim.Error as e:
-                    self.target.log.warning("Error opening CIM database")
-                    self.target.log.debug("", exc_info=e)
-            self._subscription_ns = self._repo.root.namespace("subscription")
-            self._filters = self._get_filters()
+        repodirs = list(self.get_paths())
+        if len(repodirs) > 1:
+            raise UnsupportedPluginError(
+                "CIM plugins does not support multiple paths. "
+                "If using with --direct access use wbem/repository folder as input"
+            )
+        if len(repodirs) == 0:
+            raise UnsupportedPluginError("No CIM database found")
+
+        self._filters: dict[str, EventFilter] = {}
+        repodir = repodirs[0]
+        index = repodir.joinpath("index.btr")
+        objects = repodir.joinpath("objects.data")
+        mappings = [repodir.joinpath(f"mapping{i}.map") for i in range(1, 4)]
+
+        if all([index.exists(), objects.exists(), all(m.exists() for m in mappings)]):
+            try:
+                self._repo = cim.CIM(index.open(), objects.open(), [m.open() for m in mappings])
+            except cim.Error as e:
+                self.target.log.warning("Error opening CIM database")
+                self.target.log.debug("", exc_info=e)
+        else:
+            missing_files = ",".join(str(f) for f in [index, objects, *mappings] if not f.exists())
+            raise UnsupportedPluginError(f"missing expected files : {missing_files}")
+
+        self._filters = self._get_filters()
+
+    def _get_paths(self) -> Iterator[Path]:
+        repodir = self.target.resolve("%windir%/system32/wbem/repository")
+        if repodir.exists:
+            yield repodir
 
     def check_compatible(self) -> None:
         if not self._repo:
@@ -131,13 +149,14 @@ class CimPlugin(Plugin):
         return self._repo
 
     def _iter_consumerbindings(self) -> Iterator[tuple[cim.Instance, str]]:
-        """Yield consumer bindings from ``__filtertoconsumerbinding`` of subscription namespace."""
+        """Yield consumer bindings from ``__filtertoconsumerbinding`` of all namespaces."""
         try:
-            for binding in self._subscription_ns.class_("__filtertoconsumerbinding").instances:
-                yield (
-                    self._subscription_ns.query(binding.properties["Consumer"].value),
-                    get_filter_name(binding),
-                )
+            for ns in self._repo.root.namespaces:
+                for binding in ns.class_("__filtertoconsumerbinding").instances:
+                    yield (
+                        ns.query(binding.properties["Consumer"].value),
+                        get_filter_name(binding),
+                    )
         except Exception as e:
             self.target.log.warning("Error retrieving consumerbindings")
             self.target.log.debug("", exc_info=e)
@@ -183,12 +202,13 @@ class CimPlugin(Plugin):
     def _get_filters(self) -> dict[str, EventFilter]:
         """Generate a dictionary of ``__EventFilter`` that can be mapped with ``__filtertoconsumerbinding``."""
         filters = {}
-        for event in self._subscription_ns.class_("__EventFilter").instances:
-            filter_name = event.properties["Name"].value
-            filters[filter_name] = EventFilter(
-                filter_name=filter_name,
-                filter_query=event.properties["Query"].value,
-                filter_query_language=event.properties["QueryLanguage"].value,
-                filter_creator_sid=get_creator_sid(event),
-            )
+        for ns in self._repo.root.namespaces:
+            for event in ns.class_("__EventFilter").instances:
+                filter_name = event.properties["Name"].value
+                filters[filter_name] = EventFilter(
+                    filter_name=filter_name,
+                    filter_query=event.properties["Query"].value,
+                    filter_query_language=event.properties["QueryLanguage"].value,
+                    filter_creator_sid=get_creator_sid(event),
+                )
         return filters

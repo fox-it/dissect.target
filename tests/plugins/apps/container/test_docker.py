@@ -158,7 +158,6 @@ def test_backspace_interpretation() -> None:
 
 def test_regression_running_container_parsing(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """Test if we correctly discover and reconstruct exposed container ports and commands on a running container."""
-
     id = "deadbeef"
     config = {
         "ID": id,

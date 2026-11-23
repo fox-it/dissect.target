@@ -13,12 +13,9 @@ from dissect.target.helpers.sunrpc import sunrpc
 from dissect.target.helpers.sunrpc.serializer import (
     AuthFlavor,
     AuthNullSerializer,
-    AuthSerializer,
     AuthUnixSerializer,
-    Deserializer,
     MessageSerializer,
     PortMappingSerializer,
-    Serializer,
     UInt32Serializer,
 )
 
@@ -28,6 +25,11 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
+    from dissect.target.helpers.sunrpc.serializer import (
+        AuthSerializer,
+        Deserializer,
+        Serializer,
+    )
 
 
 Credentials = TypeVar("Credentials")
@@ -151,7 +153,6 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
                 Otherwise, bind to the specified port.
             timeout_in_seconds: The timeout for making the connection.
         """
-
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         if not sys.platform.startswith("darwin"):
@@ -227,7 +228,6 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         result_deserializer: Deserializer[Results],
     ) -> Results:
         """Synchronously call an RPC procedure and return the result."""
-
         call_body = sunrpc.CallBody(
             proc_desc.program,
             proc_desc.version,

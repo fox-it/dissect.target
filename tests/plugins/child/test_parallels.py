@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 def test_parallels_child_detection(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
     """Test if we correctly find Parallels child VMs on MacOS targets."""
-
     config = absolute_path("_data/plugins/child/parallels/config.pvs")
     fs_macos.map_file("Users/dissect/Parallels/Windows 11.pvm/config.pvs", config)
     fs_macos.map_file("Users/dissect/Documents/Parallels/Windows 10.pvm/config.pvs", config)

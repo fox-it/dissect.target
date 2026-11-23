@@ -1352,7 +1352,6 @@ def test_find_functions_linux(target_linux: Target) -> None:
 
 def test_find_functions_compatible_check(target_linux: Target) -> None:
     """Test if we correctly check for compatibility in ``find_functions`` and ``_filter_compatible``."""
-
     found, _ = find_functions("*", target_linux, compatibility=True)
     assert "os.unix.log.messages.syslog.syslog" not in [f"{f.path}.{f.name}" for f in found]
 
@@ -1371,7 +1370,6 @@ def test_benchmark_functions_compatible_check(target_unix_users: Target, benchma
 
 def test_function_aliases(target_default: Target) -> None:
     """Test if alias functions are tagged as such correctly."""
-
     # function that is an alias should have an alias property set to True
     syslog_fd = find_functions("syslog", target_default)[0][0]
     assert syslog_fd
@@ -1388,7 +1386,6 @@ def test_function_aliases(target_default: Target) -> None:
 
 def test_function_required_arguments(target_default: Target) -> None:
     """Test if functions with required arguments are tagged as such correctly."""
-
     # function without any arguments should have an args property with an empty list
     syslog_fd = find_functions("syslog", target_default)[0][0]
     assert syslog_fd
@@ -1499,6 +1496,10 @@ class MockOS1(OSPlugin):
     def architecture(self) -> str | None:
         pass
 
+    @export(property=True)
+    def device(self) -> str | None:
+        pass
+
 
 class MockOS2(OSPlugin):
     __register__ = False
@@ -1526,6 +1527,10 @@ class MockOS2(OSPlugin):
     @export(property=True)
     def architecture(self) -> str | None:
         """Test docstring architecture."""
+
+    @export(property=True)
+    def device(self) -> str | None:
+        pass
 
 
 @pytest.mark.parametrize(
@@ -1750,29 +1755,43 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
             )
 
 
-def test_plugin_record_field_consistency() -> None:
-    """Test if exported plugin functions yielding records do not have conflicting field names and types.
+def test_plugin_record_field_and_name_consistency() -> None:
+    """Test that ensures that record fields with the same name across different plugins translate to the
+    same normalized type, that no two records share the same name, and that no record declares a field twice.
 
-    For example, take the following TargetRecordDescriptors for plugin X, Y and Z::
+    Consider the following TargetRecordDescriptors for plugins X, Y, Z, A and B::
 
-        RecordX = TargetRecordDescriptor("record/x", [("varint", "my_field")])
-        RecordY = TargetRecordDescriptor("record/y", [("path", "my_field")])
-        RecordZ = TargetRecordDescriptor("record/y", [("string", "my_field")])
+        # Field consistency example
+        RecordX = TargetRecordDescriptor("record/x", [("varint", "shared_field")])
+        RecordY = TargetRecordDescriptor("record/y", [("path", "shared_field")])
+        RecordZ = TargetRecordDescriptor("record/z", [("string", "shared_field")])
 
-    The ``RecordX`` descriptor will fail in this test, since the field ``my_field`` cannot be of type ``varint``
-    while also being used as ``string`` (and ``path``). The ``RecordY`` and ``RecordZ`` descriptors do not conflict,
-    since the types ``path`` and ``string`` translate to the same ``wildcard`` type.
+        # Record name consistency example
+        RecordA = TargetRecordDescriptor("record/a", [("string", "field1")])
+        RecordB = TargetRecordDescriptor("record/a", [("varint", "field2")])
 
-    Uses ``FIELD_TYPES_MAP`` which is loosely based on flow.record and ElasticSearch field types.
+    In the first example, ``RecordX`` will fail the test, as the field ``shared_field`` cannot be ``varint`` in
+    one record also being used as ``string``/``path`` in others. ``RecordY`` and ``RecordZ`` do
+    not conflict, as both translate to the same ``wildcard`` type.
+
+    In the second example, ``RecordA`` and ``RecordB`` will fail the test because they both define the name
+    ``record/a``. Duplicate record names may cause collisions in export formats or downstream processing.
+
+    A record such as ``TargetRecordDescriptor("record/c", [("varint", "pid"), ("varint", "pid")])`` fails the test
+    as well, because it declares the field ``pid`` twice.
+
+    Field type normalization is based on ``FIELD_TYPES_MAP``, loosely aligned with flow.record and
+    ElasticSearch type mappings.
 
     References:
         - https://elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
         - https://github.com/fox-it/flow.record/tree/main/flow/record/fieldtypes
         - https://github.com/JSCU-NL/dissect-elastic
     """
-
+    seen_records: set[RecordDescriptor] = set()
     seen_field_names: set[str] = set()
     seen_field_types: dict[str, tuple[str | None, RecordDescriptor]] = {}
+    seen_record_names: set[str] = set()
     inconsistencies: set[str] = set()
 
     FIELD_TYPES_MAP = {
@@ -1804,38 +1823,64 @@ def test_plugin_record_field_consistency() -> None:
 
     for descriptor in find_functions("*", Target(), compatibility=False, show_hidden=True)[0]:
         # Test if plugin function record fields make sense and do not conflict with other records.
-        if descriptor.output == "record" and hasattr(descriptor, "record"):
-            # Functions can yield a single record or a list of records.
-            records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+        if descriptor.output != "record" or not hasattr(descriptor, "record"):
+            continue
 
-            for record in records:
-                assert isinstance(record, RecordDescriptor), (
-                    f"{record!r} of function {descriptor!r} is not of type RecordDescriptor"
+        # Functions can yield a single record or a list of records.
+        records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+
+        for record in records:
+            assert isinstance(record, RecordDescriptor), (
+                f"{record!r} of function {descriptor!r} is not of type RecordDescriptor"
+            )
+            if record.name != "empty":
+                assert record.fields, f"{record!r} has no fields"
+
+            if record in seen_records:
+                continue
+
+            seen_records.add(record)
+            # Detect duplicate record names
+            if record.name in seen_record_names:
+                inconsistencies.add(f"<{record.name}> has duplicates")
+            else:
+                seen_record_names.add(record.name)
+
+            # Detect field names that are declared more than once. A TargetRecordDescriptor uses such a name as a single
+            # field, so check the fields as they were declared (target_fields) instead of the fields of the record.
+            declared_fields = getattr(record, "target_fields", None) or record.get_field_tuples()
+            field_names = [field_name for _, field_name in declared_fields]
+            duplicate_names = sorted({fname for fname in field_names if field_names.count(fname) > 1})
+            if duplicate_names:
+                inconsistencies.add(f"<{record.name}> declares field(s) more than once: {', '.join(duplicate_names)}")
+
+            for name, field in record.fields.items():
+                # Make sure field names have the same type when translated. This check does not save multiple field
+                # name and typenames, this is a bare-minumum check only.
+
+                # We only care about the field type, not if it is a list of that type.
+                field_typename = field.typename.replace("[]", "")
+
+                assert field_typename in FIELD_TYPES_MAP, (
+                    f"Field type {field_typename} is not mapped in FIELD_TYPES_MAP, please add it manually."
                 )
-                if record.name != "empty":
-                    assert record.fields, f"{record!r} has no fields"
 
-                for name, field in record.fields.items():
-                    # Make sure field names have the same type when translated. This check does not save multiple field
-                    # name and typenames, this is a bare-minumum check only.
+                if name in seen_field_names:
+                    seen_typename, seen_record = seen_field_types[name]
+                    if FIELD_TYPES_MAP[seen_typename] != FIELD_TYPES_MAP[field_typename]:
+                        inconsistencies.add(
+                            f"<{record.name} ({field.typename!r}, '{name}')> is duplicate mismatch of <{seen_record.name} ({seen_typename!r}, '{name}')>"  # noqa: E501
+                        )
 
-                    # We only care about the field type, not if it is a list of that type.
-                    field_typename = field.typename.replace("[]", "")
+                else:
+                    seen_field_names.add(name)
+                    seen_field_types[name] = (field_typename, record)
 
-                    assert field_typename in FIELD_TYPES_MAP, (
-                        f"Field type {field_typename} is not mapped in FIELD_TYPES_MAP, please add it manually."
-                    )
-
-                    if name in seen_field_names:
-                        seen_typename, seen_record = seen_field_types[name]
-                        if FIELD_TYPES_MAP[seen_typename] != FIELD_TYPES_MAP[field_typename]:
-                            inconsistencies.add(
-                                f"<{record.name} ({field.typename!r}, '{name}')> is duplicate mismatch of <{seen_record.name} ({seen_typename!r}, '{name}')>"  # noqa: E501
-                            )
-
-                    else:
-                        seen_field_names.add(name)
-                        seen_field_types[name] = (field_typename, record)
+            # Record(s) from function descriptor(s) naming convention, limited to apps for now.
+            if descriptor.path.startswith("apps.") and not record.name.startswith("application/"):
+                inconsistencies.add(
+                    f"<{record.name}> record name does not start with 'application/' (from function {descriptor.path})"
+                )
 
     if inconsistencies:
         pytest.fail(
@@ -1843,9 +1888,38 @@ def test_plugin_record_field_consistency() -> None:
         )
 
 
+def test_plugin_record_field_have_source_field() -> None:
+    """Test that ensures that every plugin have the "source" or "path" field,
+    containing path of the file used to generate the record..
+
+    As there is some backlogs, this test fail if the number of invalid plugin change.
+    First step is to ensure presence of source or path, second step will be to normalize source and path.
+    See https://github.com/fox-it/dissect.target/issues/1892
+    """
+    record_without_source: set[str] = set()
+
+    for descriptor in find_functions("*", Target(), compatibility=False, show_hidden=True)[0]:
+        # Test if plugin function record fields make sense and do not conflict with other records.
+        if descriptor.output != "record" or not hasattr(descriptor, "record"):
+            continue
+
+        # Functions can yield a single record or a list of records.
+        records = descriptor.record if isinstance(descriptor.record, list) else [descriptor.record]
+
+        for record in records:
+            fields = [name for name, field in record.fields.items()]
+            if "source" not in fields and "path" not in fields:
+                record_without_source.add(record.name)
+
+    if len(record_without_source) != 81:
+        pytest.fail(
+            f"Found {len(record_without_source)} inconsistencies in "
+            f"RecordDescriptors:\n" + "\n".join(record_without_source)
+        )
+
+
 def assert_valid_rst(src: str) -> None:
     """Attempts to compile the given string to rst."""
-
     try:
         publish_string(src, settings_overrides={"halt_level": 2})
 
@@ -1858,7 +1932,6 @@ def assert_valid_rst(src: str) -> None:
 
 def assert_compliant_rst(src: str) -> None:
     """Makes sure that the given rst docstring follows the project's conventions."""
-
     # Explicit message stating we want References instead of Resources to prevent confusion
     if "Resources:\n" in src:
         pytest.fail(f"Invalid rst: docstring contains 'Resources' instead of 'References': {src!r}", pytrace=False)
@@ -1879,7 +1952,6 @@ def assert_compliant_rst(src: str) -> None:
 )
 def test_nested_namespace_consistency(descriptor: PluginDescriptor) -> None:
     """Test whether all parts of nested namespaces exist and that there are no conflicts with other functions."""
-
     parts = descriptor.namespace.split(".")
     for i in range(len(parts)):
         part = ".".join(parts[: i + 1])
@@ -1914,7 +1986,6 @@ def test_namespace_class_usage(descriptor: PluginDescriptor) -> None:
     References:
         - https://github.com/fox-it/dissect.target/issues/1180
     """
-
     assert descriptor.cls.__subclasses__(), (
         f"NamespacePlugin {descriptor.module}.{descriptor.qualname} has no subclasses, are you sure you're using NamespacePlugin correctly?"  # noqa: E501
     )

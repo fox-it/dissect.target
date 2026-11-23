@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 from io import BytesIO
 from typing import BinaryIO
 
 from dissect.cstruct import cstruct
 
+from dissect.target.helpers.logging import get_logger
 from dissect.target.plugins.os.windows.dpapi.crypto import (
     CipherAlgorithm,
     HashAlgorithm,
@@ -21,7 +21,8 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 master_key_def = """

@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -14,6 +14,7 @@ from dissect.target.target import Target
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from pathlib import Path
+    from unittest.mock import MagicMock
 
 
 @contextlib.contextmanager

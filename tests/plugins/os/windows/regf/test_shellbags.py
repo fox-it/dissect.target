@@ -5,13 +5,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.regf.shellbags import (
     ShellBagsPlugin,
     parse_shell_item_list,
 )
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 
@@ -137,7 +138,6 @@ def test_shellbags_plugin(
     expected_path: list[str],
 ) -> None:
     """Test if shellbags mapped to a registry hive are found and parsed correctly."""
-
     key_name = "Software\\Microsoft\\Windows\\Shell\\BagMRU"
 
     for bag_key, bag_name, bag_value in bags:

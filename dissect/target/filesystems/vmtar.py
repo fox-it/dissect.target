@@ -12,6 +12,14 @@ class VmtarFilesystem(TarFilesystem):
     __type__ = "vmtar"
 
     def __init__(self, fh: BinaryIO, base: str | None = None, *args, **kwargs):
+        """Load a vmtar file (modified tar version used on ESXi).
+
+        In most case vmtar files are compressed using zstd, xz or LZMA, and then using gzip.
+
+        Args:
+            fh: File-like object of a vmtar file.
+            base: Base path in the tar file to open the filesystem on.
+        """
         fh = open_decompress(fileobj=open_decompress(fileobj=fh))
         super().__init__(fh, base, *args, tarinfo=vmtar.VisorTarInfo, **kwargs)
 

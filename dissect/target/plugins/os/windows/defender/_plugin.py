@@ -30,6 +30,9 @@ from dissect.target.plugins.os.windows.defender.mplog import (
 from dissect.target.plugins.os.windows.defender.quarantine import (
     DefenderFileQuarantineRecord,
     DefenderQuarantineRecord,
+    DefenderRegKeyQuarantineRecord,
+    DefenderStartupQuarantineRecord,
+    DefenderTaskSchedulerQuarantineRecord,
     QuarantineEntry,
     recover_quarantined_file_streams,
 )
@@ -38,6 +41,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
     from flow.record import Record
+
+    from dissect.target.helpers.compat.pathlib import TargetPath
+    from dissect.target.target import Target
+
 
 DEFENDER_EVTX_FIELDS = [
     ("datetime", "ts"),
@@ -94,6 +101,7 @@ DEFENDER_EVTX_FIELDS = [
     ("string", "Type_ID"),
     ("string", "Type_Name"),
     ("string", "Version"),
+    ("path", "source"),
 ]
 
 DEFENDER_LOG_DIR = "%windir%/system32/winevt/logs"
@@ -102,7 +110,13 @@ EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
 DEFENDER_QUARANTINE_DIR = "sysvol/programdata/microsoft/windows defender/quarantine"
 DEFENDER_MPLOG_DIR = "sysvol/programdata/microsoft/windows defender/support"
-DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey"]
+DEFENDER_MPCMDRUN_SYSTEM_DIRS = (
+    "sysvol/Windows/Temp",
+    "sysvol/Windows.old/Windows/Temp",
+    "sysvol/Windows/Microsoft Antimalware/Tmp",
+)
+DEFENDER_MPCMDRUN_USER_DIRS = ("AppData/Local/Temp",)
+DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey", b"startup", b"taskscheduler"]
 
 DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
 
@@ -120,10 +134,30 @@ DefenderExclusionRecord = TargetRecordDescriptor(
     ],
 )
 
+DefenderMpCmdRunLogRecord = TargetRecordDescriptor(
+    "filesystem/windows/defender/mpcmdrunlog",
+    [
+        ("datetime", "ts_start"),
+        ("datetime", "ts_end"),
+        ("string", "command"),
+        ("path", "source"),
+    ],
+)
+
 
 def parse_iso_datetime(datetime_value: str) -> datetime.datetime:
-    """Parse ISO8601 serialized datetime with ``Z`` ending."""
-    return datetime.datetime.strptime(datetime_value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=datetime.timezone.utc)
+    """Parse ISO8601 serialized datetime with optional ``Z`` or UTC offset ending.
+
+    MpLog timestamps may appear as:
+    - ``2025-11-26T22:01:52.403Z``
+    - ``2025-11-26T22:01:52.403+02:00``
+    - ``2025-11-26T22:01:52.403`` (no suffix, assumed UTC)
+    """
+    # Normalize Z to +00:00 so fromisoformat can handle all variants uniformly.
+    dt = datetime.datetime.fromisoformat(datetime_value.strip().replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
 
 
 def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iterator[DefenderLogRecord]:
@@ -145,14 +179,31 @@ class MicrosoftDefenderPlugin(Plugin):
 
     __namespace__ = "defender"
 
+    def __init__(self, target: Target):
+        super().__init__(target)
+
+        self.mpcmdrun_logs: set[Path] = set()
+        for system_dir in DEFENDER_MPCMDRUN_SYSTEM_DIRS:
+            if not (dir := self.target.fs.path(system_dir)).is_dir():
+                continue
+            self.mpcmdrun_logs.update(dir.glob("MpCmdRun.log*"))
+
+        for user_details in self.target.user_details.all_with_home():
+            for user_dir in DEFENDER_MPCMDRUN_USER_DIRS:
+                if not (dir := user_details.home_path.joinpath(user_dir)).is_dir():
+                    continue
+                self.mpcmdrun_logs.update(dir.glob("MpCmdRun.log*"))
+
     def check_compatible(self) -> None:
-        # Either the Defender log folder, the quarantine folder or the exclusions registry key
-        # has to exist for this plugin to be compatible.
+        # Either the Defender log folder, the quarantine folder, a Temp folder of the
+        # MpCmdRun log or the exclusions registry key has to exist for this plugin to
+        # be compatible.
 
         if not any(
             [
                 self.target.resolve(DEFENDER_LOG_DIR).exists(),
                 self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
+                *self.mpcmdrun_logs,
                 (
                     self.target.has_function("registry")
                     and len(list(self.target.registry.keys(DEFENDER_EXCLUSION_KEY))) > 0
@@ -164,7 +215,6 @@ class MicrosoftDefenderPlugin(Plugin):
     @export(record=DefenderLogRecord)
     def evtx(self) -> Iterator[DefenderLogRecord]:
         """Parse Microsoft Defender evtx log files."""
-
         defender_evtx_field_names = [field_name for _, field_name in DEFENDER_EVTX_FIELDS]
 
         evtx_records = self.target.evtx(logs_dir=DEFENDER_LOG_DIR, log_file_glob=DEFENDER_LOG_FILENAME_GLOB)
@@ -185,14 +235,30 @@ class MicrosoftDefenderPlugin(Plugin):
 
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
-    @export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
-    def quarantine(self) -> Iterator[DefenderQuarantineRecord | DefenderFileQuarantineRecord]:
+    @export(
+        record=[
+            DefenderQuarantineRecord,
+            DefenderFileQuarantineRecord,
+            DefenderRegKeyQuarantineRecord,
+            DefenderStartupQuarantineRecord,
+            DefenderTaskSchedulerQuarantineRecord,
+        ]
+    )
+    def quarantine(
+        self,
+    ) -> Iterator[
+        DefenderQuarantineRecord
+        | DefenderFileQuarantineRecord
+        | DefenderRegKeyQuarantineRecord
+        | DefenderStartupQuarantineRecord
+        | DefenderTaskSchedulerQuarantineRecord
+    ]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in
         quarantine.
         """
-        for entry in self.get_quarantine_entries():
+        for guid_path, entry in self.get_quarantine_entries():
             # These fields are present for all (currently known) quarantine entry types
             fields = {
                 "ts": entry.timestamp,
@@ -200,21 +266,40 @@ class MicrosoftDefenderPlugin(Plugin):
                 "scan_id": entry.scan_id.hex(),
                 "threat_id": entry.threat_id,
                 "detection_name": entry.detection_name,
+                "source": guid_path,
             }
             for resource in entry.resources:
                 fields.update({"detection_type": resource.detection_type})
                 if resource.detection_type == b"file":
-                    # These fields are only available for file based detections
-                    fields.update(
-                        {
-                            "detection_path": resource.detection_path,
-                            "creation_time": resource.creation_time,
-                            "last_write_time": resource.last_write_time,
-                            "last_accessed_time": resource.last_access_time,
-                            "resource_id": resource.resource_id,
-                        }
+                    yield DefenderFileQuarantineRecord(
+                        **fields,
+                        detection_path=resource.detection_path,
+                        creation_time=resource.creation_time,
+                        last_write_time=resource.last_write_time,
+                        last_accessed_time=resource.last_access_time,
+                        resource_id=resource.resource_id,
+                        file_size=resource.file_size,
+                        _target=self.target,
                     )
-                    yield DefenderFileQuarantineRecord(**fields, _target=self.target)
+                elif resource.detection_type == b"regkey":
+                    yield DefenderRegKeyQuarantineRecord(
+                        **fields,
+                        detection_path=resource.detection_path,
+                        _target=self.target,
+                    )
+                elif resource.detection_type == b"startup":
+                    yield DefenderStartupQuarantineRecord(
+                        **fields,
+                        detection_path=resource.detection_path,
+                        _target=self.target,
+                    )
+                elif resource.detection_type == b"taskscheduler":
+                    yield DefenderTaskSchedulerQuarantineRecord(
+                        **fields,
+                        detection_path=resource.detection_path,
+                        file_size=resource.file_size,
+                        _target=self.target,
+                    )
                 else:
                     # For these types, we know that they have no known additional data to add to the Quarantine Record.
                     if resource.detection_type not in DEFENDER_KNOWN_DETECTION_TYPES:
@@ -228,7 +313,6 @@ class MicrosoftDefenderPlugin(Plugin):
     @export(record=DefenderExclusionRecord)
     def exclusions(self) -> Iterator[DefenderExclusionRecord]:
         """Yield Microsoft Defender exclusions from the Registry."""
-
         # Iterate through all possible versions of the key for Defender exclusions
         for exclusions_registry_key in self.target.registry.keys(DEFENDER_EXCLUSION_KEY):
             # Every subkey of the exclusions key is a 'type' of exclusion, e.g. 'path' 'process' or 'extension'.
@@ -336,7 +420,7 @@ class MicrosoftDefenderPlugin(Plugin):
 
         yield DefenderMPLogRTPRecord(
             _target=self.target,
-            source_log=data["source_log"],
+            source=data["source"],
             **times,
             plugin_states=re.findall(r"^\s+(.*)$", data["plugin_states"])[0],
             process_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["process_exclusions"]),
@@ -367,7 +451,7 @@ class MicrosoftDefenderPlugin(Plugin):
             if match := pattern.match(mplog_line):
                 data = match.groupdict()
                 data["_target"] = self.target
-                data["source_log"] = source
+                data["source"] = source
                 yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data, tzinfo=tzinfo)
 
     def _mplog_block(
@@ -388,7 +472,7 @@ class MicrosoftDefenderPlugin(Plugin):
 
                 data = match.groupdict()
                 data["_target"] = self.target
-                data["source_log"] = source
+                data["source"] = source
                 yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data, tzinfo=tzinfo)
 
     def _mplog(
@@ -495,7 +579,7 @@ class MicrosoftDefenderPlugin(Plugin):
         resourcedata_directory = quarantine_directory.joinpath("ResourceData")
         if resourcedata_directory.exists() and resourcedata_directory.is_dir():
             recovered_files = []
-            for entry in self.get_quarantine_entries():
+            for _, entry in self.get_quarantine_entries():
                 for resource in entry.resources:
                     if resource.detection_type != b"file":
                         # We can only recover file entries
@@ -525,7 +609,7 @@ class MicrosoftDefenderPlugin(Plugin):
                     # Make sure we do not recover the same file multiple times if it has multiple entries
                     recovered_files.append(resourcedata_location)
 
-    def get_quarantine_entries(self) -> Iterator[QuarantineEntry]:
+    def get_quarantine_entries(self) -> Iterator[TargetPath, QuarantineEntry]:
         """Yield Windows Defender quarantine entries."""
         quarantine_directory = self.target.fs.path(DEFENDER_QUARANTINE_DIR)
         entries_directory = quarantine_directory.joinpath("entries")
@@ -542,4 +626,46 @@ class MicrosoftDefenderPlugin(Plugin):
             for resource in entry.resources:
                 for unknown_field in resource.unknown_fields:
                     self.target.log.warning("Encountered an unknown field identifier: %s", unknown_field.Identifier)
-            yield entry
+            yield guid_path.resolve(), entry
+
+    @export(record=[DefenderMpCmdRunLogRecord])
+    def mpcmdrun(self) -> Iterator[DefenderMpCmdRunLogRecord]:
+        """Return entries in Defender ``MpCmdRun.log`` files from ``MpCmdRun.exe`` invocations.
+
+        Entries always start with the used command line, and often contains a start time. The start time is omitted
+        in some instances.
+
+        References:
+            - https://learn.microsoft.com/defender-endpoint/command-line-arguments-microsoft-defender-antivirus
+            - https://lolbas-project.github.io/lolbas/Binaries/MpCmdRun
+            - https://itm4n.github.io/cve-2020-1170-windows-defender-eop
+        """
+        tzinfo = self.target.datetime.tzinfo
+
+        sep = "-" * 85
+        field_names = [
+            ("command", "MpCmdRun: Command Line: "),
+            ("ts_start", "Start Time: "),
+            ("ts_end", "MpCmdRun: End Time: "),
+        ]
+
+        for file in self.mpcmdrun_logs:
+            fields = {}
+            for line in file.open("rt", encoding="utf-16-le"):
+                if sep in line:
+                    if fields:
+                        yield DefenderMpCmdRunLogRecord(
+                            **fields,
+                            source=file,
+                            _target=self.target,
+                        )
+                    fields = {}
+
+                for field, prefix in field_names:
+                    if prefix in line:
+                        value = line.replace(prefix, "").strip()
+                        if field.startswith("ts_"):
+                            value = datetime.datetime.strptime(
+                                value.replace("\u200e", ""), "%a %b %d %Y %H:%M:%S"
+                            ).replace(tzinfo=tzinfo)
+                        fields[field] = value

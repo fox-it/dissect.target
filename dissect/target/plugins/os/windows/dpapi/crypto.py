@@ -43,7 +43,6 @@ class CipherAlgorithm:
         References:
             - https://github.com/tijldeneut/DPAPIck3/blob/main/dpapick3/crypto.py#L185
         """
-
         if len(key) > hash_algorithm.block_length:
             key = hashlib.new(hash_algorithm.name, key).digest()
 

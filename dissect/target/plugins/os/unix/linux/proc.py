@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from enum import IntEnum
 from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
@@ -19,6 +19,7 @@ from dissect.target.plugin import Plugin, internal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from datetime import datetime
     from pathlib import Path
 
     from typing_extensions import Self
@@ -28,7 +29,6 @@ if TYPE_CHECKING:
 
 def parse_ip(addr: str | int, version: int = 4) -> IPv6Address | IPv4Address:
     """Convert ``/proc/net`` IPv4 or IPv6 hex address into their standard IP notation."""
-
     if version == 6:
         addr = unpack("!LLLL", bytes.fromhex(addr))
         return IPv6Address(pack("@IIII", *addr))
@@ -324,7 +324,6 @@ class Sockets:
             protocol: The protocol in ``/proc/net/`` to parse entries from.
             version: The version of the protocol to parse entries from.
         """
-
         entry = self.target.fs.path(f"/proc/net/{protocol}{version if version == 6 else ''}")
 
         contents = entry.open("rt")
@@ -363,7 +362,6 @@ class Sockets:
 
     def _parse_unix_sockets(self) -> Iterator[UnixSocket]:
         """Internal function to parse ``/proc/net/unix`` entries."""
-
         entry = self.target.fs.path("/proc/net/unix")
         contents = entry.open("rt")
 
@@ -472,9 +470,10 @@ class ProcProcess:
     def _parse_environ(self) -> Iterator[Environ]:
         """Internal function to parse entries in ``/proc/[pid]/environ``."""
         # entries in /proc/<pid>/environ are null-terminated
-        lines = self.get("environ").read_text().split("\x00")
+        if not (environ_path := self.get("environ")).exists():
+            return
 
-        for line in lines:
+        for line in environ_path.read_text().split("\x00"):
             if line == "":
                 # Skip empty line
                 continue
@@ -599,7 +598,6 @@ class ProcProcess:
     @property
     def cmdline(self) -> str:
         """Return the command line of a process."""
-
         line = ""
         entry = self.get("cmdline")
 

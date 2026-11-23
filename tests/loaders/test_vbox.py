@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -32,7 +32,7 @@ def test_target_open(opener: Callable[[str | Path], Target], tmp_path: Path) -> 
         patch("dissect.target.target.Target.apply"),
     ):
         mock_vbox.return_value = mock_vbox
-        mock_vbox.disks.return_value = ["mock.vdi"]
+        mock_vbox.hardware.disks = [Mock(location="mock.vdi")]
 
         target = opener(path)
         assert isinstance(target._loader, VBoxLoader)
@@ -48,7 +48,7 @@ def test_loader(tmp_path: Path) -> None:
         patch("dissect.target.container.open") as mock_container_open,
     ):
         mock_vbox.return_value = mock_vbox
-        mock_vbox.disks.return_value = ["mock.vdi"]
+        mock_vbox.hardware.disks = [Mock(location="mock.vdi")]
 
         loader = loader_open(path)
         assert isinstance(loader, VBoxLoader)

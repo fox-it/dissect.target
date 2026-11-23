@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from dissect.sql import sqlite3
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 HitmanAlertRecord = TargetRecordDescriptor(
     "application/av/sophos/hitman/log",
     [
@@ -22,6 +23,7 @@ HitmanAlertRecord = TargetRecordDescriptor(
         ("string", "alert"),
         ("string", "description"),
         ("string", "details"),
+        ("path", "source"),
     ],
 )
 
@@ -31,6 +33,7 @@ SophosLogRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "description"),
         ("path", "path"),
+        ("path", "source"),
     ],
 )
 
@@ -76,10 +79,10 @@ class SophosPlugin(Plugin):
         systems, the details field might contain a lot of text, it might
         contain stracktraces etc.
         """
-        if self.target.fs.path(self.LOG_SOPHOS_HITMAN).exists():
+        log_sophos_hitman_path = self.target.fs.path(self.LOG_SOPHOS_HITMAN)
+        if log_sophos_hitman_path.exists():
             try:
-                fh = self.target.fs.path(self.LOG_SOPHOS_HITMAN).open("rb")
-                db = sqlite3.SQLite3(fh)
+                db = SQLite3(log_sophos_hitman_path)
                 alerts = next(filter(lambda t: t.name == "Alerts", db.tables()))
                 for alert in alerts.rows():
                     yield HitmanAlertRecord(
@@ -87,6 +90,7 @@ class SophosPlugin(Plugin):
                         alert=alert.AlertType,
                         description=alert.Description,
                         details=alert.Details,
+                        source=log_sophos_hitman_path,
                         _target=self.target,
                     )
             except Exception as e:
@@ -106,8 +110,8 @@ class SophosPlugin(Plugin):
             path (path): Path to the infected file (if available).
 
         """
-        if self.target.fs.path(self.LOG_SOPHOS_HOME).exists():
-            for line in self.target.fs.path(self.LOG_SOPHOS_HOME).open("rt", 0, "utf-16le"):
+        if (log_path := self.target.fs.path(self.LOG_SOPHOS_HOME)).exists():
+            for line in log_path.open("rt", 0, "utf-16le"):
                 if line.find(self.MARKER_INFECTION) > -1:
                     try:
                         ts, json_data = line.split(" ", maxsplit=2)
@@ -129,6 +133,7 @@ class SophosPlugin(Plugin):
                             ts=ts,
                             description=details.get("threat_name", details),
                             path=self.target.fs.path(path_to_infected_file),
+                            source=log_path,
                             _target=self.target,
                         )
                     except Exception as e:

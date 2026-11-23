@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 def test_windows_applications(target_win_users: Target, hive_hklm: VirtualHive) -> None:
     """Test if windows applications are detected correctly in the registry."""
-
     # Create and add a virtual hive for HKCU.
     # This is necessary because the updated plugin now searches for keys in HKEY_CURRENT_USER.
     hive_hkcu = VirtualHive()

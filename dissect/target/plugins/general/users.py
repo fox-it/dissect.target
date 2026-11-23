@@ -4,7 +4,6 @@ from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, NamedTuple, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import (
     IOSUserRecord,
     MacOSUserRecord,
@@ -82,7 +81,6 @@ class UsersPlugin(InternalPlugin):
 
     def all_with_home(self) -> Iterator[UserDetails]:
         """Return :class:`UserDetails` objects for users that have existing directory set as home directory."""
-
         seen: set[TargetPath] = set()
         try:
             for user in self.target.users():
@@ -111,7 +109,6 @@ class UsersPlugin(InternalPlugin):
     @cached_property
     def all_home_paths(self) -> Iterator[TargetPath]:
         """Return all home directories of users, including miscellaneous user directories that may not be linked to discovered local users."""  # noqa: E501
-
         seen: set[TargetPath] = set()
         try:
             for user in self.target.users():

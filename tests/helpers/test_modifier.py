@@ -10,7 +10,6 @@ from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record_modifier import (
     Modifier,
-    ModifierFunc,
     get_modifier_function,
 )
 from tests.helpers.test_hashutil import HASHES
@@ -18,6 +17,9 @@ from tests.helpers.test_hashutil import HASHES
 if TYPE_CHECKING:
     from flow.record import Record
 
+    from dissect.target.helpers.record_modifier import (
+        ModifierFunc,
+    )
     from dissect.target.target import Target
 
 
@@ -61,11 +63,11 @@ def test_hash_path_records_with_paths(
     ):
         hashed_record = hash_function(target_win, record)
 
-    assert hashed_record.name == "test"
-    assert len(hashed_record.records) == expected_records
-    assert hashed_record.records[0] == record
+    assert hashed_record.__name__ == "test"
+    assert len(hashed_record.__records__) == expected_records
+    assert hashed_record.__records__[0] == record
 
-    for name, _record in zip(path_field_names, hashed_record.records[1:], strict=False):
+    for name, _record in zip(path_field_names, hashed_record.__records__[1:], strict=False):
         assert getattr(_record, f"{name}_resolved") is not None
         assert getattr(_record, f"{name}_digest").__dict__ == digest(HASHES).__dict__
 
@@ -149,6 +151,6 @@ def test_resolved_modifier(record: Record, target_win: Target, resolve_function:
 
     resolved_record = resolve_function(target_win, record)
 
-    for _record in resolved_record.records[1:]:
+    for _record in resolved_record.__records__[1:]:
         assert _record.name_resolved is not None
         assert not hasattr(_record, "name_digest")

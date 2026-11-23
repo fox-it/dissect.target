@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import json
-import logging
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.helpers.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 class Overlay2Filesystem(LayerFilesystem):

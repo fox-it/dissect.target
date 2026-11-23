@@ -30,12 +30,12 @@ class SplashtopPlugin(RemoteAccessPlugin):
     __namespace__ = "splashtop"
 
     RemoteAccessLogRecord = TargetRecordDescriptor(
-        "remoteaccess/splashtop/log",
+        "application/remoteaccess/splashtop/log",
         GENERIC_LOG_RECORD_FIELDS,
     )
 
     RemoteAccessFileTransferRecord = TargetRecordDescriptor(
-        "remoteaccess/splashtop/filetransfer",
+        "application/remoteaccess/splashtop/filetransfer",
         GENERIC_FILE_TRANSFER_RECORD_FIELDS,
     )
 

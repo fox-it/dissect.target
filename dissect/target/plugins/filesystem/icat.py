@@ -30,7 +30,7 @@ class ICatPlugin(Plugin):
     @arg("--ads", default="", help="Alternate Data Stream name")
     @export(output="none")
     def icat(self, inum: int, fs: int | None, ads: str) -> None:
-        """Output the contents of a file based on its MFT segment or inode number. Supports Alternate Data Streams
+        """Output the contents of a file based on its MFT segment or inode number. Supports Alternate Data Streams.
 
         Example:
             .. code-block::
@@ -50,7 +50,6 @@ class ICatPlugin(Plugin):
                 # outputs contents of inode in filesystem 2 of target
                 target-query <TARGET> -f icat --fs 2 --inode 50947
         """
-
         open_as = None
         try:
             if fs is not None:

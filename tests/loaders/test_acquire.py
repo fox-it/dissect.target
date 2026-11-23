@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+import logging
+import tarfile
 from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.loader import open as loader_open
-from dissect.target.loaders.acquire import AcquireTarSubLoader, AcquireZipSubLoader
+from dissect.target.loaders.acquire import (
+    FILESYSTEMS_LEGACY_ROOT,
+    FILESYSTEMS_ROOT,
+    AcquireTarSubLoader,
+    AcquireZipSubLoader,
+)
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.loaders.zip import ZipLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
+from tests.filesystems.test_tar import _mkfile
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -106,6 +114,63 @@ def test_windows_sysvol_formats_zip() -> None:
     # NOTE: for the sysvol archives, this also tests the backwards compatibility
     assert sorted(t.fs.mounts.keys()) == ["c:"]
     assert t.fs.get("c:/Windows/System32/foo.txt")
+
+
+@pytest.mark.parametrize(
+    ("prefix", "subfolder"),
+    [
+        (f"{FILESYSTEMS_ROOT}/", "java.prefs"),
+        (f"{FILESYSTEMS_ROOT}/", FILESYSTEMS_ROOT),
+        (f"/{FILESYSTEMS_ROOT}/", "java.prefs"),
+        (f"/{FILESYSTEMS_ROOT}/", FILESYSTEMS_ROOT),
+    ],
+)
+def test_linux_acquire_with_fs_subfolder(prefix: str, subfolder: str, tmp_path: Path) -> None:
+    """Test that we correctly handle Linux Acquire archives with a subfolder containing 'fs/'."""
+    path = tmp_path.joinpath("target.tar.gz")
+    with tarfile.open(path, "w:gz") as tf:
+        _mkfile(tf, f"{prefix}$rootfs$/etc/test", b"testdata1")
+        _mkfile(tf, f"{prefix}$rootfs$/etc/{subfolder}/test", b"testdata2")
+
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
+    t = Target()
+    loader.map(t)
+    assert isinstance(loader.subloader, AcquireTarSubLoader)
+
+    # Test directly on $rootfs$
+    assert t.fs.get("$rootfs$/etc/test").open().read() == b"testdata1"
+    assert t.fs.get(f"$rootfs$/etc/{subfolder}/test").open().read() == b"testdata2"
+
+    # The OS plugin is not applied, so manually mount to also test this case
+    t.fs.mount("/", t.fs.mounts["$rootfs$"])
+    assert t.fs.get("/etc/test").open().read() == b"testdata1"
+    assert t.fs.get(f"/etc/{subfolder}/test").open().read() == b"testdata2"
+
+
+def test_duplicate_sysvol_and_drive_letter(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """Test that we correctly handle legacy Acquire archives containing both 'sysvol' and a drive letter."""
+    path = tmp_path.joinpath("target.tar.gz")
+    with tarfile.open(path, "w:gz") as tf:
+        _mkfile(tf, f"{FILESYSTEMS_ROOT}/c:/Windows/System32/foo.txt", b"testdata1")
+        _mkfile(tf, f"{FILESYSTEMS_ROOT}/{FILESYSTEMS_LEGACY_ROOT}/Windows/System32/foo.txt", b"testdata2")
+
+    loader = loader_open(path)
+    assert isinstance(loader, TarLoader)
+
+    t = Target()
+    with caplog.at_level(logging.DEBUG, "dissect.target.loaders.acquire"):
+        loader.map(t)
+    assert isinstance(loader.subloader, AcquireTarSubLoader)
+
+    # Test if sysvols is ignored and the file is present at c:
+    assert set(t.fs.mounts.keys()) == {"c:"}
+    assert t.fs.get("c:/Windows/System32/foo.txt").open().read() == b"testdata1"
+
+    # Test that the duplicate entry is skipped and logged
+    assert "Skipping member" in caplog.text
+    assert "in tar as 'Windows/System32/foo.txt' is already mapped" in caplog.text
 
 
 def test_anonymous_filesystems() -> None:

@@ -48,7 +48,6 @@ class CmdlinePlugin(Plugin):
             pid (int): The process ID of the process.
             cmdline (string): The complete commandline of the process.
         """
-
         for process in self.target.proc.processes():
             yield CmdlineRecord(
                 ts=process.starttime,

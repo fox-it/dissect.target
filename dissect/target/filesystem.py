@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import gzip
 import io
-import logging
 import os
 import pathlib
 import stat
 from collections import defaultdict
+from functools import cache, cached_property
 from typing import TYPE_CHECKING, Any, BinaryIO, Final
 
 from dissect.target.exceptions import (
@@ -18,18 +18,26 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import fsutil, hashutil
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.logging import get_logger
 
 TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+    from uuid import UUID
+
+    from typing_extensions import Self
 
     from dissect.target.target import Target
+
 
 FILESYSTEMS: list[type[Filesystem]] = []
 MODULE_PATH = "dissect.target.filesystems"
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
+
+
+DEFAULT_ALTSEP = type("DEFAULT_ALTSEP", (), {})
 
 
 class Filesystem:
@@ -45,28 +53,45 @@ class Filesystem:
     def __init__(
         self,
         volume: BinaryIO | list[BinaryIO] | None = None,
-        alt_separator: str = "",
+        *,
+        sep: str = "/",
+        altsep: str | None | type[DEFAULT_ALTSEP] = DEFAULT_ALTSEP,
         case_sensitive: bool = True,
     ) -> None:
         """The base initializer for the class.
 
         Args:
             volume: A volume or other file-like object associated with the filesystem.
+            sep: The separator used to distinguish between directories in a path.
+            altsep: The alternative separator used to distinguish between directories in a path.
+                If not provided, it will be set to the most common default for the given ``sep``.
+                (i.e. if ``sep`` is "/", ``altsep`` will be ``None``, and if ``sep`` is "\\", ``altsep`` will be "/").
             case_sensitive: Defines if the paths in the filesystem are case sensitive or not.
-            alt_separator: The alternative separator used to distingish between directories in a path.
 
         Raises:
             NotImplementedError: When the internal ``__type__`` of the class is not defined.
         """
         self.volume = volume
+        self.sep = sep
+        self._altsep = altsep
         self.case_sensitive = case_sensitive
-        self.alt_separator = alt_separator
 
         if self.__type__ is None:
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
         return f"<Filesystem type={self.__type__}>"
+
+    @property
+    def altsep(self) -> str | None:
+        """The alternative separator used to distinguish between directories in a path."""
+        if self._altsep is DEFAULT_ALTSEP:
+            return "/" if self.sep == "\\" else None
+        return self._altsep
+
+    @altsep.setter
+    def altsep(self, value: str | None) -> None:
+        self._altsep = value
 
     def path(self, *args) -> fsutil.TargetPath:
         """Instantiate a new path-like object on this filesystem."""
@@ -191,7 +216,7 @@ class Filesystem:
         """
         return self.get(path).iterdir()
 
-    def scandir(self, path: str) -> Iterator[FilesystemEntry]:
+    def scandir(self, path: str) -> Iterator[DirEntry]:
         """Iterate over the contents of a directory, return them as FilesystemEntry's.
 
         Args:
@@ -222,7 +247,7 @@ class Filesystem:
         Returns:
             A list of FilesystemEntry's.
         """
-        return list(self.scandir(path))
+        return [e.get() for e in self.scandir(path)]
 
     def walk(
         self,
@@ -230,6 +255,7 @@ class Filesystem:
         topdown: bool = True,
         onerror: Callable[[Exception], None] | None = None,
         followlinks: bool = False,
+        exclude: list[str] | None = None,
     ) -> Iterator[tuple[str, list[str], list[str]]]:
         """Recursively walk a directory pointed to by ``path``, returning the string representation of both files
         and directories.
@@ -239,11 +265,12 @@ class Filesystem:
             topdown: ``True`` puts the ``path`` at the top, ``False`` puts the ``path`` at the bottom.
             onerror: A method to execute when an error occurs.
             followlinks: ``True`` if we want to follow any symbolic link.
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
 
         Returns:
             An iterator of directory entries as path strings.
         """
-        return self.get(path).walk(topdown, onerror, followlinks)
+        return self.get(path).walk(topdown, onerror, followlinks, exclude)
 
     def walk_ext(
         self,
@@ -251,7 +278,8 @@ class Filesystem:
         topdown: bool = True,
         onerror: Callable[[Exception], None] | None = None,
         followlinks: bool = False,
-    ) -> Iterator[tuple[list[FilesystemEntry], list[FilesystemEntry], list[FilesystemEntry]]]:
+        exclude: list[str] | None = None,
+    ) -> Iterator[tuple[list[FilesystemEntry], list[DirEntry], list[DirEntry]]]:
         """Recursively walk a directory pointed to by ``path``, returning :class:`FilesystemEntry` of files
         and directories.
 
@@ -260,11 +288,12 @@ class Filesystem:
             topdown: ``True`` puts the ``path`` at the top, ``False`` puts the ``path`` at the bottom.
             onerror: A method to execute when an error occurs.
             followlinks: ``True`` if we want to follow any symbolic link.
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
 
         Returns:
             An iterator of directory entries as FilesystemEntry's.
         """
-        return self.get(path).walk_ext(topdown, onerror, followlinks)
+        return self.get(path).walk_ext(topdown, onerror, followlinks, exclude)
 
     def recurse(self, path: str) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield contents as :class:`FilesystemEntry`.
@@ -294,14 +323,13 @@ class Filesystem:
     def glob_ext(self, pattern: str) -> Iterator[FilesystemEntry]:
         """Iterate over the directory part of ``pattern``, returning entries matching ``pattern`` as FilesysmteEntry's.
 
-
         Args:
             pattern: The pattern to match.
 
         Returns:
             An iterator of FilesystemEntry's that match the pattern.
         """
-        path, pattern = fsutil.glob_split(pattern, alt_separator=self.alt_separator)
+        path, pattern = fsutil.glob_split(pattern, sep=self.sep)
         try:
             entry = self.get(path)
         except FileNotFoundError:
@@ -496,6 +524,33 @@ class Filesystem:
         """
         return self.get(path).hash(algos)
 
+    @cached_property
+    def uuid(self) -> UUID | None:
+        """Return the UUID of the filesystem if it has one."""
+        return None
+
+    @cached_property
+    def serial(self) -> int | str | None:
+        """Return the serial of the filesystem if it has one."""
+        return None
+
+    @cached_property
+    def identifier(self) -> str:
+        """Returns the identifier of the filesystem.
+
+        Usually this is a serial or UUID, but it can also be a volume GUID or name.
+        """
+        if self.uuid:
+            return str(self.uuid)
+        if self.serial:
+            return str(self.serial)
+        if self.volume:
+            if guid := getattr(self.volume, "guid", None):
+                return guid
+            if name := getattr(self.volume, "name", None):
+                return name
+        return repr(self)
+
 
 class FilesystemEntry:
     """Base class for filesystem entries."""
@@ -509,8 +564,8 @@ class FilesystemEntry:
             entry: The raw entry backing this filesystem entry.
         """
         self.fs = fs
-        self.path = path
-        self.name = fsutil.basename(path, alt_separator=self.fs.alt_separator)
+        self.path = fsutil.normalize(path, sep=self.fs.sep)
+        self.name = fsutil.basename(path, sep=self.fs.sep)
         self.entry = entry
 
     def __repr__(self) -> str:
@@ -519,7 +574,7 @@ class FilesystemEntry:
     def __str__(self) -> str:
         return str(self.path)
 
-    def _resolve(self, follow_symlinks: bool = True) -> FilesystemEntry:
+    def _resolve(self, follow_symlinks: bool = True) -> Self:
         """Helper method to resolve symbolic links.
 
         If ``follow_symlinks`` is ``False``, this function is effectively a no-op.
@@ -535,7 +590,7 @@ class FilesystemEntry:
             return self.readlink_ext()
         return self
 
-    def get(self, path: str) -> FilesystemEntry:
+    def get(self, path: str) -> Self:
         """Retrieve a :class:`FilesystemEntry` relative to this entry.
 
         Args:
@@ -560,13 +615,14 @@ class FilesystemEntry:
         Returns:
             An iterator of directory entries as path strings.
         """
-        raise NotImplementedError
+        for entry in self.scandir():
+            yield entry.name
 
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        """Iterate over the contents of a directory, yields :class:`FilesystemEntry`.
+    def scandir(self) -> Iterator[DirEntry]:
+        """Iterate over the contents of a directory, yields :class:`DirEntry`.
 
         Returns:
-            An iterator of :class:`FilesystemEntry`.
+            An iterator of :class:`DirEntry`.
         """
         raise NotImplementedError
 
@@ -578,19 +634,20 @@ class FilesystemEntry:
         """
         return list(self.iterdir())
 
-    def listdir_ext(self) -> list[FilesystemEntry]:
+    def listdir_ext(self) -> list[Self]:
         """List the contents of a directory as a list of :class:`FilesystemEntry`.
 
         Returns:
             A list of :class:`FilesystemEntry`.
         """
-        return list(self.scandir())
+        return [e.get() for e in self.scandir()]
 
     def walk(
         self,
         topdown: bool = True,
         onerror: Callable[[Exception], None] | None = None,
         followlinks: bool = False,
+        exclude: list[str] | None = None,
     ) -> Iterator[tuple[str, list[str], list[str]]]:
         """Recursively walk a directory and yield its contents as strings split in a tuple
         of lists of files, directories and symlinks.
@@ -604,18 +661,20 @@ class FilesystemEntry:
             topdown: ``True`` puts this entry at the top of the list, ``False`` puts this entry at the bottom.
             onerror: A method to execute when an error occurs.
             followlinks: ``True`` if we want to follow any symbolic link.
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
 
         Returns:
             An iterator of directory entries as path strings.
         """
-        yield from fsutil.walk(self, topdown, onerror, followlinks)
+        yield from fsutil.walk(self, topdown, onerror, followlinks, exclude)
 
     def walk_ext(
         self,
         topdown: bool = True,
         onerror: Callable[[Exception], None] | None = None,
         followlinks: bool = False,
-    ) -> Iterator[tuple[list[FilesystemEntry], list[FilesystemEntry], list[FilesystemEntry]]]:
+        exclude: list[str] | None = None,
+    ) -> Iterator[tuple[list[Self], list[Self], list[Self]]]:
         """Recursively walk a directory and yield its contents as :class:`FilesystemEntry` split in a tuple of
         lists of files, directories and symlinks.
 
@@ -623,24 +682,25 @@ class FilesystemEntry:
             topdown: ``True`` puts this entry at the top of the list, ``False`` puts this entry at the bottom.
             onerror: A method to execute when an error occurs.
             followlinks: ``True`` if we want to follow any symbolic link
+            exclude: ``list`` of glob-style string patterns to exclude from walking.
 
         Returns:
             An iterator of tuples :class:`FilesystemEntry`.
         """
-        yield from fsutil.walk_ext(self, topdown, onerror, followlinks)
+        yield from fsutil.walk_ext(self, topdown, onerror, followlinks, exclude)
 
     def recurse(self) -> Iterator[FilesystemEntry]:
-        """Recursively walk a directory and yield its contents as :class:`FilesystemEntry`.
+        """Recursively walk a directory and yield its contents as :class:`DirEntry`.
 
         Does not follow symbolic links.
 
         Returns:
-            An iterator of :class:`FilesystemEntry`.
+            An iterator of :class:`DirEntry`.
         """
         yield from fsutil.recurse(self)
 
     def glob(self, pattern: str) -> Iterator[str]:
-        """Iterate over this directory part of ``patern``, returning entries matching ``pattern`` as strings.
+        """Iterate over this directory part of ``pattern``, returning entries matching ``pattern`` as strings.
 
         Args:
             pattern: The pattern to match.
@@ -651,9 +711,9 @@ class FilesystemEntry:
         for entry in self.glob_ext(pattern):
             yield entry.path
 
-    def glob_ext(self, pattern: str) -> Iterator[FilesystemEntry]:
+    def glob_ext(self, pattern: str) -> Iterator[Self]:
         """Iterate over the directory part of ``pattern``, returning entries matching
-        ``pattern`` as :class:`FilesysmteEntry`.
+        ``pattern`` as :class:`FilesystemEntry`.
 
         Args:
             pattern: The pattern to glob for.
@@ -743,10 +803,11 @@ class FilesystemEntry:
         This means it follows the path a link points to, it tries to do it recursively.
 
         Returns:
-            The path the link points to."""
+            The path the link points to.
+        """
         raise NotImplementedError
 
-    def readlink_ext(self) -> FilesystemEntry:
+    def readlink_ext(self) -> Self:
         """Read the link where this entry points to, return the resulting path as :class:`FilesystemEntry`.
 
         If it is a symlink and returns the string that corresponds to that path.
@@ -755,9 +816,9 @@ class FilesystemEntry:
         Returns:
             The filesystem entry the link points to.
         """
-        log.debug("%r::readlink_ext()", self)
+        log.trace("%r::readlink_ext()", self)
         # Default behavior, resolve link own filesystem.
-        return fsutil.resolve_link(self.fs, self.readlink(), self.path, alt_separator=self.fs.alt_separator)
+        return fsutil.resolve_link(self.fs, self.readlink(), self.path, sep=self.fs.sep)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Determine the stat information of this entry.
@@ -841,14 +902,112 @@ class FilesystemEntry:
         return hashutil.common(self.open())
 
 
+class DirEntry:
+    """Directory entry base class. Closely models ``os.DirEntry``.
+
+    Filesystem implementations are encouraged to subclass this class to provide efficient
+    implementations of the various methods.
+
+    Args:
+        fs: The filesystem the entry belongs to.
+        path: The path of the parent directory.
+        name: The name of the entry.
+        entry: The raw entry backing this directory entry.
+    """
+
+    def __init__(self, fs: Filesystem, path: str, name: str, entry: Any):
+        self.fs = fs
+        """The filesystem the entry belongs to."""
+        self.path = fsutil.normalize(fsutil.join(path, name, sep=self.fs.sep), sep=self.fs.sep)
+        """The full path of the entry."""
+        self.name = name
+        """The name of the entry."""
+        self.entry = entry
+        """The raw entry backing this directory entry."""
+
+        self.stat = cache(self.stat)
+
+    def __fspath__(self) -> str:
+        return self.path
+
+    def __repr__(self) -> str:
+        return f"<DirEntry {self.name!r}>"
+
+    def __str__(self) -> str:
+        return str(self.path)
+
+    def get(self) -> FilesystemEntry:
+        """Retrieve the :class:`FilesystemEntry` this directory entry points to.
+
+        Subclasses should override this method to provide an efficient implementation.
+        """
+        return self.fs.get(self.path)
+
+    def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a directory or a symbolic link pointing to a directory.
+
+        Subclasses should override this method to provide an efficient implementation.
+        """
+        try:
+            return stat.S_ISDIR(self.stat(follow_symlinks=follow_symlinks).st_mode)
+        except FileNotFoundError:
+            return False
+
+    def is_file(self, *, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a file or a symbolic link pointing to a file.
+
+        Subclasses should override this method to provide an efficient implementation.
+        """
+        try:
+            return stat.S_ISREG(self.stat(follow_symlinks=follow_symlinks).st_mode)
+        except FileNotFoundError:
+            return False
+
+    def is_symlink(self) -> bool:
+        """Return whether this entry is a symbolic link.
+
+        Subclasses should override this method to provide an efficient implementation.
+        """
+        return stat.S_ISLNK(self.stat(follow_symlinks=False).st_mode)
+
+    def is_junction(self) -> bool:
+        """Return whether this entry is a junction (only valid for NTFS)."""
+        return False
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        """Return the stat information of this entry.
+
+        Subclasses should override this method to provide an efficient implementation.
+
+        Note that this may return slightly different information than a "full" stat on the full filesystem entry,
+        as in most cases this will generate a stat based on the information available in the directory entry only.
+        """
+        return self.fs.stat(self.path, follow_symlinks=follow_symlinks)
+
+    def inode(self) -> int:
+        """Return the inode number of this entry."""
+        return self.stat(follow_symlinks=False).st_ino
+
+
+class VirtualDirEntry(DirEntry):
+    fs: VirtualFilesystem
+    entry: FilesystemEntry
+
+    def get(self) -> FilesystemEntry:
+        return self.entry
+
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.entry.stat(follow_symlinks=follow_symlinks)
+
+
 class VirtualDirectory(FilesystemEntry):
     """Virtual directory implementation. Backed by a dict."""
 
     def __init__(self, fs: VirtualFilesystem, path: str):
         super().__init__(fs, path, None)
         self.up = None
-        self.top = None
-        self.entries = {}
+        self.top: FilesystemEntry | None = None
+        self.entries: dict[str, FilesystemEntry] = {}
 
     def __getitem__(self, item: str) -> FilesystemEntry:
         if not self.fs.case_sensitive:
@@ -869,35 +1028,35 @@ class VirtualDirectory(FilesystemEntry):
     def lattr(self) -> Any:
         raise TypeError(f"lattr is not allowed on VirtualDirectory: {self.path}")
 
-    def add(self, name: str, entry: FilesystemEntry) -> None:
-        """Add an entry to this :class:`VirtualDirectory`."""
+    def add(self, name: str, entry: FilesystemEntry, clobber: bool = False) -> None:
+        """Add an entry to this :class:`VirtualDirectory`.
+
+        Only overrides already existing entries with ``name`` if argument ``clobber`` is set to ``True``.
+
+        Args:
+            name: Name of the entry in this directory
+            entry: FilesystemEntry to add to this directory
+            clobber: Allow overwrites (default: False)
+
+        Raises:
+            KeyError if ``name`` already exists in this directory and ``clobber`` is ``False``
+        """
         if not self.fs.case_sensitive:
             name = name.lower()
+
+        if not clobber and name in self.entries:
+            raise KeyError(f"Entry {name!r} already exists in {self!r}")
 
         self.entries[name] = entry
 
     def get(self, path: str) -> FilesystemEntry:
         return self.fs.get(path, relentry=self)
 
-    def iterdir(self) -> Iterator[str]:
+    def scandir(self) -> Iterator[DirEntry]:
         yielded = set()
-        for entry in self.entries:
-            yield entry
-            yielded.add(entry)
-
-        # self.top used to be a reference to a filesystem. This is now a reference to
-        # any filesystem entry, usually the root of a filesystem.
-        if self.top:
-            for entry in self.top.iterdir():
-                if entry in yielded or (not self.fs.case_sensitive and entry.lower() in yielded):
-                    continue
-                yield entry
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
-        yielded = set()
-        for entry in self.entries.values():
-            yield entry
-            yielded.add(entry.name)
+        for name, entry in self.entries.items():
+            yield VirtualDirEntry(self.fs, self.path, entry.name, entry)
+            yielded.add(name)
 
         # self.top used to be a reference to a filesystem. This is now a reference to
         # any filesystem entry, usually the root of a filesystem.
@@ -908,7 +1067,7 @@ class VirtualDirectory(FilesystemEntry):
                 yield entry
 
     def _stat(self) -> fsutil.stat_result:
-        path_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
+        path_addr = fsutil.generate_addr(self.path, sep=self.fs.sep)
         return fsutil.stat_result([stat.S_IFDIR, path_addr, id(self.fs), 1, 0, 0, 0, 0, 0, 0])
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
@@ -965,15 +1124,12 @@ class VirtualFile(FilesystemEntry):
         raise TypeError(f"lattr is not allowed on {self.__class__.__name__}: {self.path}")
 
     def get(self, path: str) -> FilesystemEntry:
-        path = fsutil.normalize(path, alt_separator=self.fs.alt_separator).strip("/")
+        path = fsutil.normalize(path, sep=self.fs.sep).strip("/")
         if not path:
             return self
         raise NotADirectoryError(f"'{self.path}' is not a directory")
 
-    def iterdir(self) -> Iterator[str]:
-        raise NotADirectoryError(f"'{self.path}' is not a directory")
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
+    def scandir(self) -> Iterator[DirEntry]:
         raise NotADirectoryError(f"'{self.path}' is not a directory")
 
     def open(self) -> BinaryIO:
@@ -984,7 +1140,7 @@ class VirtualFile(FilesystemEntry):
 
     def lstat(self) -> fsutil.stat_result:
         size = getattr(self.entry, "size", 0)
-        file_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
+        file_addr = fsutil.generate_addr(self.path, sep=self.fs.sep)
         return fsutil.stat_result([stat.S_IFREG, file_addr, id(self.fs), 1, 0, 0, size, 0, 0, 0])
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
@@ -1056,10 +1212,7 @@ class VirtualSymlink(FilesystemEntry):
     def get(self, path: str) -> FilesystemEntry:
         return self.fs.get(path, self)
 
-    def iterdir(self) -> Iterator[str]:
-        yield from self.readlink_ext().iterdir()
-
-    def scandir(self) -> Iterator[FilesystemEntry]:
+    def scandir(self) -> Iterator[DirEntry]:
         yield from self.readlink_ext().scandir()
 
     def open(self) -> BinaryIO:
@@ -1069,7 +1222,7 @@ class VirtualSymlink(FilesystemEntry):
         return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
-        link_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
+        link_addr = fsutil.generate_addr(self.path, sep=self.fs.sep)
         return fsutil.stat_result([stat.S_IFLNK, link_addr, id(self.fs), 1, 0, 0, len(self.target), 0, 0, 0])
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
@@ -1110,8 +1263,8 @@ class VirtualFilesystem(Filesystem):
 
     def get(self, path: str, relentry: FilesystemEntry | None = None) -> FilesystemEntry:
         entry = relentry or self.root
-        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
-        full_path = fsutil.join(entry.path, path, alt_separator=self.alt_separator)
+        path = fsutil.normalize(path, sep=self.sep).strip("/")
+        full_path = fsutil.join(entry.path, path, sep=self.sep)
 
         if not path:
             return entry
@@ -1144,7 +1297,7 @@ class VirtualFilesystem(Filesystem):
                     entry = entry[part]
                 elif entry.top:
                     try:
-                        return entry.top.get(fsutil.join(*parts[i:], alt_separator=self.alt_separator))
+                        return entry.top.get(fsutil.join(*parts[i:], sep=self.sep))
                     except FilesystemError as e:
                         raise FileNotFoundError(full_path) from e
                 else:
@@ -1154,7 +1307,7 @@ class VirtualFilesystem(Filesystem):
 
     def makedirs(self, path: str) -> VirtualDirectory:
         """Create virtual directories into the VFS from the given path."""
-        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
+        path = fsutil.normalize(path, sep=self.sep).strip("/")
         directory = self.root
 
         if not path:
@@ -1163,7 +1316,7 @@ class VirtualFilesystem(Filesystem):
         parts = path.split("/")
         for i, part in enumerate(parts):
             if part not in directory:
-                vdir = VirtualDirectory(self, fsutil.join(*parts[: i + 1], alt_separator=self.alt_separator))
+                vdir = VirtualDirectory(self, fsutil.join(*parts[: i + 1], sep=self.sep))
                 vdir.up = directory
 
                 directory.add(part, vdir)
@@ -1179,12 +1332,12 @@ class VirtualFilesystem(Filesystem):
 
     mount = map_fs
 
-    def map_dir(self, vfspath: str, realpath: pathlib.Path | str) -> None:
+    def map_dir(self, vfspath: str, realpath: pathlib.Path | str, *, clobber: bool = False) -> None:
         """Recursively map a directory from the host machine into the VFS."""
         if not isinstance(realpath, pathlib.Path):
             realpath = pathlib.Path(realpath)
 
-        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator).strip("/")
+        vfspath = fsutil.normalize(vfspath, sep=self.sep).strip("/")
         base = realpath.resolve()
 
         # Compatibility walk until we are base 3.12
@@ -1198,61 +1351,58 @@ class VirtualFilesystem(Filesystem):
             if relroot == ".":
                 relroot = ""
 
-            relroot = fsutil.normalize(relroot, alt_separator=os.path.sep)
-            vfsroot = fsutil.join(vfspath, relroot, alt_separator=self.alt_separator)
+            relroot = fsutil.normalize(relroot, sep=os.path.sep)
+            vfsroot = fsutil.join(vfspath, relroot, sep=self.sep)
             directory = self.makedirs(vfsroot)
 
             for dir_ in dirs:
-                vfs_dir = fsutil.join(vfsroot, dir_, alt_separator=self.alt_separator)
+                vfs_dir = fsutil.join(vfsroot, dir_, sep=self.sep)
                 self.makedirs(vfs_dir)
 
             for file_ in files:
-                vfs_file_path = fsutil.join(vfsroot, file_, alt_separator=self.alt_separator)
+                vfs_file_path = fsutil.join(vfsroot, file_, sep=self.sep)
                 real_file_path = root.joinpath(file_)
-                directory.add(file_, MappedFile(self, vfs_file_path, str(real_file_path)))
+                directory.add(file_, MappedFile(self, vfs_file_path, str(real_file_path)), clobber=clobber)
 
-    def map_file(self, vfspath: str, realpath: str | pathlib.Path, compression: str | None = None) -> None:
+    def map_file(
+        self, vfspath: str, realpath: str | pathlib.Path, *, compression: str | None = None, clobber: bool = False
+    ) -> None:
         """Map a file from the host machine into the VFS."""
         realpath = str(realpath)
-        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
-        if vfspath[-1] == "/":
-            raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
-        file_path = vfspath.lstrip("/")
-
+        vfspath = fsutil.normalize(vfspath, sep=self.sep)
         if compression is not None:
-            mapped_file = MappedCompressedFile(self, file_path, realpath, algo=compression)
+            mapped_file = MappedCompressedFile(self, vfspath.lstrip("/"), realpath, algo=compression)
         else:
-            mapped_file = MappedFile(self, file_path, realpath)
-        self.map_file_entry(vfspath, mapped_file)
+            mapped_file = MappedFile(self, vfspath.lstrip("/"), realpath)
+        self.map_file_entry(vfspath, mapped_file, clobber=clobber)
 
-    def map_file_fh(self, vfspath: str, fh: BinaryIO) -> None:
+    def map_file_fh(self, vfspath: str, fh: BinaryIO, *, clobber: bool = False) -> None:
         """Map a file handle into the VFS."""
-        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
-        if vfspath[-1] == "/":
-            raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
-        file_path = vfspath.lstrip("/")
-        self.map_file_entry(vfspath, VirtualFile(self, file_path, fh))
+        vfspath = fsutil.normalize(vfspath, sep=self.sep)
+        self.map_file_entry(vfspath, VirtualFile(self, vfspath.lstrip("/"), fh), clobber=clobber)
 
-    def map_file_entry(self, vfspath: str, entry: FilesystemEntry) -> None:
+    def map_file_entry(self, vfspath: str, entry: FilesystemEntry, *, clobber: bool = False) -> None:
         """Map a :class:`FilesystemEntry` into the VFS.
 
         Any missing subdirectories up to, but not including, the last part of
         ``vfspath`` will be created.
         """
-        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator).strip("/")
+        vfspath = fsutil.normalize(vfspath, sep=self.sep).strip("/")
         if not vfspath:
             self.root.top = entry
         else:
             if "/" in vfspath:
-                sub_dirs = fsutil.dirname(vfspath, alt_separator=self.alt_separator)
+                sub_dirs = fsutil.dirname(vfspath, sep=self.sep)
                 directory = self.makedirs(sub_dirs)
             else:
                 directory = self.root
 
-            entry_name = fsutil.basename(vfspath, alt_separator=self.alt_separator)
-            directory.add(entry_name, entry)
+            entry_name = fsutil.basename(vfspath, sep=self.sep)
+            directory.add(entry_name, entry, clobber=clobber)
 
-    def map_dir_from_tar(self, vfspath: str, tar_file: str | pathlib.Path, map_single_file: bool = False) -> None:
+    def map_dir_from_tar(
+        self, vfspath: str, tar_file: str | pathlib.Path, *, map_single_file: bool = False, clobber: bool = False
+    ) -> None:
         """Map files in a tar onto the VFS.
 
         Args:
@@ -1260,26 +1410,25 @@ class VirtualFilesystem(Filesystem):
             tar_file: Source path of the tar file to map.
             map_single_file: Only mount a single file found inside the tar at the specified path.
         """
-
         if not isinstance(tar_file, pathlib.Path):
             try:
                 tar_file = pathlib.Path(tar_file)
             except TypeError:
                 raise ValueError("tar_file should be a string or Path instance")
 
-        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
+        vfspath = fsutil.normalize(vfspath, sep=self.sep)
         tfs = TarFilesystem(tar_file.open("rb"))
 
         if map_single_file:
             # We map the first file we find in the tar to the provided vfspath.
             for file in [f[0] for _, _, f in tfs.walk_ext("/") if f]:
                 file.name = fsutil.basename(vfspath)
-                self.map_file_entry(vfspath, file)
+                self.map_file_entry(vfspath, file, clobber=clobber)
                 return
         else:
             self.mount(vfspath, tfs)
 
-    def map_file_from_tar(self, vfspath: str, tar_file: str | pathlib.Path) -> None:
+    def map_file_from_tar(self, vfspath: str, tar_file: str | pathlib.Path, *, clobber: bool = False) -> None:
         """Map a single file in a tar archive to the given path in the VFS.
 
         The provided tar archive should contain *one* file.
@@ -1288,7 +1437,7 @@ class VirtualFilesystem(Filesystem):
             vfspath: Destination path in the virtual filesystem.
             tar_file: Source path of the tar file to map.
         """
-        return self.map_dir_from_tar(vfspath.lstrip("/"), tar_file, map_single_file=True)
+        return self.map_dir_from_tar(vfspath.lstrip("/"), tar_file, map_single_file=True, clobber=clobber)
 
     def link(self, src: str, dst: str) -> None:
         """Hard link a :class:`FilesystemEntry` to another location.
@@ -1306,8 +1455,8 @@ class VirtualFilesystem(Filesystem):
             src: The path to the target of the symlink.
             dst: The path to the symlink.
         """
-        src = fsutil.normalize(src, alt_separator=self.alt_separator).rstrip("/")
-        dst = fsutil.normalize(dst, alt_separator=self.alt_separator).strip("/")
+        src = fsutil.normalize(src, sep=self.sep).rstrip("/")
+        dst = fsutil.normalize(dst, sep=self.sep).strip("/")
         self.map_file_entry(dst, VirtualSymlink(self, dst, src))
 
 
@@ -1317,7 +1466,7 @@ class LayerFilesystem(Filesystem):
     def __init__(self, **kwargs):
         self.layers: list[Filesystem] = []
         self.mounts = {}
-        self._alt_separator = "/"
+        self._sep = "/"
         self._case_sensitive = True
         self._root_entry = LayerFilesystemEntry(self, "/", [])
         self.root = self.append_layer()
@@ -1373,7 +1522,7 @@ class LayerFilesystem(Filesystem):
 
     def append_layer(self, **kwargs) -> VirtualFilesystem:
         """Append a new layer."""
-        layer = VirtualFilesystem(case_sensitive=self.case_sensitive, alt_separator=self.alt_separator, **kwargs)
+        layer = VirtualFilesystem(case_sensitive=self.case_sensitive, sep=self.sep, **kwargs)
         self.append_fs_layer(layer)
         return layer
 
@@ -1381,7 +1530,7 @@ class LayerFilesystem(Filesystem):
 
     def prepend_layer(self, **kwargs) -> VirtualFilesystem:
         """Prepend a new layer."""
-        layer = VirtualFilesystem(case_sensitive=self.case_sensitive, alt_separator=self.alt_separator, **kwargs)
+        layer = VirtualFilesystem(case_sensitive=self.case_sensitive, sep=self.sep, **kwargs)
         self.prepend_fs_layer(layer)
         return layer
 
@@ -1430,9 +1579,14 @@ class LayerFilesystem(Filesystem):
         return self._case_sensitive
 
     @property
-    def alt_separator(self) -> str:
+    def sep(self) -> str:
+        """The separator of the filesystem."""
+        return self._sep
+
+    @property
+    def altsep(self) -> str | None:
         """The alternative separator of the filesystem."""
-        return self._alt_separator
+        return super().altsep
 
     @case_sensitive.setter
     def case_sensitive(self, value: bool) -> None:
@@ -1442,19 +1596,27 @@ class LayerFilesystem(Filesystem):
         for layer in self.layers:
             layer.case_sensitive = value
 
-    @alt_separator.setter
-    def alt_separator(self, value: str) -> None:
-        """Set the alternative separator of the filesystem (and all layers)."""
-        self._alt_separator = value
-        self.root.alt_separator = value
+    @sep.setter
+    def sep(self, value: str) -> None:
+        """Set the separator of the filesystem (and all layers)."""
+        self._sep = value
+        self.root.sep = value
         for layer in self.layers:
-            layer.alt_separator = value
+            layer.sep = value
+
+    @altsep.setter
+    def altsep(self, value: str | None) -> None:
+        """Set the alternative separator of the filesystem (and all layers)."""
+        self._altsep = value
+        self.root.altsep = value
+        for layer in self.layers:
+            layer.altsep = value
 
     def get(self, path: str, relentry: LayerFilesystemEntry | None = None) -> LayerFilesystemEntry:
         """Get a :class:`FilesystemEntry` from the filesystem."""
         entry = relentry or self._root_entry
-        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
-        full_path = fsutil.join(entry.path, path, alt_separator=self.alt_separator)
+        path = fsutil.normalize(path, sep=self.sep).strip("/")
+        full_path = fsutil.join(entry.path, path, sep=self.sep)
 
         if not path:
             return entry
@@ -1488,7 +1650,7 @@ class LayerFilesystem(Filesystem):
                     self,
                     entry.readlink(),
                     "/".join(parts[:i]),
-                    alt_separator=entry.fs.alt_separator,
+                    sep=entry.fs.sep,
                 )
             entry = entry.get(part)
 
@@ -1517,6 +1679,14 @@ class EntryList(list):
             return object.__getattribute__(self, attr)
 
 
+class LayerDirEntry(DirEntry):
+    fs: LayerFilesystem
+    entry: list[DirEntry]
+
+    def get(self) -> LayerFilesystemEntry:
+        return LayerFilesystemEntry(self.fs, self.path, [e.get() for e in self.entry])
+
+
 class LayerFilesystemEntry(FilesystemEntry):
     def __init__(self, fs: Filesystem, path: str, entry: FilesystemEntry):
         super().__init__(fs, path, EntryList(entry))
@@ -1542,24 +1712,12 @@ class LayerFilesystemEntry(FilesystemEntry):
     def open(self) -> BinaryIO:
         return self._resolve()._exec("open")
 
-    def iterdir(self) -> Iterator[str]:
-        yielded = {".", ".."}
-        selfentry = self._resolve()
-        for fsentry in selfentry.entries:
-            for entry_name in fsentry.iterdir():
-                name = entry_name if selfentry.fs.case_sensitive else entry_name.lower()
-                if name in yielded:
-                    continue
-
-                yield entry_name
-                yielded.add(name)
-
-    def scandir(self) -> Iterator[LayerFilesystemEntry]:
+    def scandir(self) -> Iterator[LayerDirEntry]:
         # Every entry is actually a list of entries from the different
         # overlaying FSes, of which each may implement a different function
         # like .stat() or .open()
         items = defaultdict(list)
-        selfentry = self._resolve()
+        selfentry: LayerFilesystemEntry = self._resolve()
         for fsentry in selfentry.entries:
             for entry in fsentry.scandir():
                 name = entry.name if selfentry.fs.case_sensitive else entry.name.lower()
@@ -1572,9 +1730,7 @@ class LayerFilesystemEntry(FilesystemEntry):
             # The filename for the first entry is taken. Note that in case of
             # non case-sensitive FSes, the different entries from the
             # overlaying FSes may have different casing of the name.
-            entry_name = entries[0].name
-            path = fsutil.join(selfentry.path, entry_name, alt_separator=selfentry.fs.alt_separator)
-            yield LayerFilesystemEntry(selfentry.fs, path, entries)
+            yield DirEntry(selfentry.fs, selfentry.path, entries[0].name, entries)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         try:
@@ -1621,8 +1777,17 @@ class RootFilesystem(LayerFilesystem):
         raise TypeError("Detect is not allowed on RootFilesystem class")
 
     def get(self, path: str, relentry: LayerFilesystemEntry | None = None) -> RootFilesystemEntry:
-        self.target.log.debug("%r::get(%r)", self, path)
+        self.target.log.trace("%r::get(%r)", self, path)
         entry = super().get(path, relentry)
+        entry.__class__ = RootFilesystemEntry
+        return entry
+
+
+class RootDirEntry(LayerDirEntry):
+    fs: RootFilesystem
+
+    def get(self) -> RootFilesystemEntry:
+        entry = super().get()
         entry.__class__ = RootFilesystemEntry
         return entry
 
@@ -1631,55 +1796,51 @@ class RootFilesystemEntry(LayerFilesystemEntry):
     fs: RootFilesystem
 
     def get(self, path: str) -> RootFilesystemEntry:
-        self.fs.target.log.debug("%r::get(%r)", self, path)
+        self.fs.target.log.trace("%r::get(%r)", self, path)
         entry = super().get(path)
         entry.__class__ = RootFilesystemEntry
         return entry
 
     def open(self) -> BinaryIO:
-        self.fs.target.log.debug("%r::open()", self)
+        self.fs.target.log.trace("%r::open()", self)
         return super().open()
 
-    def iterdir(self) -> Iterator[str]:
-        self.fs.target.log.debug("%r::iterdir()", self)
-        yield from super().iterdir()
-
-    def scandir(self) -> Iterator[RootFilesystemEntry]:
-        self.fs.target.log.debug("%r::scandir()", self)
+    def scandir(self) -> Iterator[DirEntry]:
+        self.fs.target.log.trace("%r::scandir()", self)
         for entry in super().scandir():
-            entry.__class__ = RootFilesystemEntry
+            entry.__class__ = RootDirEntry
             yield entry
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
-        self.fs.target.log.debug("%r::is_file()", self)
+        self.fs.target.log.trace("%r::is_file()", self)
         return super().is_file(follow_symlinks=follow_symlinks)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
-        self.fs.target.log.debug("%r::is_dir()", self)
+        self.fs.target.log.trace("%r::is_dir()", self)
         return super().is_dir(follow_symlinks=follow_symlinks)
 
     def is_symlink(self) -> bool:
-        self.fs.target.log.debug("%r::is_symlink()", self)
+        self.fs.target.log.trace("%r::is_symlink()", self)
         return super().is_symlink()
 
     def readlink(self) -> str:
-        self.fs.target.log.debug("%r::readlink()", self)
+        self.fs.target.log.trace("%r::readlink()", self)
         return super().readlink()
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
-        self.fs.target.log.debug("%r::stat()", self)
+        self.fs.target.log.trace("%r::stat()", self)
         return super().stat(follow_symlinks=follow_symlinks)
 
     def lstat(self) -> fsutil.stat_result:
-        self.fs.target.log.debug("%r::lstat()", self)
+        self.fs.target.log.trace("%r::lstat()", self)
         return super().lstat()
 
     def attr(self) -> Any:
-        self.fs.target.log.debug("%r::attr()", self)
+        self.fs.target.log.trace("%r::attr()", self)
         return super().attr()
 
     def lattr(self) -> Any:
-        self.fs.target.log.debug("%r::lattr()", self)
+        self.fs.target.log.trace("%r::lattr()", self)
         return super().lattr()
 
 
@@ -1694,7 +1855,6 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
         class_name: The class to load.
         internal: Whether it is an internal module or not.
     """
-
     if internal:
         module = f"{MODULE_PATH}.{module}"
 
@@ -1761,9 +1921,11 @@ register("xfs", "XfsFilesystem")
 register("fat", "FatFilesystem")
 register("ffs", "FfsFilesystem")
 register("vmfs", "VmfsFilesystem")
+register("apfs", "ApfsFilesystem")
 register("btrfs", "BtrfsFilesystem")
 register("exfat", "ExfatFilesystem")
 register("squashfs", "SquashFSFilesystem")
+register("cramfs", "CramfsFilesystem")
 register("jffs", "JffsFilesystem")
 register("qnxfs", "QnxFilesystem")
 register("zip", "ZipFilesystem")
@@ -1772,3 +1934,4 @@ register("vmtar", "VmtarFilesystem")
 register("cpio", "CpioFilesystem")
 register("vbk", "VbkFilesystem")
 register("ad1", "AD1Filesystem")
+register("ntds", "NtdsFilesystem")

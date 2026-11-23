@@ -41,6 +41,7 @@ def mock_uac_dir(tmp_path: Path) -> Path:
     ("path", "loader"),
     [
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz", TarLoader),
+        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143112.tar.gz", TarLoader),
         ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143106.zip", ZipLoader),
         ("mock_uac_dir", UacLoader),
     ],
@@ -62,9 +63,17 @@ def test_target_open(
         assert target.path == path
 
 
-def test_compressed_tar() -> None:
+@pytest.mark.parametrize(
+    "data_path",
+    [
+        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz"),
+        # this one start with ./[root]
+        ("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143112.tar.gz"),
+    ],
+)
+def test_compressed_tar(data_path: str) -> None:
     """Test if we map a compressed UAC tar image correctly."""
-    path = absolute_path("_data/loaders/uac/uac-2e44ea6da71d-linux-20250717143111.tar.gz")
+    path = absolute_path(data_path)
 
     loader = loader_open(path)
     assert isinstance(loader, TarLoader)
@@ -102,7 +111,6 @@ def test_compressed_zip() -> None:
 
 def test_dir(mock_uac_dir: Path) -> None:
     """Test if we map an extracted UAC directory correctly."""
-
     loader = loader_open(mock_uac_dir)
     assert isinstance(loader, UacLoader)
 

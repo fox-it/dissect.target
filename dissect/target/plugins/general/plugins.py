@@ -13,7 +13,6 @@ def generate_functions_overview(
     functions: list[plugin.FunctionDescriptor] | None = None, include_docs: bool = False
 ) -> list[str]:
     """Generate a tree list of functions with optional documentation."""
-
     categorized_plugins = _categorize_functions(functions)
     plugin_descriptions = _generate_plugin_tree_overview(categorized_plugins, include_docs)
 
@@ -53,7 +52,6 @@ def generate_functions_overview(
 
 def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = None) -> str:
     """Generate a JSON representation of all available functions."""
-
     loaded = []
     failed = []
 
@@ -105,7 +103,6 @@ def _get_default_functions() -> list[plugin.FunctionDescriptor]:
 
 def _categorize_functions(functions: list[plugin.FunctionDescriptor] | None = None) -> dict:
     """Categorize functions based on its module path."""
-
     functions = functions or _get_default_functions()
     result = {}
 
@@ -130,7 +127,6 @@ def _generate_plugin_tree_overview(
     indent: int = 0,
 ) -> list[str]:
     """Create plugin overview with identations."""
-
     if isinstance(plugin_tree, set):
         return [
             textwrap.indent(

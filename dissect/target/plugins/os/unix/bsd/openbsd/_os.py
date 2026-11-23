@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 

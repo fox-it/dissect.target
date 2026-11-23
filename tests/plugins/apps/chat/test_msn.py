@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 def test_msn(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     """Test if we parse MSN Chat messages on Windows XP correctly."""
-
     morpheus_id = convert_email("morpheus@matrix.internal")
     neo_id = convert_email("neo@matrix.internal")
 

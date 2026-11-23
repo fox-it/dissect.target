@@ -79,7 +79,6 @@ class ClfsPlugin(Plugin):
         References:
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-the-common-log-file-system
         """
-
         for blf_path, blf_instance in self._blfs:
             # We only parse the base record client/container contexts for now
             for base_record in blf_instance.base_records():

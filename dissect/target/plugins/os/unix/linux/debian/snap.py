@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystems.squashfs import SquashFSFilesystem
 from dissect.target.helpers import configutil
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugin import Plugin, alias, export
 from dissect.target.plugins.os.unix.applications import UnixApplicationRecord
 from dissect.target.target import Target
@@ -59,7 +58,6 @@ class SnapPlugin(Plugin):
             version      (string):   version of the application
             path         (string):   path to the application snap file
         """
-
         for install_path in self.installs:
             for snap in install_path.glob("*.snap"):
                 try:

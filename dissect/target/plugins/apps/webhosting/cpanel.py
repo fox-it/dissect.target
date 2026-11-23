@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 CPanelLastloginRecord = TargetRecordDescriptor(
-    "application/log/cpanel/lastlogin",
+    "application/webhosting/cpanel/log/lastlogin",
     [
         ("datetime", "ts"),
         ("string", "user"),

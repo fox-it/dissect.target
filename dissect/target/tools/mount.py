@@ -3,14 +3,14 @@ from __future__ import annotations
 import argparse
 import logging
 
-from dissect.util.feature import Feature, feature_enabled
-
 from dissect.target import filesystem
 from dissect.target.exceptions import TargetError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import parse_options_string
-from dissect.target.tools.utils import (
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     open_target,
     process_generic_arguments,
 )
@@ -19,19 +19,7 @@ from dissect.target.tools.utils import (
 logging.basicConfig(level=logging.INFO)
 
 try:
-    if feature_enabled(Feature.BETA):
-        from fuse3 import FUSE3 as FUSE
-        from fuse3 import util
-
-        FUSE_VERSION = "3"
-        FUSE_LIB_PATH = util.libfuse._name
-    else:
-        from fuse import FUSE, _libfuse
-
-        FUSE_VERSION = "2"
-        FUSE_LIB_PATH = _libfuse._name
-
-    logging.info("Using fuse%s library: %s", FUSE_VERSION, FUSE_LIB_PATH)
+    from fuse import FUSE
 
     from dissect.target.helpers.mount import DissectMount
 
@@ -40,7 +28,7 @@ except Exception:
     HAS_FUSE = False
 
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -49,7 +37,8 @@ logging.raiseExceptions = False
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-mount {get_dissect_target_version()} : mount the filesystem of a target to any arbitrary "
+        f"directory on your analysis machine, similar to the `mount` command on Unix systems.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
@@ -93,7 +82,19 @@ def main() -> int:
         vnames.setdefault(basename, []).append(v)
         vfs.map_file_fh(f"volumes/{fname}", v)
 
+    fake_ntfs = set()
     for i, fs in enumerate(t.filesystems):
+        ntfs_obj = getattr(fs, "ntfs", None)
+
+        if ntfs_obj in fake_ntfs:
+            continue
+
+        if ntfs_obj and fs.__type__ != "ntfs":
+            # A non ntfs filesystem with a "ntfs" object means that add_virtual_ntfs_filesystem was used.
+            # The fake ntfs object is added to the filesystem after its parent.
+            # We will mount an entry in filesystems/ for the virtual filesystem, not for the "fake" ntfs filesystem.
+            fake_ntfs.add(ntfs_obj)
+
         volumes = fs.volume if isinstance(fs.volume, list) else [fs.volume]
         for volume in volumes:
             default_name = f"fs_{i}"

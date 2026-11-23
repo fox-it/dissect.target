@@ -33,7 +33,6 @@ class EnvironmentFilePlugin(Plugin):
     @arg("--extension", default="env", help="extension of files to scan")
     def envfile(self, env_path: str, extension: str = "env") -> Iterator[EnvironmentFileRecord]:
         """Yield environment variables found in ``.env`` files at the provided path."""
-
         if not env_path:
             self.target.log.error("No ``--path`` provided!")
             return

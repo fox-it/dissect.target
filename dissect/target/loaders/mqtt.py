@@ -22,6 +22,7 @@ from dissect.util.stream import AlignedStream
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 try:
     import paho.mqtt.client as mqtt
 
@@ -37,7 +39,8 @@ try:
 except ImportError:
     HAS_PAHO = False
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 DISK_INDEX_OFFSET = 9
 
@@ -469,12 +472,13 @@ def port(value: str) -> int:
 
     Args:
         value (str): The string representation of the port number.
+
     Returns:
         int: The port number as an integer.
+
     Raises:
         argparse.ArgumentTypeError: If the port number is not an integer or out of the valid range (1-65535).
     """
-
     try:
         port = int(value)
     except ValueError:
@@ -500,7 +504,6 @@ def case(value: str) -> str:
     Raises:
         argparse.ArgumentTypeError: If the case name does not match the required pattern.
     """
-
     if re.match(r"^[a-zA-Z0-9_]+$", value):
         return value
 

@@ -11,9 +11,11 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     TargetError,
 )
-from dissect.target.tools.utils import (
+from dissect.target.helpers.logging import get_logger
+from dissect.target.tools.utils.cli import (
     catch_sigpipe,
     configure_generic_arguments,
+    get_dissect_target_version,
     open_targets,
     process_generic_arguments,
 )
@@ -21,7 +23,8 @@ from dissect.target.tools.utils import (
 if TYPE_CHECKING:
     from dissect.target.helpers.regutil import RegistryKey
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 logging.lastResort = None
 logging.raiseExceptions = False
 
@@ -30,7 +33,8 @@ logging.raiseExceptions = False
 def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.target",
+        description=f"target-reg {get_dissect_target_version()} :"
+        f" query the registry of Windows targets and print the results in a tree.",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )

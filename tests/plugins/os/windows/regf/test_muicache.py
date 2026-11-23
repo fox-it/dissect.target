@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.muicache import MuiCachePlugin
 
 if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import VirtualHive
     from dissect.target.target import Target
 
 

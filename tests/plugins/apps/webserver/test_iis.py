@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from io import BytesIO
 from typing import TYPE_CHECKING
-from unittest.mock import mock_open, patch
 
 import pytest
 
@@ -12,6 +12,8 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dissect.target.filesystem import VirtualFilesystem
 
 
@@ -92,10 +94,11 @@ def test_iis_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_confi
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
     ],
 )
-def test_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str) -> None:
+def test_iis_nonutf8(target_win_tzinfo: Target, tmp_path: Path, stream: bytes, method: str) -> None:
     # should not crash on invalid bytes like \xa7
-    with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
-        assert next(iter(getattr(iis, method)(target_win_tzinfo, Path("/iis")))).server_name == "\\xa7"
+    path = tmp_path / "iis.log"
+    path.write_bytes(stream)
+    assert next(iter(getattr(iis, method)(target_win_tzinfo, path))).server_name == "\\xa7"
 
 
 def test_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
@@ -217,6 +220,26 @@ def test_iis_access_noconfig(
     target_win_tzinfo.add_plugin(iis.IISLogsPlugin)
     results = list(target_win_tzinfo.iis.access())
     assert len(results) > 0
+
+
+def test_iis_failed_to_parse_log(
+    target_win_tzinfo: Target,
+    fs_win: VirtualFilesystem,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    map_dir = "inetpub/logs/LogFiles/W3SVC1"
+
+    data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c/W3SVC1")
+    fs_win.map_dir(map_dir, data_dir)
+    fs_win.map_file_fh(f"{map_dir}/01_logfile.log", BytesIO(b"a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p"))
+    target_win_tzinfo.add_plugin(iis.IISLogsPlugin)
+    with caplog.at_level(logging.ERROR, target_win_tzinfo.log.name):
+        assert list(target_win_tzinfo.iis.access())
+
+    assert any(
+        f"Issue processing log file sysvol/{map_dir}/01_logfile.log in auto format" in message
+        for message in caplog.messages
+    )
 
 
 def test_iis_direct_mode() -> None:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -9,6 +8,7 @@ from defusedxml import ElementTree as ET
 from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import configutil
+from dissect.target.helpers.logging import get_logger
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
-log = logging.getLogger(__name__)
+
+log = get_logger(__name__)
 
 
 @dataclass
@@ -33,6 +34,10 @@ class DeviceInfo:
     fguid: UUID | None = None
     guid: UUID | None = None
     os: str | None = None
+    chipset: str | None = None
+    imei1: str | None = None
+    imei2: str | None = None
+    securitypatchlevel: str | None = None
 
 
 @dataclass
@@ -166,11 +171,12 @@ class CellebriteFilesystem(LayerFilesystem):
         else:
             raise ValueError(f"Unsupported Cellebrite dump type {path.name}")
 
-        # We add the full file system from ``/filesystem1`` as a layer to the root ``/`` and
+        # We add the full file system (``/filesystem1`` or ``/Dump``) as a layer to the root ``/`` and
         # mount found extras and extraction metadata, such as keychain dumps to folders in ``/$fs$/fs0``,
-        # to keep this information accessible for device specific plugins.
+        # to keep this information accessible for device specific plugins. TODO: Use ``ZIPLogicalPath``.
         for fs_dir, dest in [
-            ("/filesystem1", "/"),
+            ("/filesystem1", "/"),  # iOS
+            ("/Dump", "/"),  # Android
             ("/extra", "/$fs$/fs0/extra"),
             ("/metadata1", "/$fs$/fs0/metadata"),
         ]:

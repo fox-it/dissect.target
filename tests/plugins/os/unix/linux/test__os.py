@@ -1,11 +1,17 @@
-import pathlib
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
-from dissect.target.target import Target
 from tests.conftest import make_os_target
+
+if TYPE_CHECKING:
+    import pathlib
+
+    from dissect.target.target import Target
 
 
 @pytest.fixture

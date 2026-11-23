@@ -43,7 +43,6 @@ def target_win_rdp_cache(target_win_users: Target, fs_win: VirtualFilesystem) ->
 
 def test_wrap_in_border() -> None:
     """Test if ``rdpcache.wrap_square_colors_in_border`` behaves as expected."""
-
     grey_pixel = b"\x80\x80\x80\xff"
     blue_pixel = b"\xff\x00\x00\xff"
     grey_square = grey_pixel * 4  # A 2x2 square of grey pixels
@@ -62,7 +61,6 @@ def test_wrap_in_border() -> None:
 
 def test_bmc_no_remnants() -> None:
     """Test if ``rdpcache.extract_bmc`` behaves as expected."""
-
     with BMC_PATH.open("rb") as fh:
         tiles = list(extract_bmc(fh))
 
@@ -77,7 +75,6 @@ def test_bmc_no_remnants() -> None:
 
 def test_bin() -> None:
     """Test if ``rdpcache.extract_bin`` behaves as expected."""
-
     with BIN_PATH.open("rb") as fh:
         tiles = list(extract_bin(fh))
 
@@ -89,7 +86,6 @@ def test_bin() -> None:
 
 def test_collage() -> None:
     """Test ``rdpcache.assemble_tiles_into_collage`` behaves as expected."""
-
     with BIN_PATH.open("rb") as fh:
         tiles = list(extract_bin(fh))
         collage_no_borders = assemble_tiles_into_collage(tiles)
@@ -105,7 +101,6 @@ def test_collage() -> None:
 
 def test_bmp_export() -> None:
     """Test if we can convert a tile to a bitmap correctly."""
-
     grey_pixel = b"\x80\x80\x80\xff"
     square = grey_pixel * 16
     tile = BitmapTile(4, 4, square)
@@ -134,7 +129,6 @@ def test_bmp_export() -> None:
 
 def test_parse_color_data() -> None:
     """Test ``rdpcache.parse_color_data`` behavior."""
-
     blue_color_half_transparency = b"\xff\x00\x00\x80"
     blue_square = blue_color_half_transparency * 4
 
@@ -160,7 +154,6 @@ def test_parse_color_data() -> None:
 
 def test_rdp_cache_plugin(target_win_rdp_cache: Target, tmp_path: Path) -> None:
     """Test if the ``rdpcache.recover`` and ``rdpcache.paths`` behave as expected."""
-
     # Create a directory to extract the cache to
     cache_dst = tmp_path.joinpath("rdp_cache")
     cache_dst.mkdir()

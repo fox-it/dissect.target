@@ -1,5 +1,6 @@
 <!--
 Thank you for submitting a Pull Request. Please:
+
 * Read our commit style guide:
     Commit messages should adhere to the following points:
     * Separate subject from body with a blank line
@@ -13,12 +14,25 @@ Thank you for submitting a Pull Request. Please:
   For an example, look at the following link:
   https://docs.dissect.tools/en/latest/contributing/style-guide.html#example-commit-message
 
-* Include a description of the proposed changes and how to test them.
-
-* After creation, associate the PR with an issue, under the development section.
-  Or use closing keywords in the body during creation:
-  E.G:
-  * close(|s|d) #<nr>
-  * fix(|es|ed) #<nr>
-  * resolve(|s|d) #<nr>
+* Associate the PR with an issue. If it doesn't exist, create it. Use 
+  closing keywords in the body during creation, e.g.:
+    * close(|s|d) #<nr>
+    * fix(|es|ed) #<nr>
+    * resolve(|s|d) #<nr>
 -->
+
+# _PR Title_
+
+_Introduction of problem, and summary of solution/changes_
+
+## Proposed Changes
+
+_A description of the proposed changes and how to test them_
+
+## Checklist
+
+- [ ] PR Title is descriptive of the changes
+- [ ] The description is descriptive of the changes
+- [ ] Tests are included and pass
+- [ ] Closes `related issue number`
+

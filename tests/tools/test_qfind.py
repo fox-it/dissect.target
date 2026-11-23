@@ -142,7 +142,6 @@ def test_qfind(
     capsys: pytest.CaptureFixture,
 ) -> None:
     """Test if target-qfind behaves as expected by inspecting stdout contents."""
-
     mock_disk = RawContainer(io.BytesIO(buf))
     target_bare.disks.add(mock_disk)
 

@@ -10,7 +10,6 @@ import pytest
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.configutil import (
     Bin,
-    ConfigurationParser,
     CSVish,
     Default,
     Env,
@@ -25,6 +24,9 @@ from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.helpers.configutil import (
+        ConfigurationParser,
+    )
     from dissect.target.target import Target
 
 

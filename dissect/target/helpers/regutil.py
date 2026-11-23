@@ -16,6 +16,7 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
+from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.utils import IntEnumMissing
 
 if TYPE_CHECKING:
@@ -23,8 +24,12 @@ if TYPE_CHECKING:
     from datetime import datetime
     from pathlib import Path
 
-GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
-GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
+log = get_logger(__name__)
+
+RE_GLOB_INDEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
+RE_GLOB_MAGIC = re.compile(r"[*?[]")
+RE_REGFLEX_NAME_VALUE = re.compile(r'^"(?P<name>(?:[^"\\]|\\.)*?)"=(?P<value>.*)')
+
 
 KeyType = regf.IndexLeaf | regf.FastLeaf | regf.HashLeaf | regf.IndexRoot | regf.KeyNode
 """The possible key types that can be returned from the registry."""
@@ -768,8 +773,12 @@ class RegFlex:
                 continue
 
             if line.startswith('"'):
-                name, _, value = line.partition("=")
-                name = name.strip('"')
+                if not (match := RE_REGFLEX_NAME_VALUE.search(line)):
+                    log.warning("Failed to parse RegFlex value: %r", line)
+                    continue
+
+                name = match.group("name")
+                value = match.group("value")
 
                 if value.endswith("\\"):
                     value = [value[:-1]]
@@ -867,7 +876,7 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
 
 
 def has_glob_magic(pattern: str) -> bool:
-    """Return whether ``pattern`` contains any glob patterns
+    """Return whether ``pattern`` contains any glob patterns.
 
     Args:
         pattern: The string to check on glob patterns.
@@ -875,11 +884,11 @@ def has_glob_magic(pattern: str) -> bool:
     Returns:
         Whether ``pattern`` contains any glob patterns.
     """
-    return GLOB_MAGIC_REGEX.search(pattern) is not None
+    return RE_GLOB_MAGIC.search(pattern) is not None
 
 
 def glob_split(pattern: str) -> tuple[str]:
-    """Split a key path with glob patterns on the first key path part with glob patterns
+    """Split a key path with glob patterns on the first key path part with glob patterns.
 
     Args:
         pattern: A key path with glob patterns to split.
@@ -889,7 +898,7 @@ def glob_split(pattern: str) -> tuple[str]:
         key path parts (if any) which don't have a glob pattern. The second
         contains the rest of the key path with parts containing glob patterns.
     """
-    first_glob = GLOB_INDEX_REGEX.search(pattern)
+    first_glob = RE_GLOB_INDEX.search(pattern)
 
     if not first_glob:
         return pattern, ""
@@ -899,7 +908,7 @@ def glob_split(pattern: str) -> tuple[str]:
 
 
 def glob_ext(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollection]:
-    """Yield all subkeys of ``key_collection`` that match the glob ``pattern``
+    """Yield all subkeys of ``key_collection`` that match the glob ``pattern``.
 
     Args:
         key_collection: The ``KeyCollection`` to start the path pattern glob matching on.
@@ -951,7 +960,7 @@ def glob_ext(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollect
 
 
 def glob_ext0(key_collection: KeyCollection, key_path: str) -> Iterator[KeyCollection]:
-    """Yield the subkey given by ``key_path`` relative to ``key_collection``
+    """Yield the subkey given by ``key_path`` relative to ``key_collection``.
 
     Args:
         key_collection: The ``KeyCollection`` to yield the subkey from.
@@ -967,7 +976,7 @@ def glob_ext0(key_collection: KeyCollection, key_path: str) -> Iterator[KeyColle
 
 
 def glob_ext1(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollection]:
-    """Yield all subkeys from ``key_collection`` which match the glob pattern ``pattern``
+    """Yield all subkeys from ``key_collection`` which match the glob pattern ``pattern``.
 
     Args:
         key_collection: The ``KeyCollection`` from which subkeys should be matched.

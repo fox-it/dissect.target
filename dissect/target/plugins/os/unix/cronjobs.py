@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 CronjobRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "unix/cronjob",
     [
@@ -99,7 +100,7 @@ class CronjobPlugin(Plugin):
 
     @export(record=[CronjobRecord, EnvironmentVariableRecord])
     def cronjobs(self) -> Iterator[CronjobRecord | EnvironmentVariableRecord]:
-        """Yield cronjobs, and their configured environment variables on a Unix system
+        """Yield cronjobs, and their configured environment variables on a Unix system.
 
         A cronjob is a scheduled task/command on a Unix based system. Adversaries may use cronjobs to gain
         persistence on the system.
@@ -113,7 +114,6 @@ class CronjobPlugin(Plugin):
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/crontab.5.html
             - https://www.gnu.org/software/mcron/manual/mcron.html#Guile-Syntax
         """
-
         for file in self.crontabs:
             # Cronjobs in user crontab files do not have a user field specified.
             user = None

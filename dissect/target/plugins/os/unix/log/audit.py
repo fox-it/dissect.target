@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
     from dissect.target.target import Target
 
+
 AuditRecord = TargetRecordDescriptor(
     "linux/log/audit",
     [
@@ -73,7 +74,6 @@ class AuditPlugin(Plugin):
             - https://man7.org/linux/man-pages/man8/ausearch.8.html
             - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/security_guide/sec-understanding_audit_log_files
         """
-
         for path in self.log_paths:
             try:
                 path = path.resolve(strict=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import itertools
 import json
 from collections import defaultdict
@@ -8,8 +9,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
+from dissect.database.exception import Error as DBError
+from dissect.database.sqlite3 import SQLite3
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -30,14 +31,11 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
-    from dissect.sql.sqlite3 import SQLite3
-
     from dissect.target.plugins.general.users import UserDetails
     from dissect.target.target import Target
 
 try:
     from Crypto.Cipher import AES, ChaCha20_Poly1305
-    from Crypto.Protocol.KDF import PBKDF2
     from Crypto.Util.Padding import unpad
 
     HAS_CRYPTO = True
@@ -88,23 +86,23 @@ class ChromiumMixin:
     DIRS = ()
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
+        "application/browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/cookie", GENERIC_COOKIE_FIELDS
+        "application/browser/chromium/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
+        "application/browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/extension", GENERIC_EXTENSION_RECORD_FIELDS
+        "application/browser/chromium/extension", GENERIC_EXTENSION_RECORD_FIELDS
     )
 
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/password", GENERIC_PASSWORD_RECORD_FIELDS
+        "application/browser/chromium/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     def __init__(self, target: Target) -> None:
@@ -160,10 +158,10 @@ class ChromiumMixin:
             seen.add(db_file)
 
             try:
-                yield user, db_file, sqlite3.SQLite3(db_file.open())
+                yield user, db_file, SQLite3(db_file)
             except FileNotFoundError:
                 self.target.log.warning("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -253,7 +251,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -310,7 +308,10 @@ class ChromiumMixin:
                             )
 
                         # Strip extra data
-                        if cookie_value and encrypted_cookie[0:3] == b"v20":
+                        if cookie_value and (
+                            encrypted_cookie[0:3] == b"v20"
+                            or (encrypted_cookie[0:3] == b"v10" and browser_name == "opera")
+                        ):
                             cookie_value = cookie_value[32:]
 
                     yield self.BrowserCookieRecord(
@@ -329,7 +330,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:
+            except DBError as e:
                 self.target.log.warning("Error processing cookie file %s: %s", db_file, e)
                 self.target.log.debug("", exc_info=e)
 
@@ -397,7 +398,7 @@ class ChromiumMixin:
                         _target=self.target,
                         _user=user.user,
                     )
-            except SQLError as e:  # noqa: PERF203
+            except DBError as e:  # noqa: PERF203
                 self.target.log.warning("Error processing history file: %s", db_file)
                 self.target.log.debug("", exc_info=e)
 
@@ -509,7 +510,6 @@ class ChromiumMixin:
             - https://chromium.googlesource.com/chromium/src/+/master/docs/linux/password_storage.md
             - https://chromium.googlesource.com/chromium/src/+/master/components/os_crypt/sync/os_crypt_linux.cc#40
         """
-
         for user, db_file, db in self._iter_db("Login Data"):
             keys = {}
 
@@ -678,7 +678,6 @@ class ChromiumMixin:
 
     def decrypt_value(self, user: UserDetails, keys: ChromiumKeys, encrypted: bytes) -> bytes:
         """Attempt to decrypt the given encrypted bytes."""
-
         DECRYPT_MAP = {
             OperatingSystem.WINDOWS.value: {
                 b"\x01\x00\x00": decrypt_dpapi,  # First three bytes of DPAPI blob signature.
@@ -767,7 +766,6 @@ def decrypt_v10_linux(
     References:
         - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_linux.cc
     """
-
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
@@ -776,7 +774,7 @@ def decrypt_v10_linux(
     salt = b"saltysalt"
     iv = b" " * 16
 
-    key = PBKDF2(hardcoded_key, salt, 16, 1)
+    key = hashlib.pbkdf2_hmac("sha1", password=hardcoded_key.encode(), salt=salt, iterations=1, dklen=16)
     cipher = AES.new(key, AES.MODE_CBC, IV=iv)
 
     decrypted = cipher.decrypt(ciphertext)
@@ -816,7 +814,6 @@ def decrypt_v10_windows(target: Target, user: UserDetails, keys: ChromiumKeys, e
     Returns:
         Decrypted password string.
     """
-
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
@@ -886,7 +883,6 @@ def decrypt_dpapi(target: Target, user: UserDetails, keys: ChromiumKeys, encrypt
     References:
         - https://chromium.googlesource.com/chromium/src/+/refs/heads/main/components/os_crypt/sync/os_crypt_win.cc
     """
-
     if not target.has_function("dpapi"):
         raise ValueError("Missing DPAPI plugin for DPAPI user secret decryption")
 
