@@ -84,6 +84,15 @@ GENERIC_HISTORY_RECORD_FIELDS = [
     ("path", "source"),
 ]
 
+GENERIC_BOOKMARK_RECORD_FIELDS = [
+    ("datetime", "ts_added"),
+    ("datetime", "ts_modified"),
+    ("uri", "url"),
+    ("string", "title"),
+    ("string", "id"),
+    ("path", "source"),
+]
+
 GENERIC_PASSWORD_RECORD_FIELDS = [
     ("datetime", "ts_created"),
     ("datetime", "ts_last_used"),
