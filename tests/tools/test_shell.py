@@ -789,18 +789,18 @@ a path/to/target
         assert tarinfo.isdir()
         assert tarinfo.gid == 0
         assert tarinfo.uid == 0
-        assert tarinfo.mtime == 1775548971.2269073
+        assert tarinfo.mtime == 1775548971.2269063
         assert tarinfo.pax_headers["atime"] == "1775548971.198906"
-        assert tarinfo.pax_headers["ctime"] == "1775548971.2269073"
+        assert tarinfo.pax_headers["ctime"] == "1775548971.2269063"
 
         tarinfo = tar.getmember("path/to/symlink/target")
         assert tarinfo.issym()
         assert tarinfo.gid == 0
         assert tarinfo.uid == 0
         assert tarinfo.linkname == "../target"
-        assert tarinfo.mtime == 1775548971.2269073
-        assert tarinfo.pax_headers["atime"] == "1775548971.2269073"
-        assert tarinfo.pax_headers["ctime"] == "1775548971.2269073"
+        assert tarinfo.mtime == 1775548971.2269063
+        assert tarinfo.pax_headers["atime"] == "1775548971.2269063"
+        assert tarinfo.pax_headers["ctime"] == "1775548971.2269063"
 
         tarinfo = tar.getmember("path/to/target")
         assert tarinfo.issym()

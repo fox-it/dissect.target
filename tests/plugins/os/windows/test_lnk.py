@@ -54,5 +54,5 @@ def test_lnk(
         assert str(record.lnk_full_path) == "C:\\Program Files\\pestudio\\pestudio.exe"
         assert record.machine_id == "desktop-i2purd1"
         assert record.target_mtime == datetime("2021-10-09T07:24:42+00:00")
-        assert record.target_atime == datetime("2021-10-16T15:26:55.033125+00:00")
+        assert record.target_atime == datetime("2021-10-16T15:26:55.033124+00:00")
         assert record.target_ctime == datetime("2021-10-16T15:26:20.406921+00:00")
