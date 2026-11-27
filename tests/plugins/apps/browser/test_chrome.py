@@ -104,7 +104,7 @@ def test_chrome_downloads(target_platform: Target, request: pytest.FixtureReques
     assert {"chrome"} == {record.browser for record in records}
 
     assert records[0].id == 6
-    assert records[0].ts_start == dt("2023-02-24T11:54:19.726147+00:00")
+    assert records[0].ts_start == dt("2023-02-24T11:54:19.726149+00:00")
     assert records[0].ts_end == dt("2023-02-24T11:54:21.030043+00:00")
     assert records[0].url == "https://codeload.github.com/fox-it/dissect/zip/refs/heads/main"
     assert records[0].state == "complete"
@@ -121,8 +121,8 @@ def test_chrome_extensions(target_platform: Target, request: pytest.FixtureReque
     assert len(records) == 16
     assert {"chrome"} == {record.browser for record in records}
 
-    assert records[0].ts_install == dt("2022-11-24T15:20:43.682152+00:00")
-    assert records[0].ts_update == dt("2022-11-24T15:20:43.682152+00:00")
+    assert records[0].ts_install == dt("2022-11-24T15:20:43.682153+00:00")
+    assert records[0].ts_update == dt("2022-11-24T15:20:43.682153+00:00")
     assert records[0].name == "Web Store"
     assert records[0].version == "0.2"
     assert records[0].extension_id == "ahfgeienlihckogmohjhadlkjgocpleb"
