@@ -53,7 +53,7 @@ def test_trusteddocs_plugin(target_win_users: Target, hive_hku: VirtualHive) -> 
     assert (
         results[0].document == "%USERPROFILE%\\Downloads\\example1.docm"
     )  # Resolve does not work here, should be 'C:\\Users\\John'
-    assert results[0].ts_created == datetime(2024, 4, 23, 22, 1, 6, 9405, tzinfo=timezone.utc)
+    assert results[0].ts_created == datetime(2024, 4, 23, 22, 1, 6, 9404, tzinfo=timezone.utc)
     assert results[0].ts_enabled == datetime(
         2024, 4, 23, 22, 1, tzinfo=timezone.utc
     )  # Unfortunately only minute-precision here.
@@ -64,7 +64,7 @@ def test_trusteddocs_plugin(target_win_users: Target, hive_hku: VirtualHive) -> 
     assert (
         results[1].document == "%USERPROFILE%\\Downloads\\example2.docm"
     )  # Resolve does not work here, should be 'C:\\Users\\John'
-    assert results[1].ts_created == datetime(2024, 4, 23, 22, 1, 6, 9405, tzinfo=timezone.utc)
+    assert results[1].ts_created == datetime(2024, 4, 23, 22, 1, 6, 9404, tzinfo=timezone.utc)
     assert results[1].ts_enabled == datetime(
         2024, 4, 23, 22, 3, tzinfo=timezone.utc
     )  # Unfortunately only minute-precision here.

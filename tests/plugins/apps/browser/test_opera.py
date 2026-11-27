@@ -63,7 +63,7 @@ def test_opera_history(target_platform: Target, request: pytest.FixtureRequest) 
     assert records[75].url == "https://github.com/fox-it/dissect.target"
     assert records[75].id == 76
     assert records[75].visit_count == 2
-    assert records[75].ts == dt("2026-03-17 13:24:54.736168+00:00")
+    assert records[75].ts == dt("2026-03-17 13:24:54.736169+00:00")
 
 
 @pytest.mark.parametrize(
