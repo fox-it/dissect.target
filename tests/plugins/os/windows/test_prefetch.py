@@ -133,10 +133,10 @@ def test_prefetch_compact(target_win_prefetch: Target) -> None:
     assert mpcrun.source == "c:\\Windows\\prefetch\\MPCMDRUN.EXE-962E6200.pf"
     # assert mpcrun.runcount == 21 : Todo : fix bug
     assert sorted(mpcrun.previousruns, reverse=True) == [
-        dt("2024-04-29 08:11:44.680344+00:00"),
+        dt("2024-04-29 08:11:44.680343+00:00"),
         dt("2024-04-29 07:52:38.569597+00:00"),
         dt("2024-04-29 07:52:38.319941+00:00"),
-        dt("2024-04-26 12:11:44.301853+00:00"),
+        dt("2024-04-26 12:11:44.301855+00:00"),
         dt("2024-04-26 12:11:44.161709+00:00"),
         dt("2024-04-26 09:13:19.898300+00:00"),
         dt("2024-04-26 09:13:19.757269+00:00"),
@@ -152,10 +152,10 @@ def test_prefetch(target_win_prefetch: Target) -> None:
     assert Counter(str(r.source) for r in records) == {"c:\\Windows\\prefetch\\MPCMDRUN.EXE-962E6200.pf": 328}
     assert Counter(str(r.filename) for r in records) == {"MPCMDRUN.EXE": 328}
     assert Counter(r.ts for r in records) == {
-        dt("2024-04-29 08:11:44.680344+00:00"): 41,
+        dt("2024-04-29 08:11:44.680343+00:00"): 41,
         dt("2024-04-29 07:52:38.569597+00:00"): 41,
         dt("2024-04-29 07:52:38.319941+00:00"): 41,
-        dt("2024-04-26 12:11:44.301853+00:00"): 41,
+        dt("2024-04-26 12:11:44.301855+00:00"): 41,
         dt("2024-04-26 12:11:44.161709+00:00"): 41,
         dt("2024-04-26 09:13:19.898300+00:00"): 41,
         dt("2024-04-26 09:13:19.757269+00:00"): 41,

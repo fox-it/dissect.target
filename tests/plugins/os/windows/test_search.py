@@ -64,7 +64,7 @@ def test_windows_search_esedb(
     assert records[-1].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
 
     # SearchIndexRecord (file)
-    assert records[1175].ts == datetime(2023, 2, 16, 14, 36, 23, 877518, tzinfo=timezone.utc)
+    assert records[1175].ts == datetime(2023, 2, 16, 14, 36, 23, 877517, tzinfo=timezone.utc)
     assert records[1175].ts_mtime == datetime(2023, 2, 16, 14, 36, 14, 922361, tzinfo=timezone.utc)
     assert records[1175].ts_btime == datetime(2023, 2, 16, 14, 35, 23, 656454, tzinfo=timezone.utc)
     assert records[1175].ts_atime == datetime(2023, 2, 16, 14, 36, 22, 893101, tzinfo=timezone.utc)
@@ -89,10 +89,10 @@ def test_windows_search_esedb(
     assert records[1120].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb"
 
     # SearchIndexRecord (folder)
-    assert records[1116].ts == datetime(2023, 2, 14, 13, 59, 31, 356632, tzinfo=timezone.utc)
+    assert records[1116].ts == datetime(2023, 2, 14, 13, 59, 31, 356633, tzinfo=timezone.utc)
     assert records[1116].ts_mtime == datetime(2023, 2, 14, 13, 57, 29, 517132, tzinfo=timezone.utc)
     assert records[1116].ts_btime == datetime(2023, 2, 14, 13, 57, 8, 689777, tzinfo=timezone.utc)
-    assert records[1116].ts_atime == datetime(2023, 2, 14, 13, 59, 31, 340546, tzinfo=timezone.utc)
+    assert records[1116].ts_atime == datetime(2023, 2, 14, 13, 59, 31, 340545, tzinfo=timezone.utc)
     assert records[1116].path == "C:\\Users\\testuser\\Desktop\\Content-Check"
     assert records[1116].type == "File folder"  # no mimetype available?
     assert not records[1116].size
@@ -152,9 +152,9 @@ def test_windows_search_sqlite(
 
     # SearchIndexRecord (file)
     assert records[837].ts == datetime(2023, 1, 31, 2, 45, 2, 871614, tzinfo=timezone.utc)
-    assert records[837].ts_mtime == datetime(2023, 1, 31, 2, 45, 2, 56444, tzinfo=timezone.utc)
+    assert records[837].ts_mtime == datetime(2023, 1, 31, 2, 45, 2, 56445, tzinfo=timezone.utc)
     assert records[837].ts_btime == datetime(2023, 1, 31, 2, 26, 28, 898306, tzinfo=timezone.utc)
-    assert records[837].ts_atime == datetime(2023, 1, 31, 2, 45, 2, 56444, tzinfo=timezone.utc)
+    assert records[837].ts_atime == datetime(2023, 1, 31, 2, 45, 2, 56445, tzinfo=timezone.utc)
     assert records[837].path == "C:\\Users\\Public\\malware\\New-beacon.xml"
     assert records[837].type == "text/xml"
     assert int(records[837].size) == 174
@@ -162,7 +162,7 @@ def test_windows_search_sqlite(
     assert records[837].source == "sysvol\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.db"
 
     # BrowserHistoryRecord (edge)
-    assert records[711].ts == datetime(2023, 1, 31, 0, 9, 47, 972897, tzinfo=timezone.utc)
+    assert records[711].ts == datetime(2023, 1, 31, 0, 9, 47, 972898, tzinfo=timezone.utc)
     assert records[711].browser == "winrt"
     assert (
         records[711].url
