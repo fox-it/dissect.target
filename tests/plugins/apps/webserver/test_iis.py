@@ -222,6 +222,74 @@ def test_iis_access_noconfig(
     assert len(results) > 0
 
 
+@pytest.fixture
+def target_win_two_logs(target_win: Target, fs_win: VirtualFilesystem) -> Target:
+    config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-w3c.config")
+    log_path = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c/W3SVC1/u_ex211001_x.log")
+
+    fs_win.map_file("windows/system32/inetsrv/config/applicationHost.config", config_path)
+    fs_win.map_file("Users/John/w3c-logs/W3SVC1/u_ex211001_x.log", log_path)
+    fs_win.map_file("Users/John/w3c-logs/W3SVC1/u_ex211002_y.log", log_path)
+
+    target_win.add_plugin(iis.IISLogsPlugin)
+    return target_win
+
+
+def test_iis_logs_without_log_file(target_win_two_logs: Target) -> None:
+    """Test that all discovered log files are parsed when no ``log_file`` is given."""
+    records = list(target_win_two_logs.iis.logs())
+
+    assert len(records) == 40
+    assert {r.source.name for r in records} == {"u_ex211001_x.log", "u_ex211002_y.log"}
+
+
+@pytest.mark.parametrize(
+    "log_file",
+    [
+        "C:/Users/John/w3c-logs/W3SVC1/u_ex211002_y.log",
+        "C:\\Users\\John\\w3c-logs\\W3SVC1\\u_ex211002_y.log",
+        "c:\\users\\john\\w3c-logs\\w3svc1\\U_EX211002_Y.LOG",
+    ],
+)
+def test_iis_logs_log_file(target_win_two_logs: Target, log_file: str) -> None:
+    """Test that ``log_file`` limits parsing to that file, regardless of path separators and case."""
+    records = list(target_win_two_logs.iis.logs(log_file=log_file))
+
+    assert len(records) == 20
+    assert {r.source.name for r in records} == {"u_ex211002_y.log"}
+
+
+def test_iis_access_log_file(target_win_two_logs: Target) -> None:
+    """Test that ``log_file`` is also supported by ``iis.access``."""
+    records = list(target_win_two_logs.iis.access(log_file="C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"))
+
+    assert len(records) == 20
+    assert {r.source.name for r in records} == {"u_ex211001_x.log"}
+
+
+def test_iis_logs_log_file_not_found(target_win_two_logs: Target, caplog: pytest.LogCaptureFixture) -> None:
+    """Test that a ``log_file`` that is not a discovered log file yields nothing and logs an error."""
+    with caplog.at_level(logging.ERROR, target_win_two_logs.log.name):
+        records = list(target_win_two_logs.iis.logs(log_file="C:/Users/John/w3c-logs/W3SVC1/missing.log"))
+
+    assert records == []
+    assert "IIS log file C:/Users/John/w3c-logs/W3SVC1/missing.log not found" in caplog.text
+
+
+def test_iis_log_file_argument() -> None:
+    """Test that ``log_file`` is exposed as a command line argument of ``iis.logs`` and ``iis.access``."""
+    for function in (iis.IISLogsPlugin.logs, iis.IISLogsPlugin.access):
+        assert [flags for flags, _ in function.__args__] == [("--log-file",)]
+
+
+def test_iis_direct_mode_log_file() -> None:
+    data_path = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis/W3SVC1/u_in211001.log")
+
+    target = Target.open_direct([data_path])
+    assert len(list(target.iis.logs(log_file=str(data_path)))) == 10
+    assert list(target.iis.logs(log_file="/does/not/exist.log")) == []
+
+
 def test_iis_failed_to_parse_log(
     target_win_tzinfo: Target,
     fs_win: VirtualFilesystem,
