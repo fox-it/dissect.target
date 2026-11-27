@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -8,6 +7,7 @@ from dissect.target.helpers.record import (
     COMMON_APPLICATION_FIELDS,
     TargetRecordDescriptor,
 )
+from dissect.target.helpers.utils import common_datetime_parser
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
@@ -20,13 +20,19 @@ WindowsApplicationRecord = TargetRecordDescriptor(
     COMMON_APPLICATION_FIELDS,
 )
 
+KEYS = (
+    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+)
+
 
 class WindowsApplicationsPlugin(Plugin):
     """Windows Applications plugin."""
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.keys = list(self.target.registry.keys("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"))
+        self.keys = list(self.target.registry.keys(KEYS))
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):
@@ -61,10 +67,9 @@ class WindowsApplicationsPlugin(Plugin):
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}
 
-                if install_date := values.get("InstallDate"):
-                    install_date = datetime.datetime.strptime(install_date, "%Y%m%d").replace(
-                        tzinfo=datetime.timezone.utc
-                    )
+                install_date = None
+                if install_date_string := values.get("InstallDate"):
+                    install_date = common_datetime_parser(install_date_string)
 
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,
