@@ -1686,6 +1686,9 @@ class LayerDirEntry(DirEntry):
     def get(self) -> LayerFilesystemEntry:
         return LayerFilesystemEntry(self.fs, self.path, [e.get() for e in self.entry])
 
+    def stat(self, *, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.get().stat(follow_symlinks=follow_symlinks)
+
 
 class LayerFilesystemEntry(FilesystemEntry):
     def __init__(self, fs: Filesystem, path: str, entry: FilesystemEntry):
@@ -1730,7 +1733,7 @@ class LayerFilesystemEntry(FilesystemEntry):
             # The filename for the first entry is taken. Note that in case of
             # non case-sensitive FSes, the different entries from the
             # overlaying FSes may have different casing of the name.
-            yield DirEntry(selfentry.fs, selfentry.path, entries[0].name, entries)
+            yield LayerDirEntry(selfentry.fs, selfentry.path, entries[0].name, entries)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         try:

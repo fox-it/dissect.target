@@ -21,6 +21,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     Filesystem,
+    LayerDirEntry,
     LayerFilesystem,
     MappedFile,
     NotASymlinkError,
@@ -155,6 +156,36 @@ def test_symlink_across_layers() -> None:
     target_entry = lfs.get("/path/to/symlink/target").readlink_ext()
 
     assert target_dir.stat() == target_entry.entries[0].stat()
+
+
+def test_layer_scandir_direntry_stat() -> None:
+    """Test that layer ``scandir`` yields entries whose ``stat`` does not re-resolve from the root."""
+    lfs = LayerFilesystem()
+
+    vfs1 = VirtualFilesystem()
+    vfs1.makedirs("/dir")
+    vfs1.map_file_fh("/dir/file", BytesIO(b"data"))
+    vfs1.symlink("../target", "/dir/link")
+
+    vfs2 = VirtualFilesystem()
+    vfs2.makedirs("/target")
+
+    lfs.append_layer().mount("/", vfs1)
+    lfs.append_layer().mount("/", vfs2)
+
+    entries = {entry.name: entry for entry in lfs.scandir("/dir")}
+    assert all(isinstance(entry, LayerDirEntry) for entry in entries.values())
+
+    expected_file_stat = lfs.stat("/dir/file")
+    expected_link_lstat = lfs.lstat("/dir/link")
+
+    with patch.object(lfs, "stat", side_effect=AssertionError("re-resolved from root")):
+        assert entries["file"].stat() == expected_file_stat
+        assert entries["file"].is_file()
+        assert entries["link"].is_symlink()
+        # Symlink target only exists in the second layer
+        assert entries["link"].is_dir()
+        assert entries["link"].stat(follow_symlinks=False) == expected_link_lstat
 
 
 def test_symlink_files_across_layers() -> None:
