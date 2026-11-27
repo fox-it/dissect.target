@@ -72,7 +72,7 @@ class UsnjrnlPlugin(Plugin):
                     ts = None
                     try:
                         ts = record.timestamp
-                    except ValueError as e:
+                    except (OverflowError, ValueError) as e:
                         target.log.error(  # noqa: TRY400
                             "Error occured during parsing of timestamp in usnjrnl: %x", record.record.TimeStamp
                         )
