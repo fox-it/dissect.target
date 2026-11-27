@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
@@ -9,7 +10,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.plugins.os.unix.log.auth import AuthPlugin
+from dissect.target.plugins.os.unix.log.auth import AuthPlugin, SshdService
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
@@ -417,3 +418,67 @@ def test_auth_direct_mode() -> None:
     results = list(target.authlog())
 
     assert len(results) == 10
+
+
+def test_auth_parse_error(target_unix: Target, fs_unix: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:
+    """Test if a parse error in one line does not stop the parsing of other lines."""
+    fs_unix.map_file("var/log/auth.log", absolute_path("_data/plugins/os/unix/log/auth/auth.log"))
+    target_unix.add_plugin(AuthPlugin)
+
+    with (
+        patch.object(SshdService, "parse", side_effect=ValueError("Test exception")),
+        caplog.at_level(logging.WARNING, target_unix.log.name),
+    ):
+        results = list(target_unix.authlog())
+
+    assert len(results) == 10
+    assert "Parsing additional fields in message" in caplog.text
+
+    sshd_result = next(result for result in results if result.service == "sshd" and "publickey" in result.message)
+    assert sshd_result.pid == 3
+    assert sshd_result.source == "/var/log/auth.log"
+    assert not hasattr(sshd_result, "user")
+
+
+def test_auth_md5_fingerprint(target_unix: Target, fs_unix: VirtualFilesystem, tmp_path: Path) -> None:
+    """Test if an ``Accepted publickey`` line with a hex MD5 fingerprint still gives a record.
+
+    OpenSSH 6.3 to 6.7 logs the key fingerprint as hex MD5 without a hash algorithm prefix.
+
+    The log line is the first line of ``filebeat/module/system/auth/test/test.log`` in elastic/beats,
+    commit 06c96caae748e1757452aa81494753eb1e8cbdba, licensed under the Apache License 2.0.
+
+    References:
+        - https://github.com/elastic/beats/blob/06c96caae748e1757452aa81494753eb1e8cbdba/filebeat/module/system/auth/test/test.log
+        - https://www.openssh.com/txt/release-6.3
+        - https://www.openssh.com/txt/release-6.8
+    """
+    data_path = tmp_path / "auth.log"
+    data_path.write_text(
+        "Feb 21 21:54:44 localhost sshd[3402]: Accepted publickey for vagrant from 10.0.2.2 port 63673 ssh2: "
+        "RSA 39:33:99:e9:a0:dc:f2:33:a3:e5:72:3b:7c:3a:56:84\n"
+    )
+    fs_unix.map_file("var/log/auth.log", data_path)
+    target_unix.add_plugin(AuthPlugin)
+
+    results = list(target_unix.authlog())
+
+    assert len(results) == 1
+    assert results[0].service == "sshd"
+    assert results[0].pid == 3402
+    assert results[0].message == (
+        "Accepted publickey for vagrant from 10.0.2.2 port 63673 ssh2: "
+        "RSA 39:33:99:e9:a0:dc:f2:33:a3:e5:72:3b:7c:3a:56:84"
+    )
+
+
+def test_auth_record_error(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if an error in the record creation does not stop the parsing of other lines."""
+    fs_unix.map_file("var/log/auth.log", absolute_path("_data/plugins/os/unix/log/auth/auth.log"))
+    target_unix.add_plugin(AuthPlugin)
+
+    with patch.object(SshdService, "parse", return_value={"remote_ip": "127.0.0.1/32"}):
+        results = list(target_unix.authlog())
+
+    assert len(results) == 10
+    assert not any(hasattr(result, "remote_ip") for result in results)
