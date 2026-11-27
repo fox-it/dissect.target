@@ -121,13 +121,13 @@ def test_stat_information(cluster_size: int, size: int, resident: bool, expected
         assert stat_info.st_gid == 0
         assert stat_info.st_size == size
 
-        assert stat_info.st_atime == 1726043227.939039
+        assert stat_info.st_atime == 1726043227.9390402
         assert stat_info.st_atime_ns == 1726043227939040100
-        assert stat_info.st_mtime == 1726043227.939039
+        assert stat_info.st_mtime == 1726043227.9390402
         assert stat_info.st_mtime_ns == 1726043227939040100
-        assert stat_info.st_ctime == 1651900642.631773
+        assert stat_info.st_ctime == 1651900642.631774
         assert stat_info.st_ctime_ns == 1651900642631774900
-        assert stat_info.st_birthtime == 1651900642.631773
+        assert stat_info.st_birthtime == 1651900642.631774
         assert stat_info.st_birthtime_ns == 1651900642631774900
 
         assert stat_info.st_blksize == cluster_size
