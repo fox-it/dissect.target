@@ -77,6 +77,13 @@ class DirectoryFilesystem(Filesystem):
 
         return index.get(name.lower(), [])
 
+    def _entry_name(self, item: Path) -> str:
+        """Return the name under which a directory item is exposed in listings.
+
+        Subclasses can override this if the names on disk differ from the names on the original system.
+        """
+        return item.name
+
     def _resolve_path(self, path: str) -> Path:
         if not self.case_sensitive:
             searchpath = self.base_path
@@ -145,14 +152,14 @@ class DirectoryFilesystemEntry(FilesystemEntry):
             yield from self.readlink_ext().iterdir()
         else:
             for item in self.entry.iterdir():
-                yield item.name
+                yield self.fs._entry_name(item)
 
     def scandir(self) -> Iterator[DirectoryDirEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
         for item in self._resolve().entry.iterdir():
-            yield DirectoryDirEntry(self.fs, self.path, item.name, item)
+            yield DirectoryDirEntry(self.fs, self.path, self.fs._entry_name(item), item)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:
