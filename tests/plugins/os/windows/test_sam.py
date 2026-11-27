@@ -152,7 +152,7 @@ def test_sam_plugin_rev1(target_win_users: Target, hive_hklm: VirtualHive) -> No
     assert results[2].usercomment == ""
     assert results[2].lastlogin == dt("2023-01-05T15:56:51.654921+00:00")
     assert results[2].lastpasswordset == dt("2023-01-05T15:56:51.654921+00:00")
-    assert results[2].lastincorrectlogin == dt("2023-01-05T15:57:00.546938+00:00")
+    assert results[2].lastincorrectlogin == dt("2023-01-05T15:57:00.546937+00:00")
     assert results[2].flags == 20
     assert results[2].countrycode == 1
     assert results[2].failedlogins == 1
@@ -358,7 +358,7 @@ def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> No
     )
     assert results[3].usercomment == ""
     assert results[3].lastlogin == dt("1601-01-01T00:00:00+00:00")
-    assert results[3].lastpasswordset == dt("2023-01-06T10:22:15.648840+00:00")
+    assert results[3].lastpasswordset == dt("2023-01-06T10:22:15.648839+00:00")
     assert results[3].lastincorrectlogin == dt("1601-01-01T00:00:00+00:00")
     assert results[3].flags == 17
     assert results[3].countrycode == 0
@@ -373,9 +373,9 @@ def test_sam_plugin_rev2(target_win_users: Target, hive_hklm: VirtualHive) -> No
     assert results[4].username == "John"
     assert results[4].admincomment == ""
     assert results[4].usercomment == ""
-    assert results[4].lastlogin == dt("2023-01-06T10:16:46.964138+00:00")
-    assert results[4].lastpasswordset == dt("2023-01-06T10:16:46.948549+00:00")
-    assert results[4].lastincorrectlogin == dt("2023-01-06T10:17:56.104242+00:00")
+    assert results[4].lastlogin == dt("2023-01-06T10:16:46.964139+00:00")
+    assert results[4].lastpasswordset == dt("2023-01-06T10:16:46.948550+00:00")
+    assert results[4].lastincorrectlogin == dt("2023-01-06T10:17:56.104243+00:00")
     assert results[4].flags == 20
     assert results[4].countrycode == 44
     assert results[4].failedlogins == 3

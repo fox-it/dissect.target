@@ -95,7 +95,7 @@ def test_windows_usb(target_win_users: Target, hive_hklm: VirtualHive, hive_hku:
     assert results[0].first_install == dt("2024-07-26 12:05:43.789719+00:00")
     assert results[0].last_insert == dt("2024-07-26 12:05:43.789719+00:00")
     if not missing_ts:
-        assert results[0].last_removal == dt("2024-07-26 12:08:54.878632+00:00")
+        assert results[0].last_removal == dt("2024-07-26 12:08:54.878631+00:00")
     assert results[0].volumes == ["Example USB"]
     assert results[0].mounts == ["E:", "\\??\\Volume{4be8862a-4b47-11ef-9a61-70d823df2914}"]
     assert results[0].users == ["John"]

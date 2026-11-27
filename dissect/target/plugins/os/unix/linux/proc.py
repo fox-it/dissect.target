@@ -558,11 +558,12 @@ class ProcProcess:
         """Returns the start time of the process."""
         # Starttime is saved in clockticks per second from the boot time.
         # we asume a standard of 100 clockticks per second. the actual value can be obtained from `getconf CLK_TCK`
-        starttime = self._stat_file.get("starttime", 0) / 100
+        # The clock ticks are added as an integer number of milliseconds, a float like 0.3 seconds would round down
+        starttime = timedelta(milliseconds=self._stat_file.get("starttime", 0) * 10)
 
         # Check if there is a boottime. If not, we cannot determine the starttime.
         if boottime := self._boottime:
-            return from_unix(boottime + starttime)
+            return from_unix(boottime) + starttime
 
         return None
 
