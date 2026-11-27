@@ -6,7 +6,7 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import configutil
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import Plugin, alias, export
+from dissect.target.plugin import OperatingSystem, Plugin, alias, export
 from dissect.target.plugins.general.users import UserDetails
 
 if TYPE_CHECKING:
@@ -48,16 +48,19 @@ class GnomeTrashPlugin(Plugin):
                     yield user_details, path
 
         # mounted devices trash folders
-        for mount_path in [*self.target.fs.mounts, "/mnt", "/media"]:
+        for mount_path in self.target.fs.mounts:
             if mount_path == "/":
                 continue
 
-            for mount_trash in self.target.fs.path(mount_path).rglob(".Trash-*"):
+            for mount_trash in self.target.fs.path(mount_path).glob(".Trash-*"):
                 yield UserDetails(None, None), mount_trash
 
     def check_compatible(self) -> None:
+        if self.target.os not in (OperatingSystem.UNIX, OperatingSystem.LINUX, OperatingSystem.BSD):
+            raise UnsupportedPluginError("GNOME does not exist for this OS")
+
         if not self.trashes:
-            raise UnsupportedPluginError("No Trash folder(s) found")
+            raise UnsupportedPluginError("No GNOME Trash folder(s) found")
 
     @export(record=TrashRecord)
     @alias(name="recyclebin")
