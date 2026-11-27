@@ -222,6 +222,36 @@ def test_iis_access_noconfig(
     assert len(results) > 0
 
 
+def test_iis_logs_directory_discovered_twice(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    """Test that log files are only parsed once if their directory is discovered more than once.
+
+    A directory can be a default log directory and be configured in ``applicationHost.config`` at the same time.
+    """
+    config = """
+    <configuration>
+      <system.applicationHost>
+        <sites>
+          <site name="Default Web Site" id="1">
+            <logFile logFormat="W3C" directory="%SystemDrive%\\inetpub\\logs\\LogFiles" />
+          </site>
+        </sites>
+      </system.applicationHost>
+    </configuration>
+    """
+    log_path = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c/W3SVC1/u_ex211001_x.log")
+
+    fs_win.map_file_fh("windows/system32/inetsrv/config/applicationHost.config", BytesIO(config.encode()))
+    fs_win.map_file("inetpub/logs/LogFiles/W3SVC1/u_ex211001_x.log", log_path)
+
+    target_win.add_plugin(iis.IISLogsPlugin)
+
+    # The same directory is both a default log directory and a configured one
+    assert target_win.iis.log_dirs["auto"] == target_win.iis.log_dirs["W3C"] != set()
+
+    assert len(list(target_win.iis.logs())) == 20
+    assert len(list(target_win.iis.access())) == 20
+
+
 def test_iis_failed_to_parse_log(
     target_win_tzinfo: Target,
     fs_win: VirtualFilesystem,

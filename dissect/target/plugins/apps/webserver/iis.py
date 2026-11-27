@@ -153,9 +153,16 @@ class IISLogsPlugin(WebserverPlugin):
             "auto": parse_autodetect_format_log,
         }
 
+        # A directory can be discovered with more than one log format, for example when it is both a default log
+        # directory and configured in applicationHost.config. Only parse each log file once, with the first format.
+        seen = set()
         for format, parser in parsers.items():
             for log_dir in self.log_dirs.get(format, ()):
                 for log_file in log_dir.rglob("*.log"):
+                    if log_file in seen:
+                        continue
+                    seen.add(log_file)
+
                     self.target.log.info("Processing IIS log file %s in %s format", log_file, format)
                     try:
                         yield from parser(self.target, log_file)
