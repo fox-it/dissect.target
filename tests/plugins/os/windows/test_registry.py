@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from dissect.target.helpers.logging import TRACE_LEVEL
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import HiveCollection, VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
 
@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.helpers.regutil import VirtualHive
 
 
 def test_missing_hives(fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:
@@ -210,3 +209,34 @@ def test_registry_plugin_values_keys(
     hive_hklm.map_key(key_path, key)
 
     assert [v.value for v in target_win_users.registry.values(keys, values)] == expected_output
+
+
+@pytest.mark.parametrize(
+    ("ignore_regback", "props", "expected"),
+    [
+        (None, {}, ["live", "regback"]),
+        (None, {"ignore_regback": False}, ["live", "regback"]),
+        (None, {"ignore_regback": True}, ["live"]),
+        (True, {}, ["live"]),
+        (False, {"ignore_regback": True}, ["live", "regback"]),
+    ],
+)
+def test_registry_plugin_keys_ignore_regback(
+    target_win: Target, ignore_regback: bool | None, props: dict[str, bool], expected: list[str]
+) -> None:
+    """Test that keys from RegBack hives are skipped when requested, either explicitly or through target props."""
+    live_hive = VirtualHive()
+    live_hive.filepath = target_win.fs.path("sysvol/windows/system32/config/SOFTWARE")
+    regback_hive = VirtualHive()
+    regback_hive.filepath = target_win.fs.path("sysvol/windows/system32/config/RegBack/SOFTWARE")
+
+    for hive, source in ((live_hive, "live"), (regback_hive, "regback")):
+        key = VirtualKey(hive, "TestKey")
+        key.add_value("Source", VirtualValue(hive, "Source", source))
+        hive.map_key("TestKey", key)
+
+    target_win.registry._map_hive("HKEY_LOCAL_MACHINE\\SOFTWARE", HiveCollection([live_hive, regback_hive]))
+    target_win.props.update(props)
+
+    keys = target_win.registry.keys("HKLM\\SOFTWARE\\TestKey", ignore_regback=ignore_regback)
+    assert [key.value("Source").value for key in keys] == expected

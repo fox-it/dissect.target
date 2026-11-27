@@ -99,6 +99,11 @@ def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
         type=Path,
         help="a file or directory containing plugins and extensions",
     )
+    parser.add_argument(
+        "--ignore-regback",
+        action="store_true",
+        help="ignore registry backup hives (RegBack) to avoid duplicate results",
+    )
 
 
 def process_generic_arguments(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
@@ -239,6 +244,7 @@ def open_target(args: argparse.Namespace, *, apply: bool = True) -> Target:
             # Do not continue processing, we requested a child but got none
             raise
 
+    _apply_generic_target_props(target, args)
     return target
 
 
@@ -265,7 +271,17 @@ def open_targets(args: argparse.Namespace, *, apply: bool = True) -> Iterator[Ta
                 # Do not continue processing, we requested a child but got none
                 continue
 
+        _apply_generic_target_props(target, args)
         yield target
+
+
+def _apply_generic_target_props(target: Target, args: argparse.Namespace) -> None:
+    """Set target properties based on the generic command line arguments.
+
+    Properties are only set when the corresponding argument was given, so existing values are not overwritten.
+    """
+    if getattr(args, "ignore_regback", False):
+        target.props["ignore_regback"] = True
 
 
 def list_plugins(
