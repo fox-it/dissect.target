@@ -132,10 +132,11 @@ class OperaPlugin(ChromiumMixin, BrowserPlugin):
                     ts_install = extension_data.get("first_install_time") or extension_data.get("install_time")
                     ts_update = extension_data.get("last_update_time")
 
+                    # The Preferences file stores these timestamps as strings
                     if ts_install:
-                        ts_install = webkittimestamp(ts_install)
+                        ts_install = webkittimestamp(int(ts_install))
                     if ts_update:
-                        ts_update = webkittimestamp(ts_update)
+                        ts_update = webkittimestamp(int(ts_update))
 
                     if ext_path := extension_data.get("path"):
                         ext_path = self.target.fs.path(ext_path)
