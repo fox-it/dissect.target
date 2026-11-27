@@ -24,11 +24,16 @@ import dissect.target.plugins.os.default as default
 from dissect.target.exceptions import PluginError, PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.fsutil import has_glob_magic
+from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.logging import get_logger
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.helpers.utils import StrEnum
 
+generate_argparse_for_plugin_class = import_lazy("dissect.target.tools.utils.cli").generate_argparse_for_plugin_class
+LenientNamespace = import_lazy("dissect.target.tools.utils.cli").LenientNamespace
+
 if TYPE_CHECKING:
+    import argparse
     from collections.abc import Iterator
 
     from flow.record import Record
@@ -113,7 +118,7 @@ class FunctionDescriptor:
 
     @property
     def args(self) -> list[tuple[list[str], dict[str, Any]]]:
-        return getattr(self.func, "__args__", [])
+        return getattr(self.cls, "__args__", []) + getattr(self.func, "__args__", [])
 
 
 @dataclass(frozen=True, eq=True, slots=True)
@@ -456,6 +461,15 @@ class Plugin:
             except Exception as e:
                 self.target.log.error("Error while executing `%s.%s`: %s", self.__namespace__, method_name, e)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
+
+    def get_args(self) -> argparse.Namespace:
+        """Return argparse arguments for this :class:`Plugin`."""
+        args = None
+        if self.target.unknown_args:
+            parser = generate_argparse_for_plugin_class(self.__class__)
+            args, _rest = parser.parse_known_args(self.target.unknown_args)
+
+        return LenientNamespace(**dict(args._get_kwargs()) if args else {})
 
     def get_paths(self) -> Iterator[Path]:
         """Return all artifact paths."""
