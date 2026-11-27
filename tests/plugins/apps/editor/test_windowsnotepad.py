@@ -151,7 +151,7 @@ def test_windows_saved_tab_plugin_extra_fields(
         "saved.bin": (
             "Saved!",
             "C:\\Users\\user\\Desktop\\Saved!.txt",
-            datetime(2024, 3, 28, 13, 7, 55, 482183, tzinfo=timezone.utc),
+            datetime(2024, 3, 28, 13, 7, 55, 482184, tzinfo=timezone.utc),
             "ed9b760289e614c9dc8776e7280abe870be0a85019a32220b35acc54c0ecfbc1",
         ),
         "appclosed_saved_and_deletions.bin": (

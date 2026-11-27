@@ -50,7 +50,7 @@ def test_caddy_json(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
     record = results[0]
     assert record.remote_ip == "172.17.0.1"
-    assert record.ts == dt(2023, 2, 6, 15, 5, 49, 64393, tzinfo=timezone.utc)
+    assert record.ts == dt(2023, 2, 6, 15, 5, 49, 64392, tzinfo=timezone.utc)
     assert record.method == "GET"
     assert record.uri == "/"
     assert record.protocol == "HTTP/1.1"

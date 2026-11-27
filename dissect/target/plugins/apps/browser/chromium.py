@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import itertools
 import json
 from collections import defaultdict
@@ -35,7 +36,6 @@ if TYPE_CHECKING:
 
 try:
     from Crypto.Cipher import AES, ChaCha20_Poly1305
-    from Crypto.Protocol.KDF import PBKDF2
     from Crypto.Util.Padding import unpad
 
     HAS_CRYPTO = True
@@ -437,10 +437,11 @@ class ChromiumMixin:
                     for extension_id, extension_data in extensions.items():
                         ts_install = extension_data.get("first_install_time") or extension_data.get("install_time")
                         ts_update = extension_data.get("last_update_time")
+                        # The Preferences file stores these timestamps as strings
                         if ts_install:
-                            ts_install = webkittimestamp(ts_install)
+                            ts_install = webkittimestamp(int(ts_install))
                         if ts_update:
-                            ts_update = webkittimestamp(ts_update)
+                            ts_update = webkittimestamp(int(ts_update))
 
                         if ext_path := extension_data.get("path"):
                             ext_path = self.target.fs.path(ext_path)
@@ -774,7 +775,7 @@ def decrypt_v10_linux(
     salt = b"saltysalt"
     iv = b" " * 16
 
-    key = PBKDF2(hardcoded_key, salt, 16, 1)
+    key = hashlib.pbkdf2_hmac("sha1", password=hardcoded_key.encode(), salt=salt, iterations=1, dklen=16)
     cipher = AES.new(key, AES.MODE_CBC, IV=iv)
 
     decrypted = cipher.decrypt(ciphertext)

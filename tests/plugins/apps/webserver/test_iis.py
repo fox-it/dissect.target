@@ -3,9 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
-from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import mock_open, patch
 
 import pytest
 
@@ -14,6 +12,8 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dissect.target.filesystem import VirtualFilesystem
 
 
@@ -94,10 +94,11 @@ def test_iis_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_confi
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
     ],
 )
-def test_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str) -> None:
+def test_iis_nonutf8(target_win_tzinfo: Target, tmp_path: Path, stream: bytes, method: str) -> None:
     # should not crash on invalid bytes like \xa7
-    with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
-        assert next(iter(getattr(iis, method)(target_win_tzinfo, Path("/iis")))).server_name == "\\xa7"
+    path = tmp_path / "iis.log"
+    path.write_bytes(stream)
+    assert next(iter(getattr(iis, method)(target_win_tzinfo, path))).server_name == "\\xa7"
 
 
 def test_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:

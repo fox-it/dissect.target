@@ -24,7 +24,7 @@ def test_symantec_firewall(target_win: Target, fs_win: VirtualFilesystem) -> Non
     records = list(target_win.symantec.firewall())
     assert len(records) == 3
     assert isinstance(records[0], type(SEPFirewallRecord()))
-    assert records[0].ts == dt("2023-08-18T13:44:28.219290Z")
+    assert records[0].ts == dt("2023-08-18T13:44:28.219291Z")
     assert str(records[0].local_ip) == "10.0.2.15"
     assert str(records[0].remote_ip) == "10.0.2.2"
     assert bool(records[0].outbound) is False

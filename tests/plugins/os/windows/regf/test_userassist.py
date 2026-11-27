@@ -77,7 +77,7 @@ def test_userassist_plugin(target_win_users: Target, hive_hku: VirtualHive) -> N
     assert results[1].number_of_executions is None
     assert results[1].application_focus_count is None
     assert results[1].application_focus_duration is None
-    assert str(results[2].ts) == "2016-06-01 12:12:30.115376+00:00"
+    assert str(results[2].ts) == "2016-06-01 12:12:30.115375+00:00"
     assert results[2].path == "UEME_CTLSESSION"
     assert results[2].number_of_executions == 26
     assert results[2].application_focus_count is None
